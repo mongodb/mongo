@@ -29,11 +29,17 @@
 
 #include "mongo/db/exec/agg/search/internal_search_id_lookup_stage.h"
 
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(hangBeforeResultsInInternalSearchIdLookup);
 
 boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToStageFn(
     const boost::intrusive_ptr<DocumentSource>& source) {
@@ -51,7 +57,6 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalSearchIdLookupToSta
             ? documentSource->_viewPipeline->clone(documentSource->getExpCtx())
             : nullptr);
 }
-
 
 namespace exec::agg {
 
@@ -107,6 +112,19 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
         auto documentId = inputDoc["_id"];
 
         if (!documentId.missing()) {
+            if (MONGO_unlikely(hangBeforeResultsInInternalSearchIdLookup.shouldFail())) {
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &hangBeforeResultsInInternalSearchIdLookup,
+                    pExpCtx->getOperationContext(),
+                    "hangBeforeResultsInInternalSearchIdLookup",
+                    []() {
+                        LOGV2(11147700,
+                              "Hanging aggregation due to "
+                              "'hangBeforeResultsInInternalSearchIdLookup' "
+                              "failpoint");
+                    });
+            }
+
             auto documentKey = Document({{"_id", documentId}});
 
             tassert(31052,

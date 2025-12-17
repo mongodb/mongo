@@ -31,10 +31,14 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/global_catalog/chunk_manager.h"
+#include "mongo/db/global_catalog/shard_key_pattern.h"
+#include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/catalog_resource_handle.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -46,7 +50,12 @@
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/metadata_manager.h"
+#include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 
@@ -363,6 +372,191 @@ TEST_F(InternalSearchIdLookupWithCatalogTest, ShouldNotErrorOnEmptyResult) {
     // Should return EOF since the input is empty.
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
     ASSERT_TRUE(idLookupStage->getNext().isEOF());
+
+    // Clearing collections as it needs to be destroyed before the stasher.
+    collections.clear();
+}
+
+class InternalSearchIdLookupOrphanFilteringTest : public ShardServerTestFixture {
+protected:
+    void setUp() override {
+        ShardServerTestFixture::setUp();
+        OperationContext* opCtx = operationContext();
+
+        _client = std::make_unique<DBDirectClient>(opCtx);
+        _client->createCollection(kTestNss);
+
+        _expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kTestNss);
+        _expCtx->setMongoProcessInterface(std::make_shared<MongoProcessInterfaceForTest>());
+    }
+
+    void insertDocuments(const std::vector<BSONObj>& docs) {
+        for (const auto& doc : docs) {
+            _client->insert(kTestNss, doc);
+        }
+    }
+
+    /**
+     * Sets up sharding metadata for the collection. The shard key is on the "skey" field.
+     * Documents with skey in [min, splitPoint) are owned by this shard.
+     * Documents with skey in [splitPoint, max) are orphans (owned by other shard).
+     */
+    CollectionMetadata setupShardingMetadata(int splitPoint) {
+        OperationContext* opCtx = operationContext();
+        const UUID uuid = [&] {
+            AutoGetCollection autoColl(opCtx, kTestNss, MODE_IS);
+            return autoColl->uuid();
+        }();
+
+        const ShardKeyPattern shardKeyPattern(BSON("skey" << 1));
+        const KeyPattern keyPattern = shardKeyPattern.getKeyPattern();
+
+        const OID epoch = OID::gen();
+        const Timestamp timestamp(1, 1);
+        ChunkVersion version({epoch, timestamp}, {1, 0});
+
+        // Chunk owned by this shard: [MinKey, splitPoint)
+        ChunkType ownedChunk(uuid,
+                             ChunkRange{keyPattern.globalMin(), BSON("skey" << splitPoint)},
+                             version,
+                             kMyShardName);
+        version.incMinor();
+
+        // Chunk owned by other shard (orphans): [splitPoint, MaxKey)
+        ChunkType orphanChunk(uuid,
+                              ChunkRange{BSON("skey" << splitPoint), keyPattern.globalMax()},
+                              version,
+                              ShardId("otherShard"));
+
+        auto rt = RoutingTableHistory::makeNew(kTestNss,
+                                               uuid,
+                                               keyPattern,
+                                               false, /* unsplittable */
+                                               nullptr,
+                                               false,
+                                               epoch,
+                                               timestamp,
+                                               boost::none /* timeseriesFields */,
+                                               boost::none /* reshardingFields */,
+                                               true /* allowMigrations */,
+                                               {ownedChunk, orphanChunk});
+
+        CurrentChunkManager cm(makeStandaloneRoutingTableHistory(std::move(rt)));
+        ASSERT_EQ(2, cm.numChunks());
+
+        CollectionMetadata metadata(std::move(cm), kMyShardName);
+
+        {
+            AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
+            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                opCtx, kTestNss);
+            scopedCsr->setFilteringMetadata(opCtx, metadata);
+        }
+
+        return metadata;
+    }
+
+    std::pair<boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>,
+              MultipleCollectionAccessor>
+    createCatalogResources(const CollectionMetadata& metadata) {
+        OperationContext* opCtx = operationContext();
+
+        // Set the shard version to enable shard filtering.
+        ScopedSetShardRole scopedSetShardRole{opCtx,
+                                              kTestNss,
+                                              ShardVersionFactory::make(metadata),
+                                              boost::none /* databaseVersion */};
+
+        auto coll =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, kTestNss, AcquisitionPrerequisites::OperationType::kRead),
+                              MODE_IS);
+
+        auto collections = MultipleCollectionAccessor(
+            std::move(coll), {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+        auto transactionResourcesStasher =
+            make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
+        stashTransactionResourcesFromOperationContext(opCtx, transactionResourcesStasher.get());
+
+        return {transactionResourcesStasher, std::move(collections)};
+    }
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
+    std::unique_ptr<DBDirectClient> _client;
+};
+
+TEST_F(InternalSearchIdLookupOrphanFilteringTest, ShouldFilterOrphanDocuments) {
+    _expCtx->setUUID(UUID::gen());
+
+    // Insert documents: some owned by this shard, some are orphans.
+    // Using skey field as the shard key. Documents with skey < 10 are owned, skey >= 10 are
+    // orphans.
+    std::vector<BSONObj> docs{
+        BSON("_id" << 0 << "skey" << 0 << "color" << "red"),      // owned
+        BSON("_id" << 1 << "skey" << 5 << "color" << "blue"),     // owned
+        BSON("_id" << 2 << "skey" << 10 << "color" << "green"),   // orphan
+        BSON("_id" << 3 << "skey" << 15 << "color" << "yellow"),  // orphan
+        BSON("_id" << 4 << "skey" << 9 << "color" << "purple"),   // owned
+    };
+    insertDocuments(docs);
+
+    // Set up sharding metadata with split point at 10.
+    auto metadata = setupShardingMetadata(10);
+
+    // Verify that the "orphan" documents actually exist when querying without shard information.
+    auto orphanDoc2 = _client->findOne(kTestNss, BSON("_id" << 2));
+    ASSERT_EQ(orphanDoc2.getIntField("skey"), 10);
+
+    auto orphanDoc3 = _client->findOne(kTestNss, BSON("_id" << 3));
+    ASSERT_EQ(orphanDoc3.getIntField("skey"), 15);
+
+    auto idLookup = make_intrusive<DocumentSourceInternalSearchIdLookUp>(_expCtx, 0 /*limit*/);
+
+    // Create catalog resources with shard filtering enabled.
+    auto [sharedStasher, collections] = createCatalogResources(metadata);
+    idLookup->bindCatalogInfo(collections, sharedStasher);
+
+    auto idLookupStage = exec::agg::buildStage(idLookup);
+
+    // Mock input: request all 5 documents by their _ids.
+    auto mockLocalStage = exec::agg::MockStage::createForTest({Document{{"_id", 0}},
+                                                               Document{{"_id", 1}},
+                                                               Document{{"_id", 2}},
+                                                               Document{{"_id", 3}},
+                                                               Document{{"_id", 4}}},
+                                                              _expCtx);
+    idLookupStage->setSource(mockLocalStage.get());
+
+    // We should only get the 3 non-orphan documents (skey < 10).
+    // Document with _id = 0, skey = 0 (owned)
+    auto next = idLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"_id", 0}, {"skey", 0}, {"color", "red"_sd}}));
+
+    // Document with _id = 1, skey = 5 (owned)
+    next = idLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"_id", 1}, {"skey", 5}, {"color", "blue"_sd}}));
+
+    // Documents with _id = 2 and _id = 3 are orphans (skey >= 10), they should be skipped.
+
+    // Document with _id = 4, skey = 9 (owned)
+    next = idLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(),
+                       (Document{{"_id", 4}, {"skey", 9}, {"color", "purple"_sd}}));
+
+    // Should be EOF - the orphan documents were filtered out.
+    ASSERT_TRUE(idLookupStage->getNext().isEOF());
+
+    // Verify metrics: 5 docs seen, 3 returned (2 orphans filtered).
+    auto metrics = idLookup->getSearchIdLookupMetrics();
+    ASSERT_EQ(5, metrics->getDocsSeenByIdLookup());
+    ASSERT_EQ(3, metrics->getDocsReturnedByIdLookup());
 
     // Clearing collections as it needs to be destroyed before the stasher.
     collections.clear();
