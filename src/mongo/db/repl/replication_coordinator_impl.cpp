@@ -489,6 +489,8 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
         _myLastDurableOpTimeAndWallTimeCached.store(lk, o2);
         auto o3 = OpTimeAndWallTime(OpTime(), Date_t::min());
         _myLastWrittenOpTimeAndWallTimeCached.store(lk, o3);
+
+        _currentCommittedSnapshotCached.store(lk, OpTime());
     }
 
     if (!_settings.isReplSet()) {
@@ -561,8 +563,7 @@ int64_t ReplicationCoordinatorImpl::getLastHorizonChange_forTest() const {
 }
 
 OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() const {
-    stdx::lock_guard lk(_mutex);
-    return _getCurrentCommittedSnapshotOpTime(lk);
+    return _currentCommittedSnapshotCached.load();
 }
 
 OpTime ReplicationCoordinatorImpl::_getCurrentCommittedSnapshotOpTime(WithLock) const {
@@ -5640,6 +5641,7 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(WithLock lk,
     if (MONGO_unlikely(disableSnapshotting.shouldFail()))
         return false;
     _currentCommittedSnapshot = newCommittedSnapshot;
+    _currentCommittedSnapshotCached.store(lk, newCommittedSnapshot);
     _currentCommittedSnapshotCond.notify_all();
 
     _externalState->updateCommittedSnapshot(newCommittedSnapshot);
@@ -5656,8 +5658,9 @@ void ReplicationCoordinatorImpl::clearCommittedSnapshot() {
     _clearCommittedSnapshot(lock);
 }
 
-void ReplicationCoordinatorImpl::_clearCommittedSnapshot(WithLock) {
+void ReplicationCoordinatorImpl::_clearCommittedSnapshot(WithLock lk) {
     _currentCommittedSnapshot = boost::none;
+    _currentCommittedSnapshotCached.store(lk, OpTime());
     _externalState->clearCommittedSnapshot();
 }
 

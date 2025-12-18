@@ -29,11 +29,17 @@
 
 #include "mongo/db/repl/optime.h"
 
-#include "mongo/db/repl/data_with_lock_free_reads.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace repl {
+
+TEST(OpTimeTest, OpTimeSerDeser) {
+    auto o0 = OpTime(Timestamp(1357913579), 12);
+    auto buf = o0.serializeForLockFreeReads();
+    auto o1 = OpTime::parseForLockFreeReads(buf);
+    ASSERT_EQ(o0, o1);
+}
 
 TEST(OpTimeTest, OpTimeAndWallTimeSerDeser) {
     auto o = OpTime(Timestamp(123456789), 17);

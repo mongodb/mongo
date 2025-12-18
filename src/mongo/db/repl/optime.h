@@ -57,6 +57,13 @@ namespace MONGO_MOD_PUB repl {
 
 class MONGO_MOD_PUB OpTime {
 public:
+    static constexpr size_t serializationForLockFreeReadsU64Count = 2;
+
+private:
+    using DataWithLockFreeReadsBufferT =
+        DataWithLockFreeReadsBuffer<serializationForLockFreeReadsU64Count>;
+
+public:
     static constexpr auto kTermFieldName = "t"_sd;
     static constexpr auto kTimestampFieldName = "ts"_sd;
 
@@ -107,6 +114,10 @@ public:
      */
     static OpTime parse(const BSONObj& obj);
     static OpTime parse(const BSONElement& elem);
+
+    static OpTime parseForLockFreeReads(DataWithLockFreeReadsBufferT& serialized) {
+        return OpTime(Timestamp(serialized[0]), static_cast<long long>(serialized[1]));
+    }
 
     std::string toString() const;
 
@@ -175,6 +186,10 @@ public:
 
     void appendAsQuery(BSONObjBuilder* builder) const;
     BSONObj asQuery() const;
+
+    DataWithLockFreeReadsBufferT serializeForLockFreeReads() const {
+        return {_timestamp.asULL(), static_cast<uint64_t>(_term)};
+    }
 
 private:
     Timestamp _timestamp;
