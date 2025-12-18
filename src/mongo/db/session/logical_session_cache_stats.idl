@@ -52,25 +52,37 @@ structs:
             lastSessionsCollectionJobDurationMillis:
                 type: int
                 default: 0
+            lastSessionsCollectionJobDurationMillisUpdatedTimestamp:
+                type: date
             lastSessionsCollectionJobTimestamp:
                 type: date
             lastSessionsCollectionJobEntriesRefreshed:
                 type: int
                 default: 0
+            lastSessionsCollectionJobEntriesRefreshedUpdatedTimestamp:
+                type: date
             lastSessionsCollectionJobEntriesEnded:
                 type: int
                 default: 0
+            lastSessionsCollectionJobEntriesEndedUpdatedTimestamp:
+                type: date
             lastSessionsCollectionJobCursorsClosed:
                 type: int
                 default: 0
+            lastSessionsCollectionJobCursorsClosedUpdatedTimestamp:
+                type: date
             transactionReaperJobCount:
                 type: int
                 default: 0
             lastTransactionReaperJobDurationMillis:
                 type: int
                 default: 0
+            lastTransactionReaperJobDurationUpdatedTimestamp:
+                type: date
             lastTransactionReaperJobTimestamp:
                 type: date
             lastTransactionReaperJobEntriesCleanedUp:
                 type: int
                 default: 0
+            lastTransactionReaperJobEntriesCleanedUpUpdatedTimestamp:
+                type: date

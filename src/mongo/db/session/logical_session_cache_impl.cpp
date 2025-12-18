@@ -89,6 +89,13 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(std::unique_ptr<ServiceLiaison>
       _reapSessionsOlderThanFn(std::move(reapSessionsOlderThanFn)) {
     _stats.setLastSessionsCollectionJobTimestamp(_service->now());
     _stats.setLastTransactionReaperJobTimestamp(_service->now());
+    _stats.setLastTransactionReaperJobDurationUpdatedTimestamp(_service->now());
+    _stats.setLastTransactionReaperJobEntriesCleanedUpUpdatedTimestamp(_service->now());
+    _stats.setLastSessionsCollectionJobDurationMillisUpdatedTimestamp(_service->now());
+    _stats.setLastSessionsCollectionJobEntriesRefreshedUpdatedTimestamp(_service->now());
+    _stats.setLastSessionsCollectionJobEntriesEndedUpdatedTimestamp(_service->now());
+    _stats.setLastSessionsCollectionJobCursorsClosedUpdatedTimestamp(_service->now());
+
 
     // Skip initializing this background thread when using 'recoverFromOplogAsStandalone=true',
     // --magicRestore, or --queryableBackupMode as the server is put in read-only mode after oplog
@@ -208,11 +215,6 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
     // Take the lock to update some stats.
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-        // Clear the last set of stats for our new run.
-        _stats.setLastTransactionReaperJobDurationMillis(0);
-        _stats.setLastTransactionReaperJobEntriesCleanedUp(0);
-
         // Start the new run.
         _stats.setLastTransactionReaperJobTimestamp(_service->now());
         _stats.setTransactionReaperJobCount(_stats.getTransactionReaperJobCount() + 1);
@@ -239,6 +241,7 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             auto millis = _service->now() - _stats.getLastTransactionReaperJobTimestamp();
             _stats.setLastTransactionReaperJobDurationMillis(millis.count());
+            _stats.setLastTransactionReaperJobDurationUpdatedTimestamp(_service->now());
         }
 
         return ex.toStatus();
@@ -248,7 +251,9 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         auto millis = _service->now() - _stats.getLastTransactionReaperJobTimestamp();
         _stats.setLastTransactionReaperJobDurationMillis(millis.count());
+        _stats.setLastTransactionReaperJobDurationUpdatedTimestamp(_service->now());
         _stats.setLastTransactionReaperJobEntriesCleanedUp(numReaped);
+        _stats.setLastTransactionReaperJobEntriesCleanedUpUpdatedTimestamp(_service->now());
     }
 
     return Status::OK();
@@ -277,13 +282,6 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     // Stats for serverStatus:
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-        // Clear the refresh-related stats with the beginning of our run.
-        _stats.setLastSessionsCollectionJobDurationMillis(0);
-        _stats.setLastSessionsCollectionJobEntriesRefreshed(0);
-        _stats.setLastSessionsCollectionJobEntriesEnded(0);
-        _stats.setLastSessionsCollectionJobCursorsClosed(0);
-
         // Start the new run.
         _stats.setLastSessionsCollectionJobTimestamp(_service->now());
         _stats.setSessionsCollectionJobCount(_stats.getSessionsCollectionJobCount() + 1);
@@ -294,6 +292,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         auto millis = _service->now() - _stats.getLastSessionsCollectionJobTimestamp();
         _stats.setLastSessionsCollectionJobDurationMillis(millis.count());
+        _stats.setLastSessionsCollectionJobDurationMillisUpdatedTimestamp(_service->now());
     });
 
     ON_BLOCK_EXIT([&opCtx] { clearShardingOperationFailedStatus(opCtx); });
@@ -323,7 +322,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         }
     };
     ScopeGuard activeSessionsBackSwapper([&] { backSwap(_activeSessions, activeSessions); });
-    auto explicitlyEndingBackSwaper =
+    auto explicitlyEndingBackSwapper =
         ScopeGuard([&] { backSwap(_endingSessions, explicitlyEndingSessions); });
 
     // remove all explicitlyEndingSessions from activeSessions
@@ -353,14 +352,16 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.setLastSessionsCollectionJobEntriesRefreshed(activeSessionRecords.size());
+        _stats.setLastSessionsCollectionJobEntriesRefreshedUpdatedTimestamp(_service->now());
     }
 
     // Remove the ending sessions from the sessions collection.
     _sessionsColl->removeRecords(opCtx, explicitlyEndingSessions);
-    explicitlyEndingBackSwaper.dismiss();
+    explicitlyEndingBackSwapper.dismiss();
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.setLastSessionsCollectionJobEntriesEnded(explicitlyEndingSessions.size());
+        _stats.setLastSessionsCollectionJobEntriesEndedUpdatedTimestamp(_service->now());
     }
 
     // Find which running, but not recently active sessions, are expired, and add them
@@ -403,6 +404,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.setLastSessionsCollectionJobCursorsClosed(killRes);
+        _stats.setLastSessionsCollectionJobCursorsClosedUpdatedTimestamp(_service->now());
     }
 }
 
