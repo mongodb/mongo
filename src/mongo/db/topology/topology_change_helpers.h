@@ -375,5 +375,10 @@ std::unique_ptr<Fetcher> createFindFetcher(OperationContext* opCtx,
 // ddl lock.
 void resetDDLBlockingForTopologyChangeIfNeeded(OperationContext* opCtx);
 
+
+AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(OperationContext* opCtx,
+                                                                           const ShardId& shardId,
+                                                                           bool isCount = false);
+
 }  // namespace topology_change_helpers
 }  // namespace mongo

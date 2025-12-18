@@ -190,78 +190,12 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 
 const Seconds kRemoteCommandTimeout{60};
 
-AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(OperationContext* opCtx,
-                                                                           const ShardId& shardId,
-                                                                           bool isCount = false) {
-    static const BSONObj listStage = fromjson(R"({
-       $listClusterCatalog: { "shards": true }
-     })");
-    const BSONObj shardsCondition = BSON("shards" << shardId);
-    // TODO SERVER-101594 remove condition about type:timeseries. After 9.0 becomes last LTS only
-    // viewless timeseries will exist and they will always have an associated UUID.
-    const BSONObj matchStage = fromjson(str::stream() << R"({
-       $match: {
-           $and: [
-               { sharded: false },
-               { db: {$ne: 'config'} },
-               { db: {$ne: 'admin'} },
-               )" << shardsCondition.jsonString() << R"(,
-               { type: {$ne: "view"} },
-               { $or: [
-                    {type: {$ne: "timeseries"}},
-                    {"info.uuid": {$exists: true}}
-               ]},
-               { ns: {$not: {$regex: "^enxcol_\..*(\.esc|\.ecc|\.ecoc|\.ecoc\.compact)$"} }},
-               { $or: [
-                    {ns: {$not: { $regex: "\.system\." }}},
-                    {ns: {$regex: "\.system\.buckets\."}}
-               ]}
-           ]
-        }
-    })");
-    static const BSONObj projectStage = fromjson(R"({
-       $project: {
-           _id: 0,
-           ns: {
-               $cond: [
-                   "$options.timeseries",
-                   {
-                       $replaceAll: {
-                           input: "$ns",
-                           find: ".system.buckets",
-                           replacement: ""
-                       }
-                   },
-                   "$ns"
-               ]
-           }
-       }
-    })");
-    const BSONObj countStage = BSON("$count" << "totalCount");
-
-    auto dbName = NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin);
-
-    std::vector<mongo::BSONObj> pipeline;
-    pipeline.reserve(4);
-    pipeline.push_back(listStage);
-    pipeline.push_back(matchStage);
-    if (isCount) {
-        pipeline.push_back(countStage);
-    } else {
-        pipeline.push_back(projectStage);
-    }
-
-    AggregateCommandRequest aggRequest{dbName, pipeline};
-    aggRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
-    aggRequest.setWriteConcern({});
-    return aggRequest;
-}
-
 std::vector<NamespaceString> getCollectionsToMoveForShard(OperationContext* opCtx,
                                                           Shard* shard,
                                                           const ShardId& shardId) {
 
-    auto listCollectionAggReq = makeUnshardedCollectionsOnSpecificShardAggregation(opCtx, shardId);
+    auto listCollectionAggReq =
+        topology_change_helpers::makeUnshardedCollectionsOnSpecificShardAggregation(opCtx, shardId);
 
     std::vector<NamespaceString> collections;
 
