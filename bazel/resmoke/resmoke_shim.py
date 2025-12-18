@@ -132,6 +132,9 @@ if __name__ == "__main__":
 
         report = f"report_shard_{shard_index}_of_{shard_count}.json"
     else:
+        resmoke_args.append("--shardIndex=0")
+        resmoke_args.append("--shardCount=1")
+
         report = "report.json"
     resmoke_args.append(f"--reportFile={os.path.join(undeclared_output_dir, report)}")
 

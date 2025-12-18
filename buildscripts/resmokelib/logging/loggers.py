@@ -326,31 +326,34 @@ def _add_evergreen_handler(logger, job_num, test_id=None, test_name=None):
             )
         logger.addHandler(handler)
 
-        if test_id:
-            raw_url = RAW_TEST_LOGS_URL.format(
-                task_id=config.EVERGREEN_TASK_ID,
-                job_num=job_num,
-                test_id=test_id,
-                execution=config.EVERGREEN_EXECUTION,
-            )
-            ROOT_EXECUTOR_LOGGER.info("Writing output of %s to %s.", test_id, fp)
-            ROOT_EXECUTOR_LOGGER.info("Raw logs for %s can be viewed at %s", test_name, raw_url)
-        else:
-            parsley_url = PARSLEY_JOBS_LOGS_URL.format(
-                task_id=config.EVERGREEN_TASK_ID,
-                job_num=job_num,
-                execution=config.EVERGREEN_EXECUTION,
-            )
-            raw_url = RAW_JOBS_LOGS_URL.format(
-                task_id=config.EVERGREEN_TASK_ID,
-                job_num=job_num,
-                execution=config.EVERGREEN_EXECUTION,
-            )
-            ROOT_EXECUTOR_LOGGER.info("Writing output of job #%d to %s.", job_num, fp)
-            ROOT_EXECUTOR_LOGGER.info(
-                "Parsley logs for job #%s can be viewed at %s", job_num, parsley_url
-            )
-            ROOT_EXECUTOR_LOGGER.info("Raw logs for job #%s can be viewed at %s", job_num, raw_url)
+        if config.SHARD_INDEX is None:
+            if test_id:
+                raw_url = RAW_TEST_LOGS_URL.format(
+                    task_id=config.EVERGREEN_TASK_ID,
+                    job_num=job_num,
+                    test_id=test_id,
+                    execution=config.EVERGREEN_EXECUTION,
+                )
+                ROOT_EXECUTOR_LOGGER.info("Writing output of %s to %s.", test_id, fp)
+                ROOT_EXECUTOR_LOGGER.info("Raw logs for %s can be viewed at %s", test_name, raw_url)
+            else:
+                parsley_url = PARSLEY_JOBS_LOGS_URL.format(
+                    task_id=config.EVERGREEN_TASK_ID,
+                    job_num=job_num,
+                    execution=config.EVERGREEN_EXECUTION,
+                )
+                raw_url = RAW_JOBS_LOGS_URL.format(
+                    task_id=config.EVERGREEN_TASK_ID,
+                    job_num=job_num,
+                    execution=config.EVERGREEN_EXECUTION,
+                )
+                ROOT_EXECUTOR_LOGGER.info("Writing output of job #%d to %s.", job_num, fp)
+                ROOT_EXECUTOR_LOGGER.info(
+                    "Parsley logs for job #%s can be viewed at %s", job_num, parsley_url
+                )
+                ROOT_EXECUTOR_LOGGER.info(
+                    "Raw logs for job #%s can be viewed at %s", job_num, raw_url
+                )
 
 
 def _get_evergreen_log_dirname():

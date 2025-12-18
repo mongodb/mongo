@@ -98,6 +98,7 @@ buildvariants:
       mciuploads_binary_permissions: private
       mciuploads_binary_visibility: signed
       remote_link: true
+      resmoke_tests_tag_filter: ci-development-critical-single-variant
       # Boost the priority on remote execution since this is the longest running task chain in
       # the required patch build. This priority is still lower than the priority on developer
       # workstation builds.
@@ -122,6 +123,9 @@ buildvariants:
         distros:
           - amazon2023-arm64-latest-m8gd-4xlarge
       - name: compile_jstestshell_TG
+        distros:
+          - amazon2023-arm64-latest-m8gd-4xlarge
+      - name: resmoke_tests_TG
         distros:
           - amazon2023-arm64-latest-m8gd-4xlarge
       - name: .development_critical_single_variant !.requires_large_host
@@ -174,6 +178,7 @@ buildvariants:
       remote_link: true
       mciuploads_binary_permissions: private
       mciuploads_binary_visibility: signed
+      resmoke_tests_tag_filter: ci-development-critical-single-variant
     tasks:
       - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
@@ -187,6 +192,9 @@ buildvariants:
         distros:
           - amazon2023-arm64-latest-m8gd-4xlarge
       - name: compile_jstestshell_TG
+        distros:
+          - amazon2023-arm64-latest-m8gd-4xlarge
+      - name: resmoke_tests_TG
         distros:
           - amazon2023-arm64-latest-m8gd-4xlarge
       - name: .development_critical_single_variant !.requires_large_host
@@ -274,6 +282,7 @@ buildvariants:
         --build_atlas=True
       clang_tidy_toolchain: v5
       compile_variant: *commit-queue
+      resmoke_tests_tag_filter: ci-development-critical-single-variant
     depends_on: []
     tasks:
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
@@ -286,6 +295,9 @@ buildvariants:
         distros:
           - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
       - name: compile_test_parallel_dbtest_stream_TG
+        distros:
+          - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
+      - name: resmoke_tests_TG
         distros:
           - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
       - name: .commit_check

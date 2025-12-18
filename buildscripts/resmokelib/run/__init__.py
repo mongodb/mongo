@@ -1040,12 +1040,18 @@ class TestRunner(Subcommand):
             "YAML configuration of suite {}".format(suite.get_display_name()),
             utils.dump_yaml({"test_kind": suite.get_test_kind_config()}),
             "",
-            utils.dump_yaml({"selector": suite.get_selector_config()}),
-            "",
             utils.dump_yaml({"executor": suite.get_executor_config()}),
             "",
             utils.dump_yaml({"logging": config.LOGGING_CONFIG}),
         ]
+        if config.SHARD_INDEX is None:
+            # Only dump the selector config if sharding is not being used.
+            # When sharding is used, the tests for the current shard will
+            # be a subset of the selector config, and are logged later.
+            sb += [
+                "",
+                utils.dump_yaml({"selector": suite.get_selector_config()}),
+            ]
         self._resmoke_logger.info("\n".join(sb))
 
     @staticmethod

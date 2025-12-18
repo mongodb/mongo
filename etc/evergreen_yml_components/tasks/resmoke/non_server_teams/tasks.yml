@@ -470,28 +470,6 @@ tasks:
     commands:
       - func: "streams build and push"
 
-  # Temporary task running the jscore suite as a bazel target. To be removed with SERVER-103537.
-  - name: bazel_test_jscore
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "development_critical_single_variant",
-      ]
-    depends_on:
-      - name: archive_dist_test
-    commands:
-      - func: "do setup"
-      - func: "run resmoke tests via bazel"
-        vars:
-          suite: //buildscripts/resmokeconfig:core
-          compiling_for_test: true
-          bazel_args: >-
-            --test_arg=--testTimeout=960
-            --test_timeout=1500
-          # Timeouts are 16 minutes for individual tests, the same as the default idle timeout.
-          # The bazel test timeout is 25 minutes, slightly shorter than the 30 minute commit queue
-          # timeout, so that it will timeout before the task would.
-
   - name: resmoke_tests
     tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
     depends_on:
@@ -517,7 +495,6 @@ tasks:
             --define=MONGO_VERSION=${version}
             --config=evg
             --config=opt_profiled
-            --jobs=1600
             --features=strip_debug
             --separate_debug=False
 

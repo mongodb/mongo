@@ -17,20 +17,11 @@ bazel_evergreen_shutils::activate_and_cd_src
 
 BAZEL_BINARY=$(bazel_evergreen_shutils::bazel_get_binary_path)
 
-if [ -z "${multi_suite_resmoke_task}" ]; then
-    ci_flags="\
---//bazel/resmoke:in_evergreen \
---//bazel/resmoke:installed_dist_test \
---test_output=all \
---noincompatible_enable_cc_toolchain_resolution \
---repo_env=no_c++_toolchain=1"
-else
-    ci_flags="--//bazel/resmoke:in_evergreen"
+ci_flags="--//bazel/resmoke:in_evergreen"
 
-    # For simple build ID generation:
-    export compile_variant="${compile_variant}"
-    export version_id="${version_id}"
-fi
+# For simple build ID generation:
+export compile_variant="${compile_variant}"
+export version_id="${version_id}"
 
 if [[ "${evergreen_remote_exec}" == "on" ]]; then
     ci_flags="--config=remote_test ${ci_flags}"
@@ -93,93 +84,66 @@ bazel_evergreen_shutils::write_last_engflow_link
 
 set -o errexit
 
-if [ -z "${multi_suite_resmoke_task}" ]; then
-    # Symlink data directories to where Resmoke normally puts them for compatibility with post tasks
-    # that run for all Resmoke tasks.
-    find bazel-testlogs/ -path '*data/job*' -name 'job*' -print0 |
-        while IFS= read -r -d '' test_outputs; do
-            source=${workdir}/src/$test_outputs
-            target=${workdir}/$(sed 's/.*\.outputs\///' <<<$test_outputs)
-            mkdir -p $(dirname $target)
-            ln -sf $source $target
-        done
+# Symlink test logs to where Evergreen expects them. Evergreen won't read into a symlinked directory,
+# so symlink each log file individually.
+find bazel-testlogs/ -type f -path "*TestLogs/**/*.log" -print0 |
+    while IFS= read -r -d '' test_outputs; do
+        source=${workdir}/src/$test_outputs
+        target=${workdir}/build/TestLogs/$(echo $test_outputs | sed -e 's/bazel-testlogs\///g' -e 's/test\.outputs\/build\/TestLogs\///g')
+        mkdir -p $(dirname $target)
+        ln -sf $source $target
+    done
 
-    # Symlink test logs to where Evergreen expects them. Evergreen won't read into a symlinked directory,
-    # so symlink each log file individually.
-    find bazel-testlogs/ -type f -path "*TestLogs/*" -print0 |
-        while IFS= read -r -d '' test_outputs; do
-            source=${workdir}/src/$test_outputs
-            target=${workdir}/$(sed 's/.*\.outputs\///' <<<$test_outputs)
-            mkdir -p $(dirname $target)
-            ln -sf $source $target
-        done
+# Symlink data directories to where Resmoke normally puts them for compatibility with post tasks
+# that run for all Resmoke tasks.
+find bazel-testlogs/ -path '*data/job*' -name 'job*' -print0 |
+    while IFS= read -r -d '' test_outputs; do
+        source=${workdir}/src/$test_outputs
+        target=${workdir}/$(sed 's/.*\.outputs\///' <<<$test_outputs)
+        mkdir -p $(dirname $target)
+        ln -sf $source $target
+    done
 
-    # Symlinks archived data directories from multiple tests/shards to a single folder. Evergreen needs a
-    # single folder it can glob for s3.put. See the Evergreen function "upload mongodatafiles".
-    find bazel-testlogs/ -path '*data_archives/*.tgz' -print0 |
-        while IFS= read -r -d '' archive; do
-            source=${workdir}/src/$archive
-            target=${workdir}/$(sed 's/.*\.outputs\///' <<<$archive)
-            echo $source
-            echo $target
-            mkdir -p $(dirname $target)
-            ln -sf $source $target
-        done
+# Symlinks archived data directories from multiple tests/shards to a single folder. Evergreen needs a
+# single folder it can glob for s3.put. See the Evergreen function "upload mongodatafiles".
+target_from_undeclared_outputs() {
+    echo ${1} | sed -e 's/^.*bazel-testlogs\/\(.*\)\/test.outputs.*$/\1/'
+}
+find bazel-testlogs/ -path '*data_archives/*.tgz' -print0 |
+    while IFS= read -r -d '' archive; do
+        source=${workdir}/src/$archive
+        bazel_target_prefix=$(target_from_undeclared_outputs $archive | sed 's/\//_/g')
+        target=${workdir}/$(echo $archive | sed -e 's/.*\.outputs\///' -e "s/data_archives\//&$bazel_target_prefix-/g")
+        mkdir -p $(dirname $target)
+        ln -sf $source $target
+    done
 
-    # Combine reports from potentially multiple tests/shards.
-    find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit -o report.json
-else
-    # Symlink data directories to where Resmoke normally puts them for compatibility with post tasks
-    # that run for all Resmoke tasks.
-    find bazel-testlogs/ -path '*data/job*' -name 'job*' -print0 |
-        while IFS= read -r -d '' test_outputs; do
-            source=${workdir}/src/$test_outputs
-            target=${workdir}/$(sed 's/.*\.outputs\///' <<<$test_outputs)
-            mkdir -p $(dirname $target)
-            ln -sf $source $target
-        done
+# Symlinks test.log from multiple tests/shards to a single folder. Evergreen needs a
+# single folder it can glob for s3.put. See the Evergreen function "upload bazel test logs".
+find bazel-testlogs/ -path '*test.log' -print0 |
+    while IFS= read -r -d '' log; do
+        log_renamed=$(echo $log | sed -e 's/bazel-testlogs\///g' -e 's/\//_/g')
+        source=${workdir}/src/$log
+        target=${workdir}/tmp/bazel-testlogs/$log_renamed
+        mkdir -p $(dirname $target)
+        ln -sf $source $target
+    done
+echo "format: text-timestamp" >${workdir}/build/TestLogs/log_spec.yaml
+echo "version: 0" >>${workdir}/build/TestLogs/log_spec.yaml
 
-    # Symlinks archived data directories from multiple tests/shards to a single folder. Evergreen needs a
-    # single folder it can glob for s3.put. See the Evergreen function "upload mongodatafiles".
-    target_from_undeclared_outputs() {
-        echo ${1} | sed -e 's/^.*bazel-testlogs\/\(.*\)\/test.outputs.*$/\1/'
-    }
-    find bazel-testlogs/ -path '*data_archives/*.tgz' -print0 |
-        while IFS= read -r -d '' archive; do
-            source=${workdir}/src/$archive
-            bazel_target_prefix=$(target_from_undeclared_outputs $archive | sed 's/\//_/g')
-            target=${workdir}/$(echo $archive | sed -e 's/.*\.outputs\///' -e "s/data_archives\//&$bazel_target_prefix-/g")
-            mkdir -p $(dirname $target)
-            ln -sf $source $target
-        done
+# Combine reports from potentially multiple tests/shards.
+find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit --add-bazel-target-info -o report.json || true
 
-    # Symlinks test.log from multiple tests/shards to a single folder. Evergreen needs a
-    # single folder it can glob for s3.put. See the Evergreen function "upload bazel test logs".
-    find bazel-testlogs/ -path '*test.log' -print0 |
-        while IFS= read -r -d '' log; do
-            log_renamed=$(echo $log | sed -e 's/bazel-testlogs\///g' -e 's/\//_/g')
-            source=${workdir}/src/$log
-            target=${workdir}/tmp/bazel-testlogs/$log_renamed
-            mkdir -p $(dirname $target)
-            ln -sf $source $target
-        done
-    echo "format: text-timestamp" >${workdir}/build/TestLogs/log_spec.yaml
-    echo "version: 0" >>${workdir}/build/TestLogs/log_spec.yaml
+if [[ "$RET" != "0" ]]; then
+    # This is a hacky way to save build time for the initial build during the `bazel test` above. They
+    # are stripped binaries there. We should rebuild them with debug symbols and separate debug.
+    # The relinked binaries should still be hash identical when stripped with strip.
+    sed -i -e 's/--config=remote_test//g' -e 's/--separate_debug=False/--separate_debug=True/g' -e 's/--features=strip_debug//g' .bazel_build_flags
 
-    # Combine reports from potentially multiple tests/shards.
-    find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit --add-bazel-target-info -o report.json || true
-
-    if [[ "$RET" != "0" ]]; then
-        # This is a hacky way to save build time for the initial build during the `bazel test` above. They
-        # are stripped binaries there. We should rebuild them with debug symbols and separate debug.
-        # The relinked binaries should still be hash identical when stripped with strip.
-        sed -i -e 's/--config=remote_test//g' -e 's/--separate_debug=False/--separate_debug=True/g' -e 's/--features=strip_debug//g' .bazel_build_flags
-
-        # The --config flag needs to stay consistent for the `bazel run` to avoid evicting the previous results.
-        # Strip out anything that isn't a --config flag that could interfere with the run command.
-        CONFIG_FLAGS="$(bazel_evergreen_shutils::extract_config_flags "${ALL_FLAGS}")"
-        eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests || true
-    fi
+    # The --config flag needs to stay consistent for the `bazel run` to avoid evicting the previous results.
+    # Strip out anything that isn't a --config flag that could interfere with the run command.
+    CONFIG_FLAGS="$(bazel_evergreen_shutils::extract_config_flags "${ALL_FLAGS}")"
+    eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests || true
 fi
 
 exit $RET

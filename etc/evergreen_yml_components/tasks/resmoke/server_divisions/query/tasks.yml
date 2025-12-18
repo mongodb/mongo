@@ -1172,8 +1172,8 @@ tasks:
       [
         "assigned_to_jira_team_server_query_execution",
         "development_critical",
+        "no_commit_queue",
         "requires_large_host",
-        "requires_large_host_commit_queue",
         "jscore",
         "common",
       ]

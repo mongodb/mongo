@@ -44,7 +44,6 @@ buildvariants:
     expansions:
       compile_variant: bazel-integration-tests
       evergreen_remote_exec: on
-      multi_suite_resmoke_task: true
       multiversion_platform: amazon2023
       multiversion_edition: enterprise
       multiversion_architecture: aarch64
