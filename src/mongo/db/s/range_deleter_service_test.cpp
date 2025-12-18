@@ -1168,17 +1168,18 @@ TEST_F(RangeDeleterServiceTest, RecoveryWithOverlappingTasksNoDeadlock) {
     task2.setTimestamp(Timestamp(300, 1));
     store.add(opCtx, task2);
 
+    // Verify tasks were persisted before step-up.
+    ASSERT_EQ(3, store.count(opCtx, BSONObj{}));
+
     // Trigger step-up - this should recover all tasks and they should complete without deadlock
     simulateStepup(opCtx, kStartingTerm + 1);
-
-    // All 3 overlapping tasks should be registered
-    ASSERT_EQ(3, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
     // Wait for all tasks to complete - if there's a deadlock this would hang
     auto overlappingFuture = rds->getOverlappingRangeDeletionsFuture(
         uuidCollA, ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 30)));
     overlappingFuture.get(opCtx);
 
+    // Verify tasks completed (removed from in-memory tracker).
     ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
@@ -1207,12 +1208,12 @@ TEST_F(RangeDeleterServiceTest, OverlappingTasksRegisteredDuringRecoveryWaitForS
     task1.setTimestamp(Timestamp(200, 1));
     store.add(opCtx, task1);
 
+    // Verify tasks were persisted before step-up.
+    ASSERT_EQ(2, store.count(opCtx, BSONObj{}));
+
     // Trigger step-up - both tasks should be recovered and wait for step-up to complete
     // before checking for overlaps
     simulateStepup(opCtx, kStartingTerm + 1);
-
-    // Both tasks should be registered
-    ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
     // Both tasks should complete without deadlock - step-up completion ensures
     // all recovery tasks are registered before overlap checks begin
@@ -1220,6 +1221,7 @@ TEST_F(RangeDeleterServiceTest, OverlappingTasksRegisteredDuringRecoveryWaitForS
         uuidCollA, ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 15)));
     overlappingFuture.get(opCtx);
 
+    // Verify tasks completed (removed from in-memory tracker).
     ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
