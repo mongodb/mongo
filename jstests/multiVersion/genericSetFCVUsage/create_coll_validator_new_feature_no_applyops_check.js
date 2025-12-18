@@ -13,45 +13,18 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {assertCommandWorkedInParallelShell} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
-// An array of test cases that will be used to check the delayed secondary oplog replication.
-const tests = [
-    {
-        // TODO(SERVER-72538): Change the test to check this validator only on the specific version under
-        // which it's going to be released.
-        validator: {
-            $expr: {
-                $eq: [
-                    {
-                        $map: {
-                            input: "$a",
-                            arrayIndexAs: "i",
-                            in: "$$i",
-                        },
-                    },
-                    [0, 1, 2],
-                ],
-            },
-        },
-        featureFlag: "featureFlagExposeArrayIndexInMapFilterReduce",
-    },
-    {
-        // '$_testFeatureFlagLatest' is an expression that is permanently enabled in the latest FCV.
-        validator: {$expr: {$eq: ["$stuff", {$_testFeatureFlagLatest: 1}]}},
-    },
-];
-
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
 const collName = jsTestName();
 
-for (const test of tests) {
-    if (test.featureFlag) {
-        const res = assert.commandWorked(primary.adminCommand({"getParameter": 1, [test.featureFlag]: 1}));
-        if (!res[test.featureFlag].value) {
-            jsTest.log.warning("Skipping test because the " + test.featureFlag + " feature flag is disabled");
-            continue;
+function runTest(lastVersion, validator, featureFlag) {
+    if (featureFlag) {
+        const res = assert.commandWorked(primary.adminCommand({"getParameter": 1, [featureFlag]: 1}));
+        if (!res[featureFlag].value) {
+            jsTest.log.warning("Skipping test because the " + featureFlag + " feature flag is disabled");
+            return;
         }
     }
 
@@ -62,7 +35,7 @@ for (const test of tests) {
 
     const awaitCreate = assertCommandWorkedInParallelShell(primary, primary.getDB("test"), {
         create: collName,
-        validator: test.validator,
+        validator: validator,
     });
     fpCreate.wait();
 
@@ -71,14 +44,14 @@ for (const test of tests) {
     // background because the downgrade will hang on the global lock barrier, which happens *after*
     // transitioning.
     const awaitSetFCV = assertCommandWorkedInParallelShell(primary, primary.getDB("admin"), {
-        setFeatureCompatibilityVersion: lastLTSFCV,
+        setFeatureCompatibilityVersion: binVersionToFCV(lastVersion),
         confirm: true,
     });
     assert.soon(() => {
         const fcvDoc = assert.commandWorked(
             primary.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}),
         ).featureCompatibilityVersion;
-        return fcvDoc.version == lastLTSFCV;
+        return fcvDoc.version == binVersionToFCV(lastVersion);
     });
 
     // Now, let the collection creation continue and produce the create oplog entry.
@@ -93,5 +66,30 @@ for (const test of tests) {
     assertDropCollection(primary.getDB("test"), collName);
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 }
+
+// TODO(SERVER-90514): Remove arrayIndexAs query when feature flag is removed.
+let pipeline = {
+    $expr: {
+        $eq: [
+            {
+                $map: {
+                    input: "$a",
+                    arrayIndexAs: "i",
+                    in: "$$i",
+                },
+            },
+            [0, 1, 2],
+        ],
+    },
+};
+runTest("last-lts", pipeline, "featureFlagExposeArrayIndexInMapFilterReduce");
+runTest("last-continuous", pipeline, "featureFlagExposeArrayIndexInMapFilterReduce");
+
+// '$_testFeatureFlagLatest' is an expression that is permanently enabled in the latest FCV.
+pipeline = {
+    $expr: {$eq: ["$stuff", {$_testFeatureFlagLatest: 1}]},
+};
+runTest("last-lts", pipeline);
+runTest("last-continuous", pipeline);
 
 rst.stopSet();
