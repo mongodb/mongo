@@ -184,6 +184,7 @@ common --flag_alias=build_atlas=//bazel/config:build_atlas
 common --flag_alias=dtlto=//bazel/config:dtlto
 common --flag_alias=all_headers=//bazel/config:all_headers
 common --flag_alias=evg=//bazel/config:evg
+common --flag_alias=extensions_signature_verification_secure=//bazel/config:extensions_signature_verification_secure
 
 #############################################################################################################################
 # BUILD 'PROFILES' - this is the area to set up configurations of flags to be used by developers.
@@ -561,6 +562,7 @@ common:public-release --remote_cache_compression=false
 common:public-release --grpc_keepalive_time=0s
 common:public-release --legacy_important_outputs
 common:public-release --//bazel/config:release=True
+common:public-release --//bazel/config:extensions_signature_verification_secure=True
 
 --config=fission
 common:fission --fission=yes

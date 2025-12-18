@@ -25,6 +25,7 @@ load(
     "dtlto",
     "dwarf_version",
     "evg",
+    "extensions_signature_verification_secure",
     "fsan",
     "gcov",
     "http_client",
@@ -2488,6 +2489,53 @@ selects.config_setting_group(
     match_all = [
         ":ssl_disabled",
     ],
+)
+
+# --------------------------------------
+# extensions_signature_verification_secure options
+# --------------------------------------
+extensions_signature_verification_secure(
+    name = "extensions_signature_verification_secure",
+    # False by default to build the server locally with testing and bypass verification options.
+    # This flag does not affect if the server is built in secure mode when in release mode.
+    build_setting_default = False,
+)
+
+# These config settings are used to determined if the MONGO_CONFIG_EXT_SIG_SECURE pre-processor
+# macro is defined, to guard that no insecure extensions signature verification logic is compiled
+# into the server when it should not be.
+#
+# However, regardless of the value of the 'extensions_signature_verification_secure' flag,
+# the macro needs to always be defined in release mode, to ensure that insecure logic is never
+# compiled into the server in release mode.
+#
+# So, all these defined config setting are combinations of flag values of
+# 'extensions_signature_verification_secure' and 'release' where MONGO_CONFIG_EXT_SIG_SECURE
+# should be defined; or combinations where "release || extensions_signature_verification_secure"
+# evaluates to true.
+
+config_setting(
+    name = "extensions_signature_verification_secure_enabled_release",
+    flag_values = {
+        "//bazel/config:extensions_signature_verification_secure": "True",
+        "//bazel/config:release": "True",
+    },
+)
+
+config_setting(
+    name = "extensions_signature_verification_secure_disabled_release",
+    flag_values = {
+        "//bazel/config:extensions_signature_verification_secure": "False",
+        "//bazel/config:release": "True",
+    },
+)
+
+config_setting(
+    name = "extensions_signature_verification_secure_enabled_no_release",
+    flag_values = {
+        "//bazel/config:extensions_signature_verification_secure": "True",
+        "//bazel/config:release": "False",
+    },
 )
 
 # --------------------------------------

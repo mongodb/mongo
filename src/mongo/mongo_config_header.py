@@ -435,6 +435,7 @@ def get_config_header_substs():
         ("@mongo_config_disagg_storage@", "MONGO_CONFIG_DISAGG_STORAGE"),
         ("@mongo_config_dev_stacktrace@", "MONGO_CONFIG_DEV_STACKTRACE"),
         ("@mongo_config_antithesis@", "MONGO_CONFIG_ANTITHESIS"),
+        ("@mongo_config_extensions_signature_verification_secure@", "MONGO_CONFIG_EXT_SIG_SECURE"),
     )
     return config_header_substs
 

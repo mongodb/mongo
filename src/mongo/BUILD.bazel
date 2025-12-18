@@ -96,6 +96,21 @@ generate_config_header(
             "MONGO_CONFIG_ANTITHESIS": "1",
         },
         "//conditions:default": {},
+    }) | select({
+        # Standard / expected case for release.
+        "//bazel/config:extensions_signature_verification_secure_enabled_release": {
+            "MONGO_CONFIG_EXT_SIG_SECURE": "1",
+        },
+        # This case ensures that the macro is always defined in release mode,
+        # even if somehow 'extensions_signature_verification_secure' is false.
+        "//bazel/config:extensions_signature_verification_secure_disabled_release": {
+            "MONGO_CONFIG_EXT_SIG_SECURE": "1",
+        },
+        # This case is for compiling the server locally (not for release), but still in secure mode.
+        "//bazel/config:extensions_signature_verification_secure_enabled_no_release": {
+            "MONGO_CONFIG_EXT_SIG_SECURE": "1",
+        },
+        "//conditions:default": {},
     }),
     logfile = "mongo_config.log",
     output = "config.h",

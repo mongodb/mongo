@@ -138,4 +138,7 @@
 // Defined if the build is for antithesis
 @mongo_config_antithesis@
 
+// Defined if the build is in extensions signature verification secure mode
+@mongo_config_extensions_signature_verification_secure@
+
     // clang-format on

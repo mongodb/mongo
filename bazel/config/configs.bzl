@@ -830,3 +830,16 @@ coverage = rule(
     implementation = lambda ctx: coverage_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# extensions_signature_verification_secure
+# =========
+extensions_signature_verification_secure_provider = provider(
+    doc = "Builds the server in a secure-only mode for verifying extension signatures (no test keys or bypass allowed)",
+    fields = ["enabled"],
+)
+
+extensions_signature_verification_secure = rule(
+    implementation = lambda ctx: extensions_signature_verification_secure_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
