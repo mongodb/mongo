@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/data_with_lock_free_reads.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
@@ -182,6 +183,13 @@ private:
 
 class MONGO_MOD_PUB OpTimeAndWallTime {
 public:
+    static constexpr size_t serializationForLockFreeReadsU64Count = 3;
+
+private:
+    using DataWithLockFreeReadsBufferT =
+        DataWithLockFreeReadsBuffer<serializationForLockFreeReadsU64Count>;
+
+public:
     static constexpr auto kWallClockTimeFieldName = "wall"_sd;
 
     OpTime opTime = OpTime();
@@ -202,6 +210,12 @@ public:
 
     OpTimeAndWallTime(OpTime optime, Date_t wall) : opTime(optime), wallTime(wall) {}
 
+    static OpTimeAndWallTime parseForLockFreeReads(DataWithLockFreeReadsBufferT& serialized) {
+        return OpTimeAndWallTime(
+            OpTime(Timestamp(serialized[0]), static_cast<long long>(serialized[1])),
+            Date_t::fromMillisSinceEpoch(serialized[2]));
+    }
+
     inline bool operator==(const OpTimeAndWallTime& rhs) const {
         return opTime == rhs.opTime && wallTime == rhs.wallTime;
     }
@@ -212,8 +226,13 @@ public:
     std::string toString() const {
         return opTime.toString() + ", " + wallTime.toString();
     }
-};
 
+    DataWithLockFreeReadsBufferT serializeForLockFreeReads() const {
+        return {opTime.getTimestamp().asULL(),
+                static_cast<uint64_t>(opTime.getTerm()),
+                static_cast<uint64_t>(wallTime.toMillisSinceEpoch())};
+    }
+};
 std::ostream& operator<<(std::ostream& out, const OpTimeAndWallTime& opTime);
 
 // A convenience class for holding both a Timestamp and a Date_t.

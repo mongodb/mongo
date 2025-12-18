@@ -61,6 +61,7 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
+#include "mongo/db/repl/clang_checked/mutex.h"
 #include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
@@ -453,7 +454,6 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _rsConfigState(kConfigPreStart),
       _rsConfig(std::make_shared<ReplSetConfig>()),  // Initialize with empty configuration.
       _selfIndex(-1),
-      _sleptLastElection(false),
       _readWriteAbility(std::make_unique<ReadWriteAbility>(!settings.isReplSet())),
       _replicationProcess(replicationProcess),
       _storage(storage),
@@ -477,6 +477,19 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     _electionIdTermShadow.store(_topCoord->getElectionIdTerm());
 
     invariant(_service);
+
+    {
+        clang_checked::lock_guard lk(_mutex);
+
+        auto o0 = OpTimeAndWallTime(OpTime(), Date_t::min());
+        _myLastAppliedOpTimeAndWallTimeCached.store(lk, o0);
+        auto o1 = OpTimeAndWallTime(OpTime(), Date_t::min());
+        _myLastCommittedOpTimeAndWallTimeCached.store(lk, o1);
+        auto o2 = OpTimeAndWallTime(OpTime(), Date_t::min());
+        _myLastDurableOpTimeAndWallTimeCached.store(lk, o2);
+        auto o3 = OpTimeAndWallTime(OpTime(), Date_t::min());
+        _myLastWrittenOpTimeAndWallTimeCached.store(lk, o3);
+    }
 
     if (!_settings.isReplSet()) {
         return;
@@ -1665,6 +1678,7 @@ void ReplicationCoordinatorImpl::_setMyLastWrittenOpTimeAndWallTime(
 
     _topCoord->setMyLastWrittenOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
+    _myLastWrittenOpTimeAndWallTimeCached.store(lk, opTimeAndWallTime);
 
     // Signal anyone waiting on optime changes.
     _lastWrittenOpTimeWaiterList.setValueIf(
@@ -1688,6 +1702,7 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
     // transaction, which may be delayed, but this should be fine.
     _topCoord->setMyLastDurableOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
+    _myLastDurableOpTimeAndWallTimeCached.store(lk, opTimeAndWallTime);
     // If we are using durable times to calculate the commit level, update it now.
     if (_rsConfig.unsafePeek().getWriteConcernMajorityShouldJournal()) {
         _updateLastCommittedOpTimeAndWallTime(lk);
@@ -1737,12 +1752,18 @@ bool ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTimeForward(
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastWrittenOpTime() const {
-    stdx::lock_guard lock(_mutex);
-    return _getMyLastWrittenOpTime(lock);
+    return _myLastWrittenOpTimeAndWallTimeCached.load().opTime;
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime(
     bool rollbackSafe) const {
+    // If !rollbackSafe, then we access only 1 member, so we don't need the
+    // lock.
+    if (!rollbackSafe) {
+        return _myLastWrittenOpTimeAndWallTimeCached.load();
+    }
+    // Otherwise, we must take the lock since we might touch both _memberState
+    // and _lastWritten.
     stdx::lock_guard lock(_mutex);
     if (rollbackSafe && _getMemberState(lock).rollback()) {
         return {};
@@ -1751,23 +1772,19 @@ OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime(
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastAppliedOpTime() const {
-    stdx::lock_guard lock(_mutex);
-    return _getMyLastAppliedOpTime(lock);
+    return getMyLastAppliedOpTimeAndWallTime().opTime;
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastAppliedOpTimeAndWallTime() const {
-    stdx::lock_guard lock(_mutex);
-    return _getMyLastAppliedOpTimeAndWallTime(lock);
+    return _myLastAppliedOpTimeAndWallTimeCached.load();
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastDurableOpTimeAndWallTime() const {
-    stdx::lock_guard lock(_mutex);
-    return _getMyLastDurableOpTimeAndWallTime(lock);
+    return _myLastDurableOpTimeAndWallTimeCached.load();
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastDurableOpTime() const {
-    stdx::lock_guard lock(_mutex);
-    return _getMyLastDurableOpTime(lock);
+    return getMyLastDurableOpTimeAndWallTime().opTime;
 }
 
 Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
@@ -5015,6 +5032,8 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSourceOnError
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTimeAndWallTime(WithLock lk) {
     if (_topCoord->updateLastCommittedOpTimeAndWallTime()) {
         _setStableTimestampForStorage(lk);
+        auto lastCommittedOpTimeAndWallTime = _topCoord->getLastCommittedOpTimeAndWallTime();
+        _myLastCommittedOpTimeAndWallTimeCached.store(lk, lastCommittedOpTimeAndWallTime);
     }
 }
 
@@ -5227,6 +5246,8 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
     bool forInitiate) {
     if (_topCoord->advanceLastCommittedOpTimeAndWallTime(
             committedOpTimeAndWallTime, fromSyncSource, forInitiate)) {
+        auto lastCommittedOpTimeAndWallTime = _topCoord->getLastCommittedOpTimeAndWallTime();
+        _myLastCommittedOpTimeAndWallTimeCached.store(lk, lastCommittedOpTimeAndWallTime);
         if (_getMemberState(lk).arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.
@@ -5241,13 +5262,11 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
 }
 
 OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {
-    stdx::unique_lock lk(_mutex);
-    return _topCoord->getLastCommittedOpTime();
+    return getLastCommittedOpTimeAndWallTime().opTime;
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getLastCommittedOpTimeAndWallTime() const {
-    stdx::unique_lock lk(_mutex);
-    return _topCoord->getLastCommittedOpTimeAndWallTime();
+    return _myLastCommittedOpTimeAndWallTimeCached.load();
 }
 
 Status ReplicationCoordinatorImpl::processReplSetRequestVotes(

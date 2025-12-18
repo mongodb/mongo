@@ -411,6 +411,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
 
     _topCoord->setMyLastAppliedOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
+    _myLastAppliedOpTimeAndWallTimeCached.store(lk, opTimeAndWallTime);
 
     // No need to wake up replication waiters because there should not be any replication waiters
     // waiting on our own lastApplied.

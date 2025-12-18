@@ -1,0 +1,30 @@
+int main() {
+  atomic_int gen = 0; 
+  atomic_int c0 = 0;
+  atomic_int c1 = 0;
+  {{{
+  {
+    // Write the value (33, 35)
+    // After this write, gen is 2.
+    gen.load(mo_relaxed).readsvalue(0);
+    gen.store(1, mo_relaxed);
+    c0.store(33, mo_release);
+    c1.store(35, mo_release);
+    gen.store(2, mo_release);
+    // Write the value (37, 39)
+    // After this write, gen is 4.
+    gen.load(mo_relaxed).readsvalue(2);
+    gen.store(3, mo_relaxed);
+    c0.store(37, mo_release);
+    c1.store(39, mo_release);
+    gen.store(4, mo_release);
+  } ||| {
+    // It would be incorrect to see (33, 39) after the second write.
+    gen.load(mo_acquire).readsvalue(4);
+    c0.load(mo_acquire).readsvalue(33);
+    c1.load(mo_acquire).readsvalue(39);
+    gen.load(mo_relaxed).readsvalue(4);
+  }
+  }}};
+  return 0;
+}

@@ -42,6 +42,9 @@ IndexBuildTest.waitForIndexBuildToStart(secondaryDB, collName2);
 IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collName1), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
 IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collName2), 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
 
+// Make sure all writes are part of a committed snapshot on the secondary.
+rst.awaitLastOpCommitted();
+
 jsTestLog("Shutting down secondary");
 rst.stop(secondary);
 
