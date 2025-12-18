@@ -58,6 +58,7 @@ mongo_cc_unit_test(
         "join_graph_test.cpp",
         "path_resolver_test.cpp",
         "plan_enumerator_test.cpp",
+        "predicate_extractor_test.cpp",
         "reorder_joins_test.cpp",
     ],
     data = [
@@ -69,9 +70,11 @@ mongo_cc_unit_test(
     deps = [
         ":join_ordering",
         ":plan_enumerator",
+        ":predicate_extractor",
         ":reorder_joins",
         ":unit_test_helpers",
         "//src/mongo/db:query_exec",
+        "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/pipeline:aggregation_context_fixture",
     ],
 )
@@ -149,5 +152,19 @@ mongo_cc_library(
         "//src/mongo/db/pipeline",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_library(
+    name = "predicate_extractor",
+    srcs = [
+        "predicate_extractor.cpp",
+    ],
+    hdrs = [
+        "predicate_extractor.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:canonical_query_base",
     ],
 )
