@@ -23,7 +23,17 @@ public:
   /**
    * Create a ParentBasedSampler.
    */
-  static std::unique_ptr<Sampler> Create(const std::shared_ptr<Sampler> &delegate_sampler);
+  static std::unique_ptr<Sampler> Create(const std::shared_ptr<Sampler> &root_sampler);
+
+  /**
+   * Create a ParentBasedSampler.
+   */
+  static std::unique_ptr<Sampler> Create(
+      const std::shared_ptr<Sampler> &root_sampler,
+      const std::shared_ptr<Sampler> &remote_parent_sampled_sampler,
+      const std::shared_ptr<Sampler> &remote_parent_nonsampled_sampler,
+      const std::shared_ptr<Sampler> &local_parent_sampled_sampler,
+      const std::shared_ptr<Sampler> &local_parent_nonsampled_sampler);
 };
 
 }  // namespace trace

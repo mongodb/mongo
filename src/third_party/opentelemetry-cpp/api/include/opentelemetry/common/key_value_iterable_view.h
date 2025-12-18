@@ -91,7 +91,7 @@ KeyValueIterableView<T> MakeKeyValueIterableView(const T &container) noexcept
 /**
  * Utility function to help to make a attribute view from initializer_list
  *
- * @param attributes
+ * @param attributes The initializer_list of key-value pairs
  * @return nostd::span<const std::pair<nostd::string_view, common::AttributeValue>>
  */
 inline static nostd::span<const std::pair<nostd::string_view, common::AttributeValue>>
@@ -105,7 +105,7 @@ MakeAttributes(std::initializer_list<std::pair<nostd::string_view, common::Attri
 /**
  * Utility function to help to make a attribute view from a span
  *
- * @param attributes
+ * @param attributes The span of key-value pairs
  * @return nostd::span<const std::pair<nostd::string_view, common::AttributeValue>>
  */
 inline static nostd::span<const std::pair<nostd::string_view, common::AttributeValue>>
@@ -118,7 +118,7 @@ MakeAttributes(
 /**
  * Utility function to help to make a attribute view from a KeyValueIterable
  *
- * @param attributes
+ * @param attributes The KeyValueIterable of key-value pairs
  * @return common::KeyValueIterable
  */
 inline static const common::KeyValueIterable &MakeAttributes(
@@ -130,16 +130,17 @@ inline static const common::KeyValueIterable &MakeAttributes(
 /**
  * Utility function to help to make a attribute view from a key-value iterable object
  *
- * @param attributes
+ * @tparam ArgumentType  Expected to be ArgumentType
+ * @param attributes     The key-value iterable object
  * @return nostd::span<const std::pair<nostd::string_view, common::AttributeValue>>
  */
 template <
     class ArgumentType,
     nostd::enable_if_t<common::detail::is_key_value_iterable<ArgumentType>::value> * = nullptr>
 inline static common::KeyValueIterableView<ArgumentType> MakeAttributes(
-    const ArgumentType &arg) noexcept
+    const ArgumentType &attributes) noexcept
 {
-  return common::KeyValueIterableView<ArgumentType>(arg);
+  return common::KeyValueIterableView<ArgumentType>(attributes);
 }
 
 }  // namespace common

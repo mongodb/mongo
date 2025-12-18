@@ -10,10 +10,10 @@
 #include "opentelemetry/common/timestamp.h"
 #include "opentelemetry/exporters/otlp/otlp_populate_attribute_utils.h"
 #include "opentelemetry/exporters/otlp/otlp_recordable.h"
+#include "opentelemetry/nostd/function_ref.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/nostd/span.h"
 #include "opentelemetry/nostd/string_view.h"
-#include "opentelemetry/nostd/utility.h"
 #include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/trace/span_context.h"
@@ -107,6 +107,7 @@ proto::common::v1::InstrumentationScope OtlpRecordable::GetProtoInstrumentationS
   {
     instrumentation_scope.set_name(instrumentation_scope_->GetName());
     instrumentation_scope.set_version(instrumentation_scope_->GetVersion());
+    OtlpPopulateAttributeUtils::PopulateAttribute(&instrumentation_scope, *instrumentation_scope_);
   }
   return instrumentation_scope;
 }
@@ -120,7 +121,7 @@ void OtlpRecordable::SetAttribute(nostd::string_view key,
                                   const common::AttributeValue &value) noexcept
 {
   auto *attribute = span_.add_attributes();
-  OtlpPopulateAttributeUtils::PopulateAttribute(attribute, key, value);
+  OtlpPopulateAttributeUtils::PopulateAttribute(attribute, key, value, false);
 }
 
 void OtlpRecordable::AddEvent(nostd::string_view name,
@@ -132,7 +133,7 @@ void OtlpRecordable::AddEvent(nostd::string_view name,
   event->set_time_unix_nano(timestamp.time_since_epoch().count());
 
   attributes.ForEachKeyValue([&](nostd::string_view key, common::AttributeValue value) noexcept {
-    OtlpPopulateAttributeUtils::PopulateAttribute(event->add_attributes(), key, value);
+    OtlpPopulateAttributeUtils::PopulateAttribute(event->add_attributes(), key, value, false);
     return true;
   });
 }
@@ -147,7 +148,7 @@ void OtlpRecordable::AddLink(const trace::SpanContext &span_context,
                     trace::SpanId::kSize);
   link->set_trace_state(span_context.trace_state()->ToHeader());
   attributes.ForEachKeyValue([&](nostd::string_view key, common::AttributeValue value) noexcept {
-    OtlpPopulateAttributeUtils::PopulateAttribute(link->add_attributes(), key, value);
+    OtlpPopulateAttributeUtils::PopulateAttribute(link->add_attributes(), key, value, false);
     return true;
   });
 }

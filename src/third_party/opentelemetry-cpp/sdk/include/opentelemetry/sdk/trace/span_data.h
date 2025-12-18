@@ -257,7 +257,7 @@ public:
                 opentelemetry::common::SystemTimestamp timestamp =
                     opentelemetry::common::SystemTimestamp(std::chrono::system_clock::now()),
                 const opentelemetry::common::KeyValueIterable &attributes =
-                    opentelemetry::common::KeyValueIterableView<std::map<std::string, int>>(
+                    opentelemetry::common::KeyValueIterableView<std::map<std::string, int32_t>>(
                         {})) noexcept override
   {
     SpanDataEvent event(std::string(name), timestamp, attributes);

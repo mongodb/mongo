@@ -13,6 +13,7 @@
 #  include <future>
 #endif
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <regex>
@@ -38,9 +39,9 @@ namespace client
 {
 namespace curl
 {
-const std::chrono::milliseconds default_http_conn_timeout(5000);  // ms
-const std::string http_status_regexp = "HTTP\\/\\d\\.\\d (\\d+)\\ .*";
-const std::string http_header_regexp = "(.*)\\: (.*)\\n*";
+const std::chrono::milliseconds kDefaultHttpConnTimeout(5000);  // ms
+const std::string kHttpStatusRegexp = "HTTP\\/\\d\\.\\d (\\d+)\\ .*";
+const std::string kHttpHeaderRegexp = "(.*)\\: (.*)\\n*";
 
 class HttpClient;
 class Session;
@@ -80,27 +81,35 @@ private:
   /**
    * Old-school memory allocator
    *
-   * @param contents
-   * @param size
-   * @param nmemb
-   * @param userp
-   * @return
+   * @param contents Pointer to the data received from the server.
+   * @param size Size of each data element.
+   * @param nmemb Number of data elements.
+   * @param userp Pointer to the user-defined data structure for storing the received data.
+   * @return The number of bytes actually taken care of. If this differs from size * nmemb, it
+   * signals an error to libcurl.
    */
   static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp);
 
   /**
    * C++ STL std::vector allocator
    *
-   * @param ptr
-   * @param size
-   * @param nmemb
-   * @param data
-   * @return
+   * @param ptr Pointer to the data received from the server.
+   * @param size Size of each data element.
+   * @param nmemb Number of data elements.
+   * @param userp Pointer to the user-defined data structure for storing the received data.
+   * @return The number of bytes actually taken care of. If this differs from size * nmemb, it
+   * signals an error to libcurl.
    */
   static size_t WriteVectorHeaderCallback(void *ptr, size_t size, size_t nmemb, void *userp);
   static size_t WriteVectorBodyCallback(void *ptr, size_t size, size_t nmemb, void *userp);
 
   static size_t ReadMemoryCallback(char *buffer, size_t size, size_t nitems, void *userp);
+
+  static int CurlLoggerCallback(const CURL * /* handle */,
+                                curl_infotype type,
+                                const char *data,
+                                size_t size,
+                                void * /* clientp */) noexcept;
 
 #if LIBCURL_VERSION_NUM >= 0x075000
   static int PreRequestCallback(void *clientp,
@@ -129,14 +138,15 @@ public:
 
   /**
    * Create local CURL instance for url and body
-   * @param method // HTTP Method
-   * @param url    // HTTP URL
-   * @param callback
-   * @param request_mode // sync or async
-   * @param request  Request Headers
-   * @param body  Reques Body
-   * @param raw_response whether to parse the response
-   * @param httpConnTimeout   HTTP connection timeout in seconds
+   * @param method   HTTP Method
+   * @param url   HTTP URL
+   * @param request_headers   Request Headers
+   * @param request_body   Request Body
+   * @param is_raw_response   Whether to parse the response
+   * @param http_conn_timeout   HTTP connection timeout in seconds
+   * @param reuse_connection   Whether connection should be reused or closed
+   * @param is_log_enabled   To intercept some information from cURL request
+   * @param retry_policy   Retry policy for select failure status codes
    */
   HttpOperation(opentelemetry::ext::http::client::Method method,
                 std::string url,
@@ -151,8 +161,10 @@ public:
                     opentelemetry::ext::http::client::Compression::kNone,
                 // Default connectivity and response size options
                 bool is_raw_response                        = false,
-                std::chrono::milliseconds http_conn_timeout = default_http_conn_timeout,
-                bool reuse_connection                       = false);
+                std::chrono::milliseconds http_conn_timeout = kDefaultHttpConnTimeout,
+                bool reuse_connection                       = false,
+                bool is_log_enabled                         = false,
+                const opentelemetry::ext::http::client::RetryPolicy &retry_policy = {});
 
   /**
    * Destroy CURL instance
@@ -168,6 +180,16 @@ public:
    * Cleanup all resource of curl
    */
   void Cleanup();
+
+  /**
+   * Determine if operation is retryable
+   */
+  bool IsRetryable();
+
+  /**
+   * Calculate next time to retry request
+   */
+  std::chrono::system_clock::time_point NextRetryTime();
 
   /**
    * Setup request
@@ -209,23 +231,17 @@ public:
   bool WasAborted() { return is_aborted_.load(std::memory_order_acquire); }
 
   /**
-   * Return a copy of resposne headers
-   *
-   * @return
+   * Return a copy of response headers
    */
   Headers GetResponseHeaders();
 
   /**
    * Return a copy of response body
-   *
-   * @return
    */
   inline const std::vector<uint8_t> &GetResponseBody() const noexcept { return response_body_; }
 
   /**
    * Return a raw copy of response headers+body
-   *
-   * @return
    */
   inline const std::vector<uint8_t> &GetRawResponse() const noexcept { return raw_response_; }
 
@@ -243,7 +259,7 @@ public:
    * Perform curl message, this function only can be called in the polling thread and it can only
    * be called when got a CURLMSG_DONE.
    *
-   * @param code
+   * @param code CURLcode
    */
   void PerformCurlMessage(CURLcode code);
 
@@ -300,6 +316,12 @@ private:
 
   const opentelemetry::ext::http::client::Compression &compression_;
 
+  const bool is_log_enabled_;
+
+  const RetryPolicy retry_policy_;
+  decltype(RetryPolicy::max_attempts) retry_attempts_;
+  std::chrono::system_clock::time_point last_attempt_time_;
+
   // Processed response headers and body
   long response_code_;
   std::vector<uint8_t> response_headers_;
@@ -316,6 +338,7 @@ private:
     std::promise<CURLcode> result_promise;
     std::future<CURLcode> result_future;
   };
+  friend class HttpOperationAccessor;
   std::unique_ptr<AsyncData> async_data_;
 };
 }  // namespace curl

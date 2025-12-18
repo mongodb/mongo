@@ -292,6 +292,127 @@ void DoubleUpDownCounter::Add(double value, const opentelemetry::context::Contex
   return storage_->RecordDouble(value, context);
 }
 
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+LongGauge::LongGauge(const InstrumentDescriptor &instrument_descriptor,
+                     std::unique_ptr<SyncWritableMetricStorage> storage)
+    : Synchronous(instrument_descriptor, std::move(storage))
+{
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_ERROR("[LongGauge::LongGauge] - Error constructing LongGauge."
+                            << "The metric storage is invalid for " << instrument_descriptor.name_);
+  }
+}
+
+void LongGauge::Record(int64_t value,
+                       const opentelemetry::common::KeyValueIterable &attributes) noexcept
+{
+  auto context = opentelemetry::context::Context{};
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_WARN("[LongGauge::Record(V,A)] Value not recorded - invalid storage for: "
+                           << instrument_descriptor_.name_);
+    return;
+  }
+  return storage_->RecordLong(value, attributes, context);
+}
+
+void LongGauge::Record(int64_t value,
+                       const opentelemetry::common::KeyValueIterable &attributes,
+                       const opentelemetry::context::Context &context) noexcept
+{
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_WARN("[LongGauge::Record(V,A,C)] Value not recorded - invalid storage for: "
+                           << instrument_descriptor_.name_);
+    return;
+  }
+  return storage_->RecordLong(value, attributes, context);
+}
+
+void LongGauge::Record(int64_t value) noexcept
+{
+  auto context = opentelemetry::context::Context{};
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_WARN("[LongGauge::Record(V)] Value not recorded - invalid storage for: "
+                           << instrument_descriptor_.name_);
+    return;
+  }
+  return storage_->RecordLong(value, context);
+}
+
+void LongGauge::Record(int64_t value, const opentelemetry::context::Context &context) noexcept
+{
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_WARN("[LongGauge::Record(V,C)] Value not recorded - invalid storage for: "
+                           << instrument_descriptor_.name_);
+    return;
+  }
+  return storage_->RecordLong(value, context);
+}
+
+DoubleGauge::DoubleGauge(const InstrumentDescriptor &instrument_descriptor,
+                         std::unique_ptr<SyncWritableMetricStorage> storage)
+    : Synchronous(instrument_descriptor, std::move(storage))
+{
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_ERROR("[DoubleGauge::DoubleGauge] - Error constructing DoubleUpDownCounter."
+                            << "The metric storage is invalid for " << instrument_descriptor.name_);
+  }
+}
+
+void DoubleGauge::Record(double value,
+                         const opentelemetry::common::KeyValueIterable &attributes) noexcept
+{
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_WARN("[DoubleGauge::Record(V,A)] Value not recorded - invalid storage for: "
+                           << instrument_descriptor_.name_);
+  }
+  auto context = opentelemetry::context::Context{};
+  return storage_->RecordDouble(value, attributes, context);
+}
+
+void DoubleGauge::Record(double value,
+                         const opentelemetry::common::KeyValueIterable &attributes,
+                         const opentelemetry::context::Context &context) noexcept
+{
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_WARN("[DoubleGauge::Record(V,A,C)] Value not recorded - invalid storage for: "
+                           << instrument_descriptor_.name_);
+    return;
+  }
+  return storage_->RecordDouble(value, attributes, context);
+}
+
+void DoubleGauge::Record(double value) noexcept
+{
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_WARN("[DoubleGauge::Record(V)] Value not recorded - invalid storage for: "
+                           << instrument_descriptor_.name_);
+    return;
+  }
+  auto context = opentelemetry::context::Context{};
+  return storage_->RecordDouble(value, context);
+}
+
+void DoubleGauge::Record(double value, const opentelemetry::context::Context &context) noexcept
+{
+  if (!storage_)
+  {
+    OTEL_INTERNAL_LOG_WARN("[DoubleGauge::Record(V,C)] Value not recorded - invalid storage for: "
+                           << instrument_descriptor_.name_);
+    return;
+  }
+  return storage_->RecordDouble(value, context);
+}
+#endif
+
 LongHistogram::LongHistogram(const InstrumentDescriptor &instrument_descriptor,
                              std::unique_ptr<SyncWritableMetricStorage> storage)
     : Synchronous(instrument_descriptor, std::move(storage))

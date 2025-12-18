@@ -23,7 +23,11 @@ namespace otlp
 struct OPENTELEMETRY_EXPORT OtlpFileMetricExporterOptions : public OtlpFileClientOptions
 {
   OtlpFileMetricExporterOptions();
-  ~OtlpFileMetricExporterOptions();
+  OtlpFileMetricExporterOptions(const OtlpFileMetricExporterOptions &)            = default;
+  OtlpFileMetricExporterOptions(OtlpFileMetricExporterOptions &&)                 = default;
+  OtlpFileMetricExporterOptions &operator=(const OtlpFileMetricExporterOptions &) = default;
+  OtlpFileMetricExporterOptions &operator=(OtlpFileMetricExporterOptions &&)      = default;
+  ~OtlpFileMetricExporterOptions() override;
 
   PreferredAggregationTemporality aggregation_temporality;
 };

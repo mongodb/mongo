@@ -163,6 +163,18 @@ public:
     }
   }
 
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+  /**
+   * Reports if the tracer is enabled or not. A disabled tracer will not create spans.
+   *
+   * The instrumentation authors should call this method before creating a spans to
+   * potentially avoid performing computationally expensive operations for disabled tracers.
+   *
+   * @since ABI_VERSION 2
+   */
+  bool Enabled() const noexcept { return OPENTELEMETRY_ATOMIC_READ_8(&this->enabled_) != 0; }
+#endif
+
 #if OPENTELEMETRY_ABI_VERSION_NO == 1
 
   /*
@@ -197,6 +209,36 @@ public:
   virtual void CloseWithMicroseconds(uint64_t timeout) noexcept = 0;
 
 #endif /* OPENTELEMETRY_ABI_VERSION_NO */
+
+protected:
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+
+  /**
+   * Updates the enabled state of the tracer. Calling this method will affect the result of the
+   * subsequent calls to {@code opentelemetry::v2::trace::Tracer::Enabled()}.
+   *
+   * This method should be used by SDK implementations to indicate the tracer's updated state
+   * whenever a tracer transitions from enabled to disabled state and vice versa.
+   *
+   * @param enabled The new state of the tracer. False would indicate that the tracer is no longer
+   * enabled and will not produce as
+   *
+   * @since ABI_VERSION 2
+   */
+  void UpdateEnabled(const bool enabled) noexcept
+  {
+    OPENTELEMETRY_ATOMIC_WRITE_8(&this->enabled_, enabled);
+  }
+#endif
+
+private:
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+  // Variable to support implementation of Enabled method introduced in ABI V2.
+  // Mutable allows enabled_ to be used as 'bool *' (instead of 'const bool *'), with the
+  // OPENTELEMETRY_ATOMIC_READ_8 macro's internal casts when used from a const function.
+  // std::atomic can not be used here because it is not ABI compatible for OpenTelemetry C++ API.
+  mutable bool enabled_ = true;
+#endif
 };
 }  // namespace trace
 OPENTELEMETRY_END_NAMESPACE

@@ -2047,7 +2047,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
+      "bom-ref": "pkg:github/open-telemetry/opentelemetry-cpp@v1.24.0",
       "supplier": {
         "name": "OpenTelemetry",
         "url": [
@@ -2057,7 +2057,7 @@
       "author": "The OpenTelemetry Authors",
       "group": "open-telemetry",
       "name": "opentelemetry-cpp",
-      "version": "1.17.0",
+      "version": "1.24.0",
       "description": "OpenTelemetry, also known as OTel, is a vendor-neutral open source Observability framework for instrumenting, generating, collecting, and exporting telemetry data such as traces, metrics, and logs. As an industry-standard, OpenTelemetry is supported by more than 40 observability vendors, integrated by many libraries, services, and apps, and adopted by numerous end users.",
       "licenses": [
         {
@@ -2067,7 +2067,7 @@
         }
       ],
       "copyright": "Copyright The OpenTelemetry Authors",
-      "purl": "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
+      "purl": "pkg:github/open-telemetry/opentelemetry-cpp@v1.24.0",
       "externalReferences": [
         {
           "url": "https://github.com/open-telemetry/opentelemetry-cpp.git",
@@ -2828,7 +2828,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
+      "ref": "pkg:github/open-telemetry/opentelemetry-cpp@v1.24.0",
       "dependsOn": []
     },
     {

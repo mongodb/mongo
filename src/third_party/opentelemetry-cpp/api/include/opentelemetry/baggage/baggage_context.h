@@ -27,7 +27,7 @@ inline nostd::shared_ptr<Baggage> GetBaggage(const context::Context &context) no
 }
 
 inline context::Context SetBaggage(context::Context &context,
-                                   nostd::shared_ptr<Baggage> baggage) noexcept
+                                   const nostd::shared_ptr<Baggage> &baggage) noexcept
 {
   return context.SetValue(kBaggageHeader, baggage);
 }

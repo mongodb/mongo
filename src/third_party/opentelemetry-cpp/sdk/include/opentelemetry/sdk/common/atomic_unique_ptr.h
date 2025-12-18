@@ -54,15 +54,14 @@ public:
                                                      std::memory_order_relaxed);
     if (was_successful)
     {
-      owner.release();
-      return true;
+      return owner.release() != nullptr;
     }
     return false;
   }
 
   /**
    * Atomically swap the pointer with another.
-   * @param ptr the pointer to swap with
+   * @param other The pointer to swap with
    */
   void Swap(std::unique_ptr<T> &other) noexcept { other.reset(ptr_.exchange(other.release())); }
 

@@ -1,0 +1,65 @@
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+
+#include <chrono>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "opentelemetry/exporters/otlp/otlp_builder_utils.h"
+#include "opentelemetry/exporters/otlp/otlp_http.h"
+#include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
+#include "opentelemetry/exporters/otlp/otlp_http_exporter_options.h"
+#include "opentelemetry/exporters/otlp/otlp_http_span_builder.h"
+#include "opentelemetry/sdk/configuration/http_tls_configuration.h"
+#include "opentelemetry/sdk/configuration/otlp_http_span_exporter_builder.h"
+#include "opentelemetry/sdk/configuration/otlp_http_span_exporter_configuration.h"
+#include "opentelemetry/sdk/configuration/registry.h"
+#include "opentelemetry/sdk/trace/exporter.h"
+#include "opentelemetry/version.h"
+
+OPENTELEMETRY_BEGIN_NAMESPACE
+namespace exporter
+{
+namespace otlp
+{
+
+void OtlpHttpSpanBuilder::Register(opentelemetry::sdk::configuration::Registry *registry)
+{
+  auto builder = std::make_unique<OtlpHttpSpanBuilder>();
+  registry->SetOtlpHttpSpanBuilder(std::move(builder));
+}
+
+std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> OtlpHttpSpanBuilder::Build(
+    const opentelemetry::sdk::configuration::OtlpHttpSpanExporterConfiguration *model) const
+{
+  OtlpHttpExporterOptions options(nullptr);
+
+  const auto *tls = model->tls.get();
+
+  options.url                = model->endpoint;
+  options.content_type       = OtlpBuilderUtils::ConvertOtlpHttpEncoding(model->encoding);
+  options.json_bytes_mapping = JsonBytesMappingKind::kHexId;
+  options.use_json_name      = false;
+  options.console_debug      = false;
+  options.timeout            = std::chrono::duration_cast<std::chrono::system_clock::duration>(
+      std::chrono::seconds{model->timeout});
+  options.http_headers =
+      OtlpBuilderUtils::ConvertHeadersConfigurationModel(model->headers.get(), model->headers_list);
+  options.ssl_insecure_skip_verify = false;
+
+  if (tls != nullptr)
+  {
+    options.ssl_ca_cert_path     = tls->certificate_file;
+    options.ssl_client_key_path  = tls->client_key_file;
+    options.ssl_client_cert_path = tls->client_certificate_file;
+  }
+
+  options.compression = model->compression;
+
+  return OtlpHttpExporterFactory::Create(options);
+}
+
+}  // namespace otlp
+}  // namespace exporter
+OPENTELEMETRY_END_NAMESPACE

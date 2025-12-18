@@ -247,5 +247,82 @@ public:
   }
 };
 
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+/* A Gauge instrument that records values. */
+template <class T>
+class Gauge : public SynchronousInstrument
+{
+
+public:
+  /**
+   * Record a value
+   *
+   * @param value The measurement value. May be positive, negative or zero.
+   */
+  virtual void Record(T value) noexcept = 0;
+
+  /**
+   * Record a value
+   *
+   * @param value The measurement value. May be positive, negative or zero.
+   * @param context The explicit context to associate with this measurement.
+   */
+  virtual void Record(T value, const context::Context &context) noexcept = 0;
+
+  /**
+   * Record a value with a set of attributes.
+   *
+   * @param value The measurement value. May be positive, negative or zero.
+   * @param attributes A set of attributes to associate with the value.
+   */
+
+  virtual void Record(T value, const common::KeyValueIterable &attributes) noexcept = 0;
+
+  /**
+   * Record a value with a set of attributes.
+   *
+   * @param value The measurement value. May be positive, negative or zero.
+   * @param attributes A set of attributes to associate with the value.
+   * @param context The explicit context to associate with this measurement.
+   */
+  virtual void Record(T value,
+                      const common::KeyValueIterable &attributes,
+                      const context::Context &context) noexcept = 0;
+
+  template <class U,
+            nostd::enable_if_t<common::detail::is_key_value_iterable<U>::value> * = nullptr>
+  void Record(T value, const U &attributes) noexcept
+  {
+    this->Record(value, common::KeyValueIterableView<U>{attributes});
+  }
+
+  template <class U,
+            nostd::enable_if_t<common::detail::is_key_value_iterable<U>::value> * = nullptr>
+  void Record(T value, const U &attributes, const context::Context &context) noexcept
+  {
+    this->Record(value, common::KeyValueIterableView<U>{attributes}, context);
+  }
+
+  void Record(T value,
+              std::initializer_list<std::pair<nostd::string_view, common::AttributeValue>>
+                  attributes) noexcept
+  {
+    this->Record(value, nostd::span<const std::pair<nostd::string_view, common::AttributeValue>>{
+                            attributes.begin(), attributes.end()});
+  }
+
+  void Record(
+      T value,
+      std::initializer_list<std::pair<nostd::string_view, common::AttributeValue>> attributes,
+      const context::Context &context) noexcept
+  {
+    this->Record(value,
+                 nostd::span<const std::pair<nostd::string_view, common::AttributeValue>>{
+                     attributes.begin(), attributes.end()},
+                 context);
+  }
+};
+#endif
+
 }  // namespace metrics
 OPENTELEMETRY_END_NAMESPACE

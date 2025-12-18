@@ -9,6 +9,7 @@
 
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/common/attributemap_hash.h"
+#include "opentelemetry/sdk/metrics/aggregation/aggregation_config.h"
 #include "opentelemetry/sdk/metrics/aggregation/default_aggregation.h"
 
 #ifdef ENABLE_METRICS_EXEMPLAR_PREVIEW
@@ -42,8 +43,11 @@ public:
                      const AggregationConfig *aggregation_config)
       : instrument_descriptor_(instrument_descriptor),
         aggregation_type_{aggregation_type},
-        cumulative_hash_map_(new AttributesHashMap()),
-        delta_hash_map_(new AttributesHashMap()),
+        aggregation_config_{AggregationConfig::GetOrDefault(aggregation_config)},
+        cumulative_hash_map_(
+            std::make_unique<AttributesHashMap>(aggregation_config_->cardinality_limit_)),
+        delta_hash_map_(
+            std::make_unique<AttributesHashMap>(aggregation_config_->cardinality_limit_)),
 #ifdef ENABLE_METRICS_EXEMPLAR_PREVIEW
         exemplar_filter_type_(exempler_filter_type),
         exemplar_reservoir_(exemplar_reservoir),
@@ -71,24 +75,22 @@ public:
 
       auto aggr = DefaultAggregation::CreateAggregation(aggregation_type_, instrument_descriptor_);
       aggr->Aggregate(measurement.second);
-      auto hash = opentelemetry::sdk::common::GetHashForAttributeMap(measurement.first);
-      auto prev = cumulative_hash_map_->Get(hash);
+      auto prev = cumulative_hash_map_->Get(measurement.first);
       if (prev)
       {
         auto delta = prev->Diff(*aggr);
         // store received value in cumulative map, and the diff in delta map (to pass it to temporal
         // storage)
-        cumulative_hash_map_->Set(measurement.first, std::move(aggr), hash);
-        delta_hash_map_->Set(measurement.first, std::move(delta), hash);
+        cumulative_hash_map_->Set(measurement.first, std::move(aggr));
+        delta_hash_map_->Set(measurement.first, std::move(delta));
       }
       else
       {
         // store received value in cumulative and delta map.
         cumulative_hash_map_->Set(
             measurement.first,
-            DefaultAggregation::CloneAggregation(aggregation_type_, instrument_descriptor_, *aggr),
-            hash);
-        delta_hash_map_->Set(measurement.first, std::move(aggr), hash);
+            DefaultAggregation::CloneAggregation(aggregation_type_, instrument_descriptor_, *aggr));
+        delta_hash_map_->Set(measurement.first, std::move(aggr));
       }
     }
   }
@@ -126,7 +128,8 @@ public:
     {
       std::lock_guard<opentelemetry::common::SpinLockMutex> guard(hashmap_lock_);
       delta_metrics = std::move(delta_hash_map_);
-      delta_hash_map_.reset(new AttributesHashMap);
+      delta_hash_map_ =
+          std::make_unique<AttributesHashMap>(aggregation_config_->cardinality_limit_);
     }
 
     auto status =
@@ -138,6 +141,7 @@ public:
 private:
   InstrumentDescriptor instrument_descriptor_;
   AggregationType aggregation_type_;
+  const AggregationConfig *aggregation_config_;
   std::unique_ptr<AttributesHashMap> cumulative_hash_map_;
   std::unique_ptr<AttributesHashMap> delta_hash_map_;
   opentelemetry::common::SpinLockMutex hashmap_lock_;

@@ -90,7 +90,7 @@ public:
                opentelemetry::common::SystemTimestamp /* collection_ts */,
                nostd::function_ref<bool(MetricData)> callback) noexcept override
   {
-    MetricData metric_data;
+    MetricData metric_data{};
     return callback(std::move(metric_data));
   }
 };

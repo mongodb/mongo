@@ -34,7 +34,8 @@ inline bool IsRootSpan(const context::Context &context) noexcept
 }
 
 // Set Span into explicit context
-inline context::Context SetSpan(context::Context &context, nostd::shared_ptr<Span> span) noexcept
+inline context::Context SetSpan(context::Context &context,
+                                const nostd::shared_ptr<Span> &span) noexcept
 {
   return context.SetValue(kSpanKey, span);
 }

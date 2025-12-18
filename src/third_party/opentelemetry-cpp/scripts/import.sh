@@ -8,7 +8,7 @@ IFS=$'\n\t'
 
 NAME="opentelemetry-cpp"
 
-VERSION="1.17"
+VERSION="1.24"
 BRANCH="mongo/v${VERSION}"
 
 LIB_GIT_URL="https://github.com/mongodb-forks/opentelemetry-cpp.git"
@@ -58,6 +58,10 @@ rm -rf exporters/ostream
 rm -rf exporters/prometheus
 rm -rf exporters/zipkin
 
+# Unneeded configuration files
+rm -rf sdk/include/opentelemetry/sdk/configuration/
+rm -rf sdk/src/configuration/
+
 # Test directories
 rm -rf api/test
 rm -rf exporters/otlp/test
@@ -65,14 +69,9 @@ rm -rf ext/test
 rm -rf sdk/test
 popd
 
-PATCHES_DIR="${LIBDIR}/patches"
-git apply "${PATCHES_DIR}/0001-Build-system-changes-for-opentelemetry-cpp.patch"
-git apply "${PATCHES_DIR}/0002-Build-system-changes-for-opentelemetry-cpp.patch"
-git apply "${PATCHES_DIR}/0003-Build-system-changes-for-opentelemetry-cpp.patch"
-git apply "${PATCHES_DIR}/0001-SERVER-100631-update-api-BUILD.patch"
-git apply "${PATCHES_DIR}/0001-SERVER-106258-vendor-OpenTelemetry-gRPC-exporter.patch"
-git apply "${PATCHES_DIR}/0004-SERVER-115315-vendor-memory-exporter.patch"
-
 cp -R ${DIST}/* ${LIBDIR}/
 echo ${DIST}
 rm -rf ${DIST}
+
+PATCHES_DIR="${LIBDIR}/patches"
+git apply "${PATCHES_DIR}/0001-compile-1.24.patch"

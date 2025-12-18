@@ -56,7 +56,7 @@ public:
 
   /**
    * Export all ended spans that have not yet been exported.
-   * @param timeout an optional timeout, the default timeout of 0 means that no
+   * @param timeout an optional timeout, the default timeout means that no
    * timeout is applied.
    */
   virtual bool ForceFlush(
@@ -67,7 +67,7 @@ public:
    * exported before shutdown. After the call to Shutdown, subsequent calls to
    * OnStart, OnEnd, ForceFlush or Shutdown will return immediately without
    * doing anything.
-   * @param timeout an optional timeout, the default timeout of 0 means that no
+   * @param timeout an optional timeout, the default timeout means that no
    * timeout is applied.
    */
   virtual bool Shutdown(

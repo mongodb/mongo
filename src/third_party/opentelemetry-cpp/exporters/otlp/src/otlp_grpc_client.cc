@@ -3,27 +3,45 @@
 
 #include "opentelemetry/exporters/otlp/otlp_grpc_client.h"
 
-#if defined(HAVE_GSL)
-#  include <gsl/gsl>
-#else
-#  include <assert.h>
-#endif
-
+#include <grpc/compression.h>
+#include <grpcpp/resource_quota.h>
+#include <grpcpp/security/credentials.h>
+#include <grpcpp/support/channel_arguments.h>
+#include <stdint.h>
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <thread>
-#include <unordered_set>
+#include <utility>
 
-#include "opentelemetry/common/timestamp.h"
 #include "opentelemetry/ext/http/common/url_parser.h"
-#include "opentelemetry/nostd/function_ref.h"
 #include "opentelemetry/sdk/common/global_log_handler.h"
+
+// clang-format off
+#include "opentelemetry/exporters/otlp/protobuf_include_prefix.h" // IWYU pragma: keep
+#ifdef ENABLE_ASYNC_EXPORT
+#  include "google/protobuf/arena.h"
+#endif /* ENABLE_ASYNC_EXPORT */
+#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
+#include "opentelemetry/proto/collector/metrics/v1/metrics_service.pb.h"
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+#include "opentelemetry/exporters/otlp/protobuf_include_suffix.h" // IWYU pragma: keep
+// clang-format on
+
+#ifdef ENABLE_ASYNC_EXPORT
+#  include <algorithm>
+#  include <condition_variable>
+#  include <cstdio>
+#  include <mutex>
+#  include <ratio>
+#  include <unordered_set>
+
+#  include "opentelemetry/common/timestamp.h"
+#  include "opentelemetry/nostd/string_view.h"
+#endif /* ENABLE_ASYNC_EXPORT */
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace exporter
@@ -51,8 +69,12 @@ public:
       opentelemetry::sdk::common::ExportResult::kFailure;
   GrpcAsyncCallback grpc_async_callback = nullptr;
 
-  OtlpGrpcAsyncCallDataBase() {}
-  virtual ~OtlpGrpcAsyncCallDataBase() {}
+  OtlpGrpcAsyncCallDataBase()                                             = default;
+  virtual ~OtlpGrpcAsyncCallDataBase()                                    = default;
+  OtlpGrpcAsyncCallDataBase(const OtlpGrpcAsyncCallDataBase &)            = delete;
+  OtlpGrpcAsyncCallDataBase &operator=(const OtlpGrpcAsyncCallDataBase &) = delete;
+  OtlpGrpcAsyncCallDataBase(OtlpGrpcAsyncCallDataBase &&)                 = delete;
+  OtlpGrpcAsyncCallDataBase &operator=(OtlpGrpcAsyncCallDataBase &&)      = delete;
 };
 
 // When building with -fvisibility=default, we hide the symbols and vtable to ensure we always use
@@ -74,20 +96,23 @@ public:
                      ResponseType *)>
       result_callback;
 
-  OtlpGrpcAsyncCallData() {}
-  virtual ~OtlpGrpcAsyncCallData() {}
+  OtlpGrpcAsyncCallData() = default;
 };
 }  // namespace
+#endif
 
 struct OtlpGrpcClientAsyncData
 {
+
   std::chrono::system_clock::duration export_timeout = std::chrono::seconds{10};
 
   // The best performance trade-off of gRPC is having numcpu's threads and one completion queue
   // per thread, but this exporter should not cost a lot resource and we don't want to create
-  // too many threads in the process. So we use one completion queue.
-  grpc::CompletionQueue cq;
-
+  // too many threads in the process. So we use one completion queue and shared context.
+  std::shared_ptr<grpc::Channel> channel;
+#ifdef ENABLE_ASYNC_EXPORT
+  std::mutex running_calls_lock;
+  std::unordered_set<std::shared_ptr<OtlpGrpcAsyncCallDataBase>> running_calls;
   // Running requests, this is used to limit the number of concurrent requests.
   std::atomic<std::size_t> running_requests{0};
   // Request counter is used to record ForceFlush.
@@ -98,13 +123,16 @@ struct OtlpGrpcClientAsyncData
   // Condition variable and mutex to control the concurrency count of running requests.
   std::mutex session_waker_lock;
   std::condition_variable session_waker;
+#endif
+
+  // Reference count of OtlpGrpcClient
+  std::atomic<int64_t> reference_count{0};
 
   // Do not use OtlpGrpcClientAsyncData() = default; here, some versions of GCC&Clang have BUGs
   // and may not initialize the member correctly. See also
   // https://stackoverflow.com/questions/53408962/try-to-understand-compiler-error-message-default-member-initializer-required-be
   OtlpGrpcClientAsyncData() {}
 };
-#endif
 
 namespace
 {
@@ -199,6 +227,11 @@ static sdk::common::ExportResult InternalDelegateAsyncExport(
 
   ++async_data->start_request_counter;
   ++async_data->running_requests;
+  {
+    std::lock_guard<std::mutex> lock{async_data->running_calls_lock};
+    async_data->running_calls.insert(
+        std::static_pointer_cast<OtlpGrpcAsyncCallDataBase>(call_data));
+  }
   // Some old toolchains can only use gRPC 1.33 and it's experimental.
 #  if defined(GRPC_CPP_VERSION_MAJOR) && \
       (GRPC_CPP_VERSION_MAJOR * 1000 + GRPC_CPP_VERSION_MINOR) >= 1039
@@ -207,7 +240,13 @@ static sdk::common::ExportResult InternalDelegateAsyncExport(
   stub->experimental_async()
 #  endif
       ->Export(call_data->grpc_context.get(), call_data->request, call_data->response,
-               [call_data, async_data](::grpc::Status grpc_status) {
+               [call_data, async_data, export_data_name](const ::grpc::Status &grpc_status) {
+                 {
+                   std::lock_guard<std::mutex> lock{async_data->running_calls_lock};
+                   async_data->running_calls.erase(
+                       std::static_pointer_cast<OtlpGrpcAsyncCallDataBase>(call_data));
+                 }
+
                  --async_data->running_requests;
                  ++async_data->finished_request_counter;
 
@@ -215,6 +254,13 @@ static sdk::common::ExportResult InternalDelegateAsyncExport(
                  if (call_data->grpc_status.ok())
                  {
                    call_data->export_result = opentelemetry::sdk::common::ExportResult::kSuccess;
+                 }
+                 else
+                 {
+                   OTEL_INTERNAL_LOG_ERROR("[OTLP GRPC Client] ERROR: Export "
+                                           << export_data_name << " failed with status_code: \""
+                                           << grpc_status.error_code() << "\" error_message: \""
+                                           << grpc_status.error_message() << "\"");
                  }
 
                  if (call_data->grpc_async_callback)
@@ -240,17 +286,37 @@ static sdk::common::ExportResult InternalDelegateAsyncExport(
 #endif
 }  // namespace
 
-OtlpGrpcClient::OtlpGrpcClient()
-#ifdef ENABLE_ASYNC_EXPORT
-    : is_shutdown_(false)
-#endif
-{}
+OtlpGrpcClientReferenceGuard::OtlpGrpcClientReferenceGuard() noexcept : has_value_{false} {}
+
+OtlpGrpcClientReferenceGuard::~OtlpGrpcClientReferenceGuard() noexcept {}
+
+OtlpGrpcClient::OtlpGrpcClient(const OtlpGrpcClientOptions &options) : is_shutdown_(false)
+{
+  std::shared_ptr<OtlpGrpcClientAsyncData> async_data = MutableAsyncData(options);
+  async_data->channel                                 = MakeChannel(options);
+}
 
 OtlpGrpcClient::~OtlpGrpcClient()
 {
-#ifdef ENABLE_ASYNC_EXPORT
   std::shared_ptr<OtlpGrpcClientAsyncData> async_data;
   async_data.swap(async_data_);
+
+#ifdef ENABLE_ASYNC_EXPORT
+  if (async_data)
+  {
+    std::unordered_set<std::shared_ptr<OtlpGrpcAsyncCallDataBase>> running_calls;
+    {
+      std::lock_guard<std::mutex> lock(async_data->running_calls_lock);
+      running_calls = async_data->running_calls;
+    }
+    for (auto &call_data : running_calls)
+    {
+      if (call_data && call_data->grpc_context)
+      {
+        call_data->grpc_context->TryCancel();
+      }
+    }
+  }
 
   while (async_data && async_data->running_requests.load(std::memory_order_acquire) > 0)
   {
@@ -262,6 +328,32 @@ OtlpGrpcClient::~OtlpGrpcClient()
 #endif
 }
 
+std::string OtlpGrpcClient::GetGrpcTarget(const std::string &endpoint)
+{
+  //
+  // Scheme is allowed in OTLP endpoint definition, but is not allowed for creating gRPC
+  // channel. Passing URI with scheme to grpc::CreateChannel could resolve the endpoint to some
+  // unexpected address.
+  //
+  ext::http::common::UrlParser url(endpoint);
+  if (!url.success_)
+  {
+    OTEL_INTERNAL_LOG_ERROR("[OTLP GRPC Client] invalid endpoint: " << endpoint);
+    return "";
+  }
+
+  std::string grpc_target;
+  if (url.scheme_ == "unix")
+  {
+    grpc_target = "unix:" + url.path_;
+  }
+  else
+  {
+    grpc_target = url.host_ + ":" + std::to_string(static_cast<int>(url.port_));
+  }
+  return grpc_target;
+}
+
 std::shared_ptr<grpc::Channel> OtlpGrpcClient::MakeChannel(const OtlpGrpcClientOptions &options)
 {
 
@@ -271,22 +363,16 @@ std::shared_ptr<grpc::Channel> OtlpGrpcClient::MakeChannel(const OtlpGrpcClientO
 
     return nullptr;
   }
-  //
-  // Scheme is allowed in OTLP endpoint definition, but is not allowed for creating gRPC
-  // channel. Passing URI with scheme to grpc::CreateChannel could resolve the endpoint to some
-  // unexpected address.
-  //
 
-  ext::http::common::UrlParser url(options.endpoint);
-  if (!url.success_)
+  std::shared_ptr<grpc::Channel> channel;
+  std::string grpc_target = GetGrpcTarget(options.endpoint);
+
+  if (grpc_target.empty())
   {
     OTEL_INTERNAL_LOG_ERROR("[OTLP GRPC Client] invalid endpoint: " << options.endpoint);
-
     return nullptr;
   }
 
-  std::shared_ptr<grpc::Channel> channel;
-  std::string grpc_target = url.host_ + ":" + std::to_string(static_cast<int>(url.port_));
   grpc::ChannelArguments grpc_arguments;
   grpc_arguments.SetUserAgentPrefix(options.user_agent);
 
@@ -301,6 +387,49 @@ std::shared_ptr<grpc::Channel> OtlpGrpcClient::MakeChannel(const OtlpGrpcClientO
   {
     grpc_arguments.SetCompressionAlgorithm(GRPC_COMPRESS_GZIP);
   }
+
+#ifdef ENABLE_OTLP_RETRY_PREVIEW
+  if (options.retry_policy_max_attempts > 0U &&
+      options.retry_policy_initial_backoff > std::chrono::duration<float>::zero() &&
+      options.retry_policy_max_backoff > std::chrono::duration<float>::zero() &&
+      options.retry_policy_backoff_multiplier > 0.0f)
+  {
+    static const auto kServiceConfigJson = opentelemetry::nostd::string_view{R"(
+    {
+      "methodConfig": [
+        {
+          "name": [{}],
+          "retryPolicy": {
+            "maxAttempts": %0000000000u,
+            "initialBackoff": "%0000000000.1fs",
+            "maxBackoff": "%0000000000.1fs",
+            "backoffMultiplier": %0000000000.1f,
+            "retryableStatusCodes": [
+              "CANCELLED",
+              "DEADLINE_EXCEEDED",
+              "ABORTED",
+              "OUT_OF_RANGE",
+              "DATA_LOSS",
+              "UNAVAILABLE"
+            ]
+          }
+        }
+      ]
+    })"};
+
+    // Allocate string with buffer large enough to hold the formatted json config
+    auto service_config = std::string(kServiceConfigJson.size(), '\0');
+    // Prior to C++17, need to explicitly cast away constness from `data()` buffer
+    std::snprintf(
+        const_cast<decltype(service_config)::value_type *>(service_config.data()),
+        service_config.size(), kServiceConfigJson.data(), options.retry_policy_max_attempts,
+        std::min(std::max(options.retry_policy_initial_backoff.count(), 0.f), 999999999.f),
+        std::min(std::max(options.retry_policy_max_backoff.count(), 0.f), 999999999.f),
+        std::min(std::max(options.retry_policy_backoff_multiplier, 0.f), 999999999.f));
+
+    grpc_arguments.SetServiceConfigJSON(service_config);
+  }
+#endif  // ENABLE_OTLP_RETRY_PREVIEW
 
   if (options.use_ssl_credentials)
   {
@@ -322,6 +451,19 @@ std::shared_ptr<grpc::Channel> OtlpGrpcClient::MakeChannel(const OtlpGrpcClientO
     channel =
         grpc::CreateCustomChannel(grpc_target, grpc::InsecureChannelCredentials(), grpc_arguments);
   }
+
+#ifdef ENABLE_OTLP_GRPC_CREDENTIAL_PREVIEW
+  if (options.credentials)
+  {
+    if (options.use_ssl_credentials)
+    {
+      OTEL_INTERNAL_LOG_WARN(
+          "[OTLP GRPC Client] Both 'credentials' and 'use_ssl_credentials' options are set. "
+          "The former takes priority.");
+    }
+    channel = grpc::CreateCustomChannel(grpc_target, options.credentials, grpc_arguments);
+  }
+#endif  // ENABLE_OTLP_GRPC_CREDENTIAL_PREVIEW
 
   return channel;
 }
@@ -350,21 +492,33 @@ std::unique_ptr<grpc::ClientContext> OtlpGrpcClient::MakeClientContext(
 }
 
 std::unique_ptr<proto::collector::trace::v1::TraceService::StubInterface>
-OtlpGrpcClient::MakeTraceServiceStub(const OtlpGrpcClientOptions &options)
+OtlpGrpcClient::MakeTraceServiceStub()
 {
-  return proto::collector::trace::v1::TraceService::NewStub(MakeChannel(options));
+  if (!async_data_ || !async_data_->channel)
+  {
+    return nullptr;
+  }
+  return proto::collector::trace::v1::TraceService::NewStub(async_data_->channel);
 }
 
 std::unique_ptr<proto::collector::metrics::v1::MetricsService::StubInterface>
-OtlpGrpcClient::MakeMetricsServiceStub(const OtlpGrpcClientOptions &options)
+OtlpGrpcClient::MakeMetricsServiceStub()
 {
-  return proto::collector::metrics::v1::MetricsService::NewStub(MakeChannel(options));
+  if (!async_data_ || !async_data_->channel)
+  {
+    return nullptr;
+  }
+  return proto::collector::metrics::v1::MetricsService::NewStub(async_data_->channel);
 }
 
 std::unique_ptr<proto::collector::logs::v1::LogsService::StubInterface>
-OtlpGrpcClient::MakeLogsServiceStub(const OtlpGrpcClientOptions &options)
+OtlpGrpcClient::MakeLogsServiceStub()
 {
-  return proto::collector::logs::v1::LogsService::NewStub(MakeChannel(options));
+  if (!async_data_ || !async_data_->channel)
+  {
+    return nullptr;
+  }
+  return proto::collector::logs::v1::LogsService::NewStub(async_data_->channel);
 }
 
 grpc::Status OtlpGrpcClient::DelegateExport(
@@ -395,6 +549,35 @@ grpc::Status OtlpGrpcClient::DelegateExport(
     proto::collector::logs::v1::ExportLogsServiceResponse *response)
 {
   return stub->Export(context.get(), request, response);
+}
+
+void OtlpGrpcClient::AddReference(OtlpGrpcClientReferenceGuard &guard,
+                                  const OtlpGrpcClientOptions &options) noexcept
+{
+  if (false == guard.has_value_.exchange(true, std::memory_order_acq_rel))
+  {
+    MutableAsyncData(options)->reference_count.fetch_add(1, std::memory_order_acq_rel);
+  }
+}
+
+bool OtlpGrpcClient::RemoveReference(OtlpGrpcClientReferenceGuard &guard) noexcept
+{
+  auto async_data = async_data_;
+  if (true == guard.has_value_.exchange(false, std::memory_order_acq_rel))
+  {
+    if (async_data)
+    {
+      int64_t left = async_data->reference_count.fetch_sub(1, std::memory_order_acq_rel);
+      return left <= 1;
+    }
+  }
+
+  if (async_data)
+  {
+    return async_data->reference_count.load(std::memory_order_acquire) <= 0;
+  }
+
+  return true;
 }
 
 #ifdef ENABLE_ASYNC_EXPORT
@@ -500,26 +683,37 @@ sdk::common::ExportResult OtlpGrpcClient::DelegateAsyncExport(
                                      "log(s)");
 }
 
+#endif
+
 std::shared_ptr<OtlpGrpcClientAsyncData> OtlpGrpcClient::MutableAsyncData(
     const OtlpGrpcClientOptions &options)
 {
   if (!async_data_)
   {
-    async_data_                          = std::make_shared<OtlpGrpcClientAsyncData>();
-    async_data_->export_timeout          = options.timeout;
+    async_data_                 = std::make_shared<OtlpGrpcClientAsyncData>();
+    async_data_->export_timeout = options.timeout;
+#ifdef ENABLE_ASYNC_EXPORT
     async_data_->max_concurrent_requests = options.max_concurrent_requests;
+#endif
   }
 
   return async_data_;
 }
 
-bool OtlpGrpcClient::ForceFlush(std::chrono::microseconds timeout) noexcept
+bool OtlpGrpcClient::IsShutdown() const noexcept
+{
+  return is_shutdown_.load(std::memory_order_acquire);
+}
+
+bool OtlpGrpcClient::ForceFlush(
+    OPENTELEMETRY_MAYBE_UNUSED std::chrono::microseconds timeout) noexcept
 {
   if (!async_data_)
   {
     return true;
   }
 
+#ifdef ENABLE_ASYNC_EXPORT
   std::size_t request_counter = async_data_->start_request_counter.load(std::memory_order_acquire);
   if (request_counter <= async_data_->finished_request_counter.load(std::memory_order_acquire))
   {
@@ -558,21 +752,46 @@ bool OtlpGrpcClient::ForceFlush(std::chrono::microseconds timeout) noexcept
   }
 
   return timeout_steady > std::chrono::steady_clock::duration::zero();
+#else
+  return true;
+#endif
 }
 
-bool OtlpGrpcClient::Shutdown(std::chrono::microseconds timeout) noexcept
+bool OtlpGrpcClient::Shutdown(OtlpGrpcClientReferenceGuard &guard,
+                              OPENTELEMETRY_MAYBE_UNUSED std::chrono::microseconds timeout) noexcept
 {
   if (!async_data_)
   {
     return true;
   }
 
-  bool force_flush_result;
-  if (false == is_shutdown_.exchange(true, std::memory_order_acq_rel))
+  bool last_reference_removed = RemoveReference(guard);
+  bool force_flush_result{};
+  if (last_reference_removed && false == is_shutdown_.exchange(true, std::memory_order_acq_rel))
   {
+    OTEL_INTERNAL_LOG_DEBUG("[OTLP GRPC Client] DEBUG: OtlpGrpcClient start to shutdown");
     force_flush_result = ForceFlush(timeout);
 
-    async_data_->cq.Shutdown();
+#ifdef ENABLE_ASYNC_EXPORT
+    std::unordered_set<std::shared_ptr<OtlpGrpcAsyncCallDataBase>> running_calls;
+    {
+      std::lock_guard<std::mutex> lock(async_data_->running_calls_lock);
+      running_calls = async_data_->running_calls;
+    }
+    if (!running_calls.empty())
+    {
+      OTEL_INTERNAL_LOG_WARN(
+          "[OTLP GRPC Client] WARN: OtlpGrpcClient shutdown timeout, try to cancel "
+          << running_calls.size() << " running calls.");
+    }
+    for (auto &call_data : running_calls)
+    {
+      if (call_data && call_data->grpc_context)
+      {
+        call_data->grpc_context->TryCancel();
+      }
+    }
+#endif
   }
   else
   {
@@ -581,8 +800,6 @@ bool OtlpGrpcClient::Shutdown(std::chrono::microseconds timeout) noexcept
 
   return force_flush_result;
 }
-
-#endif
 
 }  // namespace otlp
 }  // namespace exporter

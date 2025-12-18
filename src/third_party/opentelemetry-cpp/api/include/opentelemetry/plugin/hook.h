@@ -4,6 +4,7 @@
 #pragma once
 
 #include "opentelemetry/nostd/unique_ptr.h"
+#include "opentelemetry/plugin/factory.h"
 #include "opentelemetry/version.h"
 
 #ifdef _WIN32
@@ -42,7 +43,6 @@ namespace plugin
 {
 
 struct LoaderInfo;
-class FactoryImpl;
 
 using OpenTelemetryHook =
     nostd::unique_ptr<Factory::FactoryImpl> (*)(const LoaderInfo &loader_info,

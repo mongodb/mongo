@@ -13,7 +13,9 @@
 #include "opentelemetry/sdk/trace/id_generator.h"
 #include "opentelemetry/sdk/trace/processor.h"
 #include "opentelemetry/sdk/trace/sampler.h"
+#include "opentelemetry/sdk/trace/tracer_config.h"
 #include "opentelemetry/sdk/trace/tracer_context.h"
+#include "opentelemetry/trace/noop.h"
 #include "opentelemetry/trace/span.h"
 #include "opentelemetry/trace/span_context_kv_iterable.h"
 #include "opentelemetry/trace/span_startoptions.h"
@@ -105,6 +107,8 @@ private:
   // tracer-context.
   std::shared_ptr<InstrumentationScope> instrumentation_scope_;
   std::shared_ptr<TracerContext> context_;
+  TracerConfig tracer_config_;
+  static const std::shared_ptr<opentelemetry::trace::NoopTracer> kNoopTracer;
 };
 }  // namespace trace
 }  // namespace sdk

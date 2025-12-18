@@ -5,22 +5,24 @@
 
 #ifdef ENABLE_METRICS_EXEMPLAR_PREVIEW
 
-#  include <cstddef>
+#  include <stdint.h>
+#  include <chrono>
+#  include <map>
 #  include <memory>
+#  include <utility>
 
 #  include "opentelemetry/common/timestamp.h"
+#  include "opentelemetry/context/context.h"
 #  include "opentelemetry/nostd/variant.h"
 #  include "opentelemetry/sdk/metrics/data/exemplar_data.h"
+#  include "opentelemetry/sdk/metrics/data/metric_data.h"
 #  include "opentelemetry/sdk/metrics/exemplar/filter_type.h"
 #  include "opentelemetry/trace/context.h"
+#  include "opentelemetry/trace/span.h"
+#  include "opentelemetry/trace/span_context.h"
 #  include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
-namespace context
-{
-class Context;
-}  // namespace context
-
 namespace sdk
 {
 namespace metrics
@@ -125,6 +127,7 @@ private:
         res.erase(it);
       }
     }
+    res.UpdateHash();
     return res;
   }
 

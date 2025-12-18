@@ -16,7 +16,7 @@
 // bad_variant_access.h
 // -----------------------------------------------------------------------------
 //
-// This header file defines the `absl::bad_variant_access` type.
+// This header file defines the `absl::OTABSL_OPTION_NAMESPACE_NAME::bad_variant_access` type.
 
 #ifndef OTABSL_TYPES_BAD_VARIANT_ACCESS_H_
 #define OTABSL_TYPES_BAD_VARIANT_ACCESS_H_
@@ -44,21 +44,21 @@ OTABSL_NAMESPACE_BEGIN
 // bad_variant_access
 // -----------------------------------------------------------------------------
 //
-// An `absl::bad_variant_access` type is an exception type that is thrown in
+// An `absl::OTABSL_OPTION_NAMESPACE_NAME::bad_variant_access` type is an exception type that is thrown in
 // the following cases:
 //
-//   * Calling `absl::get(absl::variant) with an index or type that does not
+//   * Calling `absl::OTABSL_OPTION_NAMESPACE_NAME::get(absl::OTABSL_OPTION_NAMESPACE_NAME::variant) with an index or type that does not
 //     match the currently selected alternative type
-//   * Calling `absl::visit on an `absl::variant` that is in the
+//   * Calling `absl::OTABSL_OPTION_NAMESPACE_NAME::visit on an `absl::OTABSL_OPTION_NAMESPACE_NAME::variant` that is in the
 //     `variant::valueless_by_exception` state.
 //
 // Example:
 //
-//   absl::variant<int, std::string> v;
+//   absl::OTABSL_OPTION_NAMESPACE_NAME::variant<int, std::string> v;
 //   v = 1;
 //   try {
-//     absl::get<std::string>(v);
-//   } catch(const absl::bad_variant_access& e) {
+//     absl::OTABSL_OPTION_NAMESPACE_NAME::get<std::string>(v);
+//   } catch(const absl::OTABSL_OPTION_NAMESPACE_NAME::bad_variant_access& e) {
 //     std::cout << "Bad variant access: " << e.what() << '\n';
 //   }
 class bad_variant_access : public std::exception {

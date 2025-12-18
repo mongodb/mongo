@@ -152,6 +152,22 @@ std::string GetOtlpDefaultTracesCompression();
 std::string GetOtlpDefaultMetricsCompression();
 std::string GetOtlpDefaultLogsCompression();
 
+std::uint32_t GetOtlpDefaultTracesRetryMaxAttempts();
+std::uint32_t GetOtlpDefaultMetricsRetryMaxAttempts();
+std::uint32_t GetOtlpDefaultLogsRetryMaxAttempts();
+
+std::chrono::duration<float> GetOtlpDefaultTracesRetryInitialBackoff();
+std::chrono::duration<float> GetOtlpDefaultMetricsRetryInitialBackoff();
+std::chrono::duration<float> GetOtlpDefaultLogsRetryInitialBackoff();
+
+std::chrono::duration<float> GetOtlpDefaultTracesRetryMaxBackoff();
+std::chrono::duration<float> GetOtlpDefaultMetricsRetryMaxBackoff();
+std::chrono::duration<float> GetOtlpDefaultLogsRetryMaxBackoff();
+
+float GetOtlpDefaultTracesRetryBackoffMultiplier();
+float GetOtlpDefaultMetricsRetryBackoffMultiplier();
+float GetOtlpDefaultLogsRetryBackoffMultiplier();
+
 }  // namespace otlp
 }  // namespace exporter
 OPENTELEMETRY_END_NAMESPACE

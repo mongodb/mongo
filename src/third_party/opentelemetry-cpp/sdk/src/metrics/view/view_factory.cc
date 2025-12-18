@@ -25,46 +25,36 @@ std::unique_ptr<View> ViewFactory::Create(const std::string &name)
 
 std::unique_ptr<View> ViewFactory::Create(const std::string &name, const std::string &description)
 {
-  return Create(name, description, "", AggregationType::kDefault);
+  return Create(name, description, AggregationType::kDefault);
 }
 
 std::unique_ptr<View> ViewFactory::Create(const std::string &name,
                                           const std::string &description,
-                                          const std::string &unit)
-{
-  return Create(name, description, unit, AggregationType::kDefault);
-}
-
-std::unique_ptr<View> ViewFactory::Create(const std::string &name,
-                                          const std::string &description,
-                                          const std::string &unit,
                                           AggregationType aggregation_type)
 {
   std::shared_ptr<AggregationConfig> aggregation_config(nullptr);
-  return Create(name, description, unit, aggregation_type, aggregation_config);
+  return Create(name, description, aggregation_type, aggregation_config);
 }
 
 std::unique_ptr<View> ViewFactory::Create(const std::string &name,
                                           const std::string &description,
-                                          const std::string &unit,
                                           AggregationType aggregation_type,
                                           std::shared_ptr<AggregationConfig> aggregation_config)
 {
   auto attributes_processor =
       std::unique_ptr<AttributesProcessor>(new DefaultAttributesProcessor());
 
-  return Create(name, description, unit, aggregation_type, std::move(aggregation_config),
+  return Create(name, description, aggregation_type, std::move(aggregation_config),
                 std::move(attributes_processor));
 }
 
 std::unique_ptr<View> ViewFactory::Create(const std::string &name,
                                           const std::string &description,
-                                          const std::string &unit,
                                           AggregationType aggregation_type,
                                           std::shared_ptr<AggregationConfig> aggregation_config,
                                           std::unique_ptr<AttributesProcessor> attributes_processor)
 {
-  std::unique_ptr<View> view(new View(name, description, unit, aggregation_type,
+  std::unique_ptr<View> view(new View(name, description, aggregation_type,
                                       std::move(aggregation_config),
                                       std::move(attributes_processor)));
   return view;

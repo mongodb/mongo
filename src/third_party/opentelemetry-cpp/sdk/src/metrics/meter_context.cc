@@ -1,7 +1,6 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <memory>
@@ -17,7 +16,10 @@
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/sdk/common/global_log_handler.h"
 #include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+#include "opentelemetry/sdk/instrumentationscope/scope_configurator.h"
+#include "opentelemetry/sdk/metrics/export/metric_filter.h"
 #include "opentelemetry/sdk/metrics/meter.h"
+#include "opentelemetry/sdk/metrics/meter_config.h"
 #include "opentelemetry/sdk/metrics/meter_context.h"
 #include "opentelemetry/sdk/metrics/metric_reader.h"
 #include "opentelemetry/sdk/metrics/state/metric_collector.h"
@@ -28,6 +30,10 @@
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/version.h"
 
+#ifdef ENABLE_METRICS_EXEMPLAR_PREVIEW
+#  include "opentelemetry/sdk/metrics/exemplar/filter_type.h"
+#endif  // ENABLE_METRICS_EXEMPLAR_PREVIEW
+
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk
 {
@@ -35,8 +41,13 @@ namespace metrics
 {
 
 MeterContext::MeterContext(std::unique_ptr<ViewRegistry> views,
-                           const opentelemetry::sdk::resource::Resource &resource) noexcept
-    : resource_{resource}, views_(std::move(views)), sdk_start_ts_{std::chrono::system_clock::now()}
+                           const opentelemetry::sdk::resource::Resource &resource,
+                           std::unique_ptr<instrumentationscope::ScopeConfigurator<MeterConfig>>
+                               meter_configurator) noexcept
+    : resource_{resource},
+      views_(std::move(views)),
+      sdk_start_ts_{std::chrono::system_clock::now()},
+      meter_configurator_(std::move(meter_configurator))
 {}
 
 const resource::Resource &MeterContext::GetResource() const noexcept
@@ -47,6 +58,12 @@ const resource::Resource &MeterContext::GetResource() const noexcept
 ViewRegistry *MeterContext::GetViewRegistry() const noexcept
 {
   return views_.get();
+}
+
+const instrumentationscope::ScopeConfigurator<MeterConfig> &MeterContext::GetMeterConfigurator()
+    const noexcept
+{
+  return *meter_configurator_;
 }
 
 bool MeterContext::ForEachMeter(
@@ -79,9 +96,11 @@ opentelemetry::common::SystemTimestamp MeterContext::GetSDKStartTime() noexcept
   return sdk_start_ts_;
 }
 
-void MeterContext::AddMetricReader(std::shared_ptr<MetricReader> reader) noexcept
+void MeterContext::AddMetricReader(std::shared_ptr<MetricReader> reader,
+                                   std::unique_ptr<MetricFilter> metric_filter) noexcept
 {
-  auto collector = std::shared_ptr<MetricCollector>{new MetricCollector(this, std::move(reader))};
+  auto collector = std::shared_ptr<MetricCollector>{
+      new MetricCollector(this, std::move(reader), std::move(metric_filter))};
   collectors_.push_back(collector);
 }
 
@@ -138,16 +157,15 @@ void MeterContext::RemoveMeter(nostd::string_view name,
   meters_.swap(filtered_meters);
 }
 
-bool MeterContext::Shutdown() noexcept
+bool MeterContext::Shutdown(std::chrono::microseconds timeout) noexcept
 {
   bool result = true;
   // Shutdown only once.
   if (!shutdown_latch_.test_and_set(std::memory_order_acquire))
   {
-
     for (auto &collector : collectors_)
     {
-      bool status = std::static_pointer_cast<MetricCollector>(collector)->Shutdown();
+      bool status = std::static_pointer_cast<MetricCollector>(collector)->Shutdown(timeout);
       result      = result && status;
     }
     if (!result)

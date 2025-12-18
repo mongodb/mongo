@@ -71,6 +71,26 @@ public:
   {}
 };
 
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+template <class T>
+class NoopGauge : public Gauge<T>
+{
+public:
+  NoopGauge(nostd::string_view /* name */,
+            nostd::string_view /* description */,
+            nostd::string_view /* unit */) noexcept
+  {}
+  ~NoopGauge() override = default;
+  void Record(T /* value */) noexcept override {}
+  void Record(T /* value */, const context::Context & /* context */) noexcept override {}
+  void Record(T /* value */, const common::KeyValueIterable & /* attributes */) noexcept override {}
+  void Record(T /* value */,
+              const common::KeyValueIterable & /* attributes */,
+              const context::Context & /* context */) noexcept override
+  {}
+};
+#endif
+
 class NoopObservableInstrument : public ObservableInstrument
 {
 public:
@@ -140,6 +160,22 @@ public:
     return nostd::unique_ptr<Histogram<double>>{new NoopHistogram<double>(name, description, unit)};
   }
 
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+  nostd::unique_ptr<Gauge<int64_t>> CreateInt64Gauge(nostd::string_view name,
+                                                     nostd::string_view description = "",
+                                                     nostd::string_view unit = "") noexcept override
+  {
+    return nostd::unique_ptr<Gauge<int64_t>>{new NoopGauge<int64_t>(name, description, unit)};
+  }
+
+  nostd::unique_ptr<Gauge<double>> CreateDoubleGauge(nostd::string_view name,
+                                                     nostd::string_view description = "",
+                                                     nostd::string_view unit = "") noexcept override
+  {
+    return nostd::unique_ptr<Gauge<double>>{new NoopGauge<double>(name, description, unit)};
+  }
+#endif
+
   nostd::shared_ptr<ObservableInstrument> CreateInt64ObservableGauge(
       nostd::string_view name,
       nostd::string_view description = "",
@@ -193,6 +229,18 @@ public:
     return nostd::shared_ptr<ObservableInstrument>(
         new NoopObservableInstrument(name, description, unit));
   }
+
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+  uintptr_t RegisterCallback(
+      MultiObservableCallbackPtr /* callback */,
+      void * /* state */,
+      nostd::span<ObservableInstrument *> /* instruments */) noexcept override
+  {
+    return 0;
+  }
+
+  void DeregisterCallback(uintptr_t /* callback_id */) noexcept override {}
+#endif
 };
 
 /**

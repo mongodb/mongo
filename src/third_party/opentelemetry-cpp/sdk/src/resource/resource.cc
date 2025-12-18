@@ -8,8 +8,10 @@
 #include "opentelemetry/nostd/variant.h"
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/sdk/resource/resource_detector.h"
-#include "opentelemetry/sdk/resource/semantic_conventions.h"
 #include "opentelemetry/sdk/version/version.h"
+#include "opentelemetry/semconv/incubating/process_attributes.h"
+#include "opentelemetry/semconv/service_attributes.h"
+#include "opentelemetry/semconv/telemetry_attributes.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
@@ -17,6 +19,12 @@ namespace sdk
 {
 namespace resource
 {
+
+Resource::Resource() noexcept : attributes_(), schema_url_() {}
+
+Resource::Resource(const ResourceAttributes &attributes) noexcept
+    : attributes_(attributes), schema_url_()
+{}
 
 Resource::Resource(const ResourceAttributes &attributes, const std::string &schema_url) noexcept
     : attributes_(attributes), schema_url_(schema_url)
@@ -36,16 +44,16 @@ Resource Resource::Create(const ResourceAttributes &attributes, const std::strin
   auto resource =
       Resource::GetDefault().Merge(otel_resource).Merge(Resource{attributes, schema_url});
 
-  if (resource.attributes_.find(SemanticConventions::kServiceName) == resource.attributes_.end())
+  if (resource.attributes_.find(semconv::service::kServiceName) == resource.attributes_.end())
   {
     std::string default_service_name = "unknown_service";
     auto it_process_executable_name =
-        resource.attributes_.find(SemanticConventions::kProcessExecutableName);
+        resource.attributes_.find(semconv::process::kProcessExecutableName);
     if (it_process_executable_name != resource.attributes_.end())
     {
       default_service_name += ":" + nostd::get<std::string>(it_process_executable_name->second);
     }
-    resource.attributes_[SemanticConventions::kServiceName] = default_service_name;
+    resource.attributes_[semconv::service::kServiceName] = default_service_name;
   }
   return resource;
 }
@@ -59,9 +67,9 @@ Resource &Resource::GetEmpty()
 Resource &Resource::GetDefault()
 {
   static Resource default_resource(
-      {{SemanticConventions::kTelemetrySdkLanguage, "cpp"},
-       {SemanticConventions::kTelemetrySdkName, "opentelemetry"},
-       {SemanticConventions::kTelemetrySdkVersion, OPENTELEMETRY_SDK_VERSION}},
+      {{semconv::telemetry::kTelemetrySdkLanguage, "cpp"},
+       {semconv::telemetry::kTelemetrySdkName, "opentelemetry"},
+       {semconv::telemetry::kTelemetrySdkVersion, OPENTELEMETRY_SDK_VERSION}},
       std::string{});
   return default_resource;
 }

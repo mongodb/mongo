@@ -7,12 +7,14 @@
 #include <memory>
 #include <vector>
 
+#include "opentelemetry/sdk/instrumentationscope/scope_configurator.h"
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/sdk/trace/id_generator.h"
 #include "opentelemetry/sdk/trace/processor.h"
 #include "opentelemetry/sdk/trace/random_id_generator.h"
 #include "opentelemetry/sdk/trace/sampler.h"
 #include "opentelemetry/sdk/trace/samplers/always_on.h"
+#include "opentelemetry/sdk/trace/tracer_config.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
@@ -43,7 +45,12 @@ public:
           opentelemetry::sdk::resource::Resource::Create({}),
       std::unique_ptr<Sampler> sampler = std::unique_ptr<AlwaysOnSampler>(new AlwaysOnSampler),
       std::unique_ptr<IdGenerator> id_generator =
-          std::unique_ptr<IdGenerator>(new RandomIdGenerator())) noexcept;
+          std::unique_ptr<IdGenerator>(new RandomIdGenerator()),
+      std::unique_ptr<instrumentationscope::ScopeConfigurator<TracerConfig>> tracer_configurator =
+          std::make_unique<instrumentationscope::ScopeConfigurator<TracerConfig>>(
+              instrumentationscope::ScopeConfigurator<TracerConfig>::Builder(
+                  TracerConfig::Default())
+                  .Build())) noexcept;
 
   virtual ~TracerContext() = default;
 
@@ -78,6 +85,13 @@ public:
   const opentelemetry::sdk::resource::Resource &GetResource() const noexcept;
 
   /**
+   * Obtain the ScopeConfigurator with this tracer context.
+   * @return The ScopeConfigurator for this tracer context.
+   */
+  const instrumentationscope::ScopeConfigurator<TracerConfig> &GetTracerConfigurator()
+      const noexcept;
+
+  /**
    * Obtain the Id Generator associated with this tracer context.
    * @return The ID Generator for this tracer context.
    */
@@ -100,6 +114,7 @@ private:
   std::unique_ptr<Sampler> sampler_;
   std::unique_ptr<IdGenerator> id_generator_;
   std::unique_ptr<SpanProcessor> processor_;
+  std::unique_ptr<instrumentationscope::ScopeConfigurator<TracerConfig>> tracer_configurator_;
 };
 
 }  // namespace trace

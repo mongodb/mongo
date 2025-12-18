@@ -8,6 +8,7 @@
 
 #include "opentelemetry/exporters/otlp/otlp_http_client.h"
 #include "opentelemetry/exporters/otlp/otlp_http_metric_exporter_options.h"
+#include "opentelemetry/exporters/otlp/otlp_http_metric_exporter_runtime_options.h"
 #include "opentelemetry/sdk/common/exporter_utils.h"
 #include "opentelemetry/sdk/metrics/export/metric_producer.h"
 #include "opentelemetry/sdk/metrics/instruments.h"
@@ -37,6 +38,14 @@ public:
   OtlpHttpMetricExporter(const OtlpHttpMetricExporterOptions &options);
 
   /**
+   * Create an OtlpHttpMetricExporter with user specified options.
+   * @param options An object containing the user's configuration options.
+   * @param runtime_options An object containing the user's runtime options.
+   */
+  OtlpHttpMetricExporter(const OtlpHttpMetricExporterOptions &options,
+                         const OtlpHttpMetricExporterRuntimeOptions &runtime_options);
+
+  /**
    * Get the AggregationTemporality for exporter
    *
    * @return AggregationTemporality
@@ -58,10 +67,12 @@ public:
 
 private:
   // Configuration options for the exporter
-  const OtlpHttpMetricExporterOptions options_;
+  OtlpHttpMetricExporterOptions options_;
+  // Runtime options for the exporter
+  OtlpHttpMetricExporterRuntimeOptions runtime_options_;
 
   // Aggregation Temporality Selector
-  const sdk::metrics::AggregationTemporalitySelector aggregation_temporality_selector_;
+  sdk::metrics::AggregationTemporalitySelector aggregation_temporality_selector_;
 
   // Object that stores the HTTP sessions that have been created
   std::unique_ptr<OtlpHttpClient> http_client_;

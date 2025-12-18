@@ -1,14 +1,22 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "opentelemetry/exporters/memory/in_memory_metric_data.h"
-#include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
-#include "opentelemetry/sdk/metrics/export/metric_producer.h"
-#include "opentelemetry/sdk/resource/resource.h"
-
 #include <gtest/gtest.h>
-
+#include <map>
+#include <string>
+#include <utility>
 #include <vector>
+
+#include "opentelemetry/exporters/memory/in_memory_metric_data.h"
+#include "opentelemetry/nostd/string_view.h"
+#include "opentelemetry/nostd/unique_ptr.h"
+#include "opentelemetry/nostd/variant.h"
+#include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+#include "opentelemetry/sdk/metrics/data/metric_data.h"
+#include "opentelemetry/sdk/metrics/data/point_data.h"
+#include "opentelemetry/sdk/metrics/export/metric_producer.h"
+#include "opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/resource/resource.h"
 
 using opentelemetry::exporter::memory::CircularBufferInMemoryMetricData;
 using opentelemetry::exporter::memory::SimpleAggregateInMemoryMetricData;
@@ -23,8 +31,8 @@ TEST(InMemoryMetricDataTest, CircularBuffer)
 {
   CircularBufferInMemoryMetricData buf(10);
   Resource resource = Resource::GetEmpty();
-  buf.Add(std::make_unique<ResourceMetrics>(
-      &resource, std::vector<ScopeMetrics>{{nullptr, std::vector<MetricData>{}}}));
+  buf.Add(std::unique_ptr<ResourceMetrics>(new ResourceMetrics{
+      &resource, std::vector<ScopeMetrics>{{nullptr, std::vector<MetricData>{}}}}));
   EXPECT_EQ((*buf.Get().begin())->resource_, &resource);
 }
 
@@ -45,8 +53,8 @@ TEST(InMemoryMetricDataTest, SimpleAggregate)
   md.instrument_descriptor.name_ = "my-metric";
   md.point_data_attr_.push_back(pda);
 
-  agg.Add(std::make_unique<ResourceMetrics>(
-      &resource, std::vector<ScopeMetrics>{{scope.get(), std::vector<MetricData>{md}}}));
+  agg.Add(std::unique_ptr<ResourceMetrics>(new ResourceMetrics{
+      &resource, std::vector<ScopeMetrics>{{scope.get(), std::vector<MetricData>{md}}}}));
   auto it = agg.Get("my-scope", "my-metric").begin();
 
   auto saved_point = opentelemetry::nostd::get<SumPointData>(it->second);

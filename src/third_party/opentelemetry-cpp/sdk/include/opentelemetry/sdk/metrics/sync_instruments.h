@@ -100,6 +100,40 @@ public:
   void Add(double value, const opentelemetry::context::Context &context) noexcept override;
 };
 
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+class LongGauge : public Synchronous, public opentelemetry::metrics::Gauge<int64_t>
+{
+public:
+  LongGauge(const InstrumentDescriptor &instrument_descriptor,
+            std::unique_ptr<SyncWritableMetricStorage> storage);
+
+  void Record(int64_t value,
+              const opentelemetry::common::KeyValueIterable &attributes) noexcept override;
+  void Record(int64_t value,
+              const opentelemetry::common::KeyValueIterable &attributes,
+              const opentelemetry::context::Context &context) noexcept override;
+
+  void Record(int64_t value) noexcept override;
+  void Record(int64_t value, const opentelemetry::context::Context &context) noexcept override;
+};
+
+class DoubleGauge : public Synchronous, public opentelemetry::metrics::Gauge<double>
+{
+public:
+  DoubleGauge(const InstrumentDescriptor &instrument_descriptor,
+              std::unique_ptr<SyncWritableMetricStorage> storage);
+
+  void Record(double value,
+              const opentelemetry::common::KeyValueIterable &attributes) noexcept override;
+  void Record(double value,
+              const opentelemetry::common::KeyValueIterable &attributes,
+              const opentelemetry::context::Context &context) noexcept override;
+
+  void Record(double value) noexcept override;
+  void Record(double value, const opentelemetry::context::Context &context) noexcept override;
+};
+#endif
+
 class LongHistogram : public Synchronous, public opentelemetry::metrics::Histogram<uint64_t>
 {
 public:

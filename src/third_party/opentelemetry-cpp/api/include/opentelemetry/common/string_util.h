@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <ctype.h>
+
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/version.h"
 
@@ -15,11 +17,11 @@ class StringUtil
 public:
   static nostd::string_view Trim(nostd::string_view str, size_t left, size_t right) noexcept
   {
-    while (left <= right && str[static_cast<std::size_t>(left)] == ' ')
+    while (left <= right && isspace(str[left]))
     {
       left++;
     }
-    while (left <= right && str[static_cast<std::size_t>(right)] == ' ')
+    while (left <= right && isspace(str[right]))
     {
       right--;
     }

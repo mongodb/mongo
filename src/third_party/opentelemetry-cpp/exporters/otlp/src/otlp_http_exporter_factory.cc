@@ -4,6 +4,7 @@
 #include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
 #include "opentelemetry/exporters/otlp/otlp_http_exporter.h"
 #include "opentelemetry/exporters/otlp/otlp_http_exporter_options.h"
+#include "opentelemetry/exporters/otlp/otlp_http_exporter_runtime_options.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace exporter
@@ -20,7 +21,16 @@ std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> OtlpHttpExporterFactory
 std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> OtlpHttpExporterFactory::Create(
     const OtlpHttpExporterOptions &options)
 {
-  std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> exporter(new OtlpHttpExporter(options));
+  OtlpHttpExporterRuntimeOptions runtime_options;
+  return Create(options, runtime_options);
+}
+
+std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> OtlpHttpExporterFactory::Create(
+    const OtlpHttpExporterOptions &options,
+    const OtlpHttpExporterRuntimeOptions &runtime_options)
+{
+  std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> exporter(
+      new OtlpHttpExporter(options, runtime_options));
   return exporter;
 }
 

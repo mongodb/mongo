@@ -68,8 +68,10 @@ public:
 #  else
     __builtin_ia32_pause();
 #  endif
-#elif defined(__arm__)
-    __asm__ volatile("yield" ::: "memory");
+#elif defined(__armel__) || defined(__ARMEL__)
+    asm volatile("nop" ::: "memory");
+#elif defined(__arm__) || defined(__aarch64__)  // arm big endian / arm64
+    __asm__ __volatile__("yield" ::: "memory");
 #else
     // TODO: Issue PAGE/YIELD on other architectures.
 #endif

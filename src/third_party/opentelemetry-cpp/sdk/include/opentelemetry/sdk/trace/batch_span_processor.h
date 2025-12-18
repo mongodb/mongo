@@ -14,6 +14,7 @@
 
 #include "opentelemetry/sdk/common/circular_buffer.h"
 #include "opentelemetry/sdk/trace/batch_span_processor_options.h"
+#include "opentelemetry/sdk/trace/batch_span_processor_runtime_options.h"
 #include "opentelemetry/sdk/trace/exporter.h"
 #include "opentelemetry/sdk/trace/processor.h"
 #include "opentelemetry/sdk/trace/recordable.h"
@@ -37,11 +38,23 @@ public:
    * Creates a batch span processor by configuring the specified exporter and other parameters
    * as per the official, language-agnostic opentelemetry specs.
    *
-   * @param exporter - The backend exporter to pass the ended spans to.
-   * @param options - The batch SpanProcessor options.
+   * @param exporter The backend exporter to pass the ended spans to.
+   * @param options The batch SpanProcessor configuration options.
    */
   BatchSpanProcessor(std::unique_ptr<SpanExporter> &&exporter,
                      const BatchSpanProcessorOptions &options);
+
+  /**
+   * Creates a batch span processor by configuring the specified exporter and other parameters
+   * as per the official, language-agnostic opentelemetry specs.
+   *
+   * @param exporter The backend exporter to pass the ended spans to.
+   * @param options The batch SpanProcessor configuration options.
+   * @param runtime_options The batch SpanProcessor runtime options.
+   */
+  BatchSpanProcessor(std::unique_ptr<SpanExporter> &&exporter,
+                     const BatchSpanProcessorOptions &options,
+                     const BatchSpanProcessorRuntimeOptions &runtime_options);
 
   /**
    * Requests a Recordable(Span) from the configured exporter.
@@ -78,10 +91,11 @@ public:
 
   /**
    * Shuts down the processor and does any cleanup required. Completely drains the buffer/queue of
-   * all its ended spans and passes them to the exporter. Any subsequent calls to OnStart, OnEnd,
-   * ForceFlush or Shutdown will return immediately without doing anything.
+   * all its ended spans and passes them to the exporter.
    *
-   * NOTE: Timeout functionality not supported yet.
+   * @param timeout minimum amount of microseconds to wait for shutdown before giving up and
+   * returning failure.
+   * @return true if the shutdown succeeded, false otherwise
    */
   bool Shutdown(
       std::chrono::microseconds timeout = (std::chrono::microseconds::max)()) noexcept override;
@@ -95,6 +109,17 @@ public:
   ~BatchSpanProcessor() override;
 
 protected:
+  /**
+   * Shuts down the processor and does any cleanup required. Completely drains the buffer/queue of
+   * all its ended spans and passes them to the exporter.
+   *
+   * @param timeout minimum amount of microseconds to wait for shutdown before giving up and
+   * returning failure.
+   * @return true if the shutdown succeeded, false otherwise
+   */
+  bool InternalShutdown(
+      std::chrono::microseconds timeout = (std::chrono::microseconds::max)()) noexcept;
+
   /**
    * The background routine performed by the worker thread.
    */
@@ -158,6 +183,7 @@ protected:
   std::shared_ptr<SynchronizationData> synchronization_data_;
 
   /* The background worker thread */
+  std::shared_ptr<sdk::common::ThreadInstrumentation> worker_thread_instrumentation_;
   std::thread worker_thread_;
 };
 

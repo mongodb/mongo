@@ -10,8 +10,10 @@
 
 #include "opentelemetry/exporters/otlp/otlp_file_client.h"
 #include "opentelemetry/exporters/otlp/otlp_file_client_options.h"
+#include "opentelemetry/exporters/otlp/otlp_file_client_runtime_options.h"
 #include "opentelemetry/exporters/otlp/otlp_file_metric_exporter.h"
 #include "opentelemetry/exporters/otlp/otlp_file_metric_exporter_options.h"
+#include "opentelemetry/exporters/otlp/otlp_file_metric_exporter_runtime_options.h"
 #include "opentelemetry/exporters/otlp/otlp_metric_utils.h"
 #include "opentelemetry/sdk/common/exporter_utils.h"
 #include "opentelemetry/sdk/common/global_log_handler.h"
@@ -37,10 +39,19 @@ OtlpFileMetricExporter::OtlpFileMetricExporter()
 {}
 
 OtlpFileMetricExporter::OtlpFileMetricExporter(const OtlpFileMetricExporterOptions &options)
+    : OtlpFileMetricExporter(options, OtlpFileMetricExporterRuntimeOptions())
+{}
+
+OtlpFileMetricExporter::OtlpFileMetricExporter(
+    const OtlpFileMetricExporterOptions &options,
+    const OtlpFileMetricExporterRuntimeOptions &runtime_options)
     : options_(options),
+      runtime_options_(runtime_options),
       aggregation_temporality_selector_{
           OtlpMetricUtils::ChooseTemporalitySelector(options_.aggregation_temporality)},
-      file_client_(new OtlpFileClient(OtlpFileClientOptions(options)))
+      file_client_(new OtlpFileClient(
+          OtlpFileClientOptions(static_cast<const OtlpFileClientOptions &>(options)),
+          OtlpFileClientRuntimeOptions(runtime_options)))
 {}
 
 // ----------------------------- Exporter methods ------------------------------

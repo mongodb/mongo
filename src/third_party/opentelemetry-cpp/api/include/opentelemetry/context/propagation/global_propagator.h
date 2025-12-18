@@ -32,7 +32,7 @@ public:
     return nostd::shared_ptr<TextMapPropagator>(GetPropagator());
   }
 
-  static void SetGlobalPropagator(nostd::shared_ptr<TextMapPropagator> prop) noexcept
+  static void SetGlobalPropagator(const nostd::shared_ptr<TextMapPropagator> &prop) noexcept
   {
     std::lock_guard<common::SpinLockMutex> guard(GetLock());
     GetPropagator() = prop;

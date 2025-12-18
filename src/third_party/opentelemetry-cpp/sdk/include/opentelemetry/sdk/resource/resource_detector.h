@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/version.h"
 
@@ -21,6 +23,10 @@ public:
   ResourceDetector()          = default;
   virtual ~ResourceDetector() = default;
   virtual Resource Detect()   = 0;
+
+protected:
+  static Resource Create(const ResourceAttributes &attributes,
+                         const std::string &schema_url = std::string{});
 };
 
 /**

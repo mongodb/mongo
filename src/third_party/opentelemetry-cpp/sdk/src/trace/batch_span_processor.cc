@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <stddef.h>
-#include <stdint.h>
-#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <ratio>
@@ -22,11 +21,15 @@
 #include "opentelemetry/sdk/common/global_log_handler.h"
 #include "opentelemetry/sdk/trace/batch_span_processor.h"
 #include "opentelemetry/sdk/trace/batch_span_processor_options.h"
+#include "opentelemetry/sdk/trace/batch_span_processor_runtime_options.h"
 #include "opentelemetry/sdk/trace/exporter.h"
 #include "opentelemetry/sdk/trace/processor.h"
 #include "opentelemetry/sdk/trace/recordable.h"
-#include "opentelemetry/trace/span_context.h"
 #include "opentelemetry/version.h"
+
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+#  include "opentelemetry/sdk/common/thread_instrumentation.h"
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
 
 using opentelemetry::sdk::common::AtomicUniquePtr;
 using opentelemetry::sdk::common::CircularBufferRange;
@@ -46,8 +49,28 @@ BatchSpanProcessor::BatchSpanProcessor(std::unique_ptr<SpanExporter> &&exporter,
       max_export_batch_size_(options.max_export_batch_size),
       buffer_(max_queue_size_),
       synchronization_data_(std::make_shared<SynchronizationData>()),
-      worker_thread_(&BatchSpanProcessor::DoBackgroundWork, this)
-{}
+      worker_thread_instrumentation_(nullptr),
+      worker_thread_()
+{
+  // Make sure the constructor is complete before giving 'this' to a thread.
+  worker_thread_ = std::thread(&BatchSpanProcessor::DoBackgroundWork, this);
+}
+
+BatchSpanProcessor::BatchSpanProcessor(std::unique_ptr<SpanExporter> &&exporter,
+                                       const BatchSpanProcessorOptions &options,
+                                       const BatchSpanProcessorRuntimeOptions &runtime_options)
+    : exporter_(std::move(exporter)),
+      max_queue_size_(options.max_queue_size),
+      schedule_delay_millis_(options.schedule_delay_millis),
+      max_export_batch_size_(options.max_export_batch_size),
+      buffer_(max_queue_size_),
+      synchronization_data_(std::make_shared<SynchronizationData>()),
+      worker_thread_instrumentation_(runtime_options.thread_instrumentation),
+      worker_thread_()
+{
+  // Make sure the constructor is complete before giving 'this' to a thread.
+  worker_thread_ = std::thread(&BatchSpanProcessor::DoBackgroundWork, this);
+}
 
 std::unique_ptr<Recordable> BatchSpanProcessor::MakeRecordable() noexcept
 {
@@ -149,10 +172,24 @@ bool BatchSpanProcessor::ForceFlush(std::chrono::microseconds timeout) noexcept
 
 void BatchSpanProcessor::DoBackgroundWork()
 {
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+  if (worker_thread_instrumentation_ != nullptr)
+  {
+    worker_thread_instrumentation_->OnStart();
+  }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
+
   auto timeout = schedule_delay_millis_;
 
   while (true)
   {
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+    if (worker_thread_instrumentation_ != nullptr)
+    {
+      worker_thread_instrumentation_->BeforeWait();
+    }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
+
     // Wait for `timeout` milliseconds
     std::unique_lock<std::mutex> lk(synchronization_data_->cv_m);
     synchronization_data_->cv.wait_for(lk, timeout, [this] {
@@ -166,10 +203,17 @@ void BatchSpanProcessor::DoBackgroundWork()
     synchronization_data_->is_force_wakeup_background_worker.store(false,
                                                                    std::memory_order_release);
 
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+    if (worker_thread_instrumentation_ != nullptr)
+    {
+      worker_thread_instrumentation_->AfterWait();
+    }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
+
     if (synchronization_data_->is_shutdown.load() == true)
     {
       DrainQueue();
-      return;
+      break;
     }
 
     auto start = std::chrono::steady_clock::now();
@@ -180,14 +224,28 @@ void BatchSpanProcessor::DoBackgroundWork()
     // Subtract the duration of this export call from the next `timeout`.
     timeout = schedule_delay_millis_ - duration;
   }
+
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+  if (worker_thread_instrumentation_ != nullptr)
+  {
+    worker_thread_instrumentation_->OnEnd();
+  }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
 }
 
 void BatchSpanProcessor::Export()
 {
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+  if (worker_thread_instrumentation_ != nullptr)
+  {
+    worker_thread_instrumentation_->BeforeLoad();
+  }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
+
   do
   {
     std::vector<std::unique_ptr<Recordable>> spans_arr;
-    size_t num_records_to_export;
+    size_t num_records_to_export{};
     std::uint64_t notify_force_flush =
         synchronization_data_->force_flush_pending_sequence.load(std::memory_order_acquire);
     if (notify_force_flush)
@@ -222,6 +280,13 @@ void BatchSpanProcessor::Export()
     exporter_->Export(nostd::span<std::unique_ptr<Recordable>>(spans_arr.data(), spans_arr.size()));
     NotifyCompletion(notify_force_flush, exporter_, synchronization_data_);
   } while (true);
+
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+  if (worker_thread_instrumentation_ != nullptr)
+  {
+    worker_thread_instrumentation_->AfterLoad();
+  }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
 }
 
 void BatchSpanProcessor::NotifyCompletion(
@@ -294,6 +359,19 @@ void BatchSpanProcessor::GetWaitAdjustedTime(
 
 bool BatchSpanProcessor::Shutdown(std::chrono::microseconds timeout) noexcept
 {
+  return InternalShutdown(timeout);
+}
+
+BatchSpanProcessor::~BatchSpanProcessor()
+{
+  if (synchronization_data_->is_shutdown.load() == false)
+  {
+    InternalShutdown();
+  }
+}
+
+bool BatchSpanProcessor::InternalShutdown(std::chrono::microseconds timeout) noexcept
+{
   auto start_time = std::chrono::system_clock::now();
   std::lock_guard<std::mutex> shutdown_guard{synchronization_data_->shutdown_m};
   bool already_shutdown = synchronization_data_->is_shutdown.exchange(true);
@@ -313,14 +391,6 @@ bool BatchSpanProcessor::Shutdown(std::chrono::microseconds timeout) noexcept
   }
 
   return true;
-}
-
-BatchSpanProcessor::~BatchSpanProcessor()
-{
-  if (synchronization_data_->is_shutdown.load() == false)
-  {
-    Shutdown();
-  }
 }
 
 }  // namespace trace

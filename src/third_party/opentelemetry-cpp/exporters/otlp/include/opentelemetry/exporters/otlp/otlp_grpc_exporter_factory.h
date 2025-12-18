@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h"
+#include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/trace/exporter.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
@@ -13,6 +14,8 @@ namespace exporter
 {
 namespace otlp
 {
+
+class OtlpGrpcClient;
 
 /**
  * Factory class for OtlpGrpcExporter.
@@ -30,6 +33,13 @@ public:
    */
   static std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> Create(
       const OtlpGrpcExporterOptions &options);
+
+  /**
+   * Create an OtlpGrpcExporter using the given options and gRPC client.
+   */
+  static std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> Create(
+      const OtlpGrpcExporterOptions &options,
+      const std::shared_ptr<OtlpGrpcClient> &client);
 };
 
 }  // namespace otlp

@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "opentelemetry/sdk/resource/resource_detector.h"
+#include "opentelemetry/nostd/variant.h"
 #include "opentelemetry/sdk/common/env_variables.h"
 #include "opentelemetry/sdk/resource/resource.h"
-#include "opentelemetry/sdk/resource/semantic_conventions.h"
+#include "opentelemetry/semconv/service_attributes.h"
 #include "opentelemetry/version.h"
 
 #include <stddef.h>
@@ -18,21 +19,27 @@ namespace sdk
 namespace resource
 {
 
-const char *OTEL_RESOURCE_ATTRIBUTES = "OTEL_RESOURCE_ATTRIBUTES";
-const char *OTEL_SERVICE_NAME        = "OTEL_SERVICE_NAME";
+constexpr const char *kOtelResourceAttributes = "OTEL_RESOURCE_ATTRIBUTES";
+constexpr const char *kOtelServiceName        = "OTEL_SERVICE_NAME";
+
+Resource ResourceDetector::Create(const ResourceAttributes &attributes,
+                                  const std::string &schema_url)
+{
+  return Resource(attributes, schema_url);
+}
 
 Resource OTELResourceDetector::Detect() noexcept
 {
   std::string attributes_str, service_name;
 
   bool attributes_exists = opentelemetry::sdk::common::GetStringEnvironmentVariable(
-      OTEL_RESOURCE_ATTRIBUTES, attributes_str);
+      kOtelResourceAttributes, attributes_str);
   bool service_name_exists =
-      opentelemetry::sdk::common::GetStringEnvironmentVariable(OTEL_SERVICE_NAME, service_name);
+      opentelemetry::sdk::common::GetStringEnvironmentVariable(kOtelServiceName, service_name);
 
   if (!attributes_exists && !service_name_exists)
   {
-    return Resource();
+    return ResourceDetector::Create({});
   }
 
   ResourceAttributes attributes;
@@ -55,10 +62,10 @@ Resource OTELResourceDetector::Detect() noexcept
 
   if (service_name_exists)
   {
-    attributes[SemanticConventions::kServiceName] = service_name;
+    attributes[semconv::service::kServiceName] = service_name;
   }
 
-  return Resource(attributes);
+  return ResourceDetector::Create(attributes);
 }
 
 }  // namespace resource

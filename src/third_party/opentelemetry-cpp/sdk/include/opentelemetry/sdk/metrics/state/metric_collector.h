@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "opentelemetry/nostd/function_ref.h"
+#include "opentelemetry/sdk/metrics/export/metric_filter.h"
 #include "opentelemetry/sdk/metrics/export/metric_producer.h"
 #include "opentelemetry/sdk/metrics/instruments.h"
 #include "opentelemetry/sdk/metrics/metric_reader.h"
@@ -40,7 +41,9 @@ public:
 class MetricCollector : public MetricProducer, public CollectorHandle
 {
 public:
-  MetricCollector(MeterContext *context, std::shared_ptr<MetricReader> metric_reader);
+  MetricCollector(MeterContext *context,
+                  std::shared_ptr<MetricReader> metric_reader,
+                  std::unique_ptr<MetricFilter> metric_filter = nullptr);
 
   ~MetricCollector() override = default;
 
@@ -62,6 +65,7 @@ public:
 private:
   MeterContext *meter_context_;
   std::shared_ptr<MetricReader> metric_reader_;
+  std::unique_ptr<MetricFilter> metric_filter_;
 };
 }  // namespace metrics
 }  // namespace sdk

@@ -13,6 +13,36 @@ namespace common
 namespace internal_log
 {
 
+namespace
+{
+struct GlobalLogHandlerData
+{
+  nostd::shared_ptr<LogHandler> handler;
+  LogLevel log_level{LogLevel::Warning};
+
+  GlobalLogHandlerData() : handler(nostd::shared_ptr<LogHandler>(new DefaultLogHandler)) {}
+  ~GlobalLogHandlerData() { is_singleton_destroyed = true; }
+
+  GlobalLogHandlerData(const GlobalLogHandlerData &) = delete;
+  GlobalLogHandlerData(GlobalLogHandlerData &&)      = delete;
+
+  GlobalLogHandlerData &operator=(const GlobalLogHandlerData &) = delete;
+  GlobalLogHandlerData &operator=(GlobalLogHandlerData &&)      = delete;
+
+  static GlobalLogHandlerData &Instance() noexcept;
+  static bool is_singleton_destroyed;
+};
+
+bool GlobalLogHandlerData::is_singleton_destroyed = false;
+
+GlobalLogHandlerData &GlobalLogHandlerData::Instance() noexcept
+{
+  static GlobalLogHandlerData instance;
+  return instance;
+}
+
+}  // namespace
+
 LogHandler::~LogHandler() {}
 
 void DefaultLogHandler::Handle(LogLevel level,
@@ -57,11 +87,43 @@ void NoopLogHandler::Handle(LogLevel,
                             const sdk::common::AttributeMap &) noexcept
 {}
 
-std::pair<nostd::shared_ptr<LogHandler>, LogLevel> &GlobalLogHandler::GetHandlerAndLevel() noexcept
+nostd::shared_ptr<LogHandler> GlobalLogHandler::GetLogHandler() noexcept
 {
-  static std::pair<nostd::shared_ptr<LogHandler>, LogLevel> handler_and_level{
-      nostd::shared_ptr<LogHandler>(new DefaultLogHandler), LogLevel::Warning};
-  return handler_and_level;
+  if OPENTELEMETRY_UNLIKELY_CONDITION (GlobalLogHandlerData::is_singleton_destroyed)
+  {
+    return nostd::shared_ptr<LogHandler>();
+  }
+
+  return GlobalLogHandlerData::Instance().handler;
+}
+
+void GlobalLogHandler::SetLogHandler(const nostd::shared_ptr<LogHandler> &eh) noexcept
+{
+  if OPENTELEMETRY_UNLIKELY_CONDITION (GlobalLogHandlerData::is_singleton_destroyed)
+  {
+    return;
+  }
+
+  GlobalLogHandlerData::Instance().handler = eh;
+}
+
+LogLevel GlobalLogHandler::GetLogLevel() noexcept
+{
+  if OPENTELEMETRY_UNLIKELY_CONDITION (GlobalLogHandlerData::is_singleton_destroyed)
+  {
+    return LogLevel::None;
+  }
+
+  return GlobalLogHandlerData::Instance().log_level;
+}
+
+void GlobalLogHandler::SetLogLevel(LogLevel level) noexcept
+{
+  if OPENTELEMETRY_UNLIKELY_CONDITION (GlobalLogHandlerData::is_singleton_destroyed)
+  {
+    return;
+  }
+  GlobalLogHandlerData::Instance().log_level = level;
 }
 
 }  // namespace internal_log

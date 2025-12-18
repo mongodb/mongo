@@ -124,6 +124,19 @@ public:
   bool Shutdown(
       std::chrono::microseconds timeout = (std::chrono::microseconds::max)()) noexcept override
   {
+    return InternalShutdown(timeout);
+  }
+
+  ~MultiSpanProcessor() override
+  {
+    InternalShutdown();
+    Cleanup();
+  }
+
+protected:
+  bool InternalShutdown(
+      std::chrono::microseconds timeout = (std::chrono::microseconds::max)()) noexcept
+  {
     bool result         = true;
     ProcessorNode *node = head_;
     while (node != nullptr)
@@ -133,12 +146,6 @@ public:
       node = node->next_;
     }
     return result;
-  }
-
-  ~MultiSpanProcessor() override
-  {
-    Shutdown();
-    Cleanup();
   }
 
 private:

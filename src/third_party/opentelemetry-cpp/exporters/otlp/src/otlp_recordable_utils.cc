@@ -1,7 +1,6 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include <algorithm>
 #include <cstddef>
 #include <list>
 #include <memory>
@@ -13,7 +12,6 @@
 #include "opentelemetry/exporters/otlp/otlp_recordable.h"
 #include "opentelemetry/exporters/otlp/otlp_recordable_utils.h"
 #include "opentelemetry/nostd/span.h"
-#include "opentelemetry/sdk/common/attribute_utils.h"
 #include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
 #include "opentelemetry/sdk/resource/resource.h"
 #include "opentelemetry/sdk/trace/recordable.h"
@@ -103,6 +101,9 @@ void OtlpRecordableUtils::PopulateRequest(
         proto::common::v1::InstrumentationScope instrumentation_scope_proto;
         instrumentation_scope_proto.set_name(input_scope_spans.first->GetName());
         instrumentation_scope_proto.set_version(input_scope_spans.first->GetVersion());
+        OtlpPopulateAttributeUtils::PopulateAttribute(&instrumentation_scope_proto,
+                                                      *input_scope_spans.first);
+
         *scope_spans->mutable_scope() = instrumentation_scope_proto;
         scope_spans->set_schema_url(input_scope_spans.first->GetSchemaURL());
       }
@@ -115,7 +116,6 @@ void OtlpRecordableUtils::PopulateRequest(
     }
   }
 }
-
 }  // namespace otlp
 }  // namespace exporter
 OPENTELEMETRY_END_NAMESPACE

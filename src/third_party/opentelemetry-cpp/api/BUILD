@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "int_flag", "string_flag")
+load("@bazel_skylib//rules:common_settings.bzl", "int_flag", "string_flag")
 load("//src/third_party/opentelemetry-cpp:otel_rules.bzl", "OTEL_COPTS", "OTEL_TARGET_COMPATIBLE_WITH")
 
 package(default_visibility = ["//visibility:public"])

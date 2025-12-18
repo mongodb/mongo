@@ -3,9 +3,11 @@
 
 #pragma once
 
-#include <stdlib.h>
+#include <cerrno>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
+#include <utility>
 
 #include "opentelemetry/version.h"
 
@@ -33,7 +35,7 @@ public:
   std::string query_;
   bool success_;
 
-  UrlParser(std::string url) : url_(url), success_(true)
+  UrlParser(std::string url) : url_(std::move(url)), success_(true)
   {
     if (url_.length() == 0)
     {
@@ -49,15 +51,15 @@ public:
     }
     else
     {
-      scheme_ = std::string(url_.begin() + cpos, url_.begin() + pos);
+      scheme_ = url_.substr(cpos, pos - cpos);
       cpos    = pos + 3;
     }
 
     // credentials
-    size_t pos1 = url_.find_first_of("@", cpos);
-    size_t pos2 = url_.find_first_of("/", cpos);
+    size_t pos1 = url_.find_first_of('@', cpos);
     if (pos1 != std::string::npos)
     {
+      size_t pos2 = url_.find_first_of('/', cpos);
       // TODO - handle credentials
       if (pos2 == std::string::npos || pos1 < pos2)
       {
@@ -71,15 +73,19 @@ public:
     {
       // port missing. Used default 80 / 443
       if (scheme_ == "http")
+      {
         port_ = 80;
-      if (scheme_ == "https")
+      }
+      else if (scheme_ == "https")
+      {
         port_ = 443;
+      }
     }
     else
     {
       // port present
       is_port = true;
-      host_   = std::string(url_.begin() + cpos, url_.begin() + pos);
+      host_   = url_.substr(cpos, pos - cpos);
       cpos    = pos + 1;
     }
     pos = url_.find_first_of("/?", cpos);
@@ -88,23 +94,23 @@ public:
       path_ = std::string("/");  // use default path
       if (is_port)
       {
-        port_ = static_cast<uint16_t>(
-            std::stoi(std::string(url_.begin() + cpos, url_.begin() + url_.length())));
+        auto port_str = url_.substr(cpos);
+        port_         = GetPort(port_str);
       }
       else
       {
-        host_ = std::string(url_.begin() + cpos, url_.begin() + url_.length());
+        host_ = url_.substr(cpos);
       }
       return;
     }
     if (is_port)
     {
-      port_ =
-          static_cast<uint16_t>(std::stoi(std::string(url_.begin() + cpos, url_.begin() + pos)));
+      auto port_str = url_.substr(cpos, pos - cpos);
+      port_         = GetPort(port_str);
     }
     else
     {
-      host_ = std::string(url_.begin() + cpos, url_.begin() + pos);
+      host_ = url_.substr(cpos, pos - cpos);
     }
     cpos = pos;
 
@@ -113,21 +119,20 @@ public:
       pos = url_.find('?', cpos);
       if (pos == std::string::npos)
       {
-        path_  = std::string(url_.begin() + cpos, url_.begin() + url_.length());
-        query_ = "";
+        path_ = url_.substr(cpos);
       }
       else
       {
-        path_  = std::string(url_.begin() + cpos, url_.begin() + pos);
+        path_  = url_.substr(cpos, pos - cpos);
         cpos   = pos + 1;
-        query_ = std::string(url_.begin() + cpos, url_.begin() + url_.length());
+        query_ = url_.substr(cpos);
       }
       return;
     }
     path_ = std::string("/");
     if (url_[cpos] == '?')
     {
-      query_ = std::string(url_.begin() + cpos, url_.begin() + url_.length());
+      query_ = url_.substr(cpos);
     }
   }
 
@@ -164,6 +169,20 @@ private:
 
     return std::string::npos;
   }
+
+  std::uint16_t GetPort(const std::string &s)
+  {
+    char *e   = nullptr;
+    errno     = 0;
+    auto port = std::strtol(s.c_str(), &e, 10);
+    if (e == s.c_str() || e != s.c_str() + s.size() || errno == ERANGE || port < 0 || port > 65535)
+    {
+      success_ = false;
+      return 0;
+    }
+
+    return static_cast<uint16_t>(port);
+  }
 };
 
 class UrlDecoder
@@ -174,36 +193,39 @@ public:
     std::string result;
     result.reserve(encoded.size());
 
+    auto hex_to_int = [](int ch) -> int {
+      if (ch >= '0' && ch <= '9')
+        return ch - '0';
+      if (ch >= 'a' && ch <= 'f')
+        return ch - 'a' + 10;
+      if (ch >= 'A' && ch <= 'F')
+        return ch - 'A' + 10;
+      return -1;
+    };
+
     for (size_t pos = 0; pos < encoded.size(); pos++)
     {
-      if (encoded[pos] == '%')
+      auto c = encoded[pos];
+      if (c == '%')
       {
-
-        // Invalid input: less than two characters left after '%'
-        if (encoded.size() < pos + 3)
+        if (pos + 2 >= encoded.size())
         {
           return encoded;
         }
 
-        char hex[3] = {0};
-        hex[0]      = encoded[++pos];
-        hex[1]      = encoded[++pos];
+        int hi = hex_to_int(encoded[pos + 1]);
+        int lo = hex_to_int(encoded[pos + 2]);
 
-        char *endptr;
-        long value = strtol(hex, &endptr, 16);
-
-        // Invalid input: no valid hex characters after '%'
-        if (endptr != &hex[2])
+        if (hi == -1 || lo == -1)
         {
           return encoded;
         }
 
-        result.push_back(static_cast<char>(value));
+        c = static_cast<char>((hi << 4) | lo);
+        pos += 2;
       }
-      else
-      {
-        result.push_back(encoded[pos]);
-      }
+
+      result.push_back(c);
     }
 
     return result;

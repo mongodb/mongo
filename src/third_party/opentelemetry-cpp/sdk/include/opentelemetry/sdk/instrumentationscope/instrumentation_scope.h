@@ -103,7 +103,8 @@ public:
    */
   bool operator==(const InstrumentationScope &other) const noexcept
   {
-    return equal(other.name_, other.version_, other.schema_url_);
+    return this->name_ == other.name_ && this->version_ == other.version_ &&
+           this->schema_url_ == other.schema_url_ && this->attributes_ == other.attributes_;
   }
 
   /**
@@ -112,14 +113,31 @@ public:
    * @param name name of the instrumentation scope to compare.
    * @param version version of the instrumentation scope to compare.
    * @param schema_url schema url of the telemetry emitted by the scope.
+   * @param attributes attributes of the instrumentation scope to compare.
    * @returns true if name and version in this instrumentation scope are equal with the given name
    * and version.
    */
   bool equal(const nostd::string_view name,
              const nostd::string_view version,
-             const nostd::string_view schema_url = "") const noexcept
+             const nostd::string_view schema_url                       = "",
+             const opentelemetry::common::KeyValueIterable *attributes = nullptr) const noexcept
   {
-    return this->name_ == name && this->version_ == version && this->schema_url_ == schema_url;
+
+    if (this->name_ != name || this->version_ != version || this->schema_url_ != schema_url)
+    {
+      return false;
+    }
+
+    if (attributes == nullptr)
+    {
+      if (attributes_.empty())
+      {
+        return true;
+      }
+      return false;
+    }
+
+    return attributes_.EqualTo(*attributes);
   }
 
   const std::string &GetName() const noexcept { return name_; }

@@ -41,7 +41,7 @@
 // can be used in defining new arrays. If you use this macro on a pointer by
 // mistake, you will get a compile-time error.
 #define OTABSL_ARRAYSIZE(array) \
-  (sizeof(::absl::macros_internal::ArraySizeHelper(array)))
+  (sizeof(::absl::OTABSL_OPTION_NAMESPACE_NAME::macros_internal::ArraySizeHelper(array)))
 
 namespace absl {
 OTABSL_NAMESPACE_BEGIN
@@ -60,7 +60,7 @@ OTABSL_NAMESPACE_END
 // static storage duration, and that the constructor should do nothing to its
 // state. Use of this macro indicates to the reader that it is legal to
 // declare a static instance of the class, provided the constructor is given
-// the absl::base_internal::kLinkerInitialized argument.
+// the absl::OTABSL_OPTION_NAMESPACE_NAME::base_internal::kLinkerInitialized argument.
 //
 // Normally, it is unsafe to declare a static variable that has a constructor or
 // a destructor because invocation order is undefined. However, if the type can
@@ -70,10 +70,10 @@ OTABSL_NAMESPACE_END
 //
 // Example:
 //       // Declaration
-//       explicit MyClass(absl::base_internal:LinkerInitialized x) {}
+//       explicit MyClass(absl::OTABSL_OPTION_NAMESPACE_NAME::base_internal:LinkerInitialized x) {}
 //
 //       // Invocation
-//       static MyClass my_global(absl::base_internal::kLinkerInitialized);
+//       static MyClass my_global(absl::OTABSL_OPTION_NAMESPACE_NAME::base_internal::kLinkerInitialized);
 namespace absl {
 OTABSL_NAMESPACE_BEGIN
 namespace base_internal {

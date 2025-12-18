@@ -5,6 +5,8 @@
 
 #ifdef ENABLE_METRICS_EXEMPLAR_PREVIEW
 
+#  include <algorithm>
+
 #  include "opentelemetry/common/macros.h"
 #  include "opentelemetry/sdk/metrics/aggregation/aggregation_config.h"
 #  include "opentelemetry/sdk/metrics/exemplar/aligned_histogram_bucket_exemplar_reservoir.h"
@@ -25,6 +27,23 @@ static inline MapAndResetCellType GetMapAndResetCellMethod(
   }
 
   return &ReservoirCell::GetAndResetDouble;
+}
+
+static inline size_t GetSimpleFixedReservoirDefaultSize(const AggregationType agg_type,
+                                                        const AggregationConfig *const agg_config)
+
+{
+  constexpr size_t kMaxBase2ExponentialHistogramReservoirSize = 20;
+
+  if (agg_type == AggregationType::kBase2ExponentialHistogram)
+  {
+    const auto *histogram_agg_config =
+        static_cast<const Base2ExponentialHistogramAggregationConfig *>(agg_config);
+    return (std::min)(kMaxBase2ExponentialHistogramReservoirSize,
+                      histogram_agg_config->max_buckets_);
+  }
+
+  return SimpleFixedSizeExemplarReservoir::kDefaultSimpleReservoirSize;
 }
 
 static inline nostd::shared_ptr<ExemplarReservoir> GetExemplarReservoir(
@@ -52,7 +71,7 @@ static inline nostd::shared_ptr<ExemplarReservoir> GetExemplarReservoir(
   }
 
   return nostd::shared_ptr<ExemplarReservoir>(new SimpleFixedSizeExemplarReservoir(
-      SimpleFixedSizeExemplarReservoir::kDefaultSimpleReservoirSize,
+      GetSimpleFixedReservoirDefaultSize(agg_type, agg_config),
       SimpleFixedSizeExemplarReservoir::GetSimpleFixedSizeCellSelector(),
       GetMapAndResetCellMethod(instrument_descriptor)));
 }

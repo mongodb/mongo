@@ -20,6 +20,7 @@
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/nostd/variant.h"
 #include "opentelemetry/sdk/common/exporter_utils.h"
+#include "opentelemetry/sdk/common/thread_instrumentation.h"
 #include "opentelemetry/version.h"
 
 // forward declare google::protobuf::Message
@@ -74,6 +75,9 @@ struct OtlpHttpClientOptions
   // Additional HTTP headers
   OtlpHeaders http_headers;
 
+  // Retry policy for select failure codes
+  ext::http::client::RetryPolicy retry_policy;
+
   // Concurrent requests
   std::size_t max_concurrent_requests = 64;
 
@@ -83,28 +87,37 @@ struct OtlpHttpClientOptions
   // User agent
   std::string user_agent;
 
-  inline OtlpHttpClientOptions(nostd::string_view input_url,
-                               bool input_ssl_insecure_skip_verify,
-                               nostd::string_view input_ssl_ca_cert_path,
-                               nostd::string_view input_ssl_ca_cert_string,
-                               nostd::string_view input_ssl_client_key_path,
-                               nostd::string_view input_ssl_client_key_string,
-                               nostd::string_view input_ssl_client_cert_path,
-                               nostd::string_view input_ssl_client_cert_string,
-                               nostd::string_view input_ssl_min_tls,
-                               nostd::string_view input_ssl_max_tls,
-                               nostd::string_view input_ssl_cipher,
-                               nostd::string_view input_ssl_cipher_suite,
-                               HttpRequestContentType input_content_type,
-                               JsonBytesMappingKind input_json_bytes_mapping,
-                               nostd::string_view input_compression,
-                               bool input_use_json_name,
-                               bool input_console_debug,
-                               std::chrono::system_clock::duration input_timeout,
-                               const OtlpHeaders &input_http_headers,
-                               std::size_t input_concurrent_sessions         = 64,
-                               std::size_t input_max_requests_per_connection = 8,
-                               nostd::string_view input_user_agent = GetOtlpDefaultUserAgent())
+  std::shared_ptr<sdk::common::ThreadInstrumentation> thread_instrumentation =
+      std::shared_ptr<sdk::common::ThreadInstrumentation>(nullptr);
+
+  inline OtlpHttpClientOptions(
+      nostd::string_view input_url,
+      bool input_ssl_insecure_skip_verify,
+      nostd::string_view input_ssl_ca_cert_path,
+      nostd::string_view input_ssl_ca_cert_string,
+      nostd::string_view input_ssl_client_key_path,
+      nostd::string_view input_ssl_client_key_string,
+      nostd::string_view input_ssl_client_cert_path,
+      nostd::string_view input_ssl_client_cert_string,
+      nostd::string_view input_ssl_min_tls,
+      nostd::string_view input_ssl_max_tls,
+      nostd::string_view input_ssl_cipher,
+      nostd::string_view input_ssl_cipher_suite,
+      HttpRequestContentType input_content_type,
+      JsonBytesMappingKind input_json_bytes_mapping,
+      nostd::string_view input_compression,
+      bool input_use_json_name,
+      bool input_console_debug,
+      std::chrono::system_clock::duration input_timeout,
+      const OtlpHeaders &input_http_headers,
+      std::uint32_t input_retry_policy_max_attempts,
+      std::chrono::duration<float> input_retry_policy_initial_backoff,
+      std::chrono::duration<float> input_retry_policy_max_backoff,
+      float input_retry_policy_backoff_multiplier,
+      const std::shared_ptr<sdk::common::ThreadInstrumentation> &input_thread_instrumentation,
+      std::size_t input_concurrent_sessions         = 64,
+      std::size_t input_max_requests_per_connection = 8,
+      nostd::string_view input_user_agent           = GetOtlpDefaultUserAgent())
       : url(input_url),
         ssl_options(input_url,
                     input_ssl_insecure_skip_verify,
@@ -125,9 +138,12 @@ struct OtlpHttpClientOptions
         console_debug(input_console_debug),
         timeout(input_timeout),
         http_headers(input_http_headers),
+        retry_policy{input_retry_policy_max_attempts, input_retry_policy_initial_backoff,
+                     input_retry_policy_max_backoff, input_retry_policy_backoff_multiplier},
         max_concurrent_requests(input_concurrent_sessions),
         max_requests_per_connection(input_max_requests_per_connection),
-        user_agent(input_user_agent)
+        user_agent(input_user_agent),
+        thread_instrumentation(input_thread_instrumentation)
   {}
 };
 
@@ -143,6 +159,10 @@ public:
   explicit OtlpHttpClient(OtlpHttpClientOptions &&options);
 
   ~OtlpHttpClient();
+  OtlpHttpClient(const OtlpHttpClient &)            = delete;
+  OtlpHttpClient &operator=(const OtlpHttpClient &) = delete;
+  OtlpHttpClient(OtlpHttpClient &&)                 = delete;
+  OtlpHttpClient &operator=(OtlpHttpClient &&)      = delete;
 
   /**
    * Sync export
@@ -214,28 +234,13 @@ private:
     std::shared_ptr<opentelemetry::ext::http::client::Session> session;
     std::shared_ptr<opentelemetry::ext::http::client::EventHandler> event_handle;
 
-    inline HttpSessionData() = default;
+    HttpSessionData() = default;
 
-    inline explicit HttpSessionData(
+    explicit HttpSessionData(
         std::shared_ptr<opentelemetry::ext::http::client::Session> &&input_session,
         std::shared_ptr<opentelemetry::ext::http::client::EventHandler> &&input_handle)
-    {
-      session.swap(input_session);
-      event_handle.swap(input_handle);
-    }
-
-    inline HttpSessionData(HttpSessionData &&other)
-    {
-      session.swap(other.session);
-      event_handle.swap(other.event_handle);
-    }
-
-    inline HttpSessionData &operator=(HttpSessionData &&other) noexcept
-    {
-      session.swap(other.session);
-      event_handle.swap(other.event_handle);
-      return *this;
-    }
+        : session(std::move(input_session)), event_handle(std::move(input_handle))
+    {}
   };
 
   /**

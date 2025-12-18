@@ -13,9 +13,11 @@
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/nostd/variant.h"
 #include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
+#include "opentelemetry/sdk/instrumentationscope/scope_configurator.h"
 #include "opentelemetry/sdk/trace/id_generator.h"
 #include "opentelemetry/sdk/trace/sampler.h"
 #include "opentelemetry/sdk/trace/tracer.h"
+#include "opentelemetry/sdk/trace/tracer_config.h"
 #include "opentelemetry/sdk/trace/tracer_context.h"
 #include "opentelemetry/trace/context.h"
 #include "opentelemetry/trace/noop.h"
@@ -36,11 +38,19 @@ namespace sdk
 {
 namespace trace
 {
+const std::shared_ptr<opentelemetry::trace::NoopTracer> Tracer::kNoopTracer =
+    std::make_shared<opentelemetry::trace::NoopTracer>();
 
 Tracer::Tracer(std::shared_ptr<TracerContext> context,
                std::unique_ptr<InstrumentationScope> instrumentation_scope) noexcept
-    : instrumentation_scope_{std::move(instrumentation_scope)}, context_{std::move(context)}
-{}
+    : instrumentation_scope_{std::move(instrumentation_scope)},
+      context_{std::move(context)},
+      tracer_config_(context_->GetTracerConfigurator().ComputeConfig(*instrumentation_scope_))
+{
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+  UpdateEnabled(tracer_config_.IsEnabled());
+#endif
+}
 
 nostd::shared_ptr<opentelemetry::trace::Span> Tracer::StartSpan(
     nostd::string_view name,
@@ -48,6 +58,10 @@ nostd::shared_ptr<opentelemetry::trace::Span> Tracer::StartSpan(
     const opentelemetry::trace::SpanContextKeyValueIterable &links,
     const opentelemetry::trace::StartSpanOptions &options) noexcept
 {
+  if (!tracer_config_.IsEnabled())
+  {
+    return kNoopTracer->StartSpan(name, attributes, links, options);
+  }
   opentelemetry::trace::SpanContext parent_context = GetCurrentSpan()->GetContext();
   if (nostd::holds_alternative<opentelemetry::trace::SpanContext>(options.parent))
   {
@@ -101,6 +115,10 @@ nostd::shared_ptr<opentelemetry::trace::Span> Tracer::StartSpan(
   if (sampling_result.IsSampled())
   {
     flags |= opentelemetry::trace::TraceFlags::kIsSampled;
+  }
+  else
+  {
+    flags &= ~opentelemetry::trace::TraceFlags::kIsSampled;
   }
 
 #if 1
@@ -165,7 +183,7 @@ void Tracer::ForceFlushWithMicroseconds(uint64_t timeout) noexcept
 void Tracer::CloseWithMicroseconds(uint64_t timeout) noexcept
 {
   // Trace context is shared by many tracers.So we just call ForceFlush to flush all pending spans
-  // and do not  shutdown it.
+  // and do not shutdown it.
   if (context_)
   {
     context_->ForceFlush(

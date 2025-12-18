@@ -3,17 +3,23 @@
 
 #include <curl/curl.h>
 #include <curl/curlver.h>
-#include <curl/system.h>
+
+#ifdef ENABLE_OTLP_RETRY_PREVIEW
+#  include <array>
+#endif  // ENABLE_OTLP_RETRY_PREVIEW
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cstdint>
+#include <cmath>
 #include <cstring>
 #include <functional>
 #include <future>
-#include <istream>
 #include <map>
 #include <memory>
+#include <random>
+#include <ratio>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <utility>
@@ -22,6 +28,7 @@
 #include "opentelemetry/ext/http/client/curl/http_client_curl.h"
 #include "opentelemetry/ext/http/client/curl/http_operation_curl.h"
 #include "opentelemetry/ext/http/client/http_client.h"
+#include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/sdk/common/global_log_handler.h"
 #include "opentelemetry/version.h"
 
@@ -39,6 +46,28 @@ namespace client
 {
 namespace curl
 {
+
+class HttpOperationAccessor
+{
+public:
+  OPENTELEMETRY_SANITIZER_NO_THREAD static std::thread::id GetThreadId(
+      const HttpOperation::AsyncData &async_data)
+  {
+#if !(defined(OPENTELEMETRY_HAVE_THREAD_SANITIZER) && OPENTELEMETRY_HAVE_THREAD_SANITIZER)
+    std::atomic_thread_fence(std::memory_order_acquire);
+#endif
+    return async_data.callback_thread;
+  }
+
+  OPENTELEMETRY_SANITIZER_NO_THREAD static void SetThreadId(HttpOperation::AsyncData &async_data,
+                                                            std::thread::id thread_id)
+  {
+    async_data.callback_thread = thread_id;
+#if !(defined(OPENTELEMETRY_HAVE_THREAD_SANITIZER) && OPENTELEMETRY_HAVE_THREAD_SANITIZER)
+    std::atomic_thread_fence(std::memory_order_release);
+#endif
+  }
+};
 
 size_t HttpOperation::WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
@@ -261,7 +290,9 @@ HttpOperation::HttpOperation(opentelemetry::ext::http::client::Method method,
                              // Default connectivity and response size options
                              bool is_raw_response,
                              std::chrono::milliseconds http_conn_timeout,
-                             bool reuse_connection)
+                             bool reuse_connection,
+                             bool is_log_enabled,
+                             const RetryPolicy &retry_policy)
     : is_aborted_(false),
       is_finished_(false),
       is_cleaned_(false),
@@ -281,6 +312,14 @@ HttpOperation::HttpOperation(opentelemetry::ext::http::client::Method method,
       request_nwrite_(0),
       session_state_(opentelemetry::ext::http::client::SessionState::Created),
       compression_(compression),
+      is_log_enabled_(is_log_enabled),
+      retry_policy_(retry_policy),
+      retry_attempts_((retry_policy.max_attempts > 0U &&
+                       retry_policy.initial_backoff > SecondsDecimal::zero() &&
+                       retry_policy.max_backoff > SecondsDecimal::zero() &&
+                       retry_policy.backoff_multiplier > 0.0f)
+                          ? 0
+                          : retry_policy.max_attempts),
       response_code_(0)
 {
   /* get a curl handle */
@@ -298,9 +337,7 @@ HttpOperation::HttpOperation(opentelemetry::ext::http::client::Method method,
   {
     for (auto &kv : this->request_headers_)
     {
-      std::string header = std::string(kv.first);
-      header += ": ";
-      header += std::string(kv.second);
+      const auto header = std::string(kv.first).append(": ").append(kv.second);
       curl_resource_.headers_chunk =
           curl_slist_append(curl_resource_.headers_chunk, header.c_str());
     }
@@ -320,7 +357,7 @@ HttpOperation::~HttpOperation()
     case opentelemetry::ext::http::client::SessionState::Sending: {
       if (async_data_ && async_data_->result_future.valid())
       {
-        if (async_data_->callback_thread != std::this_thread::get_id())
+        if (HttpOperationAccessor::GetThreadId(*async_data_) != std::this_thread::get_id())
         {
           async_data_->result_future.wait();
           last_curl_result_ = async_data_->result_future.get();
@@ -345,7 +382,7 @@ void HttpOperation::Finish()
   if (async_data_ && async_data_->result_future.valid())
   {
     // We should not wait in callback from Cleanup()
-    if (async_data_->callback_thread != std::this_thread::get_id())
+    if (HttpOperationAccessor::GetThreadId(*async_data_) != std::this_thread::get_id())
     {
       async_data_->result_future.wait();
       last_curl_result_ = async_data_->result_future.get();
@@ -397,9 +434,9 @@ void HttpOperation::Cleanup()
     callback.swap(async_data_->callback);
     if (callback)
     {
-      async_data_->callback_thread = std::this_thread::get_id();
+      HttpOperationAccessor::SetThreadId(*async_data_, std::this_thread::get_id());
       callback(*this);
-      async_data_->callback_thread = std::thread::id();
+      HttpOperationAccessor::SetThreadId(*async_data_, std::thread::id());
     }
 
     // Set value to promise to continue Finish()
@@ -423,6 +460,53 @@ void HttpOperation::Cleanup()
     curl_slist_free_all(curl_resource_.headers_chunk);
     curl_resource_.headers_chunk = nullptr;
   }
+}
+
+bool HttpOperation::IsRetryable()
+{
+#ifdef ENABLE_OTLP_RETRY_PREVIEW
+  static constexpr auto kRetryableStatusCodes = std::array<decltype(response_code_), 4>{
+      429,  // Too Many Requests
+      502,  // Bad Gateway
+      503,  // Service Unavailable
+      504   // Gateway Timeout
+  };
+
+  const auto is_retryable = std::find(kRetryableStatusCodes.cbegin(), kRetryableStatusCodes.cend(),
+                                      response_code_) != kRetryableStatusCodes.cend();
+
+  return is_retryable && (last_curl_result_ == CURLE_OK) &&
+         (retry_attempts_ < retry_policy_.max_attempts);
+#else
+  return false;
+#endif  // ENABLE_OTLP_RETRY_PREVIEW
+}
+
+std::chrono::system_clock::time_point HttpOperation::NextRetryTime()
+{
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+  static std::uniform_real_distribution<float> dis(0.8f, 1.2f);
+
+  // The initial retry attempt will occur after initialBackoff * random(0.8, 1.2)
+  auto backoff = retry_policy_.initial_backoff;
+
+  // After that, the n-th attempt will occur after
+  // min(initialBackoff*backoffMultiplier**(n-1), maxBackoff) * random(0.8, 1.2))
+  if (retry_attempts_ > 1)
+  {
+    backoff = (std::min)(retry_policy_.initial_backoff *
+                             std::pow(retry_policy_.backoff_multiplier,
+                                      static_cast<SecondsDecimal::rep>(retry_attempts_ - 1)),
+                         retry_policy_.max_backoff);
+  }
+
+  // Jitter of plus or minus 0.2 is applied to the backoff delay to avoid hammering servers at the
+  // same time from a large number of clients. Note that this means that the backoff delay may
+  // actually be slightly lower than initialBackoff or slightly higher than maxBackoff
+  backoff *= dis(gen);
+
+  return last_attempt_time_ + std::chrono::duration_cast<std::chrono::milliseconds>(backoff);
 }
 
 /*
@@ -453,6 +537,7 @@ void HttpOperation::Cleanup()
 #  define HAVE_TLS_VERSION
 #endif
 
+// NOLINTNEXTLINE(google-runtime-int)
 static long parse_min_ssl_version(const std::string &version)
 {
 #ifdef HAVE_TLS_VERSION
@@ -470,6 +555,7 @@ static long parse_min_ssl_version(const std::string &version)
   return 0;
 }
 
+// NOLINTNEXTLINE(google-runtime-int)
 static long parse_max_ssl_version(const std::string &version)
 {
 #ifdef HAVE_TLS_VERSION
@@ -489,7 +575,7 @@ static long parse_max_ssl_version(const std::string &version)
 
 const char *HttpOperation::GetCurlErrorMessage(CURLcode code)
 {
-  const char *message;
+  const char *message{nullptr};
 
   if (curl_error_message_[0] != '\0')
   {
@@ -507,8 +593,6 @@ const char *HttpOperation::GetCurlErrorMessage(CURLcode code)
 
 CURLcode HttpOperation::SetCurlPtrOption(CURLoption option, void *value)
 {
-  CURLcode rc;
-
   /*
     curl_easy_setopt() is a macro with variadic arguments, type unsafe.
     Various SetCurlXxxOption() helpers ensure it is called with a pointer,
@@ -517,7 +601,7 @@ CURLcode HttpOperation::SetCurlPtrOption(CURLoption option, void *value)
     - a blob (struct curl_blob*)
     - a headers chunk (curl_slist *)
   */
-  rc = curl_easy_setopt(curl_resource_.easy_handle, option, value);
+  const CURLcode rc = curl_easy_setopt(curl_resource_.easy_handle, option, value);
 
   if (rc != CURLE_OK)
   {
@@ -529,15 +613,14 @@ CURLcode HttpOperation::SetCurlPtrOption(CURLoption option, void *value)
   return rc;
 }
 
+// NOLINTNEXTLINE(google-runtime-int)
 CURLcode HttpOperation::SetCurlLongOption(CURLoption option, long value)
 {
-  CURLcode rc;
-
   /*
     curl_easy_setopt() is a macro with variadic arguments, type unsafe.
     SetCurlLongOption() ensures it is called with a long.
   */
-  rc = curl_easy_setopt(curl_resource_.easy_handle, option, value);
+  const CURLcode rc = curl_easy_setopt(curl_resource_.easy_handle, option, value);
 
   if (rc != CURLE_OK)
   {
@@ -551,13 +634,11 @@ CURLcode HttpOperation::SetCurlLongOption(CURLoption option, long value)
 
 CURLcode HttpOperation::SetCurlOffOption(CURLoption option, curl_off_t value)
 {
-  CURLcode rc;
-
   /*
     curl_easy_setopt() is a macro with variadic arguments, type unsafe.
     SetCurlOffOption() ensures it is called with a curl_off_t.
   */
-  rc = curl_easy_setopt(curl_resource_.easy_handle, option, value);
+  const CURLcode rc = curl_easy_setopt(curl_resource_.easy_handle, option, value);
 
   if (rc != CURLE_OK)
   {
@@ -569,23 +650,108 @@ CURLcode HttpOperation::SetCurlOffOption(CURLoption option, curl_off_t value)
   return rc;
 }
 
+int HttpOperation::CurlLoggerCallback(const CURL * /* handle */,
+                                      curl_infotype type,
+                                      const char *data,
+                                      size_t size,
+                                      void * /* clientp */) noexcept
+{
+  nostd::string_view text_to_log{data, size};
+
+  if (!text_to_log.empty() && text_to_log[size - 1] == '\n')
+  {
+    text_to_log = text_to_log.substr(0, size - 1);
+  }
+
+  if (type == CURLINFO_TEXT)
+  {
+    static const auto kTlsInfo    = nostd::string_view("SSL connection using");
+    static const auto kFailureMsg = nostd::string_view("Recv failure:");
+
+    if (text_to_log.substr(0, kTlsInfo.size()) == kTlsInfo)
+    {
+      OTEL_INTERNAL_LOG_INFO(text_to_log);
+    }
+    else if (text_to_log.substr(0, kFailureMsg.size()) == kFailureMsg)
+    {
+      OTEL_INTERNAL_LOG_ERROR(text_to_log);
+    }
+// This guard serves as a catch-all block for all other less interesting output that should
+// remain available for maintainer internal use and for debugging purposes only.
+#ifdef OTEL_CURL_DEBUG
+    else
+    {
+      OTEL_INTERNAL_LOG_DEBUG(text_to_log);
+    }
+#endif  // OTEL_CURL_DEBUG
+  }
+// Same as above, this guard is meant only for internal use by maintainers, and should not be used
+// in production (information leak).
+#ifdef OTEL_CURL_DEBUG
+  else if (type == CURLINFO_HEADER_OUT)
+  {
+    static const auto kHeaderSent = nostd::string_view("Send header => ");
+
+    while (!text_to_log.empty() && !std::iscntrl(text_to_log[0]))
+    {
+      const auto pos = text_to_log.find('\n');
+
+      if (pos != nostd::string_view::npos)
+      {
+        OTEL_INTERNAL_LOG_DEBUG(kHeaderSent << text_to_log.substr(0, pos - 1));
+        text_to_log = text_to_log.substr(pos + 1);
+      }
+    }
+  }
+  else if (type == CURLINFO_HEADER_IN)
+  {
+    static const auto kHeaderRecv = nostd::string_view("Recv header => ");
+    OTEL_INTERNAL_LOG_DEBUG(kHeaderRecv << text_to_log);
+  }
+#endif  // OTEL_CURL_DEBUG
+
+  return 0;
+}
+
 CURLcode HttpOperation::Setup()
 {
+#ifdef ENABLE_CURL_LOGGING
+  static constexpr auto kEnableCurlLogging = true;
+#else
+  static constexpr auto kEnableCurlLogging = false;
+#endif  // ENABLE_CURL_LOGGING
+
   if (!curl_resource_.easy_handle)
   {
     return CURLE_FAILED_INIT;
   }
 
-  CURLcode rc;
-
   curl_error_message_[0] = '\0';
   curl_easy_setopt(curl_resource_.easy_handle, CURLOPT_ERRORBUFFER, curl_error_message_);
 
-  rc = SetCurlLongOption(CURLOPT_VERBOSE, 0L);
+// Support for custom debug function callback was added in version 7.9.6 so we guard against
+// exposing the default CURL output by keeping verbosity always disabled in lower versions.
+#if LIBCURL_VERSION_NUM < CURL_VERSION_BITS(7, 9, 6)
+  CURLcode rc = SetCurlLongOption(CURLOPT_VERBOSE, 0L);
   if (rc != CURLE_OK)
   {
     return rc;
   }
+#else
+  CURLcode rc =
+      SetCurlLongOption(CURLOPT_VERBOSE, (is_log_enabled_ && kEnableCurlLogging) ? 1L : 0L);
+  if (rc != CURLE_OK)
+  {
+    return rc;
+  }
+
+  rc = SetCurlPtrOption(CURLOPT_DEBUGFUNCTION,
+                        reinterpret_cast<void *>(&HttpOperation::CurlLoggerCallback));
+  if (rc != CURLE_OK)
+  {
+    return rc;
+  }
+#endif
 
   // Specify target URL
   rc = SetCurlStrOption(CURLOPT_URL, url_.c_str());
@@ -729,8 +895,10 @@ CURLcode HttpOperation::Setup()
 
 #ifdef HAVE_TLS_VERSION
     /* By default, TLSv1.2 or better is required (if we have TLS). */
+    // NOLINTNEXTLINE(google-runtime-int)
     long min_ssl_version = CURL_SSLVERSION_TLSv1_2;
 #else
+    // NOLINTNEXTLINE(google-runtime-int)
     long min_ssl_version = 0;
 #endif
 
@@ -755,6 +923,7 @@ CURLcode HttpOperation::Setup()
      * The CURL + openssl library may be more recent than this code,
      * and support a version we do not know about.
      */
+    // NOLINTNEXTLINE(google-runtime-int)
     long max_ssl_version = 0;
 
     if (!ssl_options_.ssl_max_tls.empty())
@@ -773,6 +942,7 @@ CURLcode HttpOperation::Setup()
 #endif
     }
 
+    // NOLINTNEXTLINE(google-runtime-int)
     long version_range = min_ssl_version | max_ssl_version;
     if (version_range != 0)
     {
@@ -819,6 +989,7 @@ CURLcode HttpOperation::Setup()
     if (ssl_options_.ssl_insecure_skip_verify)
     {
       /* 6 - DO NOT ENFORCE VERIFICATION, This is not secure. */
+      // NOLINTNEXTLINE(google-runtime-int)
       rc = SetCurlLongOption(CURLOPT_USE_SSL, static_cast<long>(CURLUSESSL_NONE));
       if (rc != CURLE_OK)
       {
@@ -840,6 +1011,7 @@ CURLcode HttpOperation::Setup()
     else
     {
       /* 6 - ENFORCE VERIFICATION */
+      // NOLINTNEXTLINE(google-runtime-int)
       rc = SetCurlLongOption(CURLOPT_USE_SSL, static_cast<long>(CURLUSESSL_ALL));
       if (rc != CURLE_OK)
       {
@@ -894,8 +1066,8 @@ CURLcode HttpOperation::Setup()
 
   // TODO: control local port to use
   // curl_easy_setopt(curl, CURLOPT_LOCALPORT, dcf_port);
-
-  rc = SetCurlLongOption(CURLOPT_TIMEOUT_MS, http_conn_timeout_.count());
+  // NOLINTNEXTLINE(google-runtime-int)
+  rc = SetCurlLongOption(CURLOPT_TIMEOUT_MS, static_cast<long>(http_conn_timeout_.count()));
   if (rc != CURLE_OK)
   {
     return rc;
@@ -1111,11 +1283,6 @@ CURLcode HttpOperation::Send()
 
   CURLcode code = curl_easy_perform(curl_resource_.easy_handle);
   PerformCurlMessage(code);
-  if (CURLE_OK != code)
-  {
-    return code;
-  }
-
   return code;
 }
 
@@ -1161,7 +1328,7 @@ CURLcode HttpOperation::SendAsync(Session *session, std::function<void(HttpOpera
   async_data_->callback = std::move(callback);
 
   session->GetHttpClient().ScheduleAddSession(session->GetSessionId());
-  return code;
+  return CURLE_OK;
 }
 
 Headers HttpOperation::GetResponseHeaders()
@@ -1182,7 +1349,7 @@ Headers HttpOperation::GetResponseHeaders()
     // switching to string comparison. Need to debug and revert back.
 
     /*std::smatch match;
-    std::regex http_headers_regex(http_header_regexp);
+    std::regex http_headers_regex(kHttpHeaderRegexp);
     if (std::regex_search(header, match, http_headers_regex))
       result.insert(std::pair<nostd::string_view, nostd::string_view>(
           static_cast<nostd::string_view>(match[1]), static_cast<nostd::string_view>(match[2])));
@@ -1219,7 +1386,10 @@ void HttpOperation::Abort()
 
 void HttpOperation::PerformCurlMessage(CURLcode code)
 {
-  last_curl_result_ = code;
+  ++retry_attempts_;
+  last_attempt_time_ = std::chrono::system_clock::now();
+  last_curl_result_  = code;
+
   if (code != CURLE_OK)
   {
     switch (GetSessionState())
@@ -1265,8 +1435,20 @@ void HttpOperation::PerformCurlMessage(CURLcode code)
     DispatchEvent(opentelemetry::ext::http::client::SessionState::Response);
   }
 
-  // Cleanup and unbind easy handle from multi handle, and finish callback
-  Cleanup();
+  if (IsRetryable())
+  {
+    // Clear any response data received in previous attempt
+    ReleaseResponse();
+    // Rewind request data so that read callback can re-transfer the payload
+    request_nwrite_ = 0;
+    // Reset session state
+    DispatchEvent(opentelemetry::ext::http::client::SessionState::Connecting);
+  }
+  else
+  {
+    // Cleanup and unbind easy handle from multi handle, and finish callback
+    Cleanup();
+  }
 }
 
 }  // namespace curl

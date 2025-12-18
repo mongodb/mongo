@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <list>
 #include <map>
 #include <memory>
@@ -23,6 +24,7 @@
 #include "opentelemetry/nostd/function_ref.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/nostd/string_view.h"
+#include "opentelemetry/sdk/common/thread_instrumentation.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
@@ -102,6 +104,14 @@ public:
     compression_ = compression;
   }
 
+  void EnableLogging(bool is_log_enabled) noexcept override { is_log_enabled_ = is_log_enabled; }
+
+  void SetRetryPolicy(
+      const opentelemetry::ext::http::client::RetryPolicy &retry_policy) noexcept override
+  {
+    retry_policy_ = retry_policy;
+  }
+
 public:
   opentelemetry::ext::http::client::Method method_;
   opentelemetry::ext::http::client::HttpSslOptions ssl_options_;
@@ -111,6 +121,8 @@ public:
   std::chrono::milliseconds timeout_ms_{5000};  // ms
   opentelemetry::ext::http::client::Compression compression_{
       opentelemetry::ext::http::client::Compression::kNone};
+  bool is_log_enabled_{false};
+  opentelemetry::ext::http::client::RetryPolicy retry_policy_;
 };
 
 class Response : public opentelemetry::ext::http::client::Response
@@ -166,13 +178,11 @@ class Session : public opentelemetry::ext::http::client::Session,
 {
 public:
   Session(HttpClient &http_client,
-          std::string scheme      = "http",
-          const std::string &host = "",
-          uint16_t port           = 80)
-      : http_client_(http_client)
-  {
-    host_ = scheme + "://" + host + ":" + std::to_string(port) + "/";
-  }
+          const std::string &scheme = "http",
+          const std::string &host   = "",
+          uint16_t port             = 80)
+      : host_{scheme + "://" + host + ":" + std::to_string(port) + "/"}, http_client_(http_client)
+  {}
 
   std::shared_ptr<opentelemetry::ext::http::client::Request> CreateRequest() noexcept override
   {
@@ -222,7 +232,7 @@ private:
   std::shared_ptr<Request> http_request_;
   std::string host_;
   std::unique_ptr<HttpOperation> curl_operation_;
-  uint64_t session_id_;
+  uint64_t session_id_ = 0UL;
   HttpClient &http_client_;
   std::atomic<bool> is_session_active_{false};
 };
@@ -301,6 +311,7 @@ class HttpClient : public opentelemetry::ext::http::client::HttpClient
 public:
   // The call (curl_global_init) is not thread safe. Ensure this is called only once.
   HttpClient();
+  HttpClient(const std::shared_ptr<sdk::common::ThreadInstrumentation> &thread_instrumentation);
   ~HttpClient() override;
 
   std::shared_ptr<opentelemetry::ext::http::client::Session> CreateSession(
@@ -312,6 +323,8 @@ public:
 
   void SetMaxSessionsPerConnection(std::size_t max_requests_per_connection) noexcept override;
 
+  bool InternalCancelAllSessions() noexcept;
+
   inline uint64_t GetMaxSessionsPerConnection() const noexcept
   {
     return max_sessions_per_connection_;
@@ -321,31 +334,23 @@ public:
 
   inline CURLM *GetMultiHandle() noexcept { return multi_handle_; }
 
-  void MaybeSpawnBackgroundThread();
+  // return true if create background thread, false is already exist background thread
+  bool MaybeSpawnBackgroundThread();
 
   void ScheduleAddSession(uint64_t session_id);
   void ScheduleAbortSession(uint64_t session_id);
   void ScheduleRemoveSession(uint64_t session_id, HttpCurlEasyResource &&resource);
 
-  void WaitBackgroundThreadExit()
-  {
-    std::unique_ptr<std::thread> background_thread;
-    {
-      std::lock_guard<std::mutex> lock_guard{background_thread_m_};
-      background_thread.swap(background_thread_);
-    }
+  void SetBackgroundWaitFor(std::chrono::milliseconds ms);
 
-    if (background_thread && background_thread->joinable())
-    {
-      background_thread->join();
-    }
-  }
+  void WaitBackgroundThreadExit();
 
 private:
   void wakeupBackgroundThread();
   bool doAddSessions();
   bool doAbortSessions();
   bool doRemoveSessions();
+  bool doRetrySessions(bool report_all);
   void resetMultiHandle();
 
   std::mutex multi_handle_m_;
@@ -360,10 +365,15 @@ private:
   std::unordered_map<uint64_t, std::shared_ptr<Session>> pending_to_abort_sessions_;
   std::unordered_map<uint64_t, HttpCurlEasyResource> pending_to_remove_session_handles_;
   std::list<std::shared_ptr<Session>> pending_to_remove_sessions_;
+  std::deque<std::shared_ptr<Session>> pending_to_retry_sessions_;
 
   std::mutex background_thread_m_;
   std::unique_ptr<std::thread> background_thread_;
+  std::shared_ptr<sdk::common::ThreadInstrumentation> background_thread_instrumentation_;
   std::chrono::milliseconds scheduled_delay_milliseconds_;
+
+  std::chrono::milliseconds background_thread_wait_for_;
+  std::atomic<bool> is_shutdown_{false};
 
   nostd::shared_ptr<HttpCurlGlobalInitializer> curl_global_initializer_;
 };

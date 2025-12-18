@@ -5,7 +5,6 @@
 #include <chrono>
 #include <memory>
 #include <mutex>
-#include <utility>
 
 #include "opentelemetry/common/spin_lock_mutex.h"
 #include "opentelemetry/common/timestamp.h"
@@ -28,8 +27,6 @@ LongLastValueAggregation::LongLastValueAggregation()
   point_data_.value_              = static_cast<int64_t>(0);
 }
 
-LongLastValueAggregation::LongLastValueAggregation(LastValuePointData &&data) : point_data_{data} {}
-
 LongLastValueAggregation::LongLastValueAggregation(const LastValuePointData &data)
     : point_data_{data}
 {}
@@ -50,12 +47,12 @@ std::unique_ptr<Aggregation> LongLastValueAggregation::Merge(
       nostd::get<LastValuePointData>(delta.ToPoint()).sample_ts_.time_since_epoch())
   {
     LastValuePointData merge_data = nostd::get<LastValuePointData>(ToPoint());
-    return std::unique_ptr<Aggregation>(new LongLastValueAggregation(std::move(merge_data)));
+    return std::unique_ptr<Aggregation>(new LongLastValueAggregation(merge_data));
   }
   else
   {
     LastValuePointData merge_data = nostd::get<LastValuePointData>(delta.ToPoint());
-    return std::unique_ptr<Aggregation>(new LongLastValueAggregation(std::move(merge_data)));
+    return std::unique_ptr<Aggregation>(new LongLastValueAggregation(merge_data));
   }
 }
 
@@ -65,12 +62,12 @@ std::unique_ptr<Aggregation> LongLastValueAggregation::Diff(const Aggregation &n
       nostd::get<LastValuePointData>(next.ToPoint()).sample_ts_.time_since_epoch())
   {
     LastValuePointData diff_data = nostd::get<LastValuePointData>(ToPoint());
-    return std::unique_ptr<Aggregation>(new LongLastValueAggregation(std::move(diff_data)));
+    return std::unique_ptr<Aggregation>(new LongLastValueAggregation(diff_data));
   }
   else
   {
     LastValuePointData diff_data = nostd::get<LastValuePointData>(next.ToPoint());
-    return std::unique_ptr<Aggregation>(new LongLastValueAggregation(std::move(diff_data)));
+    return std::unique_ptr<Aggregation>(new LongLastValueAggregation(diff_data));
   }
 }
 
@@ -85,10 +82,6 @@ DoubleLastValueAggregation::DoubleLastValueAggregation()
   point_data_.is_lastvalue_valid_ = false;
   point_data_.value_              = 0.0;
 }
-
-DoubleLastValueAggregation::DoubleLastValueAggregation(LastValuePointData &&data)
-    : point_data_{data}
-{}
 
 DoubleLastValueAggregation::DoubleLastValueAggregation(const LastValuePointData &data)
     : point_data_{data}
@@ -110,12 +103,12 @@ std::unique_ptr<Aggregation> DoubleLastValueAggregation::Merge(
       nostd::get<LastValuePointData>(delta.ToPoint()).sample_ts_.time_since_epoch())
   {
     LastValuePointData merge_data = nostd::get<LastValuePointData>(ToPoint());
-    return std::unique_ptr<Aggregation>(new DoubleLastValueAggregation(std::move(merge_data)));
+    return std::unique_ptr<Aggregation>(new DoubleLastValueAggregation(merge_data));
   }
   else
   {
     LastValuePointData merge_data = nostd::get<LastValuePointData>(delta.ToPoint());
-    return std::unique_ptr<Aggregation>(new DoubleLastValueAggregation(std::move(merge_data)));
+    return std::unique_ptr<Aggregation>(new DoubleLastValueAggregation(merge_data));
   }
 }
 
@@ -126,12 +119,12 @@ std::unique_ptr<Aggregation> DoubleLastValueAggregation::Diff(
       nostd::get<LastValuePointData>(next.ToPoint()).sample_ts_.time_since_epoch())
   {
     LastValuePointData diff_data = nostd::get<LastValuePointData>(ToPoint());
-    return std::unique_ptr<Aggregation>(new DoubleLastValueAggregation(std::move(diff_data)));
+    return std::unique_ptr<Aggregation>(new DoubleLastValueAggregation(diff_data));
   }
   else
   {
     LastValuePointData diff_data = nostd::get<LastValuePointData>(next.ToPoint());
-    return std::unique_ptr<Aggregation>(new DoubleLastValueAggregation(std::move(diff_data)));
+    return std::unique_ptr<Aggregation>(new DoubleLastValueAggregation(diff_data));
   }
 }
 

@@ -15,6 +15,7 @@ mongo_cc_library(
     deps = [
         "//src/third_party/opentelemetry-cpp/api",
         "//src/third_party/opentelemetry-cpp/sdk:headers",
+        "//src/third_party/opentelemetry-cpp/sdk/src/common:disabled",
         "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
         "//src/third_party/opentelemetry-cpp/sdk/src/common:random",
         "//src/third_party/opentelemetry-cpp/sdk/src/resource",

@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include <grpcpp/grpcpp.h>
+#include <grpcpp/support/status.h>
 
-#include "opentelemetry/sdk/version/version.h"
+#include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 

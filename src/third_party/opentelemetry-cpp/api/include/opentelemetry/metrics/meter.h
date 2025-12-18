@@ -3,7 +3,10 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "opentelemetry/nostd/shared_ptr.h"
+#include "opentelemetry/nostd/span.h"
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/nostd/unique_ptr.h"
 #include "opentelemetry/version.h"
@@ -21,7 +24,12 @@ class Histogram;
 template <typename T>
 class UpDownCounter;
 
+template <typename T>
+class Gauge;
+
 class ObservableInstrument;
+class MultiObserverResult;
+using MultiObservableCallbackPtr = void (*)(MultiObserverResult &, void *);
 
 /**
  * Handles instrument creation and provides a facility for batch recording.
@@ -91,6 +99,27 @@ public:
       nostd::string_view description = "",
       nostd::string_view unit        = "") noexcept = 0;
 
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+  /**
+   * Creates a Gauge with the passed characteristics and returns a unique_ptr to that Gauge.
+   *
+   * @param name the name of the new Gauge.
+   * @param description a brief description of what the Gauge is used for.
+   * @param unit the unit of metric values following https://unitsofmeasure.org/ucum.html.
+   * @return a unique pointer to the created Gauge.
+   */
+
+  virtual nostd::unique_ptr<Gauge<int64_t>> CreateInt64Gauge(
+      nostd::string_view name,
+      nostd::string_view description = "",
+      nostd::string_view unit        = "") noexcept = 0;
+
+  virtual nostd::unique_ptr<Gauge<double>> CreateDoubleGauge(
+      nostd::string_view name,
+      nostd::string_view description = "",
+      nostd::string_view unit        = "") noexcept = 0;
+#endif
+
   /**
    * Creates a Asynchronous (Observable) Gauge with the passed characteristics and returns a
    * shared_ptr to that Observable Gauge
@@ -145,6 +174,32 @@ public:
       nostd::string_view name,
       nostd::string_view description = "",
       nostd::string_view unit        = "") noexcept = 0;
+
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+
+  /**
+   * Registers a callback to be invoked when metrics are collected by this meter. The callback will
+   * be passed a MultiObserverResult which it can use to make observations for any or all of the
+   * instruments provided in this registration. Any measurements recorded for instruments _not_ in
+   * the initial RegisterCallback call will be discarded.
+   *
+   * @param callback the callback to be invoked.
+   * @param state the state to be passed to the callback.
+   * @param instruments the instruments to be observed.
+   * @return a unique identifier for the registered callback, which can be used to unregister the
+   * callback in DeregisterCallback.
+   */
+  virtual uintptr_t RegisterCallback(MultiObservableCallbackPtr callback,
+                                     void *state,
+                                     nostd::span<ObservableInstrument *> instruments) noexcept = 0;
+
+  /**
+   * Unregisters a callback previously registered with RegisterCallback.
+   *
+   * @param callback_id the unique identifier returned by RegisterCallback.
+   */
+  virtual void DeregisterCallback(uintptr_t callback_id) noexcept = 0;
+#endif
 };
 }  // namespace metrics
 OPENTELEMETRY_END_NAMESPACE

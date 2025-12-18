@@ -7,6 +7,7 @@
 #include <cstddef>
 
 #include "opentelemetry/exporters/otlp/otlp_file_client_options.h"
+#include "opentelemetry/exporters/otlp/otlp_file_client_runtime_options.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/common/exporter_utils.h"
 #include "opentelemetry/version.h"
@@ -35,9 +36,14 @@ public:
   /**
    * Create an OtlpFileClient using the given options.
    */
-  explicit OtlpFileClient(OtlpFileClientOptions &&options);
+  explicit OtlpFileClient(OtlpFileClientOptions &&options,
+                          OtlpFileClientRuntimeOptions &&runtime_options);
 
   ~OtlpFileClient();
+  OtlpFileClient(const OtlpFileClient &)            = delete;
+  OtlpFileClient &operator=(const OtlpFileClient &) = delete;
+  OtlpFileClient(OtlpFileClient &&)                 = delete;
+  OtlpFileClient &operator=(OtlpFileClient &&)      = delete;
 
   /**
    * Sync export
@@ -79,7 +85,9 @@ private:
   bool is_shutdown_;
 
   // The configuration options associated with this file client.
-  const OtlpFileClientOptions options_;
+  OtlpFileClientOptions options_;
+  // The runtime options associated with this file client.
+  OtlpFileClientRuntimeOptions runtime_options_;
 
   opentelemetry::nostd::shared_ptr<OtlpFileAppender> backend_;
 };

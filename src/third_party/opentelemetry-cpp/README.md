@@ -5,6 +5,8 @@
 [![Build
 Status](https://github.com/open-telemetry/opentelemetry-cpp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/open-telemetry/opentelemetry-cpp/actions)
 [![Release](https://img.shields.io/github/v/release/open-telemetry/opentelemetry-cpp?include_prereleases&style=)](https://github.com/open-telemetry/opentelemetry-cpp/releases/)
+[![FOSSA License Status](https://app.fossa.com/api/projects/custom%2B162%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-cpp.svg?type=shield&issueType=license)](https://app.fossa.com/projects/custom%2B162%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-cpp?ref=badge_shield&issueType=license)
+[![FOSSA Security Status](https://app.fossa.com/api/projects/custom%2B162%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-cpp.svg?type=shield&issueType=security)](https://app.fossa.com/projects/custom%2B162%2Fgithub.com%2Fopen-telemetry%2Fopentelemetry-cpp?ref=badge_shield&issueType=security)
 
 The C++ [OpenTelemetry](https://opentelemetry.io/) client.
 
@@ -82,22 +84,25 @@ doc](https://docs.google.com/document/d/1i1E4-_y4uJ083lCutKGDhkpi3n4_e774SBLi9hP
 For edit access, get in touch on
 [Slack](https://cloud-native.slack.com/archives/C01N3AT62SJ).
 
-[Maintainers](https://github.com/open-telemetry/community/blob/main/community-membership.md#maintainer)
-([@open-telemetry/cpp-maintainers](https://github.com/orgs/open-telemetry/teams/cpp-maintainers)):
+### Maintainers
 
 * [Ehsan Saei](https://github.com/esigo)
 * [Lalit Kumar Bhasin](https://github.com/lalitb), Microsoft
 * [Marc Alff](https://github.com/marcalff), Oracle
 * [Tom Tan](https://github.com/ThomsonTan), Microsoft
 
-[Approvers](https://github.com/open-telemetry/community/blob/main/community-membership.md#approver)
-([@open-telemetry/cpp-approvers](https://github.com/orgs/open-telemetry/teams/cpp-approvers)):
+For more information about the maintainer role, see the [community repository](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md#maintainer).
 
+### Approvers
+
+* [Doug Barker](https://github.com/dbarker)
 * [Josh Suereth](https://github.com/jsuereth), Google
+* [Pranav Sharma](https://github.com/psx95), Google
 * [WenTao Ou](https://github.com/owent), Tencent
 
-[Emeritus
-Maintainer/Approver/Triager](https://github.com/open-telemetry/community/blob/main/community-membership.md#emeritus-maintainerapprovertriager):
+For more information about the approver role, see the [community repository](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md#approver).
+
+### Emeritus Maintainer/Approver/Triager
 
 * [Alolita Sharma](https://github.com/alolita)
 * [Emil Mikulic](https://github.com/g-easy)
@@ -106,6 +111,8 @@ Maintainer/Approver/Triager](https://github.com/open-telemetry/community/blob/ma
 * [Max Golovanov](https://github.com/maxgolov)
 * [Reiley Yang](https://github.com/reyang)
 * [Ryan Burn](https://github.com/rnburn)
+
+For more information about the emeritus role, see the [community repository](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md#emeritus-maintainerapprovertriager).
 
 ### Thanks to all the people who have contributed
 

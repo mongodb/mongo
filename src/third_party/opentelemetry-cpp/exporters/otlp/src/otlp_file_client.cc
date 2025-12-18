@@ -1,40 +1,11 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "opentelemetry/exporters/otlp/otlp_file_client.h"
-
-#if defined(HAVE_GSL)
-#  include <gsl/gsl>
-#else
-#  include <assert.h>
-#endif
-
-// clang-format off
-#include "opentelemetry/exporters/otlp/protobuf_include_prefix.h" // IWYU pragma: keep
-// clang-format on
-
-#include "google/protobuf/message.h"
-#include "nlohmann/json.hpp"
-
-// clang-format off
-#include "opentelemetry/exporters/otlp/protobuf_include_suffix.h" // IWYU pragma: keep
-// clang-format on
-
-#include "opentelemetry/nostd/string_view.h"
-#include "opentelemetry/nostd/variant.h"
-#include "opentelemetry/sdk/common/base64.h"
-#include "opentelemetry/sdk/common/global_log_handler.h"
-#include "opentelemetry/version.h"
-
-#ifdef _MSC_VER
-#  include <string.h>
-#  define strcasecmp _stricmp
-#else
-#  include <strings.h>
-#endif
+#include <nlohmann/json.hpp>
 
 #include <limits.h>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <cstdio>
@@ -43,12 +14,25 @@
 #include <fstream>
 #include <functional>
 #include <mutex>
+#include <ratio>
 #include <string>
 #include <thread>
 #include <utility>
 #include <vector>
-#if OPENTELEMETRY_HAVE_EXCEPTIONS
-#  include <exception>
+
+// IWYU pragma: no_include <features.h>
+
+#if defined(HAVE_GSL)
+#  include <gsl/gsl>
+#else
+#  include <assert.h>
+#endif
+
+#ifdef _MSC_VER
+#  include <string.h>
+#  define strcasecmp _stricmp
+#else
+#  include <strings.h>
 #endif
 
 #if !defined(__CYGWIN__) && defined(_WIN32)
@@ -59,9 +43,9 @@
 #    define NOMINMAX
 #  endif
 
-#  include <Windows.h>
 #  include <direct.h>
 #  include <io.h>
+#  include <windows.h>
 
 #  ifdef UNICODE
 #    include <atlconv.h>
@@ -78,6 +62,7 @@
 
 #  include <fcntl.h>
 #  include <sys/stat.h>
+#  include <sys/types.h>
 #  include <unistd.h>
 
 #  define FS_ACCESS(x) access(x, F_OK)
@@ -118,6 +103,31 @@
 #else
 #  include <errno.h>
 #  define OTLP_FILE_OPEN(f, path, mode) f = fopen(path, mode)
+#endif
+
+#include "opentelemetry/exporters/otlp/otlp_file_client.h"
+#include "opentelemetry/exporters/otlp/otlp_file_client_options.h"
+#include "opentelemetry/exporters/otlp/otlp_file_client_runtime_options.h"
+#include "opentelemetry/nostd/shared_ptr.h"
+#include "opentelemetry/nostd/string_view.h"
+#include "opentelemetry/nostd/variant.h"
+#include "opentelemetry/sdk/common/base64.h"
+#include "opentelemetry/sdk/common/exporter_utils.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/common/thread_instrumentation.h"
+#include "opentelemetry/version.h"
+
+// clang-format off
+#include "opentelemetry/exporters/otlp/protobuf_include_prefix.h" // IWYU pragma: keep
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/message.h"
+#include "opentelemetry/exporters/otlp/protobuf_include_suffix.h" // IWYU pragma: keep
+// clang-format on
+
+// Must be included after opentelemetry/version.h,
+// which exports opentelemetry/common/macros.h
+#if OPENTELEMETRY_HAVE_EXCEPTIONS
+#  include <exception>
 #endif
 
 OPENTELEMETRY_BEGIN_NAMESPACE
@@ -710,11 +720,11 @@ static inline char HexEncode(unsigned char byte)
 #endif
   if (byte >= 10)
   {
-    return byte - 10 + 'a';
+    return static_cast<char>(byte - 10 + 'a');
   }
   else
   {
-    return byte + '0';
+    return static_cast<char>(byte + '0');
   }
 }
 
@@ -965,10 +975,10 @@ void ConvertListFieldToJson(nlohmann::json &value,
 class OPENTELEMETRY_LOCAL_SYMBOL OtlpFileSystemBackend : public OtlpFileAppender
 {
 public:
-  explicit OtlpFileSystemBackend(const OtlpFileClientFileSystemOptions &options)
-      : options_(options), is_initialized_{false}
+  explicit OtlpFileSystemBackend(const OtlpFileClientFileSystemOptions &options,
+                                 const OtlpFileClientRuntimeOptions &runtime_options)
+      : options_(options), runtime_options_(runtime_options), is_initialized_{false}
   {
-    file_ = std::make_shared<FileStats>();
     file_->is_shutdown.store(false);
     file_->rotate_index            = 0;
     file_->written_size            = 0;
@@ -995,6 +1005,11 @@ public:
     }
   }
 
+  OtlpFileSystemBackend(const OtlpFileSystemBackend &)            = delete;
+  OtlpFileSystemBackend &operator=(const OtlpFileSystemBackend &) = delete;
+  OtlpFileSystemBackend(OtlpFileSystemBackend &&)                 = delete;
+  OtlpFileSystemBackend &operator=(OtlpFileSystemBackend &&)      = delete;
+
   // Written size is not required to be precise, we can just ignore tsan report here.
   OPENTELEMETRY_SANITIZER_NO_THREAD void MaybeRotateLog(std::size_t data_size)
   {
@@ -1014,13 +1029,13 @@ public:
 
     MaybeRotateLog(data.size());
 
-    std::shared_ptr<FILE> out = OpenLogFile(true);
+    std::shared_ptr<std::FILE> out = OpenLogFile(true);
     if (!out)
     {
       return;
     }
 
-    fwrite(data.data(), 1, data.size(), out.get());
+    std::fwrite(data.data(), 1, data.size(), out.get());
 
     {
       std::lock_guard<std::mutex> lock_guard{file_->file_lock};
@@ -1028,7 +1043,7 @@ public:
       file_->record_count += record_count;
 
       // Pipe file size always returns 0, we ignore the size limit of it.
-      auto written_size = ftell(out.get());
+      auto written_size = std::ftell(out.get());
       if (written_size >= 0)
       {
         file_->written_size = static_cast<std::size_t>(written_size);
@@ -1040,7 +1055,7 @@ public:
         {
           file_->left_flush_record_count = options_.flush_count;
 
-          fflush(out.get());
+          std::fflush(out.get());
 
           file_->flushed_record_count.store(file_->record_count.load(std::memory_order_acquire),
                                             std::memory_order_release);
@@ -1186,7 +1201,7 @@ private:
       {
         if (file_pattern[i] == '%')
         {
-          int checked = static_cast<int>(file_pattern[i + 1]);
+          int checked = static_cast<unsigned char>(file_pattern[i + 1]);
           if (checked > 0 && checked < 128 && check_interval[checked] > 0)
           {
             if (0 == check_file_path_interval_ ||
@@ -1202,7 +1217,7 @@ private:
     OpenLogFile(false);
   }
 
-  std::shared_ptr<FILE> OpenLogFile(bool destroy_content)
+  std::shared_ptr<std::FILE> OpenLogFile(bool destroy_content)
   {
     std::lock_guard<std::mutex> lock_guard{file_->file_lock};
 
@@ -1223,8 +1238,6 @@ private:
       return nullptr;
     }
     file_path[file_path_size] = 0;
-
-    std::shared_ptr<FILE> of = std::make_shared<FILE>();
 
     std::string directory_name = FileSystemUtil::DirName(file_path);
     if (!directory_name.empty())
@@ -1280,10 +1293,10 @@ private:
                               << " failed with pattern: " << options_.file_pattern << hint);
       return nullptr;
     }
-    of = std::shared_ptr<std::FILE>(new_file, fclose);
+    std::shared_ptr<std::FILE> of = std::shared_ptr<std::FILE>(new_file, fclose);
 
-    fseek(of.get(), 0, SEEK_END);
-    file_->written_size = static_cast<size_t>(ftell(of.get()));
+    std::fseek(of.get(), 0, SEEK_END);
+    file_->written_size = static_cast<size_t>(std::ftell(of.get()));
 
     file_->current_file    = of;
     file_->last_checkpoint = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -1440,10 +1453,19 @@ private:
 
       std::shared_ptr<FileStats> concurrency_file = file_;
       std::chrono::microseconds flush_interval    = options_.flush_interval;
-      file_->background_flush_thread.reset(new std::thread([concurrency_file, flush_interval]() {
+      auto thread_instrumentation                 = runtime_options_.thread_instrumentation;
+      file_->background_flush_thread.reset(new std::thread([concurrency_file, flush_interval,
+                                                            thread_instrumentation]() {
         std::chrono::system_clock::time_point last_free_job_timepoint =
             std::chrono::system_clock::now();
         std::size_t last_record_count = 0;
+
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+        if (thread_instrumentation != nullptr)
+        {
+          thread_instrumentation->OnStart();
+        }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
 
         while (true)
         {
@@ -1459,10 +1481,24 @@ private:
             break;
           }
 
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+          if (thread_instrumentation != nullptr)
+          {
+            thread_instrumentation->BeforeWait();
+          }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
+
           {
             std::unique_lock<std::mutex> lk(concurrency_file->background_thread_waker_lock);
             concurrency_file->background_thread_waker_cv.wait_for(lk, flush_interval);
           }
+
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+          if (thread_instrumentation != nullptr)
+          {
+            thread_instrumentation->AfterWait();
+          }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
 
           {
             std::size_t current_record_count =
@@ -1476,7 +1512,7 @@ private:
 
             if (concurrency_file->current_file)
             {
-              fflush(concurrency_file->current_file.get());
+              std::fflush(concurrency_file->current_file.get());
             }
 
             concurrency_file->flushed_record_count.store(current_record_count,
@@ -1492,6 +1528,14 @@ private:
           std::lock_guard<std::mutex> lock_guard_inner{concurrency_file->background_thread_lock};
           background_flush_thread.swap(concurrency_file->background_flush_thread);
         }
+
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+        if (thread_instrumentation != nullptr)
+        {
+          thread_instrumentation->OnEnd();
+        }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
+
         if (background_flush_thread && background_flush_thread->joinable())
         {
           background_flush_thread->detach();
@@ -1515,6 +1559,7 @@ private:
 
 private:
   OtlpFileClientFileSystemOptions options_;
+  OtlpFileClientRuntimeOptions runtime_options_;
 
   struct FileStats
   {
@@ -1522,7 +1567,7 @@ private:
     std::size_t rotate_index;
     std::size_t written_size;
     std::size_t left_flush_record_count;
-    std::shared_ptr<FILE> current_file;
+    std::shared_ptr<std::FILE> current_file;
     std::mutex file_lock;
     std::time_t last_checkpoint;
     std::string file_path;
@@ -1536,9 +1581,9 @@ private:
     std::mutex background_thread_waiter_lock;
     std::condition_variable background_thread_waiter_cv;
   };
-  std::shared_ptr<FileStats> file_;
+  std::shared_ptr<FileStats> file_ = std::make_shared<FileStats>();
 
-  std::atomic<bool> is_initialized_;
+  std::atomic<bool> is_initialized_{false};
   std::time_t check_file_path_interval_{0};
 };
 
@@ -1547,11 +1592,9 @@ class OPENTELEMETRY_LOCAL_SYMBOL OtlpFileOstreamBackend : public OtlpFileAppende
 public:
   explicit OtlpFileOstreamBackend(const std::reference_wrapper<std::ostream> &os) : os_(os) {}
 
-  ~OtlpFileOstreamBackend() override {}
-
   void Export(nostd::string_view data, std::size_t /*record_count*/) override
   {
-    os_.get().write(data.data(), data.size());
+    os_.get().write(data.data(), static_cast<std::streamsize>(data.size()));
   }
 
   bool ForceFlush(std::chrono::microseconds /*timeout*/) noexcept override
@@ -1567,13 +1610,16 @@ private:
   std::reference_wrapper<std::ostream> os_;
 };
 
-OtlpFileClient::OtlpFileClient(OtlpFileClientOptions &&options)
-    : is_shutdown_(false), options_(std::move(options))
+OtlpFileClient::OtlpFileClient(OtlpFileClientOptions &&options,
+                               OtlpFileClientRuntimeOptions &&runtime_options)
+    : is_shutdown_(false),
+      options_{std::move(options)},
+      runtime_options_{std::move(runtime_options)}
 {
   if (nostd::holds_alternative<OtlpFileClientFileSystemOptions>(options_.backend_options))
   {
     backend_ = opentelemetry::nostd::shared_ptr<OtlpFileAppender>(new OtlpFileSystemBackend(
-        nostd::get<OtlpFileClientFileSystemOptions>(options_.backend_options)));
+        nostd::get<OtlpFileClientFileSystemOptions>(options_.backend_options), runtime_options_));
   }
   else if (nostd::holds_alternative<std::reference_wrapper<std::ostream>>(options_.backend_options))
   {

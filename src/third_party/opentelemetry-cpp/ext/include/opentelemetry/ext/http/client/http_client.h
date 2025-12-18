@@ -226,6 +226,28 @@ struct HttpSslOptions
   std::string ssl_cipher_suite{};
 };
 
+using SecondsDecimal = std::chrono::duration<float, std::ratio<1>>;
+
+struct RetryPolicy
+{
+  RetryPolicy() = default;
+
+  RetryPolicy(std::uint32_t input_max_attempts,
+              SecondsDecimal input_initial_backoff,
+              SecondsDecimal input_max_backoff,
+              float input_backoff_multiplier)
+      : max_attempts(input_max_attempts),
+        initial_backoff(input_initial_backoff),
+        max_backoff(input_max_backoff),
+        backoff_multiplier(input_backoff_multiplier)
+  {}
+
+  std::uint32_t max_attempts{};
+  SecondsDecimal initial_backoff{};
+  SecondsDecimal max_backoff{};
+  float backoff_multiplier{};
+};
+
 class Request
 {
 public:
@@ -244,6 +266,10 @@ public:
   virtual void SetTimeoutMs(std::chrono::milliseconds timeout_ms) noexcept = 0;
 
   virtual void SetCompression(const Compression &compression) noexcept = 0;
+
+  virtual void EnableLogging(bool is_log_enabled) noexcept = 0;
+
+  virtual void SetRetryPolicy(const RetryPolicy &retry_policy) noexcept = 0;
 
   virtual ~Request() = default;
 };

@@ -43,13 +43,12 @@ public:
   ~NoopKeyValueIterable() override = default;
 
   /**
-   * Iterate over key-value pairs
-   * @param callback a callback to invoke for each key-value. If the callback returns false,
-   * the iteration is aborted.
-   * @return true if every key-value pair was iterated over
+   * No-op implementation: does not invoke the callback, even if key-value pairs are present.
+   * @return true without iterating or invoking the callback
    */
   bool ForEachKeyValue(
-      nostd::function_ref<bool(nostd::string_view, common::AttributeValue)>) const noexcept override
+      nostd::function_ref<bool(nostd::string_view, common::AttributeValue)> /*callback*/)
+      const noexcept override
   {
     return true;
   }

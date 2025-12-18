@@ -5,29 +5,22 @@
 
 #ifdef ENABLE_METRICS_EXEMPLAR_PREVIEW
 
+#  include <stdint.h>
 #  include <memory>
 #  include <vector>
 
+#  include "opentelemetry/common/timestamp.h"
+#  include "opentelemetry/context/context.h"
+#  include "opentelemetry/sdk/metrics/data/exemplar_data.h"
 #  include "opentelemetry/sdk/metrics/exemplar/filter_type.h"
 #  include "opentelemetry/sdk/metrics/exemplar/reservoir.h"
 #  include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
-namespace common
-{
-class SystemTimestamp;
-}  // namespace common
-
-namespace context
-{
-class Context;
-}  // namespace context
-
 namespace sdk
 {
 namespace metrics
 {
-class ExemplarData;
 
 class NoExemplarReservoir final : public ExemplarReservoir
 {

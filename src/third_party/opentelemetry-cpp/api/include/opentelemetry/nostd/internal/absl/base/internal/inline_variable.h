@@ -68,7 +68,7 @@
 //   types, etc..
 #if defined(__clang__)
 #define OTABSL_INTERNAL_EXTERN_DECL(type, name) \
-  extern const ::absl::OTABSL_OPTION_INLINE_NAMESPACE_NAME::internal::identity_t<type> name;
+  extern const ::absl::OTABSL_OPTION_NAMESPACE_NAME::internal::identity_t<type> name;
 #else  // Otherwise, just define the macro to do nothing.
 #define OTABSL_INTERNAL_EXTERN_DECL(type, name)
 #endif  // defined(__clang__)
@@ -76,7 +76,7 @@
 // See above comment at top of file for details.
 #define OTABSL_INTERNAL_INLINE_CONSTEXPR(type, name, init) \
   OTABSL_INTERNAL_EXTERN_DECL(type, name)                  \
-  inline constexpr ::absl::OTABSL_OPTION_INLINE_NAMESPACE_NAME::internal::identity_t<type> name = init
+  inline constexpr ::absl::OTABSL_OPTION_NAMESPACE_NAME::internal::identity_t<type> name = init
 
 #else
 
@@ -89,14 +89,14 @@
 #define OTABSL_INTERNAL_INLINE_CONSTEXPR(var_type, name, init)                  \
   template <class /*AbslInternalDummy*/ = void>                               \
   struct AbslInternalInlineVariableHolder##name {                             \
-    static constexpr ::absl::OTABSL_OPTION_INLINE_NAMESPACE_NAME::internal::identity_t<var_type> kInstance = init; \
+    static constexpr ::absl::OTABSL_OPTION_NAMESPACE_NAME::internal::identity_t<var_type> kInstance = init; \
   };                                                                          \
                                                                               \
   template <class AbslInternalDummy>                                          \
-  constexpr ::absl::OTABSL_OPTION_INLINE_NAMESPACE_NAME::internal::identity_t<var_type>                            \
+  constexpr ::absl::OTABSL_OPTION_NAMESPACE_NAME::internal::identity_t<var_type>                            \
       AbslInternalInlineVariableHolder##name<AbslInternalDummy>::kInstance;   \
                                                                               \
-  static constexpr const ::absl::OTABSL_OPTION_INLINE_NAMESPACE_NAME::internal::identity_t<var_type>&              \
+  static constexpr const ::absl::OTABSL_OPTION_NAMESPACE_NAME::internal::identity_t<var_type>&              \
       name = /* NOLINT */                                                     \
       AbslInternalInlineVariableHolder##name<>::kInstance;                    \
   static_assert(sizeof(void (*)(decltype(name))) != 0,                        \

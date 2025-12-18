@@ -29,7 +29,7 @@ public:
 
   /**
    * Valid flags in W3C Trace Context version 2.
-   * See https://www.w3.org/TR/trace-context-1/#trace-flags
+   * See https://www.w3.org/TR/trace-context-2/#trace-flags
    */
   static constexpr uint8_t kAllW3CTraceContext2Flags = kIsSampled | kIsRandom;
 

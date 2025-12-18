@@ -3,11 +3,12 @@
 
 #include <curl/curl.h>
 #include <curl/curlver.h>
-#include <zconf.h>
 #include <atomic>
 #include <chrono>
-#include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <deque>
+#include <functional>
 #include <list>
 #include <mutex>
 #include <string>
@@ -22,10 +23,16 @@
 #include "opentelemetry/ext/http/common/url_parser.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/nostd/string_view.h"
+#include "opentelemetry/sdk/common/thread_instrumentation.h"
 #include "opentelemetry/version.h"
 
 #ifdef ENABLE_OTLP_COMPRESSION_PREVIEW
+#  include <zconf.h>
 #  include <zlib.h>
+#  include <algorithm>
+#  include <array>
+
+#  include "opentelemetry/nostd/type_traits.h"
 #else
 #  include "opentelemetry/sdk/common/global_log_handler.h"
 #endif
@@ -57,11 +64,85 @@ nostd::shared_ptr<HttpCurlGlobalInitializer> HttpCurlGlobalInitializer::GetInsta
   return shared_initializer;
 }
 
+#ifdef ENABLE_OTLP_COMPRESSION_PREVIEW
+// Original source:
+// https://stackoverflow.com/questions/12398377/is-it-possible-to-have-zlib-read-from-and-write-to-the-same-memory-buffer/12412863#12412863
+int deflateInPlace(z_stream *strm, unsigned char *buf, uint32_t len, uint32_t *max_len)
+{
+  // must be large enough to hold zlib or gzip header (if any) and one more byte -- 11 works for the
+  // worst case here, but if gzip encoding is used and a deflateSetHeader() call is inserted in this
+  // code after the deflateReset(), then the 11 needs to be increased to accommodate the resulting
+  // gzip header size plus one
+  std::array<unsigned char, 11> temp{};
+
+  // kick start the process with a temporary output buffer -- this allows deflate to consume a large
+  // chunk of input data in order to make room for output data there
+  strm->next_in  = buf;
+  strm->avail_in = len;
+  if (*max_len < len)
+  {
+    *max_len = len;
+  }
+  strm->next_out  = temp.data();
+  strm->avail_out = (std::min)(static_cast<decltype(z_stream::avail_out)>(temp.size()), *max_len);
+  auto ret        = deflate(strm, Z_FINISH);
+  if (ret == Z_STREAM_ERROR)
+  {
+    return ret;
+  }
+
+  // if we can, copy the temporary output data to the consumed portion of the input buffer, and then
+  // continue to write up to the start of the consumed input for as long as possible
+  auto have = strm->next_out - temp.data();  // number of bytes in temp[]
+  if (have <= static_cast<decltype(have)>(strm->avail_in ? len - strm->avail_in : *max_len))
+  {
+    std::memcpy(buf, temp.data(), have);
+    strm->next_out = buf + have;
+    have           = 0;
+    while (ret == Z_OK)
+    {
+      strm->avail_out = static_cast<decltype(z_stream::avail_out)>(
+          strm->avail_in ? strm->next_in - strm->next_out : (buf + *max_len) - strm->next_out);
+      ret = deflate(strm, Z_FINISH);
+    }
+    if (ret != Z_BUF_ERROR || strm->avail_in == 0)
+    {
+      *max_len = static_cast<uint32_t>(strm->next_out - buf);
+      return ret == Z_STREAM_END ? Z_OK : ret;
+    }
+  }
+
+  // the output caught up with the input due to insufficiently compressible data -- copy the
+  // remaining input data into an allocated buffer and complete the compression from there to the
+  // now empty input buffer (this will only occur for long incompressible streams, more than ~20 MB
+  // for the default deflate memLevel of 8, or when *max_len is too small and less than the length
+  // of the header plus one byte)
+  auto hold = static_cast<nostd::remove_const_t<decltype(z_stream::next_in)>>(
+      strm->zalloc(strm->opaque, strm->avail_in, 1));  // allocated buffer to hold input data
+  if (hold == Z_NULL)
+  {
+    return Z_MEM_ERROR;
+  }
+  std::memcpy(hold, strm->next_in, strm->avail_in);
+  strm->next_in = hold;
+  if (have)
+  {
+    std::memcpy(buf, temp.data(), have);
+    strm->next_out = buf + have;
+  }
+  strm->avail_out = static_cast<decltype(z_stream::avail_out)>((buf + *max_len) - strm->next_out);
+  ret             = deflate(strm, Z_FINISH);
+  strm->zfree(strm->opaque, hold);
+  *max_len = static_cast<uint32_t>(strm->next_out - buf);
+  return ret == Z_OK ? Z_BUF_ERROR : (ret == Z_STREAM_END ? Z_OK : ret);
+}
+#endif  // ENABLE_OTLP_COMPRESSION_PREVIEW
+
 void Session::SendRequest(
     std::shared_ptr<opentelemetry::ext::http::client::EventHandler> callback) noexcept
 {
   is_session_active_.store(true, std::memory_order_release);
-  std::string url       = host_ + std::string(http_request_->uri_);
+  const auto &url       = host_ + http_request_->uri_;
   auto callback_ptr     = callback.get();
   bool reuse_connection = false;
 
@@ -76,50 +157,54 @@ void Session::SendRequest(
   if (http_request_->compression_ == opentelemetry::ext::http::client::Compression::kGzip)
   {
 #ifdef ENABLE_OTLP_COMPRESSION_PREVIEW
-    http_request_->AddHeader("Content-Encoding", "gzip");
-
-    opentelemetry::ext::http::client::Body compressed_body(http_request_->body_.size());
-    z_stream zs;
-    zs.zalloc    = Z_NULL;
-    zs.zfree     = Z_NULL;
-    zs.opaque    = Z_NULL;
-    zs.avail_in  = static_cast<uInt>(http_request_->body_.size());
-    zs.next_in   = http_request_->body_.data();
-    zs.avail_out = static_cast<uInt>(compressed_body.size());
-    zs.next_out  = compressed_body.data();
+    z_stream zs{};
+    zs.zalloc = Z_NULL;
+    zs.zfree  = Z_NULL;
+    zs.opaque = Z_NULL;
 
     // ZLIB: Have to maually specify 16 bits for the Gzip headers
-    const int window_bits = 15 + 16;
+    static constexpr int kWindowBits = MAX_WBITS + 16;
+    static constexpr int kMemLevel   = MAX_MEM_LEVEL;
 
-    int stream =
-        deflateInit2(&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, window_bits, 8, Z_DEFAULT_STRATEGY);
+    auto stream = deflateInit2(&zs, Z_DEFAULT_COMPRESSION, Z_DEFLATED, kWindowBits, kMemLevel,
+                               Z_DEFAULT_STRATEGY);
 
     if (stream == Z_OK)
     {
-      deflate(&zs, Z_FINISH);
-      deflateEnd(&zs);
-      compressed_body.resize(zs.total_out);
-      http_request_->SetBody(compressed_body);
+      auto size     = static_cast<uInt>(http_request_->body_.size());
+      auto max_size = size;
+      stream        = deflateInPlace(&zs, http_request_->body_.data(), size, &max_size);
+
+      if (stream == Z_OK)
+      {
+        http_request_->AddHeader("Content-Encoding", "gzip");
+        http_request_->body_.resize(max_size);
+      }
     }
-    else
+
+    if (stream != Z_OK)
     {
       if (callback)
       {
-        callback->OnEvent(opentelemetry::ext::http::client::SessionState::CreateFailed, "");
+        callback->OnEvent(opentelemetry::ext::http::client::SessionState::CreateFailed,
+                          zs.msg ? zs.msg : "");
       }
       is_session_active_.store(false, std::memory_order_release);
     }
+
+    deflateEnd(&zs);
 #else
     OTEL_INTERNAL_LOG_ERROR(
         "[HTTP Client Curl] Set WITH_OTLP_HTTP_COMPRESSION=ON to use gzip compression with the "
         "OTLP HTTP Exporter");
-#endif
+#endif  // ENABLE_OTLP_COMPRESSION_PREVIEW
   }
 
-  curl_operation_.reset(new HttpOperation(http_request_->method_, url, http_request_->ssl_options_,
-                                          callback_ptr, http_request_->headers_,
-                                          http_request_->body_, http_request_->compression_, false,
-                                          http_request_->timeout_ms_, reuse_connection));
+  curl_operation_.reset(
+      new HttpOperation(http_request_->method_, url, http_request_->ssl_options_, callback_ptr,
+                        http_request_->headers_, http_request_->body_, http_request_->compression_,
+                        false, http_request_->timeout_ms_, reuse_connection,
+                        http_request_->is_log_enabled_, http_request_->retry_policy_));
   bool success =
       CURLE_OK == curl_operation_->SendAsync(this, [this, callback](HttpOperation &operation) {
         if (operation.WasAborted())
@@ -142,8 +227,8 @@ void Session::SendRequest(
 
   if (success)
   {
-    // We will try to create a background to poll events.But when the background is running, we will
-    // reuse it instead of creating a new one.
+    // We will try to create a background to poll events. But when the background is running, we
+    // will reuse it instead of creating a new one.
     http_client_.MaybeSpawnBackgroundThread();
   }
   else
@@ -188,12 +273,26 @@ HttpClient::HttpClient()
     : multi_handle_(curl_multi_init()),
       next_session_id_{0},
       max_sessions_per_connection_{8},
+      background_thread_instrumentation_(nullptr),
       scheduled_delay_milliseconds_{std::chrono::milliseconds(256)},
+      background_thread_wait_for_{std::chrono::minutes{1}},
+      curl_global_initializer_(HttpCurlGlobalInitializer::GetInstance())
+{}
+
+HttpClient::HttpClient(
+    const std::shared_ptr<sdk::common::ThreadInstrumentation> &thread_instrumentation)
+    : multi_handle_(curl_multi_init()),
+      next_session_id_{0},
+      max_sessions_per_connection_{8},
+      background_thread_instrumentation_(thread_instrumentation),
+      scheduled_delay_milliseconds_{std::chrono::milliseconds(256)},
+      background_thread_wait_for_{std::chrono::minutes{1}},
       curl_global_initializer_(HttpCurlGlobalInitializer::GetInstance())
 {}
 
 HttpClient::~HttpClient()
 {
+  is_shutdown_.store(true, std::memory_order_release);
   while (true)
   {
     std::unique_ptr<std::thread> background_thread;
@@ -203,7 +302,7 @@ HttpClient::~HttpClient()
     }
 
     // Force to abort all sessions
-    CancelAllSessions();
+    InternalCancelAllSessions();
 
     if (!background_thread)
     {
@@ -211,6 +310,7 @@ HttpClient::~HttpClient()
     }
     if (background_thread->joinable())
     {
+      wakeupBackgroundThread();  // if delay quit, wake up first
       background_thread->join();
     }
   }
@@ -223,7 +323,7 @@ HttpClient::~HttpClient()
 std::shared_ptr<opentelemetry::ext::http::client::Session> HttpClient::CreateSession(
     nostd::string_view url) noexcept
 {
-  auto parsedUrl = common::UrlParser(std::string(url));
+  const auto parsedUrl = common::UrlParser(std::string(url));
   if (!parsedUrl.success_)
   {
     return std::make_shared<Session>(*this);
@@ -236,33 +336,13 @@ std::shared_ptr<opentelemetry::ext::http::client::Session> HttpClient::CreateSes
   std::lock_guard<std::mutex> lock_guard{sessions_m_};
   sessions_.insert({session_id, session});
 
-  // FIXME: Session may leak if it do not call SendRequest
+  // FIXME: Session may leak if it does not call SendRequest
   return session;
 }
 
 bool HttpClient::CancelAllSessions() noexcept
 {
-  // CancelSession may change sessions_, we can not change a container while iterating it.
-  while (true)
-  {
-    std::unordered_map<uint64_t, std::shared_ptr<Session>> sessions;
-    {
-      // We can only cleanup session and curl handles in the IO thread.
-      std::lock_guard<std::mutex> lock_guard{sessions_m_};
-      sessions = sessions_;
-    }
-
-    if (sessions.empty())
-    {
-      break;
-    }
-
-    for (auto &session : sessions)
-    {
-      session.second->CancelSession();
-    }
-  }
-  return true;
+  return InternalCancelAllSessions();
 }
 
 bool HttpClient::FinishAllSessions() noexcept
@@ -335,21 +415,55 @@ void HttpClient::CleanupSession(uint64_t session_id)
   }
 }
 
-void HttpClient::MaybeSpawnBackgroundThread()
+bool HttpClient::InternalCancelAllSessions() noexcept
+{
+  // CancelSession may change sessions_, we can not change a container while iterating it.
+  while (true)
+  {
+    std::unordered_map<uint64_t, std::shared_ptr<Session>> sessions;
+    {
+      // We can only cleanup session and curl handles in the IO thread.
+      std::lock_guard<std::mutex> lock_guard{sessions_m_};
+      sessions = sessions_;
+    }
+
+    if (sessions.empty())
+    {
+      break;
+    }
+
+    for (auto &session : sessions)
+    {
+      session.second->CancelSession();
+    }
+  }
+  return true;
+}
+
+bool HttpClient::MaybeSpawnBackgroundThread()
 {
   std::lock_guard<std::mutex> lock_guard{background_thread_m_};
   if (background_thread_)
   {
-    return;
+    return false;
   }
 
   background_thread_.reset(new std::thread(
       [](HttpClient *self) {
-        int still_running = 1;
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+        if (self->background_thread_instrumentation_ != nullptr)
+        {
+          self->background_thread_instrumentation_->OnStart();
+        }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
+
+        auto still_running           = 1;
+        auto last_free_job_timepoint = std::chrono::system_clock::now();
+        auto need_wait_more          = false;
         while (true)
         {
-          CURLMsg *msg;
-          int queued;
+          CURLMsg *msg = nullptr;
+          int queued   = 0;
           CURLMcode mc = curl_multi_perform(self->multi_handle_, &still_running);
           // According to https://curl.se/libcurl/c/curl_multi_perform.html, when mc is not OK, we
           // can not curl_multi_perform it again
@@ -357,10 +471,17 @@ void HttpClient::MaybeSpawnBackgroundThread()
           {
             self->resetMultiHandle();
           }
-          else if (still_running)
+          else if (still_running || need_wait_more)
           {
-        // curl_multi_poll is added from libcurl 7.66.0, before 7.68.0, we can only wait util
-        // timeout to do the rest jobs
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+            if (self->background_thread_instrumentation_ != nullptr)
+            {
+              self->background_thread_instrumentation_->BeforeWait();
+            }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
+
+        // curl_multi_poll is added from libcurl 7.66.0, before 7.68.0, we can only wait until
+        // timeout to do the remaining jobs
 #if LIBCURL_VERSION_NUM >= 0x074200
             /* wait for activity, timeout or "nothing" */
             mc = curl_multi_poll(self->multi_handle_, nullptr, 0,
@@ -371,6 +492,13 @@ void HttpClient::MaybeSpawnBackgroundThread()
                                  static_cast<int>(self->scheduled_delay_milliseconds_.count()),
                                  nullptr);
 #endif
+
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+            if (self->background_thread_instrumentation_ != nullptr)
+            {
+              self->background_thread_instrumentation_->AfterWait();
+            }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
           }
 
           do
@@ -387,13 +515,20 @@ void HttpClient::MaybeSpawnBackgroundThread()
               CURLcode result   = msg->data.result;
               Session *session  = nullptr;
               curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &session);
-              // If it's already moved into pending_to_remove_session_handles_, we just ingore this
+              const auto operation = (nullptr != session) ? session->GetOperation().get() : nullptr;
+
+              // If it's already moved into pending_to_remove_session_handles_, we just ignore this
               // message.
-              if (nullptr != session && session->GetOperation())
+              if (operation)
               {
                 // Session can not be destroyed when calling PerformCurlMessage
                 auto hold_session = session->shared_from_this();
-                session->GetOperation()->PerformCurlMessage(result);
+                operation->PerformCurlMessage(result);
+
+                if (operation->IsRetryable())
+                {
+                  self->pending_to_retry_sessions_.push_back(hold_session);
+                }
               }
             }
           } while (true);
@@ -414,6 +549,38 @@ void HttpClient::MaybeSpawnBackgroundThread()
           if (self->doAddSessions())
           {
             still_running = 1;
+          }
+
+          // Check if pending easy handles can be retried
+          if (self->doRetrySessions(false))
+          {
+            still_running = 1;
+          }
+
+          std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+          if (still_running > 0)
+          {
+            last_free_job_timepoint = now;
+            need_wait_more          = false;
+            continue;
+          }
+
+          std::chrono::milliseconds wait_for = std::chrono::milliseconds::zero();
+
+#if LIBCURL_VERSION_NUM >= 0x074400
+          // only available with curl_multi_poll+curl_multi_wakeup, because curl_multi_wait would
+          // cause CPU busy, curl_multi_wait+sleep could not wakeup quickly
+          wait_for = self->background_thread_wait_for_;
+#endif
+          if (self->is_shutdown_.load(std::memory_order_acquire))
+          {
+            wait_for = std::chrono::milliseconds::zero();
+          }
+
+          if (now - last_free_job_timepoint < wait_for)
+          {
+            need_wait_more = true;
+            continue;
           }
 
           if (still_running == 0)
@@ -440,9 +607,22 @@ void HttpClient::MaybeSpawnBackgroundThread()
               still_running = 1;
             }
 
+            // Check if pending easy handles can be retried
+            if (self->doRetrySessions(true))
+            {
+              still_running = 1;
+            }
+
             // If there is no pending jobs, we can stop the background thread.
             if (still_running == 0)
             {
+#ifdef ENABLE_THREAD_INSTRUMENTATION_PREVIEW
+              if (self->background_thread_instrumentation_ != nullptr)
+              {
+                self->background_thread_instrumentation_->OnEnd();
+              }
+#endif /* ENABLE_THREAD_INSTRUMENTATION_PREVIEW */
+
               if (self->background_thread_)
               {
                 self->background_thread_->detach();
@@ -454,6 +634,7 @@ void HttpClient::MaybeSpawnBackgroundThread()
         }
       },
       this));
+  return true;
 }
 
 void HttpClient::ScheduleAddSession(uint64_t session_id)
@@ -471,16 +652,16 @@ void HttpClient::ScheduleAddSession(uint64_t session_id)
 void HttpClient::ScheduleAbortSession(uint64_t session_id)
 {
   {
-    std::lock_guard<std::mutex> lock_guard{sessions_m_};
+    std::lock_guard<std::mutex> sessions_lock{sessions_m_};
     auto session = sessions_.find(session_id);
     if (session == sessions_.end())
     {
-      std::lock_guard<std::recursive_mutex> lock_guard{session_ids_m_};
+      std::lock_guard<std::recursive_mutex> session_ids_lock{session_ids_m_};
       pending_to_add_session_ids_.erase(session_id);
     }
     else
     {
-      std::lock_guard<std::recursive_mutex> lock_guard{session_ids_m_};
+      std::lock_guard<std::recursive_mutex> session_ids_lock{session_ids_m_};
       pending_to_abort_sessions_[session_id] = std::move(session->second);
       pending_to_add_session_ids_.erase(session_id);
 
@@ -500,6 +681,28 @@ void HttpClient::ScheduleRemoveSession(uint64_t session_id, HttpCurlEasyResource
   }
 
   wakeupBackgroundThread();
+}
+
+void HttpClient::SetBackgroundWaitFor(std::chrono::milliseconds ms)
+{
+  background_thread_wait_for_ = ms;
+}
+
+void HttpClient::WaitBackgroundThreadExit()
+{
+  is_shutdown_.store(true, std::memory_order_release);
+  std::unique_ptr<std::thread> background_thread;
+  {
+    std::lock_guard<std::mutex> lock_guard{background_thread_m_};
+    background_thread.swap(background_thread_);
+  }
+
+  if (background_thread && background_thread->joinable())
+  {
+    wakeupBackgroundThread();
+    background_thread->join();
+  }
+  is_shutdown_.store(false, std::memory_order_release);
 }
 
 void HttpClient::wakeupBackgroundThread()
@@ -579,8 +782,8 @@ bool HttpClient::doAbortSessions()
 
 bool HttpClient::doRemoveSessions()
 {
-  bool has_data = false;
-  bool should_continue;
+  bool has_data{false};
+  bool should_continue{false};
   do
   {
     std::unordered_map<uint64_t, HttpCurlEasyResource> pending_to_remove_session_handles;
@@ -632,6 +835,50 @@ bool HttpClient::doRemoveSessions()
 
   return has_data;
 }
+
+#ifdef ENABLE_OTLP_RETRY_PREVIEW
+bool HttpClient::doRetrySessions(bool report_all)
+{
+  const auto now = std::chrono::system_clock::now();
+  auto has_data  = false;
+
+  // Assumptions:
+  // - This is a FIFO list so older sessions, pushed at the back, always end up at the front
+  // - Locking not required because only the background thread would be pushing to this container
+  // - Retry policy is not changed once HTTP client is initialized, so same settings for everyone
+  for (auto retry_it = pending_to_retry_sessions_.cbegin();
+       retry_it != pending_to_retry_sessions_.cend();)
+  {
+    const auto session   = *retry_it;
+    const auto operation = session ? session->GetOperation().get() : nullptr;
+
+    if (!operation)
+    {
+      retry_it = pending_to_retry_sessions_.erase(retry_it);
+    }
+    else if (operation->NextRetryTime() < now)
+    {
+      auto easy_handle = operation->GetCurlEasyHandle();
+      curl_multi_remove_handle(multi_handle_, easy_handle);
+      curl_multi_add_handle(multi_handle_, easy_handle);
+      retry_it = pending_to_retry_sessions_.erase(retry_it);
+      has_data = true;
+    }
+    else
+    {
+      break;
+    }
+  }
+
+  report_all = report_all && !pending_to_retry_sessions_.empty();
+  return has_data || report_all;
+}
+#else
+bool HttpClient::doRetrySessions(bool /* report_all */)
+{
+  return false;
+}
+#endif  // ENABLE_OTLP_RETRY_PREVIEW
 
 void HttpClient::resetMultiHandle()
 {

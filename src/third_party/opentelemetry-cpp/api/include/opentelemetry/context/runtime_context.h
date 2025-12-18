@@ -26,11 +26,11 @@ class Token
 public:
   bool operator==(const Context &other) const noexcept { return context_ == other; }
 
-  ~Token() noexcept;
+  virtual ~Token() noexcept;
 
-private:
   friend class RuntimeContextStorage;
 
+protected:
   // A constructor that sets the token's Context object to the
   // one that was passed in.
   Token(const Context &context) : context_(context) {}
@@ -56,7 +56,7 @@ public:
 
   /**
    * Set the current context.
-   * @param the new current context
+   * @param context The new current context
    * @return a token for the new current context. This never returns a nullptr.
    */
   virtual nostd::unique_ptr<Token> Attach(const Context &context) noexcept = 0;
@@ -152,7 +152,8 @@ public:
    *
    * @param storage a custom runtime context storage
    */
-  static void SetRuntimeContextStorage(nostd::shared_ptr<RuntimeContextStorage> storage) noexcept
+  static void SetRuntimeContextStorage(
+      const nostd::shared_ptr<RuntimeContextStorage> &storage) noexcept
   {
     GetStorage() = storage;
   }
@@ -240,6 +241,26 @@ private:
   {
     friend class ThreadLocalContextStorage;
 
+    /**
+     * Limit the max stack depth.
+     * The stack will still work beyond this limit,
+     * counting push() and pop() properly,
+     * but will not record contexts.
+     *
+     * In practice, this should not affect instrumented applications,
+     * the limit is set to 1 million nested scopes.
+     *
+     * The whole reason for this limit to exist is to prevent
+     * compiler warnings like:
+     *   error: argument 1 value ‘18446744073709551615’
+     *   exceeds maximum object size 9223372036854775807
+     *   [-Werror=alloc-size-larger-than=]
+     * on this line of code:
+     *   Context *temp = new Context[new_capacity];
+     * when compiling with gcc and optimizations (-flto).
+     */
+    static constexpr size_t max_capacity_ = 1000000;
+
     Stack() noexcept : size_(0), capacity_(0), base_(nullptr) {}
 
     // Pops the top Context off the stack.
@@ -247,6 +268,11 @@ private:
     {
       if (size_ == 0)
       {
+        return;
+      }
+      if (size_ > max_capacity_)
+      {
+        size_ -= 1;
         return;
       }
       // Store empty Context before decrementing `size`, to ensure
@@ -277,6 +303,10 @@ private:
       {
         return Context();
       }
+      if (size_ > max_capacity_)
+      {
+        return Context();
+      }
       return base_[size_ - 1];
     }
 
@@ -285,6 +315,10 @@ private:
     void Push(const Context &context) noexcept
     {
       size_++;
+      if (size_ > max_capacity_)
+      {
+        return;
+      }
       if (size_ > capacity_)
       {
         Resize(size_ * 2);
@@ -298,7 +332,13 @@ private:
       size_t old_size = size_ - 1;
       if (new_capacity == 0)
       {
+        // First increase
         new_capacity = 2;
+      }
+      if (new_capacity > max_capacity_)
+      {
+        // Last increase
+        new_capacity = max_capacity_;
       }
       Context *temp = new Context[new_capacity];
       if (base_ != nullptr)

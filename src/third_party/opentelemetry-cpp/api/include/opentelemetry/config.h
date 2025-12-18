@@ -3,12 +3,17 @@
 
 #pragma once
 
-#ifndef __has_include
-#  define OPENTELEMETRY_HAS_INCLUDE(x) 0
-#else
-#  define OPENTELEMETRY_HAS_INCLUDE(x) __has_include(x)
-#endif
+#include <type_traits>  // IWYU pragma: keep
 
-#if !defined(__GLIBCXX__) || OPENTELEMETRY_HAS_INCLUDE(<codecvt>)  // >= libstdc++-5
-#  define OPENTELEMETRY_TRIVIALITY_TYPE_TRAITS
+#if defined(OPENTELEMETRY_ABI_VERSION_NO) && OPENTELEMETRY_ABI_VERSION_NO >= 2
+#  error \
+      "opentelemetry/config.h is removed in ABI version 2 and later. Please use opentelemetry/version.h instead."
+#else
+#  if defined(__clang__) || defined(__GNUC__)
+#    pragma GCC warning \
+        "opentelemetry/config.h is deprecated. Please use opentelemetry/version.h instead."
+#  elif defined(_MSC_VER)
+#    pragma message( \
+        "[WARNING]: opentelemetry/config.h is deprecated. Please use opentelemetry/version.h instead.")
+#  endif
 #endif

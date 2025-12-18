@@ -19,6 +19,7 @@
 #include "opentelemetry/sdk/instrumentationscope/instrumentation_scope.h"
 #include "opentelemetry/sdk/metrics/instrument_metadata_validator.h"
 #include "opentelemetry/sdk/metrics/instruments.h"
+#include "opentelemetry/sdk/metrics/meter_config.h"
 #include "opentelemetry/sdk/metrics/meter_context.h"
 #include "opentelemetry/sdk/metrics/state/async_metric_storage.h"
 #include "opentelemetry/sdk/resource/resource.h"
@@ -75,6 +76,18 @@ public:
       nostd::string_view description = "",
       nostd::string_view unit        = "") noexcept override;
 
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+  nostd::unique_ptr<opentelemetry::metrics::Gauge<int64_t>> CreateInt64Gauge(
+      nostd::string_view name,
+      nostd::string_view description = "",
+      nostd::string_view unit        = "") noexcept override;
+
+  nostd::unique_ptr<opentelemetry::metrics::Gauge<double>> CreateDoubleGauge(
+      nostd::string_view name,
+      nostd::string_view description = "",
+      nostd::string_view unit        = "") noexcept override;
+#endif
+
   nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument> CreateInt64ObservableGauge(
       nostd::string_view name,
       nostd::string_view description = "",
@@ -118,19 +131,34 @@ public:
   std::vector<MetricData> Collect(CollectorHandle *collector,
                                   opentelemetry::common::SystemTimestamp collect_ts) noexcept;
 
+#if OPENTELEMETRY_ABI_VERSION_NO >= 2
+  uintptr_t RegisterCallback(
+      opentelemetry::metrics::MultiObservableCallbackPtr callback,
+      void *state,
+      nostd::span<opentelemetry::metrics::ObservableInstrument *> instruments) noexcept override;
+
+  void DeregisterCallback(uintptr_t callback_id) noexcept override;
+#endif
 private:
   // order of declaration is important here - instrumentation scope should destroy after
   // meter-context.
   std::unique_ptr<sdk::instrumentationscope::InstrumentationScope> scope_;
   std::weak_ptr<sdk::metrics::MeterContext> meter_context_;
-  // Mapping between instrument-name and Aggregation Storage.
-  std::unordered_map<std::string, std::shared_ptr<MetricStorage>> storage_registry_;
+  // Mapping between instrument descriptor and Aggregation Storage.
+  using MetricStorageMap = std::unordered_map<InstrumentDescriptor,
+                                              std::shared_ptr<MetricStorage>,
+                                              InstrumentDescriptorHash,
+                                              InstrumentEqualNameCaseInsensitive>;
+  MetricStorageMap storage_registry_;
   std::shared_ptr<ObservableRegistry> observable_registry_;
+  MeterConfig meter_config_;
   std::unique_ptr<SyncWritableMetricStorage> RegisterSyncMetricStorage(
       InstrumentDescriptor &instrument_descriptor);
   std::unique_ptr<AsyncWritableMetricStorage> RegisterAsyncMetricStorage(
       InstrumentDescriptor &instrument_descriptor);
   opentelemetry::common::SpinLockMutex storage_lock_;
+
+  static opentelemetry::metrics::NoopMeter kNoopMeter;
 
   static nostd::shared_ptr<opentelemetry::metrics::ObservableInstrument>
   GetNoopObservableInsrument()
@@ -148,6 +176,19 @@ private:
     return instrument_validator.ValidateName(name) && instrument_validator.ValidateUnit(unit) &&
            instrument_validator.ValidateDescription(description);
   }
+
+  // This function checks if the instrument is a duplicate of an existing one
+  // and emits a warning through the internal logger.
+  static void WarnOnDuplicateInstrument(
+      const sdk::instrumentationscope::InstrumentationScope *scope,
+      const MetricStorageMap &storage_registry,
+      const InstrumentDescriptor &new_instrument);
+
+  // This function checks if the instrument has a name case conflict with an existing one
+  // and emits a warning through the internal logger.
+  static void WarnOnNameCaseConflict(const sdk::instrumentationscope::InstrumentationScope *scope,
+                                     const InstrumentDescriptor &existing_instrument,
+                                     const InstrumentDescriptor &new_instrument);
 };
 }  // namespace metrics
 }  // namespace sdk

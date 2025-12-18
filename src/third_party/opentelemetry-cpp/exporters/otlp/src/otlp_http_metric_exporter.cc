@@ -10,14 +10,16 @@
 #include <utility>
 #include <vector>
 
-#include "opentelemetry/exporters/otlp/otlp_environment.h"
 #include "opentelemetry/exporters/otlp/otlp_http_client.h"
 #include "opentelemetry/exporters/otlp/otlp_http_metric_exporter.h"
 #include "opentelemetry/exporters/otlp/otlp_http_metric_exporter_options.h"
+#include "opentelemetry/exporters/otlp/otlp_http_metric_exporter_runtime_options.h"
 #include "opentelemetry/exporters/otlp/otlp_metric_utils.h"
+#include "opentelemetry/ext/http/client/http_client.h"
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/sdk/common/exporter_utils.h"
 #include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/common/thread_instrumentation.h"
 #include "opentelemetry/sdk/metrics/export/metric_producer.h"
 #include "opentelemetry/sdk/metrics/instruments.h"
 #include "opentelemetry/version.h"
@@ -28,6 +30,10 @@
 #include "opentelemetry/proto/collector/metrics/v1/metrics_service.pb.h"
 #include "opentelemetry/exporters/otlp/protobuf_include_suffix.h" // IWYU pragma: keep
 // clang-format on
+
+#ifdef ENABLE_ASYNC_EXPORT
+#  include <functional>
+#endif
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace exporter
@@ -41,6 +47,47 @@ OtlpHttpMetricExporter::OtlpHttpMetricExporter()
 
 OtlpHttpMetricExporter::OtlpHttpMetricExporter(const OtlpHttpMetricExporterOptions &options)
     : options_(options),
+      runtime_options_(),
+      aggregation_temporality_selector_{
+          OtlpMetricUtils::ChooseTemporalitySelector(options_.aggregation_temporality)},
+      http_client_(new OtlpHttpClient(OtlpHttpClientOptions(
+          options.url,
+          options.ssl_insecure_skip_verify,
+          options.ssl_ca_cert_path,
+          options.ssl_ca_cert_string,
+          options.ssl_client_key_path,
+          options.ssl_client_key_string,
+          options.ssl_client_cert_path,
+          options.ssl_client_cert_string,
+          options.ssl_min_tls,
+          options.ssl_max_tls,
+          options.ssl_cipher,
+          options.ssl_cipher_suite,
+          options.content_type,
+          options.json_bytes_mapping,
+          options.compression,
+          options.use_json_name,
+          options.console_debug,
+          options.timeout,
+          options.http_headers,
+          options.retry_policy_max_attempts,
+          options.retry_policy_initial_backoff,
+          options.retry_policy_max_backoff,
+          options.retry_policy_backoff_multiplier,
+          std::shared_ptr<sdk::common::ThreadInstrumentation>{nullptr}
+#ifdef ENABLE_ASYNC_EXPORT
+          ,
+          options.max_concurrent_requests,
+          options.max_requests_per_connection
+#endif
+          )))
+{}
+
+OtlpHttpMetricExporter::OtlpHttpMetricExporter(
+    const OtlpHttpMetricExporterOptions &options,
+    const OtlpHttpMetricExporterRuntimeOptions &runtime_options)
+    : options_(options),
+      runtime_options_(runtime_options),
       aggregation_temporality_selector_{
           OtlpMetricUtils::ChooseTemporalitySelector(options_.aggregation_temporality)},
       http_client_(new OtlpHttpClient(OtlpHttpClientOptions(options.url,
@@ -61,7 +108,12 @@ OtlpHttpMetricExporter::OtlpHttpMetricExporter(const OtlpHttpMetricExporterOptio
                                                             options.use_json_name,
                                                             options.console_debug,
                                                             options.timeout,
-                                                            options.http_headers
+                                                            options.http_headers,
+                                                            options.retry_policy_max_attempts,
+                                                            options.retry_policy_initial_backoff,
+                                                            options.retry_policy_max_backoff,
+                                                            options.retry_policy_backoff_multiplier,
+                                                            runtime_options.thread_instrumentation
 #ifdef ENABLE_ASYNC_EXPORT
                                                             ,
                                                             options.max_concurrent_requests,
@@ -76,18 +128,23 @@ OtlpHttpMetricExporter::OtlpHttpMetricExporter(std::unique_ptr<OtlpHttpClient> h
           OtlpMetricUtils::ChooseTemporalitySelector(options_.aggregation_temporality)},
       http_client_(std::move(http_client))
 {
-  OtlpHttpMetricExporterOptions &options = const_cast<OtlpHttpMetricExporterOptions &>(options_);
-  options.url                            = http_client_->GetOptions().url;
-  options.content_type                   = http_client_->GetOptions().content_type;
-  options.json_bytes_mapping             = http_client_->GetOptions().json_bytes_mapping;
-  options.use_json_name                  = http_client_->GetOptions().use_json_name;
-  options.console_debug                  = http_client_->GetOptions().console_debug;
-  options.timeout                        = http_client_->GetOptions().timeout;
-  options.http_headers                   = http_client_->GetOptions().http_headers;
+  options_.url                          = http_client_->GetOptions().url;
+  options_.content_type                 = http_client_->GetOptions().content_type;
+  options_.json_bytes_mapping           = http_client_->GetOptions().json_bytes_mapping;
+  options_.use_json_name                = http_client_->GetOptions().use_json_name;
+  options_.console_debug                = http_client_->GetOptions().console_debug;
+  options_.timeout                      = http_client_->GetOptions().timeout;
+  options_.http_headers                 = http_client_->GetOptions().http_headers;
+  options_.retry_policy_max_attempts    = http_client_->GetOptions().retry_policy.max_attempts;
+  options_.retry_policy_initial_backoff = http_client_->GetOptions().retry_policy.initial_backoff;
+  options_.retry_policy_max_backoff     = http_client_->GetOptions().retry_policy.max_backoff;
+  options_.retry_policy_backoff_multiplier =
+      http_client_->GetOptions().retry_policy.backoff_multiplier;
 #ifdef ENABLE_ASYNC_EXPORT
-  options.max_concurrent_requests     = http_client_->GetOptions().max_concurrent_requests;
-  options.max_requests_per_connection = http_client_->GetOptions().max_requests_per_connection;
+  options_.max_concurrent_requests     = http_client_->GetOptions().max_concurrent_requests;
+  options_.max_requests_per_connection = http_client_->GetOptions().max_requests_per_connection;
 #endif
+  runtime_options_.thread_instrumentation = http_client_->GetOptions().thread_instrumentation;
 }
 // ----------------------------- Exporter methods ------------------------------
 

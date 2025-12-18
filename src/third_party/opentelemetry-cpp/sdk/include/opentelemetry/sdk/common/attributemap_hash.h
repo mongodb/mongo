@@ -10,10 +10,6 @@
 #include <utility>
 #include <vector>
 
-#include "opentelemetry/common/attribute_value.h"
-#include "opentelemetry/common/key_value_iterable.h"
-#include "opentelemetry/nostd/function_ref.h"
-#include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/nostd/variant.h"
 #include "opentelemetry/sdk/common/attribute_utils.h"
 #include "opentelemetry/version.h"
@@ -71,27 +67,6 @@ inline size_t GetHashForAttributeMap(const OrderedAttributeMap &attribute_map)
     GetHash(seed, kv.first);
     nostd::visit(GetHashForAttributeValueVisitor(seed), kv.second);
   }
-  return seed;
-}
-
-// Calculate hash of keys and values of KeyValueIterable, filtered using callback.
-inline size_t GetHashForAttributeMap(
-    const opentelemetry::common::KeyValueIterable &attributes,
-    nostd::function_ref<bool(nostd::string_view)> is_key_present_callback)
-{
-  AttributeConverter converter;
-  size_t seed = 0UL;
-  attributes.ForEachKeyValue(
-      [&](nostd::string_view key, opentelemetry::common::AttributeValue value) noexcept {
-        if (!is_key_present_callback(key))
-        {
-          return true;
-        }
-        GetHash(seed, key);
-        auto attr_val = nostd::visit(converter, value);
-        nostd::visit(GetHashForAttributeValueVisitor(seed), attr_val);
-        return true;
-      });
   return seed;
 }
 

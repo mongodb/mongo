@@ -39,6 +39,19 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "disabled",
+    srcs = [
+        "disabled.cc",
+    ],
+    include_prefix = "src/common",
+    target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
+    deps = [
+        "//src/third_party/opentelemetry-cpp/api",
+        "//src/third_party/opentelemetry-cpp/sdk:headers",
+    ],
+)
+
+mongo_cc_library(
     name = "env_variables",
     srcs = [
         "env_variables.cc",

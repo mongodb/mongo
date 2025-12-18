@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "opentelemetry/sdk/metrics/aggregation/aggregation.h"
+#include "opentelemetry/sdk/metrics/aggregation/base2_exponential_histogram_aggregation.h"
 #include "opentelemetry/sdk/metrics/aggregation/drop_aggregation.h"
 #include "opentelemetry/sdk/metrics/aggregation/histogram_aggregation.h"
 #include "opentelemetry/sdk/metrics/aggregation/lastvalue_aggregation.h"
@@ -80,6 +81,10 @@ public:
           return std::unique_ptr<Aggregation>(new DoubleHistogramAggregation(aggregation_config));
         }
         break;
+      case AggregationType::kBase2ExponentialHistogram:
+        return std::unique_ptr<Aggregation>(
+            new Base2ExponentialHistogramAggregation(aggregation_config));
+        break;
       case AggregationType::kLastValue:
         if (instrument_descriptor.value_type_ == InstrumentValueType::kLong)
         {
@@ -113,9 +118,10 @@ public:
     }
   }
 
-  static std::unique_ptr<Aggregation> CloneAggregation(AggregationType aggregation_type,
-                                                       InstrumentDescriptor instrument_descriptor,
-                                                       const Aggregation &to_copy)
+  static std::unique_ptr<Aggregation> CloneAggregation(
+      AggregationType aggregation_type,
+      const InstrumentDescriptor &instrument_descriptor,
+      const Aggregation &to_copy)
   {
     const PointType point_data = to_copy.ToPoint();
     bool is_monotonic          = true;
@@ -138,6 +144,9 @@ public:
           return std::unique_ptr<Aggregation>(
               new DoubleHistogramAggregation(nostd::get<HistogramPointData>(point_data)));
         }
+      case AggregationType::kBase2ExponentialHistogram:
+        return std::unique_ptr<Aggregation>(new Base2ExponentialHistogramAggregation(
+            nostd::get<Base2ExponentialHistogramPointData>(point_data)));
       case AggregationType::kLastValue:
         if (instrument_descriptor.value_type_ == InstrumentValueType::kLong)
         {
@@ -180,6 +189,7 @@ public:
         return AggregationType::kSum;
       case InstrumentType::kHistogram:
         return AggregationType::kHistogram;
+      case InstrumentType::kGauge:
       case InstrumentType::kObservableGauge:
         return AggregationType::kLastValue;
       default:

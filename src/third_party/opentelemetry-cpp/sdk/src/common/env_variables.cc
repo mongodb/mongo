@@ -10,7 +10,10 @@
 #  include <strings.h>
 #endif
 
+#include <cctype>
+#include <cerrno>
 #include <cstdlib>
+#include <limits>
 #include <ostream>
 
 #include "opentelemetry/nostd/string_view.h"
@@ -89,10 +92,10 @@ static bool GetTimeoutFromString(const char *input, std::chrono::system_clock::d
   std::chrono::system_clock::duration::rep result = 0;
 
   // Skip spaces
-  for (; *input && (' ' == *input || '\t' == *input || '\r' == *input || '\n' == *input); ++input)
+  for (; *input && std::isspace(*input); ++input)
     ;
 
-  for (; *input && (*input >= '0' && *input <= '9'); ++input)
+  for (; *input && std::isdigit(*input); ++input)
   {
     result = result * 10 + (*input - '0');
   }
@@ -191,6 +194,83 @@ bool GetStringEnvironmentVariable(const char *env_var_name, std::string &value)
     return false;
   }
   return true;
+}
+
+bool GetUintEnvironmentVariable(const char *env_var_name, std::uint32_t &value)
+{
+  static constexpr auto kDefaultValue = 0U;
+  std::string raw_value;
+  bool exists = GetRawEnvironmentVariable(env_var_name, raw_value);
+
+  if (!exists || raw_value.empty())
+  {
+    value = kDefaultValue;
+    return false;
+  }
+
+  const char *end  = raw_value.c_str() + raw_value.length();
+  char *actual_end = nullptr;
+  const auto temp  = std::strtoull(raw_value.c_str(), &actual_end, 10);
+
+  if (errno == ERANGE)
+  {
+    errno = 0;
+    OTEL_INTERNAL_LOG_WARN("Environment variable <" << env_var_name << "> is out of range <"
+                                                    << raw_value << ">, defaulting to "
+                                                    << kDefaultValue);
+  }
+  else if (actual_end != end || std::numeric_limits<std::uint32_t>::max() < temp)
+  {
+    OTEL_INTERNAL_LOG_WARN("Environment variable <" << env_var_name << "> has an invalid value <"
+                                                    << raw_value << ">, defaulting to "
+                                                    << kDefaultValue);
+  }
+  else
+  {
+    value = static_cast<std::uint32_t>(temp);
+    return true;
+  }
+
+  value = kDefaultValue;
+  return false;
+}
+
+bool GetFloatEnvironmentVariable(const char *env_var_name, float &value)
+{
+  static constexpr auto kDefaultValue = 0.0f;
+  std::string raw_value;
+  bool exists = GetRawEnvironmentVariable(env_var_name, raw_value);
+
+  if (!exists || raw_value.empty())
+  {
+    value = kDefaultValue;
+    return false;
+  }
+
+  const char *end  = raw_value.c_str() + raw_value.length();
+  char *actual_end = nullptr;
+  value            = std::strtof(raw_value.c_str(), &actual_end);
+
+  if (errno == ERANGE)
+  {
+    errno = 0;
+    OTEL_INTERNAL_LOG_WARN("Environment variable <" << env_var_name << "> is out of range <"
+                                                    << raw_value << ">, defaulting to "
+                                                    << kDefaultValue);
+  }
+  else if (actual_end != end)
+  {
+    OTEL_INTERNAL_LOG_WARN("Environment variable <" << env_var_name << "> has an invalid value <"
+                                                    << raw_value << ">, defaulting to "
+                                                    << kDefaultValue);
+  }
+  else
+  {
+    return true;
+  }
+
+  value = kDefaultValue;
+  return false;
 }
 
 }  // namespace common

@@ -8,6 +8,7 @@
 
 #include "opentelemetry/exporters/otlp/otlp_http_client.h"
 #include "opentelemetry/exporters/otlp/otlp_http_exporter_options.h"
+#include "opentelemetry/exporters/otlp/otlp_http_exporter_runtime_options.h"
 #include "opentelemetry/nostd/span.h"
 #include "opentelemetry/sdk/common/exporter_utils.h"
 #include "opentelemetry/sdk/trace/exporter.h"
@@ -35,6 +36,12 @@ public:
    * Create an OtlpHttpExporter using the given options.
    */
   explicit OtlpHttpExporter(const OtlpHttpExporterOptions &options);
+
+  /**
+   * Create an OtlpHttpExporter using the given options.
+   */
+  OtlpHttpExporter(const OtlpHttpExporterOptions &options,
+                   const OtlpHttpExporterRuntimeOptions &runtime_options);
 
   /**
    * Create a span recordable.
@@ -69,7 +76,9 @@ public:
 
 private:
   // The configuration options associated with this exporter.
-  const OtlpHttpExporterOptions options_;
+  OtlpHttpExporterOptions options_;
+  // The runtime options associated with this exporter.
+  OtlpHttpExporterRuntimeOptions runtime_options_;
 
   // Object that stores the HTTP sessions that have been created
   std::unique_ptr<OtlpHttpClient> http_client_;

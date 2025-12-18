@@ -80,7 +80,7 @@ public:
    * @param trace_id the TraceId for the new Span. This will be identical to that in
    *        the parentContext, unless this is a root span.
    * @param name the name of the new Span.
-   * @param spanKind the opentelemetry::trace::SpanKind of the Span.
+   * @param span_kind the opentelemetry::trace::SpanKind of the Span.
    * @param attributes list of AttributeValue with their keys.
    * @param links Collection of links that will be associated with the Span to be created.
    * @return sampling result whether span should be sampled or not.

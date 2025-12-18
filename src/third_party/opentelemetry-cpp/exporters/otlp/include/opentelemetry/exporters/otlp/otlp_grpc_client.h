@@ -3,24 +3,76 @@
 
 #pragma once
 
-#include <grpcpp/completion_queue.h>
 #include <grpcpp/grpcpp.h>
-
+#include <grpcpp/support/status.h>
 #include <atomic>
+#include <chrono>
 #include <memory>
-
-#include "opentelemetry/sdk/common/exporter_utils.h"
+#include <string>
 
 #include "opentelemetry/exporters/otlp/otlp_grpc_client_options.h"
+#include "opentelemetry/version.h"
 
-#include "opentelemetry/exporters/otlp/protobuf_include_prefix.h"
-
-#include "google/protobuf/arena.h"
+// clang-format off
+#include "opentelemetry/exporters/otlp/protobuf_include_prefix.h" // IWYU pragma: keep
 #include "opentelemetry/proto/collector/logs/v1/logs_service.grpc.pb.h"
 #include "opentelemetry/proto/collector/metrics/v1/metrics_service.grpc.pb.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.grpc.pb.h"
+#include "opentelemetry/exporters/otlp/protobuf_include_suffix.h" // IWYU pragma: keep
+// clang-format on
 
-#include "opentelemetry/exporters/otlp/protobuf_include_suffix.h"
+#ifdef ENABLE_ASYNC_EXPORT
+#  include <functional>
+
+#  include "opentelemetry/sdk/common/exporter_utils.h"
+#endif /* ENABLE_ASYNC_EXPORT */
+
+namespace google
+{
+namespace protobuf
+{
+class Arena;
+}
+}  // namespace google
+
+namespace opentelemetry
+{
+namespace proto
+{
+namespace collector
+{
+
+namespace logs
+{
+namespace v1
+{
+class ExportLogsServiceRequest;
+class ExportLogsServiceResponse;
+}  // namespace v1
+}  // namespace logs
+
+namespace metrics
+{
+namespace v1
+{
+class ExportMetricsServiceRequest;
+class ExportMetricsServiceResponse;
+}  // namespace v1
+}  // namespace metrics
+
+namespace trace
+{
+namespace v1
+{
+class ExportTraceServiceRequest;
+class ExportTraceServiceResponse;
+}  // namespace v1
+
+}  // namespace trace
+
+}  // namespace collector
+}  // namespace proto
+}  // namespace opentelemetry
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace exporter
@@ -28,11 +80,24 @@ namespace exporter
 namespace otlp
 {
 
-struct OtlpGrpcClientOptions;
+struct OtlpGrpcClientOptions;    // IWYU pragma: keep
+struct OtlpGrpcClientAsyncData;  // IWYU pragma: keep
 
-#ifdef ENABLE_ASYNC_EXPORT
-struct OtlpGrpcClientAsyncData;
-#endif
+class OtlpGrpcClientReferenceGuard
+{
+public:
+  OtlpGrpcClientReferenceGuard() noexcept;
+  ~OtlpGrpcClientReferenceGuard() noexcept;
+
+  OtlpGrpcClientReferenceGuard(const OtlpGrpcClientReferenceGuard &)            = delete;
+  OtlpGrpcClientReferenceGuard(OtlpGrpcClientReferenceGuard &&)                 = delete;
+  OtlpGrpcClientReferenceGuard &operator=(const OtlpGrpcClientReferenceGuard &) = delete;
+  OtlpGrpcClientReferenceGuard &operator=(OtlpGrpcClientReferenceGuard &&)      = delete;
+
+private:
+  friend class OtlpGrpcClient;
+  std::atomic<bool> has_value_;
+};
 
 /**
  * The OTLP gRPC client contains utility functions of gRPC.
@@ -40,9 +105,14 @@ struct OtlpGrpcClientAsyncData;
 class OtlpGrpcClient
 {
 public:
-  OtlpGrpcClient();
-
+  OtlpGrpcClient(const OtlpGrpcClientOptions &options);
   ~OtlpGrpcClient();
+  OtlpGrpcClient(const OtlpGrpcClient &)            = delete;
+  OtlpGrpcClient(OtlpGrpcClient &&)                 = delete;
+  OtlpGrpcClient &operator=(const OtlpGrpcClient &) = delete;
+  OtlpGrpcClient &operator=(OtlpGrpcClient &&)      = delete;
+
+  static std::string GetGrpcTarget(const std::string &endpoint);
 
   /**
    * Create gRPC channel from the exporter options.
@@ -58,20 +128,18 @@ public:
   /**
    * Create trace service stub to communicate with the OpenTelemetry Collector.
    */
-  static std::unique_ptr<proto::collector::trace::v1::TraceService::StubInterface>
-  MakeTraceServiceStub(const OtlpGrpcClientOptions &options);
+  std::unique_ptr<proto::collector::trace::v1::TraceService::StubInterface> MakeTraceServiceStub();
 
   /**
    * Create metrics service stub to communicate with the OpenTelemetry Collector.
    */
-  static std::unique_ptr<proto::collector::metrics::v1::MetricsService::StubInterface>
-  MakeMetricsServiceStub(const OtlpGrpcClientOptions &options);
+  std::unique_ptr<proto::collector::metrics::v1::MetricsService::StubInterface>
+  MakeMetricsServiceStub();
 
   /**
    * Create logs service stub to communicate with the OpenTelemetry Collector.
    */
-  static std::unique_ptr<proto::collector::logs::v1::LogsService::StubInterface>
-  MakeLogsServiceStub(const OtlpGrpcClientOptions &options);
+  std::unique_ptr<proto::collector::logs::v1::LogsService::StubInterface> MakeLogsServiceStub();
 
   static grpc::Status DelegateExport(
       proto::collector::trace::v1::TraceService::StubInterface *stub,
@@ -94,8 +162,18 @@ public:
       proto::collector::logs::v1::ExportLogsServiceRequest &&request,
       proto::collector::logs::v1::ExportLogsServiceResponse *response);
 
-#ifdef ENABLE_ASYNC_EXPORT
+  void AddReference(OtlpGrpcClientReferenceGuard &guard,
+                    const OtlpGrpcClientOptions &options) noexcept;
 
+  /**
+   * Reomve reference fro a guard object
+   *
+   * @param guard guard object to remove reference from
+   * @return true if there is no more reference to this gRPC client
+   */
+  bool RemoveReference(OtlpGrpcClientReferenceGuard &guard) noexcept;
+
+#ifdef ENABLE_ASYNC_EXPORT
   /**
    * Async export
    * @param options Options used to message to create gRPC context and stub(if necessary)
@@ -155,6 +233,7 @@ public:
                          const proto::collector::logs::v1::ExportLogsServiceRequest &,
                          proto::collector::logs::v1::ExportLogsServiceResponse *)>
           &&result_callback) noexcept;
+#endif
 
   /**
    * Force flush the gRPC client.
@@ -167,9 +246,12 @@ public:
    * timeout is applied.
    * @return return the status of this operation
    */
-  bool Shutdown(std::chrono::microseconds timeout = std::chrono::microseconds(0)) noexcept;
+  bool Shutdown(OtlpGrpcClientReferenceGuard &guard,
+                std::chrono::microseconds timeout = std::chrono::microseconds(0)) noexcept;
 
   std::shared_ptr<OtlpGrpcClientAsyncData> MutableAsyncData(const OtlpGrpcClientOptions &options);
+
+  bool IsShutdown() const noexcept;
 
 private:
   // Stores if this gRPC client had its Shutdown() method called
@@ -177,7 +259,6 @@ private:
 
   // Stores shared data between threads of this gRPC client
   std::shared_ptr<OtlpGrpcClientAsyncData> async_data_;
-#endif
 };
 }  // namespace otlp
 }  // namespace exporter

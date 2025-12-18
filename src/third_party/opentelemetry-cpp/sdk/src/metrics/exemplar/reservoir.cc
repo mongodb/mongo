@@ -3,13 +3,17 @@
 
 #ifdef ENABLE_METRICS_EXEMPLAR_PREVIEW
 
+#  include <stddef.h>
 #  include <utility>
 
+#  include "opentelemetry/nostd/shared_ptr.h"
 #  include "opentelemetry/sdk/metrics/exemplar/aligned_histogram_bucket_exemplar_reservoir.h"
 #  include "opentelemetry/sdk/metrics/exemplar/no_exemplar_reservoir.h"
 #  include "opentelemetry/sdk/metrics/exemplar/reservoir.h"
 #  include "opentelemetry/sdk/metrics/exemplar/reservoir_cell.h"
+#  include "opentelemetry/sdk/metrics/exemplar/reservoir_cell_selector.h"
 #  include "opentelemetry/sdk/metrics/exemplar/simple_fixed_size_exemplar_reservoir.h"
+#  include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
 namespace sdk

@@ -4,12 +4,11 @@
 
 #include <cmath>
 #include <cstdint>
-#include <cstring>
 #include <map>
 #include <memory>
 #include <string>
 
-#include "opentelemetry/common/attribute_value.h"
+#include "opentelemetry/nostd/span.h"
 #include "opentelemetry/nostd/string_view.h"
 #include "opentelemetry/sdk/trace/sampler.h"
 #include "opentelemetry/sdk/trace/samplers/trace_id_ratio.h"
@@ -42,7 +41,8 @@ uint64_t CalculateThreshold(double ratio) noexcept
   // For probabilities >= 1-(2^-54), the product wraps to zero!
   // Instead, calculate the high and low 32 bits separately.
   const double product = UINT32_MAX * ratio;
-  double hi_bits, lo_bits = ldexp(modf(product, &hi_bits), 32) + product;
+  double hi_bits{};
+  double lo_bits = ldexp(modf(product, &hi_bits), 32) + product;
   return (static_cast<uint64_t>(hi_bits) << 32) + static_cast<uint64_t>(lo_bits);
 }
 
@@ -57,8 +57,13 @@ uint64_t CalculateThresholdFromBuffer(const trace_api::TraceId &trace_id) noexce
   // We only use the first 8 bytes of TraceId.
   static_assert(trace_api::TraceId::kSize >= 8, "TraceID must be at least 8 bytes long.");
 
-  uint64_t res = 0;
-  std::memcpy(&res, &trace_id, 8);
+  // Always interpret as big-endian
+  const uint8_t *data = trace_id.Id().data();
+  uint64_t res        = 0;
+  for (int i = 0; i < 8; ++i)
+  {
+    res = (res << 8) | data[i];
+  }
 
   double ratio = static_cast<double>(res) / static_cast<double>(UINT64_MAX);
 

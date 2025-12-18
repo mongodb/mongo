@@ -21,6 +21,7 @@
 #  pragma warning(disable : 4251)
 #  pragma warning(disable : 4267)
 #  pragma warning(disable : 4668)
+#  pragma warning(disable : 4702)
 #  pragma warning(disable : 4946)
 #  pragma warning(disable : 6001)
 #  pragma warning(disable : 6244)

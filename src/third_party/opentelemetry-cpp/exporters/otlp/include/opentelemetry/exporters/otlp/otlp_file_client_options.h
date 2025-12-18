@@ -68,7 +68,7 @@ struct OtlpFileClientFileSystemOptions
   // Maximum file count
   std::size_t rotate_size = 3;
 
-  inline OtlpFileClientFileSystemOptions() noexcept {}
+  OtlpFileClientFileSystemOptions() = default;
 };
 
 /**
@@ -77,7 +77,12 @@ struct OtlpFileClientFileSystemOptions
 class OtlpFileAppender
 {
 public:
-  virtual ~OtlpFileAppender() = default;
+  OtlpFileAppender()                                    = default;
+  virtual ~OtlpFileAppender()                           = default;
+  OtlpFileAppender(const OtlpFileAppender &)            = default;
+  OtlpFileAppender &operator=(const OtlpFileAppender &) = default;
+  OtlpFileAppender(OtlpFileAppender &&)                 = default;
+  OtlpFileAppender &operator=(OtlpFileAppender &&)      = default;
 
   virtual void Export(opentelemetry::nostd::string_view data, std::size_t record_count) = 0;
 
@@ -96,12 +101,17 @@ using OtlpFileClientBackendOptions =
  */
 struct OtlpFileClientOptions
 {
+  OtlpFileClientOptions()                                         = default;
+  virtual ~OtlpFileClientOptions()                                = default;
+  OtlpFileClientOptions(const OtlpFileClientOptions &)            = default;
+  OtlpFileClientOptions &operator=(const OtlpFileClientOptions &) = default;
+  OtlpFileClientOptions(OtlpFileClientOptions &&)                 = default;
+  OtlpFileClientOptions &operator=(OtlpFileClientOptions &&)      = default;
+
   // Whether to print the status of the FILE client in the console
   bool console_debug = false;
 
   OtlpFileClientBackendOptions backend_options;
-
-  inline OtlpFileClientOptions() noexcept {}
 };
 }  // namespace otlp
 }  // namespace exporter

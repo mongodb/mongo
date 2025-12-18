@@ -37,7 +37,7 @@ private:
 
   struct alignas(kAlignment) PlacementBuffer
   {
-    char data[kMaxSize];
+    char data[kMaxSize]{};
   };
 
   class shared_ptr_wrapper

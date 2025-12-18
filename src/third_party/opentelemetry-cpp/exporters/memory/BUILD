@@ -15,13 +15,13 @@ mongo_cc_library(
     hdrs = [
         "include/opentelemetry/exporters/memory/in_memory_metric_data.h",
     ],
+    copts = OTEL_COPTS,
     strip_include_prefix = "include",
     tags = [
         "memory",
         "test",
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
-    copts = OTEL_COPTS,
     deps = [
         ":in_memory_data",
         "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
@@ -37,13 +37,13 @@ mongo_cc_library(
     hdrs = [
         "include/opentelemetry/exporters/memory/in_memory_metric_exporter_factory.h",
     ],
+    copts = OTEL_COPTS,
     strip_include_prefix = "include",
     tags = [
         "memory",
         "test",
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
-    copts = OTEL_COPTS,
     deps = [
         ":in_memory_metric_data",
         "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
@@ -56,10 +56,10 @@ mongo_cc_library(
     hdrs = [
         "include/opentelemetry/exporters/memory/in_memory_data.h",
     ],
+    copts = OTEL_COPTS,
     strip_include_prefix = "include",
     tags = ["memory"],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
-    copts = OTEL_COPTS,
     deps = [
         "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
     ],
@@ -71,10 +71,10 @@ mongo_cc_library(
     hdrs = [
         "include/opentelemetry/exporters/memory/in_memory_span_data.h",
     ],
+    copts = OTEL_COPTS,
     strip_include_prefix = "include",
     tags = ["memory"],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
-    copts = OTEL_COPTS,
     deps = [
         ":in_memory_data",
         "//src/third_party/opentelemetry-cpp/api",
@@ -93,13 +93,13 @@ mongo_cc_library(
         "include/opentelemetry/exporters/memory/in_memory_span_exporter.h",
         "include/opentelemetry/exporters/memory/in_memory_span_exporter_factory.h",
     ],
+    copts = OTEL_COPTS,
     strip_include_prefix = "include",
     tags = [
         "memory",
         "test",
     ],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
-    copts = OTEL_COPTS,
     deps = [
         ":in_memory_span_data",
         "//src/third_party/opentelemetry-cpp/sdk/src/trace",

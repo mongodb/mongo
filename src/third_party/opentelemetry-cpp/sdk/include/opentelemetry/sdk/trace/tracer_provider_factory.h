@@ -28,7 +28,7 @@ namespace trace
 class OPENTELEMETRY_EXPORT TracerProviderFactory
 {
 public:
-  /* Serie of builders with a single processor. */
+  /* Series of creator methods with a single processor. */
 
   static std::unique_ptr<opentelemetry::sdk::trace::TracerProvider> Create(
       std::unique_ptr<SpanProcessor> processor);
@@ -48,7 +48,14 @@ public:
       std::unique_ptr<Sampler> sampler,
       std::unique_ptr<IdGenerator> id_generator);
 
-  /* Serie of builders with a vector of processor. */
+  static std::unique_ptr<opentelemetry::sdk::trace::TracerProvider> Create(
+      std::unique_ptr<SpanProcessor> processor,
+      const opentelemetry::sdk::resource::Resource &resource,
+      std::unique_ptr<Sampler> sampler,
+      std::unique_ptr<IdGenerator> id_generator,
+      std::unique_ptr<instrumentationscope::ScopeConfigurator<TracerConfig>> tracer_configurator);
+
+  /* Series of creator methods with a vector of processors. */
 
   static std::unique_ptr<opentelemetry::sdk::trace::TracerProvider> Create(
       std::vector<std::unique_ptr<SpanProcessor>> &&processors);
@@ -67,6 +74,13 @@ public:
       const opentelemetry::sdk::resource::Resource &resource,
       std::unique_ptr<Sampler> sampler,
       std::unique_ptr<IdGenerator> id_generator);
+
+  static std::unique_ptr<opentelemetry::sdk::trace::TracerProvider> Create(
+      std::vector<std::unique_ptr<SpanProcessor>> &&processors,
+      const opentelemetry::sdk::resource::Resource &resource,
+      std::unique_ptr<Sampler> sampler,
+      std::unique_ptr<IdGenerator> id_generator,
+      std::unique_ptr<instrumentationscope::ScopeConfigurator<TracerConfig>> tracer_configurator);
 
   /* Create with a tracer context. */
 

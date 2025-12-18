@@ -11,6 +11,7 @@
 #include "opentelemetry/exporters/otlp/otlp_file_client_options.h"
 #include "opentelemetry/exporters/otlp/otlp_file_exporter.h"
 #include "opentelemetry/exporters/otlp/otlp_file_exporter_options.h"
+#include "opentelemetry/exporters/otlp/otlp_file_exporter_runtime_options.h"
 #include "opentelemetry/exporters/otlp/otlp_recordable.h"
 #include "opentelemetry/exporters/otlp/otlp_recordable_utils.h"
 #include "opentelemetry/nostd/span.h"
@@ -35,7 +36,15 @@ namespace otlp
 OtlpFileExporter::OtlpFileExporter() : OtlpFileExporter(OtlpFileExporterOptions()) {}
 
 OtlpFileExporter::OtlpFileExporter(const OtlpFileExporterOptions &options)
-    : options_(options), file_client_(new OtlpFileClient(OtlpFileClientOptions(options)))
+    : OtlpFileExporter(options, OtlpFileExporterRuntimeOptions())
+{}
+
+OtlpFileExporter::OtlpFileExporter(const OtlpFileExporterOptions &options,
+                                   const OtlpFileExporterRuntimeOptions &runtime_options)
+    : options_(options),
+      runtime_options_(runtime_options),
+      file_client_(new OtlpFileClient(OtlpFileClientOptions(options),
+                                      OtlpFileExporterRuntimeOptions(runtime_options)))
 {}
 
 // ----------------------------- Exporter methods ------------------------------

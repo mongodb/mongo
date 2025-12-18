@@ -77,6 +77,15 @@ public:
   bool Shutdown(
       std::chrono::microseconds timeout = (std::chrono::microseconds::max)()) noexcept override
   {
+    return InternalShutdown(timeout);
+  }
+
+  ~SimpleSpanProcessor() override { InternalShutdown(); }
+
+protected:
+  bool InternalShutdown(
+      std::chrono::microseconds timeout = (std::chrono::microseconds::max)()) noexcept
+  {
     // We only call shutdown ONCE.
     if (exporter_ != nullptr && !shutdown_latch_.test_and_set(std::memory_order_acquire))
     {
@@ -84,8 +93,6 @@ public:
     }
     return true;
   }
-
-  ~SimpleSpanProcessor() override { Shutdown(); }
 
 private:
   std::unique_ptr<SpanExporter> exporter_;

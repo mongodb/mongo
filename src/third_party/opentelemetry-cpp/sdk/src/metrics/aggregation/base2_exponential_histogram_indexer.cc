@@ -33,7 +33,7 @@ int32_t MapToIndexScaleZero(double value)
   // Note: std::frexp() rounds submnormal values to the smallest normal value and returns an
   // exponent corresponding to fractions in the range [0.5, 1), whereas an exponent for the range
   // [1, 2), so subtract 1 from the exponent immediately.
-  int exp;
+  int exp{};
   double frac = std::frexp(value, &exp);
   exp--;
 

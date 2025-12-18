@@ -54,7 +54,7 @@ a notice will be included in
 | [MurmurHash3]                                        | Public Domain                                  | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [nlohmann/json]                                      | MIT                                            | 3.11.3                                   | ✗                    |                                 |
 | [node]                                               | ISC                                            | 22.1.0                                   |                      |                                 |
-| [opentelemetry-cpp]                                  | Apache-2.0                                     | 1.17.0                                   | ✗                    |                                 |
+| [opentelemetry-cpp]                                  | Apache-2.0                                     | 1.24.0                                   | ✗                    |                                 |
 | [opentelemetry-proto]                                | Apache-2.0                                     | 1.3.2                                    | ✗                    |                                 |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception              | 10.40                                    |                      | ✗                               |
 | [Protobuf]                                           | BSD-3-Clause                                   | 4.25.0                                   |                      | ✗                               |

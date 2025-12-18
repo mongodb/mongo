@@ -9,6 +9,7 @@
 #include "opentelemetry/common/timestamp.h"
 #include "opentelemetry/nostd/function_ref.h"
 #include "opentelemetry/nostd/span.h"
+#include "opentelemetry/sdk/metrics/aggregation/aggregation_config.h"
 #include "opentelemetry/sdk/metrics/data/metric_data.h"
 #include "opentelemetry/sdk/metrics/state/attributes_hashmap.h"
 #include "opentelemetry/sdk/metrics/state/metric_collector.h"
@@ -35,7 +36,7 @@ bool SyncMetricStorage::Collect(CollectorHandle *collector,
   {
     std::lock_guard<opentelemetry::common::SpinLockMutex> guard(attribute_hashmap_lock_);
     delta_metrics = std::move(attributes_hashmap_);
-    attributes_hashmap_.reset(new AttributesHashMap);
+    attributes_hashmap_.reset(new AttributesHashMap(aggregation_config_->cardinality_limit_));
   }
 
   return temporal_metric_storage_.buildMetrics(collector, collectors, sdk_start_ts, collection_ts,

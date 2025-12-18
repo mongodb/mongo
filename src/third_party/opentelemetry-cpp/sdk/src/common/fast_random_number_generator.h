@@ -25,7 +25,7 @@ namespace common
  *
  * ...
  * #define NOMINMAX
- * #include <Windows.h>
+ * #include <windows.h>
  * ...
  *
  * See:

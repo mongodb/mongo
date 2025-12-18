@@ -81,41 +81,29 @@ struct IsTriviallyMoveConstructibleObject
     : std::integral_constant<
           bool, std::is_move_constructible<
                     type_traits_internal::SingleMemberUnion<T>>::value &&
-                    absl::is_trivially_destructible<T>::value> {};
+                    absl::OTABSL_OPTION_NAMESPACE_NAME::is_trivially_destructible<T>::value> {};
 
 template <class T>
 struct IsTriviallyCopyConstructibleObject
     : std::integral_constant<
           bool, std::is_copy_constructible<
                     type_traits_internal::SingleMemberUnion<T>>::value &&
-                    absl::is_trivially_destructible<T>::value> {};
+                    absl::OTABSL_OPTION_NAMESPACE_NAME::is_trivially_destructible<T>::value> {};
 
 template <class T>
 struct IsTriviallyMoveAssignableReference : std::false_type {};
 
 template <class T>
 struct IsTriviallyMoveAssignableReference<T&>
-    : absl::is_trivially_move_assignable<T>::type {};
+    : absl::OTABSL_OPTION_NAMESPACE_NAME::is_trivially_move_assignable<T>::type {};
 
 template <class T>
 struct IsTriviallyMoveAssignableReference<T&&>
-    : absl::is_trivially_move_assignable<T>::type {};
+    : absl::OTABSL_OPTION_NAMESPACE_NAME::is_trivially_move_assignable<T>::type {};
 
 template <typename... Ts>
 struct VoidTImpl {
   using type = void;
-};
-
-// This trick to retrieve a default alignment is necessary for our
-// implementation of aligned_storage_t to be consistent with any implementation
-// of std::aligned_storage.
-template <size_t Len, typename T = std::aligned_storage<Len>>
-struct default_alignment_of_aligned_storage;
-
-template <size_t Len, size_t Align>
-struct default_alignment_of_aligned_storage<Len,
-                                            std::aligned_storage<Len, Align>> {
-  static constexpr size_t value = Align;
 };
 
 ////////////////////////////////
@@ -203,7 +191,7 @@ struct is_move_assignable : type_traits_internal::is_detected<
 // This metafunction is designed to be a drop-in replacement for the C++17
 // `std::void_t` metafunction.
 //
-// NOTE: `absl::void_t` does not use the standard-specified implementation so
+// NOTE: `absl::OTABSL_OPTION_NAMESPACE_NAME::void_t` does not use the standard-specified implementation so
 // that it can remain compatible with gcc < 5.1. This can introduce slightly
 // different behavior, such as when ordering partial specializations.
 template <typename... Ts>
@@ -505,7 +493,7 @@ struct is_trivially_copy_assignable
 #else
     : std::integral_constant<
           bool, __has_trivial_assign(typename std::remove_reference<T>::type) &&
-                    absl::is_copy_assignable<T>::value> {
+                    absl::OTABSL_OPTION_NAMESPACE_NAME::is_copy_assignable<T>::value> {
 #endif
 #ifdef OTABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE
  private:
@@ -549,8 +537,8 @@ class is_trivially_copyable_impl {
       std::is_copy_constructible<ExtentsRemoved>::value ||
       std::is_move_constructible<ExtentsRemoved>::value;
   static constexpr bool kIsCopyOrMoveAssignable =
-      absl::is_copy_assignable<ExtentsRemoved>::value ||
-      absl::is_move_assignable<ExtentsRemoved>::value;
+      absl::OTABSL_OPTION_NAMESPACE_NAME::is_copy_assignable<ExtentsRemoved>::value ||
+      absl::OTABSL_OPTION_NAMESPACE_NAME::is_move_assignable<ExtentsRemoved>::value;
 
  public:
   static constexpr bool kValue =
@@ -619,10 +607,6 @@ using remove_extent_t = typename std::remove_extent<T>::type;
 template <typename T>
 using remove_all_extents_t = typename std::remove_all_extents<T>::type;
 
-template <size_t Len, size_t Align = type_traits_internal::
-                          default_alignment_of_aligned_storage<Len>::value>
-using aligned_storage_t = typename std::aligned_storage<Len, Align>::type;
-
 template <typename T>
 using decay_t = typename std::decay<T>::type;
 
@@ -677,7 +661,7 @@ struct IsHashable : std::false_type {};
 template <typename Key>
 struct IsHashable<
     Key,
-    absl::enable_if_t<std::is_convertible<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<std::is_convertible<
         decltype(std::declval<std::hash<Key>&>()(std::declval<Key const&>())),
         std::size_t>::value>> : std::true_type {};
 #endif  // !OTABSL_META_INTERNAL_STD_HASH_SFINAE_FRIENDLY_
@@ -703,7 +687,7 @@ struct AssertHashEnabledHelper {
     static_assert(
         std::is_copy_constructible<std::hash<Key>>::value,
         "std::hash<Key> must be copy constructible when it is enabled");
-    static_assert(absl::is_copy_assignable<std::hash<Key>>::value,
+    static_assert(absl::OTABSL_OPTION_NAMESPACE_NAME::is_copy_assignable<std::hash<Key>>::value,
                   "std::hash<Key> must be copy assignable when it is enabled");
     // is_destructible is unchecked as it's implied by each of the
     // is_constructible checks.
@@ -733,7 +717,7 @@ namespace swap_internal {
 // Necessary for the traits.
 using std::swap;
 
-// This declaration prevents global `swap` and `absl::swap` overloads from being
+// This declaration prevents global `swap` and `absl::OTABSL_OPTION_NAMESPACE_NAME::swap` overloads from being
 // considered unless ADL picks them up.
 void swap();
 
@@ -752,7 +736,7 @@ using IsNothrowSwappableImpl = typename std::enable_if<IsNoexcept::value>::type;
 // arguments of type `T`.
 template <class T>
 struct IsSwappable
-    : absl::type_traits_internal::is_detected<IsSwappableImpl, T> {};
+    : absl::OTABSL_OPTION_NAMESPACE_NAME::type_traits_internal::is_detected<IsSwappableImpl, T> {};
 
 // IsNothrowSwappable
 //
@@ -760,13 +744,13 @@ struct IsSwappable
 // arguments of type `T` and is noexcept.
 template <class T>
 struct IsNothrowSwappable
-    : absl::type_traits_internal::is_detected<IsNothrowSwappableImpl, T> {};
+    : absl::OTABSL_OPTION_NAMESPACE_NAME::type_traits_internal::is_detected<IsNothrowSwappableImpl, T> {};
 
 // Swap()
 //
 // Performs the swap idiom from a namespace where valid candidates may only be
 // found in `std` or via ADL.
-template <class T, absl::enable_if_t<IsSwappable<T>::value, int> = 0>
+template <class T, absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<IsSwappable<T>::value, int> = 0>
 void Swap(T& lhs, T& rhs) noexcept(IsNothrowSwappable<T>::value) {
   swap(lhs, rhs);
 }

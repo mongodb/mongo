@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <memory>
 #include <mutex>
+#include <ostream>
 
 #include "opentelemetry/common/spin_lock_mutex.h"
 #include "opentelemetry/nostd/variant.h"
@@ -25,8 +26,6 @@ LongSumAggregation::LongSumAggregation(bool is_monotonic)
   point_data_.value_        = static_cast<int64_t>(0);
   point_data_.is_monotonic_ = is_monotonic;
 }
-
-LongSumAggregation::LongSumAggregation(SumPointData &&data) : point_data_{data} {}
 
 LongSumAggregation::LongSumAggregation(const SumPointData &data) : point_data_{data} {}
 
@@ -79,8 +78,6 @@ DoubleSumAggregation::DoubleSumAggregation(bool is_monotonic)
   point_data_.value_        = 0.0;
   point_data_.is_monotonic_ = is_monotonic;
 }
-
-DoubleSumAggregation::DoubleSumAggregation(SumPointData &&data) : point_data_(data) {}
 
 DoubleSumAggregation::DoubleSumAggregation(const SumPointData &data) : point_data_(data) {}
 

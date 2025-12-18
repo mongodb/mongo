@@ -181,7 +181,7 @@ private:
     {
       return {};
     }
-    auto data = data_.get();
+    AtomicUniquePtr<T> *data = data_.get();
     if (tail_index < head_index)
     {
       return CircularBufferRange<AtomicUniquePtr<T>>{nostd::span<AtomicUniquePtr<T>>{

@@ -30,22 +30,15 @@ public:
 
   static std::unique_ptr<View> Create(const std::string &name,
                                       const std::string &description,
-                                      const std::string &unit);
-
-  static std::unique_ptr<View> Create(const std::string &name,
-                                      const std::string &description,
-                                      const std::string &unit,
                                       AggregationType aggregation_type);
 
   static std::unique_ptr<View> Create(const std::string &name,
                                       const std::string &description,
-                                      const std::string &unit,
                                       AggregationType aggregation_type,
                                       std::shared_ptr<AggregationConfig> aggregation_config);
 
   static std::unique_ptr<View> Create(const std::string &name,
                                       const std::string &description,
-                                      const std::string &unit,
                                       AggregationType aggregation_type,
                                       std::shared_ptr<AggregationConfig> aggregation_config,
                                       std::unique_ptr<AttributesProcessor> attributes_processor);

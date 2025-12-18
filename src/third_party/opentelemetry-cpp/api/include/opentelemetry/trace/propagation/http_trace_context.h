@@ -86,14 +86,8 @@ public:
   }
 
 private:
-  static constexpr uint8_t kInvalidVersion = 0xFF;
-
-  static bool IsValidVersion(nostd::string_view version_hex)
-  {
-    uint8_t version;
-    detail::HexToBinary(version_hex, &version, sizeof(version));
-    return version != kInvalidVersion;
-  }
+  static constexpr uint8_t kInvalidVersion        = 0xFF;
+  static constexpr uint8_t kDefaultAssumedVersion = 0x00;
 
   static void InjectImpl(context::propagation::TextMapCarrier &carrier,
                          const SpanContext &span_context)
@@ -122,11 +116,6 @@ private:
   static SpanContext ExtractContextFromTraceHeaders(nostd::string_view trace_parent,
                                                     nostd::string_view trace_state)
   {
-    if (trace_parent.size() != kTraceParentSize)
-    {
-      return SpanContext::GetInvalid();
-    }
-
     std::array<nostd::string_view, 4> fields{};
     if (detail::SplitString(trace_parent, '-', fields.data(), 4) != 4)
     {
@@ -150,9 +139,31 @@ private:
       return SpanContext::GetInvalid();
     }
 
-    if (!IsValidVersion(version_hex))
+    // hex is valid, convert it to binary
+    uint8_t version_binary;
+    detail::HexToBinary(version_hex, &version_binary, sizeof(version_binary));
+    if (version_binary == kInvalidVersion)
     {
+      // invalid version encountered
       return SpanContext::GetInvalid();
+    }
+
+    // See https://www.w3.org/TR/trace-context/#versioning-of-traceparent
+    if (version_binary > kDefaultAssumedVersion)
+    {
+      // higher than default version detected
+      if (trace_parent.size() < kTraceParentSize)
+      {
+        return SpanContext::GetInvalid();
+      }
+    }
+    else
+    {
+      // version is either lower or same as the default version
+      if (trace_parent.size() != kTraceParentSize)
+      {
+        return SpanContext::GetInvalid();
+      }
     }
 
     TraceId trace_id = TraceIdFromHex(trace_id_hex);
@@ -169,7 +180,8 @@ private:
 
   static SpanContext ExtractImpl(const context::propagation::TextMapCarrier &carrier)
   {
-    nostd::string_view trace_parent = carrier.Get(kTraceParent);
+    // Get trace_parent after trimming the leading and trailing whitespaces
+    nostd::string_view trace_parent = common::StringUtil::Trim(carrier.Get(kTraceParent));
     nostd::string_view trace_state  = carrier.Get(kTraceState);
     if (trace_parent == "")
     {

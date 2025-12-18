@@ -23,12 +23,13 @@ namespace common
 ///    (IEEE 754-1985) or signed 64 bit integer.
 ///  - Homogenous arrays of primitive type values.
 ///
-/// \warning
+/// \warning The OpenTelemetry C++ API does not support the following attribute:
+///  uint64_t, nostd::span<const uint64_t>, and nostd::span<const uint8_t> types.
 /// \parblock The OpenTelemetry C++ API currently supports several attribute
 /// value types that are not covered by the OpenTelemetry specification:
 ///  - \c uint64_t
 ///  - \c nostd::span<const uint64_t>
-///  - \c nostd::span<uint8_t>
+///  - \c nostd::span<const uint8_t>
 ///
 /// Those types are reserved for future use and currently should not be
 /// used. There are no guarantees around how those values are handled by
@@ -54,8 +55,6 @@ using AttributeValue =
                    // Not currently supported by the specification, but reserved for future use.
                    // Added to provide support for all primitive C++ types.
                    nostd::span<const uint64_t>,
-                   // Not currently supported by the specification, but reserved for future use.
-                   // See https://github.com/open-telemetry/opentelemetry-specification/issues/780
                    nostd::span<const uint8_t>>;
 
 enum AttributeType

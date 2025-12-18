@@ -10,10 +10,13 @@ Create@BatchLogRecordProcessorFactory@logs@sdk@v1@opentelemetry
 Create@SimpleLogRecordProcessorFactory@logs@sdk@v1@opentelemetry
 Create@MultiLogRecordProcessorFactory@logs@sdk@v1@opentelemetry
 TracerProvider@trace@sdk@v1@opentelemetry
+ForceFlush@TracerProvider@trace@sdk@v1@opentelemetry
 LoggerProvider@logs@sdk@v1@opentelemetry
+ForceFlush@LoggerProvider@logs@sdk@v1@opentelemetry
 OStreamLogRecordExporter@logs@exporter@v1@opentelemetry
 Create@OStreamMetricExporterFactory@metrics@exporter@v1@opentelemetry
 Create@PeriodicExportingMetricReaderFactory@metrics@sdk@v1@opentelemetry
+PeriodicExportingMetricReaderOptions@metrics@sdk@v1@opentelemetry
 Create@MeterProviderFactory@metrics@sdk@v1@opentelemetry
 Create@MeterContextFactory@metrics@sdk@v1@opentelemetry
 Create@ViewFactory@metrics@sdk@v1@opentelemetry
@@ -23,6 +26,9 @@ AddMetricReader@MeterContext@metrics@sdk@v1@opentelemetry
 AddMetricReader@MeterProvider@metrics@sdk@v1@opentelemetry
 MeterProvider@metrics@sdk@v1@opentelemetry
 AddView@MeterProvider@metrics@sdk@v1@opentelemetry
+SetTracerProvider@Provider@trace@sdk@v1@opentelemetry
+SetMeterProvider@Provider@metrics@sdk@v1@opentelemetry
+SetLoggerProvider@Provider@logs@sdk@v1@opentelemetry
 
 #if defined(WITH_OTLP_GRPC) || defined(WITH_OTLP_HTTP)
 GetOtlpDefaultTracesTimeout@otlp@exporter@v1@opentelemetry
@@ -65,4 +71,14 @@ GetOtlpDefaultHttpTracesEndpoint@otlp@exporter@v1@opentelemetry
 GetOtlpDefaultHttpMetricsEndpoint@otlp@exporter@v1@opentelemetry
 GetOtlpDefaultHttpLogsEndpoint@otlp@exporter@v1@opentelemetry
 #endif  // defined(WITH_OTLP_HTTP)
+
+#if defined(WITH_OTLP_FILE)
+Create@OtlpFileExporterFactory@otlp@exporter@v1@opentelemetry
+Create@OtlpFileLogRecordExporterFactory@otlp@exporter@v1@opentelemetry
+Create@OtlpFileMetricExporterFactory@otlp@exporter@v1@opentelemetry
+OtlpFileExporterOptions@otlp@exporter@v1@opentelemetry
+OtlpFileLogRecordExporterOptions@otlp@exporter@v1@opentelemetry
+OtlpFileMetricExporterOptions@otlp@exporter@v1@opentelemetry
+#endif  // defined(WITH_OTLP_FILE)
+
 // clang-format on

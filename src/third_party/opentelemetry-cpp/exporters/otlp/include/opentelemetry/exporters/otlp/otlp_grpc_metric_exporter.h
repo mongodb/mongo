@@ -4,15 +4,18 @@
 #pragma once
 
 // clang-format off
-
 #include "opentelemetry/exporters/otlp/protobuf_include_prefix.h"
-#include "opentelemetry/proto/collector/metrics/v1/metrics_service.grpc.pb.h"
-#include "opentelemetry/exporters/otlp/protobuf_include_suffix.h"
+// clang-format on
 
+#include "opentelemetry/proto/collector/metrics/v1/metrics_service.grpc.pb.h"
+
+// clang-format off
+#include "opentelemetry/exporters/otlp/protobuf_include_suffix.h"
 // clang-format on
 
 #include "opentelemetry/exporters/otlp/otlp_environment.h"
 #include "opentelemetry/exporters/otlp/otlp_grpc_metric_exporter_options.h"
+#include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/metrics/push_metric_exporter.h"
 
 #include <atomic>
@@ -23,6 +26,7 @@ namespace exporter
 namespace otlp
 {
 
+class OtlpGrpcClientReferenceGuard;
 class OtlpGrpcClient;
 
 /**
@@ -37,9 +41,24 @@ public:
   OtlpGrpcMetricExporter();
 
   /**
+   * Create an OtlpGrpcMetricExporter using specified OtlpGrpcClient.
+   *
+   * @param options options to create exporter
+   * @param client the gRPC client to use
+   */
+  OtlpGrpcMetricExporter(const OtlpGrpcMetricExporterOptions &options,
+                         const std::shared_ptr<OtlpGrpcClient> &client);
+
+  /**
    * Create an OtlpGrpcMetricExporter using the given options.
    */
   explicit OtlpGrpcMetricExporter(const OtlpGrpcMetricExporterOptions &options);
+
+  ~OtlpGrpcMetricExporter() override;
+  OtlpGrpcMetricExporter(const OtlpGrpcMetricExporter &)            = delete;
+  OtlpGrpcMetricExporter(OtlpGrpcMetricExporter &&)                 = delete;
+  OtlpGrpcMetricExporter &operator=(const OtlpGrpcMetricExporter &) = delete;
+  OtlpGrpcMetricExporter &operator=(OtlpGrpcMetricExporter &&)      = delete;
 
   /**
    * Get the AggregationTemporality for exporter
@@ -58,13 +77,19 @@ public:
   bool Shutdown(
       std::chrono::microseconds timeout = (std::chrono::microseconds::max)()) noexcept override;
 
+  /**
+   * Get the Client object
+   *
+   * @return return binded gRPC client
+   */
+  const std::shared_ptr<OtlpGrpcClient> &GetClient() const noexcept;
+
 private:
   // The configuration options associated with this exporter.
   const OtlpGrpcMetricExporterOptions options_;
 
-#ifdef ENABLE_ASYNC_EXPORT
   std::shared_ptr<OtlpGrpcClient> client_;
-#endif
+  std::shared_ptr<OtlpGrpcClientReferenceGuard> client_reference_guard_;
 
   // Aggregation Temporality selector
   const sdk::metrics::AggregationTemporalitySelector aggregation_temporality_selector_;
@@ -73,7 +98,7 @@ private:
   friend class OtlpGrpcMetricExporterTestPeer;
 
   // Store service stub internally. Useful for testing.
-  std::unique_ptr<proto::collector::metrics::v1::MetricsService::StubInterface>
+  std::shared_ptr<proto::collector::metrics::v1::MetricsService::StubInterface>
       metrics_service_stub_;
 
   /**
@@ -83,6 +108,17 @@ private:
    */
   OtlpGrpcMetricExporter(
       std::unique_ptr<proto::collector::metrics::v1::MetricsService::StubInterface> stub);
+
+  /**
+   * Create an OtlpGrpcMetricExporter using the specified service stub and gRPC client.
+   * Only tests can call this constructor directly.
+   * @param stub the service stub to be used for exporting
+   * @param client the gRPC client to use
+   */
+  OtlpGrpcMetricExporter(
+      std::unique_ptr<proto::collector::metrics::v1::MetricsService::StubInterface> stub,
+      const std::shared_ptr<OtlpGrpcClient> &client);
+
   std::atomic<bool> is_shutdown_{false};
   bool isShutdown() const noexcept;
 };

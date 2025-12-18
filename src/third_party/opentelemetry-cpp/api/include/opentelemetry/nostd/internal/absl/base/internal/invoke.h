@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// absl::base_internal::Invoke(f, args...) is an implementation of
+// absl::OTABSL_OPTION_NAMESPACE_NAME::base_internal::Invoke(f, args...) is an implementation of
 // INVOKE(f, args...) from section [func.require] of the C++ standard.
 //
 // [func.require]
@@ -73,7 +73,7 @@ struct MemFunAndRef : StrippedAccept<MemFunAndRef> {
   template <typename MemFunType, typename C, typename Obj, typename... Args>
   struct AcceptImpl<MemFunType C::*, Obj, Args...>
       : std::integral_constant<bool, std::is_base_of<C, Obj>::value &&
-                                         absl::is_function<MemFunType>::value> {
+                                         absl::OTABSL_OPTION_NAMESPACE_NAME::is_function<MemFunType>::value> {
   };
 
   template <typename MemFun, typename Obj, typename... Args>
@@ -94,7 +94,7 @@ struct MemFunAndPtr : StrippedAccept<MemFunAndPtr> {
   template <typename MemFunType, typename C, typename Ptr, typename... Args>
   struct AcceptImpl<MemFunType C::*, Ptr, Args...>
       : std::integral_constant<bool, !std::is_base_of<C, Ptr>::value &&
-                                         absl::is_function<MemFunType>::value> {
+                                         absl::OTABSL_OPTION_NAMESPACE_NAME::is_function<MemFunType>::value> {
   };
 
   template <typename MemFun, typename Ptr, typename... Args>
@@ -116,7 +116,7 @@ struct DataMemAndRef : StrippedAccept<DataMemAndRef> {
   template <typename R, typename C, typename Obj>
   struct AcceptImpl<R C::*, Obj>
       : std::integral_constant<bool, std::is_base_of<C, Obj>::value &&
-                                         !absl::is_function<R>::value> {};
+                                         !absl::OTABSL_OPTION_NAMESPACE_NAME::is_function<R>::value> {};
 
   template <typename DataMem, typename Ref>
   static decltype(std::declval<Ref>().*std::declval<DataMem>()) Invoke(
@@ -134,7 +134,7 @@ struct DataMemAndPtr : StrippedAccept<DataMemAndPtr> {
   template <typename R, typename C, typename Ptr>
   struct AcceptImpl<R C::*, Ptr>
       : std::integral_constant<bool, !std::is_base_of<C, Ptr>::value &&
-                                         !absl::is_function<R>::value> {};
+                                         !absl::OTABSL_OPTION_NAMESPACE_NAME::is_function<R>::value> {};
 
   template <typename DataMem, typename Ptr>
   static decltype((*std::declval<Ptr>()).*std::declval<DataMem>()) Invoke(

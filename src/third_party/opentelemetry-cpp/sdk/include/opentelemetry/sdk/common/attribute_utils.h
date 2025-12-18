@@ -83,7 +83,7 @@ struct AttributeConverter
   {
     return OwnedAttributeValue(std::string(v));
   }
-  OwnedAttributeValue operator()(std::string v) { return OwnedAttributeValue(v); }
+  OwnedAttributeValue operator()(std::string v) { return OwnedAttributeValue(std::move(v)); }
   OwnedAttributeValue operator()(const char *v) { return OwnedAttributeValue(std::string(v)); }
   OwnedAttributeValue operator()(nostd::span<const uint8_t> v) { return convertSpan<uint8_t>(v); }
   OwnedAttributeValue operator()(nostd::span<const bool> v) { return convertSpan<bool>(v); }
@@ -100,8 +100,61 @@ struct AttributeConverter
   template <typename T, typename U = T>
   OwnedAttributeValue convertSpan(nostd::span<const U> vals)
   {
-    const std::vector<T> copy(vals.begin(), vals.end());
-    return OwnedAttributeValue(std::move(copy));
+    return OwnedAttributeValue(std::vector<T>(vals.begin(), vals.end()));
+  }
+};
+
+/**
+ * Evaluates if an owned value (from an OwnedAttributeValue) is equal to another value (from a
+ * non-owning AttributeValue). This only supports the checking equality with
+ * nostd::visit(AttributeEqualToVisitor, OwnedAttributeValue, AttributeValue).
+ */
+struct AttributeEqualToVisitor
+{
+  // Different types are not equal including containers of different element types
+  template <typename T, typename U>
+  bool operator()(const T &, const U &) const noexcept
+  {
+    return false;
+  }
+
+  // Compare the same arithmetic types
+  template <typename T>
+  bool operator()(const T &owned_value, const T &value) const noexcept
+  {
+    return owned_value == value;
+  }
+
+  // Compare std::string and const char*
+  bool operator()(const std::string &owned_value, const char *value) const noexcept
+  {
+    return owned_value == value;
+  }
+
+  // Compare std::string and nostd::string_view
+  bool operator()(const std::string &owned_value, nostd::string_view value) const noexcept
+  {
+    return owned_value == value;
+  }
+
+  // Compare std::vector<std::string> and nostd::span<const nostd::string_view>
+  bool operator()(const std::vector<std::string> &owned_value,
+                  const nostd::span<const nostd::string_view> &value) const noexcept
+  {
+    return owned_value.size() == value.size() &&
+           std::equal(owned_value.begin(), owned_value.end(), value.begin(),
+                      [](const std::string &owned_element, nostd::string_view element) {
+                        return owned_element == element;
+                      });
+  }
+
+  // Compare nostd::span<const T> and std::vector<T> for arithmetic types
+  template <typename T>
+  bool operator()(const std::vector<T> &owned_value,
+                  const nostd::span<const T> &value) const noexcept
+  {
+    return owned_value.size() == value.size() &&
+           std::equal(owned_value.begin(), owned_value.end(), value.begin());
   }
 };
 
@@ -117,11 +170,7 @@ public:
   // Construct attribute map and populate with attributes
   AttributeMap(const opentelemetry::common::KeyValueIterable &attributes) : AttributeMap()
   {
-    attributes.ForEachKeyValue(
-        [&](nostd::string_view key, opentelemetry::common::AttributeValue value) noexcept {
-          SetAttribute(key, value);
-          return true;
-        });
+    ConstructFrom(attributes);
   }
 
   // Construct attribute map and populate with optional attributes
@@ -129,11 +178,7 @@ public:
   {
     if (attributes != nullptr)
     {
-      attributes->ForEachKeyValue(
-          [&](nostd::string_view key, opentelemetry::common::AttributeValue value) noexcept {
-            SetAttribute(key, value);
-            return true;
-          });
+      ConstructFrom(*attributes);
     }
   }
 
@@ -149,6 +194,15 @@ public:
     }
   }
 
+  void ConstructFrom(const opentelemetry::common::KeyValueIterable &attributes)
+  {
+    attributes.ForEachKeyValue(
+        [&](nostd::string_view key, const opentelemetry::common::AttributeValue &value) noexcept {
+          SetAttribute(key, value);
+          return true;
+        });
+  }
+
   // Returns a reference to this map
   const std::unordered_map<std::string, OwnedAttributeValue> &GetAttributes() const noexcept
   {
@@ -159,11 +213,36 @@ public:
   void SetAttribute(nostd::string_view key,
                     const opentelemetry::common::AttributeValue &value) noexcept
   {
-    (*this)[std::string(key)] = nostd::visit(converter_, value);
+    (*this)[std::string(key)] = nostd::visit(AttributeConverter(), value);
   }
 
-private:
-  AttributeConverter converter_;
+  // Compare the attributes of this map with another KeyValueIterable
+  bool EqualTo(const opentelemetry::common::KeyValueIterable &attributes) const noexcept
+  {
+    if (attributes.size() != this->size())
+    {
+      return false;
+    }
+
+    const bool is_equal = attributes.ForEachKeyValue(
+        [this](nostd::string_view key,
+               const opentelemetry::common::AttributeValue &value) noexcept {
+          // Perform a linear search to find the key assuming the map is small
+          // This avoids temporary string creation from this->find(std::string(key))
+          for (const auto &kv : *this)
+          {
+            if (kv.first == key)
+            {
+              // Order of arguments is important here. OwnedAttributeValue is first then
+              // AttributeValue AttributeEqualToVisitor does not support the reverse order
+              return nostd::visit(AttributeEqualToVisitor(), kv.second, value);
+            }
+          }
+          return false;
+        });
+
+    return is_equal;
+  }
 };
 
 /**
@@ -208,11 +287,8 @@ public:
   void SetAttribute(nostd::string_view key,
                     const opentelemetry::common::AttributeValue &value) noexcept
   {
-    (*this)[std::string(key)] = nostd::visit(converter_, value);
+    (*this)[std::string(key)] = nostd::visit(AttributeConverter(), value);
   }
-
-private:
-  AttributeConverter converter_;
 };
 
 }  // namespace common

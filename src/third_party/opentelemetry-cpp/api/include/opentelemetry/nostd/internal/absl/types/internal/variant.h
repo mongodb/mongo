@@ -136,24 +136,24 @@ struct VariantAccessResultImpl;
 
 template <std::size_t I, template <class...> class Variantemplate, class... T>
 struct VariantAccessResultImpl<I, Variantemplate<T...>&> {
-  using type = typename absl::variant_alternative<I, variant<T...>>::type&;
+  using type = typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<I, variant<T...>>::type&;
 };
 
 template <std::size_t I, template <class...> class Variantemplate, class... T>
 struct VariantAccessResultImpl<I, const Variantemplate<T...>&> {
   using type =
-      const typename absl::variant_alternative<I, variant<T...>>::type&;
+      const typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<I, variant<T...>>::type&;
 };
 
 template <std::size_t I, template <class...> class Variantemplate, class... T>
 struct VariantAccessResultImpl<I, Variantemplate<T...>&&> {
-  using type = typename absl::variant_alternative<I, variant<T...>>::type&&;
+  using type = typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<I, variant<T...>>::type&&;
 };
 
 template <std::size_t I, template <class...> class Variantemplate, class... T>
 struct VariantAccessResultImpl<I, const Variantemplate<T...>&&> {
   using type =
-      const typename absl::variant_alternative<I, variant<T...>>::type&&;
+      const typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<I, variant<T...>>::type&&;
 };
 
 template <std::size_t I, class Variant>
@@ -198,7 +198,7 @@ using AlwaysZero = SizeT<0>;
 
 template <class Op, class... Vs>
 struct VisitIndicesResultImpl {
-  using type = absl::result_of_t<Op(AlwaysZero<Vs>...)>;
+  using type = absl::OTABSL_OPTION_NAMESPACE_NAME::result_of_t<Op(AlwaysZero<Vs>...)>;
 };
 
 template <class Op, class... Vs>
@@ -214,13 +214,14 @@ constexpr ReturnType call_with_indices(FunctionObject&& function) {
       std::is_same<ReturnType, decltype(std::declval<FunctionObject>()(
                                    SizeT<Indices>()...))>::value,
       "Not all visitation overloads have the same return type.");
-  return absl::forward<FunctionObject>(function)(SizeT<Indices>()...);
+  return absl::OTABSL_OPTION_NAMESPACE_NAME::forward<FunctionObject>(function)(SizeT<Indices>()...);
 }
 
 template <class ReturnType, class FunctionObject, std::size_t... BoundIndices>
 struct MakeVisitationMatrix<ReturnType, FunctionObject, index_sequence<>,
                             index_sequence<BoundIndices...>> {
   using ResultType = ReturnType (*)(FunctionObject&&);
+  // cppcheck-suppress [duplInheritedMember]
   static constexpr ResultType Run() {
     return &call_with_indices<ReturnType, FunctionObject,
                               (BoundIndices - 1)...>;
@@ -265,7 +266,7 @@ struct MakeVisitationMatrix<ReturnType, FunctionObject,
                             index_sequence<BoundIndices...>>
     : MakeVisitationMatrixImpl<ReturnType, FunctionObject,
                                index_sequence<TailEndIndices...>,
-                               absl::make_index_sequence<HeadEndIndex>,
+                               absl::OTABSL_OPTION_NAMESPACE_NAME::make_index_sequence<HeadEndIndex>,
                                index_sequence<BoundIndices...>> {};
 
 struct UnreachableSwitchCase {
@@ -284,7 +285,7 @@ struct UnreachableSwitchCase {
     assert(false);  // NOLINT
 
     // Hack to silence potential no return warning -- cause an infinite loop.
-    return Run(absl::forward<Op>(op));
+    return Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
 #endif  // Checks for __builtin_unreachable
   }
 };
@@ -292,7 +293,7 @@ struct UnreachableSwitchCase {
 template <class Op, std::size_t I>
 struct ReachableSwitchCase {
   static VisitIndicesResultT<Op, std::size_t> Run(Op&& op) {
-    return absl::OTABSL_OPTION_INLINE_NAMESPACE_NAME::base_internal::Invoke(absl::forward<Op>(op), SizeT<I>());
+    return absl::OTABSL_OPTION_NAMESPACE_NAME::base_internal::Invoke(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op), SizeT<I>());
   }
 };
 
@@ -326,7 +327,7 @@ using PickCase = typename PickCaseImpl<(I < EndIndex)>::template Apply<Op, I>;
 
 template <class ReturnType>
 [[noreturn]] ReturnType TypedThrowBadVariantAccess() {
-  absl::variant_internal::ThrowBadVariantAccess();
+  absl::OTABSL_OPTION_NAMESPACE_NAME::variant_internal::ThrowBadVariantAccess();
 }
 
 // Given N variant sizes, determine the number of cases there would need to be
@@ -357,74 +358,74 @@ struct VisitIndicesSwitch {
   static VisitIndicesResultT<Op, std::size_t> Run(Op&& op, std::size_t i) {
     switch (i) {
       case 0:
-        return PickCase<Op, 0, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 0, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 1:
-        return PickCase<Op, 1, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 1, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 2:
-        return PickCase<Op, 2, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 2, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 3:
-        return PickCase<Op, 3, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 3, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 4:
-        return PickCase<Op, 4, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 4, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 5:
-        return PickCase<Op, 5, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 5, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 6:
-        return PickCase<Op, 6, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 6, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 7:
-        return PickCase<Op, 7, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 7, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 8:
-        return PickCase<Op, 8, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 8, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 9:
-        return PickCase<Op, 9, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 9, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 10:
-        return PickCase<Op, 10, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 10, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 11:
-        return PickCase<Op, 11, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 11, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 12:
-        return PickCase<Op, 12, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 12, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 13:
-        return PickCase<Op, 13, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 13, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 14:
-        return PickCase<Op, 14, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 14, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 15:
-        return PickCase<Op, 15, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 15, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 16:
-        return PickCase<Op, 16, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 16, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 17:
-        return PickCase<Op, 17, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 17, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 18:
-        return PickCase<Op, 18, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 18, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 19:
-        return PickCase<Op, 19, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 19, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 20:
-        return PickCase<Op, 20, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 20, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 21:
-        return PickCase<Op, 21, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 21, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 22:
-        return PickCase<Op, 22, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 22, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 23:
-        return PickCase<Op, 23, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 23, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 24:
-        return PickCase<Op, 24, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 24, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 25:
-        return PickCase<Op, 25, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 25, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 26:
-        return PickCase<Op, 26, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 26, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 27:
-        return PickCase<Op, 27, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 27, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 28:
-        return PickCase<Op, 28, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 28, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 29:
-        return PickCase<Op, 29, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 29, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 30:
-        return PickCase<Op, 30, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 30, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 31:
-        return PickCase<Op, 31, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 31, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       case 32:
-        return PickCase<Op, 32, EndIndex>::Run(absl::forward<Op>(op));
+        return PickCase<Op, 32, EndIndex>::Run(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
       default:
         OTABSL_ASSERT(i == variant_npos);
-        return absl::OTABSL_OPTION_INLINE_NAMESPACE_NAME::base_internal::Invoke(absl::forward<Op>(op), NPos());
+        return absl::OTABSL_OPTION_NAMESPACE_NAME::base_internal::Invoke(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op), NPos());
     }
   }
 };
@@ -437,7 +438,7 @@ struct VisitIndicesFallback {
         MakeVisitationMatrix<VisitIndicesResultT<Op, SizeT...>, Op,
                              index_sequence<(EndIndices + 1)...>,
                              index_sequence<>>::Run(),
-        (indices + 1)...)(absl::forward<Op>(op));
+        (indices + 1)...)(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op));
   }
 };
 
@@ -479,7 +480,7 @@ template <class IndexSequence, std::size_t... EndIndices>
 struct VisitIndicesVariadicImpl;
 
 template <std::size_t... N, std::size_t... EndIndices>
-struct VisitIndicesVariadicImpl<absl::index_sequence<N...>, EndIndices...> {
+struct VisitIndicesVariadicImpl<absl::OTABSL_OPTION_NAMESPACE_NAME::index_sequence<N...>, EndIndices...> {
   // A type that can take an N-ary function object and converts it to a unary
   // function object that takes a single, flattened index, and "unflattens" it
   // into its individual dimensions when forwarding to the wrapped object.
@@ -488,8 +489,8 @@ struct VisitIndicesVariadicImpl<absl::index_sequence<N...>, EndIndices...> {
     template <std::size_t I>
     VisitIndicesResultT<Op, decltype(EndIndices)...> operator()(
         SizeT<I> /*index*/) && {
-      return OTABSL_OPTION_INLINE_NAMESPACE_NAME::base_internal::Invoke(
-          absl::forward<Op>(op),
+      return absl::OTABSL_OPTION_NAMESPACE_NAME::base_internal::Invoke(
+          absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op),
           SizeT<UnflattenIndex<I, N, (EndIndices + 1)...>::value -
                 std::size_t{1}>()...);
     }
@@ -501,7 +502,7 @@ struct VisitIndicesVariadicImpl<absl::index_sequence<N...>, EndIndices...> {
   static VisitIndicesResultT<Op, decltype(EndIndices)...> Run(
       Op&& op, SizeType... i) {
     return VisitIndicesSwitch<NumCasesOfSwitch<EndIndices...>::value>::Run(
-        FlattenedOp<Op>{absl::forward<Op>(op)},
+        FlattenedOp<Op>{absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op)},
         FlattenIndices<(EndIndices + std::size_t{1})...>::Run(
             (i + std::size_t{1})...));
   }
@@ -509,7 +510,7 @@ struct VisitIndicesVariadicImpl<absl::index_sequence<N...>, EndIndices...> {
 
 template <std::size_t... EndIndices>
 struct VisitIndicesVariadic
-    : VisitIndicesVariadicImpl<absl::make_index_sequence<sizeof...(EndIndices)>,
+    : VisitIndicesVariadicImpl<absl::OTABSL_OPTION_NAMESPACE_NAME::make_index_sequence<sizeof...(EndIndices)>,
                                EndIndices...> {};
 
 // This implementation will flatten N-ary visit operations into a single switch
@@ -522,14 +523,14 @@ struct VisitIndicesVariadic
 //   size.
 template <std::size_t... EndIndices>
 struct VisitIndices
-    : absl::conditional_t<(NumCasesOfSwitch<EndIndices...>::value <=
+    : absl::OTABSL_OPTION_NAMESPACE_NAME::conditional_t<(NumCasesOfSwitch<EndIndices...>::value <=
                            MaxUnrolledVisitCases),
                           VisitIndicesVariadic<EndIndices...>,
                           VisitIndicesFallback<EndIndices...>> {};
 
 template <std::size_t EndIndex>
 struct VisitIndices<EndIndex>
-    : absl::conditional_t<(EndIndex <= MaxUnrolledVisitCases),
+    : absl::OTABSL_OPTION_NAMESPACE_NAME::conditional_t<(EndIndex <= MaxUnrolledVisitCases),
                           VisitIndicesSwitch<EndIndex>,
                           VisitIndicesFallback<EndIndex>> {};
 
@@ -577,7 +578,7 @@ struct VariantCoreAccess {
   template <class VariantType>
   static void Destroy(VariantType& self) {  // NOLINT
     Derived(self).destroy();
-    self.index_ = absl::variant_npos;
+    self.index_ = absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos;
   }
 
   template <class Variant>
@@ -587,7 +588,7 @@ struct VariantCoreAccess {
 
   template <class Variant>
   static void InitFrom(Variant& self, Variant&& other) {  // NOLINT
-    VisitIndices<absl::variant_size<Variant>::value>::Run(
+    VisitIndices<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_size<Variant>::value>::Run(
         InitFromVisitor<Variant, Variant&&>{&self,
                                             std::forward<Variant>(other)},
         other.index());
@@ -612,7 +613,7 @@ struct VariantCoreAccess {
       TypedThrowBadVariantAccess<VariantAccessResult<I, Variant>>();
     }
 
-    return Access<I>(absl::forward<Variant>(self));
+    return Access<I>(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Variant>(self));
   }
 
   // The implementation of the move-assignment operation for a variant.
@@ -629,7 +630,7 @@ struct VariantCoreAccess {
       }
     }
 
-    void operator()(SizeT<absl::variant_npos> /*new_i*/) const {
+    void operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*new_i*/) const {
       Destroy(*left);
     }
 
@@ -650,7 +651,7 @@ struct VariantCoreAccess {
     template <std::size_t NewIndex>
     void operator()(SizeT<NewIndex> /*new_i*/) const {
       using New =
-          typename absl::variant_alternative<NewIndex, DerivedType>::type;
+          typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<NewIndex, DerivedType>::type;
 
       if (left->index_ == NewIndex) {
         Access<NewIndex>(*left) = Access<NewIndex>(*right);
@@ -662,7 +663,7 @@ struct VariantCoreAccess {
       }
     }
 
-    void operator()(SizeT<absl::variant_npos> /*new_i*/) const {
+    void operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*new_i*/) const {
       Destroy(*left);
     }
 
@@ -684,24 +685,24 @@ struct VariantCoreAccess {
 
     void operator()(SizeT<NewIndex::value> /*old_i*/
                     ) const {
-      Access<NewIndex::value>(*left) = absl::forward<QualifiedNew>(other);
+      Access<NewIndex::value>(*left) = absl::OTABSL_OPTION_NAMESPACE_NAME::forward<QualifiedNew>(other);
     }
 
     template <std::size_t OldIndex>
     void operator()(SizeT<OldIndex> /*old_i*/
                     ) const {
       using New =
-          typename absl::variant_alternative<NewIndex::value, Left>::type;
+          typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<NewIndex::value, Left>::type;
       if (std::is_nothrow_constructible<New, QualifiedNew>::value ||
           !std::is_nothrow_move_constructible<New>::value) {
         left->template emplace<NewIndex::value>(
-            absl::forward<QualifiedNew>(other));
+            absl::OTABSL_OPTION_NAMESPACE_NAME::forward<QualifiedNew>(other));
       } else {
         // the standard says "equivalent to
         // operator=(variant(std::forward<T>(t)))", but we use `emplace` here
         // because the variant's move assignment operator could be deleted.
         left->template emplace<NewIndex::value>(
-            New(absl::forward<QualifiedNew>(other)));
+            New(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<QualifiedNew>(other)));
       }
     }
 
@@ -712,18 +713,19 @@ struct VariantCoreAccess {
   template <class Left, class QualifiedNew>
   static ConversionAssignVisitor<Left, QualifiedNew>
   MakeConversionAssignVisitor(Left* left, QualifiedNew&& qual) {
-    return {left, absl::forward<QualifiedNew>(qual)};
+    return {left, absl::OTABSL_OPTION_NAMESPACE_NAME::forward<QualifiedNew>(qual)};
   }
 
   // Backend for operations for `emplace()` which destructs `*self` then
   // construct a new alternative with `Args...`.
   template <std::size_t NewIndex, class Self, class... Args>
-  static typename absl::variant_alternative<NewIndex, Self>::type& Replace(
+  static typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<NewIndex, Self>::type& Replace(
       Self* self, Args&&... args) {
     Destroy(*self);
-    using New = typename absl::variant_alternative<NewIndex, Self>::type;
+    using New = typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<NewIndex, Self>::type;
+    // cppcheck-suppress [legacyUninitvar]
     New* const result = ::new (static_cast<void*>(&self->state_))
-        New(absl::forward<Args>(args)...);
+        New(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Args>(args)...);
     self->index_ = NewIndex;
     return *result;
   }
@@ -738,7 +740,7 @@ struct VariantCoreAccess {
           Access<NewIndex>(std::forward<QualifiedRightVariant>(right)));
     }
 
-    void operator()(SizeT<absl::variant_npos> /*new_i*/) const {
+    void operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*new_i*/) const {
       // This space intentionally left blank.
     }
     LeftVariant* left;
@@ -888,13 +890,13 @@ struct IndexOfConstructedType<
 
 template <std::size_t... Is>
 struct ContainsVariantNPos
-    : absl::negation<std::is_same<  // NOLINT
-          absl::integer_sequence<bool, 0 <= Is...>,
-          absl::integer_sequence<bool, Is != absl::variant_npos...>>> {};
+    : absl::OTABSL_OPTION_NAMESPACE_NAME::negation<std::is_same<  // NOLINT
+          absl::OTABSL_OPTION_NAMESPACE_NAME::integer_sequence<bool, 0 <= Is...>,
+          absl::OTABSL_OPTION_NAMESPACE_NAME::integer_sequence<bool, Is != absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos...>>> {};
 
 template <class Op, class... QualifiedVariants>
 using RawVisitResult =
-    absl::result_of_t<Op(VariantAccessResult<0, QualifiedVariants>...)>;
+    absl::OTABSL_OPTION_NAMESPACE_NAME::result_of_t<Op(VariantAccessResult<0, QualifiedVariants>...)>;
 
 // NOTE: The spec requires that all return-paths yield the same type and is not
 // SFINAE-friendly, so we can deduce the return type by examining the first
@@ -905,7 +907,7 @@ using RawVisitResult =
 template <class Op, class... QualifiedVariants>
 struct VisitResultImpl {
   using type =
-      absl::result_of_t<Op(VariantAccessResult<0, QualifiedVariants>...)>;
+      absl::OTABSL_OPTION_NAMESPACE_NAME::result_of_t<Op(VariantAccessResult<0, QualifiedVariants>...)>;
 };
 
 // Done in two steps intentionally so that we don't cause substitution to fail.
@@ -919,7 +921,7 @@ struct PerformVisitation {
   template <std::size_t... Is>
   constexpr ReturnType operator()(SizeT<Is>... indices) const {
     return Run(typename ContainsVariantNPos<Is...>::type{},
-               absl::index_sequence_for<QualifiedVariants...>(), indices...);
+               absl::OTABSL_OPTION_NAMESPACE_NAME::index_sequence_for<QualifiedVariants...>(), indices...);
   }
 
   template <std::size_t... TupIs, std::size_t... Is>
@@ -927,19 +929,19 @@ struct PerformVisitation {
                            index_sequence<TupIs...>, SizeT<Is>...) const {
     static_assert(
         std::is_same<ReturnType,
-                     absl::result_of_t<Op(VariantAccessResult<
+                     absl::OTABSL_OPTION_NAMESPACE_NAME::result_of_t<Op(VariantAccessResult<
                                           Is, QualifiedVariants>...)>>::value,
         "All visitation overloads must have the same return type.");
-    return absl::OTABSL_OPTION_INLINE_NAMESPACE_NAME::base_internal::Invoke(
-        absl::forward<Op>(op),
+    return absl::OTABSL_OPTION_NAMESPACE_NAME::base_internal::Invoke(
+        absl::OTABSL_OPTION_NAMESPACE_NAME::forward<Op>(op),
         VariantCoreAccess::Access<Is>(
-            absl::forward<QualifiedVariants>(std::get<TupIs>(variant_tup)))...);
+            absl::OTABSL_OPTION_NAMESPACE_NAME::forward<QualifiedVariants>(std::get<TupIs>(variant_tup)))...);
   }
 
   template <std::size_t... TupIs, std::size_t... Is>
   [[noreturn]] ReturnType Run(std::true_type /*has_valueless*/,
                               index_sequence<TupIs...>, SizeT<Is>...) const {
-    absl::variant_internal::ThrowBadVariantAccess();
+    absl::OTABSL_OPTION_NAMESPACE_NAME::variant_internal::ThrowBadVariantAccess();
   }
 
   // TODO(calabrese) Avoid using a tuple, which causes lots of instantiations
@@ -981,11 +983,11 @@ union Union<Head, Tail...> {
 
   template <class... P>
   explicit constexpr Union(EmplaceTag<0>, P&&... args)
-      : head(absl::forward<P>(args)...) {}
+      : head(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<P>(args)...) {}
 
   template <std::size_t I, class... P>
   explicit constexpr Union(EmplaceTag<I>, P&&... args)
-      : tail(EmplaceTag<I - 1>{}, absl::forward<P>(args)...) {}
+      : tail(EmplaceTag<I - 1>{}, absl::OTABSL_OPTION_NAMESPACE_NAME::forward<P>(args)...) {}
 
   Head head;
   TailUnion tail;
@@ -1013,11 +1015,11 @@ union DestructibleUnionImpl<Head, Tail...> {
 
   template <class... P>
   explicit constexpr DestructibleUnionImpl(EmplaceTag<0>, P&&... args)
-      : head(absl::forward<P>(args)...) {}
+      : head(absl::OTABSL_OPTION_NAMESPACE_NAME::forward<P>(args)...) {}
 
   template <std::size_t I, class... P>
   explicit constexpr DestructibleUnionImpl(EmplaceTag<I>, P&&... args)
-      : tail(EmplaceTag<I - 1>{}, absl::forward<P>(args)...) {}
+      : tail(EmplaceTag<I - 1>{}, absl::OTABSL_OPTION_NAMESPACE_NAME::forward<P>(args)...) {}
 
   ~DestructibleUnionImpl() {}
 
@@ -1030,7 +1032,7 @@ union DestructibleUnionImpl<Head, Tail...> {
 // this resultant type.
 template <class... T>
 using DestructibleUnion =
-    absl::conditional_t<std::is_destructible<Union<T...>>::value, Union<T...>,
+    absl::OTABSL_OPTION_NAMESPACE_NAME::conditional_t<std::is_destructible<Union<T...>>::value, Union<T...>,
                         DestructibleUnionImpl<T...>>;
 
 // Deepest base, containing the actual union and the discriminator
@@ -1040,7 +1042,7 @@ class VariantStateBase {
   using Variant = variant<H, T...>;
 
   template <class LazyH = H,
-            class ConstructibleH = absl::enable_if_t<
+            class ConstructibleH = absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<
                 std::is_default_constructible<LazyH>::value, LazyH>>
   constexpr VariantStateBase() noexcept(
       std::is_nothrow_default_constructible<ConstructibleH>::value)
@@ -1048,7 +1050,7 @@ class VariantStateBase {
 
   template <std::size_t I, class... P>
   explicit constexpr VariantStateBase(EmplaceTag<I> tag, P&&... args)
-      : state_(tag, absl::forward<P>(args)...), index_(I) {}
+      : state_(tag, absl::OTABSL_OPTION_NAMESPACE_NAME::forward<P>(args)...), index_(I) {}
 
   explicit constexpr VariantStateBase(NoopConstructorTag)
       : state_(NoopConstructorTag()), index_(variant_npos) {}
@@ -1059,7 +1061,7 @@ class VariantStateBase {
   std::size_t index_;
 };
 
-using absl::OTABSL_OPTION_INLINE_NAMESPACE_NAME::internal::identity;
+using absl::OTABSL_OPTION_NAMESPACE_NAME::internal::identity;
 
 // OverloadSet::Overload() is a unary function which is overloaded to
 // take any of the element types of the variant, by reference-to-const.
@@ -1106,37 +1108,37 @@ using NotEqualResult = decltype(std::declval<T>() != std::declval<T>());
 using type_traits_internal::is_detected_convertible;
 
 template <class... T>
-using RequireAllHaveEqualT = absl::enable_if_t<
-    absl::conjunction<is_detected_convertible<bool, EqualResult, T>...>::value,
+using RequireAllHaveEqualT = absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<is_detected_convertible<bool, EqualResult, T>...>::value,
     bool>;
 
 template <class... T>
 using RequireAllHaveNotEqualT =
-    absl::enable_if_t<absl::conjunction<is_detected_convertible<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<is_detected_convertible<
                           bool, NotEqualResult, T>...>::value,
                       bool>;
 
 template <class... T>
 using RequireAllHaveLessThanT =
-    absl::enable_if_t<absl::conjunction<is_detected_convertible<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<is_detected_convertible<
                           bool, LessThanResult, T>...>::value,
                       bool>;
 
 template <class... T>
 using RequireAllHaveLessThanOrEqualT =
-    absl::enable_if_t<absl::conjunction<is_detected_convertible<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<is_detected_convertible<
                           bool, LessThanOrEqualResult, T>...>::value,
                       bool>;
 
 template <class... T>
 using RequireAllHaveGreaterThanOrEqualT =
-    absl::enable_if_t<absl::conjunction<is_detected_convertible<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<is_detected_convertible<
                           bool, GreaterThanOrEqualResult, T>...>::value,
                       bool>;
 
 template <class... T>
 using RequireAllHaveGreaterThanT =
-    absl::enable_if_t<absl::conjunction<is_detected_convertible<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<is_detected_convertible<
                           bool, GreaterThanResult, T>...>::value,
                       bool>;
 
@@ -1171,7 +1173,7 @@ struct VariantHelper<variant<Ts...>> {
 
   template <typename... Us>
   struct CanConvertFrom<variant<Us...>>
-      : public absl::conjunction<CanAccept<Us>...> {};
+      : public absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<CanAccept<Us>...> {};
 };
 
 // A type with nontrivial copy ctor and trivial move ctor.
@@ -1220,7 +1222,7 @@ class VariantCopyAssignBaseNontrivial;
 // Base that is dependent on whether or not the destructor can be trivial.
 template <class... T>
 using VariantStateBaseDestructor =
-    absl::conditional_t<std::is_destructible<Union<T...>>::value,
+    absl::OTABSL_OPTION_NAMESPACE_NAME::conditional_t<std::is_destructible<Union<T...>>::value,
                         VariantStateBase<T...>,
                         VariantStateBaseDestructorNontrivial<T...>>;
 
@@ -1232,44 +1234,44 @@ using VariantStateBaseDestructor =
 // So we have to use a different approach (i.e. `HasTrivialMoveConstructor`) to
 // work around the bug.
 template <class... T>
-using VariantMoveBase = absl::conditional_t<
-    absl::disjunction<
-        absl::negation<absl::conjunction<std::is_move_constructible<T>...>>,
-        absl::conjunction<IsTriviallyMoveConstructible<T>...>>::value,
+using VariantMoveBase = absl::OTABSL_OPTION_NAMESPACE_NAME::conditional_t<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::disjunction<
+        absl::OTABSL_OPTION_NAMESPACE_NAME::negation<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<std::is_move_constructible<T>...>>,
+        absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<IsTriviallyMoveConstructible<T>...>>::value,
     VariantStateBaseDestructor<T...>, VariantMoveBaseNontrivial<T...>>;
 
 // Base that is dependent on whether or not the copy-constructor can be trivial.
 template <class... T>
-using VariantCopyBase = absl::conditional_t<
-    absl::disjunction<
-        absl::negation<absl::conjunction<std::is_copy_constructible<T>...>>,
+using VariantCopyBase = absl::OTABSL_OPTION_NAMESPACE_NAME::conditional_t<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::disjunction<
+        absl::OTABSL_OPTION_NAMESPACE_NAME::negation<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<std::is_copy_constructible<T>...>>,
         std::is_copy_constructible<Union<T...>>>::value,
     VariantMoveBase<T...>, VariantCopyBaseNontrivial<T...>>;
 
 // Base that is dependent on whether or not the move-assign can be trivial.
 template <class... T>
-using VariantMoveAssignBase = absl::conditional_t<
-    absl::disjunction<
-        absl::conjunction<absl::is_move_assignable<Union<T...>>,
+using VariantMoveAssignBase = absl::OTABSL_OPTION_NAMESPACE_NAME::conditional_t<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::disjunction<
+        absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<absl::OTABSL_OPTION_NAMESPACE_NAME::is_move_assignable<Union<T...>>,
                           std::is_move_constructible<Union<T...>>,
                           std::is_destructible<Union<T...>>>,
-        absl::negation<absl::conjunction<std::is_move_constructible<T>...,
+        absl::OTABSL_OPTION_NAMESPACE_NAME::negation<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<std::is_move_constructible<T>...,
                                          // Note: We're not qualifying this with
-                                         // absl:: because it doesn't compile
+                                         // absl::OTABSL_OPTION_NAMESPACE_NAME:: because it doesn't compile
                                          // under MSVC.
                                          is_move_assignable<T>...>>>::value,
     VariantCopyBase<T...>, VariantMoveAssignBaseNontrivial<T...>>;
 
 // Base that is dependent on whether or not the copy-assign can be trivial.
 template <class... T>
-using VariantCopyAssignBase = absl::conditional_t<
-    absl::disjunction<
-        absl::conjunction<absl::is_copy_assignable<Union<T...>>,
+using VariantCopyAssignBase = absl::OTABSL_OPTION_NAMESPACE_NAME::conditional_t<
+    absl::OTABSL_OPTION_NAMESPACE_NAME::disjunction<
+        absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<absl::OTABSL_OPTION_NAMESPACE_NAME::is_copy_assignable<Union<T...>>,
                           std::is_copy_constructible<Union<T...>>,
                           std::is_destructible<Union<T...>>>,
-        absl::negation<absl::conjunction<std::is_copy_constructible<T>...,
+        absl::OTABSL_OPTION_NAMESPACE_NAME::negation<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<std::is_copy_constructible<T>...,
                                          // Note: We're not qualifying this with
-                                         // absl:: because it doesn't compile
+                                         // absl::OTABSL_OPTION_NAMESPACE_NAME:: because it doesn't compile
                                          // under MSVC.
                                          is_copy_assignable<T>...>>>::value,
     VariantMoveAssignBase<T...>, VariantCopyAssignBaseNontrivial<T...>>;
@@ -1299,17 +1301,18 @@ class VariantStateBaseDestructorNontrivial : protected VariantStateBase<T...> {
     template <std::size_t I>
     void operator()(SizeT<I> i) const {
       using Alternative =
-          typename absl::variant_alternative<I, variant<T...>>::type;
+          typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<I, variant<T...>>::type;
       variant_internal::AccessUnion(self->state_, i).~Alternative();
     }
 
-    void operator()(SizeT<absl::variant_npos> /*i*/) const {
+    void operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*i*/) const {
       // This space intentionally left blank
     }
 
     VariantStateBaseDestructorNontrivial* self;
   };
 
+  // cppcheck-suppress [duplInheritedMember]
   void destroy() { VisitIndices<sizeof...(T)>::Run(Destroyer{this}, index_); }
 
   ~VariantStateBaseDestructorNontrivial() { destroy(); }
@@ -1331,12 +1334,12 @@ class VariantMoveBaseNontrivial : protected VariantStateBaseDestructor<T...> {
     template <std::size_t I>
     void operator()(SizeT<I> i) const {
       using Alternative =
-          typename absl::variant_alternative<I, variant<T...>>::type;
+          typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<I, variant<T...>>::type;
       ::new (static_cast<void*>(&self->state_)) Alternative(
-          variant_internal::AccessUnion(absl::move(other->state_), i));
+          variant_internal::AccessUnion(absl::OTABSL_OPTION_NAMESPACE_NAME::move(other->state_), i));
     }
 
-    void operator()(SizeT<absl::variant_npos> /*i*/) const {}
+    void operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*i*/) const {}
 
     VariantMoveBaseNontrivial* self;
     VariantMoveBaseNontrivial* other;
@@ -1344,7 +1347,7 @@ class VariantMoveBaseNontrivial : protected VariantStateBaseDestructor<T...> {
 
   VariantMoveBaseNontrivial() = default;
   VariantMoveBaseNontrivial(VariantMoveBaseNontrivial&& other) noexcept(
-      absl::conjunction<std::is_nothrow_move_constructible<T>...>::value)
+      absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<std::is_nothrow_move_constructible<T>...>::value)
       : Base(NoopConstructorTag()) {
     VisitIndices<sizeof...(T)>::Run(Construct{this, &other}, other.index_);
     index_ = other.index_;
@@ -1376,12 +1379,12 @@ class VariantCopyBaseNontrivial : protected VariantMoveBase<T...> {
     template <std::size_t I>
     void operator()(SizeT<I> i) const {
       using Alternative =
-          typename absl::variant_alternative<I, variant<T...>>::type;
+          typename absl::OTABSL_OPTION_NAMESPACE_NAME::variant_alternative<I, variant<T...>>::type;
       ::new (static_cast<void*>(&self->state_))
           Alternative(variant_internal::AccessUnion(other->state_, i));
     }
 
-    void operator()(SizeT<absl::variant_npos> /*i*/) const {}
+    void operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*i*/) const {}
 
     VariantCopyBaseNontrivial* self;
     const VariantCopyBaseNontrivial* other;
@@ -1421,7 +1424,7 @@ class VariantMoveAssignBaseNontrivial : protected VariantCopyBase<T...> {
 
     VariantMoveAssignBaseNontrivial&
     operator=(VariantMoveAssignBaseNontrivial&& other) noexcept(
-        absl::conjunction<std::is_nothrow_move_constructible<T>...,
+        absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<std::is_nothrow_move_constructible<T>...,
                           std::is_nothrow_move_assignable<T>...>::value) {
       VisitIndices<sizeof...(T)>::Run(
           VariantCoreAccess::MakeMoveAssignVisitor(this, &other), other.index_);
@@ -1471,7 +1474,7 @@ struct EqualsOp {
   const variant<Types...>* v;
   const variant<Types...>* w;
 
-  constexpr bool operator()(SizeT<absl::variant_npos> /*v_i*/) const {
+  constexpr bool operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*v_i*/) const {
     return true;
   }
 
@@ -1486,7 +1489,7 @@ struct NotEqualsOp {
   const variant<Types...>* v;
   const variant<Types...>* w;
 
-  constexpr bool operator()(SizeT<absl::variant_npos> /*v_i*/) const {
+  constexpr bool operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*v_i*/) const {
     return false;
   }
 
@@ -1501,7 +1504,7 @@ struct LessThanOp {
   const variant<Types...>* v;
   const variant<Types...>* w;
 
-  constexpr bool operator()(SizeT<absl::variant_npos> /*v_i*/) const {
+  constexpr bool operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*v_i*/) const {
     return false;
   }
 
@@ -1516,7 +1519,7 @@ struct GreaterThanOp {
   const variant<Types...>* v;
   const variant<Types...>* w;
 
-  constexpr bool operator()(SizeT<absl::variant_npos> /*v_i*/) const {
+  constexpr bool operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*v_i*/) const {
     return false;
   }
 
@@ -1531,7 +1534,7 @@ struct LessThanOrEqualsOp {
   const variant<Types...>* v;
   const variant<Types...>* w;
 
-  constexpr bool operator()(SizeT<absl::variant_npos> /*v_i*/) const {
+  constexpr bool operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*v_i*/) const {
     return true;
   }
 
@@ -1546,7 +1549,7 @@ struct GreaterThanOrEqualsOp {
   const variant<Types...>* v;
   const variant<Types...>* w;
 
-  constexpr bool operator()(SizeT<absl::variant_npos> /*v_i*/) const {
+  constexpr bool operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*v_i*/) const {
     return true;
   }
 
@@ -1584,7 +1587,7 @@ struct Swap {
     VariantCoreAccess::InitFrom(*v, std::move(tmp));
   }
 
-  void operator()(SizeT<absl::variant_npos> /*w_i*/) const {
+  void operator()(SizeT<absl::OTABSL_OPTION_NAMESPACE_NAME::variant_npos> /*w_i*/) const {
     if (!v->valueless_by_exception()) {
       generic_swap();
     }
@@ -1618,7 +1621,7 @@ struct VariantHashVisitor {
 
 template <typename Variant, typename... Ts>
 struct VariantHashBase<Variant,
-                       absl::enable_if_t<absl::conjunction<
+                       absl::OTABSL_OPTION_NAMESPACE_NAME::enable_if_t<absl::OTABSL_OPTION_NAMESPACE_NAME::conjunction<
                            type_traits_internal::IsHashable<Ts>...>::value>,
                        Ts...> {
   using argument_type = Variant;

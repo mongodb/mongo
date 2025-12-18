@@ -31,6 +31,11 @@ public:
       const opentelemetry::sdk::resource::Resource &resource);
 
   static std::unique_ptr<opentelemetry::sdk::metrics::MeterProvider> Create(
+      std::unique_ptr<ViewRegistry> views,
+      const opentelemetry::sdk::resource::Resource &resource,
+      std::unique_ptr<instrumentationscope::ScopeConfigurator<MeterConfig>> meter_configurator);
+
+  static std::unique_ptr<opentelemetry::sdk::metrics::MeterProvider> Create(
       std::unique_ptr<sdk::metrics::MeterContext> context);
 };
 

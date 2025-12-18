@@ -3,10 +3,6 @@
 
 #pragma once
 
-#ifdef OPENTELEMETRY_NO_DEPRECATED_CODE
-#  error "header <opentelemetry/trace/propagation/jaeger.h> is deprecated."
-#endif
-
 #include "detail/hex.h"
 #include "detail/string.h"
 #include "opentelemetry/context/propagation/text_map_propagator.h"
@@ -21,7 +17,7 @@ namespace propagation
 
 static const nostd::string_view kJaegerTraceHeader = "uber-trace-id";
 
-class OPENTELEMETRY_DEPRECATED JaegerPropagator : public context::propagation::TextMapPropagator
+class JaegerPropagator : public context::propagation::TextMapPropagator
 {
 public:
   void Inject(context::propagation::TextMapCarrier &carrier,

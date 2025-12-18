@@ -59,7 +59,8 @@ public:
     size_t cnt = kv_str_tokenizer.NumTokens();  // upper bound on number of kv pairs
     if (cnt > kMaxKeyValuePairs)
     {
-      cnt = kMaxKeyValuePairs;
+      // trace state should be discarded if count exceeds
+      return GetDefault();
     }
 
     nostd::shared_ptr<TraceState> ts(new TraceState(cnt));

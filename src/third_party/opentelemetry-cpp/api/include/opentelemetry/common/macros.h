@@ -341,7 +341,7 @@ point.
 // Atomic wrappers based on compiler intrinsics for memory read/write.
 // The tailing number is read/write length in bits.
 //
-// N.B. Compiler instrinsic is used because the usage of C++ standard library is restricted in the
+// N.B. Compiler intrinsic is used because the usage of C++ standard library is restricted in the
 // OpenTelemetry C++ API.
 //
 #if defined(__GNUC__)

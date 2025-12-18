@@ -75,12 +75,18 @@ public:
     return sdk::common::ExportResult::kSuccess;
   }
 
+  virtual bool ForceFlush(std::chrono::microseconds /* timeout */) noexcept override
+  {
+    return true;
+  }
+
   /**
-   * @param timeout an optional value containing the timeout of the exporter
+   * Attempt to shut down the in-memory span exporter.
+   * @param timeout Timeout is an optional value containing the timeout of the exporter
    * note: passing custom timeout values is not currently supported for this exporter
    * @return Returns the status of the operation
    */
-  bool Shutdown(std::chrono::microseconds /* timeout */) noexcept override
+  bool Shutdown(std::chrono::microseconds timeout OPENTELEMETRY_MAYBE_UNUSED) noexcept override
   {
     is_shutdown_ = true;
     return true;

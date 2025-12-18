@@ -3,12 +3,14 @@
 
 #pragma once
 
+#include <memory>
 #include <utility>
 #include <vector>
 
 #include "opentelemetry/nostd/function_ref.h"
 #include "opentelemetry/nostd/variant.h"
 #include "opentelemetry/sdk/metrics/data/metric_data.h"
+#include "opentelemetry/sdk/metrics/export/metric_filter.h"
 #include "opentelemetry/version.h"
 
 OPENTELEMETRY_BEGIN_NAMESPACE
@@ -85,8 +87,6 @@ public:
 
   MetricProducer(const MetricProducer &)  = delete;
   MetricProducer(const MetricProducer &&) = delete;
-  void operator=(const MetricProducer &)  = delete;
-  void operator=(const MetricProducer &&) = delete;
 
   enum class Status
   {

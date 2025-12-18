@@ -120,7 +120,7 @@ protected:
   class HttpRequestHandler : public std::pair<std::string, HttpRequestCallback *>
   {
   public:
-    HttpRequestHandler(std::string key, HttpRequestCallback *value)
+    HttpRequestHandler(const std::string &key, HttpRequestCallback *value)
     {
       first  = key;
       second = value;
@@ -168,7 +168,7 @@ public:
         m_maxRequestContentSize(2 * 1024 * 1024)
   {}
 
-  HttpServer(std::string serverHost, int port = 30000) : HttpServer()
+  HttpServer(const std::string &serverHost, int port = 30000) : HttpServer()
   {
     std::ostringstream os;
     os << serverHost << ":" << port;
@@ -648,7 +648,15 @@ protected:
       {
         ptr++;
       }
-      conn.request.headers[name] = std::string(begin, ptr);
+      if (!conn.request.headers[name].empty())
+      {
+        conn.request.headers[name] =
+            conn.request.headers[name].append(",").append(std::string(begin, ptr));
+      }
+      else
+      {
+        conn.request.headers[name] = std::string(begin, ptr);
+      }
       if (*ptr == '\r')
       {
         ptr++;
