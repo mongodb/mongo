@@ -67,7 +67,7 @@
   "moduleExtensions": {
     "//bazel:bzlmod.bzl%setup_mongo_python_toolchains": {
       "general": {
-        "bzlTransitiveDigest": "FtdgOJSyGbsXr7BmljeEF/t1sU5tfBjOHatXFzh137E=",
+        "bzlTransitiveDigest": "78DxaVnBFdwwQfK3cuvhNaJNaYfdCeT3128LXHazcTc=",
         "usagesDigest": "bUxjq9n+hj2YwYT/lcSP4lHyQ2GVy5JpFgSmddUqUZg=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
@@ -133,9 +133,9 @@
               "arch": "amd64",
               "os": "windows",
               "interpreter_path": "dist/python.exe",
-              "sha256": "35458ef3163a2705cd0952ba1df6012acb42b043349dcb31ab49afec341369cf",
+              "sha256": "3933545e6d41462dd6a47e44133ea40995bc6efeed8c2e4cbdf1a699303e95ea",
               "urls": [
-                "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-pc-windows-msvc-static-install_only.tar.gz"
+                "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-pc-windows-msvc-shared-install_only.tar.gz"
               ]
             }
           },
