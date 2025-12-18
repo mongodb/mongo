@@ -314,6 +314,11 @@ function verifyCommitOpEntriesOnShards(expectedOpEntryTemplates, shards, orderSt
             // - Skip the handling of 'fromMigrate' (which will be delegated to the callers of this
             // method);
             let {ui, ts, t, v, wall, versionContext, fromMigrate, ...strippedOpEntry} = opEntry;
+            if (opEntry.o.recordIdsReplicated) {
+                // 'recordIdsReplicated' is feature specific - instead of special casing when
+                // enabled, remove field.
+                delete strippedOpEntry.o.recordIdsReplicated;
+            }
             if (opEntry.o.create || opEntry.o.createIndexes) {
                 // Also strip out the 'o2' field, containing references to the ident values for the
                 // created collection & index.

@@ -5,7 +5,10 @@
  * @tags: [
  *  # We need persistence as we temporarily restart nodes as standalones.
  *   requires_persistence,
- *   requires_fcv_80
+ *   requires_fcv_80,
+ *   # TODO SERVER-88309: Re-enable when 'injectInconsistencyOnSecondary' is compatible with
+ *   # replicated recordIds.
+ *   exclude_when_record_ids_replicated,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

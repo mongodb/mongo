@@ -2,6 +2,10 @@
  * Tests that applyOps correctly respects the 'oplogApplicationMode' and 'alwaysUpsert' flags.
  * 'alwaysUpsert' defaults to false and 'oplogApplicationMode' defaults to 'ApplyOps'. We test
  * that these default values do not lead to command failure.
+ * @tags: [
+ *  # TODO SERVER-115578: Make this test compatible with replicated recordIds enabled.
+ *  exclude_when_record_ids_replicated,
+ * ]
  */
 
 let standalone = MongoRunner.runMongod();

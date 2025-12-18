@@ -642,34 +642,29 @@ buildvariants:
           - amazon2023-arm64-latest-m8g-2xlarge
       - name: .fuzzer_deterministic !.multiversion
 
-  # TODO SERVER-94401: Reenable testing this variant.
-  # # Run all-feature-flags along with recordIdsReplicated:true on all collections.
-  # - &enterprise-amazon-linux2023-arm64-all-feature-flags-recordIdsReplicated
-  #   <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
-  #   name: enterprise-amazon-linux2023-arm64-all-feature-flags-recordIdsReplicated
-  #   display_name: "Amazon Linux 2023 arm64 Enterprise (all feature flags) recordIdsReplicated"
-  #   tags: []
-  #   # Run daily once at 4 AM.
-  #   cron: "0 1 * * *"
-  #   tasks:
-  #     - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.exclude_when_record_ids_replicated
-  #     - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.exclude_when_record_ids_replicated
-  #       distros:
-  #         - amazon2023-arm64-atlas-latest-large
-  #     - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.exclude_when_record_ids_replicated
-  #     - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.exclude_when_record_ids_replicated
-  #       distros:
-  #         - amazon2023-arm64-atlas-latest-large
-  #     - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.exclude_when_record_ids_replicated
-  #     - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.exclude_when_record_ids_replicated
-  #       distros:
-  #         - amazon2023-arm64-atlas-latest-large
-  #   expansions:
-  #     <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-expansions
-  #     # This builder excludes tests tagged with:
-  #     # 1) exclude_when_record_ids_replicated: indicates that the test is particular about recordIdsReplicated:false
-  #     # 2) disables_test_commands: this builder uses failpoints, and setting disables_test_commands means that the builder can't use failpoints.
-  #     test_flags: >-
-  #       --runAllFeatureFlagTests
-  #       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,exclude_when_record_ids_replicated,disables_test_commands,incompatible_with_atlas_environment,requires_ldap_pool
-  #       --mongodSetParameters="{'failpoint.overrideRecordIdsReplicatedDefault': {mode: 'alwaysOn'}, 'failpoint.automaticallyCollmodToRecordIdsReplicatedFalse': {mode: 'alwaysOn'}}"
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-with-replicatedRecordIds
+    display_name: "Amazon Linux 2023 arm64 Enterprise (all feature flags) with replicatedRecordIds"
+    tags: []
+    cron: "0 1 * * *" # Run daily once at 4am.
+    run_on:
+      - amazon2023-arm64-atlas-latest-m8g-xlarge
+    expansions:
+      <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --mongodSetParameters="{'failpoint.overrideRecordIdsReplicatedDefault': {mode: 'alwaysOn'}, 'failpoint.automaticallyCollmodToRecordIdsReplicatedFalse': {mode: 'alwaysOn'}}"
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,m8g_incompatible,exclude_when_record_ids_replicated,disables_test_commands
+    tasks:
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
+        distros:
+          - amazon2023-arm64-latest-m8g-2xlarge
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
+        distros:
+          - amazon2023-arm64-latest-m8g-2xlarge
+      - name: .default !.requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
+      - name: .default .requires_large_host !.requires_extra_system_deps !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.multiversion !.exclude_when_record_ids_replicated
+        distros:
+          - amazon2023-arm64-latest-m8g-2xlarge
