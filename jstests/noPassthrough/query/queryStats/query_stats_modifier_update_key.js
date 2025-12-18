@@ -157,6 +157,41 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
             );
             assert.eq([], sortedEntries);
         });
+
+        it("should validate modifier update with no-op operators", function () {
+            const modifierUpdateCommandObjNoop = {
+                update: collName,
+                updates: [
+                    {
+                        q: {v: 3},
+                        u: {
+                            $set: {},
+                            $unset: {},
+                            $rename: {},
+                            $setOnInsert: {},
+                            $currentDate: {},
+                            $bit: {},
+                            $min: {},
+                            $max: {},
+                            $mul: {},
+                            $addToSet: {},
+                            $push: {},
+                            $pop: {},
+                            $pull: {},
+                            $pullAll: {},
+                        },
+                    },
+                ],
+            };
+
+            runCommandAndValidateQueryStats({
+                coll: coll,
+                commandName: "update",
+                commandObj: modifierUpdateCommandObjNoop,
+                shapeFields: queryShapeUpdateFieldsRequired,
+                keyFields: updateKeyFieldsRequired,
+            });
+        });
     });
 }
 

@@ -72,6 +72,32 @@ BSONObj shapifyQuery(const ParsedUpdate& parsedUpdate, const SerializationOption
     return swParseResult.getValue()->serialize(opts);
 }
 
+/**
+ * Create a no-op modifier update
+ *
+ * If the parsed modifier update is a no-op (e.g., {$inc: {}}), its serialized output will be an
+ * empty BSONObj (i.e., {}). That is semantically incorrect because an empty BSONObj will be treated
+ * as a replacement update rather than a modifier update.
+ *
+ * To resolve this, we reconstruct a no-op shape using the 'updateModifier' by iterating through its
+ * operator fields and appending an empty object for each of them.
+ *
+ * NOTE: We iterate in sorted order so as to be consistent with the serialized output.
+ */
+static BSONObj makeNoopModifierUpdateOpShape(const BSONObj& updateModifier) {
+    BSONObjIteratorSorted iter(updateModifier);
+    BSONObjBuilder bob;
+    while (iter.more()) {
+        auto element = iter.next();
+        tassert(11560300,
+                "An no-op modifer update is expected to have empty object for each of its update "
+                "operator.",
+                element.isABSONObj() && element.Obj().isEmpty());
+        bob.append(element);
+    }
+    return bob.obj();
+}
+
 Value shapifyUpdateOp(const ParsedUpdate& parsedUpdate,
                       const SerializationOptions& opts =
                           SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
@@ -83,8 +109,13 @@ Value shapifyUpdateOp(const ParsedUpdate& parsedUpdate,
                 parsedUpdate.getRequest()->getUpdateModification().getUpdateReplacement());
         case write_ops::UpdateModification::Type::kPipeline:
             return Value(static_cast<const PipelineExecutor*>(executor)->serialize(opts));
-        case write_ops::UpdateModification::Type::kModifier:
-            return Value(static_cast<const UpdateTreeExecutor*>(executor)->serialize(opts));
+        case write_ops::UpdateModification::Type::kModifier: {
+            auto value = static_cast<const UpdateTreeExecutor*>(executor)->serialize(opts);
+            return value.getDocument().empty()
+                ? Value(makeNoopModifierUpdateOpShape(
+                      parsedUpdate.getRequest()->getUpdateModification().getUpdateModifier()))
+                : value;
+        }
         default:
             MONGO_UNREACHABLE_TASSERT(11034402);
     }

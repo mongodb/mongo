@@ -92,6 +92,21 @@ function runReplacementUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 keyFields: updateKeyFieldsComplex,
             });
         });
+
+        it("should validate empty doc replacement update key fields", function () {
+            const replacementUpdateCommandObjEmpty = {
+                update: collName,
+                updates: [{q: {v: 1}, u: {}}],
+            };
+
+            runCommandAndValidateQueryStats({
+                coll: coll,
+                commandName: "update",
+                commandObj: replacementUpdateCommandObjEmpty,
+                shapeFields: queryShapeUpdateFieldsRequired,
+                keyFields: updateKeyFieldsRequired,
+            });
+        });
     });
 }
 

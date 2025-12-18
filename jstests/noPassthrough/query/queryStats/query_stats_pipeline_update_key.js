@@ -93,6 +93,21 @@ function runPipelineUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 keyFields: updateKeyFieldsComplex,
             });
         });
+
+        it("should validate no-op pipeline update key fields", function () {
+            const pipelineUpdateCommandObjNoop = {
+                update: collName,
+                updates: [{q: {v: 3}, u: []}],
+            };
+
+            runCommandAndValidateQueryStats({
+                coll: coll,
+                commandName: "update",
+                commandObj: pipelineUpdateCommandObjNoop,
+                shapeFields: queryShapeUpdateFieldsRequired,
+                keyFields: updateKeyFieldsRequired,
+            });
+        });
     });
 }
 
