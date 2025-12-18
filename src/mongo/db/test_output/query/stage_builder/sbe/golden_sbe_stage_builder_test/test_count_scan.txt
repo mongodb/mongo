@@ -1,7 +1,6 @@
 # Golden test output of GoldenSbeStageBuilderTest/TestCountScan
-[2] project [s8 = newBsonObj("_id", s6, "count", s7)] 
-[2] project [s7 = (convert ( s5, int32) ?: s5)] 
-[2] group [s6] [s5 = count()] spillSlots[s4] mergingExprs[sum(s4)] 
+[2] project [s7 = newBsonObj("_id", s6, "count", s4)] 
+[2] group [s6] [s4 = _internalArithmeticAverage::accumulate(s4, 1)] spillSlots[s5] mergingExprs[_internalArithmeticAverage::merge] 
 [2] project [s6 = (s3 ?: null)] 
 [1] project [s3 = getField(s2, "_id")] 
 [1] ixseek seekKeyLow = KS(27FDFE) seekKeyHigh = KS(2BFE01) [s1 = recordId] [] @"UUID" @"a_1" forward 

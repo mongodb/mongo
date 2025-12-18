@@ -171,7 +171,7 @@ std::vector<DebugPrinter::Block> SinglePurposeHashAggAccumulator::debugPrintAccu
     DebugPrinter::addKeyword(debugOutput, "accumulate");
     debugOutput.emplace_back(DebugPrinter::Block("`(`"));
     DebugPrinter::addIdentifier(debugOutput, _outSlot);
-    debugOutput.emplace_back(DebugPrinter::Block(",`"));
+    debugOutput.emplace_back(DebugPrinter::Block("`,"));
     DebugPrinter::addBlocks(debugOutput, _transformExpr->debugPrint());
     debugOutput.emplace_back(DebugPrinter::Block("`)"));
 

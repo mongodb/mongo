@@ -570,7 +570,7 @@ public:
     using CountHashAggAccumulatorBase::CountHashAggAccumulatorBase;
 
     std::unique_ptr<HashAggAccumulator> clone() const final {
-        return std::make_unique<CountHashAggAccumulatorTerminal>(
+        return std::make_unique<CountHashAggAccumulatorPartial>(
             _outSlot, _spillSlot, _transformExpr->clone(), boost::none);
     }
 

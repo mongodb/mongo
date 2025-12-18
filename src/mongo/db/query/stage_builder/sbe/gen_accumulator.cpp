@@ -2072,7 +2072,7 @@ bool AccumOp::hasBuildAddBlockAggs() const {
 }
 
 bool AccumOp::canBuildSinglePurposeAccumulator() const {
-    return bool{_opInfo->buildSinglePurposeAccum};
+    return bool{getOpInfo()->buildSinglePurposeAccum};
 }
 
 SbHashAggAccumulator AccumOp::buildSinglePurposeAccumulator(StageBuilderState& state,
