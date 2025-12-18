@@ -1187,6 +1187,7 @@ void explainUpdateOp(OperationContext* opCtx,
 
     write_ops_exec::explainUpdate(opCtx,
                                   updateRequest,
+                                  nullptr,  // null while bulkWrite query stats unsupported
                                   isTimeseriesLogicalRequest,
                                   req.getSerializationContext(),
                                   command,

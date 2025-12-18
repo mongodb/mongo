@@ -47,5 +47,6 @@ withQueryStatsEnabled(collName, (coll) => {
         commandObj: countCommand,
         shapeFields: queryShapeCountFields,
         keyFields: countKeyFields,
+        checkExplain: false, //TODO(SERVER-115764): enable once explain count includes queryShapeHash
     });
 });

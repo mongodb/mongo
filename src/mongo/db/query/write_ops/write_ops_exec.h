@@ -236,6 +236,7 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
  */
 void explainUpdate(OperationContext* opCtx,
                    UpdateRequest& updateRequest,
+                   const write_ops::UpdateCommandRequest* updateOp,
                    bool isTimeseriesViewRequest,
                    const SerializationContext& serializationContext,
                    const BSONObj& command,

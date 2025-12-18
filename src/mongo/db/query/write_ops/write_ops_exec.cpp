@@ -2460,6 +2460,7 @@ bool shouldRetryDuplicateKeyException(OperationContext* opCtx,
 
 void explainUpdate(OperationContext* opCtx,
                    UpdateRequest& updateRequest,
+                   const write_ops::UpdateCommandRequest* updateOp,
                    bool isTimeseriesViewRequest,
                    const SerializationContext& serializationContext,
                    const BSONObj& command,
@@ -2506,6 +2507,17 @@ void explainUpdate(OperationContext* opCtx,
         expCtx,
         &updateRequest,
         makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &updateRequest.getNsString())));
+
+    // Register query shape here once we obtain 'parsedUpdate', before executing the update
+    // command. Inside 'parsedUpdate', the parsed preoptimized query and the update driver are
+    // available for computing query shape.
+
+    // TODO(SERVER-111843): We only need to compute the query hash for explain, registration is
+    // unnecessary. Clean this up once registerRequestForQueryStats is refactored
+    if (updateOp) {
+        registerRequestForQueryStats(
+            opCtx, expCtx, updateRequest.getNamespaceString(), collection, *updateOp, parsedUpdate);
+    }
 
     auto canonicalUpdate = uassertStatusOK(CanonicalUpdate::make(
         expCtx, std::move(parsedUpdate), collection.getCollectionPtr(), isTimeseriesViewRequest));

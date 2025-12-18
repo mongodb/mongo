@@ -642,6 +642,7 @@ export function withQueryStatsEnabled(collName, callbackFn) {
  * 2. The fields nested inside of queryShape field of the key exactly matches those given by
  * shapeFields.
  * 3. The list of fields of the key exactly matches those given by keyFields.
+ * 4. The query shape hash is present in the explain output and matches the query stats entry.
  * /**
  * @param {object} coll - The given collection to run on
  * @param {string} commandName - string name of type of command, ex. "find", "aggregate", or
@@ -652,9 +653,16 @@ export function withQueryStatsEnabled(collName, callbackFn) {
  * @param {object} keyFields - List of outer fields not nested inside queryShape but should be part
  *     of the key
  */
-export function runCommandAndValidateQueryStats({coll, commandName, commandObj, shapeFields, keyFields}) {
+export function runCommandAndValidateQueryStats({
+    coll,
+    commandName,
+    commandObj,
+    shapeFields,
+    keyFields,
+    checkExplain = true,
+}) {
     const testDB = coll.getDB();
-    assert.commandWorked(testDB.runCommand(commandObj));
+    const result = assert.commandWorked(testDB.runCommand(commandObj));
     const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});
 
     assert.eq(entry.key.queryShape.command, commandName);
@@ -715,6 +723,24 @@ export function runCommandAndValidateQueryStats({coll, commandName, commandObj, 
             .hint({"v": 60, $hint: -128})
             .itcount();
     }, ErrorCodes.BadValue);
+
+    // Verify that the same shape hash is present in the explain output
+    function compareQueryShapeHash(explainResult) {
+        assert(entry.hasOwnProperty("queryShapeHash"), entry);
+        assert(explainResult.hasOwnProperty("queryShapeHash"), explainResult);
+        assert.eq(explainResult.queryShapeHash, entry.queryShapeHash);
+    }
+    if (checkExplain) {
+        if (commandObj.explain) {
+            compareQueryShapeHash(result);
+        } else if (commandName == "aggregate") {
+            const explainResult = assert.commandWorked(testDB.runCommand({...commandObj, explain: true}));
+            compareQueryShapeHash(explainResult);
+        } else {
+            const explainResult = assert.commandWorked(testDB.runCommand({explain: {...commandObj}}));
+            compareQueryShapeHash(explainResult);
+        }
+    }
 }
 
 /**

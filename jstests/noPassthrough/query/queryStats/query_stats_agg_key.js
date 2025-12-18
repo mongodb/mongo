@@ -55,5 +55,6 @@ withQueryStatsEnabled(collName, (coll) => {
         commandObj: aggregateCommandObj,
         shapeFields: queryShapeAggregateFields,
         keyFields: queryStatsAggregateKeyFields,
+        checkExplain: false, // writeConcern with explain not supported
     });
 });

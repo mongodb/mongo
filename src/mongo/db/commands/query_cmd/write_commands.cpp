@@ -638,6 +638,7 @@ public:
 
             write_ops_exec::explainUpdate(opCtx,
                                           updateRequest,
+                                          &request(),
                                           isTimeseriesLogicalRequest,
                                           request().getSerializationContext(),
                                           _commandObj,
