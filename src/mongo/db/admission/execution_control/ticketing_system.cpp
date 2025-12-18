@@ -115,7 +115,7 @@ bool wasOperationDowngradedToLowPriority(OperationContext* opCtx,
         return false;
     }
 
-    return ExecutionAdmissionContext::shouldDeprioritize(admCtx);
+    return ExecutionAdmissionContext::shouldDeprioritize(admCtx->getAdmissions());
 }
 
 Status checkPrioritizationTransition(bool oldStateUsesPrioritization,
@@ -446,23 +446,15 @@ Status TicketingSystem::setBackgroundTasksDeprioritization(bool enabled) {
 }
 
 void TicketingSystem::_appendOperationStats(BSONObjBuilder& b, OperationType opType) const {
-    const auto& shortExecutionStats = [&]() {
-        if (opType == OperationType::kRead) {
-            return _readShortExecutionStats;
-        } else {
-            return _writeShortExecutionStats;
-        }
-    }();
-    const auto& longExecutionStats = [&]() {
-        if (opType == OperationType::kRead) {
-            return _readLongExecutionStats;
-        } else {
-            return _writeLongExecutionStats;
-        }
-    }();
+    const auto& shortExecutionStats =
+        opType == OperationType::kRead ? _operationStats.readShort : _operationStats.writeShort;
+    const auto& longExecutionStats =
+        opType == OperationType::kRead ? _operationStats.readLong : _operationStats.writeLong;
+
     BSONObjBuilder shortB(b.subobjStart(kShortRunningName));
     shortExecutionStats.appendStats(shortB);
     shortB.done();
+
     BSONObjBuilder longB(b.subobjStart(kLongRunningName));
     longExecutionStats.appendStats(longB);
     longB.done();
@@ -571,6 +563,19 @@ void TicketingSystem::appendStats(BSONObjBuilder& b) const {
         _throughputProbing.appendStats(bbb);
         bbb.done();
     }
+
+    // Report finalized stats (CPU, elapsed, load shed) by short/long running classification.
+    // These are independent of read/write operation type.
+    {
+        BSONObjBuilder shortB(b.subobjStart(kShortRunningName));
+        _operationStats.shortRunning.appendStats(shortB);
+        shortB.done();
+    }
+    {
+        BSONObjBuilder longB(b.subobjStart(kLongRunningName));
+        _operationStats.longRunning.appendStats(longB);
+        longB.done();
+    }
 }
 
 int32_t TicketingSystem::numOfTicketsUsed() const {
@@ -586,31 +591,33 @@ int32_t TicketingSystem::numOfTicketsUsed() const {
     return total;
 }
 
-void TicketingSystem::incrementStats(OperationContext* opCtx,
-                                     int64_t elapsedMicros,
-                                     int64_t cpuUsageMicros) {
-    auto& admCtx = ExecutionAdmissionContext::get(opCtx);
+void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
+                                             int64_t elapsedMicros,
+                                             int64_t cpuUsageMicros) {
+    auto finalizedStats =
+        ExecutionAdmissionContext::get(opCtx).finalizeStats(cpuUsageMicros, elapsedMicros);
+    bool wasDeprioritized = finalizedStats.wasDeprioritized;
 
-    auto priority = admCtx.getPriorityLowered() ? AdmissionContext::Priority::kLow
-                                                : AdmissionContext::Priority::kNormal;
+    // Increment ticket holder (normal and low priority) statistics counters.
+    auto priority =
+        wasDeprioritized ? AdmissionContext::Priority::kLow : AdmissionContext::Priority::kNormal;
+    _getHolder(priority, OperationType::kRead)
+        ->incrementDelinquencyStats(finalizedStats.readDelinquency);
+    _getHolder(priority, OperationType::kWrite)
+        ->incrementDelinquencyStats(finalizedStats.writeDelinquency);
 
-    // Update delinquency stats.
+    // Increment finalized stats (CPU, elapsed, load shed) - only depend on short/long running.
+    _operationStats.shortRunning += finalizedStats.shortRunning;
+    _operationStats.longRunning += finalizedStats.longRunning;
 
-    {
-        const auto& readStats = admCtx.readDelinquencyStats();
-        _getHolder(priority, OperationType::kRead)->incrementDelinquencyStats(readStats);
-        const auto& writeStats = admCtx.writeDelinquencyStats();
-        _getHolder(priority, OperationType::kWrite)->incrementDelinquencyStats(writeStats);
-    }
+    // Increment per-acquisition execution stats (short and long running) by read/write type.
+    _operationStats.readShort += finalizedStats.readShort;
+    _operationStats.readLong += finalizedStats.readLong;
+    _operationStats.writeShort += finalizedStats.writeShort;
+    _operationStats.writeLong += finalizedStats.writeLong;
 
-    // Update long/short operation stats.
-    admCtx.recordExecutionCPUUsageAndElapsedTime(cpuUsageMicros, elapsedMicros);
-    _writeShortExecutionStats += admCtx.writeShortExecutionStats();
-    _writeLongExecutionStats += admCtx.writeLongExecutionStats();
-    _readShortExecutionStats += admCtx.readShortExecutionStats();
-    _readLongExecutionStats += admCtx.readLongExecutionStats();
-
-    if (admCtx.getPriorityLowered()) {
+    // Increment other global statistics counters.
+    if (wasDeprioritized) {
         _opsDeprioritized.fetchAndAddRelaxed(1);
     }
 }

@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/execution_control/execution_control_stats.h"
 #include "mongo/db/admission/execution_control/throughput_probing.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -208,10 +209,15 @@ public:
     int32_t numOfTicketsUsed() const;
 
     /**
-     * Bumps the delinquency counters to all ticket holders (read and write pools) and the
-     * de-prioritization stats.
+     * Finalizes per-operation stats by accumulating them into the global operation stats.
+     *
+     * Called at the end of an operation's lifecycle (e.g. CurOp destructor) to aggregate the
+     * operation's execution stats into the ticketing system's global counters. This includes
+     * delinquency stats, execution time metrics, and operation counts.
      */
-    void incrementStats(OperationContext* opCtx, int64_t elapsedMicros, int64_t cpuUsageMicros);
+    void finalizeOperationStats(OperationContext* opCtx,
+                                int64_t elapsedMicros,
+                                int64_t cpuUsageMicros);
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'.
@@ -340,10 +346,7 @@ private:
     /**
      * Accumulate long/short operation statistics for read and write operations.
      */
-    OperationExecutionStats _readShortExecutionStats;
-    mongo::admission::execution_control::OperationExecutionStats _readLongExecutionStats;
-    mongo::admission::execution_control::OperationExecutionStats _writeShortExecutionStats;
-    mongo::admission::execution_control::OperationExecutionStats _writeLongExecutionStats;
+    AggregatedExecutionStats _operationStats;
 };
 
 }  // namespace MONGO_MOD_PUBLIC execution_control

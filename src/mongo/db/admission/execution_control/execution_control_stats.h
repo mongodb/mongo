@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
@@ -34,11 +36,22 @@
 #include <cstdint>
 #include <string>
 
-#pragma once
 
-namespace mongo {
-namespace admission {
-namespace MONGO_MOD_PUBLIC execution_control {
+MONGO_MOD_PUBLIC;
+
+namespace mongo::admission::execution_control {
+
+// Forward declaration to avoid circular dependency.
+enum class OperationType;
+
+/**
+ * Identifies which stats bucket an operation's metrics should be recorded to.
+ */
+enum class ExecutionStatsBucket {
+    kShort,  // Operations that complete quickly (below admission threshold).
+    kLong    // Operations that yield frequently or are explicitly low-priority.
+};
+
 /**
  * Recollect the number of operations that hold the ticket longer than a defined threshold.
  */
@@ -58,7 +71,32 @@ public:
 };
 
 /**
+ * Stats recorded at operation finalization time (CPU usage, elapsed time, load shed info).
+ * These are independent of read/write operation type and only depend on short/long running
+ * classification.
+ */
+class OperationFinalizedStats {
+public:
+    OperationFinalizedStats() = default;
+    OperationFinalizedStats(const OperationFinalizedStats& other);
+    OperationFinalizedStats& operator=(const OperationFinalizedStats& other);
+    OperationFinalizedStats& operator+=(const OperationFinalizedStats& other);
+
+    void appendStats(BSONObjBuilder& b) const;
+
+    AtomicWord<int64_t> totalCPUUsageMicros{0};
+    AtomicWord<int64_t> totalElapsedTimeMicros{0};
+    AtomicWord<int64_t> newAdmissionsLoadShed{0};
+    AtomicWord<int64_t> totalCPUUsageLoadShed{0};
+    AtomicWord<int64_t> totalElapsedTimeMicrosLoadShed{0};
+    AtomicWord<int64_t> totalAdmissionsLoadShed{0};
+    AtomicWord<int64_t> totalQueuedTimeMicrosLoadShed{0};
+};
+
+/**
  * Recollect information about long and short operations on the server.
+ * These stats are recorded per-acquisition and depend on both read/write type and short/long
+ * running classification.
  */
 class OperationExecutionStats {
 public:
@@ -69,20 +107,28 @@ public:
 
     void appendStats(BSONObjBuilder& b) const;
 
-    AtomicWord<int64_t> totalElapsedTimeMicros{0};
     AtomicWord<int64_t> totalTimeQueuedMicros{0};
     AtomicWord<int64_t> totalTimeProcessingMicros{0};
-    AtomicWord<int64_t> totalCPUUsageMicros{0};
     AtomicWord<int64_t> totalAdmissions{0};
     AtomicWord<int64_t> newAdmissions{0};
-    AtomicWord<int64_t> newAdmissionsLoadShed{0};
-    AtomicWord<int64_t> totalCPUUsageLoadShed{0};
-    AtomicWord<int64_t> totalElapsedTimeMicrosLoadShed{0};
-    AtomicWord<int64_t> totalQueuedTimeMicrosLoadShed{0};
-    AtomicWord<int64_t> totalAdmissionsLoadShed{0};
     DelinquencyStats delinquencyStats;
 };
 
-}  // namespace MONGO_MOD_PUBLIC execution_control
-}  // namespace admission
-}  // namespace mongo
+/**
+ * Aggregated execution stats for the ticketing system.
+ * Contains both per-acquisition stats (by read/write and short/long) and finalized stats
+ * (by short/long running only).
+ */
+struct AggregatedExecutionStats {
+    // Finalized stats (CPU, elapsed, load shed) - only depend on short/long running classification.
+    OperationFinalizedStats shortRunning;
+    OperationFinalizedStats longRunning;
+
+    // Per-acquisition stats by bucket (short/long) and type (read/write).
+    OperationExecutionStats readShort;
+    OperationExecutionStats readLong;
+    OperationExecutionStats writeShort;
+    OperationExecutionStats writeLong;
+};
+
+}  // namespace mongo::admission::execution_control

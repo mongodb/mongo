@@ -40,11 +40,9 @@ namespace {
 const auto contextDecoration = OperationContext::declareDecoration<ExecutionAdmissionContext>();
 }  // namespace
 
-
-bool ExecutionAdmissionContext::shouldDeprioritize(ExecutionAdmissionContext* admCtx) {
+bool ExecutionAdmissionContext::shouldDeprioritize(std::int32_t admissions) {
     // If the op is eligible, downgrade it if it has yielded enough times to meet the threshold.
-    return admCtx->getAdmissions() >=
-        admission::execution_control::gHeuristicNumAdmissionsDeprioritizeThreshold.load();
+    return admissions >= ec::gHeuristicNumAdmissionsDeprioritizeThreshold.load();
 }
 
 ExecutionAdmissionContext& ExecutionAdmissionContext::get(OperationContext* opCtx) {
@@ -54,139 +52,150 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::get(OperationContext* opCt
 ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionContext& other)
     : AdmissionContext(other),
       _readDelinquencyStats(other._readDelinquencyStats),
-      _writeDelinquencyStats(other._writeDelinquencyStats) {}
+      _writeDelinquencyStats(other._writeDelinquencyStats),
+      _readShortStats(other._readShortStats),
+      _readLongStats(other._readLongStats),
+      _writeShortStats(other._writeShortStats),
+      _writeLongStats(other._writeLongStats),
+      _shortRunningFinalStats(other._shortRunningFinalStats),
+      _longRunningFinalStats(other._longRunningFinalStats),
+      _priorityLowered(other._priorityLowered.loadRelaxed()),
+      _opType(other._opType) {}
 
 ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     const ExecutionAdmissionContext& other) {
     AdmissionContext::operator=(other);
     _readDelinquencyStats = other._readDelinquencyStats;
     _writeDelinquencyStats = other._writeDelinquencyStats;
+    _readShortStats = other._readShortStats;
+    _readLongStats = other._readLongStats;
+    _writeShortStats = other._writeShortStats;
+    _writeLongStats = other._writeLongStats;
+    _shortRunningFinalStats = other._shortRunningFinalStats;
+    _longRunningFinalStats = other._longRunningFinalStats;
+    _priorityLowered.store(other._priorityLowered.loadRelaxed());
+    _opType = other._opType;
     return *this;
 }
 
-admission::execution_control::OperationExecutionStats&
-ExecutionAdmissionContext::_getOperationExecutionStats() {
-    auto dePrioritized = ExecutionAdmissionContext::shouldDeprioritize(this) ||
-        getPriority() == AdmissionContext::Priority::kLow;
-    switch (getOperationType()) {
-        case admission::execution_control::OperationType::kRead:
-            return dePrioritized ? _readShortStats : _readLongStats;
+ExecutionAdmissionContext::FinalizedStats ExecutionAdmissionContext::finalizeStats(
+    int64_t cpuUsageMicros, int64_t elapsedMicros) {
+    // Append CPU, elapsed time, and load-shed stats only if the operation is not composed solely of
+    // exempted admissions.
+    if (getAdmissions() > getExemptedAdmissions()) {
+        // Record CPU and elapsed time to the appropriate finalized stats bucket (short/long
+        // running). This is independent of operation type (read/write) since the type may have
+        // changed during the operation's lifetime.
+        auto& stats = _isLongRunning(true /* isFinalization */) ? _longRunningFinalStats
+                                                                : _shortRunningFinalStats;
 
-        case admission::execution_control::OperationType::kWrite:
-            return dePrioritized ? _writeShortStats : _writeLongStats;
+        stats.totalCPUUsageMicros.fetchAndAddRelaxed(cpuUsageMicros);
+        stats.totalElapsedTimeMicros.fetchAndAddRelaxed(elapsedMicros);
+
+        // Record final CPU, elapsed time and number of admissions to the load shed bucket.
+        if (getLoadShed()) {
+            stats.totalCPUUsageLoadShed.fetchAndAddRelaxed(cpuUsageMicros);
+            stats.totalElapsedTimeMicrosLoadShed.fetchAndAddRelaxed(elapsedMicros);
+            stats.newAdmissionsLoadShed.fetchAndAddRelaxed(1);
+            stats.totalAdmissionsLoadShed.fetchAndAddRelaxed(getAdmissions());
+            stats.totalQueuedTimeMicrosLoadShed.fetchAndAddRelaxed(totalTimeQueuedMicros().count());
+        }
     }
 
-    MONGO_UNREACHABLE;
+    // Take a snapshot of all stats.
+    FinalizedStats result;
+    result.shortRunning = _shortRunningFinalStats;
+    result.longRunning = _longRunningFinalStats;
+    result.readShort = _readShortStats;
+    result.readLong = _readLongStats;
+    result.writeShort = _writeShortStats;
+    result.writeLong = _writeLongStats;
+    result.readDelinquency = _readDelinquencyStats;
+    result.writeDelinquency = _writeDelinquencyStats;
+    result.wasDeprioritized = getPriorityLowered();
+
+    return result;
 }
 
 void ExecutionAdmissionContext::recordExecutionAcquisition() {
-    if (!_isUserOperation())
+    if (!_shouldRecordStats()) {
         return;
-
-    _recordExecutionAcquisition(_getOperationExecutionStats());
-}
-
-void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(Microseconds queueTimeMicros) {
-    if (!_isUserOperation())
-        return;
-
-    _recordExecutionTimeQueued(queueTimeMicros, _getOperationExecutionStats());
-}
-
-void ExecutionAdmissionContext::recordExecutionRelease(Microseconds processedTimeMicros) {
-    if (!_isUserOperation())
-        return;
-
-    _recordExecutionProcessedTime(processedTimeMicros, _getOperationExecutionStats());
-}
-
-void ExecutionAdmissionContext::recordOperationLoadShed() {
-    AdmissionContext::recordOperationLoadShed();
-    _recordExecutionShed(_getOperationExecutionStats());
-}
-
-void ExecutionAdmissionContext::recordExecutionCPUUsageAndElapsedTime(int64_t cpuUsageMicros,
-                                                                      int64_t elapsedMicros) {
-    if (!_isUserOperation())
-        return;
-
-    _recordExecutionCPUUsageAndElapsedTimeShed(
-        cpuUsageMicros, elapsedMicros, _getOperationExecutionStats());
-    if (getLoadShed()) {
-        recordOperationLoadShed();
     }
-}
 
-void ExecutionAdmissionContext::recordDelinquentAcquisition(Milliseconds delay) {
-    _recordDelinquentAcquisition(delay, _getDelinquencyStats());
-    _recordDelinquentAcquisition(delay, _getOperationExecutionStats().delinquencyStats);
-}
-
-admission::execution_control::DelinquencyStats& ExecutionAdmissionContext::_getDelinquencyStats() {
-    return (getOperationType() == admission::execution_control::OperationType::kRead)
-        ? _readDelinquencyStats
-        : _writeDelinquencyStats;
-}
-
-bool ExecutionAdmissionContext::_isUserOperation() {
-    // We want the long/short running stats to reflect the behavior of user workloads, by preventing
-    // counting commands with exempted acquisitions, we remove noise comming from internal
-    // operations.
-    return getExemptedAdmissions() == 0;
-}
-
-void ExecutionAdmissionContext::_recordDelinquentAcquisition(
-    Milliseconds delay, admission::execution_control::DelinquencyStats& stats) {
-    const int64_t delayMs = delay.count();
-    stats.totalDelinquentAcquisitions.fetchAndAddRelaxed(1);
-    stats.totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delayMs);
-    stats.maxAcquisitionDelinquencyMillis.storeRelaxed(
-        std::max(stats.maxAcquisitionDelinquencyMillis.loadRelaxed(), delayMs));
-}
-
-void ExecutionAdmissionContext::_recordExecutionTimeQueued(
-    Microseconds queueTimeMillis, admission::execution_control::OperationExecutionStats& stats) {
-    stats.totalTimeQueuedMicros.fetchAndAddRelaxed(queueTimeMillis.count());
-}
-
-void ExecutionAdmissionContext::_recordExecutionAcquisition(
-    admission::execution_control::OperationExecutionStats& stats) {
-    if (!_isUserOperation())
-        return;
-
-    auto admissions = getAdmissions();
-    if (admissions == 1) {
+    auto& stats = _getOperationExecutionStats();
+    if (getAdmissions() == 1) {
         stats.newAdmissions.fetchAndAddRelaxed(1);
     }
     stats.totalAdmissions.fetchAndAddRelaxed(1);
 }
 
-void ExecutionAdmissionContext::_recordExecutionProcessedTime(
-    Microseconds processedTimeMillis,
-    admission::execution_control::OperationExecutionStats& stats) {
-    stats.totalTimeProcessingMicros.fetchAndAddRelaxed(processedTimeMillis.count());
+void ExecutionAdmissionContext::recordExecutionWaitedAcquisition(Microseconds queueTimeMicros) {
+    if (!_shouldRecordStats()) {
+        return;
+    }
+
+    auto& stats = _getOperationExecutionStats();
+    stats.totalTimeQueuedMicros.fetchAndAddRelaxed(queueTimeMicros.count());
 }
 
-void ExecutionAdmissionContext::_recordExecutionShed(
-    admission::execution_control::OperationExecutionStats& stats) {
-    stats.newAdmissionsLoadShed.fetchAndAddRelaxed(1);
-    stats.totalAdmissionsLoadShed.fetchAndAddRelaxed(getAdmissions() - getExemptedAdmissions());
-    stats.totalQueuedTimeMicrosLoadShed.fetchAndAddRelaxed(totalTimeQueuedMicros().count());
+void ExecutionAdmissionContext::recordExecutionRelease(Microseconds processedTimeMicros) {
+    if (!_shouldRecordStats()) {
+        return;
+    }
+
+    auto& stats = _getOperationExecutionStats();
+    stats.totalTimeProcessingMicros.fetchAndAddRelaxed(processedTimeMicros.count());
 }
 
-void ExecutionAdmissionContext::_recordExecutionCPUUsageAndElapsedTime(
-    int64_t cpuUsageMicros,
-    int64_t elapsedMicros,
-    admission::execution_control::OperationExecutionStats& stats) {
-    stats.totalCPUUsageMicros.fetchAndAddRelaxed(cpuUsageMicros);
-    stats.totalElapsedTimeMicros.fetchAndAddRelaxed(elapsedMicros);
+void ExecutionAdmissionContext::recordDelinquentAcquisition(Milliseconds delay) {
+    auto recordDelinquentAcquisition = [](Milliseconds delay, ec::DelinquencyStats& stats) {
+        const int64_t delayMs = delay.count();
+        stats.totalDelinquentAcquisitions.fetchAndAddRelaxed(1);
+        stats.totalAcquisitionDelinquencyMillis.fetchAndAddRelaxed(delayMs);
+        stats.maxAcquisitionDelinquencyMillis.storeRelaxed(
+            std::max(stats.maxAcquisitionDelinquencyMillis.loadRelaxed(), delayMs));
+    };
+
+    auto& ticketHolderStats = getOperationType() == ec::OperationType::kRead
+        ? _readDelinquencyStats
+        : _writeDelinquencyStats;
+    recordDelinquentAcquisition(delay, ticketHolderStats);
+
+    auto& operationStats = _getOperationExecutionStats().delinquencyStats;
+    recordDelinquentAcquisition(delay, operationStats);
 }
 
-void ExecutionAdmissionContext::_recordExecutionCPUUsageAndElapsedTimeShed(
-    int64_t cpuUsage,
-    int64_t elapsedMicros,
-    admission::execution_control::OperationExecutionStats& stats) {
-    stats.totalCPUUsageLoadShed.fetchAndAddRelaxed(cpuUsage);
-    stats.totalElapsedTimeMicrosLoadShed.fetchAndAddRelaxed(elapsedMicros);
+bool ExecutionAdmissionContext::_isLongRunning(bool isFinalization) const {
+    // An operation is considered "long running" if any of these conditions are true:
+    //   1. The deprioritization heuristic says it should be deprioritized (based on admissions).
+    //      Note that this is called AFTER the number of admissions was successfully accounted for,
+    //      so we need to decrease the number of admissions to match the state at decision time.
+    //   2. The operation was heuristically demoted at some point (priorityLowered flag).
+    //   3. The operation has an inherently low priority.
+    int32_t admissions = getAdmissions();
+    if (isHoldingTicket() || isFinalization) {
+        admissions -= 1;
+    }
+    return shouldDeprioritize(admissions) || getPriorityLowered() ||
+        getPriority() == AdmissionContext::Priority::kLow;
 }
+
+ec::OperationExecutionStats& ExecutionAdmissionContext::_getOperationExecutionStats() {
+    const bool isLongRunning = _isLongRunning();
+
+    switch (getOperationType()) {
+        case ec::OperationType::kRead:
+            return isLongRunning ? _readLongStats : _readShortStats;
+
+        case ec::OperationType::kWrite:
+            return isLongRunning ? _writeLongStats : _writeShortStats;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+bool ExecutionAdmissionContext::_shouldRecordStats() {
+    return getPriority() != AdmissionContext::Priority::kExempt;
+}
+
 }  // namespace mongo

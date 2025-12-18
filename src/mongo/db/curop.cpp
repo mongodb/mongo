@@ -505,18 +505,16 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
                     std::max(metrics.maxAcquisitionDelinquency.value_or(Milliseconds(0)).count(),
                              admCtx.getMaxAcquisitionDelinquencyMillis())};
             }
-            // Only record execution control metrics for non exempted operations, that is, user
-            // operations, this is done to prevent having extra noise on the statistics comming from
-            // internal operations.
-            if (admCtx.getAdmissions() > 0 && admCtx.getExemptedAdmissions() == 0) {
+
+            if (admCtx.getAdmissions() > 0) {
                 metrics.totalTimeQueuedMicros =
                     metrics.totalTimeQueuedMicros.value_or(Microseconds(0)) +
                     admCtx.totalTimeQueuedMicros();
-                metrics.totalAdmissions = metrics.totalAdmissions.value_or(0) +
-                    (admCtx.getAdmissions() - admCtx.getExemptedAdmissions());
+                metrics.totalAdmissions =
+                    metrics.totalAdmissions.value_or(0) + admCtx.getAdmissions();
                 metrics.wasLoadShed = metrics.wasLoadShed.value_or(false) || admCtx.getLoadShed();
                 metrics.wasDeprioritized =
-                    metrics.wasDeprioritized.value_or(false) || admCtx.getLoadShed();
+                    metrics.wasDeprioritized.value_or(false) || admCtx.getPriorityLowered();
             }
         }
 
@@ -831,7 +829,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
             calculateCpuTime();
             auto start = _start.load();
             auto end = _end.load();
-            ticketingSystem->incrementStats(
+            ticketingSystem->finalizeOperationStats(
                 opCtx,
                 start != 0 ? durationCount<Microseconds>(computeElapsedTimeTotal(start, end)) : 0,
                 durationCount<Microseconds>(_debug.cpuTime));
