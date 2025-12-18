@@ -50,6 +50,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -189,24 +190,28 @@ bool PlanCacheClearCommand::run(OperationContext* opCtx,
                                 BSONObjBuilder& result) {
     const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
-    // This is a read lock. The query cache is owned by the collection.
-    auto ctx = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead),
-        MODE_IS);
     AutoStatsTracker statsTracker(opCtx,
                                   nss,
                                   Top::LockType::ReadLocked,
                                   AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                   DatabaseProfileSettings::get(opCtx->getServiceContext())
                                       .getDatabaseProfileLevel(nss.dbName()));
+
+    // This is a read lock. The query cache is owned by the collection.
+    // TODO SERVER-104759: switch to normal acquireCollection once 9.0 becomes last LTS
+    auto [ctx, _] = timeseries::acquireCollectionWithBucketsLookup(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kRead),
+        LockMode::MODE_IS);
+
     if (!ctx.exists()) {
         // Clearing a non-existent collection always succeeds.
         return true;
     }
 
     auto planCache = getPlanCache(opCtx, ctx.getCollectionPtr());
-    uassertStatusOK(clear(opCtx, ctx.getCollectionPtr(), planCache, nss, cmdObj));
+    uassertStatusOK(clear(opCtx, ctx.getCollectionPtr(), planCache, ctx.nss(), cmdObj));
     return true;
 }
 

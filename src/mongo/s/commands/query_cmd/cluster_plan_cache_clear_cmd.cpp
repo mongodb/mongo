@@ -123,55 +123,73 @@ bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
 
     sharding::router::CollectionRouter router(opCtx, nss);
     return router.routeWithRoutingContext(
-        getName(), [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-            // Clear the result builder since this lambda function may be retried if the router
-            // cache is stale.
-            result.resetToEmpty();
+        getName(), [&](OperationContext* opCtx, RoutingContext& unusedRoutingCtx) {
+            // The CollectionRouter is not capable of implicitly translate the namespace to
+            // a timeseries buckets collection, which is required in this command. Hence,
+            // we'll use the CollectionRouter to handle StaleConfig errors but will ignore
+            // its RoutingContext. Instead, we'll use a CollectionRoutingInfoTargeter object
+            // to properly get the RoutingContext when the collection is timeseries.
+            // TODO (SPM-3830) Use the RoutingContext provided by the CollectionRouter once
+            // all timeseries collections become viewless.
+            unusedRoutingCtx.skipValidation();
 
-            auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
-                opCtx,
-                routingCtx,
-                nss,
-                applyReadWriteConcern(
-                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-                ReadPreferenceSetting::get(opCtx),
-                Shard::RetryPolicy::kIdempotent,
-                query,
-                CollationSpec::kSimpleSpec,
-                boost::none /*letParameters*/,
-                boost::none /*runtimeConstants*/);
+            // Build a targeter from the user namespace. For a legacy time-series collection this
+            // will target the underlying buckets namespace and provide a RoutingContext for it.
+            auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
 
-            // Sort shard responses by shard id.
-            std::sort(shardResponses.begin(),
-                      shardResponses.end(),
-                      [](const AsyncRequestsSender::Response& response1,
-                         const AsyncRequestsSender::Response& response2) {
-                          return response1.shardId < response2.shardId;
-                      });
+            return routing_context_utils::runAndValidate(
+                targeter.getRoutingCtx(), [&](RoutingContext& routingCtx) {
+                    // Clear the result builder since this lambda function may be retried if the
+                    // router cache is stale.
+                    result.resetToEmpty();
 
-            // Set value of first shard result's "ok" field.
-            bool clusterCmdResult = true;
+                    auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                        opCtx,
+                        routingCtx,
+                        targeter.getNS(),
+                        applyReadWriteConcern(
+                            opCtx,
+                            this,
+                            CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                        ReadPreferenceSetting::get(opCtx),
+                        Shard::RetryPolicy::kIdempotent,
+                        query,
+                        CollationSpec::kSimpleSpec,
+                        boost::none /*letParameters*/,
+                        boost::none /*runtimeConstants*/);
 
-            for (auto i = shardResponses.begin(); i != shardResponses.end(); ++i) {
-                const auto& response = *i;
-                auto status = response.swResponse.getStatus();
-                uassertStatusOK(
-                    status.withContext(str::stream() << "failed on: " << response.shardId));
-                const auto& cmdResult = response.swResponse.getValue().data;
+                    // Sort shard responses by shard id.
+                    std::sort(shardResponses.begin(),
+                              shardResponses.end(),
+                              [](const AsyncRequestsSender::Response& response1,
+                                 const AsyncRequestsSender::Response& response2) {
+                                  return response1.shardId < response2.shardId;
+                              });
 
-                // In absence of sensible aggregation strategy, promote first shard's result to top
-                // level.
-                if (i == shardResponses.begin()) {
-                    CommandHelpers::filterCommandReplyForPassthrough(cmdResult, &result);
-                    status = getStatusFromCommandResult(cmdResult);
-                    clusterCmdResult = status.isOK();
-                }
+                    // Set value of first shard result's "ok" field.
+                    bool clusterCmdResult = true;
 
-                // Append shard result as a sub object. Name the field after the shard.
-                result.append(response.shardId, cmdResult);
-            }
+                    for (auto i = shardResponses.begin(); i != shardResponses.end(); ++i) {
+                        const auto& response = *i;
+                        auto status = response.swResponse.getStatus();
+                        uassertStatusOK(
+                            status.withContext(str::stream() << "failed on: " << response.shardId));
+                        const auto& cmdResult = response.swResponse.getValue().data;
 
-            return clusterCmdResult;
+                        // In absence of sensible aggregation strategy, promote first shard's result
+                        // to top level.
+                        if (i == shardResponses.begin()) {
+                            CommandHelpers::filterCommandReplyForPassthrough(cmdResult, &result);
+                            status = getStatusFromCommandResult(cmdResult);
+                            clusterCmdResult = status.isOK();
+                        }
+
+                        // Append shard result as a sub object. Name the field after the shard.
+                        result.append(response.shardId, cmdResult);
+                    }
+
+                    return clusterCmdResult;
+                });
         });
 }
 

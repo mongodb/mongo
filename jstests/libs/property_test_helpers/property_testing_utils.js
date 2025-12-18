@@ -3,7 +3,6 @@
  */
 import {LeafParameter, leafParametersPerFamily} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
-import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 /*
@@ -192,9 +191,6 @@ function isCollTS(collName) {
 
 export function getPlanCache(coll) {
     const collName = coll.getName();
-    if (isCollTS(collName)) {
-        return getTimeseriesCollForDDLOps(db, coll).getPlanCache();
-    }
     return db[collName].getPlanCache();
 }
 
