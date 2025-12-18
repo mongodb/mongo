@@ -3,7 +3,6 @@
  *
  * @tags: [
  *  requires_fcv_82,
- *  featureFlagMultiPlanLimiter,
  *  requires_getmore,
  *  incompatible_with_concurrency_simultaneous,
  *  assumes_stable_shard_list,
