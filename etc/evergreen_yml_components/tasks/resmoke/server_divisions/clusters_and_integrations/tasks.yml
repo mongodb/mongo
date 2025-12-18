@@ -2493,28 +2493,26 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
 
-  # TODO (SERVER-115374): Enable this suite.
-  # - <<: *gen_task_template
-  #  name: concurrency_sharded_replication_execution_control_with_prioritization_gen
-  #  tags:
-  #    [
-  #      "assigned_to_jira_team_server_workload_scheduling",
-  #      "execution_control_with_prioritization",
-  #      "sharding",
-  #    ]
-  #  commands:
-  #    - func: "generate resmoke tasks"
+  - <<: *gen_task_template
+    name: concurrency_sharded_replication_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "execution_control_with_prioritization",
+        "sharding",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
 
-  # TODO (SERVER-115374): Enable this suite.
-  # - <<: *gen_task_template
-  #  name: concurrency_replication_execution_control_with_prioritization_gen
-  #  tags:
-  #    [
-  #      "assigned_to_jira_team_server_workload_scheduling",
-  #      "execution_control_with_prioritization",
-  #    ]
-  #  commands:
-  #    - func: "generate resmoke tasks"
+  - <<: *gen_task_template
+    name: concurrency_replication_execution_control_with_prioritization_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_workload_scheduling",
+        "execution_control_with_prioritization",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: auth_execution_control_with_prioritization_gen
