@@ -673,7 +673,5 @@ mongo_cc_library(
     ],
     deps = [
         ":backoff_with_jitter",
-        "//src/mongo/db:error_labels",
-        "//src/third_party/folly:folly_token_bucket",
     ],
 )

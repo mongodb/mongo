@@ -30,6 +30,7 @@
 #include "mongo/util/future_util.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -576,6 +577,440 @@ TEST_F(AsyncTryUntilTest, MoveOnlyType) {
             // Access the move-only result via a const reference.
             return swResult.isOK();
         })
+        .on(executor(), CancellationToken::uncancelable())
+        .getAsync([](StatusWith<MoveOnly>) {
+            // Consume the (move-only) result.
+        });
+}
+
+using AsyncTryWithRetryStrategyTest = FutureUtilTest;
+
+struct TestRetryStrategy : RetryStrategy {
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& origin,
+                                             std::span<const std::string> errorLabels) override {
+        return shouldRetry(s, origin, errorLabels);
+    }
+
+    void recordSuccess(const boost::optional<HostAndPort>&) override {
+        successRecorded = true;
+    }
+
+    Milliseconds getNextRetryDelay() const override {
+        return retryDelay;
+    }
+
+    const TargetingMetadata& getTargetingMetadata() const override {
+        return metadata;
+    }
+
+    void recordBackoff(Milliseconds backoff) override {
+        totalBackoff += backoff;
+    }
+
+    std::function<bool(Status, const boost::optional<HostAndPort>&, std::span<const std::string>)>
+        shouldRetry = [](auto...) {
+            return true;
+        };
+
+    Milliseconds totalBackoff;
+    Milliseconds retryDelay;
+    bool successRecorded = false;
+
+    TargetingMetadata metadata;
+};
+
+TEST_F(AsyncTryWithRetryStrategyTest, LoopExecutesOnceWithAlwaysRetryStrategy) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+
+    auto i = 0;
+    auto resultFut = AsyncTry([&](const TargetingMetadata&) { ++i; })
+                         .withRetryStrategy(strategy)
+                         .on(executor(), CancellationToken::uncancelable());
+    resultFut.wait();
+
+    ASSERT_EQ(i, 1);
+    ASSERT(strategy->successRecorded);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, RetryLoopDoesNotExecuteIfExecutorAlreadyShutdown) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    executor()->shutdown();
+
+    auto i = 0;
+    auto resultFut = AsyncTry([&](const TargetingMetadata&) { ++i; })
+                         .withRetryStrategy(strategy)
+                         .on(executor(), CancellationToken::uncancelable());
+
+    ASSERT_THROWS_CODE(resultFut.get(), DBException, ErrorCodes::ShutdownInProgress);
+
+    ASSERT_EQ(i, 0);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       RetryLoopDoesNotReturnBrokenPromiseIfExecutorShutdownWhileLoopBodyExecutes) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    strategy->shouldRetry = [](auto...) {
+        return false;
+    };
+
+    unittest::Barrier barrierBeforeShutdown(2);
+    unittest::Barrier barrierAfterShutdown(2);
+    auto resultFut = AsyncTry([&](const TargetingMetadata&) {
+                         barrierBeforeShutdown.countDownAndWait();
+                         barrierAfterShutdown.countDownAndWait();
+                     })
+                         .withRetryStrategy(strategy)
+                         .on(executor(), CancellationToken::uncancelable());
+    barrierBeforeShutdown.countDownAndWait();
+    executor()->shutdown();
+    barrierAfterShutdown.countDownAndWait();
+
+    ASSERT_THROWS_CODE(resultFut.get(), DBException, ErrorCodes::ShutdownInProgress);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, RetryLoopExecutesUntilConditionIsTrue) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    constexpr auto numLoops = 3;
+    strategy->shouldRetry = [&, i = 0](auto...) mutable {
+        return i++ < numLoops;
+    };
+
+    auto i = 0;
+    auto resultFut = AsyncTry([&](const TargetingMetadata&) -> StatusWith<int> {
+                         if (++i < numLoops) {
+                             return Status{ErrorCodes::CommandFailed, "retry"};
+                         } else {
+                             return i;
+                         }
+                     })
+                         .withRetryStrategy(strategy)
+                         .on(executor(), CancellationToken::uncancelable());
+    resultFut.wait();
+
+    ASSERT_EQ(i, numLoops);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, RetryLoopExecutesUntilConditionIsTrueWithStatusFromValue) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    constexpr auto numLoops = 3;
+    strategy->shouldRetry = [&](auto...) {
+        return true;
+    };
+
+    auto i = 0;
+    auto resultFut =
+        AsyncTry([&](const TargetingMetadata&) -> StatusWith<int> { return ++i; })
+            .withRetryStrategy(strategy,
+                               [](StatusWith<int> swValue) {
+                                   return swValue.getValue() == numLoops
+                                       ? RetryStrategy::ResultStatus::makeOKResult()
+                                       : RetryStrategy::ResultStatus{
+                                             Status{ErrorCodes::CommandFailed, "retry"}, {}};
+                               })
+            .on(executor(), CancellationToken::uncancelable());
+    resultFut.wait();
+
+    ASSERT_EQ(i, numLoops);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, NoBackoffWhenNoRetryPerformed) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    strategy->retryDelay = Seconds{10000000};
+    auto i = 0;
+    auto resultFut = AsyncTry([&](const TargetingMetadata&) { return ++i; })
+                         .withRetryStrategy(strategy)
+                         .on(executor(), CancellationToken::uncancelable());
+    // This would hang for a very long time if the behavior were incorrect.
+    resultFut.wait();
+
+    ASSERT_EQ(i, 1);
+    ASSERT_EQ(strategy->totalBackoff, Milliseconds{0});
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, RetryLoopPerformBackoffDelayAfterEvaluatingCondition) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    strategy->retryDelay = Seconds{1000};
+    constexpr int numLoops = 2;
+
+    strategy->shouldRetry = [&, i = 0](auto...) mutable {
+        return true;
+    };
+
+    auto i = 0;
+    auto resultFut =
+        AsyncTry([&](const TargetingMetadata&) {
+            ++i;
+            return i;
+        })
+            .withRetryStrategy(strategy,
+                               [](StatusWith<int> swValue) {
+                                   return swValue.getValue() == numLoops
+                                       ? RetryStrategy::ResultStatus::makeOKResult()
+                                       : RetryStrategy::ResultStatus{
+                                             Status{ErrorCodes::CommandFailed, "retry"}, {}};
+                               })
+            .on(executor(), CancellationToken::uncancelable());
+    ASSERT_FALSE(resultFut.isReady());
+
+    // Advance the time some, but not enough to be past the delay yet.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Seconds{100});
+    }
+
+    ASSERT_FALSE(resultFut.isReady());
+
+    // Advance the time past the delay.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Seconds{1000});
+    }
+
+    resultFut.wait();
+
+    ASSERT_EQ(i, numLoops);
+    ASSERT(strategy->successRecorded);
+    ASSERT_EQ(strategy->totalBackoff, Seconds{1000});
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, RetryLoopBodyPropagatesValueOfLastIterationToCaller) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    auto i = 0;
+    constexpr auto expectedResult = 3;
+    auto resultFut =
+        AsyncTry([&](const TargetingMetadata&) {
+            ++i;
+            return i;
+        })
+            .withRetryStrategy(strategy,
+                               [](StatusWith<int> swValue) {
+                                   return swValue.getValue() == expectedResult
+                                       ? RetryStrategy::ResultStatus::makeOKResult()
+                                       : RetryStrategy::ResultStatus{
+                                             Status{ErrorCodes::CommandFailed, "retry"}, {}};
+                               })
+            .on(executor(), CancellationToken::uncancelable());
+
+    ASSERT_EQ(resultFut.get(), expectedResult);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       SemiFutureReturningRetryLoopBodyPropagatesValueOfLastIterationToCaller) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    auto i = 0;
+    constexpr auto expectedResult = 3;
+    auto resultFut =
+        AsyncTry([&](const TargetingMetadata&) {
+            ++i;
+            return SemiFuture<int>::makeReady(i);
+        })
+            .withRetryStrategy(strategy,
+                               [](StatusWith<int> swValue) {
+                                   return swValue.getValue() == expectedResult
+                                       ? RetryStrategy::ResultStatus::makeOKResult()
+                                       : RetryStrategy::ResultStatus{
+                                             Status{ErrorCodes::CommandFailed, "retry"}, {}};
+                               })
+            .on(executor(), CancellationToken::uncancelable());
+
+    ASSERT_EQ(resultFut.get(), expectedResult);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       RetryStrategyResultReturningRetryLoopBodyPropagatesValueOfLastIterationToCaller) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    auto i = 0;
+    constexpr auto expectedResult = 3;
+    auto resultFut =
+        AsyncTry([&](const TargetingMetadata&) {
+            if (++i < expectedResult) {
+                return RetryStrategy::Result<int>{Status{ErrorCodes::CommandFailed, "retry"}, {}};
+            } else {
+                return RetryStrategy::Result<int>{i};
+            }
+        })
+            .withRetryStrategy(strategy)
+            .on(executor(), CancellationToken::uncancelable());
+
+    resultFut.wait();
+
+    ASSERT_EQ(i, expectedResult);
+    ASSERT_EQ(resultFut.get(), expectedResult);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       ExecutorFutureReturningRetryLoopBodyPropagatesValueOfLastIterationToCaller) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    auto i = 0;
+    constexpr auto expectedResult = 3;
+    auto resultFut =
+        AsyncTry([&](const TargetingMetadata&) {
+            ++i;
+            return ExecutorFuture<int>(executor(), i);
+        })
+            .withRetryStrategy(strategy,
+                               [](StatusWith<int> swValue) {
+                                   return swValue.getValue() == expectedResult
+                                       ? RetryStrategy::ResultStatus::makeOKResult()
+                                       : RetryStrategy::ResultStatus{
+                                             Status{ErrorCodes::CommandFailed, "retry"}, {}};
+                               })
+            .on(executor(), CancellationToken::uncancelable());
+
+    ASSERT_EQ(resultFut.get(), expectedResult);
+}
+
+void doTestWithError(auto&& executor,
+                     const auto& bodyReturn,
+                     std::shared_ptr<RetryStrategy> retryStrategy) {
+    unittest::threadAssertionMonitoredTest([&](auto& assertionMonitor) {
+        auto resultFut =
+            AsyncTry([&](const TargetingMetadata&) {
+                uasserted(ErrorCodes::InternalError, "test error");
+                return bodyReturn();
+            })
+                .withRetryStrategy(retryStrategy,
+                                   [&](StatusWith<int> swInt) {
+                                       assertionMonitor.exec([&] {
+                                           ASSERT_NOT_OK(swInt);
+                                           ASSERT_EQ(swInt.getStatus().code(),
+                                                     ErrorCodes::InternalError);
+                                       });
+
+                                       return RetryStrategy::ResultStatus::makeOKResult();
+                                   })
+                .on(executor, CancellationToken::uncancelable());
+
+        ASSERT_EQ(resultFut.getNoThrow(), ErrorCodes::InternalError);
+    });
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, RetryLoopBodyPropagatesErrorToConditionAndCaller) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    doTestWithError(executor(), [] { return 3; }, strategy);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       FutureReturningRetryLoopBodyPropagatesErrorToConditionAndCaller) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    doTestWithError(executor(), [] { return Future<int>::makeReady(3); }, strategy);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       SemiFutureReturningRetryLoopBodyPropagatesErrorToConditionAndCaller) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    doTestWithError(executor(), [] { return SemiFuture<int>::makeReady(3); }, strategy);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       ExecutorFutureReturningRetryLoopBodyPropagatesErrorToConditionAndCaller) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    doTestWithError(executor(), [&] { return ExecutorFuture<int>(executor(), 3); }, strategy);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, AsyncTryWithRetryStrategyCanBeCanceled) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    CancellationSource cancelSource;
+    auto resultFut = AsyncTry([](const TargetingMetadata&) {})
+                         .withRetryStrategy(strategy)
+                         .on(executor(), cancelSource.token());
+    // This should hang forever if it is not canceled.
+    cancelSource.cancel();
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       AsyncTryWithRetryStrategyCanBeCanceledWhileLoopBodyIsExecuting) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    strategy->retryDelay = Milliseconds{10};
+    CancellationSource cancelSource;
+    unittest::Barrier barrierBeforeCancel{2}, barrierAfterCancel{2};
+    int timesRanCallback = 0;
+    // Arbitrary delay used, enforce only one loop body execution with timesRanCallback
+    auto resultFut = AsyncTry([&](const TargetingMetadata&) {
+                         timesRanCallback += 1;
+                         barrierBeforeCancel.countDownAndWait();
+                         barrierAfterCancel.countDownAndWait();
+                     })
+                         .withRetryStrategy(strategy)
+                         .on(executor(), cancelSource.token());
+    // Enforce cancellation during loop body execution
+    barrierBeforeCancel.countDownAndWait();
+    cancelSource.cancel();
+    barrierAfterCancel.countDownAndWait();
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+    ASSERT_EQ(timesRanCallback, 1);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       AsyncTryWithRetryStrategyCanBeCanceledAfterLoopBodyIsExecuting) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    // Arbitrary delay used, enforce only one loop body execution with timesRanCallback
+    strategy->retryDelay = Milliseconds{10};
+    CancellationSource cancelSource;
+    unittest::Barrier barrierBeforeCancel{2}, barrierAfterCancel{2};
+    int timesRanCallback = 0;
+    auto resultFut = AsyncTry([&](const TargetingMetadata&) { timesRanCallback += 1; })
+                         .withRetryStrategy(strategy,
+                                            [&](Status status) {
+                                                barrierBeforeCancel.countDownAndWait();
+                                                barrierAfterCancel.countDownAndWait();
+                                                return RetryStrategy::ResultStatus{
+                                                    Status{ErrorCodes::CommandFailed, "retry"}};
+                                            })
+                         .on(executor(), cancelSource.token());
+    // Enforce cancellation during loop body execution
+    barrierBeforeCancel.countDownAndWait();
+    cancelSource.cancel();
+    barrierAfterCancel.countDownAndWait();
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+    ASSERT_EQ(timesRanCallback, 1);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest,
+       CanceledTryWithRetryStrategyLoopDoesNotExecuteIfAlreadyCanceled) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    strategy->retryDelay = Seconds{1000};
+    int counter{0};
+    CancellationSource cancelSource;
+    auto canceledToken = cancelSource.token();
+    cancelSource.cancel();
+    auto resultFut = AsyncTry([&](const TargetingMetadata&) { ++counter; })
+                         .withRetryStrategy(strategy)
+                         .on(executor(), canceledToken);
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+    ASSERT_EQ(counter, 0);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, StatusFromValueBodyPropagatesErrorToCaller) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    strategy->retryDelay = Seconds{1000};
+    const auto error = Status(ErrorCodes::InternalError, "Some error");
+    auto resultFut = AsyncTry([](const TargetingMetadata&) {})
+                         .withRetryStrategy(strategy,
+
+                                            [&](Status status) -> RetryStrategy::ResultStatus {
+                                                iasserted(error);
+                                            })
+                         .on(executor(), CancellationToken::uncancelable());
+    ASSERT_EQ(resultFut.getNoThrow(), error);
+}
+
+TEST_F(AsyncTryWithRetryStrategyTest, MoveOnlyType) {
+    auto strategy = std::make_shared<TestRetryStrategy>();
+    using MoveOnly = std::unique_ptr<int>;
+
+    AsyncTry([this](const TargetingMetadata&) { return ExecutorFuture(executor(), MoveOnly{}); })
+        .withRetryStrategy(std::move(strategy),
+                           [](const StatusWith<MoveOnly>& swResult) {
+                               // Access the move-only result via a const reference.
+                               if (swResult.isOK()) {
+                                   return RetryStrategy::ResultStatus::makeOKResult();
+                               } else {
+                                   return RetryStrategy::ResultStatus{swResult.getStatus()};
+                               }
+                           })
         .on(executor(), CancellationToken::uncancelable())
         .getAsync([](StatusWith<MoveOnly>) {
             // Consume the (move-only) result.

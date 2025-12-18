@@ -305,6 +305,12 @@ public:
             }
         }
 
+        static Result makeOKResult(boost::optional<HostAndPort> origin = {})
+        requires(std::same_as<std::monostate, T>)
+        {
+            return Result{std::monostate{}, origin};
+        }
+
     private:
         // We friend all templates of this class to allow direct access for
         // constructors from other types of 'Result<T>'.
@@ -344,6 +350,8 @@ public:
         ValueOrErrorLabels _valueOrError;
         boost::optional<HostAndPort> _origin;
     };
+
+    using ResultStatus = Result<std::monostate>;
 };
 
 /**

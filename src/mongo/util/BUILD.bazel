@@ -401,6 +401,7 @@ mongo_cc_library(
         "future_util.cpp",
     ],
     deps = [
+        "//src/mongo/client:retry_strategy",
         "//src/mongo/executor:task_executor_interface",
     ],
 )

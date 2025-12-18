@@ -31,6 +31,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -44,6 +45,7 @@
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/time_support.h"
 
+#include <concepts>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -226,54 +228,57 @@ private:
          */
         template <typename ReturnType>
         void runImpl(std::unique_ptr<PromiseWithCustomBrokenStatus<ReturnType>> resultPromise) {
-            executor->schedule([this,
-                                self = this->shared_from_this(),
-                                resultPromise =
-                                    std::move(resultPromise)](Status scheduleStatus) mutable {
-                if (!scheduleStatus.isOK()) {
-                    resultPromise->setError(std::move(scheduleStatus));
-                    return;
-                }
+            executor->schedule(
+                [this, self = this->shared_from_this(), resultPromise = std::move(resultPromise)](
+                    Status scheduleStatus) mutable {
+                    if (!scheduleStatus.isOK()) {
+                        resultPromise->setError(std::move(scheduleStatus));
+                        return;
+                    }
 
-                using BodyCallableResult = std::invoke_result_t<BodyCallable>;
-                // Convert the result of the loop body into an ExecutorFuture, even if the
-                // loop body is not future-returning. This isn't strictly necessary but it
-                // makes implementation easier.
-                makeExecutorFutureWith(executor, executeLoopBody)
-                    .getAsync([this, self, resultPromise = std::move(resultPromise)](
-                                  StatusOrStatusWith<ReturnType>&& swResult) mutable {
-                        if (cancelToken.isCanceled()) {
-                            resultPromise->setError(asyncTryCanceledStatus());
-                            return;
-                        }
-
-                        const auto swShouldStop = [&]() -> StatusWith<bool> {
-                            try {
-                                return shouldStopIteration(swResult);
-                            } catch (...) {
-                                return exceptionToStatus();
+                    // Convert the result of the loop body into an ExecutorFuture, even if the
+                    // loop body is not future-returning. This isn't strictly necessary but it
+                    // makes implementation easier.
+                    makeExecutorFutureWith(executor, executeLoopBody)
+                        .getAsync([this, self, resultPromise = std::move(resultPromise)](
+                                      StatusOrStatusWith<ReturnType>&& swResult) mutable {
+                            if (cancelToken.isCanceled()) {
+                                resultPromise->setError(asyncTryCanceledStatus());
+                                return;
                             }
-                        }();
-                        if (MONGO_unlikely(!swShouldStop.isOK())) {
-                            resultPromise->setError(swShouldStop.getStatus());
-                        } else if (swShouldStop.getValue()) {
-                            resultPromise->setFrom(std::move(swResult));
-                        } else {
-                            // Retry after a delay.
-                            executor->sleepFor(delay.getNext(), cancelToken)
-                                .getAsync([this, self, resultPromise = std::move(resultPromise)](
-                                              Status s) mutable {
-                                    // Prevent another loop iteration when cancellation happens
-                                    // after loop body
-                                    if (s.isOK()) {
-                                        runImpl(std::move(resultPromise));
-                                    } else {
-                                        resultPromise->setError(std::move(s));
-                                    }
-                                });
-                        }
-                    });
-            });
+
+                            const auto swShouldStop = [&]() -> StatusWith<bool> {
+                                try {
+                                    return shouldStopIteration(swResult);
+                                } catch (...) {
+                                    return exceptionToStatus();
+                                }
+                            }();
+                            if (MONGO_unlikely(!swShouldStop.isOK())) {
+                                resultPromise->setError(swShouldStop.getStatus());
+                            } else if (swShouldStop.getValue()) {
+                                resultPromise->setFrom(std::move(swResult));
+                            } else {
+                                // Retry after a delay.
+                                const auto sleepDuration = delay.getNext();
+                                executor->sleepFor(sleepDuration, cancelToken)
+                                    .getAsync([this,
+                                               self,
+                                               sleepDuration,
+                                               resultPromise =
+                                                   std::move(resultPromise)](Status s) mutable {
+                                        // Prevent another loop iteration when cancellation happens
+                                        // after loop body
+                                        if (s.isOK()) {
+                                            delay.onSleepDone(sleepDuration);
+                                            runImpl(std::move(resultPromise));
+                                        } else {
+                                            resultPromise->setError(std::move(s));
+                                        }
+                                    });
+                            }
+                        });
+                });
         }
 
         SleepableExecutor executor;
@@ -313,6 +318,11 @@ public:
     /**
      * Creates an exponential delay which takes place after evaluating the condition and before
      * executing the loop body.
+     *
+     * The backoff type must be a class type with a `nextSleep` member function that returns
+     * `Milliseconds`. Optionally, it can have the member function `onSleepDone` that has one
+     * parameter of type `Milliseconds`. This can be used to perform instructions once the
+     * backoff has been performed such as accumulating metrics.
      */
     template <typename BackoffType>
     MONGO_MOD_PUBLIC auto withBackoffBetweenIterations(BackoffType backoff) && {
@@ -343,9 +353,11 @@ private:
     public:
         explicit ConstDelay(DurationType delay) : _delay(delay) {}
 
-        Milliseconds getNext() {
+        Milliseconds getNext() const {
             return Milliseconds(_delay);
         }
+
+        void onSleepDone(Milliseconds backoff) {}
 
     private:
         DurationType _delay;
@@ -358,6 +370,12 @@ private:
 
         Milliseconds getNext() {
             return _backoff.nextSleep();
+        }
+
+        void onSleepDone(Milliseconds backoff) {
+            if constexpr (requires { _backoff.onSleepDone(backoff); }) {
+                _backoff.onSleepDone(backoff);
+            }
         }
 
     private:
@@ -456,6 +474,60 @@ private:
     ConditionCallable _condition;
 };
 
+/**
+ * Callable type to transform a Status or StatusWith to a retry strategy result.
+ *
+ * Used in `AsyncTry::withRetryStrategy` as the default function to extract a
+ * `RetryStrategy::ResultStatus` from a `Status`.
+ */
+struct DefaultExtractRetryParameters {
+    template <typename T>
+    RetryStrategy::ResultStatus operator()(
+        const StatusWith<RetryStrategy::Result<T>>& statusWithResult) const {
+        if (!statusWithResult.isOK()) {
+            return RetryStrategy::ResultStatus{statusWithResult.getStatus()};
+        }
+
+        auto& result = statusWithResult.getValue();
+        if (!result.isOK()) {
+            std::vector<std::string> errorLabels;
+
+            auto resultErrorLabels = result.getErrorLabels();
+            errorLabels.resize(resultErrorLabels.size());
+            std::ranges::copy(resultErrorLabels, errorLabels.begin());
+
+            return RetryStrategy::ResultStatus{
+                result.getStatus(), std::move(errorLabels), result.getOrigin()};
+        }
+
+        return RetryStrategy::ResultStatus::makeOKResult(result.getOrigin());
+    }
+
+    template <typename T>
+    RetryStrategy::ResultStatus operator()(const StatusWith<T>& statusWithValue) const {
+        if (statusWithValue.isOK()) {
+            return RetryStrategy::ResultStatus::makeOKResult();
+        } else {
+            return RetryStrategy::ResultStatus{statusWithValue.getStatus()};
+        }
+    }
+
+    RetryStrategy::ResultStatus operator()(const Status& status) const {
+        if (status.isOK()) {
+            return RetryStrategy::ResultStatus::makeOKResult();
+        } else {
+            return RetryStrategy::ResultStatus{status};
+        }
+    }
+};
+
+template <typename Extractor, typename Callable>
+concept IsRetryParameterExtractorFor = std::same_as<
+    RetryStrategy::ResultStatus,
+    std::invoke_result_t<
+        Extractor,
+        StatusOrStatusWith<FutureContinuationResult<Callable, const TargetingMetadata&>>>>;
+
 // Helpers for functions which only take Future or ExecutorFutures, but not SemiFutures or
 // SharedSemiFutures.
 template <typename T>
@@ -497,6 +569,37 @@ std::vector<T> variadicArgsToVector(U&&... elems) {
  * type for the callable, and should accept this argument as a const reference. This allows
  * avoiding unnecessary copies and supporting move-only types. Optionally, a delay can be added
  * after each iteration of the loop through invoking `withDelayBetweenIterations`.
+ *
+ * Using a retry strategy is possible in order to automatically manage backoff and retry
+ * conditions. To achieve this, one can use `withRetryStrategy` instead of `until`.
+ *
+ *    ExecutorFuture<Response> response =
+ *           AsyncTry([](const TargetingMetadata& metadata) { return sendRequest(metadata); })
+ *          .withRetryStrategy(std::make_unique<DefaultRetryStrategy>())
+ *          .on(executor);
+ *
+ * To customize how error labels and the origin are obtained, a second parameter can be sent
+ * that returns a `RetryStrategy::ResultStatus` from the result of the callable body.
+ *
+ *    ExecutorFuture<Response> response =
+ *           AsyncTry([](const TargetingMetadata& metadata) { return sendRequest(metadata); })
+ *          .withRetryStrategy(
+ *              std::make_unique<DefaultRetryStrategy>(),
+ *              [](StatusWith<Response> swResponse) {
+ *                  if (!swResponse.isOK()) {
+ *                      return RetryStrategy::ResultStatus{swResponse.getStatus()}
+ *                  } else if (auto& response = swResponse.getValue(); !response.isRemoteOK()) {
+ *                      return RetryStrategy::ResultStatus{
+ *                          response.getRemoteStatus(),
+ *                          response.getErrorLabels(),
+ *                          response.getOrigin(),
+ *                      };
+ *                  } else {
+ *                      return RetryStrategy::ResultStatus::makeOKResult(response.getOrigin());
+ *                  }
+ *              }
+ *          })
+ *          .on(executor);
  */
 template <typename Callable>
 class [[nodiscard]] AsyncTry {
@@ -504,11 +607,49 @@ public:
     explicit AsyncTry(Callable&& callable) : _body(std::move(callable)) {}
 
     template <typename Condition>
+    requires(std::invocable<Callable>)
     auto until(Condition&& condition) && {
         return future_util_details::AsyncTryUntil(std::move(_body), std::move(condition));
     }
 
+    template <future_util_details::IsRetryParameterExtractorFor<Callable> ExtractRetryParameters =
+                  future_util_details::DefaultExtractRetryParameters>
+    requires(std::invocable<Callable, const TargetingMetadata&>)
+    auto withRetryStrategy(std::shared_ptr<RetryStrategy> strategy,
+                           ExtractRetryParameters extractRetryParameters = {}) && {
+        using ReturnType = FutureContinuationResult<Callable, const TargetingMetadata&>;
+
+        return mongo::AsyncTry{[body = std::move(_body), strategy] {
+                   return body(strategy->getTargetingMetadata());
+               }}
+            .until([strategy, extractRetryParameters = std::move(extractRetryParameters)](
+                       const StatusOrStatusWith<ReturnType>& swResult) {
+                auto result = extractRetryParameters(swResult);
+
+                if (result.isOK()) {
+                    strategy->recordSuccess(result.getOrigin());
+                    return true;
+                }
+
+                return !strategy->recordFailureAndEvaluateShouldRetry(
+                    result.getStatus(), result.getOrigin(), result.getErrorLabels());
+            })
+            .withBackoffBetweenIterations(RetryDelayAsBackoff{strategy});
+    }
+
 private:
+    struct RetryDelayAsBackoff {
+        Milliseconds nextSleep() const {
+            return strategy->getNextRetryDelay();
+        }
+
+        void onSleepDone(Milliseconds sleepDuration) {
+            strategy->recordBackoff(sleepDuration);
+        }
+
+        std::shared_ptr<RetryStrategy> strategy;
+    };
+
     Callable _body;
 };
 
