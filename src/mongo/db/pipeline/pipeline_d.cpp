@@ -1494,7 +1494,8 @@ bool PipelineD::sortAndKeyPatternPartAgreeAndOnMeta(
     const timeseries::BucketUnpacker& bucketUnpacker,
     StringData keyPatternFieldName,
     const FieldPath& sortFieldPath) {
-    FieldPath keyPatternFieldPath = FieldPath(keyPatternFieldName);
+    FieldPath keyPatternFieldPath = FieldPath(
+        keyPatternFieldName, false /* precomputeHashes */, false /* validateFieldNames */);
 
     // If they don't have the same path length they cannot agree.
     if (keyPatternFieldPath.getPathLength() != sortFieldPath.getPathLength())

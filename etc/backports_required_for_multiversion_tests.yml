@@ -889,6 +889,8 @@ last-continuous:
     ticket: SERVER-95570
   - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
     ticket: SERVER-110953
+  - test_file: jstests/core/compound_wildcard_index_validation.js
+    ticket: SERVER-97229
   suites: null
 last-lts:
   all:
@@ -1840,4 +1842,6 @@ last-lts:
     ticket: SERVER-95570
   - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
     ticket: SERVER-110953
+  - test_file: jstests/core/compound_wildcard_index_validation.js
+    ticket: SERVER-97229
   suites: null
