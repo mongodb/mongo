@@ -117,6 +117,14 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
+    name = "metrics_gauge_test",
+    srcs = [
+        "metrics_gauge_test.cpp",
+    ],
+    tags = ["mongo_unittest_seventh_group"],
+)
+
+mongo_cc_unit_test(
     name = "metrics_histogram_test",
     srcs = [
         "metrics_histogram_test.cpp",
