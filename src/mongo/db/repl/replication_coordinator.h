@@ -1274,6 +1274,12 @@ public:
 
 protected:
     ReplicationCoordinator();
+
+    /**
+     * Validates that any afterClusterTime or atClusterTime specified are paired with an allowed
+     * readConcernLevel.
+     */
+    Status readConcernArgsValidForWait(ReadConcernArgs& readConcern) const;
 };
 
 }  // namespace repl

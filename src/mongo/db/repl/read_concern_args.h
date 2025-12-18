@@ -279,6 +279,25 @@ public:
         _waitLastStableRecoveryTimestamp = wait;
     }
 
+    /**
+     * Computes the OpTime that this ReadConcernArgs intends to wait for.
+     * Exactly one of getArgsAfterClusterTime(), getArgsAtClusterTime(), getArgsOpTime() must be
+     * non-empty and must not be un-initialized.
+     */
+    OpTime getTargetOpTime() const;
+
+    /**
+     * Returns true if this ReadConcernArgs represents a majority committed read, and false
+     * otherwise.
+     */
+    bool isMajorityCommittedRead(bool inMultiDocumentTransaction) const;
+
+    /**
+     * Verifies that this ReadConcernArgs instance represents a valid combination of readConcern
+     * level and associated timing options.
+     */
+    Status validate() const;
+
 private:
     /**
      * Appends level, afterOpTime, and the other "inner" fields of the read concern args.

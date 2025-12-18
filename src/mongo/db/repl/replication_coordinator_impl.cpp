@@ -1789,22 +1789,10 @@ OpTime ReplicationCoordinatorImpl::getMyLastDurableOpTime() const {
 
 Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
                                                         const ReadConcernArgs& readConcern) {
-    if (readConcern.getArgsAfterClusterTime() &&
-        readConcern.getLevel() != ReadConcernLevel::kMajorityReadConcern &&
-        readConcern.getLevel() != ReadConcernLevel::kLocalReadConcern &&
-        readConcern.getLevel() != ReadConcernLevel::kSnapshotReadConcern) {
-        return {
-            ErrorCodes::BadValue,
-            "Only readConcern level 'majority', 'local', or 'snapshot' is allowed when specifying "
-            "afterClusterTime"};
+    auto status = readConcern.validate();
+    if (!status.isOK()) {
+        return status;
     }
-
-    if (readConcern.getArgsAtClusterTime() &&
-        readConcern.getLevel() != ReadConcernLevel::kSnapshotReadConcern) {
-        return {ErrorCodes::BadValue,
-                "readConcern level 'snapshot' is required when specifying atClusterTime"};
-    }
-
 
     if (readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern &&
         !_externalState->isReadConcernSnapshotSupportedByStorageEngine(opCtx)) {
@@ -2025,28 +2013,8 @@ Status ReplicationCoordinatorImpl::waitUntilMajorityOpTime(mongo::OperationConte
 Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext* opCtx,
                                                                 const ReadConcernArgs& readConcern,
                                                                 boost::optional<Date_t> deadline) {
-    invariant(readConcern.getArgsAfterClusterTime() || readConcern.getArgsAtClusterTime());
-    invariant(!readConcern.getArgsAfterClusterTime() || !readConcern.getArgsAtClusterTime());
-    auto clusterTime = readConcern.getArgsAfterClusterTime()
-        ? *readConcern.getArgsAfterClusterTime()
-        : *readConcern.getArgsAtClusterTime();
-    invariant(clusterTime != LogicalTime::kUninitialized);
-
-    // convert clusterTime to opTime so it can be used by the _lastAppliedOpTimeWaiterList for wait
-    // on readConcern level local.
-    auto targetOpTime = OpTime(clusterTime.asTimestamp(), OpTime::kUninitializedTerm);
-    invariant(!readConcern.getArgsOpTime());
-
-    // We don't set isMajorityCommittedRead for transactions because snapshots are always
-    // speculative; we wait for majority when the transaction commits.
-    //
-    // Majority and snapshot reads outside of transactions should non-speculatively wait for the
-    // majority committed snapshot.
-    const bool isMajorityCommittedRead = !opCtx->inMultiDocumentTransaction() &&
-        (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern ||
-         readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern);
-
-    if (isMajorityCommittedRead) {
+    const auto targetOpTime = readConcern.getTargetOpTime();
+    if (readConcern.isMajorityCommittedRead(opCtx->inMultiDocumentTransaction())) {
         return waitUntilMajorityOpTime(opCtx, targetOpTime, deadline);
     } else {
         return _waitUntilOpTime(opCtx, targetOpTime, deadline);
@@ -2056,11 +2024,8 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
 // TODO: remove when SERVER-29729 is done
 Status ReplicationCoordinatorImpl::_waitUntilOpTimeForReadDeprecated(
     OperationContext* opCtx, const ReadConcernArgs& readConcern) {
-    const bool isMajorityCommittedRead =
-        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern;
-
-    const auto targetOpTime = readConcern.getArgsOpTime().value_or(OpTime());
-    if (isMajorityCommittedRead) {
+    const auto targetOpTime = readConcern.getTargetOpTime();
+    if (readConcern.isMajorityCommittedRead(opCtx->inMultiDocumentTransaction())) {
         return waitUntilMajorityOpTime(opCtx, targetOpTime);
     } else {
         return _waitUntilOpTime(opCtx, targetOpTime);

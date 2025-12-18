@@ -97,6 +97,15 @@ Status ReadConcernArgs::parse(ReadConcernIdl inner) {
         _provenance = *provenance;
     }
 
+    auto status = validate();
+    if (status.isOK()) {
+        _specified = true;
+        return Status::OK();
+    }
+    return status;
+}
+
+Status ReadConcernArgs::validate() const {
     if (_afterClusterTime && _opTime) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream()
@@ -158,7 +167,6 @@ Status ReadConcernArgs::parse(ReadConcernIdl inner) {
                       str::stream() << kAfterClusterTimeFieldName << " cannot be a null timestamp");
     }
 
-    _specified = true;
     return Status::OK();
 }
 
@@ -184,6 +192,31 @@ bool ReadConcernArgs::isEmpty() const {
 
 bool ReadConcernArgs::isImplicitDefault() const {
     return getProvenance().isImplicitDefault();
+}
+
+OpTime ReadConcernArgs::getTargetOpTime() const {
+    invariant(getArgsAfterClusterTime() || getArgsAtClusterTime() || getArgsOpTime());
+
+    if (getArgsAfterClusterTime() || getArgsAtClusterTime()) {
+        auto clusterTime =
+            getArgsAfterClusterTime() ? *getArgsAfterClusterTime() : *getArgsAtClusterTime();
+
+        invariant(clusterTime != LogicalTime::kUninitialized);
+        return OpTime(clusterTime.asTimestamp(), OpTime::kUninitializedTerm);
+    } else {
+        return getArgsOpTime().value_or(OpTime());
+    }
+}
+
+bool ReadConcernArgs::isMajorityCommittedRead(bool inMultiDocumentTransaction) const {
+    // Transaction snapshots are always speculative; we wait for majority when the transaction
+    // commits, and is therefore not considered a majority committed read.
+    //
+    // Majority and snapshot reads outside of transactions are non-speculative and must always use a
+    // majority commited snapshot.
+    return !inMultiDocumentTransaction &&
+        (getLevel() == ReadConcernLevel::kMajorityReadConcern ||
+         getLevel() == ReadConcernLevel::kSnapshotReadConcern);
 }
 
 Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {

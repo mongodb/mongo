@@ -248,8 +248,17 @@ Status RSLocalClient::runAggregation(
         // don't allow specifying a future timestamp for normal operations.
         if (const auto lastOp = _getLastOpTime();
             afterClusterTime->asTimestamp() < lastOp.getTimestamp()) {
+            auto level = requestReadConcernArgs.getLevel();
+            if (level == repl::ReadConcernLevel::kSnapshotReadConcern) {
+                // Snapshot read concern can not be used to wait for an opTime as it is only valid
+                // with logical times (such as clusterTimes). As a result, we need to convert the
+                // user requested level to majority read concern. This is sufficient for the
+                // pre-wait because we only need to ensure _lastOpTime is majority-committed/visible
+                // before proceeding.
+                level = repl::ReadConcernLevel::kMajorityReadConcern;
+            }
             auto status = repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
-                opCtx, repl::ReadConcernArgs{lastOp, requestReadConcernArgs.getLevel()});
+                opCtx, repl::ReadConcernArgs{lastOp, level});
             if (!status.isOK())
                 return status;
         }
