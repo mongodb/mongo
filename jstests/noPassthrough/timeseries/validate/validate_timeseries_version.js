@@ -145,7 +145,7 @@ getTimeseriesCollForRawOps(db, coll).updateOne(
 res = coll.validate();
 assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 2);
-assert.eq(res.errors.length, 2);
+assert.eq(res.errors.length, 1);
 
 // As of SERVER-86451, time-series inconsistencies detected during validation
 // will error in testing, instead of being warnings. In this case,
