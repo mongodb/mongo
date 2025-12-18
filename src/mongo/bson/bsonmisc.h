@@ -29,14 +29,13 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/bsontypes_util.h"
-#include "mongo/bson/util/builder.h"
+#include "mongo/util/modules.h"
 
-#include <memory>
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 

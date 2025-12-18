@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/generator_extended_canonical_2_0_0.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class ExtendedRelaxedV200Generator : private ExtendedCanonicalV200Generator {

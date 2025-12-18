@@ -29,14 +29,11 @@
 
 #pragma once
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/base/parse_number.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -46,6 +43,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decimal_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/time_support.h"
@@ -56,13 +54,14 @@
 #include <cstring>
 #include <limits>
 #include <list>
-#include <map>
 #include <set>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <sys/types.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -150,14 +149,6 @@ public:
           _offset(std::move(other._offset)),
           _doneCalled(std::move(other._doneCalled)) {
         other.abandon();
-    }
-
-    Derived& asDerived() {
-        return static_cast<Derived&>(*this);
-    }
-
-    const Derived& asDerived() const {
-        return static_cast<const Derived&>(*this);
     }
 
     /**
@@ -678,7 +669,7 @@ public:
         return _b.len();
     }
 
-    B& bb() {
+    MONGO_MOD_NEEDS_REPLACEMENT B& bb() {
         return _b;
     }
 
@@ -695,6 +686,14 @@ protected:
     ~BSONObjBuilderBase() {
         // It is the derived class's responsibility to ensure that done() is called.
         invariant(!needsDone());
+    }
+
+    Derived& asDerived() {
+        return static_cast<Derived&>(*this);
+    }
+
+    const Derived& asDerived() const {
+        return static_cast<const Derived&>(*this);
     }
 
     char* _done() {
@@ -992,13 +991,6 @@ public:
     BSONArrayBuilderBase(int initialSize, BuilderArgs&&... args)
         : _b(initialSize, std::forward<BuilderArgs>(args)...) {}
 
-    Derived& asDerived() {
-        return static_cast<Derived&>(*this);
-    }
-    const Derived& asDerived() const {
-        return static_cast<const Derived&>(*this);
-    }
-
     template <typename T>
     Derived& append(const T& x) {
         _b.append(_fieldCount, x);
@@ -1135,13 +1127,20 @@ public:
         return _fieldCount;
     }
 
-    auto& bb() {
+    MONGO_MOD_NEEDS_REPLACEMENT auto& bb() {
         return _b.bb();
     }
 
 protected:
     template <class BufBuilderType>
     BSONArrayBuilderBase(BufBuilderType& builder) : _b(builder) {}
+
+    Derived& asDerived() {
+        return static_cast<Derived&>(*this);
+    }
+    const Derived& asDerived() const {
+        return static_cast<const Derived&>(*this);
+    }
 
     DecimalCounter<uint32_t> _fieldCount;
     BSONObjBuilderType _b;

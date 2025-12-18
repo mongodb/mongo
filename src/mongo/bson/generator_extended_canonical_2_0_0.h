@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str_escape.h"
 
 #include <fmt/compile.h>

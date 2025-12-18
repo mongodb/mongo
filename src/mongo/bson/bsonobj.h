@@ -43,11 +43,10 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
-#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/string_map.h"
 
@@ -60,8 +59,6 @@
 #include <iterator>
 #include <limits>
 #include <list>
-#include <memory>
-#include <set>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -70,6 +67,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -119,7 +118,7 @@ class LegacyStrictGenerator;
  Code With Scope: <total size><String><Object>
  \endcode
  */
-class MONGO_MOD_PUBLIC BSONObj {
+class BSONObj {
 public:
     struct DefaultSizeTrait {
         constexpr static int MaxSize = BSONObjMaxInternalSize;
@@ -330,21 +329,21 @@ public:
                              fmt::memory_buffer& buffer,
                              size_t writeLimit = 0) const;
 
-    BSONObj jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
-                                int pretty,
-                                bool isArray,
-                                fmt::memory_buffer& buffer,
-                                size_t writeLimit = 0) const;
-    BSONObj jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
-                                int pretty,
-                                bool isArray,
-                                fmt::memory_buffer& buffer,
-                                size_t writeLimit = 0) const;
-    BSONObj jsonStringGenerator(LegacyStrictGenerator const& generator,
-                                int pretty,
-                                bool isArray,
-                                fmt::memory_buffer& buffer,
-                                size_t writeLimit = 0) const;
+    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(ExtendedCanonicalV200Generator const& generator,
+                                                  int pretty,
+                                                  bool isArray,
+                                                  fmt::memory_buffer& buffer,
+                                                  size_t writeLimit = 0) const;
+    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(ExtendedRelaxedV200Generator const& generator,
+                                                  int pretty,
+                                                  bool isArray,
+                                                  fmt::memory_buffer& buffer,
+                                                  size_t writeLimit = 0) const;
+    MONGO_MOD_PRIVATE BSONObj jsonStringGenerator(LegacyStrictGenerator const& generator,
+                                                  int pretty,
+                                                  bool isArray,
+                                                  fmt::memory_buffer& buffer,
+                                                  size_t writeLimit = 0) const;
 
     /**
      * Add specific field to the end of the object if it did not exist, otherwise replace it
@@ -477,6 +476,7 @@ public:
      * arrays are bson objects with numeric and increasing field names
      * @return true if field names are numeric and increasing
      */
+    MONGO_MOD_USE_REPLACEMENT(this almost certainly is not what you want; contact us if it is)
     bool couldBeArray() const;
 
     /**
@@ -635,12 +635,10 @@ public:
     }
 
     /**
-     * Return a version of this object where top level elements of types
-     * that are not part of the bson wire protocol are replaced with
-     * std::string identifier equivalents.
-     * TODO Support conversion of element types other than min and max.
+     * Return a version of this object where top level elements of
+     * MinKey and MaxKey type are replaced with EJSON-like objects.
      */
-    BSONObj clientReadable() const;
+    MONGO_MOD_USE_REPLACEMENT(move this code to data_movement) BSONObj clientReadable() const;
 
     static BSONObj stripFieldNames(const BSONObj& obj);
 

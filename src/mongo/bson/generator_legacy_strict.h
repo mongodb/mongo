@@ -31,6 +31,7 @@
 
 #include "mongo/bson/generator_extended_canonical_2_0_0.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <fmt/format.h>

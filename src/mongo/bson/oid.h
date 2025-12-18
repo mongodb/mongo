@@ -37,6 +37,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
@@ -45,6 +46,8 @@
 #include <string>
 
 #include <sys/types.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 class SecureRandom;

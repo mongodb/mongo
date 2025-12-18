@@ -37,6 +37,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <iosfwd>
@@ -46,6 +47,8 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 
@@ -306,9 +309,6 @@ inline int canonicalizeBSONType(BSONType type) {
                 fmt::format("Invalid/undefined BSONType value was provided ({:d})", type));
 }
 
-template <BSONType value>
-struct FormatKind : std::integral_constant<BSONType, value> {};
-
 template <typename T>
 struct BSONObjAppendFormat;
 
@@ -316,10 +316,13 @@ struct BSONObjAppendFormat;
  * Returns whether conversion to JSON should format the Date type as local timezone.
  * This is a global setting set by the systemLog.timeStampFormat server option.
  */
-void setDateFormatIsLocalTimezone(bool localTimeZone);
+MONGO_MOD_NEEDS_REPLACEMENT void setDateFormatIsLocalTimezone(bool localTimeZone);
 bool dateFormatIsLocalTimezone();
 
 namespace bsontype_detail {
+
+template <BSONType value>
+struct FormatKind : std::integral_constant<BSONType, value> {};
 
 /* BSONObjFallbackFormat is the trait that BSONObjAppendFormat falls back to in case there is
    no explicit specialization for a type. It has a second templated parameter so it can be enabled
@@ -355,38 +358,38 @@ template <typename T>
 struct BSONObjAppendFormat : bsontype_detail::BSONObjFallbackFormat<T> {};
 
 template <>
-struct BSONObjAppendFormat<bool> : FormatKind<BSONType::boolean> {};
+struct BSONObjAppendFormat<bool> : bsontype_detail::FormatKind<BSONType::boolean> {};
 
 template <>
-struct BSONObjAppendFormat<char> : FormatKind<BSONType::numberInt> {};
+struct BSONObjAppendFormat<char> : bsontype_detail::FormatKind<BSONType::numberInt> {};
 
 template <>
-struct BSONObjAppendFormat<unsigned char> : FormatKind<BSONType::numberInt> {};
+struct BSONObjAppendFormat<unsigned char> : bsontype_detail::FormatKind<BSONType::numberInt> {};
 
 template <>
-struct BSONObjAppendFormat<short> : FormatKind<BSONType::numberInt> {};
+struct BSONObjAppendFormat<short> : bsontype_detail::FormatKind<BSONType::numberInt> {};
 
 template <>
-struct BSONObjAppendFormat<unsigned short> : FormatKind<BSONType::numberInt> {};
+struct BSONObjAppendFormat<unsigned short> : bsontype_detail::FormatKind<BSONType::numberInt> {};
 
 template <>
-struct BSONObjAppendFormat<int> : FormatKind<BSONType::numberInt> {};
+struct BSONObjAppendFormat<int> : bsontype_detail::FormatKind<BSONType::numberInt> {};
 
 /* For platforms where long long and int64_t are the same, this partial specialization will be
    used for both. Otherwise, int64_t will use the specialization above. */
 template <>
-struct BSONObjAppendFormat<long long> : FormatKind<BSONType::numberLong> {};
+struct BSONObjAppendFormat<long long> : bsontype_detail::FormatKind<BSONType::numberLong> {};
 
 template <>
-struct BSONObjAppendFormat<Counter64> : FormatKind<BSONType::numberLong> {};
+struct BSONObjAppendFormat<Counter64> : bsontype_detail::FormatKind<BSONType::numberLong> {};
 
 template <>
-struct BSONObjAppendFormat<Decimal128> : FormatKind<BSONType::numberDecimal> {};
+struct BSONObjAppendFormat<Decimal128> : bsontype_detail::FormatKind<BSONType::numberDecimal> {};
 
 template <>
-struct BSONObjAppendFormat<double> : FormatKind<BSONType::numberDouble> {};
+struct BSONObjAppendFormat<double> : bsontype_detail::FormatKind<BSONType::numberDouble> {};
 
 template <>
-struct BSONObjAppendFormat<float> : FormatKind<BSONType::numberDouble> {};
+struct BSONObjAppendFormat<float> : bsontype_detail::FormatKind<BSONType::numberDouble> {};
 
 }  // namespace mongo
