@@ -51,7 +51,8 @@ public:
     // ExpressionContext cloning.
     ExpressionContextBuilder& opCtx(OperationContext*, VersionContext vCtx);
 
-    ExpressionContextBuilder& ifrContext(const IncrementalFeatureRolloutContext& ifrContext);
+    ExpressionContextBuilder& ifrContext(
+        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext);
     ExpressionContextBuilder& collator(std::unique_ptr<CollatorInterface>&&);
     ExpressionContextBuilder& mongoProcessInterface(std::shared_ptr<MongoProcessInterface>);
     ExpressionContextBuilder& ns(NamespaceString);

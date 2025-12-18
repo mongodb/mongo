@@ -902,7 +902,7 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              _cq.getExpCtx(),
              _cq.getExpCtx()->getNeedsMerge(),
              _cq.getExpCtx()->getAllowDiskUse(),
-             _cq.getExpCtx()->getIfrContext()) {
+             *_cq.getExpCtx()->getIfrContext()) {
     // Initialize '_data->queryCollator'.
     _data->queryCollator = cq.getCollatorShared();
 

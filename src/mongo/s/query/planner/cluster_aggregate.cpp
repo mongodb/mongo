@@ -204,7 +204,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     ResolvedNamespaceMap resolvedNamespaces,
     bool hasChangeStream,
     boost::optional<ExplainOptions::Verbosity> verbosity,
-    ExpressionContextCollationMatchesDefault collationMatchesDefault) {
+    ExpressionContextCollationMatchesDefault collationMatchesDefault,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr) {
 
     std::unique_ptr<CollatorInterface> collation;
     if (!collationObj.isEmpty()) {
@@ -219,6 +220,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     auto mergeCtx = ExpressionContextBuilder{}
                         .fromRequest(opCtx, request)
                         .explain(verbosity)
+                        .ifrContext(std::move(ifrContext))
                         .collator(std::move(collation))
                         .mongoProcessInterface(std::make_shared<MongosProcessInterface>(
                             Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor()))
@@ -431,7 +433,8 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     bool requiresCollationForParsingUnshardedAggregate,
     boost::optional<ResolvedView> resolvedView,
     boost::optional<AggregateCommandRequest> originalRequest,
-    boost::optional<ExplainOptions::Verbosity> verbosity) {
+    boost::optional<ExplainOptions::Verbosity> verbosity,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr) {
     // Populate the collation. If this is a change stream, take the user-defined collation if one
     // exists, or an empty BSONObj otherwise. Change streams never inherit the collection's default
     // collation, and since collectionless aggregations generally run on the 'admin'
@@ -460,7 +463,8 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
                               resolveInvolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces()),
                               hasChangeStream,
                               verbosity,
-                              collationMatchesDefault);
+                              collationMatchesDefault,
+                              std::move(ifrContext));
 
     // If the routing table exists, then the collection is tracked in the router role and we can
     // validate if it is timeseries. If the collection is untracked, this validation will happen in
@@ -663,7 +667,8 @@ Status runAggregateImpl(OperationContext* opCtx,
                         boost::optional<ResolvedView> resolvedView,
                         boost::optional<AggregateCommandRequest> originalRequest,
                         boost::optional<ExplainOptions::Verbosity> verbosity,
-                        BSONObjBuilder* res) {
+                        BSONObjBuilder* res,
+                        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr) {
     const auto pipelineDataSource = sharded_agg_helpers::getPipelineDataSource(liteParsedPipeline);
     if (!originalRoutingCtx.hasNss(namespaces.executionNss) &&
         sharded_agg_helpers::checkIfMustRunOnAllShards(namespaces.executionNss,
@@ -777,7 +782,8 @@ Status runAggregateImpl(OperationContext* opCtx,
                                                requiresCollationForParsingUnshardedAggregate,
                                                resolvedView,
                                                originalRequest,
-                                               verbosity);
+                                               verbosity,
+                                               std::move(ifrContext));
         const boost::intrusive_ptr<ExpressionContext>& pipelineCtx = pipeline->getContext();
 
         // If cri is valueful, then the database definitely exists and the cluster has shards. If
@@ -1036,6 +1042,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       boost::optional<ExplainOptions::Verbosity> verbosity,
                                       BSONObjBuilder* result,
                                       StringData comment) {
+    // Creates a new IFRContext for the aggregation, which will be shared among the root
+    // ExpressionContext and any child ExpressionContexts that are created, for example, as part of
+    // sub-pipeline execution.
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
 
     const bool requiresCollectionRouter = std::invoke([&]() {
         const auto pipelineDataSource =
@@ -1056,7 +1066,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                 boost::none /* resolvedView */,
                                 boost::none /* originalRequest */,
                                 verbosity,
-                                result);
+                                result,
+                                std::move(ifrContext));
     }
 
     sharding::router::CollectionRouter router(opCtx, namespaces.executionNss);
@@ -1088,7 +1099,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                          boost::none /* resolvedView */,
                                          boost::none /* originalRequest */,
                                          verbosity,
-                                         result));
+                                         result,
+                                         ifrContext));
         return Status::OK();
     };
 

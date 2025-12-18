@@ -340,5 +340,25 @@ DEATH_TEST_F(ExpressionContextTestDeathTest, IllegalNeedsMergeComboNeedsMergeEmp
     AddCmdTestCase{.needsSortedMerge = true}.makeExpCtx(opCtx.get());
 }
 
+TEST_F(ExpressionContextTest, IfrContextIsSharedWithSubPipeline) {
+    auto opCtx = makeOperationContext();
+
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx.get())
+                      .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd))
+                      .ifrContext(ifrContext)
+                      .build();
+
+    ASSERT_EQ(ifrContext.get(), expCtx->getIfrContext().get());
+
+    auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
+        expCtx, NamespaceString::createNamespaceString_forTest("test"_sd, "subColl"_sd));
+
+    // Verify that 'expCtx' and 'subExpCtx' share the same IFRContext.
+    ASSERT_EQ(ifrContext.get(), subExpCtx->getIfrContext().get());
+    ASSERT_EQ(expCtx->getIfrContext().get(), subExpCtx->getIfrContext().get());
+}
+
 }  // namespace
 }  // namespace mongo

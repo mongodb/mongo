@@ -942,7 +942,7 @@ A feature whose behavior applies to a query can use the `IncrementalFeatureRollo
 to the query's `ExpressionContext` for this purpose.
 
 ```c++
-if (expCtx->getIfrContext().getSavedFlagValue(featureFlagSpork)) {
+if (expCtx->getIfrContext()->getSavedFlagValue(featureFlagSpork)) {
     // The feature flag is enabled. Implement the new behavior.
 } else {
     // The feature flag is disabled. Implement the backwards-compatible behavior.

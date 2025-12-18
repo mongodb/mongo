@@ -72,6 +72,11 @@ ExpressionContext::ExpressionContext(ExpressionContextParams&& params)
 
     _params.timeZoneDatabase = mongo::getTimeZoneDatabase(_params.opCtx);
 
+    // Default IFRContext for code paths that don't go through run_aggregate or cluster_aggregate.
+    if (!_params.ifrContext) {
+        _params.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+    }
+
     // Disallow disk use if in read-only mode.
     if (_params.allowDiskUse) {
         tassert(7738401, "opCtx null check", _params.opCtx);
@@ -211,7 +216,7 @@ void ExpressionContext::throwIfParserShouldRejectFeature(StringData name, Featur
                       << feature_compatibility_version_documentation::compatibilityLink()
                       << " for more information.",
         flag.checkWithContext(_params.vCtx,
-                              _params.ifrContext,
+                              *_params.ifrContext,
                               ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS}));
 }
 

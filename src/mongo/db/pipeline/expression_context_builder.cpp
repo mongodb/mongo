@@ -67,8 +67,8 @@ ExpressionContextBuilder& ExpressionContextBuilder::opCtx(OperationContext* opCt
 }
 
 ExpressionContextBuilder& ExpressionContextBuilder::ifrContext(
-    const IncrementalFeatureRolloutContext& ifrContext) {
-    params.ifrContext = ifrContext;
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+    params.ifrContext = std::move(ifrContext);
 
     return *this;
 }

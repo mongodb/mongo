@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
@@ -75,6 +76,7 @@ public:
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
         : ExpressionContext(ExpressionContextParams{
               .vCtx = VersionContext(fcv),
+              .ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(),
               .ns = nss,
               .originalNs = nss,
               .runtimeConstants = LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0))}) {
@@ -128,6 +130,7 @@ public:
         : ExpressionContext(ExpressionContextParams{
               .opCtx = opCtx,
               .vCtx = VersionContext(fcv),
+              .ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(),
               .ns = nss,
               .originalNs = nss,
               .runtimeConstants = LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0))}),
@@ -150,6 +153,7 @@ public:
         : ExpressionContext(ExpressionContextParams{
               .opCtx = opCtx,
               .vCtx = VersionContext(fcv),
+              .ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(),
               .ns = nss,
               .originalNs = nss,
               .serializationContext = sc,
@@ -172,6 +176,7 @@ public:
         : ExpressionContext(ExpressionContextParams{
               .opCtx = opCtx,
               .vCtx = VersionContext(fcv),
+              .ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(),
               .ns = request.getNamespace(),
               .originalNs = request.getNamespace(),
               .serializationContext = request.getSerializationContext(),
@@ -217,6 +222,7 @@ public:
         : ExpressionContext(ExpressionContextParams{
               .opCtx = opCtx,
               .vCtx = VersionContext(fcv),
+              .ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(),
               .collator = std::move(collator),
               .ns = nss,
               .originalNs = nss,

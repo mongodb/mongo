@@ -756,8 +756,8 @@ SbHashAggAccumulatorVector generateScalarAccumulators(StageBuilderState& state,
     SbHashAggAccumulatorVector accumulatorList;
     auto rootSlot = outputs.getResultObjIfExists();
 
-    bool enableSinglePurposeAccumulators =
-        state.expCtx->getIfrContext().getSavedFlagValue(feature_flags::gFeatureFlagSbeAccumulators);
+    bool enableSinglePurposeAccumulators = state.expCtx->getIfrContext()->getSavedFlagValue(
+        feature_flags::gFeatureFlagSbeAccumulators);
 
     for (const auto& accStmt : groupNode.accumulators) {
         AccumOp accOp(accStmt);

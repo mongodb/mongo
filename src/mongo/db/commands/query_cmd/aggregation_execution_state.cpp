@@ -780,6 +780,7 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
                       .collationMatchesDefault(collationMatchesDefault)
                       .canBeRejected(canPipelineBeRejected)
                       .explain(_aggExState.getVerbosity())
+                      .ifrContext(_aggExState.getIfrContext())
                       .build();
 
     if (_aggExState.getRequest().getIsHybridSearch()) {

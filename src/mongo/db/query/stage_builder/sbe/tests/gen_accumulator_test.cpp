@@ -2330,7 +2330,7 @@ public:
                  _expCtx,
                  false /* needsMerge */,
                  false /* allowDiskUse */,
-                 _expCtx->getIfrContext()} {}
+                 *_expCtx->getIfrContext()} {}
 
     AccumulationStatement makeAccumulationStatement(StringData accumName) {
         return makeAccumulationStatement(BSON("unused" << BSON(accumName << "unused")));

@@ -236,7 +236,7 @@ void GoldenSbeExprBuilderTestFixture::setUp() {
                    _expCtx,
                    false /* needsMerge */,
                    false /* allowDiskUse */,
-                   _expCtx->getIfrContext());
+                   *_expCtx->getIfrContext());
 }
 
 void GoldenSbeExprBuilderTestFixture::runTest(stage_builder::SbExpr sbExpr,

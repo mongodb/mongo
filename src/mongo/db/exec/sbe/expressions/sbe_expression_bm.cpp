@@ -147,7 +147,7 @@ public:
                                                _expCtx,
                                                false /* needsMerge */,
                                                false /* allowDiskUse */,
-                                               expCtx->getIfrContext()};
+                                               *expCtx->getIfrContext()};
 
         auto rootSlot =
             stage_builder::SbSlot{_inputSlotId, stage_builder::TypeSignature::kAnyScalarType};

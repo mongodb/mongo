@@ -289,7 +289,7 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig 
     });
 
     boost::optional<MultiPlanTicket> multiPlanTicket{};
-    if (expCtx()->getIfrContext().getSavedFlagValue(feature_flags::gfeatureFlagMultiPlanLimiter) &&
+    if (expCtx()->getIfrContext()->getSavedFlagValue(feature_flags::gfeatureFlagMultiPlanLimiter) &&
         concurrentMultiPlanJobs > internalQueryConcurrentMultiPlanningThreshold.load() &&
         yieldPolicy->canAutoYield()) {
         multiPlanTicket = rateLimit(yieldPolicy, candidatesSize);

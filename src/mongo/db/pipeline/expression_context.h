@@ -529,11 +529,7 @@ public:
         return _params.vCtx;
     }
 
-    IncrementalFeatureRolloutContext& getIfrContext() {
-        return _params.ifrContext;
-    }
-
-    const IncrementalFeatureRolloutContext& getIfrContext() const {
+    std::shared_ptr<IncrementalFeatureRolloutContext> getIfrContext() const {
         return _params.ifrContext;
     }
 
@@ -1035,7 +1031,11 @@ protected:
         // TODO SERVER-111234 We should probably swap this out for an FCVSnapshot until we implement
         // SPM-4227.
         VersionContext vCtx;
-        IncrementalFeatureRolloutContext ifrContext;
+        // Shared by the root ExpressionContext for an aggregation and any child ExpressionContexts
+        // that are created, for example, as part of sub-pipeline execution. A default value is set
+        // in the ExpressionContext constructor for code paths that don't go through run_aggregate
+        // or cluster_aggregate.
+        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr;
         std::unique_ptr<CollatorInterface> collator = nullptr;
         // An interface for accessing information or performing operations that have different
         // implementations on mongod and mongos, or that only make sense on one of the two.

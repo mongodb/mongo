@@ -175,7 +175,7 @@ void PipelineRewriteContext::enqueueRules() {
         bool enabled = !registration.featureFlag ||
             registration.featureFlag->checkWithContext(
                 _expCtx.getVersionContext(),
-                _expCtx.getIfrContext(),
+                *_expCtx.getIfrContext(),
                 ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS});
 
         if (enabled) {

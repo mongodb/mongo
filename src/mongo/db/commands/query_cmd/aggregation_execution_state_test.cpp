@@ -33,6 +33,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
@@ -365,6 +366,22 @@ TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogState) {
     ASSERT_EQ(aggCatalogState->determineCollectionType(), query_shape::CollectionType::kCollection);
 
     ASSERT_DOES_NOT_THROW(aggCatalogState->relinquishResources());
+}
+
+TEST_F(AggregationExecutionStateTest, CreateIfrContextForAggExStateAndExpressionContext) {
+    StringData coll{"coll"};
+    createTestCollectionWithMetadata(coll, false /*sharded*/);
+
+    std::unique_ptr<AggExState> aggExState = createDefaultAggExState(coll);
+
+    auto ifrContext = aggExState->getIfrContext();
+    ASSERT_TRUE(ifrContext != nullptr);
+
+    std::unique_ptr<AggCatalogState> aggCatalogState = aggExState->createAggCatalogState();
+    auto expCtx = aggCatalogState->createExpressionContext();
+
+    // Verify that the same IFRContext is propagated to the ExpressionContext.
+    ASSERT_EQ(ifrContext.get(), expCtx->getIfrContext().get());
 }
 
 TEST_F(AggregationExecutionStateTest, CreateDefaultAggCatalogStateWithSecondaryCollection) {

@@ -80,7 +80,7 @@ protected:
                  _expCtx,
                  false /* needsMerge */,
                  false /* allowDiskUse */,
-                 _expCtx->getIfrContext()} {
+                 *_expCtx->getIfrContext()} {
         _ctx.root = &_emptyStage;
     }
 
