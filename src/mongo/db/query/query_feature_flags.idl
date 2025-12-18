@@ -303,6 +303,12 @@ feature_flags:
         default: false
         fcv_gated: true
 
+    featureFlagQueryStatsCBRMetrics:
+        description: "Feature flag to enable cost-based ranker metrics in query stats."
+        cpp_varname: gFeatureFlagQueryStatsCBRMetrics
+        default: false
+        fcv_gated: true
+
     featureFlagQueryStatsMetricsSubsections:
         description: "Feature flag to enable query stats metrics being reorganized into subsections, rather than a flat structure."
         cpp_varname: gFeatureFlagQueryStatsMetricsSubsections
