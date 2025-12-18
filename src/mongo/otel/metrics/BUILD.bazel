@@ -55,6 +55,7 @@ mongo_cc_unit_test(
     deps = [
         ":in_memory_metrics_exporter",
         ":metrics_initialization",
+        ":metrics_test_util",
     ],
 )
 
@@ -87,6 +88,7 @@ mongo_cc_unit_test(
         ":in_memory_metrics_exporter",
         ":metrics_initialization",
         ":metrics_service",
+        ":metrics_test_util",
         "//src/mongo/db:service_context_test_fixture",
         "//src/third_party/opentelemetry-cpp/api",
         "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
@@ -134,5 +136,30 @@ mongo_cc_library(
         "//src/third_party/opentelemetry-cpp/exporters/memory:in_memory_data",
         "//src/third_party/opentelemetry-cpp/exporters/memory:in_memory_metric_data",
         "//src/third_party/opentelemetry-cpp/exporters/memory:in_memory_metric_exporter_factory",
+    ],
+)
+
+mongo_cc_library(
+    name = "metrics_test_util",
+    testonly = True,
+    srcs = [
+        "metrics_test_util.cpp",
+    ],
+    deps = [
+        ":in_memory_metrics_exporter",
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "metrics_test_util_test",
+    srcs = [
+        "metrics_test_util_test.cpp",
+    ],
+    tags = ["mongo_unittest_third_group"],
+    deps = [
+        ":metrics_test_util",
+        "//src/mongo/db:service_context_test_fixture",
     ],
 )

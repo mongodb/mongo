@@ -81,11 +81,11 @@ private:
 };
 }  // namespace test_util_detail
 
-bool isNoopMeter(opentelemetry::metrics::Meter* provider) {
+inline bool isNoopMeter(opentelemetry::metrics::Meter* provider) {
     return !!dynamic_cast<opentelemetry::metrics::NoopMeter*>(provider);
 }
 
-bool isNoopMeterProvider(opentelemetry::metrics::MeterProvider* provider) {
+inline bool isNoopMeterProvider(opentelemetry::metrics::MeterProvider* provider) {
     return !!dynamic_cast<opentelemetry::metrics::NoopMeterProvider*>(provider);
 }
 
@@ -95,24 +95,7 @@ bool isNoopMeterProvider(opentelemetry::metrics::MeterProvider* provider) {
  */
 class MONGO_MOD_PUBLIC OtelMetricsCapturer {
 public:
-    OtelMetricsCapturer() {
-        invariant(isNoopMeterProvider(opentelemetry::metrics::Provider::GetMeterProvider().get()));
-
-        auto metrics =
-            std::make_shared<opentelemetry::exporter::memory::SimpleAggregateInMemoryMetricData>();
-        _metrics = metrics.get();
-
-        auto exporter = opentelemetry::exporter::memory::InMemoryMetricExporterFactory::Create(
-            std::move(metrics));
-
-        auto reader = std::make_shared<test_util_detail::OnDemandMetricReader>(std::move(exporter));
-        _reader = reader.get();
-
-        std::shared_ptr<opentelemetry::sdk::metrics::MeterProvider> provider =
-            opentelemetry::sdk::metrics::MeterProviderFactory::Create();
-        provider->AddMetricReader(std::move(reader));
-        opentelemetry::metrics::Provider::SetMeterProvider(std::move(provider));
-    }
+    OtelMetricsCapturer();
 
     ~OtelMetricsCapturer() {
         opentelemetry::metrics::Provider::SetMeterProvider(
@@ -120,8 +103,8 @@ public:
                 new opentelemetry::metrics::NoopMeterProvider()));
     }
 
-    // TODO SERVER-115538 When we actually have instrument reading to consume, implement a wrapper
-    // around SimpleAggregateInMemoryMetricData::Get that easily exposes the data we need.
+    // Gets the value of an Int64 counter, and throws an exception if it is not found.
+    int64_t readInt64Counter(StringData name);
 
 private:
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagOtelMetrics", true};

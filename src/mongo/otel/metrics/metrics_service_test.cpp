@@ -98,7 +98,27 @@ TEST_F(CreateInt64CounterTest, ExceptionWhenSameNameButDifferentParameters) {
 
 // TODO SERVER-115164 or SERVER-114955 or SERVER-114954 add a test that verifies that creating
 // duplicate metrics with different types fails.
-// TODO SERVER-115538 Add a test that verifies that counter adds work correctly
+
+TEST_F(CreateInt64CounterTest, RecordsValues) {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Counter<int64_t>* counter_1 =
+        metricsService.createInt64Counter("counter_1", "description1", MetricUnit::kSeconds);
+    Counter<int64_t>* counter_2 =
+        metricsService.createInt64Counter("counter_2", "description2", MetricUnit::kBytes);
+
+    counter_1->add(10);
+    counter_2->add(1);
+    counter_1->add(5);
+    counter_2->add(1);
+    counter_2->add(1);
+
+    ASSERT_EQ(metricsCapturer.readInt64Counter("counter_1"), 15);
+    ASSERT_EQ(metricsCapturer.readInt64Counter("counter_2"), 3);
+
+    counter_1->add(5);
+    ASSERT_EQ(metricsCapturer.readInt64Counter("counter_1"), 20);
+}
 
 }  // namespace
 }  // namespace mongo::otel::metrics
