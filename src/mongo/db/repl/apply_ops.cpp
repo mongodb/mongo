@@ -45,6 +45,7 @@
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
@@ -57,8 +58,6 @@
 #include "mongo/util/uuid.h"
 
 #include <algorithm>
-#include <memory>
-#include <string>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>

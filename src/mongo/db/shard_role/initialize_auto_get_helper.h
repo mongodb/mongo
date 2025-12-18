@@ -31,89 +31,35 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/router_role/router_role.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_role_loop.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/topology/sharding_state.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
+
 /**
  * Function which produces an vector of 'ScopedShardRole' objects for the namespaces in 'nssList'
  * using the routing information in 'criMap'.
  */
-inline std::vector<ScopedSetShardRole> createScopedShardRoles(
+MONGO_MOD_PRIVATE
+std::vector<ScopedSetShardRole> createScopedShardRoles(
     OperationContext* opCtx,
     const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap,
-    const std::vector<NamespaceString>& nssList) {
-    std::vector<ScopedSetShardRole> scopedShardRoles;
-    scopedShardRoles.reserve(nssList.size());
-    const auto myShardId = ShardingState::get(opCtx)->shardId();
-    const auto placementConflictTime = [&] {
-        const auto txnRouter = TransactionRouter::get(opCtx);
-        return txnRouter && opCtx->inMultiDocumentTransaction()
-            ? txnRouter.getPlacementConflictTime()
-            : boost::none;
-    }();
-
-    for (const auto& nss : nssList) {
-        const auto nssCri = criMap.find(nss);
-        tassert(8322004,
-                "Must be an entry in criMap for namespace " + nss.toStringForErrorMsg(),
-                nssCri != criMap.end());
-
-        bool isTracked = nssCri->second.hasRoutingTable();
-
-        auto shardVersion = [&] {
-            auto sv =
-                isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNTRACKED();
-            if (placementConflictTime) {
-                sv.setPlacementConflictTime_DEPRECATED(*placementConflictTime);
-            }
-            return sv;
-        }();
-
-        // For UNTRACKED collections, the collection will only be potentially considered local if
-        // this shard is the dbPrimary shard.
-        //
-        // If the routing info tells this shard is, then attach the DatabaseVersion to validate
-        // that. For the opposite case, where the routing info says that this shard is not the
-        // dbPrimary shard, we cannot attach the DatabaseVersion because the protocol does not allow
-        // a way to express that, so it won't be validated. If the routing info was stale, this will
-        // potentially result in executing a correct but sub-optimal query plan (only this time,
-        // because the next executions will see an updated routing info as a side effect of this
-        // execution having targeted a "remotely" and therefore will choose the optimal plan).
-        const bool isDbPrimaryShard = nssCri->second.getDbPrimaryShardId() == myShardId;
-        auto dbVersion = !isTracked && isDbPrimaryShard
-            ? boost::optional<DatabaseVersion>(nssCri->second.getDbVersion())
-            : boost::none;
-
-        if (placementConflictTime && dbVersion) {
-            dbVersion->setPlacementConflictTime_DEPRECATED(*placementConflictTime);
-        }
-
-        try {
-            scopedShardRoles.emplace_back(opCtx, nss, shardVersion, dbVersion);
-        } catch (const ExceptionFor<ErrorCodes::IllegalChangeToExpectedDatabaseVersion>&) {
-            // Only one can be correct. Check css and the new one.
-            const auto scopedDss = DatabaseShardingState::acquire(opCtx, nss.dbName());
-            scopedDss->checkDbVersionOrThrow(opCtx);
-            scopedDss->checkDbVersionOrThrow(opCtx, *dbVersion);
-            MONGO_UNREACHABLE_TASSERT(10825600);
-        }
-    }
-    return scopedShardRoles;
-}
+    const std::vector<NamespaceString>& nssList,
+    const boost::optional<LogicalTime>& placementConflictTime);
 
 /**
  * Helper that constructs a ShardRole CollectionAcquisition using 'initAutoGetFn'.
  * Returns whether any namespaces in 'secondaryExecNssList' are non local.
  */
 template <typename F>
-bool initializeAutoGet(OperationContext* opCtx,
-                       const NamespaceString& nss,
-                       const std::vector<NamespaceStringOrUUID>& secondaryExecNssList,
-                       F&& initAutoGetFn) {
+MONGO_MOD_PUBLIC bool initializeAutoGet(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<NamespaceStringOrUUID>& secondaryExecNssList,
+    F&& initAutoGetFn) {
     bool isAnySecondaryCollectionNotLocal = false;
     auto* grid = Grid::get(opCtx->getServiceContext());
     if (grid->isInitialized() && grid->isShardingInitialized() &&
@@ -145,9 +91,16 @@ bool initializeAutoGet(OperationContext* opCtx,
                 isAnySecondaryCollectionNotLocal =
                     multiCollectionRouter.isAnyCollectionNotLocal(opCtx, criMap);
 
+                const auto placementConflictTime = [&] {
+                    const auto txnRouter = TransactionRouter::get(opCtx);
+                    return txnRouter && opCtx->inMultiDocumentTransaction()
+                        ? txnRouter.getPlacementConflictTime()
+                        : boost::none;
+                }();
+
                 shard_role_loop::withStaleShardRetry(opCtx, [&]() {
-                    auto scopedShardRoles =
-                        createScopedShardRoles(opCtx, criMap, secondaryExecNssListJustNss);
+                    auto scopedShardRoles = createScopedShardRoles(
+                        opCtx, criMap, secondaryExecNssListJustNss, placementConflictTime);
                     initAutoGetFn();
                 });
             });
@@ -157,4 +110,5 @@ bool initializeAutoGet(OperationContext* opCtx,
 
     return isAnySecondaryCollectionNotLocal;
 }
+
 }  // namespace mongo

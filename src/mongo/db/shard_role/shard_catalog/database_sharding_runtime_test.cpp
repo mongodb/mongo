@@ -44,6 +44,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state_factory_shard.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"

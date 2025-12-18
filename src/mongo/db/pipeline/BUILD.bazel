@@ -1369,23 +1369,6 @@ mongo_cc_unit_test(
     ],
 )
 
-mongo_cc_unit_test(
-    name = "initialize_auto_get_helper_test",
-    srcs = [
-        "initialize_auto_get_helper_test.cpp",
-    ],
-    private_hdrs = [
-        "initialize_auto_get_helper.h",
-    ],
-    tags = ["mongo_unittest_eighth_group"],
-    deps = [
-        "//src/mongo/db:shard_role_api",
-        "//src/mongo/db/s:sharding_runtime_d",
-        "//src/mongo/db/sharding_environment:shard_server_test_fixture",
-        "//src/mongo/s:sharding_router_api",
-    ],
-)
-
 mongo_cc_benchmark(
     name = "pipeline_optimization_bm",
     srcs = [

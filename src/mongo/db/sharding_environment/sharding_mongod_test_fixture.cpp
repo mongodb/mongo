@@ -30,12 +30,10 @@
 #include "mongo/db/sharding_environment/sharding_mongod_test_fixture.h"
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
@@ -50,12 +48,12 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
-#include "mongo/db/router_role/routing_cache/shard_server_catalog_cache_loader_impl.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/client/shard_factory.h"
 #include "mongo/db/sharding_environment/client/shard_remote.h"
@@ -72,7 +70,6 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -83,7 +80,6 @@
 #include "mongo/util/version/releases.h"
 
 #include <cstddef>
-#include <functional>
 #include <memory>
 #include <utility>
 #include <vector>

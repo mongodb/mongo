@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/initialize_auto_get_helper.h"
+#include "mongo/db/shard_role/initialize_auto_get_helper.h"
 
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/s/session_catalog_router.h"

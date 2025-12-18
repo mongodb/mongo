@@ -30,12 +30,11 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
-#include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/shard_role/shard_catalog/drop_indexes.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -45,6 +44,7 @@
 
 namespace mongo {
 namespace {
+
 class ShardsvrDropIndexesParticipantCommand final
     : public TypedCommand<ShardsvrDropIndexesParticipantCommand> {
 public:

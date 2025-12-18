@@ -40,7 +40,6 @@
 #include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/collection_type.h"
 #include "mongo/db/shard_role/shard_catalog/database_sharding_state.h"
-#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/views/view.h"
