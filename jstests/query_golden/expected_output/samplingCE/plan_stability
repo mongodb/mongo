@@ -8389,7 +8389,7 @@
 
 ],
 ">>>totals": {"pipelines": 1044, "plans": 10410, "keys": 90552510, "docs": 55768060, "sorts": 88838579, "rows": 38020103, "errors":      0},
-">>>parameters": {"planRankerMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"random","internalQuerySamplingBySequentialScan":true}}
+">>>parameters": {"planRankerMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":true}}
 
 
 [jsTest] ----

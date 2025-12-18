@@ -2561,7 +2561,7 @@
 
 ],
 ">>>totals": {"pipelines": 1034, "plans": 468, "keys": 3129565, "docs": 3009944, "sorts":     17, "rows": 1931988, "errors":    954},
-">>>parameters": {"planRankerMode":"histogramCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"random","internalQuerySamplingBySequentialScan":false}}
+">>>parameters": {"planRankerMode":"histogramCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false}}
 
 
 [jsTest] ----
