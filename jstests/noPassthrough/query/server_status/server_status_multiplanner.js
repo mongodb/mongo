@@ -68,20 +68,30 @@ assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
     assertClassicMultiPlannerMetrics(multiPlannerMetrics, 2);
 }
 
-assert.soon(() => {
-    // Verify FTDC includes aggregate metrics.
-    const multiPlannerMetricsFtdc = verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query
-        .multiPlanner;
+assert.soon(
+    () => {
+        // Verify FTDC includes aggregate metrics.
+        const multiPlannerMetricsFtdc = verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query
+            .multiPlanner;
 
-    const expectedClassicCount = 2;
-    if (multiPlannerMetricsFtdc.classicCount != expectedClassicCount) {
-        // This is an indication we haven't retrieve the expected serverStatus metrics yet.
-        return false;
-    }
+        const expectedClassicCount = 2;
+        if (multiPlannerMetricsFtdc.classicCount != expectedClassicCount) {
+            // This is an indication we haven't retrieve the expected serverStatus metrics yet.
+            return false;
+        }
 
-    assertClassicMultiPlannerMetrics(multiPlannerMetricsFtdc, expectedClassicCount);
-    return true;
-}, "FTDC output should eventually reflect observed serverStatus metrics.");
+        try {
+            assertClassicMultiPlannerMetrics(multiPlannerMetricsFtdc, expectedClassicCount);
+        } catch (e) {
+            // All counters are updated individually, so it is possible that classicCount is updated, but histograms are not.
+            return false;
+        }
+        return true;
+    },
+    () =>
+        "FTDC output should eventually reflect observed serverStatus metrics. Current FTDC: " +
+        tojson(verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query.multiPlanner),
+);
 
 // Test 'stoppingConditions.hitWorksLimit'.
 {
