@@ -98,8 +98,6 @@ class JsExecution;
 
 class Pipeline;
 class RoutingContext;
-// TODO SERVER-112970 Investigate removing 'CatalogResourceHandle' and 'MultipleCollectionAccessor'
-// information from forward declarations.
 class CatalogResourceHandle;
 class MultipleCollectionAccessor;
 class TransactionHistoryIteratorBase;
