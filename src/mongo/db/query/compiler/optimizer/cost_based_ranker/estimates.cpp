@@ -182,4 +182,12 @@ CardinalityEstimate operator*(const CardinalityEstimate& ce, const SelectivityEs
     return s * ce;
 }
 
+CardinalityEstimate operator/(const CardinalityEstimate& ce, const SelectivityEstimate& s) {
+    CardinalityEstimate result(ce);
+    result.mergeSources(s);
+    result._estimate._v /= s._estimate.v();
+    result.assertValid();
+    return result;
+}
+
 }  // namespace mongo::cost_based_ranker

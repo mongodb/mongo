@@ -121,6 +121,12 @@ private:
     CEResult estimate(const IndexBounds* node);
     CEResult estimate(const OrderedIntervalList* node, bool forceHistogram = false);
 
+    /**
+     * Attempt to push a limit down to child stages, potentially scaling by the selectivity
+     * of the child.
+     */
+    void propagateLimit(const QuerySolutionNode* node, size_t limit);
+
     // Internal helper functions
 
     /**
