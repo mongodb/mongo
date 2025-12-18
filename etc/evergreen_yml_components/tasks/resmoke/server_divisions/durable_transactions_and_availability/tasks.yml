@@ -973,7 +973,18 @@ tasks:
   # Only run hot_backups tests for hot_backups variant.
   - <<: *gen_task_template
     name: hotBackups_gen
-    tags: ["assigned_to_jira_team_server_repl", "release_critical"]
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "release_critical",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_debug_mode",
+        "misc_js",
+        "requires_execution_on_windows_patch_build",
+        "requires_large_host",
+      ]
     commands:
       - func: "generate resmoke tasks"
         vars:
