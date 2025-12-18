@@ -34,46 +34,56 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
+#include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
+#include <algorithm>
 #include <cstddef>
-#include <functional>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::sbe {
 namespace {
+// Set to "true" and recompile the tests to dump plans and skip asserts in favor of printing
+// more data. Because asserts are suppressed in this mode tests might pass while being broken.
+// Do not check in with 'enableDebugOutput' set to "true".
+constexpr bool enableDebugOutput = false;
 
 using namespace value;
 
-class JoinStageBuilderTestBase : public SbeStageBuilderTestFixture {
-protected:
-    // Set to "true" and recompile the tests to dump plans and skip asserts in favor of printing
-    // more data. Because asserts are suppressed in this mode tests might pass while being broken.
-    // Do not check in with 'enableDebugOutput' set to "true".
-    bool enableDebugOutput = false;
-
+class LookupStageBuilderTest : public SbeStageBuilderTestFixture {
 public:
     void setUp() override {
         SbeStageBuilderTestFixture::setUp();
@@ -102,9 +112,58 @@ public:
         SlotAccessor* resultSlotAccessor;
     };
 
-    template <class Callable>
-    void executeTestWithPlanCallbackAndExpectedResults(Callable&& buildSbePlan,
-                                                       const std::vector<BSONObj>& expected) {
+    // Constructs ready-to-execute SBE tree for $lookup specified by the arguments.
+    CompiledTree buildLookupSbeTree(EqLookupNode::LookupStrategy strategy,
+                                    MultipleCollectionAccessor& colls,
+                                    const std::string& localKey,
+                                    const std::string& foreignKey,
+                                    const std::string& asKey) {
+        // Documents from the local collection are provided using collection scan.
+        auto localScanNode = std::make_unique<CollectionScanNode>();
+        localScanNode->nss = _nss;
+
+        // Construct logical query solution.
+        auto lookupNode = std::make_unique<EqLookupNode>(std::move(localScanNode),
+                                                         _foreignNss,
+                                                         localKey,
+                                                         foreignKey,
+                                                         asKey,
+                                                         strategy,
+                                                         boost::none /* idxEntry */,
+                                                         true /* shouldProduceBson */);
+        auto solution = makeQuerySolution(std::move(lookupNode));
+
+        // Convert logical solution into the physical SBE plan.
+        auto [resultSlots, stage, data, _] =
+            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
+
+        if (enableDebugOutput) {
+            std::cout << std::endl
+                      << DebugPrinter{true}.print(stage->debugPrint(DebugPrintInfo())) << std::endl;
+        }
+
+        // Prepare the SBE tree for execution.
+        auto ctx = makeCompileCtx();
+        prepareTree(ctx.get(), stage.get());
+
+        auto resultSlot = *data.staticData->resultSlot;
+        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
+
+        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
+    }
+
+    // Check that SBE plan for '$lookup' returns expected documents.
+    void assertReturnedDocuments(EqLookupNode::LookupStrategy strategy,
+                                 const std::string& localKey,
+                                 const std::string& foreignKey,
+                                 const std::string& asKey,
+                                 const std::vector<BSONObj>& expected) {
+        if (enableDebugOutput) {
+            std::cout << std::endl
+                      << "LookupStrategy: " << EqLookupNode::serializeLookupStrategy(strategy)
+                      << std::endl;
+        }
+
         CollectionOrViewAcquisitionMap secondaryAcquisitions;
         CollectionOrViewAcquisitionRequests acquisitionRequests;
         // Emplace the main acquisition request.
@@ -124,7 +183,7 @@ public:
                                          secondaryAcquisitions,
                                          false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-        auto tree = std::invoke(buildSbePlan, colls);
+        auto tree = buildLookupSbeTree(strategy, colls, localKey, foreignKey, asKey);
         auto& stage = tree.stage;
 
         size_t i = 0;
@@ -158,122 +217,6 @@ public:
 
         ASSERT_EQ(i, expected.size());
         stage->close();
-    }
-
-    template <class Callable>
-    void executeTestWithPlanCallbackAndExpectedResultsUnordered(
-        Callable&& buildSbePlan, const std::vector<BSONObj>& expected) {
-        CollectionOrViewAcquisitionMap secondaryAcquisitions;
-        CollectionOrViewAcquisitionRequests acquisitionRequests;
-        // Emplace the main acquisition request.
-        acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-            operationContext(), _nss, AcquisitionPrerequisites::kRead));
-
-        // Emplace a request for every secondary nss.
-        acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
-            operationContext(), _foreignNss, AcquisitionPrerequisites::kRead));
-
-        // Acquire all the collection and extract the main acquisition
-        secondaryAcquisitions = makeAcquisitionMap(
-            acquireCollectionsOrViewsMaybeLockFree(operationContext(), acquisitionRequests));
-        auto localColl = secondaryAcquisitions.extract(_nss).mapped();
-
-        MultipleCollectionAccessor colls(localColl,
-                                         secondaryAcquisitions,
-                                         false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
-
-        auto tree = std::invoke(buildSbePlan, colls);
-        auto& stage = tree.stage;
-
-        // Build the map used to keep track of matched documents.
-        SimpleBSONObjMultiSet unorderedExpected;
-        for (auto& doc : expected) {
-            unorderedExpected.insert(doc);
-        }
-
-        size_t i = 0;
-        for (auto state = stage->getNext(); state == PlanState::ADVANCED;
-             state = stage->getNext(), i++) {
-            // Retrieve the result document from SBE plan.
-            auto [resultTag, resultValue] = tree.resultSlotAccessor->getViewOfValue();
-            if (enableDebugOutput) {
-                std::cout << "Actual document:   " << std::make_pair(resultTag, resultValue)
-                          << std::endl;
-            }
-
-            // If the plan returned more documents than expected, proceed extracting all of them.
-            // This way, the developer will see them if debug print is enabled.
-            if (i >= expected.size()) {
-                continue;
-            }
-
-            ASSERT_EQ(resultTag, TypeTags::bsonObject);
-            auto it = unorderedExpected.find(BSONObj((const char*)resultValue));
-            ASSERT_NE(it, unorderedExpected.end());
-            auto [expectedTag, expectedValue] =
-                copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(it->objdata()));
-            ValueGuard expectedGuard{expectedTag, expectedValue};
-
-            if (enableDebugOutput) {
-                std::cout << "Expected document: " << std::make_pair(expectedTag, expectedValue)
-                          << std::endl;
-            }
-            // Assert that the document from SBE plan is equal to the expected one.
-            assertValuesEqual(resultTag, resultValue, expectedTag, expectedValue);
-            unorderedExpected.erase(it);
-        }
-
-        ASSERT_EQ(i, expected.size());
-        stage->close();
-    }
-
-    CompiledTree compileAndRun(MultipleCollectionAccessor& colls,
-                               std::unique_ptr<QuerySolutionNode> node) {
-        auto solution = makeQuerySolution(std::move(node));
-
-        // Convert logical solution into the physical SBE plan.
-        auto [resultSlots, stage, data, _] =
-            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
-
-        if (enableDebugOutput) {
-            DebugPrintInfo debugPrintInfo{};
-            std::cout << std::endl
-                      << DebugPrinter{true}.print(stage->debugPrint(debugPrintInfo)) << std::endl;
-        }
-
-        // Prepare the SBE tree for execution.
-        auto ctx = makeCompileCtx();
-        prepareTree(ctx.get(), stage.get());
-
-        auto resultSlot = *data.staticData->resultSlot;
-        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
-
-        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
-    }
-
-protected:
-    const NamespaceString _foreignNss =
-        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
-};
-
-class LookupStageBuilderTest : public JoinStageBuilderTestBase {
-public:
-    void assertReturnedDocuments(EqLookupNode::LookupStrategy strategy,
-                                 const std::string& localKey,
-                                 const std::string& foreignKey,
-                                 const std::string& asKey,
-                                 const std::vector<BSONObj>& expected) {
-        if (enableDebugOutput) {
-            std::cout << std::endl
-                      << "LookupStrategy: " << EqLookupNode::serializeLookupStrategy(strategy)
-                      << std::endl;
-        }
-
-        executeTestWithPlanCallbackAndExpectedResults(
-            [&](MultipleCollectionAccessor& colls) {
-                return buildLookupSbeTree(strategy, colls, localKey, foreignKey, asKey);
-            },
-            expected);
     }
 
     void assertReturnedDocuments(const std::string& localKey,
@@ -327,368 +270,13 @@ public:
         }
     }
 
-private:
+protected:
     std::vector<EqLookupNode::LookupStrategy> strategies = {
         EqLookupNode::LookupStrategy::kNestedLoopJoin, EqLookupNode::LookupStrategy::kHashJoin};
 
-    // Constructs ready-to-execute SBE tree for $lookup specified by the arguments.
-    CompiledTree buildLookupSbeTree(EqLookupNode::LookupStrategy strategy,
-                                    MultipleCollectionAccessor& colls,
-                                    const std::string& localKey,
-                                    const std::string& foreignKey,
-                                    const std::string& asKey) {
-        // Documents from the local collection are provided using collection scan.
-        auto localScanNode = std::make_unique<CollectionScanNode>();
-        localScanNode->nss = _nss;
-
-        // Construct logical query solution.
-        auto lookupNode = std::make_unique<EqLookupNode>(std::move(localScanNode),
-                                                         _foreignNss,
-                                                         localKey,
-                                                         foreignKey,
-                                                         asKey,
-                                                         strategy,
-                                                         boost::none /* idxEntry */,
-                                                         true /* shouldProduceBson */);
-        auto solution = makeQuerySolution(std::move(lookupNode));
-
-        // Convert logical solution into the physical SBE plan.
-        auto [resultSlots, stage, data, _] =
-            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
-
-        if (enableDebugOutput) {
-            DebugPrintInfo debugPrintInfo{};
-            std::cout << std::endl
-                      << DebugPrinter{true}.print(stage->debugPrint(debugPrintInfo)) << std::endl;
-        }
-
-        // Prepare the SBE tree for execution.
-        auto ctx = makeCompileCtx();
-        prepareTree(ctx.get(), stage.get());
-
-        auto resultSlot = *data.staticData->resultSlot;
-        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
-
-        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
-        return compileAndRun(colls, std::move(lookupNode));
-    }
-};
-
-class NestedLoopJoinStageBuilderTest : public JoinStageBuilderTestBase {
-public:
-    void assertReturnedDocuments(FieldPath leftField,
-                                 FieldPath rightField,
-                                 boost::optional<FieldPath> leftEmbeddingFieldArg,
-                                 boost::optional<FieldPath> rightEmbeddingFieldArg,
-                                 const std::vector<BSONObj>& expected) {
-        executeTestWithPlanCallbackAndExpectedResults(
-            [&](MultipleCollectionAccessor& colls) {
-                return buildNestedLoopJoinSbeTree(colls,
-                                                  std::move(leftField),
-                                                  std::move(rightField),
-                                                  std::move(leftEmbeddingFieldArg),
-                                                  std::move(rightEmbeddingFieldArg));
-            },
-            expected);
-    }
-
-    void assertReturnedDocuments(FieldPath leftField,
-                                 FieldPath centerField,
-                                 FieldPath rightField,
-                                 boost::optional<FieldPath> leftEmbeddingFieldArg,
-                                 boost::optional<FieldPath> centerEmbeddingFieldArg,
-                                 boost::optional<FieldPath> rightEmbeddingFieldArg,
-                                 const std::vector<BSONObj>& expected) {
-        executeTestWithPlanCallbackAndExpectedResults(
-            [&](MultipleCollectionAccessor& colls) {
-                return buildNestedLoopJoinSbeTreeStar(colls,
-                                                      leftField,
-                                                      centerField,
-                                                      rightField,
-                                                      leftEmbeddingFieldArg,
-                                                      centerEmbeddingFieldArg,
-                                                      rightEmbeddingFieldArg);
-            },
-            expected);
-        executeTestWithPlanCallbackAndExpectedResults(
-            [&](MultipleCollectionAccessor& colls) {
-                return buildNestedLoopJoinSbeTreeChain(colls,
-                                                       std::move(leftField),
-                                                       std::move(centerField),
-                                                       std::move(rightField),
-                                                       std::move(leftEmbeddingFieldArg),
-                                                       std::move(centerEmbeddingFieldArg),
-                                                       std::move(rightEmbeddingFieldArg));
-            },
-            expected);
-    }
-
 private:
-    CompiledTree buildNestedLoopJoinSbeTree(MultipleCollectionAccessor& colls,
-                                            FieldPath leftField,
-                                            FieldPath rightField,
-                                            boost::optional<FieldPath> leftEmbeddingFieldArg,
-                                            boost::optional<FieldPath> rightEmbeddingFieldArg) {
-        auto outerScanNode = std::make_unique<CollectionScanNode>();
-        outerScanNode->nss = _nss;
-
-        auto innerScanNode = std::make_unique<CollectionScanNode>();
-        innerScanNode->nss = _foreignNss;
-
-        auto nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
-            std::move(outerScanNode),
-            std::move(innerScanNode),
-            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                                           .leftField = std::move(leftField),
-                                                           .rightField = std::move(rightField)}},
-            std::move(leftEmbeddingFieldArg),
-            std::move(rightEmbeddingFieldArg));
-
-        return compileAndRun(colls, std::move(nestedLoopJoinEmbeddingNode));
-    }
-
-    CompiledTree buildNestedLoopJoinSbeTreeStar(MultipleCollectionAccessor& colls,
-                                                FieldPath leftField,
-                                                FieldPath centerField,
-                                                FieldPath rightField,
-                                                boost::optional<FieldPath> leftEmbeddingFieldArg,
-                                                boost::optional<FieldPath> centerEmbeddingFieldArg,
-                                                boost::optional<FieldPath> rightEmbeddingFieldArg) {
-        // Create a three-way join with (left == center && left == right)
-        auto outerScanNode = std::make_unique<CollectionScanNode>();
-        outerScanNode->nss = _nss;
-
-        auto innerScanNode = std::make_unique<CollectionScanNode>();
-        innerScanNode->nss = _foreignNss;
-
-        auto nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
-            std::move(outerScanNode),
-            std::move(innerScanNode),
-            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                                           .leftField = leftField,
-                                                           .rightField = std::move(centerField)}},
-            leftEmbeddingFieldArg,
-            std::move(centerEmbeddingFieldArg));
-
-        auto innerScanNode2 = std::make_unique<CollectionScanNode>();
-        innerScanNode2->nss = _foreignNss;
-
-        // The left field must be prepended with the embedding used for that table.
-        nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
-            std::move(nestedLoopJoinEmbeddingNode),
-            std::move(innerScanNode2),
-            std::vector<QSNJoinPredicate>{
-                QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                 .leftField = leftEmbeddingFieldArg.has_value()
-                                     ? leftEmbeddingFieldArg->concat(leftField)
-                                     : leftField,
-                                 .rightField = std::move(rightField)}},
-            boost::none,
-            std::move(rightEmbeddingFieldArg));
-
-        return compileAndRun(colls, std::move(nestedLoopJoinEmbeddingNode));
-    }
-
-    CompiledTree buildNestedLoopJoinSbeTreeChain(
-        MultipleCollectionAccessor& colls,
-        FieldPath leftField,
-        FieldPath centerField,
-        FieldPath rightField,
-        boost::optional<FieldPath> leftEmbeddingFieldArg,
-        boost::optional<FieldPath> centerEmbeddingFieldArg,
-        boost::optional<FieldPath> rightEmbeddingFieldArg) {
-        // Create a three-way join with (left == center && denter == right)
-        auto outerScanNode = std::make_unique<CollectionScanNode>();
-        outerScanNode->nss = _nss;
-
-        auto innerScanNode = std::make_unique<CollectionScanNode>();
-        innerScanNode->nss = _foreignNss;
-
-        auto nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
-            std::move(outerScanNode),
-            std::move(innerScanNode),
-            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                                           .leftField = std::move(leftField),
-                                                           .rightField = centerField}},
-            std::move(leftEmbeddingFieldArg),
-            centerEmbeddingFieldArg);
-
-        auto innerScanNode2 = std::make_unique<CollectionScanNode>();
-        innerScanNode2->nss = _foreignNss;
-
-        // The left field must be prepended with the embedding used for that table.
-        nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
-            std::move(nestedLoopJoinEmbeddingNode),
-            std::move(innerScanNode2),
-            std::vector<QSNJoinPredicate>{
-                QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                 .leftField = centerEmbeddingFieldArg.has_value()
-                                     ? centerEmbeddingFieldArg->concat(centerField)
-                                     : centerField,
-                                 .rightField = std::move(rightField)}},
-            boost::none,
-            std::move(rightEmbeddingFieldArg));
-
-        return compileAndRun(colls, std::move(nestedLoopJoinEmbeddingNode));
-    }
-};
-
-class HashJoinStageBuilderTest : public JoinStageBuilderTestBase {
-public:
-    void assertReturnedDocuments(FieldPath leftField,
-                                 FieldPath rightField,
-                                 boost::optional<FieldPath> leftEmbeddingFieldArg,
-                                 boost::optional<FieldPath> rightEmbeddingFieldArg,
-                                 const std::vector<BSONObj>& expected) {
-        executeTestWithPlanCallbackAndExpectedResultsUnordered(
-            [&](MultipleCollectionAccessor& colls) {
-                return buildHashJoinSbeTree(colls,
-                                            std::move(leftField),
-                                            std::move(rightField),
-                                            std::move(leftEmbeddingFieldArg),
-                                            std::move(rightEmbeddingFieldArg));
-            },
-            expected);
-    }
-
-    void assertReturnedDocuments(FieldPath leftField,
-                                 FieldPath centerField,
-                                 FieldPath rightField,
-                                 boost::optional<FieldPath> leftEmbeddingFieldArg,
-                                 boost::optional<FieldPath> centerEmbeddingFieldArg,
-                                 boost::optional<FieldPath> rightEmbeddingFieldArg,
-                                 const std::vector<BSONObj>& expected) {
-        executeTestWithPlanCallbackAndExpectedResultsUnordered(
-            [&](MultipleCollectionAccessor& colls) {
-                return buildHashJoinSbeTreeStar(colls,
-                                                leftField,
-                                                centerField,
-                                                rightField,
-                                                leftEmbeddingFieldArg,
-                                                centerEmbeddingFieldArg,
-                                                rightEmbeddingFieldArg);
-            },
-            expected);
-        executeTestWithPlanCallbackAndExpectedResultsUnordered(
-            [&](MultipleCollectionAccessor& colls) {
-                return buildHashJoinSbeTreeChain(colls,
-                                                 std::move(leftField),
-                                                 std::move(centerField),
-                                                 std::move(rightField),
-                                                 std::move(leftEmbeddingFieldArg),
-                                                 std::move(centerEmbeddingFieldArg),
-                                                 std::move(rightEmbeddingFieldArg));
-            },
-            expected);
-    }
-
-private:
-    CompiledTree buildHashJoinSbeTree(MultipleCollectionAccessor& colls,
-                                      FieldPath leftField,
-                                      FieldPath rightField,
-                                      boost::optional<FieldPath> leftEmbeddingFieldArg,
-                                      boost::optional<FieldPath> rightEmbeddingFieldArg) {
-        auto outerScanNode = std::make_unique<CollectionScanNode>();
-        outerScanNode->nss = _nss;
-
-        auto innerScanNode = std::make_unique<CollectionScanNode>();
-        innerScanNode->nss = _foreignNss;
-
-        auto hashJoinEmbeddingNode = std::make_unique<HashJoinEmbeddingNode>(
-            std::move(outerScanNode),
-            std::move(innerScanNode),
-            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                                           .leftField = std::move(leftField),
-                                                           .rightField = std::move(rightField)}},
-            std::move(leftEmbeddingFieldArg),
-            std::move(rightEmbeddingFieldArg));
-
-        return compileAndRun(colls, std::move(hashJoinEmbeddingNode));
-    }
-
-    CompiledTree buildHashJoinSbeTreeStar(MultipleCollectionAccessor& colls,
-                                          FieldPath leftField,
-                                          FieldPath centerField,
-                                          FieldPath rightField,
-                                          boost::optional<FieldPath> leftEmbeddingFieldArg,
-                                          boost::optional<FieldPath> centerEmbeddingFieldArg,
-                                          boost::optional<FieldPath> rightEmbeddingFieldArg) {
-        // Create a three-way join with (left == center && left == right)
-        auto outerScanNode = std::make_unique<CollectionScanNode>();
-        outerScanNode->nss = _nss;
-
-        auto innerScanNode = std::make_unique<CollectionScanNode>();
-        innerScanNode->nss = _foreignNss;
-
-        auto hashJoinEmbeddingNode = std::make_unique<HashJoinEmbeddingNode>(
-            std::move(outerScanNode),
-            std::move(innerScanNode),
-            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                                           .leftField = leftField,
-                                                           .rightField = std::move(centerField)}},
-            leftEmbeddingFieldArg,
-            std::move(centerEmbeddingFieldArg));
-
-        auto innerScanNode2 = std::make_unique<CollectionScanNode>();
-        innerScanNode2->nss = _foreignNss;
-
-        // The left field must be prepended with the embedding used for that table.
-        hashJoinEmbeddingNode = std::make_unique<HashJoinEmbeddingNode>(
-            std::move(hashJoinEmbeddingNode),
-            std::move(innerScanNode2),
-            std::vector<QSNJoinPredicate>{
-                QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                 .leftField = leftEmbeddingFieldArg.has_value()
-                                     ? leftEmbeddingFieldArg->concat(leftField)
-                                     : leftField,
-                                 .rightField = std::move(rightField)}},
-            boost::none,
-            std::move(rightEmbeddingFieldArg));
-
-        return compileAndRun(colls, std::move(hashJoinEmbeddingNode));
-    }
-
-    CompiledTree buildHashJoinSbeTreeChain(MultipleCollectionAccessor& colls,
-                                           FieldPath leftField,
-                                           FieldPath centerField,
-                                           FieldPath rightField,
-                                           boost::optional<FieldPath> leftEmbeddingFieldArg,
-                                           boost::optional<FieldPath> centerEmbeddingFieldArg,
-                                           boost::optional<FieldPath> rightEmbeddingFieldArg) {
-        // Create a three-way join with (left == center && center == right)
-        auto outerScanNode = std::make_unique<CollectionScanNode>();
-        outerScanNode->nss = _nss;
-
-        auto innerScanNode = std::make_unique<CollectionScanNode>();
-        innerScanNode->nss = _foreignNss;
-
-        auto hashJoinEmbeddingNode = std::make_unique<HashJoinEmbeddingNode>(
-            std::move(outerScanNode),
-            std::move(innerScanNode),
-            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                                           .leftField = std::move(leftField),
-                                                           .rightField = centerField}},
-            std::move(leftEmbeddingFieldArg),
-            centerEmbeddingFieldArg);
-
-        auto innerScanNode2 = std::make_unique<CollectionScanNode>();
-        innerScanNode2->nss = _foreignNss;
-
-        // The left field must be prepended with the embedding used for that table.
-        hashJoinEmbeddingNode = std::make_unique<HashJoinEmbeddingNode>(
-            std::move(hashJoinEmbeddingNode),
-            std::move(innerScanNode2),
-            std::vector<QSNJoinPredicate>{
-                QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
-                                 .leftField = centerEmbeddingFieldArg.has_value()
-                                     ? centerEmbeddingFieldArg->concat(centerField)
-                                     : centerField,
-                                 .rightField = std::move(rightField)}},
-            boost::none,
-            std::move(rightEmbeddingFieldArg));
-
-        return compileAndRun(colls, std::move(hashJoinEmbeddingNode));
-    }
+    const NamespaceString _foreignNss =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
 };
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_Basic) {
@@ -1208,63 +796,464 @@ TEST_F(LookupStageBuilderTest, ThreeComponentAsPathDoesNotPerformArrayTraversal)
         "_id", "_id", "one.two.three", {fromjson("{_id: 0, one: {two: {three: [{_id: 0}]}}}")});
 }
 
-TEST_F(NestedLoopJoinStageBuilderTest, JoinWithSinglePredicate) {
-    const std::vector<BSONObj> ldocs = {
-        fromjson("{_id: 0, lkey: 1}"),
-        fromjson("{_id: 1, lkey: -1}"),
-        fromjson("{_id: 2, lkey: 3}"),
-        fromjson("{_id: 3, no_lkey: -2}"),
-        fromjson("{_id: 4, lkey: null}"),
-        fromjson("{_id: 5, lkey: undefined}"),
+class ExecutablePlan {
+public:
+    ExecutablePlan(MultipleCollectionAccessor colls,
+                   std::unique_ptr<CompileCtx> context,
+                   std::unique_ptr<PlanStage> rootStage,
+                   stage_builder::PlanStageData data,
+                   SlotId resultSlot)
+        : _colls(std::move(colls)),
+          _context(std::move(context)),
+          _rootStage(std::move(rootStage)),
+          _data(std::move(data)),
+          _resultSlot(resultSlot) {}
+
+    void expectReturnedDocuments(const std::vector<BSONObj>& documents) {
+        auto resultAccessor = _rootStage->getAccessor(*_context, _resultSlot);
+
+        for (const auto& document : documents) {
+            auto state = _rootStage->getNext();
+
+            // Fail when plan produces fewer documents than expected.
+            ASSERT_EQ(state, PlanState::ADVANCED);
+
+            auto [tagResult, valResult] = resultAccessor->getViewOfValue();
+
+            auto [tagExpected, valExpected] =
+                copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(document.objdata()));
+            ValueGuard guardExpected(tagExpected, valExpected);
+
+            PlanStageTestFixture::assertValuesEqual(tagResult, valResult, tagExpected, valExpected);
+        }
+
+        if (enableDebugOutput) {
+            size_t extraDocuments = 0;
+
+            while (_rootStage->getNext() == PlanState::ADVANCED) {
+                ++extraDocuments;
+
+                std::cout << "Unexpected document in results set: "
+                          << resultAccessor->getViewOfValue() << std::endl;
+            }
+
+            // Fail when plan produces more documents than expected.
+            ASSERT_EQ(extraDocuments, 0);
+        } else {
+            // Fail when plan produces more documents than expected.
+            ASSERT_EQ(_rootStage->getNext(), PlanState::IS_EOF);
+        }
+    }
+
+    void expectReturnedDocumentsInAnyOrder(const std::vector<BSONObj>& documents) {
+        SimpleBSONObjMultiSet unorderedExpected(documents.begin(), documents.end());
+
+        auto resultAccessor = _rootStage->getAccessor(*_context, _resultSlot);
+
+        for (size_t i = 0; i < documents.size(); ++i) {
+            auto state = _rootStage->getNext();
+
+            // Fail when plan produces fewer documents than expected.
+            ASSERT_EQ(state, PlanState::ADVANCED);
+
+            auto [tagResult, valResult] = resultAccessor->getViewOfValue();
+            ASSERT_EQ(tagResult, TypeTags::bsonObject);
+
+            auto it = unorderedExpected.find(BSONObj(bitcastTo<const char*>(valResult)));
+            ASSERT_NE(it, unorderedExpected.end());
+
+            unorderedExpected.erase(it);
+        }
+
+        if (enableDebugOutput) {
+            size_t extraDocuments = 0;
+
+            while (_rootStage->getNext() == PlanState::ADVANCED) {
+                ++extraDocuments;
+
+                std::cout << "Unexpected document in results set: "
+                          << resultAccessor->getViewOfValue() << std::endl;
+            }
+
+            // Fail when plan produces more documents than expected.
+            ASSERT_EQ(extraDocuments, 0);
+        } else {
+            // Fail when plan produces more documents than expected.
+            ASSERT_EQ(_rootStage->getNext(), PlanState::IS_EOF);
+        }
+    }
+
+    /**
+     * Verify that the SBE plan executes and eventually reaches EOF without crashing.
+     */
+    void expectCompleteExecution() {
+        while (_rootStage->getNext() != PlanState::ADVANCED) {
+            // So far, so good!
+        }
+    }
+
+private:
+    MultipleCollectionAccessor _colls;
+    std::unique_ptr<CompileCtx> _context;
+    std::unique_ptr<PlanStage> _rootStage;
+    stage_builder::PlanStageData _data;
+    SlotId _resultSlot;
+};
+
+class BinaryJoinStageBuilderTest : public SbeStageBuilderTestFixture {
+public:
+    void setUp() override {
+        SbeStageBuilderTestFixture::setUp();
+    }
+
+    void tearDown() override {
+        SbeStageBuilderTestFixture::tearDown();
+    }
+
+    enum class JoinAlgorithm {
+        nestedLoop,
+        hash,
     };
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0}"),
-        fromjson("{_id: 1, fkey: 1}"),
-        fromjson("{_id: 2, fkey: 2}"),
-        fromjson("{_id: 3, fkey: 3}"),
-        fromjson("{_id: 4, no_fkey: -3}"),
-        fromjson("{_id: 5, fkey: null}"),
-        fromjson("{_id: 6, fkey: undefined}"),
+    struct EquiJoinOperation {
+        NamespaceString rightCollectionName;
+        JoinAlgorithm algorithm;
+        boost::optional<FieldPath> embeddingPath;
+        FieldPath leftJoinKey;
+        FieldPath rightJoinKey;
     };
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 0, lkey: 1, embedding: {_id: 1, fkey: 1}}"),
-        fromjson("{_id: 2, lkey: 3, embedding: {_id: 3, fkey: 3}}"),
-        fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 5, fkey: null}}"),
-        fromjson("{_id: 4, lkey: null, embedding: {_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 4, lkey: null, embedding: {_id: 5, fkey: null}}"),
-        fromjson("{_id: 5, lkey: undefined, embedding: {_id: 6, fkey: undefined}}"),
-    };
+protected:
+    void instatiateMainCollection(const std::vector<BSONObj>& documents) {
+        ASSERT_OK(
+            storageInterface()->createCollection(operationContext(), _nss, CollectionOptions()));
 
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            {},
-                            boost::make_optional<FieldPath>("embedding"),
-                            expected);
+        SbeStageBuilderTestFixture::insertDocuments(_nss, documents);
+    }
+
+    void instantiateSecondaryCollection(const NamespaceString& collectionName,
+                                        const std::vector<BSONObj>& documents) {
+        ASSERT_OK(storageInterface()->createCollection(
+            operationContext(), collectionName, CollectionOptions()));
+
+        SbeStageBuilderTestFixture::insertDocuments(collectionName, documents);
+    }
+
+    ExecutablePlan createNLJPlanEmbeddingRightDocument(
+        const NamespaceString& leftCollectionName,
+        const NamespaceString& rightCollectionName,
+        const FieldPath& embeddingPath,
+        const std::vector<std::pair<FieldPath, FieldPath>>& joinKeys) {
+        auto leftScanNode = std::make_unique<CollectionScanNode>();
+        leftScanNode->nss = leftCollectionName;
+
+        auto rightScanNode = std::make_unique<CollectionScanNode>();
+        rightScanNode->nss = rightCollectionName;
+
+        std::vector<QSNJoinPredicate> predicateList;
+        std::transform(joinKeys.begin(),
+                       joinKeys.end(),
+                       std::back_inserter(predicateList),
+                       [](const auto keys) {
+                           return QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                   .leftField = keys.first,
+                                                   .rightField = keys.second};
+                       });
+
+        auto solution = makeQuerySolution(
+            std::make_unique<NestedLoopJoinEmbeddingNode>(std::move(leftScanNode),
+                                                          std::move(rightScanNode),
+                                                          std::move(predicateList),
+                                                          boost::none,
+                                                          embeddingPath)
+
+        );
+
+        return makeExecutablePlan(
+            leftCollectionName,
+            {rightCollectionName},
+            std::move(solution),
+            new ExpressionContextForTest(operationContext(), leftCollectionName));
+    }
+
+    ExecutablePlan createNLJPlanEmbeddingLeftDocument(const NamespaceString& leftCollectionName,
+                                                      const NamespaceString& rightCollectionName,
+                                                      const FieldPath& embeddingPath,
+                                                      const FieldPath& leftJoinKey,
+                                                      const FieldPath& rightJoinKey) {
+        auto leftScanNode = std::make_unique<CollectionScanNode>();
+        leftScanNode->nss = leftCollectionName;
+
+        auto rightScanNode = std::make_unique<CollectionScanNode>();
+        rightScanNode->nss = rightCollectionName;
+
+        auto solution = makeQuerySolution(std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::move(leftScanNode),
+            std::move(rightScanNode),
+            std::vector<QSNJoinPredicate>{{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                           .leftField = leftJoinKey,
+                                           .rightField = rightJoinKey}},
+            embeddingPath,
+            boost::none)
+
+        );
+
+        return makeExecutablePlan(
+            leftCollectionName,
+            {rightCollectionName},
+            std::move(solution),
+            new ExpressionContextForTest(operationContext(), leftCollectionName));
+    }
+
+    ExecutablePlan createNLJPlanWithFollowOnProjection(const NamespaceString& leftCollectionName,
+                                                       const NamespaceString& rightCollectionName,
+                                                       const FieldPath& embeddingPath,
+                                                       const FieldPath& leftJoinKey,
+                                                       const FieldPath& rightJoinKey,
+                                                       BSONObj projection) {
+        auto leftScanNode = std::make_unique<CollectionScanNode>();
+        leftScanNode->nss = leftCollectionName;
+
+        auto rightScanNode = std::make_unique<CollectionScanNode>();
+        rightScanNode->nss = rightCollectionName;
+
+        auto joinNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::move(leftScanNode),
+            std::move(rightScanNode),
+            std::vector<QSNJoinPredicate>{{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                           .leftField = leftJoinKey,
+                                           .rightField = rightJoinKey}},
+            boost::none,
+            embeddingPath);
+
+        boost::intrusive_ptr<ExpressionContext> expCtx(
+            new ExpressionContextForTest(operationContext(), leftCollectionName));
+        auto solution = makeQuerySolution(std::make_unique<ProjectionNodeDefault>(
+            std::move(joinNode),
+            nullptr,
+            projection_ast::parseAndAnalyze(
+                expCtx, std::move(projection), ProjectionPolicies::aggregateProjectionPolicies())));
+
+        return makeExecutablePlan(
+            leftCollectionName, {rightCollectionName}, std::move(solution), expCtx);
+    }
+
+    ExecutablePlan createNWayJoinPlan(const NamespaceString& leftMostCollectionName,
+                                      boost::optional<FieldPath> leftEmbeddingPath,
+                                      std::vector<EquiJoinOperation> equiJoins) {
+        auto rootNode = [&]() -> std::unique_ptr<QuerySolutionNode> {
+            auto collectionScan = std::make_unique<CollectionScanNode>();
+            collectionScan->nss = leftMostCollectionName;
+            return collectionScan;
+        }();
+
+        // Of the involved collections (inluding the left-most), exactly one should have no
+        // embedding, and we consider that one to be the "main" collection.
+        auto mainCollectionName = !leftEmbeddingPath.has_value()
+            ? boost::make_optional<NamespaceString>(NamespaceString(leftMostCollectionName))
+            : boost::none;
+        std::set<NamespaceString> allCollectionNames;
+        allCollectionNames.insert(leftMostCollectionName);
+
+        auto leftSideEmbedding = leftEmbeddingPath;
+
+        for (const auto& join : equiJoins) {
+            allCollectionNames.insert(join.rightCollectionName);
+            if (!join.embeddingPath.has_value()) {
+                // Fail if there are multiple collections without an embedding.
+                ASSERT_FALSE(mainCollectionName.has_value());
+                mainCollectionName = join.rightCollectionName;
+            }
+
+            auto rightScanNode = std::make_unique<CollectionScanNode>();
+            rightScanNode->nss = join.rightCollectionName;
+
+            std::vector<QSNJoinPredicate> predicates = {{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                         .leftField = join.leftJoinKey,
+                                                         .rightField = join.rightJoinKey}};
+            rootNode = [&]() -> std::unique_ptr<QuerySolutionNode> {
+                switch (join.algorithm) {
+                    case BinaryJoinStageBuilderTest::JoinAlgorithm::nestedLoop:
+                        return std::make_unique<NestedLoopJoinEmbeddingNode>(
+                            std::move(rootNode),
+                            std::move(rightScanNode),
+                            std::move(predicates),
+                            std::move(leftSideEmbedding),
+                            join.embeddingPath);
+                    case BinaryJoinStageBuilderTest::JoinAlgorithm::hash:
+                        return std::make_unique<HashJoinEmbeddingNode>(std::move(rootNode),
+                                                                       std::move(rightScanNode),
+                                                                       std::move(predicates),
+                                                                       std::move(leftSideEmbedding),
+                                                                       join.embeddingPath);
+                }
+                MONGO_UNREACHABLE;
+            }();
+
+            // Only the first join operator can have an embedding on the left side.
+            leftSideEmbedding = boost::none;
+        }
+
+        // Fail if there is no collection without an embedding.
+        ASSERT(mainCollectionName.has_value());
+
+        // Remove the main collection from the 'allCollectionNames' set so that we can use it to
+        // create a list of just secondary collections.
+        allCollectionNames.erase(*mainCollectionName);
+
+        return makeExecutablePlan(
+            *mainCollectionName,
+            std::vector<NamespaceString>(allCollectionNames.begin(), allCollectionNames.end()),
+            makeQuerySolution(std::move(rootNode)),
+            new ExpressionContextForTest(operationContext(), *mainCollectionName));
+    }
+
+    ExecutablePlan createHashJoinPlanEmbeddingRightDocument(
+        const NamespaceString& leftCollectionName,
+        const NamespaceString& rightCollectionName,
+        const FieldPath& embeddingPath,
+        const std::vector<std::pair<FieldPath, FieldPath>>& joinKeys) {
+        auto leftScanNode = std::make_unique<CollectionScanNode>();
+        leftScanNode->nss = leftCollectionName;
+
+        auto rightScanNode = std::make_unique<CollectionScanNode>();
+        rightScanNode->nss = rightCollectionName;
+
+        std::vector<QSNJoinPredicate> predicateList;
+        std::transform(joinKeys.begin(),
+                       joinKeys.end(),
+                       std::back_inserter(predicateList),
+                       [](const auto keys) {
+                           return QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                   .leftField = keys.first,
+                                                   .rightField = keys.second};
+                       });
+
+        auto solution =
+            makeQuerySolution(std::make_unique<HashJoinEmbeddingNode>(std::move(leftScanNode),
+                                                                      std::move(rightScanNode),
+                                                                      std::move(predicateList),
+                                                                      boost::none,
+                                                                      embeddingPath)
+
+            );
+
+        return makeExecutablePlan(
+            leftCollectionName,
+            {rightCollectionName},
+            std::move(solution),
+            new ExpressionContextForTest(operationContext(), leftCollectionName));
+    }
+
+    ExecutablePlan createHashJoinPlanEmbeddingLeftDocument(
+        const NamespaceString& leftCollectionName,
+        const NamespaceString& rightCollectionName,
+        const FieldPath& embeddingPath,
+        const FieldPath& leftJoinKey,
+        const FieldPath& rightJoinKey) {
+        auto leftScanNode = std::make_unique<CollectionScanNode>();
+        leftScanNode->nss = leftCollectionName;
+
+        auto rightScanNode = std::make_unique<CollectionScanNode>();
+        rightScanNode->nss = rightCollectionName;
+
+        auto solution = makeQuerySolution(std::make_unique<HashJoinEmbeddingNode>(
+            std::move(leftScanNode),
+            std::move(rightScanNode),
+            std::vector<QSNJoinPredicate>{{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                           .leftField = leftJoinKey,
+                                           .rightField = rightJoinKey}},
+            embeddingPath,
+            boost::none)
+
+        );
+
+        return makeExecutablePlan(
+            leftCollectionName,
+            {rightCollectionName},
+            std::move(solution),
+            new ExpressionContextForTest(operationContext(), leftCollectionName));
+    }
+
+    ExecutablePlan makeExecutablePlan(const NamespaceString& mainCollectionName,
+                                      std::vector<NamespaceString> secondaryCollectionNames,
+                                      std::unique_ptr<QuerySolution> solution,
+                                      boost::intrusive_ptr<ExpressionContext> expCtx) {
+        CollectionOrViewAcquisitionRequests acquisitionRequests;
+
+        // Create requests for all collections.
+        acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+            operationContext(), mainCollectionName, AcquisitionPrerequisites::kRead));
+        for (auto collectionName : secondaryCollectionNames) {
+            acquisitionRequests.emplace_back(CollectionOrViewAcquisitionRequest::fromOpCtx(
+                operationContext(), std::move(collectionName), AcquisitionPrerequisites::kRead));
+        }
+
+        // Acquire all requested collections and then move the acquired main collection from the
+        // resulting 'secondaryAcquisitions' map into its own standalone acquisition.
+        auto secondaryAcquisitions = makeAcquisitionMap(
+            acquireCollectionsOrViewsMaybeLockFree(operationContext(), acquisitionRequests));
+        auto mainAcquisition = secondaryAcquisitions.extract(mainCollectionName).mapped();
+
+        MultipleCollectionAccessor colls(mainAcquisition,
+                                         secondaryAcquisitions,
+                                         false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
+
+        BuildPlanStageParam params;
+        params.expCtx = expCtx;
+        auto [resultSlots, rootStage, data, _] =
+            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/, std::move(params));
+        ASSERT_EQ(resultSlots.size(), 1);
+
+        if (enableDebugOutput) {
+            std::cout << std::endl
+                      << DebugPrinter{true}.print(rootStage->debugPrint(DebugPrintInfo()))
+                      << std::endl;
+        }
+
+        auto context = makeCompileCtx();
+        prepareTree(context.get(), rootStage.get());
+
+        return ExecutablePlan(std::move(colls),
+                              std::move(context),
+                              std::move(rootStage),
+                              std::move(data),
+                              resultSlots.front());
+    }
+};
+
+std::string toString(BinaryJoinStageBuilderTest::JoinAlgorithm algorithm) {
+    switch (algorithm) {
+        case BinaryJoinStageBuilderTest::JoinAlgorithm::nestedLoop:
+            return "nested loop";
+        case BinaryJoinStageBuilderTest::JoinAlgorithm::hash:
+            return "hash";
+    }
+    MONGO_UNREACHABLE;
 }
 
-TEST_F(NestedLoopJoinStageBuilderTest, JoinThreeTablesWithSinglePredicate) {
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, JoinThreeTablesWithSinglePredicate) {
+    instatiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
         fromjson("{_id: 3, no_lkey: -2}"),
         fromjson("{_id: 4, lkey: null}"),
         fromjson("{_id: 5, lkey: undefined}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0, fkey1: 0}"),
-        fromjson("{_id: 1, fkey: 1, fkey1: 1}"),
-        fromjson("{_id: 2, fkey: 2, fkey1: 2}"),
-        fromjson("{_id: 3, fkey: 3, fkey1: 3}"),
-        fromjson("{_id: 4, no_fkey: -3}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null}"),
-        fromjson("{_id: 6, fkey: undefined, fkey1: undefined}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0, fkey1: 0}"),
+                                       fromjson("{_id: 1, fkey: 1, fkey1: 1}"),
+                                       fromjson("{_id: 2, fkey: 2, fkey1: 2}"),
+                                       fromjson("{_id: 3, fkey: 3, fkey1: 3}"),
+                                       fromjson("{_id: 4, no_fkey: -3}"),
+                                       fromjson("{_id: 5, fkey: null, fkey1: null}"),
+                                       fromjson("{_id: 6, fkey: undefined, fkey1: undefined}"),
+                                   });
 
     const std::vector<BSONObj> expected = {
         fromjson("{_id: 0, lkey: 1, embedding1: {_id: 1, fkey: 1, fkey1: 1}, embedding: {_id: 1, "
@@ -1291,111 +1280,133 @@ TEST_F(NestedLoopJoinStageBuilderTest, JoinThreeTablesWithSinglePredicate) {
                  "undefined}, embedding: {_id: 6, fkey: undefined, fkey1: undefined}}"),
     };
 
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            FieldPath("fkey1"),
-                            {},
-                            boost::make_optional<FieldPath>("embedding"),
-                            boost::make_optional<FieldPath>("embedding1"),
-                            expected);
+    // Perform the join LOCAL ⋈_{lkey == fkey} FOREIGN ⋈_{lkey == fkey1} FOREIGN.
+    for (auto algorithm1 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+        for (auto algorithm2 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+            LOGV2(11137700,
+                  "Performing join LOCAL ⋈_{lkey == fkey} FOREIGN ⋈_{lkey == fkey1} FOREIGN",
+                  "join1"_attr = toString(algorithm1),
+                  "join2"_attr = toString(algorithm2));
+            createNWayJoinPlan(_nss,
+                               boost::none,
+                               std::vector<EquiJoinOperation>{
+                                   {.rightCollectionName = foreignCollectionName,
+                                    .algorithm = algorithm1,
+                                    .embeddingPath = FieldPath("embedding"),
+                                    .leftJoinKey = FieldPath("lkey"),
+                                    .rightJoinKey = FieldPath("fkey")},
+                                   {.rightCollectionName = foreignCollectionName,
+                                    .algorithm = algorithm2,
+                                    .embeddingPath = FieldPath("embedding1"),
+                                    .leftJoinKey = FieldPath("lkey"),
+                                    .rightJoinKey = FieldPath("fkey1")},
+                               })
+                .expectReturnedDocumentsInAnyOrder(expected);
+        }
+    }
+
+    // Perform the equivalent join LOCAL ⋈_{lkey == fkey} FOREIGN ⋈_{fkey == fkey1} FOREIGN.
+    for (auto algorithm1 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+        for (auto algorithm2 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+            LOGV2(11137701,
+                  "Performing join LOCAL ⋈_{lkey == fkey} FOREIGN ⋈_{fkey == fkey1} FOREIGN",
+                  "join1"_attr = toString(algorithm1),
+                  "join2"_attr = toString(algorithm2));
+            createNWayJoinPlan(_nss,
+                               boost::none,
+                               std::vector<EquiJoinOperation>{
+                                   {.rightCollectionName = foreignCollectionName,
+                                    .algorithm = algorithm1,
+                                    .embeddingPath = FieldPath("embedding"),
+                                    .leftJoinKey = FieldPath("lkey"),
+                                    .rightJoinKey = FieldPath("fkey")},
+                                   {.rightCollectionName = foreignCollectionName,
+                                    .algorithm = algorithm2,
+                                    .embeddingPath = FieldPath("embedding1"),
+                                    .leftJoinKey = FieldPath("embedding.fkey"),
+                                    .rightJoinKey = FieldPath("fkey1")},
+                               })
+                .expectReturnedDocumentsInAnyOrder(expected);
+        }
+    }
 }
 
-TEST_F(NestedLoopJoinStageBuilderTest, JoinThreeTablesWithSinglePredicateBaseIsLast) {
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, NLJWithSinglePredicate) {
+    instatiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
         fromjson("{_id: 3, no_lkey: -2}"),
         fromjson("{_id: 4, lkey: null}"),
         fromjson("{_id: 5, lkey: undefined}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0, fkey1: 0}"),
-        fromjson("{_id: 1, fkey: 1, fkey1: 1}"),
-        fromjson("{_id: 2, fkey: 2, fkey1: 2}"),
-        fromjson("{_id: 3, fkey: 3, fkey1: 3}"),
-        fromjson("{_id: 4, no_fkey: -3}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null}"),
-        fromjson("{_id: 6, fkey: undefined, fkey1: undefined}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0}"),
+                                       fromjson("{_id: 1, fkey: 1}"),
+                                       fromjson("{_id: 2, fkey: 2}"),
+                                       fromjson("{_id: 3, fkey: 3}"),
+                                       fromjson("{_id: 4, no_fkey: -3}"),
+                                       fromjson("{_id: 5, fkey: null}"),
+                                       fromjson("{_id: 6, fkey: undefined}"),
+                                   });
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 1, fkey: 1, fkey1: 1, embedding: {_id: 0, lkey: 1}, embedding1: {_id: 1, "
-                 "fkey: 1, fkey1: 1}}"),
-        fromjson("{_id: 3, fkey: 3, fkey1: 3, embedding: {_id: 2, lkey: 3}, embedding1: {_id: 3, "
-                 "fkey: 3, fkey1: 3}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}, embedding1: {_id: 4, "
-                 "no_fkey: -3}}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 3, no_lkey: -2}, embedding1: "
-                 "{_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}, embedding1: {_id: 5, "
-                 "fkey: null, fkey1: null}}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 3, no_lkey: -2}, embedding1: "
-                 "{_id: 5, fkey: null, fkey1: null}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}, embedding1: {_id: 4, "
-                 "no_fkey: -3}}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 4, lkey: null}, embedding1: "
-                 "{_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}, embedding1: {_id: 5, "
-                 "fkey: null, fkey1: null}}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 4, lkey: null}, embedding1: "
-                 "{_id: 5, fkey: null, fkey1: null}}"),
-        fromjson("{_id: 6, fkey: undefined, fkey1: undefined, embedding: {_id: 5, lkey: "
-                 "undefined}, embedding1: {_id: 6, fkey: undefined, fkey1: undefined}}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            FieldPath("fkey1"),
-                            boost::make_optional<FieldPath>("embedding"),
-                            boost::make_optional<FieldPath>("embedding1"),
-                            {},
-                            expected);
+    createNLJPlanEmbeddingRightDocument(_nss,
+                                        foreignCollectionName,
+                                        FieldPath("embedding"),
+                                        {std::make_pair(FieldPath("lkey"), FieldPath("fkey"))})
+        .expectReturnedDocuments({
+            fromjson("{_id: 0, lkey: 1, embedding: {_id: 1, fkey: 1}}"),
+            fromjson("{_id: 2, lkey: 3, embedding: {_id: 3, fkey: 3}}"),
+            fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 4, no_fkey: -3}}"),
+            fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 5, fkey: null}}"),
+            fromjson("{_id: 4, lkey: null, embedding: {_id: 4, no_fkey: -3}}"),
+            fromjson("{_id: 4, lkey: null, embedding: {_id: 5, fkey: null}}"),
+            fromjson("{_id: 5, lkey: undefined, embedding: {_id: 6, fkey: undefined}}"),
+        });
 }
 
-TEST_F(NestedLoopJoinStageBuilderTest, JoinWithSinglePredicateEmbeddingLeftInRight) {
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, NLJWithSinglePredicateEmbeddingLeftInRight) {
+    instatiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
         fromjson("{_id: 3, no_lkey: -2}"),
         fromjson("{_id: 4, lkey: null}"),
         fromjson("{_id: 5, lkey: undefined}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0}"),
-        fromjson("{_id: 1, fkey: 1}"),
-        fromjson("{_id: 2, fkey: 2}"),
-        fromjson("{_id: 3, fkey: 3}"),
-        fromjson("{_id: 4, no_fkey: -3}"),
-        fromjson("{_id: 5, fkey: null}"),
-        fromjson("{_id: 6, fkey: undefined}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0}"),
+                                       fromjson("{_id: 1, fkey: 1}"),
+                                       fromjson("{_id: 2, fkey: 2}"),
+                                       fromjson("{_id: 3, fkey: 3}"),
+                                       fromjson("{_id: 4, no_fkey: -3}"),
+                                       fromjson("{_id: 5, fkey: null}"),
+                                       fromjson("{_id: 6, fkey: undefined}"),
+                                   });
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 1, fkey: 1, embedding: {_id: 0, lkey: 1}}"),
-        fromjson("{_id: 3, fkey: 3, embedding: {_id: 2, lkey: 3}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}}"),
-        fromjson("{_id: 5, fkey: null, embedding: {_id: 3, no_lkey: -2}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}}"),
-        fromjson("{_id: 5, fkey: null, embedding: {_id: 4, lkey: null}}"),
-        fromjson("{_id: 6, fkey: undefined, embedding: {_id: 5, lkey: undefined}}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            boost::make_optional<FieldPath>("embedding"),
-                            {},
-                            expected);
+    createNLJPlanEmbeddingLeftDocument(
+        _nss, foreignCollectionName, FieldPath("embedding"), FieldPath("lkey"), FieldPath("fkey"))
+        .expectReturnedDocuments({
+            fromjson("{_id: 1, fkey: 1, embedding: {_id: 0, lkey: 1}}"),
+            fromjson("{_id: 3, fkey: 3, embedding: {_id: 2, lkey: 3}}"),
+            fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}}"),
+            fromjson("{_id: 5, fkey: null, embedding: {_id: 3, no_lkey: -2}}"),
+            fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}}"),
+            fromjson("{_id: 5, fkey: null, embedding: {_id: 4, lkey: null}}"),
+            fromjson("{_id: 6, fkey: undefined, embedding: {_id: 5, lkey: undefined}}"),
+        });
 }
 
-TEST_F(NestedLoopJoinStageBuilderTest, JoinWithDottedPathPredicate) {
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathPredicate) {
+    instatiateMainCollection({
         fromjson("{_id: 0, a: {b: 1}}"),
         fromjson("{_id: 1, a: {b: 2}}"),
         fromjson("{_id: 2, no_a: -1}"),
@@ -1403,62 +1414,62 @@ TEST_F(NestedLoopJoinStageBuilderTest, JoinWithDottedPathPredicate) {
         fromjson("{_id: 4, a: 'str'}"),
         fromjson("{_id: 5, a: {b: null}}"),
         fromjson("{_id: 6, a: {no_b: -2}}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, x: {y: {z: 1}}}"),
-        fromjson("{_id: 1, no_x: -3}"),
-        fromjson("{_id: 2, x: null}"),
-        fromjson("{_id: 3, x: 'str2'}"),
-        fromjson("{_id: 4, x: {no_y: -3}}"),
-        fromjson("{_id: 5, x: {y: null}}"),
-        fromjson("{_id: 6, x: {y: {z: null}}}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, x: {y: {z: 1}}}"),
+                                       fromjson("{_id: 1, no_x: -3}"),
+                                       fromjson("{_id: 2, x: null}"),
+                                       fromjson("{_id: 3, x: 'str2'}"),
+                                       fromjson("{_id: 4, x: {no_y: -3}}"),
+                                       fromjson("{_id: 5, x: {y: null}}"),
+                                       fromjson("{_id: 6, x: {y: {z: null}}}"),
+                                   });
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 0, a: {b: 1}, embedding: {_id: 0, x: {y: {z: 1}}}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 6, x: {y: {z: null}}}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 6, x: {y: {z: null}}}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 6, x: {y: {z: null}}}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 6, x: {y: {z: null}}}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 6, x: {y: {z: null}}}}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("a.b"),
-                            FieldPath("x.y.z"),
-                            {},
-                            boost::make_optional<FieldPath>("embedding"),
-                            expected);
+    createNLJPlanEmbeddingRightDocument(_nss,
+                                        foreignCollectionName,
+                                        FieldPath("embedding"),
+                                        {std::make_pair(FieldPath("a.b"), FieldPath("x.y.z"))})
+        .expectReturnedDocuments({
+            fromjson("{_id: 0, a: {b: 1}, embedding: {_id: 0, x: {y: {z: 1}}}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 6, x: {y: {z: null}}}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 6, x: {y: {z: null}}}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 6, x: {y: {z: null}}}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 6, x: {y: {z: null}}}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 6, x: {y: {z: null}}}}"),
+        });
 }
 
-TEST_F(NestedLoopJoinStageBuilderTest, JoinWithDottedPathEmbedding) {
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, NLJWithDottedPathEmbedding) {
+    instatiateMainCollection({
         fromjson("{_id: 0, a: {b: {c: 1, x: 1}, y: 1}, lkey: 0}"),
         fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: 1}, z: 1}}"),
         fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1}, z: 1}}"),
@@ -1468,264 +1479,167 @@ TEST_F(NestedLoopJoinStageBuilderTest, JoinWithDottedPathEmbedding) {
         fromjson("{_id: 6, lkey: 0, a: {x: 1, b: 'str', z: 1}}"),
         fromjson("{_id: 7, lkey: 0, a: [{x: 1, b: {c: null, y: 1}, z: 1}, {b: {c: 1, d: 2}}]}"),
         fromjson("{_id: 8, lkey: 0, a: {}, b: 2}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0}"),
+                                   });
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 0, a: {b: {c: {_id: 0, fkey: 0}, x: 1}, y: 1}, lkey: 0}"),
-        fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
-        fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
-        fromjson("{_id: 3, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
-        fromjson("{_id: 4, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
-        fromjson("{_id: 5, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
-        fromjson("{_id: 6, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
-        fromjson("{_id: 7, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}}"),
-        fromjson("{_id: 8, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}, b: 2}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            {},
-                            boost::make_optional<FieldPath>("a.b.c"),
-                            expected);
+    createNLJPlanEmbeddingRightDocument(_nss,
+                                        foreignCollectionName,
+                                        FieldPath("a.b.c"),
+                                        {std::make_pair(FieldPath("lkey"), FieldPath("fkey"))})
+        .expectReturnedDocuments({
+            fromjson("{_id: 0, a: {b: {c: {_id: 0, fkey: 0}, x: 1}, y: 1}, lkey: 0}"),
+            fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 3, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
+            fromjson("{_id: 4, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
+            fromjson("{_id: 5, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 6, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 7, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}}"),
+            fromjson("{_id: 8, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}, b: 2}"),
+        });
 }
 
-TEST_F(NestedLoopJoinStageBuilderTest, JoinWithArrayPredicate) {
-    // Note that this test does not need to assert on results as technically the HashJoin stage
-    // should not be built if array predicates are involved. However its possible for arrays to be
-    // introduced during execution so we must ensure that the stage at least does not crash.
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, NLJWithArrayPredicate) {
+    // A binary join over paths that traverse or contain arrays results in undefined behavior, and
+    // the optimizer should use multi-key information to ensure all of a predicate's paths reference
+    // a single value. However, if execution encounters an array while evaluating a predicate, it
+    // should at least run without crashing, even if the results don't make sense.
+    instatiateMainCollection({
         fromjson("{_id: 0, lkey: [1]}"),
         fromjson("{_id: 1, lkey: [0, 1]}"),
         fromjson("{_id: 2, lkey: []}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0}"),
-        fromjson("{_id: 1, fkey: 1}"),
-        fromjson("{_id: 2, fkey: [1]}"),
-        fromjson("{_id: 3, fkey: [0]}"),
-        fromjson("{_id: 4, fkey: [0, 1]}"),
-        fromjson("{_id: 5}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0}"),
+                                       fromjson("{_id: 1, fkey: 1}"),
+                                       fromjson("{_id: 2, fkey: [1]}"),
+                                       fromjson("{_id: 3, fkey: [0]}"),
+                                       fromjson("{_id: 4, fkey: [0, 1]}"),
+                                       fromjson("{_id: 5}"),
+                                   });
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 0, lkey: [1], embedding: {_id: 2, fkey: [1]}}"),
-        fromjson("{_id: 1, lkey: [0, 1], embedding: {_id: 4, fkey: [0, 1]}}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            {},
-                            boost::make_optional<FieldPath>("embedding"),
-                            expected);
+    createNLJPlanEmbeddingRightDocument(_nss,
+                                        foreignCollectionName,
+                                        FieldPath("embedding"),
+                                        {std::make_pair(FieldPath("lkey"), FieldPath("fkey"))})
+        .expectCompleteExecution();
 }
 
-TEST_F(HashJoinStageBuilderTest, JoinThreeTablesWithSinglePredicate) {
-    // Creates a join ((A hj B) hj B') to represent a query
-    //
-    //  db.A.aggregate([
-    //     {$lookup: {from: B as:embedding localField:lkey foreignField:fkey}},
-    //     {$lookup: {from: B' as:embedding1 localField:lkey foreignField:fkey1}},
-    //  ])
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, NLJWithCompoundPredicate) {
+    instatiateMainCollection({
+        fromjson("{_id: 0, lkey1: 0, lkey2: 0}"),
+        fromjson("{_id: 1, lkey1: 1, lkey2: 0}"),
+        fromjson("{_id: 2, lkey1: 2, lkey2: 3}"),
+        fromjson("{_id: 3, lkey1: 3, lkey2: 3}"),
+    });
+
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 10, fkey1: 0, fkey2: 0}"),
+                                       fromjson("{_id: 11, fkey1: 1, fkey2: 1}"),
+                                       fromjson("{_id: 12, fkey1: 2, fkey2: 2}"),
+                                       fromjson("{_id: 13, fkey1: 3, fkey2: 3}"),
+                                   });
+
+    createNLJPlanEmbeddingRightDocument(_nss,
+                                        foreignCollectionName,
+                                        FieldPath("embedding"),
+                                        {std::make_pair(FieldPath("lkey1"), FieldPath("fkey1")),
+                                         std::make_pair(FieldPath("lkey2"), FieldPath("fkey2"))})
+        .expectReturnedDocuments({
+            fromjson("{_id: 0, lkey1: 0, lkey2: 0, embedding: {_id: 10, fkey1: 0, fkey2: 0}}"),
+            fromjson("{_id: 3, lkey1: 3, lkey2: 3, embedding: {_id: 13, fkey1: 3, fkey2: 3}}"),
+        });
+}
+
+TEST_F(BinaryJoinStageBuilderTest, HashJoinWithSinglePredicate) {
+    instatiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
         fromjson("{_id: 3, no_lkey: -2}"),
         fromjson("{_id: 4, lkey: null}"),
         fromjson("{_id: 5, lkey: undefined}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0, fkey1: 0}"),
-        fromjson("{_id: 1, fkey: 1, fkey1: 1}"),
-        fromjson("{_id: 2, fkey: 2, fkey1: 2}"),
-        fromjson("{_id: 3, fkey: 3, fkey1: 3}"),
-        fromjson("{_id: 4, no_fkey: -3}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null}"),
-        fromjson("{_id: 6, fkey: undefined, fkey1: undefined}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0}"),
+                                       fromjson("{_id: 1, fkey: 1}"),
+                                       fromjson("{_id: 2, fkey: 2}"),
+                                       fromjson("{_id: 3, fkey: 3}"),
+                                       fromjson("{_id: 4, no_fkey: -3}"),
+                                       fromjson("{_id: 5, fkey: null}"),
+                                       fromjson("{_id: 6, fkey: undefined}"),
+                                   });
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 0, lkey: 1, embedding1: {_id: 1, fkey: 1, fkey1: 1}, embedding: {_id: 1, "
-                 "fkey: 1, fkey1: 1}}"),
-        fromjson("{_id: 2, lkey: 3, embedding1: {_id: 3, fkey: 3, fkey1: 3}, embedding: {_id: 3, "
-                 "fkey: 3, fkey1: 3}}"),
-        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 4, "
-                 "no_fkey: -3}}"),
-        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
-                 "{_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 5, "
-                 "fkey: null, fkey1: null}}"),
-        fromjson("{_id: 3, no_lkey: -2, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
-                 "{_id: 5, fkey: null, fkey1: null}}"),
-        fromjson("{_id: 4, lkey: null, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 4, "
-                 "no_fkey: -3}}"),
-        fromjson("{_id: 4, lkey: null, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
-                 "{_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 4, lkey: null, embedding1: {_id: 4, no_fkey: -3}, embedding: {_id: 5, "
-                 "fkey: null, fkey1: null}}"),
-        fromjson("{_id: 4, lkey: null, embedding1: {_id: 5, fkey: null, fkey1: null}, embedding: "
-                 "{_id: 5, fkey: null, fkey1: null}}"),
-        fromjson("{_id: 5, lkey: undefined, embedding1: {_id: 6, fkey: undefined, fkey1: "
-                 "undefined}, embedding: {_id: 6, fkey: undefined, fkey1: undefined}}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            FieldPath("fkey1"),
-                            {},
-                            boost::make_optional<FieldPath>("embedding"),
-                            boost::make_optional<FieldPath>("embedding1"),
-                            expected);
+    createHashJoinPlanEmbeddingRightDocument(_nss,
+                                             foreignCollectionName,
+                                             FieldPath("embedding"),
+                                             {std::make_pair(FieldPath("lkey"), FieldPath("fkey"))})
+        .expectReturnedDocumentsInAnyOrder({
+            fromjson("{_id: 0, lkey: 1, embedding: {_id: 1, fkey: 1}}"),
+            fromjson("{_id: 2, lkey: 3, embedding: {_id: 3, fkey: 3}}"),
+            fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 4, no_fkey: -3}}"),
+            fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 5, fkey: null}}"),
+            fromjson("{_id: 4, lkey: null, embedding: {_id: 4, no_fkey: -3}}"),
+            fromjson("{_id: 4, lkey: null, embedding: {_id: 5, fkey: null}}"),
+            fromjson("{_id: 5, lkey: undefined, embedding: {_id: 6, fkey: undefined}}"),
+        });
 }
 
-TEST_F(HashJoinStageBuilderTest, JoinThreeTablesWithSinglePredicateBaseIsLast) {
-    // Creates a join ((A hj B) hj B') to represent a query
-    //
-    //  db.B'.aggregate([
-    //     {$lookup: {from: A as:embedding localField:fkey1 foreignField:lkey}},
-    //     {$lookup: {from: B as:embedding1 localField:fkey1 foreignField:fkey}},
-    //  ])
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, HashJoinWithSinglePredicateEmbeddingLeftInRight) {
+    instatiateMainCollection({
         fromjson("{_id: 0, lkey: 1}"),
         fromjson("{_id: 1, lkey: -1}"),
         fromjson("{_id: 2, lkey: 3}"),
         fromjson("{_id: 3, no_lkey: -2}"),
         fromjson("{_id: 4, lkey: null}"),
         fromjson("{_id: 5, lkey: undefined}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0, fkey1: 0}"),
-        fromjson("{_id: 1, fkey: 1, fkey1: 1}"),
-        fromjson("{_id: 2, fkey: 2, fkey1: 2}"),
-        fromjson("{_id: 3, fkey: 3, fkey1: 3}"),
-        fromjson("{_id: 4, no_fkey: -3}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null}"),
-        fromjson("{_id: 6, fkey: undefined, fkey1: undefined}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0}"),
+                                       fromjson("{_id: 1, fkey: 1}"),
+                                       fromjson("{_id: 2, fkey: 2}"),
+                                       fromjson("{_id: 3, fkey: 3}"),
+                                       fromjson("{_id: 4, no_fkey: -3}"),
+                                       fromjson("{_id: 5, fkey: null}"),
+                                       fromjson("{_id: 6, fkey: undefined}"),
+                                   });
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 1, fkey: 1, fkey1: 1, embedding: {_id: 0, lkey: 1}, embedding1: {_id: 1, "
-                 "fkey: 1, fkey1: 1}}"),
-        fromjson("{_id: 3, fkey: 3, fkey1: 3, embedding: {_id: 2, lkey: 3}, embedding1: {_id: 3, "
-                 "fkey: 3, fkey1: 3}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}, embedding1: {_id: 4, "
-                 "no_fkey: -3}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}, embedding1: {_id: 5, "
-                 "fkey: null, fkey1: null}}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 3, no_lkey: -2}, embedding1: "
-                 "{_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 3, no_lkey: -2}, embedding1: "
-                 "{_id: 5, fkey: null, fkey1: null}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}, embedding1: {_id: 4, "
-                 "no_fkey: -3}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}, embedding1: {_id: 5, "
-                 "fkey: null, fkey1: null}}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 4, lkey: null}, embedding1: "
-                 "{_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 5, fkey: null, fkey1: null, embedding: {_id: 4, lkey: null}, embedding1: "
-                 "{_id: 5, fkey: null, fkey1: null}}"),
-        fromjson("{_id: 6, fkey: undefined, fkey1: undefined, embedding: {_id: 5, lkey: "
-                 "undefined}, embedding1: {_id: 6, fkey: undefined, fkey1: undefined}}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            FieldPath("fkey1"),
-                            boost::make_optional<FieldPath>("embedding"),
-                            boost::make_optional<FieldPath>("embedding1"),
-                            {},
-                            expected);
+    createHashJoinPlanEmbeddingLeftDocument(
+        _nss, foreignCollectionName, FieldPath("embedding"), FieldPath("lkey"), FieldPath("fkey"))
+        .expectReturnedDocumentsInAnyOrder({
+            fromjson("{_id: 1, fkey: 1, embedding: {_id: 0, lkey: 1}}"),
+            fromjson("{_id: 3, fkey: 3, embedding: {_id: 2, lkey: 3}}"),
+            fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}}"),
+            fromjson("{_id: 5, fkey: null, embedding: {_id: 3, no_lkey: -2}}"),
+            fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}}"),
+            fromjson("{_id: 5, fkey: null, embedding: {_id: 4, lkey: null}}"),
+            fromjson("{_id: 6, fkey: undefined, embedding: {_id: 5, lkey: undefined}}"),
+        });
 }
 
-TEST_F(HashJoinStageBuilderTest, JoinWithSinglePredicate) {
-    const std::vector<BSONObj> ldocs = {
-        fromjson("{_id: 0, lkey: 1}"),
-        fromjson("{_id: 1, lkey: -1}"),
-        fromjson("{_id: 2, lkey: 3}"),
-        fromjson("{_id: 3, no_lkey: -2}"),
-        fromjson("{_id: 4, lkey: null}"),
-        fromjson("{_id: 5, lkey: undefined}"),
-    };
-
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0}"),
-        fromjson("{_id: 1, fkey: 1}"),
-        fromjson("{_id: 2, fkey: 2}"),
-        fromjson("{_id: 3, fkey: 3}"),
-        fromjson("{_id: 4, no_fkey: -3}"),
-        fromjson("{_id: 5, fkey: null}"),
-        fromjson("{_id: 6, fkey: undefined}"),
-    };
-
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 0, lkey: 1, embedding: {_id: 1, fkey: 1}}"),
-        fromjson("{_id: 2, lkey: 3, embedding: {_id: 3, fkey: 3}}"),
-        fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 5, fkey: null}}"),
-        fromjson("{_id: 4, lkey: null, embedding: {_id: 4, no_fkey: -3}}"),
-        fromjson("{_id: 4, lkey: null, embedding: {_id: 5, fkey: null}}"),
-        fromjson("{_id: 5, lkey: undefined, embedding: {_id: 6, fkey: undefined}}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            {},
-                            boost::make_optional<FieldPath>("embedding"),
-                            expected);
-}
-
-TEST_F(HashJoinStageBuilderTest, JoinWithSinglePredicateEmbeddingLeftInRight) {
-    const std::vector<BSONObj> ldocs = {
-        fromjson("{_id: 0, lkey: 1}"),
-        fromjson("{_id: 1, lkey: -1}"),
-        fromjson("{_id: 2, lkey: 3}"),
-        fromjson("{_id: 3, no_lkey: -2}"),
-        fromjson("{_id: 4, lkey: null}"),
-        fromjson("{_id: 5, lkey: undefined}"),
-    };
-
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0}"),
-        fromjson("{_id: 1, fkey: 1}"),
-        fromjson("{_id: 2, fkey: 2}"),
-        fromjson("{_id: 3, fkey: 3}"),
-        fromjson("{_id: 4, no_fkey: -3}"),
-        fromjson("{_id: 5, fkey: null}"),
-        fromjson("{_id: 6, fkey: undefined}"),
-    };
-
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 1, fkey: 1, embedding: {_id: 0, lkey: 1}}"),
-        fromjson("{_id: 3, fkey: 3, embedding: {_id: 2, lkey: 3}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}}"),
-        fromjson("{_id: 5, fkey: null, embedding: {_id: 3, no_lkey: -2}}"),
-        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}}"),
-        fromjson("{_id: 5, fkey: null, embedding: {_id: 4, lkey: null}}"),
-        fromjson("{_id: 6, fkey: undefined, embedding: {_id: 5, lkey: undefined}}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            boost::make_optional<FieldPath>("embedding"),
-                            {},
-                            expected);
-}
-
-TEST_F(HashJoinStageBuilderTest, JoinWithDottedPathPredicate) {
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, HashJoinWithDottedPathPredicate) {
+    instatiateMainCollection({
         fromjson("{_id: 0, a: {b: 1}}"),
         fromjson("{_id: 1, a: {b: 2}}"),
         fromjson("{_id: 2, no_a: -1}"),
@@ -1733,62 +1647,62 @@ TEST_F(HashJoinStageBuilderTest, JoinWithDottedPathPredicate) {
         fromjson("{_id: 4, a: 'str'}"),
         fromjson("{_id: 5, a: {b: null}}"),
         fromjson("{_id: 6, a: {no_b: -2}}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, x: {y: {z: 1}}}"),
-        fromjson("{_id: 1, no_x: -3}"),
-        fromjson("{_id: 2, x: null}"),
-        fromjson("{_id: 3, x: 'str2'}"),
-        fromjson("{_id: 4, x: {no_y: -3}}"),
-        fromjson("{_id: 5, x: {y: null}}"),
-        fromjson("{_id: 6, x: {y: {z: null}}}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, x: {y: {z: 1}}}"),
+                                       fromjson("{_id: 1, no_x: -3}"),
+                                       fromjson("{_id: 2, x: null}"),
+                                       fromjson("{_id: 3, x: 'str2'}"),
+                                       fromjson("{_id: 4, x: {no_y: -3}}"),
+                                       fromjson("{_id: 5, x: {y: null}}"),
+                                       fromjson("{_id: 6, x: {y: {z: null}}}"),
+                                   });
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 0, a: {b: 1}, embedding: {_id: 0, x: {y: {z: 1}}}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 2, no_a: -1, embedding: {_id: 6, x: {y: {z: null}}}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 3, a: null, embedding: {_id: 6, x: {y: {z: null}}}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 4, a: 'str', embedding: {_id: 6, x: {y: {z: null}}}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 6, x: {y: {z: null}}}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 1, no_x: -3}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 2, x: null}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 3, x: 'str2'}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 4, x: {no_y: -3}}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 5, x: {y: null}}}"),
-        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 6, x: {y: {z: null}}}}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("a.b"),
-                            FieldPath("x.y.z"),
-                            {},
-                            boost::make_optional<FieldPath>("embedding"),
-                            expected);
+    createHashJoinPlanEmbeddingRightDocument(_nss,
+                                             foreignCollectionName,
+                                             FieldPath("embedding"),
+                                             {std::make_pair(FieldPath("a.b"), FieldPath("x.y.z"))})
+        .expectReturnedDocumentsInAnyOrder({
+            fromjson("{_id: 0, a: {b: 1}, embedding: {_id: 0, x: {y: {z: 1}}}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 2, no_a: -1, embedding: {_id: 6, x: {y: {z: null}}}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 3, a: null, embedding: {_id: 6, x: {y: {z: null}}}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 4, a: 'str', embedding: {_id: 6, x: {y: {z: null}}}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 5, a: {b: null}, embedding: {_id: 6, x: {y: {z: null}}}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 1, no_x: -3}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 2, x: null}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 3, x: 'str2'}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 4, x: {no_y: -3}}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 5, x: {y: null}}}"),
+            fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 6, x: {y: {z: null}}}}"),
+        });
 }
 
-TEST_F(HashJoinStageBuilderTest, JoinWithDottedPathEmbedding) {
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, JoinWithDottedPathEmbedding) {
+    instatiateMainCollection({
         fromjson("{_id: 0, a: {b: {c: 1, x: 1}, y: 1}, lkey: 0}"),
         fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: 1}, z: 1}}"),
         fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1}, z: 1}}"),
@@ -1798,62 +1712,362 @@ TEST_F(HashJoinStageBuilderTest, JoinWithDottedPathEmbedding) {
         fromjson("{_id: 6, lkey: 0, a: {x: 1, b: 'str', z: 1}}"),
         fromjson("{_id: 7, lkey: 0, a: [{x: 1, b: {c: null, y: 1}, z: 1}, {b: {c: 1, d: 2}}]}"),
         fromjson("{_id: 8, lkey: 0, a: {}, b: 2}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0}"),
+                                   });
 
-    const std::vector<BSONObj> expected = {
-        fromjson("{_id: 0, a: {b: {c: {_id: 0, fkey: 0}, x: 1}, y: 1}, lkey: 0}"),
-        fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
-        fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
-        fromjson("{_id: 3, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
-        fromjson("{_id: 4, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
-        fromjson("{_id: 5, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
-        fromjson("{_id: 6, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
-        fromjson("{_id: 7, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}}"),
-        fromjson("{_id: 8, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}, b: 2}"),
-    };
-
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            {},
-                            boost::make_optional<FieldPath>("a.b.c"),
-                            expected);
+    createHashJoinPlanEmbeddingRightDocument(_nss,
+                                             foreignCollectionName,
+                                             FieldPath("a.b.c"),
+                                             {std::make_pair(FieldPath("lkey"), FieldPath("fkey"))})
+        .expectReturnedDocumentsInAnyOrder({
+            fromjson("{_id: 0, a: {b: {c: {_id: 0, fkey: 0}, x: 1}, y: 1}, lkey: 0}"),
+            fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 3, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
+            fromjson("{_id: 4, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
+            fromjson("{_id: 5, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 6, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
+            fromjson("{_id: 7, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}}"),
+            fromjson("{_id: 8, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}, b: 2}"),
+        });
 }
 
-TEST_F(HashJoinStageBuilderTest, JoinWithArrayPredicate) {
-    // Note that this test does not need to assert on results as technically the HashJoin stage
-    // should not be built if array predicates are involved. However its possible for arrays to be
-    // introduced during execution so we must ensure that the stage at least does not crash.
-    const std::vector<BSONObj> ldocs = {
+TEST_F(BinaryJoinStageBuilderTest, HashJoinWithArrayPredicate) {
+    // A binary join over paths that traverse or contain arrays results in undefined behavior, and
+    // the optimizer should use multi-key information to ensure all of a predicate's paths reference
+    // a single value. However, if execution encounters an array while evaluating a predicate, it
+    // should at least run without crashing, even if the results don't make sense.
+    instatiateMainCollection({
         fromjson("{_id: 0, lkey: [1]}"),
         fromjson("{_id: 1, lkey: [0, 1]}"),
         fromjson("{_id: 2, lkey: []}"),
-    };
+    });
 
-    const std::vector<BSONObj> fdocs = {
-        fromjson("{_id: 0, fkey: 0}"),
-        fromjson("{_id: 1, fkey: 1}"),
-        fromjson("{_id: 2, fkey: [1]}"),
-        fromjson("{_id: 3, fkey: [0]}"),
-        fromjson("{_id: 4, fkey: [0, 1]}"),
-        fromjson("{_id: 5}"),
-    };
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 0, fkey: 0}"),
+                                       fromjson("{_id: 1, fkey: 1}"),
+                                       fromjson("{_id: 2, fkey: [1]}"),
+                                       fromjson("{_id: 3, fkey: [0]}"),
+                                       fromjson("{_id: 4, fkey: [0, 1]}"),
+                                       fromjson("{_id: 5}"),
+                                   });
+
+    createHashJoinPlanEmbeddingRightDocument(_nss,
+                                             foreignCollectionName,
+                                             FieldPath("embedding"),
+                                             {std::make_pair(FieldPath("lkey"), FieldPath("fkey"))})
+        .expectCompleteExecution();
+}
+
+// Compute A ⨝ B, embedding the document from A into the document from B with A as the "main"
+// collection. The optimizer will never generate a plan that does this, because there is no way to
+// represent it syntactically, but it makes sense to support nonetheless.
+TEST_F(BinaryJoinStageBuilderTest, JoinWithInvertedEmbedding) {
+    instatiateMainCollection({
+        fromjson("{_id: 0, lkey: 0}"),
+        fromjson("{_id: 1, lkey: 1}"),
+    });
+
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 10, fkey: 0}"),
+                                       fromjson("{_id: 11, fkey: 1}"),
+                                   });
+
+    createNLJPlanEmbeddingLeftDocument(
+        _nss, foreignCollectionName, FieldPath("embedding"), FieldPath("lkey"), FieldPath("fkey"))
+        .expectReturnedDocuments({
+            fromjson("{_id: 10, fkey: 0, embedding: {_id: 0, lkey: 0}}"),
+            fromjson("{_id: 11, fkey: 1, embedding: {_id: 1, lkey: 1}}"),
+        });
+}
+
+// Compute B ⨝ A, embedding the document from B into the document from A with A as the "main"
+// collection. This join is what would result from
+//   db.A.aggregate([$lookup: {from: B, ...}, {$unwind: ...}])
+// if the optimizer decided to swap the outer and inner sides.
+TEST_F(BinaryJoinStageBuilderTest, ReverseOrderJoin) {
+    instatiateMainCollection({
+        fromjson("{_id: 0, lkey: 0}"),
+        fromjson("{_id: 1, lkey: 1}"),
+    });
+
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 10, fkey: 0}"),
+                                       fromjson("{_id: 11, fkey: 1}"),
+                                   });
+
+    for (auto algorithm : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+        LOGV2(11137702, "Performing reverse-order join", "join"_attr = toString(algorithm));
+
+        createNWayJoinPlan(foreignCollectionName,
+                           FieldPath("embedding"),
+                           std::vector<EquiJoinOperation>{
+                               {.rightCollectionName = _nss,
+                                .algorithm = algorithm,
+                                .embeddingPath = boost::none,
+                                .leftJoinKey = FieldPath("fkey"),
+                                .rightJoinKey = FieldPath("lkey")},
+                           })
+            .expectReturnedDocuments({
+                fromjson("{_id: 0, lkey: 0, embedding: {_id: 10, fkey: 0}}"),
+                fromjson("{_id: 1, lkey: 1, embedding: {_id: 11, fkey: 1}}"),
+            });
+    }
+}
+
+TEST_F(BinaryJoinStageBuilderTest, HashJoinWithCompoundPredicate) {
+    instatiateMainCollection({
+        fromjson("{_id: 0, lkey1: 0, lkey2: 0}"),
+        fromjson("{_id: 1, lkey1: 1, lkey2: 0}"),
+        fromjson("{_id: 2, lkey1: 2, lkey2: 3}"),
+        fromjson("{_id: 3, lkey1: 3, lkey2: 3}"),
+    });
+
+    NamespaceString foreignCollectionName =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    instantiateSecondaryCollection(foreignCollectionName,
+                                   {
+                                       fromjson("{_id: 10, fkey1: 0, fkey2: 0}"),
+                                       fromjson("{_id: 11, fkey1: 1, fkey2: 1}"),
+                                       fromjson("{_id: 12, fkey1: 2, fkey2: 2}"),
+                                       fromjson("{_id: 13, fkey1: 3, fkey2: 3}"),
+                                   });
+
+    createHashJoinPlanEmbeddingRightDocument(
+        _nss,
+        foreignCollectionName,
+        FieldPath("embedding"),
+        {std::make_pair(FieldPath("lkey1"), FieldPath("fkey1")),
+         std::make_pair(FieldPath("lkey2"), FieldPath("fkey2"))})
+        .expectReturnedDocumentsInAnyOrder({
+            fromjson("{_id: 0, lkey1: 0, lkey2: 0, embedding: {_id: 10, fkey1: 0, fkey2: 0}}"),
+            fromjson("{_id: 3, lkey1: 3, lkey2: 3, embedding: {_id: 13, fkey1: 3, fkey2: 3}}"),
+        });
+}
+
+TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoin) {
+    instatiateMainCollection({
+        fromjson("{_id: 0, lkey: 0}"),
+        fromjson("{_id: 1, lkey: 1}"),
+    });
+
+    NamespaceString foreignCollectionName1 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_1");
+    instantiateSecondaryCollection(foreignCollectionName1,
+                                   {
+                                       fromjson("{_id: 10, f1key: 0}"),
+                                       fromjson("{_id: 11, f1key: 1}"),
+                                   });
+
+    NamespaceString foreignCollectionName2 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_2");
+    instantiateSecondaryCollection(foreignCollectionName2,
+                                   {
+                                       fromjson("{_id: 20, f2key: 0}"),
+                                       fromjson("{_id: 21, f2key: 1}"),
+                                   });
 
     const std::vector<BSONObj> expected = {
-        fromjson("{_id: 0, lkey: [1], embedding: {_id: 2, fkey: [1]}}"),
-        fromjson("{_id: 1, lkey: [0, 1], embedding: {_id: 4, fkey: [0, 1]}}"),
+        fromjson("{_id: 0, lkey: 0, c: {_id: 20, f2key: 0}, b: {_id: 10, f1key: 0}}"),
+        fromjson("{_id: 1, lkey: 1, c: {_id: 21, f2key: 1}, b: {_id: 11, f1key: 1}}"),
     };
 
-    insertDocuments(ldocs, fdocs);
-    assertReturnedDocuments(FieldPath("lkey"),
-                            FieldPath("fkey"),
-                            {},
-                            boost::make_optional<FieldPath>("embedding"),
-                            expected);
+    for (auto algorithm1 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+        for (auto algorithm2 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+            LOGV2(11137703,
+                  "Performing three-collection join",
+                  "join1"_attr = toString(algorithm1),
+                  "join2"_attr = toString(algorithm2));
+            createNWayJoinPlan(_nss,
+                               boost::none,
+                               std::vector<EquiJoinOperation>{
+                                   {.rightCollectionName = foreignCollectionName1,
+                                    .algorithm = algorithm1,
+                                    .embeddingPath = FieldPath("b"),
+                                    .leftJoinKey = FieldPath("lkey"),
+                                    .rightJoinKey = FieldPath("f1key")},
+                                   {.rightCollectionName = foreignCollectionName2,
+                                    .algorithm = algorithm2,
+                                    .embeddingPath = FieldPath("c"),
+                                    .leftJoinKey = FieldPath("lkey"),
+                                    .rightJoinKey = FieldPath("f2key")},
+                               })
+                .expectReturnedDocumentsInAnyOrder(expected);
+        }
+    }
+}
+
+TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoinWithNestedPathPredicate) {
+    instatiateMainCollection({
+        fromjson("{_id: 0, l1key: 0}"),
+        fromjson("{_id: 1, l1key: 1}"),
+    });
+
+    NamespaceString foreignCollectionName1 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_1");
+    instantiateSecondaryCollection(foreignCollectionName1,
+                                   {
+                                       fromjson("{_id: 10, f1key: 0, l2key: 10}"),
+                                       fromjson("{_id: 11, f1key: 1, l2key: 11}"),
+                                   });
+
+    NamespaceString foreignCollectionName2 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_2");
+    instantiateSecondaryCollection(foreignCollectionName2,
+                                   {
+                                       fromjson("{_id: 20, f2key: 10}"),
+                                       fromjson("{_id: 21, f2key: 11}"),
+                                   });
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, l1key: 0, c: {_id: 20, f2key: 10}, b: {_id: 10, f1key: 0, l2key: 10}}"),
+        fromjson("{_id: 1, l1key: 1, c: {_id: 21, f2key: 11}, b: {_id: 11, f1key: 1, l2key: 11}}"),
+    };
+
+    for (auto algorithm1 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+        for (auto algorithm2 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+            LOGV2(11137704,
+                  "Performing three-collection join with nested-path predicate",
+                  "join1"_attr = toString(algorithm1),
+                  "join2"_attr = toString(algorithm2));
+            createNWayJoinPlan(_nss,
+                               boost::none,
+                               std::vector<EquiJoinOperation>{
+                                   {.rightCollectionName = foreignCollectionName1,
+                                    .algorithm = algorithm1,
+                                    .embeddingPath = FieldPath("b"),
+                                    .leftJoinKey = FieldPath("l1key"),
+                                    .rightJoinKey = FieldPath("f1key")},
+                                   {.rightCollectionName = foreignCollectionName2,
+                                    .algorithm = algorithm2,
+                                    .embeddingPath = FieldPath("c"),
+                                    .leftJoinKey = FieldPath("b.l2key"),
+                                    .rightJoinKey = FieldPath("f2key")},
+                               })
+                .expectReturnedDocumentsInAnyOrder(expected);
+        }
+    }
+}
+
+TEST_F(BinaryJoinStageBuilderTest, ThreeWayNestedLoopJoinWithNestedPathEmbeddings) {
+    instatiateMainCollection({
+        fromjson("{_id: 0, lkey: 0}"),
+        fromjson("{_id: 1, lkey: 1}"),
+    });
+
+    NamespaceString foreignCollectionName1 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_1");
+    instantiateSecondaryCollection(foreignCollectionName1,
+                                   {
+                                       fromjson("{_id: 10, f1key: 0}"),
+                                       fromjson("{_id: 11, f1key: 1}"),
+                                   });
+
+    NamespaceString foreignCollectionName2 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_2");
+    instantiateSecondaryCollection(foreignCollectionName2,
+                                   {
+                                       fromjson("{_id: 20, f2key: 0}"),
+                                       fromjson("{_id: 21, f2key: 1}"),
+                                   });
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, lkey: 0, embed: {c: {_id: 20, f2key: 0}, b: {_id: 10, f1key: 0}}}"),
+        fromjson("{_id: 1, lkey: 1, embed: {c: {_id: 21, f2key: 1}, b: {_id: 11, f1key: 1}}}"),
+    };
+
+    for (auto algorithm1 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+        for (auto algorithm2 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+            LOGV2(11137705,
+                  "Performing three-collection join with nested-path embeddings",
+                  "join1"_attr = toString(algorithm1),
+                  "join2"_attr = toString(algorithm2));
+            createNWayJoinPlan(_nss,
+                               boost::none,
+                               std::vector<EquiJoinOperation>{
+                                   {.rightCollectionName = foreignCollectionName1,
+                                    .algorithm = algorithm1,
+                                    .embeddingPath = FieldPath("embed.b"),
+                                    .leftJoinKey = FieldPath("lkey"),
+                                    .rightJoinKey = FieldPath("f1key")},
+                                   {.rightCollectionName = foreignCollectionName2,
+                                    .algorithm = algorithm2,
+                                    .embeddingPath = FieldPath("embed.c"),
+                                    .leftJoinKey = FieldPath("lkey"),
+                                    .rightJoinKey = FieldPath("f2key")},
+                               })
+                .expectReturnedDocumentsInAnyOrder(expected);
+        }
+    }
+}
+
+TEST_F(BinaryJoinStageBuilderTest, ThreeWayJoinWithNestedPathPredicatesAndEmbeddings) {
+    instatiateMainCollection({
+        fromjson("{_id: 0, l1key: 0}"),
+        fromjson("{_id: 1, l1key: 1}"),
+    });
+
+    NamespaceString foreignCollectionName1 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_1");
+    instantiateSecondaryCollection(foreignCollectionName1,
+                                   {
+                                       fromjson("{_id: 10, f1key: 0, l2key: 10}"),
+                                       fromjson("{_id: 11, f1key: 1, l2key: 11}"),
+                                   });
+
+    NamespaceString foreignCollectionName2 =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign_2");
+    instantiateSecondaryCollection(foreignCollectionName2,
+                                   {
+                                       fromjson("{_id: 20, f2key: 10}"),
+                                       fromjson("{_id: 21, f2key: 11}"),
+                                   });
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, l1key: 0, c: {_id: 20, f2key: 10},"
+                 "embed: {b: {_id: 10, f1key: 0, l2key: 10}}}"),
+        fromjson("{_id: 1, l1key: 1, c: {_id: 21, f2key: 11},"
+                 "embed: {b: {_id: 11, f1key: 1, l2key: 11}}}"),
+    };
+
+    for (auto algorithm1 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+        for (auto algorithm2 : {JoinAlgorithm::nestedLoop, JoinAlgorithm::hash}) {
+            LOGV2(11137706,
+                  "Performing three-collection join with nested-path predicates and embeddings",
+                  "join1"_attr = toString(algorithm1),
+                  "join2"_attr = toString(algorithm2));
+            createNWayJoinPlan(_nss,
+                               boost::none,
+                               std::vector<EquiJoinOperation>{
+                                   {.rightCollectionName = foreignCollectionName1,
+                                    .algorithm = algorithm1,
+                                    .embeddingPath = FieldPath("embed.b"),
+                                    .leftJoinKey = FieldPath("l1key"),
+                                    .rightJoinKey = FieldPath("f1key")},
+                                   {.rightCollectionName = foreignCollectionName2,
+                                    .algorithm = algorithm2,
+                                    .embeddingPath = FieldPath("c"),
+                                    .leftJoinKey = FieldPath("embed.b.l2key"),
+                                    .rightJoinKey = FieldPath("f2key")},
+                               })
+                .expectReturnedDocumentsInAnyOrder(expected);
+        }
+    }
 }
 }  // namespace
 }  // namespace mongo::sbe
