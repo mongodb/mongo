@@ -3126,12 +3126,15 @@ void logKeyString(const RecordId& recordId,
     // We need to rehydrate the keyString to something readable.
     BSONObj rehydratedKey = rehydrateKey(keyPatternBson, keyStringBson);
 
+    auto typeBits = keyStringValue.getTypeBits();
+
     LOGV2(51811,
           "logging keystring",
           "caller"_attr = callerLogPrefix,
           "record_id"_attr = recordId,
           "rehydrated_key"_attr = rehydratedKey,
-          "key_string"_attr = keyStringValue);
+          "key_string"_attr = keyStringValue,
+          "type_bits"_attr = hexblob::encode(typeBits.getBuffer(), typeBits.getSize()));
 }
 
 BSONObj rehydrateKey(const BSONObj& keyPatternBson, const BSONObj& keyStringBson) {
