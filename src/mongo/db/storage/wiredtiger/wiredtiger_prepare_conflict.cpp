@@ -131,7 +131,8 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx, std::function<in
         // MODE_S lock (or MODE_X lock for completeness).
         if (type == RESOURCE_GLOBAL || type == RESOURCE_DATABASE || type == RESOURCE_COLLECTION)
             invariant(lock.mode != MODE_S && lock.mode != MODE_X,
-                      str::stream() << lock.resourceId.toString() << " in " << modeName(lock.mode));
+                      str::stream()
+                          << toStringForLogging(lock.resourceId) << " in " << modeName(lock.mode));
     }
 
     if (MONGO_unlikely(WTSkipPrepareConflictRetries.shouldFail())) {
