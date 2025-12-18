@@ -83,6 +83,7 @@ let pipeline = {
     },
 };
 runTest("last-lts", pipeline, "featureFlagExposeArrayIndexInMapFilterReduce");
+// TODO(SERVER-115778): Remove the 'last-continuous' test below when 8.3 becomes last continuous.
 runTest("last-continuous", pipeline, "featureFlagExposeArrayIndexInMapFilterReduce");
 
 // '$_testFeatureFlagLatest' is an expression that is permanently enabled in the latest FCV.

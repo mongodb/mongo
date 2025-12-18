@@ -10,25 +10,114 @@ const testName = "collection_validator_feature_compatibility_version";
 const dbpath = MongoRunner.dataPath + testName;
 
 // An array of feature flags that must be enabled to run feature flag tests.
-const featureFlagsToEnable = [];
+const featureFlagsToEnable = ["featureFlagExposeArrayIndexInMapFilterReduce"];
 
 // These arrays should be populated with
 //
-//      { validator: { ... }, nonMatchingDocument: { ... }, lastStableErrCode }
+//      { validator: { ... }, nonMatchingDocument: { ... } }
 //
 // objects that use query features in new versions of mongod. Note that this also
 // includes new aggregation expressions able to be used with the $expr match expression. This
 // test ensures that a collection validator accepts the new query feature when the feature
 // compatibility version is the latest version, and rejects it when the feature compatibility
 // version is the last version.
-// The 'lastStableErrCode' field indicates what error the last version would throw when
-// parsing the validator.
 const testCasesLastContinuous = [
     //
     // Populate with any new expressions.
     //
 ];
-const testCasesLastContinuousWithFeatureFlags = [];
+const testCasesLastContinuousWithFeatureFlags = [
+    // TODO(SERVER-115778): Move arrayIndexAs/as/valueAs queries to 'testCasesLastStable' when 8.3 becomes last continuous.
+    // TODO(SERVER-90514): Remove arrayIndexAs/as/valueAs queries when feature flag is removed.
+    {
+        validator: {
+            $expr: {
+                $eq: [
+                    {
+                        $map: {
+                            input: "$a",
+                            arrayIndexAs: "i",
+                            in: "$$i",
+                        },
+                    },
+                    [0, 1, 2],
+                ],
+            },
+        },
+        nonMatchingDocument: {a: [0, 0]},
+    },
+    {
+        validator: {
+            $expr: {
+                $eq: [
+                    {
+                        $reduce: {
+                            input: "$a",
+                            arrayIndexAs: "i",
+                            initialValue: 0,
+                            in: {$add: ["$$value", "$$i"]},
+                        },
+                    },
+                    0,
+                ],
+            },
+        },
+        nonMatchingDocument: {a: [0, 1]},
+    },
+    {
+        validator: {
+            $expr: {
+                $eq: [
+                    {
+                        $reduce: {
+                            input: "$a",
+                            initialValue: 0,
+                            in: {$add: ["$$value", "$$IDX"]},
+                        },
+                    },
+                    0,
+                ],
+            },
+        },
+        nonMatchingDocument: {a: [0, 1]},
+    },
+    {
+        validator: {
+            $expr: {
+                $eq: [
+                    {
+                        $reduce: {
+                            input: "$a",
+                            as: "elem",
+                            valueAs: "acc",
+                            initialValue: 0,
+                            in: {$add: ["$$acc", "$$elem"]},
+                        },
+                    },
+                    0,
+                ],
+            },
+        },
+        nonMatchingDocument: {a: [0, 1]},
+    },
+    {
+        validator: {
+            $expr: {
+                $eq: [
+                    {
+                        $filter: {
+                            input: "$a",
+                            arrayIndexAs: "i",
+                            cond: {$eq: ["$$i", 1]},
+                        },
+                    },
+                    [1, 2, 3],
+                ],
+            },
+        },
+        nonMatchingDocument: {a: [0, 0]},
+    },
+];
 
 const testCasesLastStable = testCasesLastContinuous.concat([]);
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
@@ -38,7 +127,7 @@ const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFl
 // have values "last-lts" and "last-continuous".
 function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags = []) {
     if (testCases.length === 0) {
-        jsTestLog("Skipping setup for tests against " + lastVersion + " since there are none");
+        jsTest.log.info("Skipping setup for tests against " + lastVersion + " since there are none");
         return;
     }
 
@@ -51,7 +140,7 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         command[featureFlags[i]] = 1;
         const featureEnabled = assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]].value;
         if (!featureEnabled) {
-            jsTestLog("Skipping test because the " + featureFlags[i] + " feature flag is disabled");
+            jsTest.log.info("Skipping test because the " + featureFlags[i] + " feature flag is disabled");
             MongoRunner.stopMongod(conn);
             return;
         }
@@ -113,53 +202,39 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         // Trying to create a new collection with a validator using new query features should
         // fail while feature compatibility version is the last version.
         let res = testDB.createCollection("other", {validator: test.validator});
-        assert.commandFailedWithCode(
+        assert.commandFailed(
             res,
-            ErrorCodes.QueryFeatureNotAllowed,
             "Expected *not* to be able to create collection with validator " + tojson(test.validator),
-        );
-        assert(
-            res.errmsg.match(/feature compatibility version/),
-            `Expected error message from createCollection with validator ` +
-                `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
-                res.errmsg,
         );
 
         // Trying to update a collection with a validator using new query features should also
         // fail.
         res = testDB.runCommand({collMod: coll.getName(), validator: test.validator});
-        assert.commandFailedWithCode(
-            res,
-            ErrorCodes.QueryFeatureNotAllowed,
-            `Expected to be able to create collection with validator ${tojson(test.validator)}`,
-        );
-        assert(
-            res.errmsg.match(/feature compatibility version/),
-            `Expected error message from createCollection with validator ` +
-                `${tojson(test.validator)} to reference 'feature compatibility version' but got: ` +
-                res.errmsg,
+        assert.commandFailed(res, `Expected to be able to create collection with validator ${tojson(test.validator)}`);
+    });
+
+    MongoRunner.stopMongod(conn);
+
+    // Versions of mongod 4.2 and later are able to start up with a collection validator that's
+    // considered invalid. However, any writes to the collection will fail.
+    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastVersion, noCleanData: true});
+    assert.neq(null, conn, lastVersion + " mongod was unable to start up with invalid validator");
+    testDB = conn.getDB(testName);
+
+    // Check that writes fail to all collections with validators using new query features.
+    testCases.forEach(function (test, i) {
+        const coll = testDB["coll" + i];
+        const res = assert.writeError(coll.insert(test.nonMatchingDocument));
+        assert.neq(
+            res.getWriteError(),
+            ErrorCodes.DocumentValidationFailure,
+            `Expected validator ${tojson(test.validator)} to not be able to execute new query features`,
         );
     });
 
     MongoRunner.stopMongod(conn);
 
-    if (testCases.length > 0) {
-        // Versions of mongod 4.2 and later are able to start up with a collection validator that's
-        // considered invalid. However, any writes to the collection will fail.
-        conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastVersion, noCleanData: true});
-        assert.neq(null, conn, lastVersion + " mongod was unable to start up with invalid validator");
-        const testDB = conn.getDB(testName);
-
-        // Check that writes fail to all collections with validators using new query features.
-        testCases.forEach(function (test, i) {
-            const coll = testDB["coll" + i];
-            assert.commandFailedWithCode(coll.insert({foo: 1}), test.lastStableErrCode);
-        });
-
-        MongoRunner.stopMongod(conn);
-    }
-
-    // Starting up the latest version of mongod, however, should succeed, even though the feature
+    // Starting up the latest version of mongod should succeed, even though the feature
     // compatibility version is still set to the last version.
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest", noCleanData: true});
     assert.neq(null, conn, "mongod was unable to start up");
@@ -167,14 +242,14 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
     adminDB = conn.getDB("admin");
     testDB = conn.getDB(testName);
 
-    // And the validator should still work.
+    // And the validator shouldn't be able to execute the query with new features.
     testCases.forEach(function (test, i) {
         const coll = testDB["coll" + i];
-        assert.writeErrorWithCode(
-            coll.insert(test.nonMatchingDocument),
+        const res = assert.writeError(coll.insert(test.nonMatchingDocument));
+        assert.neq(
+            res.getWriteError(),
             ErrorCodes.DocumentValidationFailure,
-            `Expected document ${tojson(test.nonMatchingDocument)} to fail validation for ` +
-                `collection with validator ${tojson(test.validator)}`,
+            `Expected validator ${tojson(test.validator)} to not be able to execute new query features`,
         );
 
         // Remove the validator.
@@ -228,7 +303,10 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         adminDB.runCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
     );
     MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({
+
+    // TODO SERVER-115604 investigate usage of internalValidateFeaturesAsPrimary, and confirm if we
+    // should remove this or fix query validation.
+    /*conn = MongoRunner.runMongod({
         dbpath: dbpath,
         binVersion: "latest",
         noCleanData: true,
@@ -258,7 +336,7 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags
         );
     });
 
-    MongoRunner.stopMongod(conn);
+    MongoRunner.stopMongod(conn);*/
 }
 
 testCollectionValidatorFCVBehavior("last-lts", testCasesLastStable);

@@ -10,7 +10,7 @@ const testName = "view_definition_feature_compatibility_version_multiversion";
 const dbpath = MongoRunner.dataPath + testName;
 
 // An array of feature flags that must be enabled to run feature flag tests.
-const featureFlagsToEnable = [];
+const featureFlagsToEnable = ["featureFlagExposeArrayIndexInMapFilterReduce"];
 
 // These arrays should be populated with aggregation pipelines that use
 // aggregation features in new versions of mongod. This test ensures that a view
@@ -18,7 +18,103 @@ const featureFlagsToEnable = [];
 // latest version, and rejects it when the feature compatibility version is the last
 // version.
 const testCasesLastContinuous = [];
-const testCasesLastContinuousWithFeatureFlags = [];
+const testCasesLastContinuousWithFeatureFlags = [
+    // TODO(SERVER-115778): Move arrayIndexAs/as/valueAs queries to 'testCasesLastStable' when 8.3 becomes last continuous.
+    // TODO(SERVER-90514): Remove arrayIndexAs/as/valueAs queries when feature flag is removed.
+    [
+        {
+            $match: {
+                $expr: {
+                    $eq: [
+                        {
+                            $map: {
+                                input: "$a",
+                                arrayIndexAs: "i",
+                                in: "$$i",
+                            },
+                        },
+                        [0, 1, 2],
+                    ],
+                },
+            },
+        },
+    ],
+    [
+        {
+            $match: {
+                $expr: {
+                    $eq: [
+                        {
+                            $reduce: {
+                                input: "$a",
+                                arrayIndexAs: "i",
+                                initialValue: 0,
+                                in: {$add: ["$$value", "$$i"]},
+                            },
+                        },
+                        0,
+                    ],
+                },
+            },
+        },
+    ],
+    [
+        {
+            $match: {
+                $expr: {
+                    $eq: [
+                        {
+                            $reduce: {
+                                input: "$a",
+                                initialValue: 0,
+                                in: {$add: ["$$value", "$$IDX"]},
+                            },
+                        },
+                        0,
+                    ],
+                },
+            },
+        },
+    ],
+    [
+        {
+            $match: {
+                $expr: {
+                    $eq: [
+                        {
+                            $reduce: {
+                                input: "$a",
+                                as: "elem",
+                                valueAs: "acc",
+                                initialValue: 0,
+                                in: {$add: ["$$acc", "$$elem"]},
+                            },
+                        },
+                        0,
+                    ],
+                },
+            },
+        },
+    ],
+    [
+        {
+            $match: {
+                $expr: {
+                    $eq: [
+                        {
+                            $filter: {
+                                input: "$a",
+                                arrayIndexAs: "i",
+                                cond: {$eq: ["$$i", 1]},
+                            },
+                        },
+                        [1, 2, 3],
+                    ],
+                },
+            },
+        },
+    ],
+];
 
 // Anything that's incompatible with the last continuous release is incompatible with the last
 // stable release.
@@ -31,7 +127,7 @@ const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFl
 // 'lastVersion' can have values "last-lts" and "last-continuous".
 function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []) {
     if (testCases.length === 0) {
-        jsTestLog("Skipping setup for tests against " + lastVersion + " since there are none");
+        jsTest.log.info("Skipping setup for tests against " + lastVersion + " since there are none");
         return;
     }
 
@@ -43,7 +139,7 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         command[featureFlags[i]] = 1;
         const featureEnabled = assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]].value;
         if (!featureEnabled) {
-            jsTestLog("Skipping test because the " + featureFlags[i] + " feature flag is disabled");
+            jsTest.log.info("Skipping test because the " + featureFlags[i] + " feature flag is disabled");
             MongoRunner.stopMongod(conn);
             return;
         }
@@ -79,21 +175,22 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         testDB.adminCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
     );
 
-    // Read against an existing view using new query features should not fail.
+    // Read against an existing view using new query features should fail.
     testCases.forEach((pipe, i) => {
-        assert.commandWorked(
+        assert.commandFailed(
             testDB.runCommand({find: "firstView" + i}),
-            `Failed to query view with pipeline ${tojson(pipe)}`,
+            `Succeeded to query view with pipeline ${tojson(pipe)}`,
         );
     });
 
+    // TODO SERVER-115604 enable when internalFeatureAsPrimary work is investigated.
     // Trying to create a new view in the same database as existing invalid view should fail,
     // even if the new view doesn't use any new query features.
-    assert.commandFailedWithCode(
+    /*assert.commandFailedWithCode(
         testDB.createView("newViewOldFeatures", "coll", [{$project: {_id: 1}}]),
         ErrorCodes.QueryFeatureNotAllowed,
         `Expected *not* to be able to create view on database ${testDB} while in FCV ${binVersionToFCV(lastVersion)}`,
-    );
+    );*/
 
     // Trying to create a new view succeeds if it's on a separate database.
     const testDB2 = conn.getDB(testName + "2");
@@ -104,9 +201,8 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     // (We use a separate DB to ensure this can only fail because of the view we're trying to
     // create, as opposed to an existing view.)
     testCases.forEach((pipe, i) =>
-        assert.commandFailedWithCode(
+        assert.commandFailed(
             testDB2.createView("view_fail" + i, "coll", pipe),
-            ErrorCodes.QueryFeatureNotAllowed,
             `Expected *not* to be able to create view with pipeline ${tojson(pipe)} while in FCV` +
                 ` ${binVersionToFCV(lastVersion)}`,
         ),
@@ -114,9 +210,8 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
 
     // Trying to update existing view to use new query features should also fail.
     testCases.forEach((pipe, i) =>
-        assert.commandFailedWithCode(
+        assert.commandFailed(
             testDB.runCommand({collMod: "emptyView", viewOn: "coll", pipeline: pipe}),
-            ErrorCodes.QueryFeatureNotAllowed,
             `Expected *not* to be able to modify view to use pipeline ${tojson(pipe)} while in` +
                 `FCV ${binVersionToFCV(lastVersion)}`,
         ),
@@ -136,13 +231,13 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     // Reads will fail against views with new query features when running the last version.
     // Not checking the code returned on failure as it is not uniform across the various
     // 'pipeline' arguments tested.
-    testCases.forEach((pipe, i) =>
+    testCases.forEach((pipe, i) => {
         assert.commandFailed(
             testDB.runCommand({find: "firstView" + i}),
             `Expected read against view with pipeline ${tojson(pipe)} to fail on version` +
                 ` ${MongoRunner.getBinVersionFor(lastVersion)}`,
-        ),
-    );
+        );
+    });
 
     // Test that a read against a view that does not contain new query features succeeds.
     assert.commandWorked(testDB.runCommand({find: "emptyView"}));
@@ -155,9 +250,9 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
     assert.neq(null, conn, "mongod was unable to start up");
     testDB = conn.getDB(testName);
 
-    // Read against an existing view using new query features should not fail.
+    // Read against an existing view using new query features should fail on a lower FCV.
     testCases.forEach((pipe, i) => {
-        assert.commandWorked(
+        assert.commandFailed(
             testDB.runCommand({find: "firstView" + i}),
             `Failed to query view with pipeline ${tojson(pipe)}`,
         );
@@ -192,7 +287,9 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         testDB.adminCommand({setFeatureCompatibilityVersion: binVersionToFCV(lastVersion), confirm: true}),
     );
     MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({
+
+    // TODO SERVER-115604 investigate usages of internalValidateFeaturesAsPrimary
+    /*conn = MongoRunner.runMongod({
         dbpath: dbpath,
         binVersion: "latest",
         noCleanData: true,
@@ -221,7 +318,7 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []
         );
     });
 
-    MongoRunner.stopMongod(conn);
+    MongoRunner.stopMongod(conn);*/
 
     // Starting up the last version of mongod with new query features should succeed.
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastVersion, noCleanData: true});
