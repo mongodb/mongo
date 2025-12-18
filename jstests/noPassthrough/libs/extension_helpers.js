@@ -111,9 +111,12 @@ export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["sta
         {
             const shardingTest = new ShardingTest({
                 shards: 1,
+                rs: {nodes: 1},
                 mongos: 1,
                 config: 1,
                 mongosOptions: options,
+                configOptions: options,
+                rsOptions: options,
             });
             func(shardingTest.s);
             shardingTest.stop();

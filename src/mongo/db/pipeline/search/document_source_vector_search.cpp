@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/search/vector_search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
+#include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_index_view_validation.h"
@@ -51,10 +52,24 @@ using boost::intrusive_ptr;
 
 ALLOCATE_STAGE_PARAMS_ID(vectorSearch, VectorSearchStageParams::id);
 
-REGISTER_DOCUMENT_SOURCE(vectorSearch,
-                         VectorSearchLiteParsed::parse,
-                         DocumentSourceVectorSearch::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+// Register the legacy parser as a fallback. This parser will be used when
+// featureFlagVectorSearchExtension is disabled or when the vector search extension has not been
+// loaded.
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(vectorSearch,
+                                              VectorSearchLiteParsed::parse,
+                                              AllowedWithApiStrict::kNeverInVersion1,
+                                              &feature_flags::gFeatureFlagVectorSearchExtension);
+
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(
+    vectorSearch,
+    DocumentSourceVectorSearch::kStageName,
+    VectorSearchStageParams::id,
+    [](const std::unique_ptr<StageParams>& stageParams,
+       const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return DocumentSourceVectorSearch::createFromBson(
+            dynamic_cast<VectorSearchStageParams*>(stageParams.get())->getOriginalBson(), expCtx);
+    });
+
 ALLOCATE_DOCUMENT_SOURCE_ID(vectorSearch, DocumentSourceVectorSearch::id)
 
 DocumentSourceVectorSearch::DocumentSourceVectorSearch(

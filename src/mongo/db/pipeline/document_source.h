@@ -213,6 +213,20 @@ namespace mongo {
     }
 
 /**
+ * Registers a fallback LiteParsedDocumentSource parser that will be used when no primary parser is
+ * registered or when the associated feature flag is disabled.
+ */
+#define REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(                                             \
+    key, liteParser, allowedWithApiStrict, featureFlag)                                            \
+    MONGO_INITIALIZER_GENERAL(addToLiteParsedFallbackParserMap_##key,                              \
+                              ("BeginDocumentSourceRegistration"),                                 \
+                              ("EndDocumentSourceRegistration"))                                   \
+    (InitializerContext*) {                                                                        \
+        LiteParsedDocumentSource::registerFallbackParser(                                          \
+            "$" #key, liteParser, featureFlag, allowedWithApiStrict, AllowedWithClientType::kAny); \
+    }
+
+/**
  * Allocates a new, unique DocumentSource::Id value.
  * Assigns it to a private variable (in an anonymous namespace) based on the given `name`, and
  * declares a const reference named `constName` to the private variable.
