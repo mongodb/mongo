@@ -123,7 +123,7 @@ private:
         /**
          * Child nodes representing further segments of the path.
          */
-        stdx::unordered_map<std::string, TrieNode> _children;
+        std::map<std::string, TrieNode> _children;
 
         /**
          * Represents whether the current node (i.e. path segment) may contain array values.
