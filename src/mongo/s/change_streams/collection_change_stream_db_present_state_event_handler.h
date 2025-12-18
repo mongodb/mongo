@@ -50,6 +50,8 @@ protected:
      */
     std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> buildDbAbsentStateEventHandler()
         const override;
+
+    std::string toString() const override;
 };
 
 }  // namespace mongo

@@ -27,20 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/s/change_streams/collection_change_stream_db_absent_state_event_handler.h"
+#include "mongo/s/change_streams/database_change_stream_db_present_state_event_handler.h"
 
-#include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
-
-#include <memory>
+#include "mongo/s/change_streams/database_change_stream_db_absent_state_event_handler.h"
 
 namespace mongo {
-std::unique_ptr<ChangeStreamShardTargeterStateEventHandler>
-CollectionChangeStreamShardTargeterDbAbsentStateEventHandler::buildDbPresentStateEventHandler()
-    const {
-    return std::make_unique<CollectionChangeStreamShardTargeterDbPresentStateEventHandler>();
+
+ShardTargeterDecision DatabaseChangeStreamShardTargeterDbPresentStateEventHandler::handleMoveChunk(
+    OperationContext* opCtx,
+    const MoveChunkControlEvent& event,
+    ChangeStreamShardTargeterStateEventHandlingContext& ctx,
+    ChangeStreamReaderContext& readerCtx) {
+    return handlePlacementRefresh(opCtx, event.clusterTime, ctx, readerCtx);
 }
 
-std::string CollectionChangeStreamShardTargeterDbAbsentStateEventHandler::toString() const {
-    return "CollectionChangeStreamShardTargeterDbAbsentStateEventHandler";
+std::unique_ptr<ChangeStreamShardTargeterStateEventHandler>
+DatabaseChangeStreamShardTargeterDbPresentStateEventHandler::buildDbAbsentStateEventHandler()
+    const {
+    return std::make_unique<DatabaseChangeStreamShardTargeterDbAbsentStateEventHandler>();
 }
+
+std::string DatabaseChangeStreamShardTargeterDbPresentStateEventHandler::toString() const {
+    return "DatabaseChangeStreamShardTargeterDbPresentStateEventHandler";
+}
+
 }  // namespace mongo

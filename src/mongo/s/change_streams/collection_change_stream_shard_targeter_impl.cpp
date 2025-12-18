@@ -36,6 +36,11 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+// Prefix that will be added to all log messages emitted by this stage.
+#define STAGE_LOG_PREFIX "CollectionChangeStreamShardTargeterImpl: "
+
 namespace mongo {
 
 ShardTargeterDecision CollectionChangeStreamShardTargeterImpl::initialize(
@@ -73,6 +78,8 @@ ShardTargeterDecision CollectionChangeStreamShardTargeterImpl::handleEvent(
             "CollectionChangeStreamShardTargeterImpl::_eventHandler must be present for handling "
             "control events",
             _eventHandler);
+    LOGV2_DEBUG(
+        11132500, 3, STAGE_LOG_PREFIX "Handling event", "controlEvent"_attr = event.toString());
 
     auto controlEvent = parseControlEvent(event);
     return readerContext.inDegradedMode()
@@ -98,6 +105,12 @@ CollectionChangeStreamShardTargeterImpl::getEventHandler() const {
 
 void CollectionChangeStreamShardTargeterImpl::setEventHandler(
     std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> eventHandler) {
+    tassert(11132501, "ChangeStreamShardTargeterStateEventHandler must be provided", eventHandler);
+    LOGV2_DEBUG(11132502,
+                3,
+                STAGE_LOG_PREFIX "Setting event handler",
+                "previousEventHandler"_attr = _eventHandler ? _eventHandler->toString() : "none",
+                "newEventHandler"_attr = eventHandler->toString());
     _eventHandler = std::move(eventHandler);
 }
 

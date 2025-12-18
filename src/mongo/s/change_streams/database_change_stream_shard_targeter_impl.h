@@ -32,14 +32,21 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/pipeline/change_stream_reader_context.h"
 #include "mongo/db/pipeline/change_stream_shard_targeter.h"
+#include "mongo/db/pipeline/historical_placement_fetcher.h"
+#include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler.h"
+#include "mongo/s/change_streams/control_events.h"
 #include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 
 namespace mongo {
 
-class DatabaseChangeStreamShardTargeterImpl : public ChangeStreamShardTargeter {
+class DatabaseChangeStreamShardTargeterImpl : public ChangeStreamShardTargeter,
+                                              ChangeStreamShardTargeterStateEventHandlingContext {
 public:
+    DatabaseChangeStreamShardTargeterImpl(std::unique_ptr<HistoricalPlacementFetcher> fetcher)
+        : _fetcher(std::move(fetcher)) {}
+
     ShardTargeterDecision initialize(OperationContext* opCtx,
                                      Timestamp atClusterTime,
                                      ChangeStreamReaderContext& context) override;
@@ -52,6 +59,15 @@ public:
     ShardTargeterDecision handleEvent(OperationContext* opCtx,
                                       const Document& event,
                                       ChangeStreamReaderContext& context) override;
+
+    HistoricalPlacementFetcher& getHistoricalPlacementFetcher() const override;
+
+    void setEventHandler(
+        std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> eventHandler) override;
+
+private:
+    std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> _eventHandler = nullptr;
+    std::unique_ptr<HistoricalPlacementFetcher> _fetcher;
 };
 
 }  // namespace mongo

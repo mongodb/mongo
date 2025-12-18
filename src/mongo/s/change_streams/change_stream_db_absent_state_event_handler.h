@@ -32,8 +32,6 @@
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler.h"
 #include "mongo/util/modules.h"
 
-#include <memory>
-
 namespace mongo {
 
 class ChangeStreamShardTargeterDbAbsentStateEventHandler

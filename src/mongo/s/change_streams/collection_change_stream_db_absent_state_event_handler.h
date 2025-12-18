@@ -44,6 +44,8 @@ public:
      */
     std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> buildDbPresentStateEventHandler()
         const override;
+
+    std::string toString() const override;
 };
 
 }  // namespace mongo

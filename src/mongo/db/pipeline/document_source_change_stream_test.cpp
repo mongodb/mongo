@@ -624,9 +624,9 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1ForAllDatabasesC
     ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
 }
 
-// Tests that change stream reader version v1 is selected when a database-level change stream is
-// opened, despite "v2" being explicitly requested.
-TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1ForDatabaseLevelChangeStream) {
+// Tests that change stream reader version v2 is selected when a database-level change stream is
+// opened.
+TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV2ForDatabaseLevelChangeStream) {
     getExpCtx()->setInRouter(true);
 
     getExpCtx()->setNamespaceString(
@@ -634,12 +634,14 @@ TEST_F(ChangeStreamStageTest, SelectsChangeStreamReaderVersionV1ForDatabaseLevel
 
     RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
 
-    const BSONObj spec = BSON("$changeStream" << BSON("version" << "v2"));
-
+    auto spec = BSON("$changeStream" << BSON("version" << "v2"));
     auto pipeline = DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_FALSE(pipeline.empty());
-    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV1, getExpCtx()->getChangeStreamSpec()->getVersion());
+    ASSERT_EQ(ChangeStreamReaderVersionEnum::kV2, getExpCtx()->getChangeStreamSpec()->getVersion());
 }
 
 // Test that creating a v2 change stream reader pipeline will fail if no valid
@@ -5194,16 +5196,14 @@ TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamV2StagesOrder) {
 
     auto pipeline = buildTestPipelineForDatabase(rawPipeline);
 
-    // TODO SERVER-111325: adjust the following pipeline once database-level change streams are
-    // supported by V2 change stream readers.
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
                            "$_internalChangeStreamUnwindTransaction",
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
-                           "$_internalChangeStreamHandleTopologyChange"});
+                           "$_internalChangeStreamInjectControlEvents",
+                           "$_internalChangeStreamHandleTopologyChangeV2"});
 }
 
 //

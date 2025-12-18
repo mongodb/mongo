@@ -49,13 +49,13 @@ namespace mongo {
 
 std::unique_ptr<ChangeStreamShardTargeter> ChangeStreamReaderBuilderImpl::buildShardTargeter(
     OperationContext* opCtx, const ChangeStream& changeStream) {
+    auto fetcher = std::make_unique<HistoricalPlacementFetcherImpl>();
     switch (changeStream.getChangeStreamType()) {
         case ChangeStreamType::kCollection: {
-            auto fetcher = std::make_unique<HistoricalPlacementFetcherImpl>();
             return std::make_unique<CollectionChangeStreamShardTargeterImpl>(std::move(fetcher));
         }
         case ChangeStreamType::kDatabase: {
-            return std::make_unique<DatabaseChangeStreamShardTargeterImpl>();
+            return std::make_unique<DatabaseChangeStreamShardTargeterImpl>(std::move(fetcher));
         }
         case ChangeStreamType::kAllDatabases: {
             return std::make_unique<AllDatabasesChangeStreamShardTargeterImpl>();

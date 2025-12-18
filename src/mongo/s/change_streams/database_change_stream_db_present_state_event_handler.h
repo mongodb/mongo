@@ -27,20 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/s/change_streams/collection_change_stream_db_absent_state_event_handler.h"
+#pragma once
 
-#include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
-
-#include <memory>
+#include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
 
 namespace mongo {
-std::unique_ptr<ChangeStreamShardTargeterStateEventHandler>
-CollectionChangeStreamShardTargeterDbAbsentStateEventHandler::buildDbPresentStateEventHandler()
-    const {
-    return std::make_unique<CollectionChangeStreamShardTargeterDbPresentStateEventHandler>();
-}
+class DatabaseChangeStreamShardTargeterDbPresentStateEventHandler
+    : public ChangeStreamShardTargeterDbPresentStateEventHandler {
+protected:
+    /**
+     * Opens a cursor on the destination shard if needed and closes the cursor on the donor shard
+     * if all its chunks have been migrated away.
+     */
+    ShardTargeterDecision handleMoveChunk(OperationContext* opCtx,
+                                          const MoveChunkControlEvent& e,
+                                          ChangeStreamShardTargeterStateEventHandlingContext& ctx,
+                                          ChangeStreamReaderContext& readerCtx) override;
 
-std::string CollectionChangeStreamShardTargeterDbAbsentStateEventHandler::toString() const {
-    return "CollectionChangeStreamShardTargeterDbAbsentStateEventHandler";
-}
+    /**
+     * Returns DatabaseChangeStreamShardTargeterDbAbsentStateEventHandler.
+     */
+    std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> buildDbAbsentStateEventHandler()
+        const override;
+
+    std::string toString() const override;
+};
+
 }  // namespace mongo

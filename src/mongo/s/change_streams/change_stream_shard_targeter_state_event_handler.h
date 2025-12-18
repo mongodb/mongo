@@ -93,5 +93,10 @@ public:
         const ControlEvent& event,
         ChangeStreamShardTargeterStateEventHandlingContext& context,
         ChangeStreamReaderContext& readerContext) = 0;
+
+    /**
+     * Returns the name of the event handler.
+     */
+    virtual std::string toString() const = 0;
 };
 }  // namespace mongo

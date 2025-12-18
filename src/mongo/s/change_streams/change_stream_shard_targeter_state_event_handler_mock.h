@@ -90,6 +90,7 @@ public:
         ++normalCallCount;
         return normalDecision;
     }
+
     ShardTargeterDecision handleEventInDegradedMode(
         OperationContext*,
         const ControlEvent& e,
@@ -98,6 +99,10 @@ public:
         calls.emplace_back(true, e);
         ++degradedCallCount;
         return degradedDecision;
+    }
+
+    std::string toString() const override {
+        return "ChangeStreamShardTargeterEventHandlerMock";
     }
 
     std::vector<Call> calls;

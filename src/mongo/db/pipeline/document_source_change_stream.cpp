@@ -349,8 +349,8 @@ ChangeStreamReaderVersionEnum DocumentSourceChangeStream::_determineChangeStream
 
     // The user has explicitly selected the v2 change stream reader version.
 
-    // v2 change stream readers are currently only supported for collection-level change streams.
-    if (changeStream.getChangeStreamType() != ChangeStreamType::kCollection) {
+    // v2 change stream readers are currently not supported for all databases level change streams.
+    if (changeStream.getChangeStreamType() == ChangeStreamType::kAllDatabases) {
         return ChangeStreamReaderVersionEnum::kV1;
     }
 
