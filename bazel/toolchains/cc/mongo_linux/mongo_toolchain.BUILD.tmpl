@@ -209,11 +209,6 @@ WARNINGS_AS_ERRORS_ENABLED = select({
     "@//conditions:default": False,
 })
 
-IS_DEBUG_BUILD = select({
-    "@//bazel/config:dbg_enabled": True,
-    "@//conditions:default": False,
-})
-
 LINK_FLAGS = ["-L" + flag for flag in COMMON_LINK_FLAGS] + LINKER_LINKFLAGS
 
 # Helper target for the toolchain (see below):
@@ -244,7 +239,6 @@ mongo_linux_cc_toolchain_config(
     name = "cc_gcc_toolchain_config",
     bin_dirs = COMMON_BINDIRS,
     compiler = "gcc",
-    dbg = IS_DEBUG_BUILD,
     linker = CHOSEN_LINKER,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",
@@ -306,7 +300,6 @@ mongo_linux_cc_toolchain_config(
     name = "cc_clang_toolchain_config",
     bin_dirs = COMMON_BINDIRS,
     compiler = "clang",
-    dbg = IS_DEBUG_BUILD,
     linker = CHOSEN_LINKER,
     distro = "{distro}",
     cpu = "{bazel_toolchain_cpu}",

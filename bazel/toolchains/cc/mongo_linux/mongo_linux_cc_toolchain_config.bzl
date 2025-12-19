@@ -1758,19 +1758,6 @@ def _impl(ctx):
         ],
     )
 
-    hardening_debug_feature = feature(
-        name = "hardening_debug",
-        enabled = ctx.attr.dbg,
-        flag_sets = [
-            flag_set(
-                actions = all_compile_actions,
-                flag_groups = [flag_group(flags = [
-                    "-ftrivial-auto-var-init=pattern",
-                ])],
-            ),
-        ],
-    )
-
     disable_warnings_for_third_party_libraries_clang_feature = feature(
         name = "disable_warnings_for_third_party_libraries_clang",
         enabled = ctx.attr.compiler == COMPILERS.CLANG,
@@ -1914,7 +1901,6 @@ def _impl(ctx):
         extra_cflags_feature,
         extra_cxxflags_feature,
         extra_ldflags_feature,
-        hardening_debug_feature,
         disable_warnings_for_third_party_libraries_clang_feature,
         disable_warnings_for_third_party_libraries_gcc_feature,
     ]
@@ -1951,7 +1937,6 @@ mongo_linux_cc_toolchain_config = rule(
         "cxx_builtin_include_directories": attr.string_list(mandatory = True),
         "cpu": attr.string(mandatory = True),
         "compiler": attr.string(mandatory = True),
-        "dbg": attr.bool(mandatory = True),
         "linker": attr.string(mandatory = True),
         "distro": attr.string(mandatory = False),
         "extra_cflags": attr.string_list(mandatory = False),
