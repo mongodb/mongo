@@ -88,7 +88,7 @@ export function deleteExtensionConfigs(names) {
  * Runs a test function in environments with one or more extension loaded, ensuring proper
  * generation and cleanup of .conf files.
  */
-export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["standalone", "sharded"]) {
+export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["standalone", "sharded"], numShards = 1) {
     const extensionsToLoad = [];
 
     for (const [extLib, extensionOptions] of Object.entries(extToOptionsMap)) {
@@ -110,7 +110,7 @@ export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["sta
     function runShardedTest(func) {
         {
             const shardingTest = new ShardingTest({
-                shards: 1,
+                shards: numShards,
                 rs: {nodes: 1},
                 mongos: 1,
                 config: 1,

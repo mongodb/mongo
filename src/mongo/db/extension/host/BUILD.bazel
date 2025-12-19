@@ -84,6 +84,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/extension/test_examples:host_version_fails_bad_extension",
         "//src/mongo/db/extension/test_examples:host_version_succeeds_mongo_extension",
         "//src/mongo/db/extension/test_examples:initialize_version_fails_bad_extension",
+        "//src/mongo/db/extension/test_examples:limit_mongo_extension",
         "//src/mongo/db/extension/test_examples:load_highest_compatible_version_mongo_extension",
         "//src/mongo/db/extension/test_examples:load_two_stages_mongo_extension",
         "//src/mongo/db/extension/test_examples:major_version_max_int_bad_extension",

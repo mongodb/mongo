@@ -104,10 +104,10 @@ GetNextResult ExtensionStage::doGetNext() {
             auto nextDocument = [&]() {
                 if (_lastGetNextResult.resultMetadata.has_value()) {
                     return Document::createDocumentWithMetadata(
-                        _lastGetNextResult.resultDocument->getUnownedBSONObj(),
-                        _lastGetNextResult.resultMetadata->getUnownedBSONObj());
+                        _lastGetNextResult.resultDocument->getUnownedBSONObj().getOwned(),
+                        _lastGetNextResult.resultMetadata->getUnownedBSONObj().getOwned());
                 }
-                return Document{_lastGetNextResult.resultDocument->getUnownedBSONObj()};
+                return Document{_lastGetNextResult.resultDocument->getUnownedBSONObj().getOwned()};
             }();
             return GetNextResult(std::move(nextDocument));
         }

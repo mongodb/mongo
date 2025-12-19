@@ -31,6 +31,7 @@ extensions_with_config(
         # are added to the "skips" list in that test.
         ":bar_mongo_extension",
         ":foo_mongo_extension",
+        ":limit_mongo_extension",
         ":logging_mongo_extension",
         ":debug_logging_mongo_extension",
         ":parse_options_mongo_extension",
@@ -88,6 +89,7 @@ pkg_name = "//" + package_name() + "/"
         srcs = [pkg_name + "desugar:" + extension_name + ".cpp"],
     )
     for extension_name in [
+        "limit",
         "match_topN",
         "native_vector_search",
     ]
