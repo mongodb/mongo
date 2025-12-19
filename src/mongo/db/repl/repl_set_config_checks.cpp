@@ -317,7 +317,6 @@ Status validateOldAndNewConfigsCompatible(const VersionContext& vCtx,
 Status validateMaintenancePortSettings(const VersionContext& vCtx, const ReplSetConfig& newConfig) {
     // TODO (SERVER-112863) Remove this check.
     // TODO (SERVER-113217) Ensure FCV stability of this check.
-    // TODO (SERVER-113536) Handle this check for disaggregated storage.
     // If any member config specifies a maintenance port, ensure that we are in an FCV which can
     // handle this.
     for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
