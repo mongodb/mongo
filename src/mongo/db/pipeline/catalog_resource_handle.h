@@ -40,10 +40,15 @@ namespace mongo {
  */
 class MONGO_MOD_PUBLIC CatalogResourceHandle : public RefCountable {
 public:
-    virtual void acquire(OperationContext*) = 0;
+    ~CatalogResourceHandle() override = default;
+
+    virtual void acquire(OperationContext* opCtx) = 0;
     virtual void release() = 0;
-    virtual void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) = 0;
-    virtual boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher() = 0;
+    virtual void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) {
+        // Default no-op.
+    }
+    virtual boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher()
+        const = 0;
 };
 
 class MONGO_MOD_PRIVATE DSCatalogResourceHandleBase : public CatalogResourceHandle {
@@ -56,18 +61,16 @@ public:
                 _transactionResourcesStasher);
     }
 
-    void acquire(OperationContext* opCtx) override {
+    void acquire(OperationContext* opCtx) final {
         tassert(10271302, "Expected resources to be absent", !_resources);
         _resources.emplace(opCtx, _transactionResourcesStasher.get());
     }
 
-    void release() override {
+    void release() final {
         _resources.reset();
     }
 
-    void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) override = 0;
-
-    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher() override {
+    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher() const final {
         return _transactionResourcesStasher;
     }
 

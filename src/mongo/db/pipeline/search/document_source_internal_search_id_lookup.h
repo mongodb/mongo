@@ -261,10 +261,6 @@ public:
         CollectionAcquisition collection)
         : DSCatalogResourceHandleBase(std::move(stasher)), _collection(std::move(collection)) {}
 
-    void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) override {
-        MONGO_UNREACHABLE;
-    }
-
     CollectionAcquisition getCollection() {
         tassert(11140101,
                 "catalogResourceHandle must be acquired to access the collection",

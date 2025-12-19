@@ -78,11 +78,9 @@ public:
     void release() override {
         ASSERT_EQ(*_executorHoldsStorageEngineState, false);
     }
-    void checkCanServeReads(OperationContext* opCtx, const PlanExecutor& exec) override {
-        // No-op.
-    }
 
-    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher() override {
+    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> getStasher()
+        const override {
         MONGO_UNREACHABLE;
     }
 
