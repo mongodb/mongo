@@ -947,3 +947,38 @@ commands:
         strict: false
         namespace: ignored
         api_version: ""
+
+    _shardsvrRecreateRangeDeletionTasks:
+        description:
+            "Internal command sent to a db primary shard to recreate range deletion documents
+            for a collection, based on the current routing table."
+        command_name: _shardsvrRecreateRangeDeletionTasks
+        cpp_name: ShardSvrRecreateRangeDeletionTasks
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        api_version: ""
+        reply_type: OkReply
+        strict: false
+        fields:
+            skipEmptyRanges:
+                description: "If true, only recreate range deletion document if needed"
+                type: bool
+
+    _shardsvrRecreateRangeDeletionTasksParticipant:
+        description:
+            "Internal command sent to shards to recreate range deletion documents
+            for a collection, based on the current routing table."
+        command_name: _shardsvrRecreateRangeDeletionTasksParticipant
+        cpp_name: ShardSvrRecreateRangeDeletionTasksParticipant
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        api_version: ""
+        reply_type: OkReply
+        strict: false
+        fields:
+            skipEmptyRanges:
+                description: "If true, only recreate range deletion document if needed"
+                type: bool
+            uuid:
+                type: uuid
+                description: "UUID of the collection"

@@ -1377,6 +1377,16 @@ export let MongosAPIParametersUtil = (function () {
         {commandName: "profile", skip: "not supported in mongos"},
         {commandName: "reapLogicalSessionCacheNow", skip: "is a no-op on mongos"},
         {
+            commandName: "recreateRangeDeletionTasks",
+            run: {
+                inAPIVersion1: false,
+                shardCommandName: "_shardsvrRecreateRangeDeletionTasks",
+                permittedInTxn: false,
+                requiresShardedCollection: true,
+                command: () => ({recreateRangeDeletionTasks: "collection", skipEmptyRanges: true}),
+            },
+        },
+        {
             commandName: "refineCollectionShardKey",
             run: {
                 inAPIVersion1: false,

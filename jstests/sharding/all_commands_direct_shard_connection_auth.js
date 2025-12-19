@@ -126,6 +126,8 @@ const allCommands = {
     _shardsvrMovePrimaryExitCriticalSection: {skip: isAnInternalCommand},
     _shardsvrMoveRange: {skip: isAnInternalCommand},
     _shardsvrNotifyShardingEvent: {skip: isAnInternalCommand},
+    _shardsvrRecreateRangeDeletionTasks: {skip: isAnInternalCommand},
+    _shardsvrRecreateRangeDeletionTasksParticipant: {skip: isAnInternalCommand},
     _shardsvrRenameCollection: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipantUnblock: {skip: isAnInternalCommand},
@@ -991,6 +993,7 @@ const allCommands = {
     recipientForgetMigration: {skip: isAnInternalCommand},
     recipientSyncData: {skip: isAnInternalCommand},
     recipientVoteImportedFiles: {skip: isAnInternalCommand},
+    recreateRangeDeletionTasks: {skip: requiresMongoS},
     refineCollectionShardKey: {skip: requiresMongoS},
     refreshLogicalSessionCacheNow: {
         command: {refreshLogicalSessionCacheNow: 1},

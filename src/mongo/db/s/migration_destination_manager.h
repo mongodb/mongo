@@ -236,6 +236,21 @@ public:
         const NamespaceString& nss,
         const CollectionOptionsAndIndexes& collectionOptionsAndIndexes);
 
+    /**
+     * Checks if any documents already exist in the given shard key range on the recipient shard.
+     * This is used to detect orphaned documents that are present due to possible range deleter bugs
+     * or unsupported manual operations on a direct connection.
+     *
+     * Returns the shard key of the first document found in the range, or boost::none if no
+     * documents exist.
+     */
+    static boost::optional<BSONObj> checkForExistingDocumentsInRange(OperationContext* opCtx,
+                                                                     const NamespaceString& nss,
+                                                                     const UUID& collUuid,
+                                                                     const BSONObj& shardKeyPattern,
+                                                                     const BSONObj& min,
+                                                                     const BSONObj& max);
+
 private:
     /**
      * Set state to Fail without Logging.

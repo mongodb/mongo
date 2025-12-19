@@ -298,6 +298,7 @@ const skippedAuthTestingCommands = [
     "planCacheSetFilter",
     "prepareTransaction",
     "reapLogicalSessionCacheNow",
+    "recreateRangeDeletionTasks",
     "releaseMemory",
     "repairShardedCollectionChunksHistory",
     "replicateSearchIndexCommand",

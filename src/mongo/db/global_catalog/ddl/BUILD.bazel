@@ -151,6 +151,15 @@ idl_generator(
 )
 
 idl_generator(
+    name = "recreate_range_deletion_tasks_gen",
+    src = "recreate_range_deletion_tasks.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "refine_collection_shard_key_coordinator_document_gen",
     src = "refine_collection_shard_key_coordinator_document.idl",
     deps = [

@@ -64,4 +64,6 @@ export const commandsAddedToMongodSinceLastLTS = [
     "_shardsvrMergeChunks",
     "_configsvrCommitShardRemoval",
     "testCommandFeatureFlaggedOnLatestFCV83",
+    "_shardsvrRecreateRangeDeletionTasks",
+    "_shardsvrRecreateRangeDeletionTasksParticipant",
 ];

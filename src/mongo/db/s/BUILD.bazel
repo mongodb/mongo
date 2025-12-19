@@ -616,6 +616,7 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:shardsvr_move_primary_exit_critical_section_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_notify_sharding_event_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_participant_block_command.cpp",
+        "//src/mongo/db/global_catalog/ddl:shardsvr_recreate_range_deletion_tasks_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_refine_collection_shard_key_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_rename_collection_command.cpp",
         "//src/mongo/db/global_catalog/ddl:shardsvr_rename_collection_participant_command.cpp",

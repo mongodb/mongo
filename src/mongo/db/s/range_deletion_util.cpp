@@ -605,9 +605,23 @@ size_t checkForConflictingDeletions(OperationContext* opCtx,
 
 void persistRangeDeletionTaskLocally(OperationContext* opCtx,
                                      const RangeDeletionTask& deletionTask,
-                                     const WriteConcernOptions& writeConcern) {
+                                     const WriteConcernOptions& writeConcern,
+                                     bool doNotPersistIfDocCoveringSameRangeAlreadyExists) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     try {
+        if (doNotPersistIfDocCoveringSameRangeAlreadyExists) {
+            const auto sameBoundsAlreadyCovered =
+                BSON(RangeDeletionTask::kCollectionUuidFieldName
+                     << deletionTask.getCollectionUuid()
+                     << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinFieldName
+                     << deletionTask.getRange().getMin()
+                     << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxFieldName
+                     << deletionTask.getRange().getMax());
+            if (store.count(opCtx, sameBoundsAlreadyCovered) > 0) {
+                return;
+            }
+        }
+
         store.add(opCtx, deletionTask, writeConcern);
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         // Convert a DuplicateKey error to an anonymous error.
@@ -807,14 +821,18 @@ RangeDeletionTask createAndPersistRangeDeletionTask(
     const bool pending,
     const boost::optional<KeyPattern>& shardKeyPattern,
     const boost::optional<ChunkVersion>& preMigrationShardVersion,
-    const WriteConcernOptions& writeConcern) {
+    const WriteConcernOptions& writeConcern,
+    bool doNotPersistIfDocCoveringSameRangeAlreadyExists) {
     RangeDeletionTask task(migrationId, nss, collectionUuid, donorShardId, range, whenToClean);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     task.setTimestamp(currentTime.clusterTime().asTimestamp());
-    task.setPending(pending);
+    if (pending) {
+        task.setPending(pending);
+    }
     task.setKeyPattern(shardKeyPattern);
     task.setPreMigrationShardVersion(preMigrationShardVersion);
-    persistRangeDeletionTaskLocally(opCtx, task, writeConcern);
+    persistRangeDeletionTaskLocally(
+        opCtx, task, writeConcern, doNotPersistIfDocCoveringSameRangeAlreadyExists);
 
     return task;
 }

@@ -132,7 +132,8 @@ size_t checkForConflictingDeletions(OperationContext* opCtx,
  */
 void persistRangeDeletionTaskLocally(OperationContext* opCtx,
                                      const RangeDeletionTask& deletionTask,
-                                     const WriteConcernOptions& writeConcern);
+                                     const WriteConcernOptions& writeConcern,
+                                     bool doNotPersistIfDocCoveringSameRangeAlreadyExists = false);
 
 /**
  * Retrieves the value of 'numOrphanedDocs' from the recipient shard's range deletion task document.
@@ -198,18 +199,19 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
  */
 MONGO_MOD_PUBLIC void setPreMigrationShardVersionOnRangeDeletionTasks(OperationContext* opCtx);
 
-RangeDeletionTask createAndPersistRangeDeletionTask(
-    OperationContext* opCtx,
-    const UUID& migrationId,
-    const NamespaceString& nss,
-    const UUID& collectionUuid,
-    const ShardId& donorShardId,
-    const ChunkRange& range,
-    CleanWhenEnum whenToClean,
-    bool pending,
-    const boost::optional<KeyPattern>& shardKeyPattern,
-    const boost::optional<ChunkVersion>& preMigrationShardVersion,
-    const WriteConcernOptions& writeConcern);
+MONGO_MOD_PUBLIC RangeDeletionTask
+createAndPersistRangeDeletionTask(OperationContext* opCtx,
+                                  const UUID& migrationId,
+                                  const NamespaceString& nss,
+                                  const UUID& collectionUuid,
+                                  const ShardId& donorShardId,
+                                  const ChunkRange& range,
+                                  CleanWhenEnum whenToClean,
+                                  bool pending,
+                                  const boost::optional<KeyPattern>& shardKeyPattern,
+                                  const boost::optional<ChunkVersion>& preMigrationShardVersion,
+                                  const WriteConcernOptions& writeConcern,
+                                  bool doNotPersistIfDocCoveringSameRangeAlreadyExists = false);
 
 boost::optional<RangeDeletionTask> getRangeDeletionTask(OperationContext* opCtx,
                                                         const UUID& collectionUuid,

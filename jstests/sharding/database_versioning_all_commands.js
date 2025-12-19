@@ -744,6 +744,15 @@ const allTestCases = {
         },
         profile: {skip: "not supported in mongos"},
         reapLogicalSessionCacheNow: {skip: "is a no-op on mongos"},
+        recreateRangeDeletionTasks: {
+            run: {
+                sendsDbVersion: true,
+                explicitlyCreateCollection: true,
+                command: function (dbName, collName) {
+                    return {recreateRangeDeletionTasks: collName, skipEmptyRanges: true};
+                },
+            },
+        },
         refineCollectionShardKey: {skip: "not on a user database"},
         refreshLogicalSessionCacheNow: {skip: "goes through the cluster write path"},
         refreshSessions: {skip: "executes locally on mongos (not sent to any remote node)"},
@@ -1012,6 +1021,8 @@ const allTestCases = {
         _shardsvrMoveRange: {skip: "TODO"},
         _shardsvrNotifyShardingEvent: {skip: "TODO"},
         _shardsvrParticipantBlock: {skip: "TODO"},
+        _shardsvrRecreateRangeDeletionTasks: {skip: "TODO"},
+        _shardsvrRecreateRangeDeletionTasksParticipant: {skip: "TODO"},
         _shardsvrRefineCollectionShardKey: {skip: "TODO"},
         _shardsvrRenameCollection: {skip: "TODO"},
         _shardsvrRenameCollectionParticipant: {skip: "TODO"},

@@ -686,6 +686,7 @@ TEST_F(RangeDeleterTest, PreMigrationShardVersionUpgradeDowngradeTest) {
         return true;
     });
 }
+
 TEST_F(RangeDeleterTest, PersistRangeDeletionTaskLocallyHappyPath) {
     auto opCtx = operationContext();
     const auto uuid = UUID::gen();
@@ -693,6 +694,29 @@ TEST_F(RangeDeleterTest, PersistRangeDeletionTaskLocallyHappyPath) {
     RangeDeletionTask task = createDeletionTask(
         opCtx, NamespaceString::createNamespaceString_forTest("one"), uuid, 0, 10);
     rangedeletionutil::persistRangeDeletionTaskLocally(opCtx, task, defaultMajorityWriteConcern());
+    ASSERT_EQ(store.count(opCtx), 1);
+}
+
+TEST_F(RangeDeleterTest, PersistRangeDeletionTaskLocallyDoesNotPersistDuplicateRangesWhenFlagSet) {
+    auto opCtx = operationContext();
+    const auto uuid = UUID::gen();
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    RangeDeletionTask task = createDeletionTask(
+        opCtx, NamespaceString::createNamespaceString_forTest("one"), uuid, 0, 10);
+    rangedeletionutil::persistRangeDeletionTaskLocally(
+        opCtx,
+        task,
+        defaultMajorityWriteConcern(),
+        true /* doNotPersistIfDocCoveringSameRangeAlreadyExists */);
+    ASSERT_EQ(store.count(opCtx), 1);
+
+    RangeDeletionTask taskOnSameRange = createDeletionTask(
+        opCtx, NamespaceString::createNamespaceString_forTest("one"), uuid, 0, 10);
+    rangedeletionutil::persistRangeDeletionTaskLocally(
+        opCtx,
+        taskOnSameRange,
+        defaultMajorityWriteConcern(),
+        true /* doNotPersistIfDocCoveringSameRangeAlreadyExists */);
     ASSERT_EQ(store.count(opCtx), 1);
 }
 
@@ -706,11 +730,11 @@ TEST_F(RangeDeleterTest, PersistRangeDeletionTaskLocallyFailsDuplicateKey) {
     rangedeletionutil::persistRangeDeletionTaskLocally(opCtx, task, defaultMajorityWriteConcern());
     ASSERT_EQ(store.count(opCtx), 1);
 
-    RangeDeletionTask duplicateTask = createDeletionTask(
+    RangeDeletionTask taskWithDuplicateMigrationId = createDeletionTask(
         opCtx, NamespaceString::createNamespaceString_forTest("one"), uuid, 20, 30, migrationId);
 
     ASSERT_THROWS_CODE(rangedeletionutil::persistRangeDeletionTaskLocally(
-                           opCtx, task, defaultMajorityWriteConcern()),
+                           opCtx, taskWithDuplicateMigrationId, defaultMajorityWriteConcern()),
                        DBException,
                        31375);
 }

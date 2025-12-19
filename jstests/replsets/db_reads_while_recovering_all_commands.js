@@ -119,6 +119,8 @@ const allCommands = {
     _shardsvrMovePrimaryExitCriticalSection: {skip: isPrimaryOnly},
     _shardsvrMoveRange: {skip: isPrimaryOnly},
     _shardsvrNotifyShardingEvent: {skip: isPrimaryOnly},
+    _shardsvrRecreateRangeDeletionTasks: {skip: isPrimaryOnly},
+    _shardsvrRecreateRangeDeletionTasksParticipant: {skip: isPrimaryOnly},
     _shardsvrRenameCollection: {skip: isPrimaryOnly},
     _shardsvrRenameCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipantUnblock: {skip: isAnInternalCommand},

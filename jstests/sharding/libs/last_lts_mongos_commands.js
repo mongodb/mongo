@@ -28,4 +28,5 @@ export const commandsAddedToMongosSinceLastLTS = [
     "commitTransitionToDedicatedConfigServer",
     "rewriteCollection",
     "abortRewriteCollection",
+    "recreateRangeDeletionTasks",
 ];

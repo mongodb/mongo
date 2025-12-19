@@ -132,6 +132,8 @@ const allCommands = {
     _shardsvrMovePrimaryExitCriticalSection: {skip: isAnInternalCommand},
     _shardsvrMoveRange: {skip: isAnInternalCommand},
     _shardsvrNotifyShardingEvent: {skip: isAnInternalCommand},
+    _shardsvrRecreateRangeDeletionTasks: {skip: isAnInternalCommand},
+    _shardsvrRecreateRangeDeletionTasksParticipant: {skip: isAnInternalCommand},
     _shardsvrRenameCollection: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipant: {skip: isAnInternalCommand},
     _shardsvrRenameCollectionParticipantUnblock: {skip: isAnInternalCommand},
@@ -1213,6 +1215,17 @@ const allCommands = {
     recipientForgetMigration: {skip: isAnInternalCommand},
     recipientSyncData: {skip: isAnInternalCommand},
     recipientVoteImportedFiles: {skip: isAnInternalCommand},
+    recreateRangeDeletionTasks: {
+        isShardedOnly: true,
+        isAdminCommand: false,
+        setUp: function (conn) {
+            assert.commandWorked(conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {a: "hashed"}}));
+        },
+        command: {recreateRangeDeletionTasks: collName, skipEmptyRanges: false},
+        teardown: function (conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+    },
     refineCollectionShardKey: {
         isShardedOnly: true,
         isAdminCommand: true,
