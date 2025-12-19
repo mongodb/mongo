@@ -6,6 +6,9 @@
  *   # TODO SERVER-98659 Investigate why this test is failing on
  *   # 'sharding_kill_stepdown_terminate_jscore_passthrough'.
  *   does_not_support_stepdowns,
+ *   # 'setQuerySettings' and 'removeQuerySettings' are implemented on top of cluster parameters
+ *   # which can conflict with the 'setClusterParameter' commands emitted by the config fuzzer.
+ *   does_not_support_config_fuzzer,
  *   command_not_supported_in_serverless,
  *   directly_against_shardsvrs_incompatible,
  *   uses_parallel_shell,
