@@ -108,7 +108,7 @@ public:
 
 private:
     void _periodicRefresh(Client* client);
-    void _refresh(Client* client);
+    Status _refresh(Client* client);
 
     void _periodicReap(Client* client);
     Status _reap(Client* client);
