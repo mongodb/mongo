@@ -49,12 +49,13 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::list;
 
-ALLOCATE_STAGE_PARAMS_ID(sortByCount, SortByCountStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(sortByCount,
+                                     SortByCountLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(sortByCount,
-                         SortByCountLiteParsed::parse,
-                         DocumentSourceSortByCount::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(sortByCount,
+                                                             DocumentSourceSortByCount,
+                                                             SortByCountStageParams);
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

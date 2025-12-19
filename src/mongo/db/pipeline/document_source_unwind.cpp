@@ -65,12 +65,12 @@ DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext
       _indexPath(indexPath),
       _strict(strict) {}
 
-ALLOCATE_STAGE_PARAMS_ID(unwind, UnwindStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(unwind,
+                                     UnwindLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(unwind,
-                         UnwindLiteParsed::parse,
-                         DocumentSourceUnwind::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(unwind, DocumentSourceUnwind, UnwindStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(unwind, DocumentSourceUnwind::id)
 
 const char* DocumentSourceUnwind::getSourceName() const {

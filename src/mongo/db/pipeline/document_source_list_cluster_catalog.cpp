@@ -84,12 +84,13 @@ std::string getDefaultMaxChunkSize(OperationContext* opCtx) {
     return std::string("null");
 }
 
-ALLOCATE_STAGE_PARAMS_ID(listClusterCatalog, ListClusterCatalogStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(listClusterCatalog,
+                                     DocumentSourceListClusterCatalog::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(listClusterCatalog,
-                         DocumentSourceListClusterCatalog::LiteParsed::parse,
-                         DocumentSourceListClusterCatalog::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(listClusterCatalog,
+                                                             DocumentSourceListClusterCatalog,
+                                                             ListClusterCatalogStageParams);
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceListClusterCatalog::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {

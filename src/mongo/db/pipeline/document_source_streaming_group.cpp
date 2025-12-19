@@ -56,12 +56,13 @@ namespace mongo {
  * $_internalStreamingGroup is an internal stage that is only used in certain cases by the
  * pipeline optimizer. For now it should not be used anywhere outside the MongoDB server.
  */
-ALLOCATE_STAGE_PARAMS_ID(_internalStreamingGroup, StreamingGroupStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalStreamingGroup,
+                                     StreamingGroupLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(_internalStreamingGroup,
-                         StreamingGroupLiteParsed::parse,
-                         DocumentSourceStreamingGroup::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalStreamingGroup,
+                                                   DocumentSourceStreamingGroup,
+                                                   StreamingGroupStageParams);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalStreamingGroup, DocumentSourceStreamingGroup::id)
 

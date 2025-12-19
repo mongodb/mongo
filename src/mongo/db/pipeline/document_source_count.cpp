@@ -53,12 +53,11 @@ using boost::intrusive_ptr;
 using std::list;
 using std::string;
 
-ALLOCATE_STAGE_PARAMS_ID(count, CountStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(count, CountLiteParsed::parse, AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(count,
-                         CountLiteParsed::parse,
-                         DocumentSourceCount::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(count,
+                                                             DocumentSourceCount,
+                                                             CountStageParams);
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

@@ -58,16 +58,17 @@ using boost::intrusive_ptr;
 /**
  * Register $score as a DocumentSource without feature flag and check that the hybrid scoring
  * feature flag is enabled in createFromBson() instead of via
- * REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG. This method of feature flag checking avoids hitting
- * QueryFeatureNotAllowed and duplicate parser map errors in $scoreFusion tests ($scoreFusion is
- * gated behind the same feature flag).
+ * REGISTER_LITE_PARSED_DOCUMENT_SOURCE_WITH_FEATURE_FLAG. This method of feature flag checking
+ * avoids hitting QueryFeatureNotAllowed and duplicate parser map errors in $scoreFusion tests
+ * ($scoreFusion is gated behind the same feature flag).
  */
-ALLOCATE_STAGE_PARAMS_ID(score, ScoreStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(score,
+                                     ScoreLiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(score,
-                         ScoreLiteParsed::parse,
-                         DocumentSourceScore::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(score,
+                                                             DocumentSourceScore,
+                                                             ScoreStageParams);
 
 namespace {
 static const std::string scoreScoreDetailsDescription =

@@ -64,6 +64,7 @@
 namespace mongo {
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Densify);
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalDensify);
 
 class RangeStatement;
 class DensifyValue {

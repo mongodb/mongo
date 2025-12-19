@@ -126,7 +126,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSource::parseFromLiteParsed(
         // Note: Validation that stages are not registered in both the old parserMap and the new
         // StageParams->DocumentSource registry happens at startup during registration in
         // registerStageParamsToDocumentSourceFn.
-        return {ds.value()};
+        return ds.value();
     }
 
     auto it = parserMap.find(liteParsed.getParseTimeName());
@@ -179,4 +179,10 @@ MONGO_INITIALIZER_GROUP(BeginDocumentSourceIdAllocation,
                         ("default"),
                         ("EndDocumentSourceIdAllocation"))
 MONGO_INITIALIZER_GROUP(EndDocumentSourceIdAllocation, ("BeginDocumentSourceIdAllocation"), ())
+MONGO_INITIALIZER_GROUP(BeginDocumentSourceFallbackRegistration,
+                        ("BeginDocumentSourceRegistration"),
+                        ("EndDocumentSourceFallbackRegistration"))
+MONGO_INITIALIZER_GROUP(EndDocumentSourceFallbackRegistration,
+                        ("BeginDocumentSourceFallbackRegistration"),
+                        ("EndDocumentSourceRegistration"))
 }  // namespace mongo

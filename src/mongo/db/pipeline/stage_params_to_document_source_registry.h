@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/init.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/stage_params.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
@@ -39,7 +38,11 @@
 
 namespace mongo {
 
-using StageParamsToDocumentSourceFn = std::function<boost::intrusive_ptr<DocumentSource>(
+class DocumentSource;
+class LiteParsedDocumentSource;
+class ExpressionContext;
+
+using StageParamsToDocumentSourceFn = std::function<std::list<boost::intrusive_ptr<DocumentSource>>(
     const std::unique_ptr<StageParams>&, const boost::intrusive_ptr<ExpressionContext>&)>;
 
 /**
@@ -77,9 +80,11 @@ using StageParamsToDocumentSourceFn = std::function<boost::intrusive_ptr<Documen
  * DO NOT call this function directly. Instead, use the
  * REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING macro defined in this file.
  */
-void registerStageParamsToDocumentSourceFn(StringData stageName,
-                                           StageParams::Id stageParamsId,
-                                           StageParamsToDocumentSourceFn fn);
+MONGO_MOD_PUBLIC  // Needed by enterprise hot backup registrations.
+    void
+    registerStageParamsToDocumentSourceFn(StringData stageName,
+                                          StageParams::Id stageParamsId,
+                                          StageParamsToDocumentSourceFn fn);
 
 /**
  * Create the corresponding 'DocumentSource' object for the given instance of
@@ -87,7 +92,7 @@ void registerStageParamsToDocumentSourceFn(StringData stageName,
  *
  * TODO SERVER-114343: Remove optional return value once all stages are migrated.
  */
-boost::optional<boost::intrusive_ptr<DocumentSource>> buildDocumentSource(
+boost::optional<std::list<boost::intrusive_ptr<DocumentSource>>> buildDocumentSource(
     const LiteParsedDocumentSource& liteParsed,
     const boost::intrusive_ptr<ExpressionContext>& expCtx);
 

@@ -37,12 +37,15 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(listSearchIndexes, ListSearchIndexesStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(
+    listSearchIndexes,
+    DocumentSourceListSearchIndexes::LiteParsedListSearchIndexes::parse,
+    AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(listSearchIndexes,
-                         DocumentSourceListSearchIndexes::LiteParsedListSearchIndexes::parse,
-                         DocumentSourceListSearchIndexes::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1)
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listSearchIndexes,
+                                                   DocumentSourceListSearchIndexes,
+                                                   ListSearchIndexesStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(listSearchIndexes, DocumentSourceListSearchIndexes::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSearchIndexes::createFromBson(

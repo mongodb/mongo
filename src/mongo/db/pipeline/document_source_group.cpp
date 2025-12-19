@@ -57,12 +57,10 @@ namespace mongo {
 
 constexpr StringData DocumentSourceGroup::kStageName;
 
-ALLOCATE_STAGE_PARAMS_ID(group, GroupStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(group, GroupLiteParsed::parse, AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(group,
-                         GroupLiteParsed::parse,
-                         DocumentSourceGroup::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(group, DocumentSourceGroup, GroupStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(group, DocumentSourceGroup::id)
 
 const char* DocumentSourceGroup::getSourceName() const {

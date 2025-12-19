@@ -48,12 +48,14 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(listSessions, ListSessionsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(listSessions,
+                                     DocumentSourceListSessions::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(listSessions,
-                         DocumentSourceListSessions::LiteParsed::parse,
-                         DocumentSourceListSessions::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listSessions,
+                                                   DocumentSourceListSessions,
+                                                   ListSessionsStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(listSessions, DocumentSourceListSessions::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(

@@ -48,17 +48,27 @@ using boost::intrusive_ptr;
 DocumentSourceInternalAllCollectionStats::DocumentSourceInternalAllCollectionStats(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
     DocumentSourceInternalAllCollectionStatsSpec spec)
-    : DocumentSource(kStageNameInternal, pExpCtx),
-      _internalAllCollectionStatsSpec(std::move(spec)) {}
+    : DocumentSource(kStageName, pExpCtx), _internalAllCollectionStatsSpec(std::move(spec)) {}
 
-ALLOCATE_STAGE_PARAMS_ID(_internalAllCollectionStats, InternalAllCollectionStatsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalAllCollectionStats,
+                                     DocumentSourceInternalAllCollectionStats::LiteParsed::parse,
+                                     AllowedWithApiStrict::kInternal);
 
-REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,
-                         DocumentSourceInternalAllCollectionStats::LiteParsed::parse,
-                         DocumentSourceInternalAllCollectionStats::createFromBsonInternal,
-                         AllowedWithApiStrict::kInternal);
+// Custom registration because this stage uses createFromBsonInternal instead of createFromBson.
+DocumentSourceContainer _internalAllCollectionStatsStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* typedParams = dynamic_cast<InternalAllCollectionStatsStageParams*>(stageParams.get());
+    return {DocumentSourceInternalAllCollectionStats::createFromBsonInternal(
+        typedParams->getOriginalBson(), expCtx)};
+}
+
+ALLOCATE_AND_REGISTER_STAGE_PARAMS(_internalAllCollectionStats,
+                                   DocumentSourceInternalAllCollectionStats,
+                                   InternalAllCollectionStatsStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalAllCollectionStats,
-                            DocumentSourceInternalAllCollectionStats::id)
+                            DocumentSourceInternalAllCollectionStats::id);
 
 DocumentSourceContainer::iterator DocumentSourceInternalAllCollectionStats::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
@@ -141,14 +151,14 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalAllCollectionStats::createFr
             pExpCtx->getNamespaceString().isAdminDB() &&
                 pExpCtx->getNamespaceString().isCollectionlessAggregateNS());
 
-    auto spec = DocumentSourceInternalAllCollectionStatsSpec::parse(
-        elem.embeddedObject(), IDLParserContext(kStageNameInternal));
+    auto spec = DocumentSourceInternalAllCollectionStatsSpec::parse(elem.embeddedObject(),
+                                                                    IDLParserContext(kStageName));
 
     return make_intrusive<DocumentSourceInternalAllCollectionStats>(pExpCtx, std::move(spec));
 }
 
 const char* DocumentSourceInternalAllCollectionStats::getSourceName() const {
-    return kStageNameInternal.data();
+    return kStageName.data();
 }
 
 Value DocumentSourceInternalAllCollectionStats::serialize(const SerializationOptions& opts) const {

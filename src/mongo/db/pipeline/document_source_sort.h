@@ -73,6 +73,7 @@
 namespace mongo {
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Sort);
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalBoundedSort);
 
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceSort final : public DocumentSource {
 public:

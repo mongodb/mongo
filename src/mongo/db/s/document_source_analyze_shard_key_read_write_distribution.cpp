@@ -47,13 +47,16 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-ALLOCATE_STAGE_PARAMS_ID(analyzeShardKeyReadWriteDistribution,
-                         AnalyzeShardKeyReadWriteDistributionStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(
+    _analyzeShardKeyReadWriteDistribution,
+    DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse,
+    AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(_analyzeShardKeyReadWriteDistribution,
-                         DocumentSourceAnalyzeShardKeyReadWriteDistribution::LiteParsed::parse,
-                         DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(
+    analyzeShardKeyReadWriteDistribution,
+    DocumentSourceAnalyzeShardKeyReadWriteDistribution,
+    AnalyzeShardKeyReadWriteDistributionStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_analyzeShardKeyReadWriteDistribution,
                             DocumentSourceAnalyzeShardKeyReadWriteDistribution::id)
 

@@ -50,13 +50,15 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(queryStats, QueryStatsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
+                                                       DocumentSourceQueryStats::LiteParsed::parse,
+                                                       AllowedWithApiStrict::kNeverInVersion1,
+                                                       &feature_flags::gFeatureFlagQueryStats);
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
-                                           DocumentSourceQueryStats::LiteParsed::parse,
-                                           DocumentSourceQueryStats::createFromBson,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           &feature_flags::gFeatureFlagQueryStats);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(queryStats,
+                                                   DocumentSourceQueryStats,
+                                                   QueryStatsStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(queryStats, DocumentSourceQueryStats::id)
 
 namespace {

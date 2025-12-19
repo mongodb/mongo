@@ -49,13 +49,12 @@ using boost::intrusive_ptr;
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(_internalChangeStreamCheckResumability,
-                         ChangeStreamCheckResumabilityStageParams::id);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamCheckResumability,
+                                              ChangeStreamCheckResumabilityLiteParsed::parse);
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamCheckResumability,
-                                  ChangeStreamCheckResumabilityLiteParsed::parse,
-                                  DocumentSourceChangeStreamCheckResumability::createFromBson,
-                                  true);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalChangeStreamCheckResumability,
+                                                   DocumentSourceChangeStreamCheckResumability,
+                                                   ChangeStreamCheckResumabilityStageParams);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamCheckResumability,
                             DocumentSourceChangeStreamCheckResumability::id)

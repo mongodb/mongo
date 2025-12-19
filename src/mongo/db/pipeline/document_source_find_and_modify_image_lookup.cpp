@@ -53,12 +53,13 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(findAndModifyImageLookup, FindAndModifyImageLookupStageParams::id);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalFindAndModifyImageLookup,
+                                              FindAndModifyImageLookupLiteParsed::parse);
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalFindAndModifyImageLookup,
-                                  FindAndModifyImageLookupLiteParsed::parse,
-                                  DocumentSourceFindAndModifyImageLookup::createFromBson,
-                                  true);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalFindAndModifyImageLookup,
+                                                   DocumentSourceFindAndModifyImageLookup,
+                                                   FindAndModifyImageLookupStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalFindAndModifyImageLookup,
                             DocumentSourceFindAndModifyImageLookup::id)
 

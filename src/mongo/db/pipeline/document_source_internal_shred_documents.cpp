@@ -37,13 +37,15 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(_internalShredDocuments, InternalShredDocumentsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalShredDocuments,
+                                     InternalShredDocumentsLiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(_internalShredDocuments,
-                         InternalShredDocumentsLiteParsed::parse,
-                         DocumentSourceInternalShredDocuments::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
-ALLOCATE_DOCUMENT_SOURCE_ID(_internalShredDocuments, DocumentSourceInternalShredDocuments::id)
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalShredDocuments,
+                                                   DocumentSourceInternalShredDocuments,
+                                                   InternalShredDocumentsStageParams);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalShredDocuments, DocumentSourceInternalShredDocuments::id);
 
 DocumentSourceInternalShredDocuments::DocumentSourceInternalShredDocuments(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)

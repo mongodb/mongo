@@ -53,12 +53,13 @@ using boost::intrusive_ptr;
 
 constexpr StringData DocumentSourceSetVariableFromSubPipeline::kStageName;
 
-ALLOCATE_STAGE_PARAMS_ID(setVariableFromSubPipeline, SetVariableFromSubPipelineStageParams::id);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(setVariableFromSubPipeline,
+                                              SetVariableFromSubPipelineLiteParsed::parse);
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(setVariableFromSubPipeline,
-                                  SetVariableFromSubPipelineLiteParsed::parse,
-                                  DocumentSourceSetVariableFromSubPipeline::createFromBson,
-                                  true);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(setVariableFromSubPipeline,
+                                                   DocumentSourceSetVariableFromSubPipeline,
+                                                   SetVariableFromSubPipelineStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(setVariableFromSubPipeline,
                             DocumentSourceSetVariableFromSubPipeline::id)
 

@@ -378,13 +378,16 @@ private:
 };
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(TrackingMock);
-ALLOCATE_STAGE_PARAMS_ID(trackingMock, TrackingMockStageParams::id);
 
-REGISTER_DOCUMENT_SOURCE(trackingMock,
-                         TrackingMockLiteParsed::parse,
-                         DocumentSourceTrackingMock::createFromBson,
-                         AllowedWithApiStrict::kAlways);
-ALLOCATE_DOCUMENT_SOURCE_ID(trackingMock, DocumentSourceTrackingMock::id)
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(trackingMock,
+                                     TrackingMockLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
+
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(trackingMock,
+                                                   DocumentSourceTrackingMock,
+                                                   TrackingMockStageParams);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(trackingMock, DocumentSourceTrackingMock::id);
 
 REGISTER_RULES(DocumentSourceTrackingMock, OPTIMIZE_IN_PLACE_RULE(DocumentSourceTrackingMock));
 

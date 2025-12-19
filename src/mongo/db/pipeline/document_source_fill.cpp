@@ -58,12 +58,13 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(fill, FillStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(fill,
+                                     FillLiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(fill,
-                         FillLiteParsed::parse,
-                         document_source_fill::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(fill,
+                                                             document_source_fill,
+                                                             FillStageParams);
 
 namespace document_source_fill {
 

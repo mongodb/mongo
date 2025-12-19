@@ -40,13 +40,15 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-ALLOCATE_STAGE_PARAMS_ID(internalSearchIdLookup, InternalSearchIdLookupStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalSearchIdLookup,
+                                     DocumentSourceInternalSearchIdLookUp::LiteParsed::parse,
+                                     AllowedWithApiStrict::kInternal);
 
-REGISTER_DOCUMENT_SOURCE(_internalSearchIdLookup,
-                         DocumentSourceInternalSearchIdLookUp::LiteParsed::parse,
-                         DocumentSourceInternalSearchIdLookUp::createFromBson,
-                         AllowedWithApiStrict::kInternal);
-ALLOCATE_DOCUMENT_SOURCE_ID(_internalSearchIdLookup, DocumentSourceInternalSearchIdLookUp::id)
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalSearchIdLookup,
+                                                   DocumentSourceInternalSearchIdLookUp,
+                                                   InternalSearchIdLookupStageParams);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalSearchIdLookup, DocumentSourceInternalSearchIdLookUp::id);
 
 DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     const intrusive_ptr<ExpressionContext>& expCtx,

@@ -50,12 +50,14 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(listMqlEntities, ListMqlEntitiesStageParams::id);
-
 // No privileges are required to run this agg stage as it is only available with enableTestCommands.
-REGISTER_TEST_DOCUMENT_SOURCE(listMqlEntities,
-                              DocumentSourceListMqlEntities::LiteParsed::parse,
-                              DocumentSourceListMqlEntities::createFromBson);
+REGISTER_TEST_LITE_PARSED_DOCUMENT_SOURCE(listMqlEntities,
+                                          DocumentSourceListMqlEntities::LiteParsed::parse);
+
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listMqlEntities,
+                                                   DocumentSourceListMqlEntities,
+                                                   ListMqlEntitiesStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(listMqlEntities, DocumentSourceListMqlEntities::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListMqlEntities::createFromBson(

@@ -2369,7 +2369,6 @@ TEST_F(AuthorizationSessionTest, ClusterActionsTestUser) {
 }
 
 DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(NoPrivsWithAuthzChecks)
-ALLOCATE_STAGE_PARAMS_ID(noPrivsWithAuthzChecks, NoPrivsWithAuthzChecksStageParams::id);
 
 // Test agg stage that doesn't use authz checks and doesn't use opt-out
 class TestDocumentSourceNoPrivsWithAuthzChecks : public DocumentSource {
@@ -2441,10 +2440,16 @@ public:
     }
 };
 
-REGISTER_DOCUMENT_SOURCE(testNoPrivsWithAuthzChecks,
-                         TestDocumentSourceNoPrivsWithAuthzChecks::LiteParsed::parse,
-                         TestDocumentSourceNoPrivsWithAuthzChecks::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(testNoPrivsWithAuthzChecks,
+                                     TestDocumentSourceNoPrivsWithAuthzChecks::LiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
+
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(testNoPrivsWithAuthzChecks,
+                                                   TestDocumentSourceNoPrivsWithAuthzChecks,
+                                                   NoPrivsWithAuthzChecksStageParams);
+
+
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(NoPrivsWithAuthzChecksOptOut)
 
 // Test agg stage that doesn't use authz checks and uses opt-out
 class TestDocumentSourceNoPrivsWithAuthzChecksOptOut
@@ -2471,6 +2476,10 @@ public:
         bool requiresAuthzChecks() const override {
             return false;
         }
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<NoPrivsWithAuthzChecksOptOutStageParams>(_originalBson);
+        }
     };
 
     TestDocumentSourceNoPrivsWithAuthzChecksOptOut(
@@ -2485,11 +2494,16 @@ public:
     }
 };
 
-REGISTER_DOCUMENT_SOURCE(testNoPrivsWithAuthzChecksOptOut,
-                         TestDocumentSourceNoPrivsWithAuthzChecksOptOut::LiteParsedOptOut::parse,
-                         TestDocumentSourceNoPrivsWithAuthzChecksOptOut::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(
+    testNoPrivsWithAuthzChecksOptOut,
+    TestDocumentSourceNoPrivsWithAuthzChecksOptOut::LiteParsedOptOut::parse,
+    AllowedWithApiStrict::kAlways);
 
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(testNoPrivsWithAuthzChecksOptOut,
+                                                   TestDocumentSourceNoPrivsWithAuthzChecksOptOut,
+                                                   NoPrivsWithAuthzChecksOptOutStageParams);
+
+DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(WithPrivs)
 // Test agg stage that uses authz checks (no need for opt out)
 class TestDocumentSourceWithPrivs : public TestDocumentSourceNoPrivsWithAuthzChecks {
 public:
@@ -2517,6 +2531,11 @@ public:
             : TestDocumentSourceNoPrivsWithAuthzChecks::LiteParsed(spec),
               _namespace(std::move(nss)) {}
 
+
+        std::unique_ptr<StageParams> getStageParams() const override {
+            return std::make_unique<WithPrivsStageParams>(_originalBson);
+        }
+
     private:
         NamespaceString _namespace;
     };
@@ -2532,10 +2551,13 @@ public:
     }
 };
 
-REGISTER_DOCUMENT_SOURCE(testWithPrivs,
-                         TestDocumentSourceWithPrivs::LiteParsedWithPrivs::parse,
-                         TestDocumentSourceWithPrivs::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(testWithPrivs,
+                                     TestDocumentSourceWithPrivs::LiteParsedWithPrivs::parse,
+                                     AllowedWithApiStrict::kAlways);
+
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(testWithPrivs,
+                                                   TestDocumentSourceWithPrivs,
+                                                   WithPrivsStageParams);
 
 //  Multitenancy disabled
 using AuthorizationSessionTestDeathTest = AuthorizationSessionTest;

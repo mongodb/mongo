@@ -62,12 +62,12 @@ DocumentSourceRedact::DocumentSourceRedact(const intrusive_ptr<ExpressionContext
     : DocumentSource(kStageName, expCtx),
       _redactProcessor(std::make_shared<RedactProcessor>(expCtx, expression, currentId)) {}
 
-ALLOCATE_STAGE_PARAMS_ID(redact, RedactStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(redact,
+                                     RedactLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(redact,
-                         RedactLiteParsed::parse,
-                         DocumentSourceRedact::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(redact, DocumentSourceRedact, RedactStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(redact, DocumentSourceRedact::id)
 
 const char* DocumentSourceRedact::getSourceName() const {

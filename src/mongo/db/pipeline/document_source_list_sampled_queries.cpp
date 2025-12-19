@@ -39,12 +39,14 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-ALLOCATE_STAGE_PARAMS_ID(listSampledQueries, ListSampledQueriesStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(listSampledQueries,
+                                     DocumentSourceListSampledQueries::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(listSampledQueries,
-                         DocumentSourceListSampledQueries::LiteParsed::parse,
-                         DocumentSourceListSampledQueries::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listSampledQueries,
+                                                   DocumentSourceListSampledQueries,
+                                                   ListSampledQueriesStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(listSampledQueries, DocumentSourceListSampledQueries::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFromBson(

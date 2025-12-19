@@ -52,15 +52,16 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(_internalComputeGeoNearDistance,
-                         InternalComputeGeoNearDistanceStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalComputeGeoNearDistance,
+                                     InternalComputeGeoNearDistanceLiteParsed::parse,
+                                     AllowedWithApiStrict::kInternal);
 
-REGISTER_DOCUMENT_SOURCE(_internalComputeGeoNearDistance,
-                         InternalComputeGeoNearDistanceLiteParsed::parse,
-                         DocumentSourceInternalGeoNearDistance::createFromBson,
-                         AllowedWithApiStrict::kInternal);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalComputeGeoNearDistance,
+                                                   DocumentSourceInternalGeoNearDistance,
+                                                   InternalComputeGeoNearDistanceStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalComputeGeoNearDistance,
-                            DocumentSourceInternalGeoNearDistance::id)
+                            DocumentSourceInternalGeoNearDistance::id);
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalGeoNearDistance::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

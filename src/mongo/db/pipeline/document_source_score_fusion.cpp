@@ -45,13 +45,15 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(scoreFusion, ScoreFusionStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(
+    scoreFusion,
+    DocumentSourceScoreFusion::LiteParsed::parse,
+    AllowedWithApiStrict::kNeverInVersion1,
+    &feature_flags::gFeatureFlagSearchHybridScoringFull);
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(scoreFusion,
-                                           DocumentSourceScoreFusion::LiteParsed::parse,
-                                           DocumentSourceScoreFusion::createFromBson,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           &feature_flags::gFeatureFlagSearchHybridScoringFull);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(scoreFusion,
+                                                   DocumentSourceScoreFusion,
+                                                   ScoreFusionStageParams);
 
 std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {

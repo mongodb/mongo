@@ -34,8 +34,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -54,27 +52,11 @@ DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext>&
                                          long long limit)
     : DocumentSource(kStageName, pExpCtx), _limit(limit) {}
 
-intrusive_ptr<DocumentSource> limitStageParamsToDocumentSourceFn(
-    const std::unique_ptr<StageParams>& stageParams,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto* limitParams = dynamic_cast<LimitStageParams*>(stageParams.get());
-
-    return DocumentSourceLimit::createFromBson(limitParams->getOriginalBson(), expCtx);
-}
-
-ALLOCATE_STAGE_PARAMS_ID(limit, LimitStageParams::id);
-
-// Register the LiteParsed parser (needed for LiteParsedDocumentSource::parse()).
 REGISTER_LITE_PARSED_DOCUMENT_SOURCE(limit, LimitLiteParsed::parse, AllowedWithApiStrict::kAlways);
 
-// Register the StageParams->DocumentSource mapping (the new registry).
-// This stage is NOT registered in the old parserMap.
-REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(limit,
-                                                 DocumentSourceLimit::kStageName,
-                                                 LimitStageParams::id,
-                                                 limitStageParamsToDocumentSourceFn);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(limit, DocumentSourceLimit, LimitStageParams);
 
-ALLOCATE_DOCUMENT_SOURCE_ID(limit, DocumentSourceLimit::id)
+ALLOCATE_DOCUMENT_SOURCE_ID(limit, DocumentSourceLimit::id);
 
 constexpr StringData DocumentSourceLimit::kStageName;
 

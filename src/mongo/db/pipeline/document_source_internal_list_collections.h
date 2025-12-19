@@ -66,7 +66,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalListCollections);
  */
 class DocumentSourceInternalListCollections final : public DocumentSource {
 public:
-    static constexpr StringData kStageNameInternal = "$_internalListCollections"_sd;
+    static constexpr StringData kStageName = "$_internalListCollections"_sd;
 
     DocumentSourceInternalListCollections(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
@@ -108,7 +108,7 @@ public:
                                                      bool isImplicitDefault) const override {
             // The listCollections command that runs under the hood only accepts 'local' read
             // concern.
-            return onlyReadConcernLocalSupported(kStageNameInternal, level, isImplicitDefault);
+            return onlyReadConcernLocalSupported(kStageName, level, isImplicitDefault);
         }
 
     private:

@@ -75,7 +75,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalAllCollectionStats);
  */
 class DocumentSourceInternalAllCollectionStats final : public DocumentSource {
 public:
-    static constexpr StringData kStageNameInternal = "$_internalAllCollectionStats"_sd;
+    static constexpr StringData kStageName = "$_internalAllCollectionStats"_sd;
 
     DocumentSourceInternalAllCollectionStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                              DocumentSourceInternalAllCollectionStatsSpec spec);

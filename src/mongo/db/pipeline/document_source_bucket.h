@@ -47,6 +47,8 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Bucket);
  */
 class DocumentSourceBucket final {
 public:
+    static constexpr StringData kStageName = "$bucket"_sd;
+
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,

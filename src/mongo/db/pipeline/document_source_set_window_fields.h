@@ -72,6 +72,7 @@
 namespace mongo {
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(SetWindowFields);
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalSetWindowFields);
 
 /**
  * $setWindowFields is an alias: it desugars to some combination of projection, sorting,

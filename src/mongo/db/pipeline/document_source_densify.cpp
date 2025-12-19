@@ -137,17 +137,19 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
     return range;
 }
 
-ALLOCATE_STAGE_PARAMS_ID(densify, DensifyStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(densify,
+                                     DensifyLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(densify,
-                         DensifyLiteParsed::parse,
-                         document_source_densify::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(densify,
+                                                   document_source_densify,
+                                                   DensifyStageParams);
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalDensify,
-                                  DensifyLiteParsed::parse,
-                                  DocumentSourceInternalDensify::createFromBson,
-                                  true);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalDensify, InternalDensifyLiteParsed::parse);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalDensify,
+                                                   DocumentSourceInternalDensify,
+                                                   InternalDensifyStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalDensify, DocumentSourceInternalDensify::id)
 
 namespace document_source_densify {

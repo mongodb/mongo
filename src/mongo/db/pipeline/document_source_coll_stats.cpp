@@ -41,12 +41,14 @@ using boost::intrusive_ptr;
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(collStats, CollStatsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(collStats,
+                                     DocumentSourceCollStats::LiteParsed::parse,
+                                     AllowedWithApiStrict::kConditionally);
 
-REGISTER_DOCUMENT_SOURCE(collStats,
-                         DocumentSourceCollStats::LiteParsed::parse,
-                         DocumentSourceCollStats::createFromBson,
-                         AllowedWithApiStrict::kConditionally);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(collStats,
+                                                   DocumentSourceCollStats,
+                                                   CollStatsStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(collStats, DocumentSourceCollStats::id)
 
 void DocumentSourceCollStats::LiteParsed::assertPermittedInAPIVersion(

@@ -100,12 +100,25 @@ namespace mongo {
  * $_internalUnpackBucket is an internal stage for materializing time-series measurements from
  * time-series collections. It should never be used anywhere outside the MongoDB server.
  */
-ALLOCATE_STAGE_PARAMS_ID(_internalUnpackBucket, InternalUnpackBucketStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalUnpackBucket,
+                                     InternalUnpackBucketLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
-                         InternalUnpackBucketLiteParsed::parse,
-                         DocumentSourceInternalUnpackBucket::createFromBsonInternal,
-                         AllowedWithApiStrict::kAlways);
+DocumentSourceContainer internalUnpackBucketStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* typedParams = dynamic_cast<InternalUnpackBucketStageParams*>(stageParams.get());
+    return {DocumentSourceInternalUnpackBucket::createFromBsonInternal(
+        typedParams->getOriginalBson(), expCtx)};
+}
+
+ALLOCATE_STAGE_PARAMS_ID(_internalUnpackBucket, InternalUnpackBucketStageParams::id);
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(
+    _internalUnpackBucket,
+    DocumentSourceInternalUnpackBucket::kStageNameInternal,
+    InternalUnpackBucketStageParams::id,
+    internalUnpackBucketStageParamsToDocumentSourceFn)
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalUnpackBucket, DocumentSourceInternalUnpackBucket::id)
 
 /*
@@ -113,10 +126,24 @@ ALLOCATE_DOCUMENT_SOURCE_ID(_internalUnpackBucket, DocumentSourceInternalUnpackB
  * "metaField" parameters and is only used for special known use cases by other MongoDB products
  * rather than user applications.
  */
-REGISTER_DOCUMENT_SOURCE(_unpackBucket,
-                         InternalUnpackBucketLiteParsed::parse,
-                         DocumentSourceInternalUnpackBucket::createFromBsonExternal,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_unpackBucket,
+                                     ExternalUnpackBucketLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
+
+DocumentSourceContainer externalUnpackBucketStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* typedParams = dynamic_cast<ExternalUnpackBucketStageParams*>(stageParams.get());
+    return {DocumentSourceInternalUnpackBucket::createFromBsonExternal(
+        typedParams->getOriginalBson(), expCtx)};
+}
+
+ALLOCATE_STAGE_PARAMS_ID(_unpackBucket, ExternalUnpackBucketStageParams::id);
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(
+    _unpackBucket,
+    DocumentSourceInternalUnpackBucket::kStageNameExternal,
+    ExternalUnpackBucketStageParams::id,
+    externalUnpackBucketStageParamsToDocumentSourceFn)
 
 namespace {
 using timeseries::BucketSpec;

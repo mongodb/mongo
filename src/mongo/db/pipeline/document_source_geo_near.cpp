@@ -77,12 +77,14 @@ using boost::intrusive_ptr;
 
 constexpr StringData DocumentSourceGeoNear::kKeyFieldName;
 
-ALLOCATE_STAGE_PARAMS_ID(geoNear, GeoNearStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(geoNear,
+                                     GeoNearLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(geoNear,
-                         GeoNearLiteParsed::parse,
-                         DocumentSourceGeoNear::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(geoNear,
+                                                   DocumentSourceGeoNear,
+                                                   GeoNearStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(geoNear, DocumentSourceGeoNear::id)
 
 Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {

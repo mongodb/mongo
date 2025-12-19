@@ -53,12 +53,14 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(listLocalSessions, ListLocalSessionsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(listLocalSessions,
+                                     DocumentSourceListLocalSessions::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(listLocalSessions,
-                         DocumentSourceListLocalSessions::LiteParsed::parse,
-                         DocumentSourceListLocalSessions::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listLocalSessions,
+                                                   DocumentSourceListLocalSessions,
+                                                   ListLocalSessionsStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(listLocalSessions, DocumentSourceListLocalSessions::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceListLocalSessions::createFromBson(

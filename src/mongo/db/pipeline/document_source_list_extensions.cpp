@@ -47,13 +47,15 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(listExtensions, ListExtensionsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(
+    listExtensions,
+    DocumentSourceListExtensions::LiteParsed::parse,
+    AllowedWithApiStrict::kNeverInVersion1,
+    &feature_flags::gFeatureFlagExtensionsAPI);
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(listExtensions,
-                                           DocumentSourceListExtensions::LiteParsed::parse,
-                                           DocumentSourceListExtensions::createFromBson,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           &feature_flags::gFeatureFlagExtensionsAPI);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listExtensions,
+                                                   DocumentSourceListExtensions,
+                                                   ListExtensionsStageParams);
 
 // Implements DocumentSourceListExtensions based on DocumentSourceQueue stage.
 boost::intrusive_ptr<DocumentSource> DocumentSourceListExtensions::createFromBson(

@@ -68,12 +68,12 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(merge, MergeStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(merge,
+                                     DocumentSourceMerge::LiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(merge,
-                         DocumentSourceMerge::LiteParsed::parse,
-                         DocumentSourceMerge::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(merge, DocumentSourceMerge, MergeStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(merge, DocumentSourceMerge::id)
 
 namespace {

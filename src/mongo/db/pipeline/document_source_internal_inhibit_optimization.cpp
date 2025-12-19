@@ -43,14 +43,16 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(_internalInhibitOptimization, InternalInhibitOptimizationStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalInhibitOptimization,
+                                     InternalInhibitOptimizationLiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(_internalInhibitOptimization,
-                         InternalInhibitOptimizationLiteParsed::parse,
-                         DocumentSourceInternalInhibitOptimization::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalInhibitOptimization,
+                                                   DocumentSourceInternalInhibitOptimization,
+                                                   InternalInhibitOptimizationStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalInhibitOptimization,
-                            DocumentSourceInternalInhibitOptimization::id)
+                            DocumentSourceInternalInhibitOptimization::id);
 
 constexpr StringData DocumentSourceInternalInhibitOptimization::kStageName;
 

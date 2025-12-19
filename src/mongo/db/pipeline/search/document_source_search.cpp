@@ -65,21 +65,21 @@ StringData removePrefixWorkaround(StringData key, StringData pre) {
 }
 }  // namespace
 
-ALLOCATE_STAGE_PARAMS_ID(search, SearchStageParams::id);
-
-REGISTER_DOCUMENT_SOURCE(search,
-                         SearchLiteParsed::parse,
-                         DocumentSourceSearch::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
-
-ALLOCATE_DOCUMENT_SOURCE_ID(search, DocumentSourceSearch::id)
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(search,
+                                     SearchLiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
 // $searchBeta is supported as an alias for $search for compatibility with applications that used
 // search during its beta period.
-REGISTER_DOCUMENT_SOURCE(searchBeta,
-                         SearchLiteParsed::parse,
-                         DocumentSourceSearch::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(searchBeta,
+                                     SearchLiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
+
+// This allocates SearchStageStageParams::id, which is shared by $search, $searchBeta,
+// $searchMeta, and $vectorSearch.
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(search, DocumentSourceSearch, SearchStageParams);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(search, DocumentSourceSearch::id);
 
 const char* DocumentSourceSearch::getSourceName() const {
     return kStageName.data();

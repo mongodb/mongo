@@ -51,12 +51,13 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(out, OutStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(out,
+                                     DocumentSourceOut::LiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(out,
-                         DocumentSourceOut::LiteParsed::parse,
-                         DocumentSourceOut::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(out, DocumentSourceOut, OutStageParams);
+
+
 ALLOCATE_DOCUMENT_SOURCE_ID(out, DocumentSourceOut::id)
 
 StageConstraints DocumentSourceOut::constraints(PipelineSplitState pipeState) const {

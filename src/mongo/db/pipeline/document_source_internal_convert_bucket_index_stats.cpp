@@ -45,15 +45,16 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(_internalConvertBucketIndexStats,
-                         InternalConvertBucketIndexStatsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalConvertBucketIndexStats,
+                                     InternalConvertBucketIndexStatsLiteParsed::parse,
+                                     AllowedWithApiStrict::kInternal);
 
-REGISTER_DOCUMENT_SOURCE(_internalConvertBucketIndexStats,
-                         InternalConvertBucketIndexStatsLiteParsed::parse,
-                         DocumentSourceInternalConvertBucketIndexStats::createFromBson,
-                         AllowedWithApiStrict::kInternal);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalConvertBucketIndexStats,
+                                                   DocumentSourceInternalConvertBucketIndexStats,
+                                                   InternalConvertBucketIndexStatsStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalConvertBucketIndexStats,
-                            DocumentSourceInternalConvertBucketIndexStats::id)
+                            DocumentSourceInternalConvertBucketIndexStats::id);
 
 DocumentSourceInternalConvertBucketIndexStats::DocumentSourceInternalConvertBucketIndexStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

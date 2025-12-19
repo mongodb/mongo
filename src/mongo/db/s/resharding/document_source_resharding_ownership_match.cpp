@@ -46,12 +46,13 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(reshardingOwnershipMatch, ReshardingOwnershipMatchStageParams::id);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalReshardingOwnershipMatch,
+                                              ReshardingOwnershipMatchLiteParsed::parse);
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalReshardingOwnershipMatch,
-                                  ReshardingOwnershipMatchLiteParsed::parse,
-                                  DocumentSourceReshardingOwnershipMatch::createFromBson,
-                                  true);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalReshardingOwnershipMatch,
+                                                   DocumentSourceReshardingOwnershipMatch,
+                                                   ReshardingOwnershipMatchStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalReshardingOwnershipMatch,
                             DocumentSourceReshardingOwnershipMatch::id)
 

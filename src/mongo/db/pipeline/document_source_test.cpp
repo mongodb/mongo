@@ -127,10 +127,6 @@ DEATH_TEST_F(DocumentSourceExtensionParserTestDeathTest,
     // Should throw assertion on duplicate registration.
     DocumentSource::registerParser("$duplicateTest", DocumentSourceMockExtension::createFromBson);
 }
-DEATH_TEST_F(DocumentSourceExtensionParserTestDeathTest, ShouldThrowOnExistingStage, "28707") {
-    // Should throw when trying to override an existing stage that's not eligible for overrides.
-    DocumentSource::registerParser("$match", DocumentSourceMockExtension::createFromBson);
-}
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldAllowVectorSearchOverride) {
     BSONObj vectorSearchSpec = BSON("$vectorSearch" << BSON("index" << "test"

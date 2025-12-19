@@ -48,13 +48,13 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-ALLOCATE_STAGE_PARAMS_ID(indexStats, IndexStatsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(indexStats,
+                                     DocumentSourceIndexStats::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(indexStats,
-                         DocumentSourceIndexStats::LiteParsed::parse,
-                         DocumentSourceIndexStats::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
-
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(indexStats,
+                                                   DocumentSourceIndexStats,
+                                                   IndexStatsStageParams);
 
 // Implements 'DocumentSourceIndexStats' based on a shard-only 'DocumentSourceQueue' stage.
 intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(

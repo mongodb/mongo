@@ -504,12 +504,12 @@ PrivilegeVector DocumentSourceLookUp::LiteParsed::requiredPrivileges(
     return requiredPrivileges;
 }
 
-ALLOCATE_STAGE_PARAMS_ID(lookUp, LookUpStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(lookup,
+                                     DocumentSourceLookUp::LiteParsed::parse,
+                                     AllowedWithApiStrict::kConditionally);
 
-REGISTER_DOCUMENT_SOURCE(lookup,
-                         DocumentSourceLookUp::LiteParsed::parse,
-                         DocumentSourceLookUp::createFromBson,
-                         AllowedWithApiStrict::kConditionally);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(lookup, DocumentSourceLookUp, LookUpStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(lookup, DocumentSourceLookUp::id)
 
 const char* DocumentSourceLookUp::getSourceName() const {

@@ -56,12 +56,13 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(rankFusion, RankFusionStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(rankFusion,
+                                     DocumentSourceRankFusion::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(rankFusion,
-                         DocumentSourceRankFusion::LiteParsed::parse,
-                         DocumentSourceRankFusion::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_CONTAINER_WITH_STAGE_PARAMS_DEFAULT(rankFusion,
+                                                             DocumentSourceRankFusion,
+                                                             RankFusionStageParams);
 
 std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {

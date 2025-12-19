@@ -48,13 +48,12 @@ using boost::intrusive_ptr;
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(_internalChangeStreamInjectControlEvents,
-                         ChangeStreamInjectControlEventsStageParams::id);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_internalChangeStreamInjectControlEvents,
+                                              ChangeStreamInjectControlEventsLiteParsed::parse);
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalChangeStreamInjectControlEvents,
-                                  ChangeStreamInjectControlEventsLiteParsed::parse,
-                                  DocumentSourceChangeStreamInjectControlEvents::createFromBson,
-                                  true);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalChangeStreamInjectControlEvents,
+                                                   DocumentSourceChangeStreamInjectControlEvents,
+                                                   ChangeStreamInjectControlEventsStageParams);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalChangeStreamInjectControlEvents,
                             DocumentSourceChangeStreamInjectControlEvents::id)

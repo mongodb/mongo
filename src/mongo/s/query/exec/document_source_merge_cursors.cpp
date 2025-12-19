@@ -48,12 +48,12 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(mergeCursors, MergeCursorsStageParams::id);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(mergeCursors, MergeCursorsLiteParsed::parse);
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(mergeCursors,
-                                  MergeCursorsLiteParsed::parse,
-                                  DocumentSourceMergeCursors::createFromBson,
-                                  true);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(mergeCursors,
+                                                   DocumentSourceMergeCursors,
+                                                   MergeCursorsStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(mergeCursors, DocumentSourceMergeCursors::id)
 
 constexpr StringData DocumentSourceMergeCursors::kStageName;

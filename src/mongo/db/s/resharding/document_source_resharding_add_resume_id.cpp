@@ -42,12 +42,13 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(reshardingAddResumeId, ReshardingAddResumeIdStageParams::id);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(_addReshardingResumeId,
+                                              ReshardingAddResumeIdLiteParsed::parse);
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(_addReshardingResumeId,
-                                  ReshardingAddResumeIdLiteParsed::parse,
-                                  DocumentSourceReshardingAddResumeId::createFromBson,
-                                  true);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_addReshardingResumeId,
+                                                   DocumentSourceReshardingAddResumeId,
+                                                   ReshardingAddResumeIdStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(_addReshardingResumeId, DocumentSourceReshardingAddResumeId::id)
 
 boost::intrusive_ptr<DocumentSourceReshardingAddResumeId>

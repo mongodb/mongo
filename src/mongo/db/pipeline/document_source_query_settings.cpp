@@ -46,12 +46,14 @@ namespace mongo {
 
 using namespace query_settings;
 
-ALLOCATE_STAGE_PARAMS_ID(querySettings, QuerySettingsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(querySettings,
+                                     DocumentSourceQuerySettings::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(querySettings,
-                         DocumentSourceQuerySettings::LiteParsed::parse,
-                         DocumentSourceQuerySettings::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(querySettings,
+                                                   DocumentSourceQuerySettings,
+                                                   QuerySettingsStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(querySettings, DocumentSourceQuerySettings::id)
 
 DocumentSourceQuerySettings::DocumentSourceQuerySettings(

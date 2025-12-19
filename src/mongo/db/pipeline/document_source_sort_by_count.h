@@ -47,6 +47,8 @@ DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(SortByCount);
  */
 class DocumentSourceSortByCount final {
 public:
+    static constexpr StringData kStageName = "$sortByCount"_sd;
+
     /**
      * Returns a $group stage followed by a $sort stage.
      */

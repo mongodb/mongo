@@ -54,7 +54,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalAllCollectionStatsT
             internalAllCollectionStatsDS);
 
     return make_intrusive<exec::agg::InternalAllCollectionStatsStage>(
-        internalAllCollectionStatsDS->kStageNameInternal,
+        internalAllCollectionStatsDS->kStageName,
         internalAllCollectionStatsDS->getExpCtx(),
         internalAllCollectionStatsDS->_internalAllCollectionStatsSpec,
         internalAllCollectionStatsDS->_absorbedMatch,

@@ -52,7 +52,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceInternalListCollectionsToSt
             internalListCollectionsDS);
 
     return make_intrusive<exec::agg::InternalListCollectionsStage>(
-        internalListCollectionsDS->kStageNameInternal,
+        internalListCollectionsDS->kStageName,
         internalListCollectionsDS->getExpCtx(),
         internalListCollectionsDS->_absorbedMatch);
 }

@@ -62,12 +62,14 @@ const StringData kShardFieldName = "shard"_sd;
 
 using boost::intrusive_ptr;
 
-ALLOCATE_STAGE_PARAMS_ID(currentOp, CurrentOpStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(currentOp,
+                                     DocumentSourceCurrentOp::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(currentOp,
-                         DocumentSourceCurrentOp::LiteParsed::parse,
-                         DocumentSourceCurrentOp::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(currentOp,
+                                                   DocumentSourceCurrentOp,
+                                                   CurrentOpStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(currentOp, DocumentSourceCurrentOp::id)
 
 constexpr StringData DocumentSourceCurrentOp::kStageName;

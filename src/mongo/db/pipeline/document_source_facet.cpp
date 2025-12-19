@@ -63,7 +63,13 @@ using std::pair;
 using std::string;
 using std::vector;
 
-ALLOCATE_STAGE_PARAMS_ID(facet, FacetStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(facet,
+                                     DocumentSourceFacet::LiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
+
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(facet, DocumentSourceFacet, FacetStageParams);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(facet, DocumentSourceFacet::id);
 
 DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
                                          const intrusive_ptr<ExpressionContext>& expCtx,
@@ -161,12 +167,6 @@ std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed
 
     return std::make_unique<DocumentSourceFacet::LiteParsed>(spec, std::move(liteParsedPipelines));
 }
-
-REGISTER_DOCUMENT_SOURCE(facet,
-                         DocumentSourceFacet::LiteParsed::parse,
-                         DocumentSourceFacet::createFromBson,
-                         AllowedWithApiStrict::kAlways);
-ALLOCATE_DOCUMENT_SOURCE_ID(facet, DocumentSourceFacet::id)
 
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
     std::vector<FacetPipeline> facetPipelines,

@@ -42,13 +42,11 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(queue, QueueStageParams::id);
+REGISTER_INTERNAL_LITE_PARSED_DOCUMENT_SOURCE(queue, QueueLiteParsed::parse);
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(queue,
-                                  QueueLiteParsed::parse,
-                                  DocumentSourceQueue::createFromBson,
-                                  true);
-ALLOCATE_DOCUMENT_SOURCE_ID(queue, DocumentSourceQueue::id)
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(queue, DocumentSourceQueue, QueueStageParams);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(queue, DocumentSourceQueue::id);
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
     BSONElement arrayElem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

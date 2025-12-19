@@ -50,12 +50,14 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-ALLOCATE_STAGE_PARAMS_ID(listCatalog, ListCatalogStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(listCatalog,
+                                     DocumentSourceListCatalog::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(listCatalog,
-                         DocumentSourceListCatalog::LiteParsed::parse,
-                         DocumentSourceListCatalog::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(listCatalog,
+                                                   DocumentSourceListCatalog,
+                                                   ListCatalogStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(listCatalog, DocumentSourceListCatalog::id)
 
 const char* DocumentSourceListCatalog::getSourceName() const {

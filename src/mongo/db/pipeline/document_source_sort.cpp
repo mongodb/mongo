@@ -146,24 +146,34 @@ DocumentSourceSort::DocumentSourceSort(const boost::intrusive_ptr<ExpressionCont
             !_sortExecutor->sortPattern().empty());
 }
 
-ALLOCATE_STAGE_PARAMS_ID(sort, SortStageParams::id);
 
-REGISTER_DOCUMENT_SOURCE(sort,
-                         SortLiteParsed::parse,
-                         DocumentSourceSort::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(sort, SortLiteParsed::parse, AllowedWithApiStrict::kAlways);
+
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(sort, DocumentSourceSort, SortStageParams);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(sort, DocumentSourceSort::id)
 
-REGISTER_DOCUMENT_SOURCE_WITH_CLIENT_TYPE(_internalBoundedSort,
-                                          SortLiteParsed::parse,
-                                          DocumentSourceSort::parseBoundedSort,
-                                          ::mongo::getTestCommandsEnabled()
-                                              ? AllowedWithApiStrict::kNeverInVersion1
-                                              : AllowedWithApiStrict::kInternal,
-                                          ::mongo::getTestCommandsEnabled()
-                                              ? AllowedWithClientType::kAny
-                                              : AllowedWithClientType::kInternal);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE_WITH_CLIENT_TYPE(_internalBoundedSort,
+                                                      InternalBoundedSortLiteParsed::parse,
+                                                      ::mongo::getTestCommandsEnabled()
+                                                          ? AllowedWithApiStrict::kNeverInVersion1
+                                                          : AllowedWithApiStrict::kInternal,
+                                                      ::mongo::getTestCommandsEnabled()
+                                                          ? AllowedWithClientType::kAny
+                                                          : AllowedWithClientType::kInternal);
+
+DocumentSourceContainer _internalBoundedSortStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* typedParams = dynamic_cast<InternalBoundedSortStageParams*>(stageParams.get());
+    return {DocumentSourceSort::parseBoundedSort(typedParams->getOriginalBson(), expCtx)};
+}
+
+ALLOCATE_STAGE_PARAMS_ID(_internalBoundedSort, InternalBoundedSortStageParams::id);
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(_internalBoundedSort,
+                                                 "$_internalBoundedSort",
+                                                 InternalBoundedSortStageParams::id,
+                                                 _internalBoundedSortStageParamsToDocumentSourceFn)
 
 void DocumentSourceSort::serializeForBoundedSort(std::vector<Value>& array,
                                                  const SerializationOptions& opts) const {
@@ -378,7 +388,6 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     boost::optional<long long> limit,
     bool outputSortKeyMetadata,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-
     auto ds = DocumentSourceSort::create(expCtx, pat);
 
     SortOptions opts;

@@ -45,13 +45,15 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(_internalSplitPipeline, InternalSplitPipelineStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalSplitPipeline,
+                                     InternalSplitPipelineLiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(_internalSplitPipeline,
-                         InternalSplitPipelineLiteParsed::parse,
-                         DocumentSourceInternalSplitPipeline::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
-ALLOCATE_DOCUMENT_SOURCE_ID(_internalSplitPipeline, DocumentSourceInternalSplitPipeline::id)
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalSplitPipeline,
+                                                   DocumentSourceInternalSplitPipeline,
+                                                   InternalSplitPipelineStageParams);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalSplitPipeline, DocumentSourceInternalSplitPipeline::id);
 
 constexpr StringData DocumentSourceInternalSplitPipeline::kStageName;
 

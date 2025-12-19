@@ -44,12 +44,14 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(planCacheStats, PlanCacheStatsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(planCacheStats,
+                                     DocumentSourcePlanCacheStats::LiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(planCacheStats,
-                         DocumentSourcePlanCacheStats::LiteParsed::parse,
-                         DocumentSourcePlanCacheStats::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(planCacheStats,
+                                                   DocumentSourcePlanCacheStats,
+                                                   PlanCacheStatsStageParams);
+
 ALLOCATE_DOCUMENT_SOURCE_ID(planCacheStats, DocumentSourcePlanCacheStats::id)
 
 boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBson(

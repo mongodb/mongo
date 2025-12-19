@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -50,7 +51,10 @@ void registerStageParamsToDocumentSourceFn(StringData stageName,
                                            StageParamsToDocumentSourceFn fn) {
     const auto [itr_ignored, inserted] =
         documentSourceBuildersMap.insert(std::make_pair(stageParamsId, fn));
-    tassert(11458700, "Duplicate StageParams to DocumentSource mapping", inserted);
+    tassert(11458700,
+            str::stream() << "Stage '" << stageName
+                          << "' is a duplicate in the StageParams to DocumentSource mapping",
+            inserted);
 
     // Validate that the stage is not also registered in the old parserMap.
     tassert(11458701,
@@ -74,7 +78,7 @@ MONGO_INITIALIZER_GROUP(EndStageParamsToDocumentSourceRegistration,
                         ("BeginStageParamsToDocumentSourceRegistration"),
                         ())
 
-boost::optional<boost::intrusive_ptr<DocumentSource>> buildDocumentSource(
+boost::optional<DocumentSourceContainer> buildDocumentSource(
     const LiteParsedDocumentSource& liteParsed,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto stageParams = liteParsed.getStageParams();

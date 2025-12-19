@@ -45,13 +45,15 @@
 
 namespace mongo {
 
-ALLOCATE_STAGE_PARAMS_ID(_internalApplyOplogUpdate, InternalApplyOplogUpdateStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(_internalApplyOplogUpdate,
+                                     InternalApplyOplogUpdateLiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(_internalApplyOplogUpdate,
-                         InternalApplyOplogUpdateLiteParsed::parse,
-                         DocumentSourceInternalApplyOplogUpdate::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
-ALLOCATE_DOCUMENT_SOURCE_ID(_internalApplyOplogUpdate, DocumentSourceInternalApplyOplogUpdate::id)
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(_internalApplyOplogUpdate,
+                                                   DocumentSourceInternalApplyOplogUpdate,
+                                                   InternalApplyOplogUpdateStageParams);
+
+ALLOCATE_DOCUMENT_SOURCE_ID(_internalApplyOplogUpdate, DocumentSourceInternalApplyOplogUpdate::id);
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalApplyOplogUpdate::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -104,10 +105,11 @@ TEST(StageParamsToDocumentSourceRegistryTest, RegisteredStageReturnsDocumentSour
     auto result = buildDocumentSource(liteParsed, expCtx);
 
     ASSERT_TRUE(result.has_value());
-    ASSERT_TRUE(result.get() != nullptr);
+    ASSERT_EQ(result.get().size(), 1);
+    ASSERT_TRUE(result.get().front() != nullptr);
 
     // Verify it's actually a DocumentSourceLimit.
-    auto* limitDS = dynamic_cast<DocumentSourceLimit*>(result.get().get());
+    auto* limitDS = dynamic_cast<DocumentSourceLimit*>(result.get().front().get());
     ASSERT_TRUE(limitDS != nullptr);
     ASSERT_EQ(limitDS->getLimit(), 10);
 }
@@ -119,10 +121,9 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(DuplicateRegistrationTest);
 ALLOCATE_STAGE_PARAMS_ID(duplicateRegistrationTest, DuplicateRegistrationTestStageParams::id);
 
 // A dummy mapping function for the duplicate registration test.
-boost::intrusive_ptr<DocumentSource> dummyMappingFn(
-    const std::unique_ptr<StageParams>& stageParams,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return nullptr;
+DocumentSourceContainer dummyMappingFn(const std::unique_ptr<StageParams>& stageParams,
+                                       const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return {};
 }
 
 // Register the first mapping for the duplicate registration test.
@@ -161,10 +162,19 @@ ALLOCATE_STAGE_PARAMS_ID(overlappingRegistrationTest, OverlappingRegistrationTes
 DEATH_TEST(StageParamsToDocumentSourceRegistryTest,
            RegistrationFailsForStageInParserMap,
            "11458701") {
-    // $match is registered in the old parserMap, so registering it in the new registry
-    // should trigger a tassert.
+    constexpr auto kOverlappingStageName = "$overlappingRegistrationTestStage";
+
+    // Ensure the stage name is present in the legacy parserMap so the registration below will
+    // trip the validation that prevents a stage from being in both registries.
+    DocumentSource::registerParser(
+        kOverlappingStageName,
+        [](BSONElement stageSpec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+            return DocumentSourceContainer{};
+        },
+        nullptr);
+
     registerStageParamsToDocumentSourceFn(
-        "$match", OverlappingRegistrationTestStageParams::id, dummyMappingFn);
+        kOverlappingStageName, OverlappingRegistrationTestStageParams::id, dummyMappingFn);
 }
 
 }  // namespace

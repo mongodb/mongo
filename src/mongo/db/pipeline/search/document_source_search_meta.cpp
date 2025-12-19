@@ -61,14 +61,15 @@ auto cloneEachOne(std::list<boost::intrusive_ptr<DocumentSource>> stages, const 
 }
 }  // namespace
 
-ALLOCATE_STAGE_PARAMS_ID(searchMeta, SearchMetaStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(searchMeta,
+                                     SearchMetaLiteParsed::parse,
+                                     AllowedWithApiStrict::kNeverInVersion1);
 
-REGISTER_DOCUMENT_SOURCE(searchMeta,
-                         SearchMetaLiteParsed::parse,
-                         DocumentSourceSearchMeta::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(searchMeta,
+                                                   DocumentSourceSearchMeta,
+                                                   SearchMetaStageParams);
 
-ALLOCATE_DOCUMENT_SOURCE_ID(searchMeta, DocumentSourceSearchMeta::id)
+ALLOCATE_DOCUMENT_SOURCE_ID(searchMeta, DocumentSourceSearchMeta::id);
 
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceSearchMeta::distributedPlanLogic() {

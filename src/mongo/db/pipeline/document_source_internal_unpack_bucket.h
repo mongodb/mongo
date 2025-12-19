@@ -62,6 +62,7 @@
 namespace MONGO_MOD_PUB mongo {
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(InternalUnpackBucket);
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(ExternalUnpackBucket);
 
 struct MONGO_MOD_PRIVATE InternalUnpackBucketSharedState {
     // It's beneficial to do as much filtering at the bucket level as possible to avoid unpacking

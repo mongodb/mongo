@@ -32,7 +32,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/util/assert_util.h"
@@ -47,16 +46,16 @@
 namespace mongo {
 using boost::intrusive_ptr;
 
-ALLOCATE_STAGE_PARAMS_ID(addFields, AddFieldsStageParams::id);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(addFields,
+                                     AddFieldsLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE(set,
+                                     AddFieldsLiteParsed::parse,
+                                     AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE(addFields,
-                         AddFieldsLiteParsed::parse,
-                         DocumentSourceAddFields::createFromBson,
-                         AllowedWithApiStrict::kAlways);
-REGISTER_DOCUMENT_SOURCE(set,
-                         AddFieldsLiteParsed::parse,
-                         DocumentSourceAddFields::createFromBson,
-                         AllowedWithApiStrict::kAlways);
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(addFields,
+                                                   DocumentSourceAddFields,
+                                                   AddFieldsStageParams);
 
 intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
     BSONObj addFieldsSpec,
