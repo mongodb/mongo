@@ -59,9 +59,16 @@ export const $config = (function () {
                 // verification.
                 reshardCollectionCmd.performVerification = false;
             }
-            assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd), [
-                ErrorCodes.SnapshotUnavailable,
-            ]);
+            assert.soonRetryOnAcceptableErrors(
+                () => {
+                    assert.commandWorkedOrFailedWithCode(db.adminCommand(reshardCollectionCmd), [
+                        ErrorCodes.SnapshotUnavailable,
+                    ]);
+                    return true;
+                },
+                ErrorCodes.FailedToSatisfyReadPreference,
+                "reshardCollection should eventually succeed after primary elections",
+            );
         } else {
             assert.commandWorked(db.adminCommand(reshardCollectionCmd));
         }
