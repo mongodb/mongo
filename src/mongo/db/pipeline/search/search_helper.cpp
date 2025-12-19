@@ -255,7 +255,8 @@ void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
     // (from the _id values returned by mongot), apply the view's data transforms, and pass
     // said transformed documents through the rest of the user pipeline.
     if (lpp.hasSearchStage() && !resolvedView.getPipeline().empty()) {
-        expCtx->setView(boost::make_optional(std::make_pair(viewName, resolvedView.getPipeline())));
+        expCtx->setView(boost::make_optional(
+            ViewInfo(viewName, resolvedView.getNamespace(), resolvedView.getPipeline())));
     }
 }
 
@@ -618,8 +619,8 @@ boost::optional<SearchQueryViewSpec> getViewFromExpCtx(
     boost::intrusive_ptr<ExpressionContext> expCtx) {
     if (expCtx->getView()) {
         const auto& expCtxView = *expCtx->getView();
-        return boost::make_optional(
-            SearchQueryViewSpec(std::string(expCtxView.first.coll()), expCtxView.second));
+        return boost::make_optional(SearchQueryViewSpec(std::string(expCtxView.viewName.coll()),
+                                                        expCtxView.getOriginalBson()));
     }
 
     return boost::none;

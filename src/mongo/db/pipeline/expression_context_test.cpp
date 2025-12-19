@@ -35,6 +35,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -195,39 +196,41 @@ TEST_F(ExpressionContextTest, CanBuildWithView) {
     auto opCtx = makeOperationContext();
 
     auto viewNss = NamespaceString::createNamespaceString_forTest("test"_sd, "view"_sd);
+    auto collNss = NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd);
     std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
 
-    auto view = boost::make_optional(std::make_pair(viewNss, viewPipeline));
-    auto expCtxWithView =
-        mongo::ExpressionContextBuilder{}
-            .opCtx(opCtx.get())
-            .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd))
-            .view(view)
-            .build();
+    auto view = boost::make_optional(ViewInfo{viewNss, collNss, viewPipeline});
+    auto expCtxWithView = mongo::ExpressionContextBuilder{}
+                              .opCtx(opCtx.get())
+                              .ns(collNss)
+                              .view(std::move(view))
+                              .build();
 
     // expCtx namespace isn't affected by the view namespace.
     ASSERT_EQUALS(expCtxWithView->getNamespaceString(),
                   NamespaceString::createNamespaceString_forTest("test"_sd, "coll"_sd));
 
     ASSERT_TRUE(expCtxWithView->getView().has_value());
-    ASSERT_EQUALS(expCtxWithView->getView()->first, viewNss);
-    ASSERT_EQUALS(expCtxWithView->getView()->second.size(), viewPipeline.size());
-    ASSERT_BSONOBJ_EQ(expCtxWithView->getView()->second[0], viewPipeline[0]);
+    ASSERT_EQUALS(expCtxWithView->getView()->viewName, viewNss);
+    ASSERT_EQUALS(expCtxWithView->getView()->viewPipeline.size(), viewPipeline.size());
+    ASSERT(expCtxWithView->getView()->viewPipeline[0] != nullptr);
+    ASSERT_BSONOBJ_EQ(expCtxWithView->getView()->viewPipeline[0]->getOriginalBson().wrap(),
+                      viewPipeline[0]);
 }
 
 TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
     auto opCtx = makeOperationContext();
 
     auto viewNss = NamespaceString::createNamespaceString_forTest("test"_sd, "view"_sd);
+    auto coll1Nss = NamespaceString::createNamespaceString_forTest("test"_sd, "coll1"_sd);
     std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
 
-    auto view = boost::make_optional(std::make_pair(viewNss, viewPipeline));
-    auto expCtxOriginal =
-        mongo::ExpressionContextBuilder{}
-            .opCtx(opCtx.get())
-            .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "coll1"_sd))
-            .view(view)
-            .build();
+    auto view = boost::make_optional(ViewInfo{viewNss, coll1Nss, viewPipeline});
+    auto expCtxOriginal = mongo::ExpressionContextBuilder{}
+                              .opCtx(opCtx.get())
+                              .ns(coll1Nss)
+                              .view(std::move(view))
+                              .build();
 
     auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"_sd, "coll2"_sd);
     auto expCtxCopy = makeCopyFromExpressionContext(expCtxOriginal, namespaceCopy);
@@ -237,34 +240,39 @@ TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
 
     // expCtxOriginal isn't affected by the copy.
     ASSERT_TRUE(expCtxOriginal->getView().has_value());
-    ASSERT_EQUALS(expCtxOriginal->getView()->first, viewNss);
-    ASSERT_EQUALS(expCtxOriginal->getView()->second.size(), viewPipeline.size());
-    ASSERT_BSONOBJ_EQ(expCtxOriginal->getView()->second[0], viewPipeline[0]);
+    ASSERT_EQUALS(expCtxOriginal->getView()->viewName, viewNss);
+    ASSERT_EQUALS(expCtxOriginal->getView()->viewPipeline.size(), viewPipeline.size());
+    ASSERT(expCtxOriginal->getView()->viewPipeline[0] != nullptr);
+    ASSERT_BSONOBJ_EQ(expCtxOriginal->getView()->viewPipeline[0]->getOriginalBson().wrap(),
+                      viewPipeline[0]);
 }
 
 TEST_F(ExpressionContextTest, CopyWithInitializesViewWhenSpecified) {
     auto opCtx = makeOperationContext();
 
     auto viewNss = NamespaceString::createNamespaceString_forTest("test"_sd, "view"_sd);
+    auto coll1Nss = NamespaceString::createNamespaceString_forTest("test"_sd, "coll1"_sd);
     std::vector<BSONObj> viewPipeline = {BSON("$project" << BSON("_id" << 0))};
 
-    auto view = boost::make_optional(std::make_pair(viewNss, viewPipeline));
-    auto expCtxOriginal =
-        mongo::ExpressionContextBuilder{}
-            .opCtx(opCtx.get())
-            .ns(NamespaceString::createNamespaceString_forTest("test"_sd, "coll1"_sd))
-            .view(view)
-            .build();
+    auto view = boost::make_optional(ViewInfo{viewNss, coll1Nss, viewPipeline});
+    auto expCtxOriginal = mongo::ExpressionContextBuilder{}
+                              .opCtx(opCtx.get())
+                              .ns(coll1Nss)
+                              .view(std::move(view))
+                              .build();
 
     auto namespaceCopy = NamespaceString::createNamespaceString_forTest("test"_sd, "coll2"_sd);
+    auto viewInfo = boost::make_optional(ViewInfo(viewNss, coll1Nss, viewPipeline));
     auto expCtxCopy = makeCopyFromExpressionContext(
-        expCtxOriginal, namespaceCopy, boost::none, boost::none, view);
+        expCtxOriginal, namespaceCopy, boost::none, boost::none, std::move(viewInfo));
 
     // expCtxCopy has a view.
     ASSERT_TRUE(expCtxCopy->getView().has_value());
-    ASSERT_EQUALS(expCtxCopy->getView()->first, viewNss);
-    ASSERT_EQUALS(expCtxCopy->getView()->second.size(), viewPipeline.size());
-    ASSERT_BSONOBJ_EQ(expCtxCopy->getView()->second[0], viewPipeline[0]);
+    ASSERT_EQUALS(expCtxCopy->getView()->viewName, viewNss);
+    ASSERT_EQUALS(expCtxCopy->getView()->viewPipeline.size(), viewPipeline.size());
+    ASSERT(expCtxCopy->getView()->viewPipeline[0] != nullptr);
+    ASSERT_BSONOBJ_EQ(expCtxCopy->getView()->viewPipeline[0]->getOriginalBson().wrap(),
+                      viewPipeline[0]);
 }
 
 struct AddCmdTestCase {

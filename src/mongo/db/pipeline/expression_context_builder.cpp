@@ -347,8 +347,7 @@ ExpressionContextBuilder& ExpressionContextBuilder::serverSideJsConfig(
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::view(
-    boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view) {
+ExpressionContextBuilder& ExpressionContextBuilder::view(boost::optional<ViewInfo> view) {
     params.view = std::move(view);
     return *this;
 }
@@ -559,7 +558,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
     NamespaceString ns,
     boost::optional<UUID> uuid,
     boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator,
-    boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view,
+    const boost::optional<ViewInfo>& view,
     boost::optional<NamespaceString> userNs) {
     auto collator = [&]() {
         if (updatedCollator) {
@@ -570,6 +569,8 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
             return std::unique_ptr<CollatorInterface>();
         }
     }();
+
+    boost::optional<ViewInfo> clonedView = view ? boost::make_optional(view->clone()) : boost::none;
 
     // Some of the properties of expression context are not cloned (e.g runtimeConstants,
     // letParameters, view). In case new fields need to be cloned, they will need to be added in the
@@ -608,7 +609,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
             .originalAggregateCommand(other->getOriginalAggregateCommand())
             .subPipelineDepth(other->getSubPipelineDepth())
             .initialPostBatchResumeToken(other->getInitialPostBatchResumeToken().getOwned())
-            .view(view)
+            .view(std::move(clonedView))
             .requiresTimeseriesExtendedRangeSupport(
                 other->getRequiresTimeseriesExtendedRangeSupport())
             .isHybridSearch(other->isHybridSearch())

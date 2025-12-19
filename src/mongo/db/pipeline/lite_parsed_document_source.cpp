@@ -281,4 +281,25 @@ const ParserMap& LiteParsedDocumentSource::getParserMap() {
     return parserMap;
 }
 
+ViewInfo::ViewInfo(NamespaceString pViewName,
+                   NamespaceString pResolvedNss,
+                   std::vector<BSONObj> pViewPipeBson,
+                   const LiteParserOptions& pOptions)
+    : viewName(std::move(pViewName)),
+      resolvedNss(std::move(pResolvedNss)),
+      _ownedOriginalBsonPipeline(std::move(pViewPipeBson)) {
+    viewPipeline.reserve(_ownedOriginalBsonPipeline.size());
+    for (const auto& stage : _ownedOriginalBsonPipeline) {
+        viewPipeline.push_back(LiteParsedDocumentSource::parse(viewName, stage, pOptions));
+    }
+}
+
+std::vector<BSONObj> ViewInfo::getOriginalBson() const {
+    return _ownedOriginalBsonPipeline;
+}
+
+ViewInfo ViewInfo::clone() const {
+    return ViewInfo{viewName, resolvedNss, getOriginalBson()};
+}
+
 }  // namespace mongo

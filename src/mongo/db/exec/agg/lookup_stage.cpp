@@ -356,8 +356,11 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     // Update the expression context with any new namespaces the resolved pipeline has
     // introduced.
     LiteParsedPipeline liteParsedPipeline(resolvedNs, viewPipeline);
-    _fromExpCtx = makeCopyFromExpressionContext(
-        _fromExpCtx, resolvedNs, boost::none, boost::none, std::make_pair(_fromNs, viewPipeline));
+    _fromExpCtx = makeCopyFromExpressionContext(_fromExpCtx,
+                                                resolvedNs,
+                                                boost::none,
+                                                boost::none,
+                                                ViewInfo(_fromNs, resolvedNs, viewPipeline));
     _fromExpCtx->addResolvedNamespaces(liteParsedPipeline.getInvolvedNamespaces());
 
     // Parse the new pipeline and prepare it again. We must resolve the view before entering

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/util/modules.h"
 
 namespace MONGO_MOD_PUBLIC mongo {
@@ -101,8 +102,7 @@ public:
     ExpressionContextBuilder& subPipelineDepth(long long);
     ExpressionContextBuilder& initialPostBatchResumeToken(BSONObj);
     ExpressionContextBuilder& tailableMode(TailableModeEnum);
-    ExpressionContextBuilder& view(
-        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>>);
+    ExpressionContextBuilder& view(boost::optional<ViewInfo>);
     ExpressionContextBuilder& originalNs(NamespaceString);
     ExpressionContextBuilder& isHybridSearch(bool);
     ExpressionContextBuilder& mainCollPathArrayness(
@@ -165,7 +165,7 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
     NamespaceString ns,
     boost::optional<UUID> uuid = boost::none,
     boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator = boost::none,
-    boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none,
+    const boost::optional<ViewInfo>& view = boost::none,
     boost::optional<NamespaceString> userNs = boost::none);
 
 /**

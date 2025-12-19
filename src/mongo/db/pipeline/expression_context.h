@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/variables.h"
@@ -872,7 +873,7 @@ public:
         _params.tailableMode = tailableMode;
     }
 
-    const boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>>& getView() const {
+    const boost::optional<ViewInfo>& getView() const {
         return _params.view;
     }
 
@@ -881,7 +882,7 @@ public:
             VersionContext::getDecoration(getOperationContext()));
     }
 
-    void setView(boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view) {
+    void setView(boost::optional<ViewInfo> view) {
         _params.view = std::move(view);
     }
 
@@ -1057,10 +1058,11 @@ protected:
         boost::optional<LegacyRuntimeConstants> runtimeConstants = boost::none;
         boost::optional<BSONObj> letParameters = boost::none;
 
-        // The *view's* namespace with the view's effective pipeline. Note that this is different
-        // than ResolvedNamespace as that holds the *underlying collections's* namespace with the
-        // view's effective pipeline.
-        boost::optional<std::pair<NamespaceString, std::vector<BSONObj>>> view = boost::none;
+        // The *view's* namespace with the view's unresolved nss, view's resolved (underlying
+        // collection) nss, and the a vector of LiteParsedDocumentSources.
+        // TODO SERVER-115590: Remove view information from the expression context.
+        boost::optional<ViewInfo> view = boost::none;
+
         // Defaults to empty to prevent external sorting in mongos.
         boost::filesystem::path tmpDir;
         // Tracks whether the collator to use for the aggregation matches the default collation of

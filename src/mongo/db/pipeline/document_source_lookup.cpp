@@ -316,7 +316,7 @@ void DocumentSourceLookUp::resolvedPipelineHelper(
         // such, we overwrite the view pipeline. This is because in the case of mongot queries on
         // mongot-indexed views, idLookup applies the view transforms as part of its subpipeline.
         _fromExpCtx->setView(
-            boost::make_optional(std::make_pair(fromNs, _sharedState->resolvedPipeline)));
+            boost::make_optional(ViewInfo{fromNs, _resolvedNs, _sharedState->resolvedPipeline}));
         _sharedState->resolvedPipeline = pipeline;
         _fieldMatchPipelineIdx = 1;
         if (localForeignFields != boost::none) {

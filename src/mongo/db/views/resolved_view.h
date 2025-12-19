@@ -131,6 +131,14 @@ public:
     static ResolvedView parseFromBSON(const BSONElement& elem);
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
 
+    /**
+     * Constructs a ViewInfo struct from the ResolvedView.
+     */
+    ViewInfo toViewInfo(const NamespaceString& viewNss,
+                        const LiteParserOptions& options = LiteParserOptions{}) const {
+        return ViewInfo{viewNss, _namespace, _pipeline, options};
+    }
+
 private:
     NamespaceString _namespace;
     std::vector<BSONObj> _pipeline;

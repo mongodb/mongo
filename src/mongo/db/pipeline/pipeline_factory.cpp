@@ -160,8 +160,7 @@ std::unique_ptr<Pipeline> viewPipelineHelperForSearch(
     // (from the _id values returned by mongot), apply the view's data transforms, and pass
     // said transformed documents through the rest of the user pipeline.
     const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
-    subPipelineExpCtx->setView(
-        boost::make_optional(std::make_pair(originalNs, resolvedView.getPipeline())));
+    subPipelineExpCtx->setView(resolvedView.toViewInfo(originalNs));
 
     // return the user pipeline without appending the view stages.
     return makePipeline(currentPipeline, subPipelineExpCtx, opts);

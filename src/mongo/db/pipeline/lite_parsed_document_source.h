@@ -76,6 +76,59 @@ namespace exec::agg {
 class ListMqlEntitiesStage;
 }  // namespace exec::agg
 
+// Forward declare LiteParsedDocumentSource.
+class LiteParsedDocumentSource;
+
+/**
+ * A ViewInfo struct stores the view namespace, resolved namespace (underlying collection), and the
+ * desugared view pipeline from ResolvedView.
+ */
+struct MONGO_MOD_PUBLIC ViewInfo {
+    using LiteParsedVec = std::vector<std::unique_ptr<LiteParsedDocumentSource>>;
+
+    ViewInfo() = default;
+
+    // Move-only semantics (viewPipeline contains unique_ptrs which are non-copyable).
+    ViewInfo(ViewInfo&&) noexcept = default;
+    ViewInfo& operator=(ViewInfo&&) noexcept = default;
+    ViewInfo(const ViewInfo&) = delete;
+    ViewInfo& operator=(const ViewInfo&) = delete;
+
+    /**
+     * Constructs a ViewInfo object from the view namespace, underlying collection's namespace, and
+     * parses the bson stages in the view pipeline into LiteParsedDocumentSources.
+     *
+     * Note that the ViewInfo owns the backing BSONObj for `viewPipeline`.
+     */
+    ViewInfo(NamespaceString viewName,
+             NamespaceString resolvedNss,
+             std::vector<BSONObj> viewPipeBson,
+             const LiteParserOptions& options = LiteParserOptions{});
+
+    /**
+     * Returns the original BSON view pipeline. Note that this is the pre-desugared version of the
+     * pipeline.
+     */
+    std::vector<BSONObj> getOriginalBson() const;
+
+    ViewInfo clone() const;
+
+    NamespaceString viewName;     // Unresolved view namespace.
+    NamespaceString resolvedNss;  // Underlying collection that the view runs.
+
+private:
+    // Owns the BSON data that viewPipeline's LiteParsedDocumentSource objects reference.
+    // Must be declared before viewPipeline so it is destroyed after viewPipeline (C++ destroys
+    // members in reverse declaration order, and LiteParsedDocumentSource holds BSONElement
+    // references into this data).
+    std::vector<BSONObj> _ownedOriginalBsonPipeline;
+
+public:
+    // The desugared view pipeline as a vector of LiteParsedDocumentSources. This vector can be
+    // added to existing pipelines to apply a view to a pipeline.
+    LiteParsedVec viewPipeline;
+};
+
 /**
  * A lightly parsed version of a DocumentSource. It is not executable and not guaranteed to return a
  * parse error when encountering an invalid specification. Instead, the purpose of this class is to
