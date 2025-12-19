@@ -123,7 +123,10 @@ private:
         /**
          * Child nodes representing further segments of the path.
          */
-        std::map<std::string, TrieNode> _children;
+        // TODO SERVER-115824: Investigate replacing with stdx::unordered_map
+        // NOLINT is included to permit usage of std:: instead of stdx::. This is necessary due to
+        // stricter compilation requirements on Windows variants.
+        std::unordered_map<std::string, TrieNode> _children;  // NOLINT
 
         /**
          * Represents whether the current node (i.e. path segment) may contain array values.
