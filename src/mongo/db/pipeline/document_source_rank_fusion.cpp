@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/rank_fusion_pipeline_builder.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/util/rank_fusion_util.h"
@@ -137,7 +138,8 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateRankedSelection
         // Ensure that all pipelines are valid ranked selection pipelines.
         rankFusionBsonPipelineValidator(bsonPipeline);
 
-        auto pipeline = Pipeline::parse(bsonPipeline, pExpCtx);
+        auto pipeline = pipeline_factory::makePipeline(
+            bsonPipeline, pExpCtx, pipeline_factory::kOptionsMinimal);
 
         // Validate pipeline name.
         auto inputName = innerPipelineBsonElem.fieldName();

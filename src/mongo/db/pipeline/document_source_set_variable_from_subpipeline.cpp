@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -101,9 +102,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
                       << spec.getSetVariable() << " is not allowed.",
         spec.getSetVariable() == searchMetaStr);
 
-    std::unique_ptr<Pipeline> pipeline = Pipeline::parse(
+    std::unique_ptr<Pipeline> pipeline = pipeline_factory::makePipeline(
         spec.getPipeline(),
-        makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString()));
+        makeCopyForSubPipelineFromExpressionContext(expCtx, expCtx->getNamespaceString()),
+        pipeline_factory::kOptionsMinimal);
 
     return DocumentSourceSetVariableFromSubPipeline::create(
         expCtx, std::move(pipeline), Variables::kSearchMetaId);

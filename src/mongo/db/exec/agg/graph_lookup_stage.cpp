@@ -548,8 +548,8 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
     // to the '_fromExpCtx' by copying them from the parent query ExpressionContext.
     _fromExpCtx->setQuerySettingsIfNotPresent(pExpCtx->getQuerySettings());
 
-    std::unique_ptr<mongo::Pipeline> pipeline = mongo::Pipeline::parse(_fromPipeline, _fromExpCtx);
-    _fromExpCtx->initializeReferencedSystemVariables();
+    std::unique_ptr<mongo::Pipeline> pipeline = mongo::pipeline_factory::makePipeline(
+        _fromPipeline, _fromExpCtx, pipeline_factory::kOptionsMinimal);
     try {
         return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             _fromExpCtx,
@@ -595,8 +595,8 @@ std::unique_ptr<mongo::Pipeline> GraphLookUpStage::makePipeline(BSONObj match,
                     "new_pipe"_attr = mongo::Pipeline::serializePipelineForLogging(_fromPipeline));
 
         // We can now safely optimize and reattempt attaching the cursor source.
-        pipeline = mongo::Pipeline::parse(_fromPipeline, _fromExpCtx);
-        _fromExpCtx->initializeReferencedSystemVariables();
+        pipeline = mongo::pipeline_factory::makePipeline(
+            _fromPipeline, _fromExpCtx, pipeline_factory::kOptionsMinimal);
 
         return pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             _fromExpCtx,

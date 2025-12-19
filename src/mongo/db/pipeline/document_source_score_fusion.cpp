@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/score_fusion_pipeline_builder.h"
 #include "mongo/db/query/allowed_contexts.h"
 
@@ -125,7 +126,8 @@ std::map<std::string, std::unique_ptr<Pipeline>> parseAndValidateScoredSelection
         // Ensure that all pipelines are valid scored selection pipelines.
         scoreFusionBsonPipelineValidator(bsonPipeline, pExpCtx);
 
-        auto pipeline = Pipeline::parse(bsonPipeline, pExpCtx);
+        auto pipeline = pipeline_factory::makePipeline(
+            bsonPipeline, pExpCtx, pipeline_factory::kOptionsMinimal);
         tassert(
             10535800,
             "The metadata dependency tracker determined $scoreFusion input pipeline does not "

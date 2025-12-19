@@ -54,6 +54,8 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
@@ -827,8 +829,10 @@ BSONObj DocumentSourceLookUp::makeMatchStageFromInput(const Document& input,
 void DocumentSourceLookUp::initializeResolvedIntrospectionPipeline() {
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
     _fromExpCtx->startExpressionCounters();
+    pipeline_factory::MakePipelineOptions pipelineOpts = pipeline_factory::kOptionsMinimal;
+    pipelineOpts.validator = lookupPipeValidator;
     _sharedState->resolvedIntrospectionPipeline =
-        Pipeline::parse(_sharedState->resolvedPipeline, _fromExpCtx, mongo::lookupPipeValidator);
+        pipeline_factory::makePipeline(_sharedState->resolvedPipeline, _fromExpCtx, pipelineOpts);
     _fromExpCtx->stopExpressionCounters();
 }
 
@@ -861,7 +865,9 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         }
         if (opts.isSerializingForQueryStats()) {
             // TODO SERVER-94227 we don't need to do any validation as part of this parsing pass.
-            return Pipeline::parse(*_userPipeline, _fromExpCtx)->serializeToBson(opts);
+            return pipeline_factory::makePipeline(
+                       *_userPipeline, _fromExpCtx, pipeline_factory::kOptionsMinimal)
+                ->serializeToBson(opts);
         }
         if (opts.isSerializingForExplain()) {
             // TODO SERVER-81802 We should also serialize the resolved pipeline for explain.
