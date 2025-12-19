@@ -2048,7 +2048,12 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
 
     // Push a fresh set of read concern settings for the getTags command.
     auto& opCtxReadConcern = repl::ReadConcernArgs::get(_opCtx);
-    ON_BLOCK_EXIT([&, oldRC = opCtxReadConcern]() { opCtxReadConcern = oldRC; });
+    auto& outerCmdInvocation = CommandInvocation::get(_opCtx);
+
+    ON_BLOCK_EXIT([&, oldRC = opCtxReadConcern, oldCmdInvocation = outerCmdInvocation]() {
+        opCtxReadConcern = oldRC;
+        CommandInvocation::set(_opCtx, oldCmdInvocation);
+    });
     opCtxReadConcern = repl::ReadConcernArgs{};
 
     const auto setDollarTenant = nss.tenantId() && gMultitenancySupport;
