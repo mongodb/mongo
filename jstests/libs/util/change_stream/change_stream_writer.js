@@ -8,18 +8,16 @@ class Writer {
     /**
      * Execute all commands in the configuration and notify completion.
      * @param {Mongo} conn - MongoDB connection.
-     * @param {string} controlDbName - Name of the control database for test coordination.
-     * @param {string} notificationCollName - Name of the notification collection for test completion.
      * @param {Object} config - Configuration object containing:
      *   - commands: Array of command objects to execute
-     *   - instanceName: Name of the test instance
+     *   - instanceName: Name of the test instance (also used as collection name)
      */
-    static run(conn, controlDbName, notificationCollName, config) {
+    static run(conn, config) {
         for (const cmd of config.commands) {
             cmd.execute(conn);
         }
 
-        Connector.notifyDone(conn, controlDbName, notificationCollName, config.instanceName);
+        Connector.notifyDone(conn, config.instanceName);
     }
 }
 

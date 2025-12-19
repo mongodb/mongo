@@ -60,6 +60,13 @@ export function runCommandChangeStreamPassthroughAware(db, cmdObj, noPassthrough
  *     - whole cluster streams: none.
  * Returns the invalidate document if there was one, or null otherwise.
  */
+/**
+ * Checks if the change event is an invalidate event.
+ */
+export function isInvalidated(change) {
+    return change.operationType === "invalidate";
+}
+
 export function assertInvalidateOp({cursor, opType}) {
     if (
         !isChangeStreamPassthrough() ||
@@ -392,13 +399,6 @@ export function ChangeStreamTest(_db, options) {
         }
         return changes;
     };
-
-    /**
-     * Checks if the change has been invalidated.
-     */
-    function isInvalidated(change) {
-        return change.operationType === "invalidate";
-    }
 
     /**
      * Asserts that the last observed change was the change we expect to see. This also asserts
