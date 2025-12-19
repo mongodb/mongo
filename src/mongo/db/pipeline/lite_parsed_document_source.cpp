@@ -319,4 +319,15 @@ ViewInfo ViewInfo::clone() const {
     return ViewInfo{viewName, resolvedNss, getOriginalBson()};
 }
 
+DisallowViewsPolicy::DisallowViewsPolicy()
+    : ViewPolicy(
+          kFirstStageApplicationPolicy::kDoNothing, [](const ViewInfo&, StringData stageName) {
+              uasserted(ErrorCodes::CommandNotSupportedOnView,
+                        std::string(str::stream() << stageName << " is not supported on views."));
+          }) {}
+
+DisallowViewsPolicy::DisallowViewsPolicy(ViewPolicyCallbackFn&& fn)
+    : ViewPolicy(kFirstStageApplicationPolicy::kDoNothing, std::move(fn)) {}
+
+
 }  // namespace mongo
