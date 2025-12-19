@@ -36,7 +36,6 @@
 #include "mongo/util/fixed_string.h"
 #include "mongo/util/modules.h"
 
-#include <compare>
 #include <limits>
 
 #include <boost/functional/hash.hpp>
@@ -206,8 +205,6 @@ public:
 
     bool operator==(const StrongDouble<TypeTag>& other) const = default;
 
-    auto operator<=>(const StrongDouble& other) const = default;
-
     // The minimum and maximum values of this type, inclusive.
     static StrongDouble<TypeTag> minValue() {
         static StrongDouble<TypeTag> theValue(TypeTag::kMinValue);
@@ -253,8 +250,6 @@ public:
 
     friend CardinalityEstimate operator*(const SelectivityEstimate& s,
                                          const CardinalityEstimate& ce);
-    friend CardinalityEstimate operator/(const CardinalityEstimate& ce,
-                                         const SelectivityEstimate& s);
 
 private:
     double _v;
@@ -369,9 +364,20 @@ public:
         return !(*this == e);
     }
 
-    auto operator<=>(const OptimizerEstimate<ValueType, EstimateType>& e) const {
-        return *this == e ? std::partial_ordering::equivalent
-                          : this->_estimate._v <=> e._estimate._v;
+    bool operator>(const OptimizerEstimate<ValueType, EstimateType>& e) const {
+        return (*this != e) && this->_estimate._v > e._estimate._v;
+    }
+
+    bool operator>=(const OptimizerEstimate<ValueType, EstimateType>& e) const {
+        return (*this == e) || this->_estimate._v > e._estimate._v;
+    }
+
+    bool operator<(const OptimizerEstimate<ValueType, EstimateType>& e) const {
+        return (*this != e) && this->_estimate._v < e._estimate._v;
+    }
+
+    bool operator<=(const OptimizerEstimate<ValueType, EstimateType>& e) const {
+        return (*this == e) || this->_estimate._v < e._estimate._v;
     }
 
     // Arithmetic operators.
@@ -450,9 +456,6 @@ public:
                                          const CardinalityEstimate& ce);
 
     friend CardinalityEstimate operator*(const CardinalityEstimate& ce,
-                                         const SelectivityEstimate& s);
-
-    friend CardinalityEstimate operator/(const CardinalityEstimate& ce,
                                          const SelectivityEstimate& s);
 };
 
@@ -536,9 +539,6 @@ public:
                                          const CardinalityEstimate& ce);
 
     friend CardinalityEstimate operator*(const CardinalityEstimate& ce,
-                                         const SelectivityEstimate& s);
-
-    friend CardinalityEstimate operator/(const CardinalityEstimate& ce,
                                          const SelectivityEstimate& s);
 };
 

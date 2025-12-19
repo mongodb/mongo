@@ -289,6 +289,8 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
         }
         case STAGE_LIMIT: {
             nodeCost = childCosts[0];
+            // TODO SERVER-100647, SERVER-107606: Determine if there's any costing solution to this
+            // problem.
             const auto& inCE = childCEs[0];
             auto limitNode = static_cast<const LimitNode*>(node);
             auto limitCE = CardinalityEstimate{

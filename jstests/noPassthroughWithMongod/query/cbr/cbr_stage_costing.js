@@ -341,12 +341,15 @@ function runTest(planRankerMode) {
     );
     assert.lt(rootStageCost(coll.find().limit(1).hint({a: 1})), rootStageCost(coll.find().limit(100).hint({a: 1})));
 
-    assert.lt(
+    // TODO(SERVER-100647: Pushdown stand-alone LIMIT into streaming operators while estimating CE)
+    // Currently, the input streaming operator has the same cost independently from the LIMIT above.
+    assert.close(
         inputStageCost(coll.find().limit(1).hint({$natural: 1})),
         inputStageCost(coll.find().limit(100).hint({$natural: 1})),
     );
 
-    assert.lt(
+    // TODO(SERVER-100647):
+    assert.close(
         inputStageCost(
             coll
                 .find({a: {$gt: 100}})
