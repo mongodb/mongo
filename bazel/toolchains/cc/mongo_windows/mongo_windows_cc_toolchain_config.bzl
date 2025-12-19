@@ -815,6 +815,13 @@ def _impl(ctx):
                                 # consistently. Suppress the warning.
                                 "/wd4251",
 
+                                # C4146: unary minus operator applied to unsigned type, result still
+                                # unsigned. Unsigned negation is well defined as performing the exact
+                                # same bitwise operation as on signed types, with the advantage of not
+                                # being UB for any value, including INT_MIN which negates to itself due
+                                # to overflow.
+                                "/wd4146",
+
                                 # some warnings we should treat as errors:
                                 # c4013
                                 #  'function' undefined; assuming extern returning int
