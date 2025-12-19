@@ -45,6 +45,13 @@ public:
             new DocumentSourceExtensionExpandable(expCtx, rawStage, staticDescriptor));
     }
 
+    // Needed by the StageParams -> DS map.
+    static boost::intrusive_ptr<DocumentSourceExtensionExpandable> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, AggStageParseNodeHandle parseNode) {
+        return boost::intrusive_ptr<DocumentSourceExtensionExpandable>(
+            new DocumentSourceExtensionExpandable(expCtx, std::move(parseNode)));
+    }
+
     Value serialize(const SerializationOptions& opts) const override;
 
     std::list<boost::intrusive_ptr<DocumentSource>> expand() const {
@@ -69,6 +76,11 @@ public:
 
     // Define how to desugar a DocumentSourceExtensionExpandable.
     static Desugarer::StageExpander stageExpander;
+
+protected:
+    DocumentSourceExtensionExpandable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      AggStageParseNodeHandle parseNode)
+        : DocumentSourceExtension(parseNode.getName(), expCtx), _parseNode(std::move(parseNode)) {}
 
 private:
     const AggStageParseNodeHandle _parseNode;

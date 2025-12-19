@@ -21,19 +21,16 @@ function checkLogs(db, debugLogLevel, shouldLog, extensionAttrs) {
         }
     }
 
-    // Parse() is called twice - once when the LiteParsed stage is created, and once when the full
-    // DocumentSource stage is created. Log lines are printed in both cases.
-    const parseCallCount = 2;
-    // Make sure there is at most one matching log line per parse call.
-    assert.lte(matchingDebugLogLines.length, parseCallCount);
+    // Make sure there is at most one matching log line.
+    assert.lte(matchingDebugLogLines.length, 1);
 
     // After adding the 'shouldLog' optimization, $debugLog also prints a warning log indicating
     // whether the debug log should be printed or not.
     const matchingWarningLogLines = checkLog.getFilteredLogMessages(db, shouldLog ? 11134101 : 11134102, {}, "W");
-    // Since the warning line always gets printed, we expect one warning log line per parse call.
-    assert.eq(matchingWarningLogLines.length, parseCallCount);
+    // Since the warning line always gets printed, we expect one warning log line.
+    assert.eq(matchingWarningLogLines.length, 1);
 
-    return matchingDebugLogLines.length == parseCallCount;
+    return matchingDebugLogLines.length == 1;
 }
 
 function testDebugLog({serverLogLevel, debugLogLevel, commandShouldLog, extensionAttrs}) {

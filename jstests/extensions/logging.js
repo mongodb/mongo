@@ -47,26 +47,22 @@ function testLogStage({
     }
 }
 
-// Parse() is called twice - once when the LiteParsed stage is created, and once when the full
-// DocumentSource stage is created. Log lines are printed in both cases.
-const parseCallCount = 2;
-
 // Test that the $log stage logs info log lines as expected.
 testLogStage({
     pipeline: [{$log: {numInfoLogLines: 1}}],
-    expectedInfoLogCount: 1 * parseCallCount,
+    expectedInfoLogCount: 1,
 });
 testLogStage({
     pipeline: [{$log: {numInfoLogLines: 3}}],
-    expectedInfoLogCount: 3 * parseCallCount,
+    expectedInfoLogCount: 3,
 });
 testLogStage({
     pipeline: [{$log: {numInfoLogLines: 5}}],
-    expectedInfoLogCount: 5 * parseCallCount,
+    expectedInfoLogCount: 5,
 });
 testLogStage({
     pipeline: [{$log: {numInfoLogLines: 1, attrs: {a: "hi", b: "12345"}}}],
-    expectedInfoLogCount: 1 * parseCallCount,
+    expectedInfoLogCount: 1,
     expectedAttrs: {attr: {a: "hi", b: "12345"}},
 });
 
@@ -77,7 +73,7 @@ testLogStage({
     expectedOtherLog: {
         expectedLogCode: 11134000,
         expectedLogMessage: "$log stage spec is empty or not an object.",
-        expectedLogCount: 1 * parseCallCount,
+        expectedLogCount: 1,
         severity: "E",
     },
 });
@@ -104,11 +100,10 @@ testLogStage({
     },
 });
 
-// Test that the $log stage with an numInfoLogLines > 5 logs a warning and 5 info log lines per
-// parse call.
+// Test that the $log stage with an numInfoLogLines > 5 logs a warning and 5 info log lines.
 testLogStage({
     pipeline: [{$log: {numInfoLogLines: 99}}],
-    expectedInfoLogCount: 5 * parseCallCount,
+    expectedInfoLogCount: 5,
     expectedOtherLog: {
         expectedLogCode: 11134003,
         expectedLogMessage: "$log stage will not print more than 5 log lines.",
