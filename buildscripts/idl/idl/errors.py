@@ -1335,7 +1335,7 @@ class ParserContext(object):
         self._add_node_error(
             node,
             ERROR_ID_BAD_VISIBILITY,
-            f"Bad visibility value '{mod_visibility}', only public, public_for_technical_reasons, private, file_private, open, needs_replacement, and use_replacement(...) are accepted",
+            f"Bad visibility value '{mod_visibility}', only public, public_for_technical_reasons, private, file_private, unfortunately_open, needs_replacement, and use_replacement(...) are accepted",
         )
 
 

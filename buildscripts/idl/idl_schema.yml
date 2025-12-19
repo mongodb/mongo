@@ -114,7 +114,7 @@ description: Schema for IDL files in the mongo codebase.
           - private
           - file_private
           - needs_replacement
-          - open
+          - unfortunately_open
       - type: string
         pattern: "^use_replacement(.+)$"
   fields:

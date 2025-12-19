@@ -1165,10 +1165,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         with self._block(f"const std::set<std::string>& {fn_name}() const final {{", "}"):
             self._writer.write_line("return %s;" % value)
 
-    def gen_invocation_base_class_declaration(self, command):
-        # type: (ast.Command) -> None
+    def gen_invocation_base_class_declaration(
+        self, command: ast.Command, mod_visibility: str
+    ) -> None:
         """Generate the InvocationBaseGen class for a command's base class."""
-        class_declaration = "class InvocationBaseGen : public _TypedCommandInvocationBase {"
+        class_declaration = f"class {make_mod_tag(mod_visibility)}InvocationBaseGen : public _TypedCommandInvocationBase {{"
         with writer.IndentedScopedBlock(self._writer, class_declaration, "};"):
             # public requires special indentation that aligns with the class definition.
             self._writer.unindent()
@@ -1237,7 +1238,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.write_empty_line()
 
             # Write InvocationBaseGen class.
-            self.gen_invocation_base_class_declaration(command)
+            self.gen_invocation_base_class_declaration(command, command.mod_visibility)
 
     def _need_feature_flag_headers(self, spec):
         # type: (ast.IDLAST) -> bool

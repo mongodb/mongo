@@ -225,7 +225,7 @@ def _parse_config_global(ctxt, node):
 
 
 _mod_visibility_pattern = re.compile(
-    "(pub|public|public_for_technical_reasons|private|file_private|needs_replacement|open|use_replacement\(.+\))"
+    "(pub|public|public_for_technical_reasons|private|file_private|needs_replacement|unfortunately_open|use_replacement\(.+\))"
 )
 
 
