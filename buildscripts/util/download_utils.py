@@ -8,7 +8,7 @@ import botocore.session
 import requests
 
 
-def get_s3_client():
+def get_s3_client(**client_kwargs):
     botocore.session.Session()
 
     if sys.platform in ("win32", "cygwin"):
@@ -32,7 +32,7 @@ def get_s3_client():
             }
         )
         boto3.setup_default_session(botocore_session=botocore_session)
-    return boto3.client("s3")
+    return boto3.client("s3", **client_kwargs)
 
 
 def extract_s3_bucket_key(url: str) -> tuple[str, str]:
@@ -63,5 +63,17 @@ def download_from_s3_with_requests(url, output_file, raise_on_error=False):
 
 def download_from_s3_with_boto(url, output_file):
     bucket_name, object_key = extract_s3_bucket_key(url)
-    s3_client = get_s3_client()
-    s3_client.download_file(bucket_name, object_key, output_file)
+    try:
+        s3_client = get_s3_client()
+        s3_client.download_file(bucket_name, object_key, output_file)
+        return
+    except botocore.exceptions.ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code", "")
+        # 403 Forbidden means credentials lack permission, even for public buckets - try unsigned
+        if error_code == "403":
+            s3_client = get_s3_client(
+                config=botocore.client.Config(signature_version=botocore.UNSIGNED)
+            )
+            s3_client.download_file(bucket_name, object_key, output_file)
+        else:
+            raise
