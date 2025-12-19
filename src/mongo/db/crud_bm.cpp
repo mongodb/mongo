@@ -159,6 +159,9 @@ void setupStorage(ServiceContext* svcCtx, ClusterRole role) {
 
 class CrudBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
 public:
+    static constexpr auto kCollection = "test"_sd;
+    static constexpr auto kDatabase = "test"_sd;
+
     void setUpServiceContext(ServiceContext* svcCtx) override {
         auto service = svcCtx->getService(getClusterRole());
         service->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
@@ -181,19 +184,6 @@ public:
         return ClusterRole::ShardServer;
     }
 
-    static auto makeFindOneById() {
-        return BSON("find" << kCollection << "$db" << kDatabase << "filter" << BSON("_id" << 1)
-                           << "limit" << 1 << "singleBatch" << true);
-    }
-
-    static auto makeUpdateOneById() {
-        return BSON(
-            "update" << kCollection << "$db" << kDatabase << "updates"
-                     << BSON_ARRAY(BSON("q" << BSON("_id" << 1) << "u"
-                                            << BSON("$set" << BSON("data" << "MongoDB Updated"))
-                                            << "multi" << false << "upsert" << false)));
-    }
-
 private:
     void _populateTestData(ServiceContext* svcCtx) {
         auto service = svcCtx->getService(getClusterRole());
@@ -207,19 +197,45 @@ private:
             doRequest(service->getServiceEntryPoint(), strand->getClientPointer(), msg);
         });
     }
-
-    static constexpr auto kCollection = "test"_sd;
-    static constexpr auto kDatabase = "test"_sd;
 };
 
 BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_FIND_ONE)
 (benchmark::State& state) {
-    runBenchmark(state, makeFindOneById());
+    // clang-format off
+    BSONObj cmd = BSON(
+            "find" << kCollection
+            << "$db" << kDatabase
+            << "filter" << BSON("_id" << 1)
+            << "limit" << 1
+            << "singleBatch" << true);
+    // clang-format on
+    runBenchmark(state, [=] { return cmd; });
 }
 
 BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_UPDATE_ONE)
 (benchmark::State& state) {
-    runBenchmark(state, makeUpdateOneById());
+    runBenchmark(state, [updateValue = int64_t{0}]() mutable {
+        // clang-format off
+        return BSON(
+            "update" << kCollection
+            << "$db" << kDatabase
+            << "updates" << BSON_ARRAY(
+                BSON(
+                    "q" << BSON(
+                        "_id" << 1
+                    )
+                    << "u" << BSON(
+                        "$set" << BSON(
+                            "data" << ++updateValue
+                        )
+                    )
+                    << "multi" << false
+                    << "upsert" << false
+                )
+            )
+        );
+        // clang-format on
+    });
 }
 
 BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_FIND_ONE)->ThreadRange(1, kCommandBMMaxThreads);

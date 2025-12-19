@@ -53,7 +53,7 @@ public:
 
 BENCHMARK_DEFINE_F(ServiceEntryPointShardRoleBenchmarkFixture, BM_SEP_PING)
 (benchmark::State& state) {
-    runBenchmark(state, makePingCommand());
+    runBenchmark(state, [] { return makePingCommand(); });
 }
 
 BENCHMARK_REGISTER_F(ServiceEntryPointShardRoleBenchmarkFixture, BM_SEP_PING)

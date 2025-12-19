@@ -44,6 +44,7 @@
 #include "mongo/util/processinfo.h"
 
 #include <memory>
+#include <type_traits>
 
 #include <benchmark/benchmark.h>
 
@@ -83,18 +84,24 @@ public:
                     .getNoThrow());
     }
 
-    void runBenchmark(benchmark::State& state, BSONObj obj) {
+    template <typename F>
+    requires(std::is_invocable_r_v<BSONObj, F>)
+    void runBenchmark(benchmark::State& state, F makeRequestBody) {
         auto strand = ClientStrand::make(
             getGlobalServiceContext()
                 ->getService(getClusterRole())
                 ->makeClient(fmt::format("conn{}", _nextClientId.fetchAndAdd(1)), nullptr));
-        OpMsgRequest request;
-        request.body = obj;
-        auto msg = request.serialize();
         strand->run([&] {
             auto client = strand->getClientPointer();
             auto sep = client->getService()->getServiceEntryPoint();
-            runBenchmarkWithProfiler([&]() { doRequest(sep, client, msg); }, state);
+            runBenchmarkWithProfiler(
+                [&] {
+                    OpMsgRequest request;
+                    request.body = makeRequestBody();
+                    auto msg = request.serialize();
+                    doRequest(sep, client, msg);
+                },
+                state);
         });
     }
 
