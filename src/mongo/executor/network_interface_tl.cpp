@@ -550,12 +550,14 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequ
                    std::move(req), baton, std::move(connAcquiredTimer), cancelSource.token());
            })
         .thenRunOn(makeGuaranteedExecutor())
-        .onCompletion(
-            [this, anchor = shared_from_this()](StatusWith<RemoteCommandResponse> swResp) {
-                auto status = swResp.isOK() ? swResp.getValue().status : swResp.getStatus();
-                releaseClientHandle(status);
-                return swResp;
-            });
+        .then([this](RemoteCommandResponse response) {
+            // Release the client handle now if the request was a success. Otherwise, the client
+            // handle is released in CommandStateBase::sendRequest.
+            if (response.status.isOK()) {
+                releaseClientHandle(response.status);
+            }
+            return response;
+        });
 }
 
 void NetworkInterfaceTL::CommandStateBase::doMetadataHook(const RemoteCommandResponse& response) {
@@ -873,7 +875,28 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::CommandStateBase::send
     }
 
     setTimer();
-    return sendRequestImpl(std::move(requestToSend));
+    return sendRequestImpl(std::move(requestToSend))
+        .onCompletion(
+            [this, anchor = shared_from_this()](StatusWith<RemoteCommandResponse> swResp) {
+                auto status = swResp.isOK() ? swResp.getValue().status : swResp.getStatus();
+                if (swResp == ErrorCodes::CallbackCanceled) {
+                    stdx::lock_guard lock(cancelMutex);
+                    if (!cancelStatus.isOK()) {
+                        status.addContext(
+                            fmt::format("I/O interrupted due to {}", cancelStatus.codeString()));
+                        // Ensure the cancel status is propagated to the original caller.
+                        swResp = cancelStatus;
+                    }
+                }
+                if (!status.isOK()) {
+                    // We always release the client handle when the request is not succesful. If the
+                    // reason for failure is cancelation, we provide additional context for logging,
+                    // but we preserve the original error to not affect connection pool error
+                    // handling behavior.
+                    releaseClientHandle(status);
+                }
+                return swResp;
+            });
 }
 
 Status NetworkInterfaceTL::CommandStateBase::handleClientAcquisitionError(Status status) {
@@ -928,14 +951,6 @@ ExecutorFuture<RemoteCommandResponse> NetworkInterfaceTL::_runCommand(
                     });
             })
         .onCompletion([cmdState, this](StatusWith<RemoteCommandResponse> swResponse) {
-            // If the command was cancelled for a reason, return a status that reflects that.
-            if (swResponse == ErrorCodes::CallbackCanceled) {
-                stdx::lock_guard<stdx::mutex> lk(cmdState->cancelMutex);
-                if (!cmdState->cancelStatus.isOK()) {
-                    swResponse = cmdState->cancelStatus;
-                }
-            }
-
             auto response = [&]() -> RemoteCommandResponse {
                 if (swResponse.isOK()) {
                     return swResponse.getValue();
