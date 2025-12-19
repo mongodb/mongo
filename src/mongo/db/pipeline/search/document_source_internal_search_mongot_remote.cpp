@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/search/search_helper.h"
@@ -64,9 +65,11 @@ DocumentSourceInternalSearchMongotRemote::DocumentSourceInternalSearchMongotRemo
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::shared_ptr<executor::TaskExecutor> taskExecutor)
     : DocumentSource(kStageName, expCtx),
-      _mergingPipeline(spec.getMergingPipeline().has_value()
-                           ? mongo::Pipeline::parse(*spec.getMergingPipeline(), expCtx)
-                           : nullptr),
+      _mergingPipeline(
+          spec.getMergingPipeline().has_value()
+              ? mongo::pipeline_factory::makePipeline(
+                    *spec.getMergingPipeline(), expCtx, pipeline_factory::kOptionsMinimal)
+              : nullptr),
       _sharedState(std::make_shared<InternalSearchMongotRemoteSharedState>()),
       _spec(std::move(spec)),
       _taskExecutor(taskExecutor) {

@@ -54,6 +54,9 @@ struct MakePipelineOptions {
     boost::optional<BSONObj> readConcern;
 };
 
+static const MakePipelineOptions kOptionsMinimal{
+    .optimize = false, .alreadyOptimized = false, .attachCursorSource = false};
+
 /**
  * Factory functions for creating Pipeline objects from various input formats.
  *

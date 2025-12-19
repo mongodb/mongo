@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
@@ -112,8 +113,8 @@ intrusive_ptr<DocumentSource> DocumentSourceSearch::createFromBson(
     // router.
     // We need to make sure that the mongotQuery BSONObj in the InternalSearchMongotRemoteSpec is
     // owned so that it persists safely to GetMores. Since the IDL type is object_owned, using the
-    // parse() function will make sure it's owned. Manually constructing the spec does _not_ ensure
-    // the owned is owned, which is why we call specObj.getOwned().
+    // parseOwned() function will make sure it's owned. Manually constructing the spec does _not_
+    // ensure the owned is owned, which is why we call specObj.getOwned().
     InternalSearchMongotRemoteSpec spec =
         specObj.hasField(InternalSearchMongotRemoteSpec::kMongotQueryFieldName)
         ? InternalSearchMongotRemoteSpec::parseOwned(specObj.getOwned(),
@@ -255,7 +256,8 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSearch::dist
     if (_spec.getMergingPipeline() && _spec.getRequiresSearchMetaCursor()) {
         logic.mergingStages = {DocumentSourceSetVariableFromSubPipeline::create(
             getExpCtx(),
-            Pipeline::parse(*_spec.getMergingPipeline(), getExpCtx()),
+            pipeline_factory::makePipeline(
+                *_spec.getMergingPipeline(), getExpCtx(), pipeline_factory::kOptionsMinimal),
             Variables::kSearchMetaId)};
     }
 

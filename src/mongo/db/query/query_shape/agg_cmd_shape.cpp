@@ -30,6 +30,7 @@
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_shape {
@@ -82,7 +83,8 @@ void AggCmdShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
     // re-parse the pipeline from the initial request.
     expCtx->setInRouter(_inRouter);
     expCtx->addResolvedNamespaces(_components.involvedNamespaces);
-    auto reparsed = Pipeline::parse(_components.representativePipeline, expCtx);
+    auto reparsed = pipeline_factory::makePipeline(
+        _components.representativePipeline, expCtx, pipeline_factory::kOptionsMinimal);
     auto serializedPipeline = reparsed->serializeToBson(opts);
     AggCmdShapeComponents{_components.allowDiskUse,
                           _components.involvedNamespaces,

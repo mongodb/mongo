@@ -35,6 +35,7 @@
 #include "mongo/db/index_key_validate.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/query_settings/query_settings_backfill.h"
 #include "mongo/db/query/query_settings/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
@@ -268,7 +269,8 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(OperationContext* opCtx,
     expCtx->addResolvedNamespaces(
         stdx::unordered_set<NamespaceString>{involvedNamespaces.begin(), involvedNamespaces.end()});
 
-    auto pipeline = Pipeline::parse(aggregateCommandRequest.getPipeline(), expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        aggregateCommandRequest.getPipeline(), expCtx, pipeline_factory::kOptionsMinimal);
 
     const auto serializationContext = aggregateCommandRequest.getSerializationContext();
     AggCmdShape aggCmdShape{aggregateCommandRequest, nss, involvedNamespaces, *pipeline, expCtx};

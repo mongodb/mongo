@@ -832,10 +832,11 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     const AggCatalogState& aggCatalogState,
     boost::intrusive_ptr<ExpressionContext> expCtx) {
     // If applicable, ensure that the resolved namespace is added to the resolvedNamespaces map on
-    // the expCtx before calling Pipeline::parse(). This is necessary for search on views as
-    // Pipeline::parse() will first check if a view exists directly on the stage specification and
-    // if none is found, will then check for the view using the expCtx. As such, it's necessary to
-    // add the resolved namespace to the expCtx prior to any call to Pipeline::parse().
+    // the expCtx before calling pipeline_factory::makePipeline(). This is necessary for search on
+    // views as pipeline_factory::makePipeline() will first check if a view exists directly on the
+    // stage specification and if none is found, will then check for the view using the expCtx. As
+    // such, it's necessary to add the resolved namespace to the expCtx prior to any call to
+    // pipeline_factory::makePipeline().
     auto* opCtx = expCtx->getOperationContext();
 
     if (aggExState.isView()) {

@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -668,7 +669,8 @@ std::unique_ptr<Pipeline> ResolvedViewAggExState::applyViewToPipeline(
         // which will account for those rewrites.
         // TODO SERVER-101599 remove this code once 9.0 becomes last LTS. By then only viewless
         // timeseries collections will exist.
-        return Pipeline::parse(getRequest().getPipeline(), expCtx);
+        return pipeline_factory::makePipeline(
+            getRequest().getPipeline(), expCtx, pipeline_factory::kOptionsMinimal);
     } else if (search_helpers::isMongotPipeline(pipeline.get())) {
         // For search queries on views don't do any of the pipeline stitching that is done for
         // normal views.
@@ -678,7 +680,8 @@ std::unique_ptr<Pipeline> ResolvedViewAggExState::applyViewToPipeline(
     // Parse the view pipeline, then stitch the user pipeline and view pipeline together
     // to build the total aggregation pipeline.
     auto userPipeline = std::move(pipeline);
-    pipeline = Pipeline::parse(getResolvedView().getPipeline(), expCtx);
+    pipeline = pipeline_factory::makePipeline(
+        getResolvedView().getPipeline(), expCtx, pipeline_factory::kOptionsMinimal);
     pipeline->appendPipeline(std::move(userPipeline));
     return pipeline;
 }

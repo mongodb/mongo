@@ -31,6 +31,7 @@
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup_gen.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 
@@ -56,7 +57,10 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
     boost::optional<SearchQueryViewSpec> view)
     : DocumentSource(kStageName, expCtx),
       _limit(limit),
-      _viewPipeline(view ? Pipeline::parse(view->getEffectivePipeline(), getExpCtx()) : nullptr) {
+      _viewPipeline(view ? pipeline_factory::makePipeline(view->getEffectivePipeline(),
+                                                          getExpCtx(),
+                                                          pipeline_factory::kOptionsMinimal)
+                         : nullptr) {
     // We need to reset the docsSeenByIdLookup/docsReturnedByIdLookup in the state sharedby the
     // DocumentSourceInternalSearchMongotRemote and DocumentSourceInternalSearchIdLookup stages when
     // we create a new DocumentSourceInternalSearchIdLookup stage. This is because if $search is
@@ -117,8 +121,9 @@ Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions
             pipeline.insert(pipeline.end(), bsonViewPipeline.begin(), bsonViewPipeline.end());
         }
 
-        outputSpec["subPipeline"] =
-            Value(Pipeline::parse(pipeline, getExpCtx())->serializeToBson(opts));
+        outputSpec["subPipeline"] = Value(
+            pipeline_factory::makePipeline(pipeline, getExpCtx(), pipeline_factory::kOptionsMinimal)
+                ->serializeToBson(opts));
     }
 
     return Value(DOC(getSourceName() << outputSpec.freezeToValue()));
