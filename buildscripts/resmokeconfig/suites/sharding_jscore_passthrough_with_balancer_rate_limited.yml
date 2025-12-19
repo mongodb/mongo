@@ -99,6 +99,8 @@ executor:
         defaultClientBaseBackoffMillis: 10
         defaultClientMaxBackoffMillis: 1000
         shardRetryTokenBucketCapacity: 1073741823
+        # TODO SERVER-115873: use the default maxRoundsWithoutProgressParameter.
+        maxRoundsWithoutProgressParameter: 20
     mongod_options:
       set_parameters:
         enableTestCommands: 1
