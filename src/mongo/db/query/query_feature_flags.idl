@@ -110,7 +110,8 @@ feature_flags:
             "Feature flag to enable referencing array indices in $map, $filter, and $reduce
             expressions."
         cpp_varname: gFeatureFlagExposeArrayIndexInMapFilterReduce
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
 
     featureFlagBinDataConvertNumeric:
