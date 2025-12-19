@@ -107,6 +107,7 @@ MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanInterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible);
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
+MONGO_FAIL_POINT_DEFINE(avoidTassertForInconsistentMetadata);
 
 const auto getDecoration = ServiceContext::declareDecoration<FilteringMetadataCache>();
 
@@ -887,12 +888,23 @@ void FilteringMetadataCache::_onDbVersionMismatchAuthoritative(
 
         const auto wantedVersion = *dbVersion;
 
-        tassert(StaleDbRoutingVersion(dbName, receivedDbVersion, wantedVersion),
+        if (MONGO_unlikely(avoidTassertForInconsistentMetadata.shouldFail())) {
+            uassert(
+                StaleDbRoutingVersion(dbName, receivedDbVersion, wantedVersion),
                 str::stream() << "Version mismatch for the database: "
                               << dbName.toStringForErrorMsg()
                               << ". Shard is authoritative and we have waited long enough for it "
                                  "to catch up. It can't have a version behind the routers anymore.",
                 receivedDbVersion <= wantedVersion);
+        } else {
+            tassert(
+                StaleDbRoutingVersion(dbName, receivedDbVersion, wantedVersion),
+                str::stream() << "Version mismatch for the database: "
+                              << dbName.toStringForErrorMsg()
+                              << ". Shard is authoritative and we have waited long enough for it "
+                                 "to catch up. It can't have a version behind the routers anymore.",
+                receivedDbVersion <= wantedVersion);
+        }
 
         uassert(StaleDbRoutingVersion(dbName, receivedDbVersion, wantedVersion),
                 str::stream() << "Version mismatch for the database "
