@@ -218,10 +218,13 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
     switch (qkc.getJoinReorderMode()) {
         case JoinReorderModeEnum::kBottomUp: {
             // Optimize join order using bottom-up Sellinger-style algorithm.
-            JoinCardinalityEstimator estimator = JoinCardinalityEstimator::make(
-                ctx, swAccessPlans.getValue().estimate, samplingEstimators);
-            reordered = constructSolutionBottomUp(
-                ctx, std::move(estimator), getPlanTreeShape(qkc.getJoinPlanTreeShape()));
+            auto estimator =
+                std::make_unique<JoinCardinalityEstimator>(JoinCardinalityEstimator::make(
+                    ctx, swAccessPlans.getValue().estimate, samplingEstimators));
+            reordered = constructSolutionBottomUp(ctx,
+                                                  std::move(estimator),
+                                                  getPlanTreeShape(qkc.getJoinPlanTreeShape()),
+                                                  qkc.getEnableJoinEnumerationHJOrderPruning());
             break;
         }
         case JoinReorderModeEnum::kRandom:

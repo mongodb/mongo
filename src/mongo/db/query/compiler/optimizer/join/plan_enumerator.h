@@ -48,8 +48,11 @@ enum class PlanTreeShape { LEFT_DEEP, RIGHT_DEEP, ZIG_ZAG };
 class PlanEnumeratorContext {
 public:
     PlanEnumeratorContext(const JoinReorderingContext& ctx,
-                          const JoinCardinalityEstimator& estimator)
-        : _ctx{ctx}, _estimator(estimator) {}
+                          std::unique_ptr<JoinCardinalityEstimator> estimator,
+                          bool enableHJOrderPruning)
+        : _ctx{ctx},
+          _estimator(std::move(estimator)),
+          _enableHJOrderPruning(enableHJOrderPruning) {}
 
     // Delete copy and move operations to prevent issues with copying '_joinGraph'.
     PlanEnumeratorContext(const PlanEnumeratorContext&) = delete;
@@ -77,6 +80,10 @@ public:
 
     const JoinPlanNodeRegistry& registry() const {
         return _registry;
+    }
+
+    JoinCardinalityEstimator* getJoinCardinalityEstimator() const {
+        return _estimator.get();
     }
 
     /**
@@ -115,10 +122,11 @@ private:
                              JoinMethod method,
                              const JoinSubset& left,
                              const JoinSubset& right,
-                             const JoinSubset& subset) const;
+                             const JoinSubset& subset);
 
     const JoinReorderingContext& _ctx;
-    const JoinCardinalityEstimator& _estimator;
+    std::unique_ptr<JoinCardinalityEstimator> _estimator;
+    const bool _enableHJOrderPruning;
 
     // Hold intermediate results of the enumeration algorithm. The index into the outer vector
     // represents the "level". The i'th level contains solutions for the optimal way to join all

@@ -98,6 +98,7 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _maxEdgesInJoinGraph = internalMaxEdgesInJoinGraph.load();
     _maxNumberNodesConsideredForImplicitEdges =
         internalMaxNumberNodesConsideredForImplicitEdges.load();
+    _enableJoinEnumerationHJOrderPruning = internalEnableJoinEnumerationHJOrderPruning.load();
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
@@ -151,6 +152,10 @@ size_t QueryKnobConfiguration::getMaxEdgesInJoinGraph() const {
 
 size_t QueryKnobConfiguration::getMaxNumberNodesConsideredForImplicitEdges() const {
     return _maxNumberNodesConsideredForImplicitEdges;
+}
+
+bool QueryKnobConfiguration::getEnableJoinEnumerationHJOrderPruning() const {
+    return _enableJoinEnumerationHJOrderPruning;
 }
 
 double QueryKnobConfiguration::getSamplingMarginOfError() const {
