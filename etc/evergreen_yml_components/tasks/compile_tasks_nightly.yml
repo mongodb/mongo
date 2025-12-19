@@ -696,16 +696,6 @@ tasks:
             DEBUG_SYMBOLS_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
             MSI_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi
             MSI_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi
-            SERVER_TARBALL_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
-            SERVER_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
-            CRYPTD_TARBALL_SHA1_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
-            CRYPTD_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
-            SOURCE_TARBALL_SHA1_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1
-            SOURCE_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1
-            DEBUG_SYMBOLS_TARBALL_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
-            DEBUG_SYMBOLS_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
-            MSI_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha1
-            MSI_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha1
             SERVER_TARBALL_SHA256_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
             SERVER_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
             CRYPTD_TARBALL_SHA256_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
@@ -716,16 +706,6 @@ tasks:
             DEBUG_SYMBOLS_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
             MSI_SHA256_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha256
             MSI_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256
-            SERVER_TARBALL_MD5_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
-            SERVER_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
-            CRYPTD_TARBALL_MD5_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
-            CRYPTD_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
-            SOURCE_TARBALL_MD5_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5
-            SOURCE_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5
-            DEBUG_SYMBOLS_TARBALL_MD5_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
-            DEBUG_SYMBOLS_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
-            MSI_MD5_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.md5
-            MSI_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5
             AWS_ACCESS_KEY_ID: ${upload_lock_access_key_id}
             AWS_SECRET_ACCESS_KEY: ${upload_lock_secret_access_key}
             UPLOAD_LOCK_IMAGE: ${upload_lock_image_ecr}
