@@ -74,6 +74,7 @@ public:
                                      const TargetingMetadata& targetingMetadata) override;
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
+                                                   const TargetingMetadata& targetingMetadata,
                                                    const CancellationToken& cancelToken) override;
 
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,

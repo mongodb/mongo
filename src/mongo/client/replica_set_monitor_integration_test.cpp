@@ -187,6 +187,7 @@ TEST_F(ReplicaSetMonitorFixture, StreamableRSMWireVersion) {
 
     auto primaryFuture =
         rsm->getHostOrRefresh(ReadPreferenceSetting(mongo::ReadPreference::PrimaryOnly),
+                              {},
                               CancellationToken::uncancelable());
     primaryFuture.get();
 
@@ -260,6 +261,7 @@ TEST_F(ReplicaSetMonitorFixture, PingTime) {
     auto rsm = ReplicaSetMonitor::createIfNeeded(replSetUri);
 
     rsm->getHostOrRefresh(ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                          {},
                           CancellationToken::uncancelable())
         .get();
 

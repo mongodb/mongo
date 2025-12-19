@@ -66,6 +66,7 @@ public:
                                      const TargetingMetadata& targetingMetadata) override;
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
+                                                   const TargetingMetadata& targetingMetadata,
                                                    const CancellationToken& cancelToken) override;
 
     SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,

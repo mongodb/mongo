@@ -131,19 +131,6 @@ TEST_F(AsyncRemoteCommandTargeterAdapterTest, OnRemoteErrorUpdatesTopologyAndRes
     ASSERT_EQUALS(resolveFuture.get(), kHosts[1]);
 }
 
-/**
- * When targeting metadata contains depioritized servers, the targeter will resolve other servers.
- */
-TEST_F(AsyncRemoteCommandTargeterAdapterTest, TargeterDeprioritizeServersFromMetadata) {
-    ReadPreferenceSetting readPref;
-    auto targeter = AsyncRemoteCommandTargeterAdapter(readPref, getTargeter());
-
-    auto resolveFuture = targeter.resolve(CancellationToken::uncancelable(),
-                                          TargetingMetadata{.deprioritizedServers = {kHosts[0]}});
-
-    ASSERT_EQUALS(resolveFuture.get(), kHosts[1]);
-}
-
 }  // namespace
 }  // namespace async_rpc
 }  // namespace mongo

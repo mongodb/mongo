@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/targeting_metadata.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -65,8 +66,9 @@ public:
     }
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
+                                                   const TargetingMetadata& targetingMetadata,
                                                    const CancellationToken& cancelToken) override {
-        return _mock->findHosts(readPref, cancelToken);
+        return _mock->findHosts(readPref, targetingMetadata, cancelToken);
     }
 
     void markHostNotPrimary(const HostAndPort& host, const Status& status) override {

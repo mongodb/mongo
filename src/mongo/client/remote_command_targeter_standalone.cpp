@@ -54,7 +54,9 @@ SemiFuture<HostAndPort> RemoteCommandTargeterStandalone::findHost(
 }
 
 SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterStandalone::findHosts(
-    const ReadPreferenceSetting& readPref, const CancellationToken& cancelToken) {
+    const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata,
+    const CancellationToken& cancelToken) {
     return {{_hostAndPort}};
 }
 

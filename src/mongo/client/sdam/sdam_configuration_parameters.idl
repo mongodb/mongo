@@ -51,6 +51,14 @@ server_parameters:
             gte: 0
         default: 15
         redact: false
+    overloadAwareServerSelectionEnabled:
+        description: >-
+            Controls whether server selection will avoid selecting servers suspected to be overloaded when performing retries.
+        set_at: [startup, runtime]
+        cpp_vartype: "Atomic<bool>"
+        cpp_varname: gOverloadAwareServerSelectionEnabled
+        default: true
+        redact: false
     connectTimeoutMs:
         description: Determines the connection timeout used in the replica set monitor.
         set_at: startup

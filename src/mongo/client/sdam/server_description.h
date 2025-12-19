@@ -212,7 +212,7 @@ private:
 
     // The topology description of that we are a part of. Since this is a weak_ptr, code that
     // accesses this variable should ensure that the TopologyDescription cannot be destroyed by
-    // holding a copy of it's shared_ptr. The SdamServerSelector uses this variable when calculating
+    // holding a copy of it's shared_ptr. The ServerSelector uses this variable when calculating
     // staleness.
     boost::optional<std::weak_ptr<TopologyDescription>> _topologyDescription;
 

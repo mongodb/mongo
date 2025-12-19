@@ -55,7 +55,7 @@ public:
 
     PrimaryServerDiscoveryTime() : sdamConfiguration(SdamConfiguration({{HostAndPort("s0")}})) {}
     static inline const OID kOidOne{"000000000000000000000001"};
-    SdamServerSelector selector = SdamServerSelector(sdamConfiguration);
+    ServerSelector selector = ServerSelector(sdamConfiguration);
     StreamableReplicaSetMonitor::StreamableReplicaSetMonitorDiscoveryTimeProcessor
         _rsmTimeProcessor;
 };

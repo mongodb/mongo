@@ -214,6 +214,8 @@ public:
         ShardSharedStateCache::Stats* _stats;
         bool _recordedAttempted = false;
         bool _previousAttemptOverloaded = false;
+        // The number of retries that avoided a server that previously returned an overload error.
+        std::int64_t _numRetargets = 0;
     };
 
     /**

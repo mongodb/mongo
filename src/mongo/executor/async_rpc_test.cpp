@@ -1438,31 +1438,28 @@ TEST_F(AsyncRPCTestFixture, TargeterDeprioritizedServer) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
 
     FindCommandRequest findCmd(nss);
+    auto retryStrategy = std::make_shared<DefaultRetryStrategy>();
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
-        getExecutorPtr(),
-        CancellationToken::uncancelable(),
-        findCmd,
-        std::make_shared<DefaultRetryStrategy>());
+        getExecutorPtr(), CancellationToken::uncancelable(), findCmd, retryStrategy);
     auto future = sendCommandAndWaitUntilRequestIsReady(
         options, opCtxHolder.get(), std::move(targeter), getNetworkInterfaceMock());
 
+    HostAndPort overloadedHost;
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, hosts[0]);
+        overloadedHost = request.target;
         return createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
     });
 
     advanceUntilReadyRequest();
 
     onCommand([&](const auto& request) {
-        // For the second request, we expect the second host to be chosen.
-        // This is because host[0] returned a system overloaded error, and we expect the targeting
-        // metadata to be updated.
-        ASSERT_EQ(request.target, hosts[1]);
         // We chose BadValue since this code is non-retryable.
         return createErrorResponse(Status(ErrorCodes::BadValue, "test"));
     });
 
     future.wait();
+    ASSERT_EQ(retryStrategy->getTargetingMetadata().deprioritizedServers,
+              std::vector<HostAndPort>{overloadedHost});
 }
 
 }  // namespace

@@ -47,6 +47,7 @@
 #include "mongo/client/server_discovery_monitor.h"
 #include "mongo/client/server_ping_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
+#include "mongo/client/targeting_metadata.h"
 #include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_component.h"
@@ -124,12 +125,12 @@ public:
         std::shared_ptr<ReplicaSetMonitorManagerStats> managerStats);
 
     Future<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
-                                         const std::vector<HostAndPort>& excludedHosts,
+                                         const TargetingMetadata& targetingMetadata,
                                          const CancellationToken& cancelToken) override;
 
     Future<std::vector<HostAndPort>> getHostsOrRefresh(
         const ReadPreferenceSetting& readPref,
-        const std::vector<HostAndPort>& excludedHosts,
+        const TargetingMetadata& targetingMetadata,
         const CancellationToken& cancelToken) override;
 
     HostAndPort getPrimaryOrUassert() override;
@@ -222,7 +223,7 @@ private:
 
         ReadPreferenceSetting criteria;
 
-        std::vector<HostAndPort> excludedHosts;
+        TargetingMetadata targetingMetadata;
 
         // Used to compute latency.
         Date_t start;
@@ -246,7 +247,7 @@ private:
     Future<std::vector<HostAndPort>> _enqueueOutstandingQuery(
         WithLock,
         const ReadPreferenceSetting& criteria,
-        const std::vector<HostAndPort>& excludedHosts,
+        const TargetingMetadata& targetingMetadata,
         const CancellationToken& cancelToken,
         const Date_t& deadline);
 
@@ -263,10 +264,9 @@ private:
     boost::optional<std::vector<HostAndPort>> _getHosts(
         const sdam::TopologyDescriptionPtr& topology,
         const ReadPreferenceSetting& criteria,
-        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>());
-    boost::optional<std::vector<HostAndPort>> _getHosts(
-        const ReadPreferenceSetting& criteria,
-        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>());
+        const TargetingMetadata& targetingMetadata);
+    boost::optional<std::vector<HostAndPort>> _getHosts(const ReadPreferenceSetting& criteria,
+                                                        const TargetingMetadata& targetingMetadata);
 
     // Incoming Events
     void onTopologyDescriptionChangedEvent(sdam::TopologyDescriptionPtr previousDescription,
@@ -324,7 +324,7 @@ private:
 
     sdam::SdamConfiguration _sdamConfig;
     sdam::TopologyManagerPtr _topologyManager;
-    sdam::ServerSelectorPtr _serverSelector;
+    std::shared_ptr<sdam::ServerSelector> _serverSelector;
     sdam::TopologyEventsPublisherPtr _eventsPublisher;
     std::unique_ptr<StreamableReplicaSetMonitorErrorHandler> _errorHandler;
     sdam::ServerDiscoveryMonitorPtr _serverDiscoveryMonitor;

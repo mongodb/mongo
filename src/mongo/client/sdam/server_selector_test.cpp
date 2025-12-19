@@ -148,7 +148,7 @@ public:
                               {{"dc", "north"}, {"usage", "production"}})};
     };
 
-    SdamServerSelector selector = SdamServerSelector(sdamConfiguration);
+    ServerSelector selector = ServerSelector(sdamConfiguration);
 };
 
 TEST_F(ServerSelectorTestFixture, ShouldFilterCorrectlyByLatencyWindow) {
@@ -184,7 +184,7 @@ TEST_F(ServerSelectorTestFixture, ShouldThrowOnWireError) {
     topologyDescription->installServerDescription(oldServer);
 
     ASSERT(!topologyDescription->isWireVersionCompatible());
-    ASSERT_THROWS_CODE(selector.selectServers(topologyDescription, ReadPreferenceSetting()),
+    ASSERT_THROWS_CODE(selector.selectServers(topologyDescription, ReadPreferenceSetting(), {}),
                        DBException,
                        ErrorCodes::IncompatibleServerVersion);
 }
@@ -216,7 +216,7 @@ TEST_F(ServerSelectorTestFixture, ShouldNotThrowWireErrorIfOnlyOneServerUnknown)
     const auto ninetySeconds = Seconds(90);
     const auto readPref =
         ReadPreferenceSetting(ReadPreference::Nearest, TagSets::emptySet, ninetySeconds);
-    auto result = selector.selectServers(topologyDescription, readPref);
+    auto result = selector.selectServers(topologyDescription, readPref, {});
     ASSERT(result);
     ASSERT_EQ(primary->getAddress(), (*result)[0]->getAddress());
 }
@@ -224,8 +224,9 @@ TEST_F(ServerSelectorTestFixture, ShouldNotThrowWireErrorIfOnlyOneServerUnknown)
 TEST_F(ServerSelectorTestFixture, ShouldReturnNoneIfTopologyUnknown) {
     auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
     ASSERT_EQ(TopologyType::kUnknown, topologyDescription->getType());
-    ASSERT_EQ(adaptForAssert(boost::none),
-              adaptForAssert(selector.selectServers(topologyDescription, ReadPreferenceSetting())));
+    ASSERT_EQ(
+        adaptForAssert(boost::none),
+        adaptForAssert(selector.selectServers(topologyDescription, ReadPreferenceSetting(), {})));
 }
 
 TEST_F(ServerSelectorTestFixture, ShouldBeAbleToSelectWithMaxStalenessFromClonedTopology) {
@@ -250,7 +251,7 @@ TEST_F(ServerSelectorTestFixture, ShouldBeAbleToSelectWithMaxStalenessFromCloned
     const auto ninetySeconds = Seconds(90);
     const auto readPref =
         ReadPreferenceSetting(ReadPreference::Nearest, TagSets::emptySet, ninetySeconds);
-    auto result = selector.selectServers(topologyDescription, readPref);
+    auto result = selector.selectServers(topologyDescription, readPref, {});
     ASSERT(result);
     ASSERT_EQ(primary->getAddress(), (*result)[0]->getAddress());
 }
@@ -300,8 +301,8 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectRandomlyWhenMultipleOptionsAreAvai
                                              {HostAndPort("s2"), 0},
                                              {HostAndPort("s3"), 0}};
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-        auto server = selector.selectServer(topologyDescription,
-                                            ReadPreferenceSetting(ReadPreference::Nearest));
+        auto server = selector.selectServer(
+            topologyDescription, ReadPreferenceSetting(ReadPreference::Nearest), {});
         if (server) {
             frequencyInfo[(*server)->getAddress()]++;
         }
@@ -313,7 +314,7 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectRandomlyWhenMultipleOptionsAreAvai
     ASSERT_FALSE(frequencyInfo[HostAndPort("s3")]);
 }
 
-TEST_F(ServerSelectorTestFixture, ShouldNotSelectExcludedHostsNearest) {
+TEST_F(ServerSelectorTestFixture, ShouldNotSelectDeprioritizedHostsNearest) {
     TopologyStateMachine stateMachine(sdamConfiguration);
     auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
 
@@ -375,17 +376,19 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectExcludedHostsNearest) {
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s3);
 
-    auto excludedHosts = std::vector<HostAndPort>();
-    excludedHosts.push_back(HostAndPort("s2"));
-    excludedHosts.push_back(HostAndPort("s3"));
+    auto deprioritizedHosts = std::vector<HostAndPort>();
+    deprioritizedHosts.push_back(HostAndPort("s2"));
+    deprioritizedHosts.push_back(HostAndPort("s3"));
 
     std::map<HostAndPort, int> frequencyInfo{{HostAndPort("s0"), 0},
                                              {HostAndPort("s1"), 0},
                                              {HostAndPort("s2"), 0},
                                              {HostAndPort("s3"), 0}};
+    TargetingMetadata md{.deprioritizedServers = deprioritizedHosts,
+                         .stats = std::make_shared<TargetingMetadata::Stats>()};
     for (int i = 0; i < NUM_ITERATIONS; i++) {
         auto server = selector.selectServer(
-            topologyDescription, ReadPreferenceSetting(ReadPreference::Nearest), excludedHosts);
+            topologyDescription, ReadPreferenceSetting(ReadPreference::Nearest), md);
         if (server) {
             frequencyInfo[(*server)->getAddress()]++;
         }
@@ -395,9 +398,30 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectExcludedHostsNearest) {
     ASSERT(frequencyInfo[HostAndPort("s1")]);
     ASSERT_FALSE(frequencyInfo[HostAndPort("s2")]);
     ASSERT_FALSE(frequencyInfo[HostAndPort("s3")]);
+    ASSERT_EQ(md.stats->numTargetingAvoidedDeprioritized.load(), NUM_ITERATIONS);
+
+    frequencyInfo.clear();
+    md.stats->numTargetingAvoidedDeprioritized.store(0);
+
+    md.deprioritizedServers.push_back(HostAndPort("s0"));
+    md.deprioritizedServers.push_back(HostAndPort("s1"));
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+        auto server = selector.selectServer(
+            topologyDescription, ReadPreferenceSetting(ReadPreference::Nearest), md);
+        if (server) {
+            frequencyInfo[(*server)->getAddress()]++;
+        }
+    }
+
+    // Whenn all servers are deprioritized, they can all be selected and retargeting never occurs.
+    ASSERT(frequencyInfo[HostAndPort("s0")]);
+    ASSERT(frequencyInfo[HostAndPort("s1")]);
+    ASSERT(frequencyInfo[HostAndPort("s2")]);
+    ASSERT(frequencyInfo[HostAndPort("s3")]);
+    ASSERT_EQ(md.stats->numTargetingAvoidedDeprioritized.load(), 0);
 }
 
-TEST_F(ServerSelectorTestFixture, ShouldNotSelectWhenPrimaryExcludedAndPrimaryOnly) {
+TEST_F(ServerSelectorTestFixture, ShouldNotSelectDeprioritizedPrimaryWhenPrimaryPreferred) {
     TopologyStateMachine stateMachine(sdamConfiguration);
     auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
 
@@ -431,22 +455,149 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectWhenPrimaryExcludedAndPrimaryOn
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s1);
 
-    auto excludedHosts = std::vector<HostAndPort>();
-    excludedHosts.push_back(HostAndPort("s0"));
+    auto deprioritizedHosts = std::vector<HostAndPort>();
+    deprioritizedHosts.push_back(HostAndPort("s0"));
 
+    TargetingMetadata md{.deprioritizedServers = std::move(deprioritizedHosts),
+                         .stats = std::make_shared<TargetingMetadata::Stats>()};
     std::map<HostAndPort, int> frequencyInfo{{HostAndPort("s0"), 0}, {HostAndPort("s1"), 0}};
     for (int i = 0; i < NUM_ITERATIONS; i++) {
         auto server = selector.selectServer(
-            topologyDescription, ReadPreferenceSetting(ReadPreference::PrimaryOnly), excludedHosts);
+            topologyDescription, ReadPreferenceSetting(ReadPreference::PrimaryPreferred), md);
         if (server) {
             frequencyInfo[(*server)->getAddress()]++;
         }
     }
 
-    // The primary has been excluded, and the read preference is PrimaryOnly. Thus, we should not
-    // select either of the nodes.
+    // Deprioritization takes precedent over prefering a primary in a primaryPreferred read
+    // preference. Thus the secondary should be selected every time.
     ASSERT_FALSE(frequencyInfo[HostAndPort("s0")]);
-    ASSERT_FALSE(frequencyInfo[HostAndPort("s1")]);
+    ASSERT_EQ(frequencyInfo[HostAndPort("s1")], NUM_ITERATIONS);
+    ASSERT_EQ(md.stats->numTargetingAvoidedDeprioritized.load(), NUM_ITERATIONS);
+
+    frequencyInfo.clear();
+    md.stats->numTargetingAvoidedDeprioritized.store(0);
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+        auto server = selector.selectServer(
+            topologyDescription, ReadPreferenceSetting(ReadPreference::PrimaryOnly), md);
+        if (server) {
+            frequencyInfo[(*server)->getAddress()]++;
+        }
+    }
+
+    // Deprioritization won't cause selection to fail, so even if the primary is deprioritized, it
+    // will still be selected if a PrimaryOnly read preference is used.
+    ASSERT_EQ(frequencyInfo[HostAndPort("s0")], NUM_ITERATIONS);
+    ASSERT_EQ(frequencyInfo[HostAndPort("s1")], 0);
+    ASSERT_EQ(md.stats->numTargetingAvoidedDeprioritized.load(), 0);
+}
+
+TEST_F(ServerSelectorTestFixture, ShouldNotSelectDeprioritizedSecondaryWhenSecondaryPreferred) {
+    TopologyStateMachine stateMachine(sdamConfiguration);
+    auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
+
+    const auto s0 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s0"))
+                        .withType(ServerType::kRSPrimary)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withHost(HostAndPort("s0"))
+                        .withHost(HostAndPort("s1"))
+                        .withHost(HostAndPort("s2"))
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s0);
+
+    const auto s1 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s1"))
+                        .withType(ServerType::kRSSecondary)
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s1);
+
+    const auto s2 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s2"))
+                        .withType(ServerType::kRSSecondary)
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s2);
+
+
+    auto deprioritizedServers = std::vector<HostAndPort>();
+    deprioritizedServers.push_back(HostAndPort("s1"));
+
+    TargetingMetadata md{.deprioritizedServers = std::move(deprioritizedServers),
+                         .stats = std::make_shared<TargetingMetadata::Stats>()};
+    std::map<HostAndPort, int> frequencyInfo{
+        {HostAndPort("s0"), 0}, {HostAndPort("s1"), 0}, {HostAndPort("s2"), 0}};
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+        auto server = selector.selectServer(
+            topologyDescription, ReadPreferenceSetting(ReadPreference::SecondaryPreferred), md);
+        if (server) {
+            frequencyInfo[(*server)->getAddress()]++;
+        }
+    }
+
+    // The primary should never be selected due to the secondaryPreferred read preference and one
+    // suitable secondary being available.
+    ASSERT_EQ(frequencyInfo[HostAndPort("s0")], 0);
+    // The deprioritized secondary should never be selected.
+    ASSERT_EQ(frequencyInfo[HostAndPort("s1")], 0);
+    ASSERT_EQ(frequencyInfo[HostAndPort("s2")], NUM_ITERATIONS);
+    ASSERT_EQ(md.stats->numTargetingAvoidedDeprioritized.load(), NUM_ITERATIONS);
+
+    frequencyInfo.clear();
+    md.stats->numTargetingAvoidedDeprioritized.store(0);
+    md.deprioritizedServers.push_back(HostAndPort("s2"));
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+        auto server = selector.selectServer(
+            topologyDescription, ReadPreferenceSetting(ReadPreference::SecondaryPreferred), md);
+        if (server) {
+            frequencyInfo[(*server)->getAddress()]++;
+        }
+    }
+
+    // If all secondaries are deprioritized, only then will the primary be selected.
+    ASSERT_EQ(frequencyInfo[HostAndPort("s0")], NUM_ITERATIONS);
+    ASSERT_EQ(frequencyInfo[HostAndPort("s1")], 0);
+    ASSERT_EQ(frequencyInfo[HostAndPort("s2")], 0);
+    ASSERT_EQ(md.stats->numTargetingAvoidedDeprioritized.load(), NUM_ITERATIONS);
+
+    frequencyInfo.clear();
+    md.stats->numTargetingAvoidedDeprioritized.store(0);
+    md.deprioritizedServers.push_back(HostAndPort("s0"));
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+        auto server = selector.selectServer(
+            topologyDescription, ReadPreferenceSetting(ReadPreference::SecondaryPreferred), md);
+        if (server) {
+            frequencyInfo[(*server)->getAddress()]++;
+        }
+    }
+
+    // If all servers are deprioritized, then a secondary will be selected.
+    ASSERT_EQ(frequencyInfo[HostAndPort("s0")], 0);
+    ASSERT_GT(frequencyInfo[HostAndPort("s1")], 0);
+    ASSERT_GT(frequencyInfo[HostAndPort("s2")], 0);
+    ASSERT_EQ(md.stats->numTargetingAvoidedDeprioritized.load(), 0);
 }
 
 TEST_F(ServerSelectorTestFixture, ShouldOnlyChooseSecondaryWithHighLatencyPrimary) {
@@ -483,9 +634,8 @@ TEST_F(ServerSelectorTestFixture, ShouldOnlyChooseSecondaryWithHighLatencyPrimar
                         .instance();
     stateMachine.onServerDescription(*topologyDescription, s1);
 
-    auto excludedHosts = std::vector<HostAndPort>();
     auto server = selector.selectServers(
-        topologyDescription, ReadPreferenceSetting(ReadPreference::Nearest), excludedHosts);
+        topologyDescription, ReadPreferenceSetting(ReadPreference::Nearest), {});
 
     // Should only select secondary since primary had too much network lag.
     ASSERT_TRUE(server && !(*server).empty());
@@ -555,7 +705,7 @@ TEST_F(ServerSelectorTestFixture, ShouldFilterByLastWriteTime) {
     std::map<HostAndPort, int> frequencyInfo{
         {HostAndPort("s0"), 0}, {HostAndPort("s1"), 0}, {HostAndPort("s2"), 0}};
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-        auto server = selector.selectServer(topologyDescription, readPref);
+        auto server = selector.selectServer(topologyDescription, readPref, {});
 
         if (server) {
             frequencyInfo[(*server)->getAddress()]++;
@@ -609,18 +759,18 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectPreferredIfAvailable) {
 
     const auto primaryPreferredTagSecondary =
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred, TagSets::secondarySet);
-    auto result1 = selector.selectServer(topologyDescription, primaryPreferredTagSecondary);
+    auto result1 = selector.selectServer(topologyDescription, primaryPreferredTagSecondary, {});
     ASSERT(result1 != boost::none);
     ASSERT_EQ(HostAndPort("s0"), (*result1)->getAddress());
 
     const auto secondaryPreferredWithTag =
         ReadPreferenceSetting(ReadPreference::SecondaryPreferred, TagSets::secondarySet);
-    auto result2 = selector.selectServer(topologyDescription, secondaryPreferredWithTag);
+    auto result2 = selector.selectServer(topologyDescription, secondaryPreferredWithTag, {});
     ASSERT(result2 != boost::none);
     ASSERT_EQ(HostAndPort("s1"), (*result2)->getAddress());
 
     const auto secondaryPreferredNoTag = ReadPreferenceSetting(ReadPreference::SecondaryPreferred);
-    auto result3 = selector.selectServer(topologyDescription, secondaryPreferredNoTag);
+    auto result3 = selector.selectServer(topologyDescription, secondaryPreferredNoTag, {});
     ASSERT(result3 != boost::none);
     ASSERT_EQ(HostAndPort("s1"), (*result2)->getAddress());
 }
@@ -693,7 +843,7 @@ TEST_F(ServerSelectorTestFixture, ShouldSelectTaggedSecondaryIfPreferredPrimaryN
 
     const auto primaryPreferredTagSecondary =
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred, TagSets::secondarySet);
-    auto result1 = selector.selectServer(topologyDescription, primaryPreferredTagSecondary);
+    auto result1 = selector.selectServer(topologyDescription, primaryPreferredTagSecondary, {});
     ASSERT(result1 != boost::none);
     ASSERT_EQ(HostAndPort("s1"), (*result1)->getAddress());
 }
@@ -784,7 +934,7 @@ TEST_F(ServerSelectorTestFixture, ShouldIgnoreMinClusterTimeIfNotSatisfiable) {
     // Ensure that minClusterTime is ignored if no server can satisfy it
     auto readPref = ReadPreferenceSetting(ReadPreference::Nearest);
     readPref.minClusterTime = repl::OpTime::max().getTimestamp();
-    auto result = selector.selectServers(topologyDescription, readPref);
+    auto result = selector.selectServers(topologyDescription, readPref, {});
 
     ASSERT(result);
     ASSERT_EQ(result->size(), 2);
@@ -792,7 +942,7 @@ TEST_F(ServerSelectorTestFixture, ShouldIgnoreMinClusterTimeIfNotSatisfiable) {
     // Ensure that tags are still respected if minClusterTime is ignored
     readPref = ReadPreferenceSetting(ReadPreference::Nearest, TagSets::secondarySet);
     readPref.minClusterTime = repl::OpTime::max().getTimestamp();
-    result = selector.selectServers(topologyDescription, readPref);
+    result = selector.selectServers(topologyDescription, readPref, {});
 
     ASSERT(result);
     ASSERT_EQ(result->size(), 1);
@@ -803,7 +953,7 @@ TEST_F(ServerSelectorTestFixture, ShouldIgnoreMinClusterTimeIfNotSatisfiable) {
     readPref =
         ReadPreferenceSetting(ReadPreference::Nearest, TagSets::emptySet, maxStalenessSeconds);
     readPref.minClusterTime = repl::OpTime::max().getTimestamp();
-    result = selector.selectServers(topologyDescription, readPref);
+    result = selector.selectServers(topologyDescription, readPref, {});
 
     ASSERT_EQ(result->size(), 1);
     ASSERT_EQ((*result)[0]->getAddress(), s0->getAddress());

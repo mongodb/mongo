@@ -31,8 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/client/remote_command_targeter.h"
-#include "mongo/client/remote_command_targeter_server_parameters_gen.h"
-#include "mongo/client/retry_strategy.h"
+#include "mongo/client/targeting_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_impl.h"
 
@@ -67,8 +66,7 @@ StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(
         return _findHostReturnValue.getStatus();
     }
 
-    return firstHostPrioritized(_findHostReturnValue.getValue(),
-                                targetingMetadata.deprioritizedServers);
+    return _findHostReturnValue.getValue().front();
 }
 
 SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHost(
@@ -79,16 +77,11 @@ SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHost(
         return _findHostReturnValue.getStatus();
     }
 
-    if (!gOverloadAwareRetargetingEnabled.load()) {
-        return _findHostReturnValue.getValue().front();
-    }
-
-    return RemoteCommandTargeter::firstHostPrioritized(_findHostReturnValue.getValue(),
-                                                       targetingMetadata.deprioritizedServers);
+    return _findHostReturnValue.getValue().front();
 }
 
 SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterMock::findHosts(
-    const ReadPreferenceSetting&, const CancellationToken&) {
+    const ReadPreferenceSetting&, const TargetingMetadata&, const CancellationToken&) {
 
     return _findHostReturnValue;
 }

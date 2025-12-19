@@ -393,19 +393,12 @@ mongo_cc_library(
     ],
 )
 
-idl_generator(
-    name = "remote_command_targeter_server_parameters_gen",
-    src = "remote_command_targeter_server_parameters.idl",
-)
-
 mongo_cc_library(
     name = "remote_command_targeter",
     srcs = [
-        "remote_command_targeter.cpp",
         "remote_command_targeter_factory_impl.cpp",
         "remote_command_targeter_rs.cpp",
         "remote_command_targeter_standalone.cpp",
-        ":remote_command_targeter_server_parameters_gen",
     ],
     deps = [
         ":clientdriver_network",
@@ -502,7 +495,6 @@ mongo_cc_unit_test(
         "mongo_uri_test.cpp",
         "read_preference_test.cpp",
         "remote_command_retry_scheduler_test.cpp",
-        "remote_command_targeter_test.cpp",
         "replica_set_monitor_server_parameters_test.cpp",
         "retry_strategy_test.cpp",
         "server_discovery_monitor_expedited_test.cpp",

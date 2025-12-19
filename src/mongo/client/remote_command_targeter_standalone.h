@@ -63,6 +63,7 @@ public:
 
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
+                                                   const TargetingMetadata& targetingMetadata,
                                                    const CancellationToken& cancelToken) override;
 
     void markHostNotPrimary(const HostAndPort& host, const Status& status) override;

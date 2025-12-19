@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/backoff_with_jitter.h"
+#include "mongo/client/targeting_metadata.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -49,10 +50,6 @@
 #include <boost/optional.hpp>
 
 namespace MONGO_MOD_PUBLIC mongo {
-
-struct TargetingMetadata {
-    std::vector<HostAndPort> deprioritizedServers;
-};
 
 /**
  * Interface for implementing retry behavior. Allows user to specify exactly how much time we
@@ -426,7 +423,8 @@ private:
     BackoffWithJitter _backoffWithJitter;
     std::int32_t _maxRetryAttempts;
     std::int32_t _retryAttemptCount = 0;
-    TargetingMetadata _targetingMetadata;
+    TargetingMetadata _targetingMetadata{.deprioritizedServers = {},
+                                         .stats = std::make_shared<TargetingMetadata::Stats>()};
 };
 
 /**

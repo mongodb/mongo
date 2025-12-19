@@ -27,27 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/client/remote_command_targeter.h"
+#pragma once
 
-namespace mongo {
+#include "mongo/util/modules.h"
+#include "mongo/util/net/hostandport.h"
 
-const HostAndPort& RemoteCommandTargeter::firstHostPrioritized(
-    std::span<const HostAndPort> hosts, std::span<const HostAndPort> deprioritizedServers) {
-    invariant(!hosts.empty());
+#include <cstdint>
+#include <vector>
 
-    if (MONGO_likely(deprioritizedServers.empty())) {
-        return hosts.front();
-    }
+namespace MONGO_MOD_PUBLIC mongo {
 
-    const auto notDeprioritized = [&](const HostAndPort& server) {
-        return std::ranges::find(deprioritizedServers, server) == deprioritizedServers.end();
+/**
+ * Additional information used to inform remote command targeting / server selection.
+ */
+struct TargetingMetadata {
+    struct Stats {
+        /**
+         * Counter of how many times targeting did not select a deprioritized server using this
+         * metadata. This counter is not increased for targeting performed without any deprioritized
+         * servers.
+         */
+        Atomic<int64_t> numTargetingAvoidedDeprioritized;
     };
 
-    if (auto it = std::ranges::find_if(hosts, notDeprioritized); it != hosts.end()) {
-        return *it;
-    }
+    /**
+     * List of servers that should not be targeted, if possible.
+     * If there are no other suitable, non-deprioritized servers, then a deprioritized server may
+     * still be selected.
+     */
+    std::vector<HostAndPort> deprioritizedServers;
 
-    return hosts.front();
-}
-
-}  // namespace mongo
+    // If null, stats will not be recorded.
+    std::shared_ptr<Stats> stats = {};
+};
+}  // namespace MONGO_MOD_PUBLIC mongo

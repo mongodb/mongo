@@ -252,10 +252,10 @@ public:
         TestCaseResult result{{}, _testFilePath};
 
         try {
-            SdamServerSelector serverSelector(
+            ServerSelector serverSelector(
                 SdamConfiguration(std::vector<HostAndPort>{HostAndPort("foo:1234")}));
             auto selectedServers =
-                serverSelector.selectServers(_topologyDescription, _readPreference);
+                serverSelector.selectServers(_topologyDescription, _readPreference, {});
 
             std::vector<std::string> selectedHosts;
             if (selectedServers) {

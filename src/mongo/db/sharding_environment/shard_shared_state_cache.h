@@ -81,6 +81,12 @@ public:
         Atomic<std::int64_t> numOverloadErrorsReceived;
 
         /**
+         * The total number of retries directed to this shard that did not select a server that had
+         * previously returned an error with the `SystemOverloaded` error label.
+         */
+        Atomic<std::int64_t> numRetriesRetargetedDueToOverload;
+
+        /**
          * The total amount of milliseconds waited due to backing off.
          */
         Atomic<std::int64_t> totalBackoffTimeMillis;

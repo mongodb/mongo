@@ -140,6 +140,8 @@ void ShardSharedStateCache::Stats::appendStats(BSONObjBuilder* bob) const {
     bob->append("numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded",
                 numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded.loadRelaxed());
     bob->append("numRetriesDueToOverloadAttempted", numRetriesDueToOverloadAttempted.loadRelaxed());
+    bob->append("numRetriesRetargetedDueToOverload",
+                numRetriesRetargetedDueToOverload.loadRelaxed());
     bob->append("numOverloadErrorsReceived", numOverloadErrorsReceived.loadRelaxed());
     bob->append("totalBackoffTimeMillis", totalBackoffTimeMillis.loadRelaxed());
 }

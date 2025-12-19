@@ -472,36 +472,6 @@ TEST_F(ShardRemoteTest, TimeoutCodeUnsetWhenMaxTimeMSNotSet) {
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::CommandFailed);
 }
 
-TEST_F(ShardRemoteTest, SystemOverloadedTargetingDeprioritizedServers) {
-    FailPointEnableBlock _{"setBackoffDelayForTesting", BSON("backoffDelayMs" << 0)};
-
-    auto firstShard = kTestShards.front().id;
-    auto firstShardHosts = kTestShards.front().hosts;
-
-    auto future = launchAsync([&] {
-        auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), firstShard));
-        auto result = uassertStatusOK(shard->runCommandWithIndefiniteRetries(
-            operationContext(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            DatabaseName::createDatabaseName_forTest(boost::none, "unusedDb"),
-            BSON("unused" << "cmd"),
-            Shard::RetryPolicy::kIdempotent));
-        uassertStatusOK(result.commandStatus);
-    });
-
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, firstShardHosts[0]);
-        return createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
-    });
-
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, firstShardHosts[1]);
-        return Status{ErrorCodes::CommandFailed, "Error"};
-    });
-
-    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::CommandFailed);
-}
-
 TEST_F(ShardRetryabilityTest, RetryableErrorRemoteNoRetry) {
     ASSERT_FALSE(_shard->remoteIsRetriableError(
         Status{ErrorCodes::CommandFailed, "error"}, {}, Shard::RetryPolicy::kNoRetry));

@@ -212,6 +212,15 @@ void Shard::RetryStrategy::_recordOperationAttempted() {
         _recordedAttempted = true;
         _stats->numOperationsAttempted.addAndFetch(1);
     }
+
+    if (getTargetingMetadata().stats) {
+        auto previousRetargetCounter = std::exchange(
+            _numRetargets, getTargetingMetadata().stats->numTargetingAvoidedDeprioritized.load());
+        if (previousRetargetCounter < _numRetargets) {
+            _stats->numRetriesRetargetedDueToOverload.addAndFetch(_numRetargets -
+                                                                  previousRetargetCounter);
+        }
+    }
 }
 
 void Shard::RetryStrategy::_recordOperationNotOverloaded() {

@@ -79,8 +79,9 @@ public:
                                              const TargetingMetadata& targetingMetadata) = 0;
 
     virtual SemiFuture<std::vector<HostAndPort>> findHosts(
-        const ReadPreferenceSetting& readPref, const CancellationToken& cancelToken) = 0;
-
+        const ReadPreferenceSetting& readPref,
+        const TargetingMetadata& targetingMetadata,
+        const CancellationToken& cancelToken) = 0;
 
     /**
      * Checks the given status and updates the host bookkeeping accordingly.
@@ -118,15 +119,6 @@ public:
      * host again on a subsequent request for the primary.
      */
     virtual void markHostShuttingDown(const HostAndPort& host, const Status& status) = 0;
-
-    /**
-     * Uses the list of deprioritized servers to pick the most suitable host from the list of hosts.
-     *
-     * This function is exposed so that it can be tested separately, as findHost already executes
-     * this logic.
-     */
-    static const HostAndPort& firstHostPrioritized(
-        std::span<const HostAndPort> hosts, std::span<const HostAndPort> deprioritizedServers);
 
 protected:
     RemoteCommandTargeter() = default;

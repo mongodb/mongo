@@ -31,6 +31,7 @@
 
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/client/targeting_metadata.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
@@ -70,23 +71,13 @@ public:
      *  FailedToSatisfyReadPreference, if node cannot be found, which matches the read preference.
      */
     virtual Future<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
-                                                 const std::vector<HostAndPort>& excludedHosts,
+                                                 const TargetingMetadata& targetingMetadata,
                                                  const CancellationToken& cancelToken) = 0;
-
-    Future<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
-                                         const CancellationToken& cancelToken) {
-        return getHostOrRefresh(readPref, {} /* excludedHosts */, cancelToken);
-    }
 
     virtual Future<std::vector<HostAndPort>> getHostsOrRefresh(
         const ReadPreferenceSetting& readPref,
-        const std::vector<HostAndPort>& excludedHosts,
+        const TargetingMetadata& targetingMetadata,
         const CancellationToken& cancelToken) = 0;
-
-    Future<std::vector<HostAndPort>> getHostsOrRefresh(const ReadPreferenceSetting& readPref,
-                                                       const CancellationToken& cancelToken) {
-        return getHostsOrRefresh(readPref, {} /* excludedHosts */, cancelToken);
-    }
 
     /**
      * Returns the host the RSM thinks is the current primary or uasserts.

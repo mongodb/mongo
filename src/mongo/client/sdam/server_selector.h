@@ -33,6 +33,7 @@
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/topology_description.h"
+#include "mongo/client/targeting_metadata.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -49,46 +50,19 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sdam {
-/**
- * This is the interface that allows one to select a server to satisfy a DB operation given a
- * TopologyDescription and a ReadPreferenceSetting.
- */
+
 class ServerSelector {
 public:
-    /**
-     * Finds a list of candidate servers according to the ReadPreferenceSetting.
-     */
-    virtual boost::optional<std::vector<ServerDescriptionPtr>> selectServers(
-        TopologyDescriptionPtr topologyDescription,
-        const ReadPreferenceSetting& criteria,
-        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) = 0;
-
-    /**
-     * Select a single server according to the ReadPreference and latency of the
-     * ServerDescription(s). The server is selected randomly from those that match the criteria.
-     */
-    virtual boost::optional<ServerDescriptionPtr> selectServer(
-        TopologyDescriptionPtr topologyDescription,
-        const ReadPreferenceSetting& criteria,
-        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) = 0;
-
-    virtual ~ServerSelector();
-};
-using ServerSelectorPtr = std::unique_ptr<ServerSelector>;
-
-class SdamServerSelector : public ServerSelector {
-public:
-    explicit SdamServerSelector(const SdamConfiguration& config);
+    explicit ServerSelector(const SdamConfiguration& config);
 
     boost::optional<std::vector<ServerDescriptionPtr>> selectServers(
         TopologyDescriptionPtr topologyDescription,
         const ReadPreferenceSetting& criteria,
-        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) override;
+        const TargetingMetadata& targetingMetadata);
 
-    boost::optional<ServerDescriptionPtr> selectServer(
-        TopologyDescriptionPtr topologyDescription,
-        const ReadPreferenceSetting& criteria,
-        const std::vector<HostAndPort>& excludedHosts = std::vector<HostAndPort>()) override;
+    boost::optional<ServerDescriptionPtr> selectServer(TopologyDescriptionPtr topologyDescription,
+                                                       const ReadPreferenceSetting& criteria,
+                                                       const TargetingMetadata& targetingMetadata);
 
     // remove servers that do not match the TagSet
     void filterTags(std::vector<ServerDescriptionPtr>* servers, const TagSet& tagSet);

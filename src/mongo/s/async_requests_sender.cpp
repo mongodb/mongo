@@ -393,6 +393,8 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
             if (_retryStrategy->recordFailureAndEvaluateShouldRetry(
                     status, rcr.response.target, rcr.response.getErrorLabels()) &&
                 !_ars->_stopRetrying) {
+                const auto delay = _retryStrategy->getNextRetryDelay();
+
                 LOGV2_DEBUG(
                     4615637,
                     1,
@@ -400,9 +402,9 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandCallbackArgs r
                     "shardId"_attr = _shardId,
                     "attemptedHosts"_attr = rcr.request.target,
                     "failedHost"_attr = rcr.response.target,
-                    "error"_attr = redact(status));
+                    "error"_attr = redact(status),
+                    "delay"_attr = delay);
                 _shardHostAndPort.reset();
-                const auto delay = _retryStrategy->getNextRetryDelay();
 
                 if (delay > Milliseconds{0}) {
                     return _ars->_subBaton

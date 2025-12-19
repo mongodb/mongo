@@ -4,20 +4,12 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
-import {Thread} from "jstests/libs/parallelTester.js";
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const rs0Name = "rs0";
 const shardId = `${jsTest.name()}-${rs0Name}`;
 const kCollName = `${jsTest.name()}_coll`;
 const kDbName = `${jsTest.name()}_db`;
-
-const kFailCommandOff = {
-    configureFailPoint: "failCommand",
-    mode: "off",
-};
 
 function shardingStatisticsDifference(stats1, stats2) {
     return {
@@ -29,24 +21,21 @@ function shardingStatisticsDifference(stats1, stats2) {
             stats2.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded,
         numRetriesDueToOverloadAttempted:
             stats1.numRetriesDueToOverloadAttempted - stats2.numRetriesDueToOverloadAttempted,
+        numRetriesRetargetedDueToOverload:
+            stats1.numRetriesRetargetedDueToOverload - stats2.numRetriesRetargetedDueToOverload,
         numOverloadErrorsReceived: stats1.numOverloadErrorsReceived - stats2.numOverloadErrorsReceived,
         totalBackoffTimeMillis: stats1.totalBackoffTimeMillis - stats2.totalBackoffTimeMillis,
         retryBudgetTokenBucketBalance: stats1.retryBudgetTokenBucketBalance - stats2.retryBudgetTokenBucketBalance,
     };
 }
 
-function runTestSingleCommand(execTest, command, conn, rs0) {
-    const db = conn.getDB(kDbName);
-    const rsAdmin = rs0.getDB("admin");
-
-    const initialShardStats = db.serverStatus().shardingStatistics.shards[shardId];
-
+function enableFailCommand(conn, command, times) {
     const commands = Array.isArray(command) ? command : [command];
 
     assert.commandWorked(
-        rs0.getDB("admin").adminCommand({
+        conn.adminCommand({
             configureFailPoint: "failCommand",
-            mode: {times: 3},
+            mode: {times},
             data: {
                 errorCode: ErrorCodes.IngressRequestRateLimitExceeded,
                 failCommands: commands,
@@ -55,71 +44,121 @@ function runTestSingleCommand(execTest, command, conn, rs0) {
             },
         }),
     );
-    execTest(db);
-    assert.commandWorked(rs0.getDB("admin").adminCommand(kFailCommandOff));
-
-    const finalShardStats = db.serverStatus().shardingStatistics.shards[shardId];
-    const shardStats = shardingStatisticsDifference(finalShardStats, initialShardStats);
-
-    assert.eq(shardStats.numOperationsAttempted, 1);
-    assert.eq(shardStats.numOperationsRetriedAtLeastOnceDueToOverload, 1);
-    assert.eq(shardStats.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 1);
-    assert.eq(shardStats.numRetriesDueToOverloadAttempted, 3);
-    assert.eq(shardStats.numOverloadErrorsReceived, 3);
-    assert.gt(shardStats.totalBackoffTimeMillis, 0);
-    assert.lt(shardStats.retryBudgetTokenBucketBalance, 1000);
 }
 
-function testInsert(db) {
-    assert.commandWorked(db.runCommand({insert: kCollName, documents: [{name: "test0"}]}));
-}
-
-function testFind(db) {
-    assert.commandWorked(db.runCommand({find: kCollName, filter: {name: "test0"}}));
-}
-
-function testDistinct(db) {
-    assert.commandWorked(db.runCommand({distinct: kCollName, key: "name"}));
-}
-
-function testCount(db) {
-    assert.commandWorked(db.runCommand({count: kCollName}));
-}
-
-function testCreateIndex(db) {
+function disableFailCommand(conn) {
     assert.commandWorked(
-        db.runCommand({
-            createIndexes: kCollName,
-            indexes: [
-                {
-                    name: "name_1",
-                    key: {key: 1},
-                },
-            ],
+        conn.adminCommand({
+            configureFailPoint: "failCommand",
+            mode: "off",
         }),
     );
 }
 
-function testDropIndex(db) {
-    assert.commandWorked(db.runCommand({dropIndexes: kCollName, index: {name: 1}}));
+function getShardingStats(conn) {
+    return conn.getDB("admin").serverStatus().shardingStatistics.shards[shardId];
 }
 
-function testListIndexes(db) {
-    assert.commandWorked(db.runCommand({listIndexes: kCollName}));
+function runTestOnlyPrimaryFails(commandName, command, readPref, mongos, shard) {
+    jsTestLog("Running primary-failure test with command '" + commandName + "' and read preference '" + readPref + "'");
+
+    // Iniitial request must target the primary in these tests.
+    assert(!readPref || ["primary", "primaryPreferred"].includes(readPref));
+
+    const kNumFailures = 3;
+
+    const shardPrimary = shard.getPrimary();
+    const initialShardStats = getShardingStats(mongos);
+
+    enableFailCommand(shardPrimary, commandName, kNumFailures);
+
+    const cmd = {
+        ...command,
+        "$readPreference": readPref ? {mode: readPref} : command["$readPreference"],
+    };
+    jsTestLog("Executing command: ", cmd);
+    assert.commandWorked(mongos.getDB(kDbName).runCommand(cmd));
+
+    disableFailCommand(shardPrimary);
+
+    const finalShardStats = getShardingStats(mongos);
+    const shardStatsDiff = shardingStatisticsDifference(finalShardStats, initialShardStats);
+
+    assert.eq(shardStatsDiff.numOperationsAttempted, 1);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 1);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 1);
+    assert.gt(shardStatsDiff.totalBackoffTimeMillis, 0);
+
+    if (!readPref || readPref == "primary") {
+        assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, kNumFailures);
+        assert.eq(shardStatsDiff.numOverloadErrorsReceived, kNumFailures);
+        assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
+    } else if (readPref == "primaryPreferred") {
+        assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, 1);
+        assert.eq(shardStatsDiff.numOverloadErrorsReceived, 1);
+        assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 1);
+    }
 }
 
-function testShardCollection(db) {
-    assert.commandWorked(
-        db.adminCommand({
-            shardCollection: `${kDbName}.${kCollName}`,
-            key: {key: 1},
-        }),
+function runTestAllNodesFail(commandName, command, readPref, mongos, shard) {
+    jsTestLog(
+        "Running all-nodes-failure test with command '" + commandName + "' and read preference '" + readPref + "'",
     );
+    const initialShardStats = getShardingStats(mongos);
+
+    const kNumFailures = 1;
+    for (let node of shard.nodes) {
+        enableFailCommand(node, commandName, kNumFailures);
+    }
+
+    const cmd = {
+        ...command,
+        "$readPreference": readPref ? {mode: readPref} : command["$readPreference"],
+    };
+    jsTestLog("Executing command: ", cmd);
+    assert.commandWorked(mongos.getDB(kDbName).runCommand(cmd));
+
+    for (let node of shard.nodes) {
+        disableFailCommand(node);
+    }
+
+    const finalShardStats = getShardingStats(mongos);
+    const shardStatsDiff = shardingStatisticsDifference(finalShardStats, initialShardStats);
+
+    jsTestLog(shardStatsDiff);
+
+    assert.eq(shardStatsDiff.numOperationsAttempted, 1);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverload, 1);
+    assert.eq(shardStatsDiff.numOperationsRetriedAtLeastOnceDueToOverloadAndSucceeded, 1);
+    assert.gt(shardStatsDiff.totalBackoffTimeMillis, 0);
+
+    if (!readPref || readPref === "primary") {
+        assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, kNumFailures);
+        assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, 0);
+        assert.eq(shardStatsDiff.numOverloadErrorsReceived, kNumFailures);
+    } else if (readPref === "secondary") {
+        // If we can only retry on secondaries, we retry on each secondary once.
+        assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, shard.nodes.length - 1);
+        // One of these retries will be on a secondary we already attempted, since we will have run out of other secondaries to try.
+        assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, shard.nodes.length - 1 - 1);
+        // Each secondary will have returned an overloaded error exactly once.
+        assert.eq(shardStatsDiff.numOverloadErrorsReceived, shard.nodes.length - 1);
+    } else {
+        // For all other read preferences, we retry once on each node.
+        assert.eq(shardStatsDiff.numRetriesDueToOverloadAttempted, shard.nodes.length);
+        // Each retry will avoid a previously selected server except for the last one, which must choose an already deprioritized secondary.
+        assert.eq(shardStatsDiff.numRetriesRetargetedDueToOverload, shard.nodes.length - 1);
+        // Each node will have returned an overloaded error exactly once.
+        assert.eq(shardStatsDiff.numOverloadErrorsReceived, shard.nodes.length);
+    }
 }
 
 const kStartupParams = {
     "failpoint.failCommand": tojson({
         mode: "off",
+    }),
+    "failpoint.returnMaxBackoffDelay": tojson({
+        mode: "alwaysOn",
     }),
     "defaultClientBaseBackoffMillis": 10,
     "defaultClientMaxBackoffMillis": 1000,
@@ -148,11 +187,10 @@ function runTestSharded() {
         },
     });
 
-    const rs0Primary = st.rs0.getPrimary();
-
-    const db = st.s.getDB(`${jsTest.name()}_db`);
+    const shard = st.rs0;
 
     // Warmup coll. Otherwise, we'll see more requests in the stats than we should read.
+    const db = st.s.getDB(`${jsTest.name()}_db`);
     assert.commandWorked(
         db[kCollName].insertMany([
             {name: "test0", key: 0},
@@ -160,14 +198,53 @@ function runTestSharded() {
         ]),
     );
 
-    runTestSingleCommand(testCount, "count", st.s, rs0Primary);
-    runTestSingleCommand(testDistinct, "distinct", st.s, rs0Primary);
-    runTestSingleCommand(testFind, "find", st.s, rs0Primary);
-    runTestSingleCommand(testInsert, "insert", st.s, rs0Primary);
+    const readPrefs = [null, "primary", "secondary", "secondaryPreferred", "nearest"];
 
-    // As dropIndexes seem to run on mongod and not mongos, skip dropIndexes from this test.
-    runTestSingleCommand(testCreateIndex, "createIndexes", st.s, rs0Primary);
-    runTestSingleCommand(testListIndexes, "listIndexes", st.s, rs0Primary);
+    const readCommands = [
+        ["find", {find: kCollName, filter: {name: "test0"}}],
+        ["aggregate", {aggregate: kCollName, pipeline: [{"$match": {name: "test0"}}], cursor: {}}],
+        ["count", {count: kCollName}],
+        ["distinct", {distinct: kCollName, key: "name"}],
+        ["listIndexes", {listIndexes: kCollName}],
+    ];
+
+    const writeCommands = [
+        ["insert", {insert: kCollName, documents: [{name: "test0"}]}],
+        ["update", {update: kCollName, updates: [{q: {"foo": "barr"}, u: {"$set": {"x": 2}}}]}],
+        ["aggregate", {aggregate: kCollName, pipeline: [{"$match": {"foo": "bar"}}, {"$out": "newColl"}], cursor: {}}],
+        [
+            "createIndexes",
+            {
+                createIndexes: kCollName,
+                indexes: [
+                    {
+                        name: "name_1",
+                        key: {key: 1},
+                    },
+                ],
+            },
+        ],
+    ];
+
+    jsTestLog("Testing retry behavior when every node in the shard fails.");
+    for (let readPref of readPrefs) {
+        for (let readCommand of readCommands) {
+            runTestAllNodesFail(readCommand[0], readCommand[1], readPref, st.s, shard);
+        }
+    }
+    for (let writeCommand of writeCommands) {
+        runTestAllNodesFail(writeCommand[0], writeCommand[1], null, st.s, shard);
+    }
+
+    jsTestLog("Testing retry behavior when only the primary fails");
+    for (let readPref of [null, "primary", "primaryPreferred"]) {
+        for (let readCommand of readCommands) {
+            runTestOnlyPrimaryFails(readCommand[0], readCommand[1], readPref, st.s, shard);
+        }
+    }
+    for (let writeCommand of writeCommands) {
+        runTestOnlyPrimaryFails(writeCommand[0], writeCommand[1], null, st.s, shard);
+    }
 
     st.stop();
 }
