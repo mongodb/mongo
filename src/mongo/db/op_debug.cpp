@@ -40,6 +40,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -197,6 +198,11 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     pAttrs->add("isFromUserConnection", client && client->isFromUserConnection());
+    if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
+        pAttrs->add("isFromMaintenancePortConnection",
+                    client && client->session() &&
+                        client->session()->isConnectedToMaintenancePort());
+    }
     pAttrs->addDeepCopy("ns", toStringForLogging(curop.getNSS()));
     pAttrs->addDeepCopy("collectionType", getCollectionType(opCtx, curop.getNSS()));
 
@@ -561,6 +567,12 @@ void OpDebug::append(OperationContext* opCtx,
 
     b.append("ns", curop.getNS());
 
+    if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
+        b.append("isFromMaintenancePortConnection",
+                 opCtx->getClient() && opCtx->getClient()->session() &&
+                     opCtx->getClient()->session()->isConnectedToMaintenancePort());
+    }
+
     if (!omitCommand) {
         curop_bson_helpers::appendObjectTruncatingAsNecessary(
             "command",
@@ -883,6 +895,13 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
         b.append(field, logicalOpToString(args.op.logicalOp));
     });
     addIfNeeded("ns", [](auto field, auto args, auto& b) { b.append(field, args.curop.getNS()); });
+
+    addIfNeeded("isFromMaintenancePortConnection", [](auto field, auto args, auto& b) {
+        bool isFromMaintenanceConnection = args.opCtx->getClient() &&
+            args.opCtx->getClient()->session() &&
+            args.opCtx->getClient()->session()->isConnectedToMaintenancePort();
+        b.append(field, isFromMaintenanceConnection);
+    });
 
     addIfNeeded("command", [](auto field, auto args, auto& b) {
         curop_bson_helpers::appendObjectTruncatingAsNecessary(
