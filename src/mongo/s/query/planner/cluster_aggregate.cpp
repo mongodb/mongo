@@ -963,8 +963,6 @@ Status runAggregateImpl(OperationContext* opCtx,
                         &result,
                         requestQueryStatsFromRemotes);
                 }
-
-                    MONGO_UNREACHABLE;
             }
             MONGO_UNREACHABLE;
         } catch (const DBException& dbe) {

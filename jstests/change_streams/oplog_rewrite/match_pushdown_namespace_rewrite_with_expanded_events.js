@@ -42,13 +42,20 @@ const db = mongosConn.getDB(dbName);
 // 'userMatchExpr' and validates that:
 // 1. for each shard, the events are seen in that order as specified in 'expectedResult'
 // 2. the filtering is been done at oplog level
-function verifyOnWholeCluster(resumeAfterToken, userMatchExpr, expectedResult, expectedOplogRetDocsForEachShard) {
+function verifyOnWholeCluster(
+    resumeAfterToken,
+    userMatchExpr,
+    expectedResult,
+    expectedOplogRetDocsForEachShard,
+    expectedMigrateChunkToNewShardEventsForEachShard = [0, 0],
+) {
     verifyChangeStreamOnWholeCluster({
-        st: st,
+        st,
         changeStreamSpec: {resumeAfter: resumeAfterToken, showExpandedEvents: true},
-        userMatchExpr: userMatchExpr,
-        expectedResult: expectedResult,
+        userMatchExpr,
+        expectedResult,
         expectedOplogNReturnedPerShard: expectedOplogRetDocsForEachShard,
+        expectedMigrateChunkToNewShardEventsForEachShard,
     });
 }
 
@@ -846,12 +853,14 @@ verifyOnWholeCluster(
     {$match: {ns: {db: dbName}}},
     {},
     [8, 2] /* expectedOplogRetDocsForEachShard */,
+    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
 );
 verifyOnWholeCluster(
     secondResumeToken,
     {$match: {$expr: {$eq: ["$ns", {db: dbName}]}}},
     {},
     [8, 2] /* expectedOplogRetDocsForEachShard */,
+    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
 );
 
 verifyOnWholeCluster(
@@ -859,6 +868,7 @@ verifyOnWholeCluster(
     {$match: {ns: {db: dbName, coll: collName}}},
     {[collName]: {create: [collName], shardCollection: [collName]}},
     [9, 2] /* expectedOplogRetDocsForEachShard */,
+    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
 );
 
 verifyOnWholeCluster(
@@ -866,6 +876,7 @@ verifyOnWholeCluster(
     {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: collName}]}}},
     {[collName]: {create: [collName], shardCollection: [collName]}},
     [9, 2] /* expectedOplogRetDocsForEachShard */,
+    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
 );
 
 verifyOnWholeCluster(
@@ -873,6 +884,7 @@ verifyOnWholeCluster(
     {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: coll2Name}]}}},
     {[coll2Name]: {create: [coll2Name], shardCollection: [coll2Name]}},
     [9, 2] /* expectedOplogRetDocsForEachShard */,
+    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
 );
 
 verifyOnWholeCluster(
@@ -885,6 +897,7 @@ verifyOnWholeCluster(
         "view2": {create: ["view2"], drop: ["view2"]},
     },
     [9, 3] /* expectedOplogRetDocsForEachShard */,
+    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
 );
 
 // Create a new change stream and resume token for replaying the stream after this point.
@@ -925,6 +938,7 @@ verifyOnWholeCluster(
         },
     },
     [9, 4] /* expectedOplogRetDocsForEachShard */,
+    [2, 1] /* expectedMigrateChunkToNewShardEventsForEachShard */,
 );
 
 st.stop();

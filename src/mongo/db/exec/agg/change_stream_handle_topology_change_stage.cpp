@@ -32,7 +32,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/pipeline/change_stream_topology_change_info.h"
 #include "mongo/db/pipeline/change_stream_topology_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
@@ -62,9 +61,6 @@ REGISTER_AGG_STAGE_MAPPING(_internalChangeStreamHandleTopologyChange,
                            documentSourceChangeStreamHandleTopologyChangeToStageFn)
 
 namespace {
-// Failpoint to throw an exception when the 'kNewShardDetected' event is observed.
-MONGO_FAIL_POINT_DEFINE(throwChangeStreamTopologyChangeExceptionToClient);
-
 // Returns true if the change stream document is an event in 'config.shards'.
 bool isShardConfigEvent(const Document& eventDoc) {
     // TODO SERVER-44039: we continue to generate 'kNewShardDetected' events for compatibility
@@ -81,17 +77,9 @@ bool isShardConfigEvent(const Document& eventDoc) {
         return false;
     }
 
+    // TODO SERVER-112325: Remove this check once no MongoDB version generates
+    // 'migrateChunkToNewShard' events.
     if (opType.getStringData() == DocumentSourceChangeStream::kNewShardDetectedOpType) {
-        // If the failpoint is enabled, throw the 'ChangeStreamTopologyChange' exception to the
-        // client. This is used in testing to confirm that the swallowed 'kNewShardDetected' event
-        // has reached the mongoS.
-        // TODO SERVER-30784: remove this failpoint when the 'kNewShardDetected' event is the only
-        // way we detect a new shard.
-        if (MONGO_unlikely(throwChangeStreamTopologyChangeExceptionToClient.shouldFail())) {
-            uasserted(ChangeStreamTopologyChangeInfo(eventDoc.toBsonWithMetaData()),
-                      "Collection migrated to new shard");
-        }
-
         return true;
     }
 

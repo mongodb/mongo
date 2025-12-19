@@ -210,8 +210,8 @@ void ChangeStreamStageTest::checkTransformation(
 }
 
 /**
- * Returns a list of stages expanded from a $changStream specification, starting with a
- * DocumentSourceMock which contains a single document representing 'entry'.
+ * Returns a list of stages expanded from a $changeStream specification, starting with a
+ * DocumentSourceMock which contains a single document-representing 'entry'.
  *
  * Stages such as DSEnsureResumeTokenPresent which can swallow results are removed from the
  * returned list.
@@ -222,8 +222,8 @@ std::unique_ptr<exec::agg::Pipeline> ChangeStreamStageTest::makeExecPipeline(BSO
 }
 
 /**
- * Returns a list of the stages expanded from a $changStream specification, starting with a
- * DocumentSourceMock which contains a list of document representing 'entries'.
+ * Returns a list of the stages expanded from a $changeStream specification, starting with a
+ * DocumentSourceMock which contains a list of document-representing 'entries'.
  */
 std::unique_ptr<exec::agg::Pipeline> ChangeStreamStageTest::makeExecPipeline(
     std::vector<BSONObj> entries, const BSONObj& spec, bool removeEnsureResumeTokenStage) {

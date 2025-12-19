@@ -865,7 +865,6 @@ mongo_cc_library(
     srcs = [
         "change_stream_invalidation_info.cpp",
         "change_stream_start_after_invalidate_info.cpp",
-        "change_stream_topology_change_info.cpp",
     ],
     deps = [
         "//src/mongo:base",

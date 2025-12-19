@@ -401,6 +401,8 @@ const skips = new Set([
     "$_internalChangeStreamAddPreImage",
     "$_internalChangeStreamCheckInvalidate",
     "$_internalChangeStreamCheckResumability",
+    // TODO SERVER-112325: Remove this stage once all mongos versions are guaranteed to not
+    // generate this stage in a change stream pipeline anymore.
     "$_internalChangeStreamCheckTopologyChange",
     "$_internalChangeStreamHandleTopologyChange",
     "$_internalChangeStreamInjectControlEvents",

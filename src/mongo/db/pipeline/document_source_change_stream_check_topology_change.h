@@ -53,15 +53,23 @@ using ChangeStreamCheckTopologyChangeLiteParsed =
     DocumentSourceChangeStreamLiteParsedInternal<ChangeStreamCheckTopologyChangeStageParams>;
 
 /**
- * This stage detects change stream topology changes in the form of 'kNewShardDetectedOpType' events
- * and forwards them directly to the executor via an exception. Using an exception bypasses the rest
- * of the pipeline, ensuring that the event cannot be filtered out or modified by user-specified
- * stages and that it will ultimately be available to the mongoS.
+ * TODO SERVER-112325: Remove this stage once no MongoDB version generates 'migrateChunkToNewShard'
+ * events.
  *
- * The mongoS must see all 'kNewShardDetectedOpType' events, so that it knows when it needs to open
- * cursors on newly active shards. These events are generated when a chunk is migrated to a shard
- * that previously may not have held any data for the collection being watched, and they contain the
- * information necessary for the mongoS to include the new shard in the merged change stream.
+ * This stage detected change stream topology changes in the form of 'kNewShardDetectedOpType'
+ * events and forwarded them directly to the executor via an exception. Using an exception bypassed
+ * the rest of the pipeline, ensuring that the event cannot be filtered out or modified by
+ * user-specified stages and that it will ultimately be available to the mongoS.
+ *
+ * The mongoS needed to see all 'kNewShardDetectedOpType' events, so that it knows when it needs to
+ * open cursors on newly active shards. These events were generated when a chunk is migrated to a
+ * shard that previously may not have held any data for the collection being watched, and they
+ * contained the information necessary for the mongoS to include the new shard in the merged change
+ * stream.
+ *
+ * This stage is only there for backwards-compatibility reasons. It is necessary to keep this stage
+ * for now because old versions of mongos can still create change stream pipelines creating this
+ * stage. However, the stage is now a no-op, so it can be removed in the future.
  */
 class DocumentSourceChangeStreamCheckTopologyChange final
     : public DocumentSourceInternalChangeStreamStage {

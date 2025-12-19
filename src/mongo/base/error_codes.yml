@@ -585,11 +585,8 @@ error_codes:
       categories: [VersionedAPIError, VoteAbortError],
     }
 
-  - {
-      code: 348,
-      name: ChangeStreamTopologyChange,
-      extra: ChangeStreamTopologyChangeInfo,
-    }
+  # Removed in v8.3
+  # - {code: 348, name: ChangeStreamTopologyChange, extra: ChangeStreamTopologyChangeInfo}
 
   - {code: 349, name: KeyPatternShorterThanBound}
 

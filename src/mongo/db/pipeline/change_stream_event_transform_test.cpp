@@ -305,6 +305,42 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {
     ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
 }
 
+// Tests that "migrateChunkToNewShard" oplog entries are converted to change stream
+// events correctly.
+// TODO SERVER-112325: Remove this test once there can be no more change stream pipelines
+// that include this the 'migrateChunkToNewShard' in their oplog match filter.
+TEST(ChangeStreamEventTransformTest, TransformNewShardDetected) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+    auto o2Field = Document{{"migrateChunkToNewShard", nss.toString_forTest()},
+                            {"fromShardId", "fromShard"_sd},
+                            {"toShardId", "toShard"_sd}};
+    auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kNoop,
+                                     nss,
+                                     BSONObj(),
+                                     testUuid(),
+                                     boost::none,  // fromMigrate
+                                     o2Field.toBson());
+
+    const auto opDesc =
+        Value(Document{{"fromShardId", "fromShard"_sd}, {"toShardId", "toShard"_sd}});
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), opDesc, DocumentSourceChangeStream::kNewShardDetectedOpType)},
+        {DocumentSourceChangeStream::kOperationTypeField,
+         DocumentSourceChangeStream::kNewShardDetectedOpType},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kCollectionUuidField, testUuid()},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField, opDesc},
+    };
+
+    ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
+}
+
 TEST(ChangeStreamEventTransformTest,
      Given_NoopOplogEntry_When_CallingTransform_Then_FieldsAreNotCopied) {
     const NamespaceString nss =

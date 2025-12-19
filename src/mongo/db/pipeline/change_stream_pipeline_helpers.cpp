@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
-#include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
@@ -198,16 +197,6 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
     // Always include a DSCSCheckResumability stage, both to verify that there is enough history to
     // cover the change stream's starting point, and to swallow all events up to the resume point.
     stages.push_back(DocumentSourceChangeStreamCheckResumability::create(expCtx, spec));
-
-    // If the pipeline is built on router, we check for topology change events here. If a topology
-    // change event is detected, this stage forwards the event directly to the executor via an
-    // exception (bypassing the rest of the pipeline). Router must see all topology change events,
-    // so it's important that this stage occurs before any filtering is performed.
-    if (expCtx->getInRouter() && !useV2ChangeStreamReader) {
-        // Only add this stage for V1 change stream readers. V2 change stream readers handle all
-        // topology changes via the HandleTopologyChangeV2 stage.
-        stages.push_back(DocumentSourceChangeStreamCheckTopologyChange::create(expCtx));
-    }
 
     if (expCtx->getInRouter() && useV2ChangeStreamReader) {
         // For V2 change stream readers in sharded clusters, add the DSCSInjectControlEvents stage

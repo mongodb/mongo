@@ -75,11 +75,14 @@ constexpr std::array kBuiltInNoopEvents = {
     DocumentSourceChangeStream::kMigrateLastChunkFromShardOpType,
     DocumentSourceChangeStream::kRefineCollectionShardKeyOpType,
     DocumentSourceChangeStream::kReshardCollectionOpType,
-    DocumentSourceChangeStream::kNewShardDetectedOpType,
     DocumentSourceChangeStream::kReshardBeginOpType,
     DocumentSourceChangeStream::kReshardBlockingWritesOpType,
     DocumentSourceChangeStream::kReshardDoneCatchUpOpType,
-    DocumentSourceChangeStream::kEndOfTransactionOpType};
+    DocumentSourceChangeStream::kEndOfTransactionOpType,
+
+    // TODO SERVER-112325: Remove this event type from here once this event once it can be
+    // guaranteed that this event type cannot appear in the oplog anymore.
+    DocumentSourceChangeStream::kNewShardDetectedOpType};
 
 const StringDataSet kOpsWithoutUUID = {
     DocumentSourceChangeStream::kInvalidateOpType,

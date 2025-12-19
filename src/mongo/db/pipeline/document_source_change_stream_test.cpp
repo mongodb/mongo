@@ -1943,34 +1943,6 @@ TEST_F(ChangeStreamStageTest, MatchFiltersDropDatabaseCommand) {
     checkTransformation(dropDB, boost::none);
 }
 
-TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
-    auto o2Field = D{{"migrateChunkToNewShard", nss.toString_forTest()},
-                     {"fromShardId", "fromShard"_sd},
-                     {"toShardId", "toShard"_sd}};
-    auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,
-                                           nss,
-                                           BSONObj(),
-                                           testUuid(),
-                                           boost::none,  // fromMigrate
-                                           o2Field.toBson());
-
-    const auto opDesc = Value(D{{"fromShardId", "fromShard"_sd}, {"toShardId", "toShard"_sd}});
-    Document expectedNewShardDetected{
-        {DSChangeStream::kIdField,
-         makeResumeToken(kDefaultTs, testUuid(), opDesc, DSChangeStream::kNewShardDetectedOpType)},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kNewShardDetectedOpType},
-        {DSChangeStream::kClusterTimeField, kDefaultTs},
-        {DSChangeStream::kCollectionUuidField, testUuid()},
-        {DSChangeStream::kWallTimeField, Date_t()},
-        {DSChangeStream::kNamespaceField, D{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
-        {DSChangeStream::kOperationDescriptionField, opDesc},
-    };
-
-    getExpCtx()->setNeedsMerge(true);
-
-    checkTransformation(newShardDetected, expectedNewShardDetected, kShowExpandedEventsSpec);
-}
-
 TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
     auto uuid = UUID::gen();
 
@@ -1978,7 +1950,6 @@ TEST_F(ChangeStreamStageTest, TransformShardingEvents) {
                            DSChangeStream::kMigrateLastChunkFromShardOpType,
                            DSChangeStream::kRefineCollectionShardKeyOpType,
                            DSChangeStream::kReshardCollectionOpType,
-                           DSChangeStream::kNewShardDetectedOpType,
                            DSChangeStream::kReshardBeginOpType,
                            DSChangeStream::kReshardBlockingWritesOpType,
                            DSChangeStream::kReshardDoneCatchUpOpType}) {
@@ -5093,7 +5064,6 @@ TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamStagesOrder) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
@@ -5117,7 +5087,6 @@ TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamStagesOrder) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
@@ -5142,7 +5111,6 @@ TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamStagesOrder) {
                            "$_internalChangeStreamUnwindTransaction",
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
@@ -5233,7 +5201,6 @@ TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamV2StagesOrder) {
                            "$_internalChangeStreamUnwindTransaction",
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
@@ -5257,7 +5224,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$match",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
@@ -5313,7 +5279,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$match",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
@@ -5352,7 +5317,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatch) {
 
 //
 // Tests that multiple '$match' gets merged and promoted before the
-// '$_internalChangeStreamCheckTopologyChange' when resume token is present.
+// '$_internalChangeStreamHandleTopologyChange' when resume token is present.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
@@ -5374,7 +5339,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$match",
                            "$_internalChangeStreamHandleTopologyChange",
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
@@ -5382,7 +5346,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
 
 //
 // Tests that multiple '$match' gets merged and promoted before the
-// '$_internalChangeStreamCheckTopologyChange' in a v2 change stream when resume token is present.
+// '$_internalChangeStreamHandleTopologyChange' in a v2 change stream when resume token is present.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatchAndResumeToken) {
     RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
@@ -5436,7 +5400,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleProject) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
@@ -5491,7 +5454,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProject) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$project",
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange"});
@@ -5554,7 +5516,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProjectAndResumeToken) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$project",
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange",
@@ -5585,7 +5546,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithProjectMatchAndResumeToken) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$match",
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange",
@@ -5594,8 +5554,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithProjectMatchAndResumeToken) {
 
 //
 // Tests that the single '$unset' gets promoted before the
-// '$_internalChangeStreamCheckTopologyChange' as
-// '$project'.
+// '$_internalChangeStreamHandleTopologyChange' as '$project'.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleUnset) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
@@ -5611,14 +5570,13 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleUnset) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
 //
-// Tests that multiple '$unset' gets promoted before the '$_internalChangeStreamCheckTopologyChange'
-// as '$project'.
+// Tests that multiple '$unset' gets promoted before the
+// '$_internalChangeStreamHandleTopologyChange' as '$project'.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleUnset) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
@@ -5635,14 +5593,13 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleUnset) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            // The two '$unset' stages are coalesced.
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
 //
-// Tests that the '$unset' gets promoted before the '$_internalChangeStreamCheckTopologyChange' as
+// Tests that the '$unset' gets promoted before the '$_internalChangeStreamHandleTopologyChange' as
 // '$project' even if resume token is present.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamWithUnsetAndResumeToken) {
@@ -5664,7 +5621,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithUnsetAndResumeToken) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange",
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
@@ -5688,7 +5644,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleAddFields) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$addFields",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
@@ -5712,14 +5667,13 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleAddFields) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$addFields",
                            "$addFields",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
 //
-// Tests that the '$addFields' gets promoted before the '$_internalChangeStreamCheckTopologyChange'
+// Tests that the '$addFields' gets promoted before the '$_internalChangeStreamHandleTopologyChange'
 // if resume token is present.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamWithAddFieldsAndResumeToken) {
@@ -5741,7 +5695,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithAddFieldsAndResumeToken) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$addFields",
                            "$_internalChangeStreamHandleTopologyChange",
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
@@ -5765,7 +5718,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleSet) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$set",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
@@ -5788,14 +5740,13 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleSet) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$set",
                            "$set",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
 //
-// Tests that the '$set' gets promoted before the '$_internalChangeStreamCheckTopologyChange' if
+// Tests that the '$set' gets promoted before the '$_internalChangeStreamHandleTopologyChange' if
 // resume token is present.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSetAndResumeToken) {
@@ -5817,7 +5768,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSetAndResumeToken) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$set",
                            "$_internalChangeStreamHandleTopologyChange",
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
@@ -5841,14 +5791,13 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceRoot) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$replaceRoot",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
 //
 // Tests that the '$replaceRoot' gets promoted before the
-// '$_internalChangeStreamCheckTopologyChange' if resume token is present.
+// '$_internalChangeStreamHandleTopologyChange' if resume token is present.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceRootAndResumeToken) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
@@ -5869,7 +5818,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceRootAndResumeToken) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$replaceRoot",
                            "$_internalChangeStreamHandleTopologyChange",
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
@@ -5877,8 +5825,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceRootAndResumeToken) {
 
 //
 // Tests that the single '$replaceWith' gets promoted before the
-// '$_internalChangeStreamCheckTopologyChange' as
-// '$replaceRoot'.
+// '$_internalChangeStreamHandleTopologyChange' as '$replaceRoot'.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceWith) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
@@ -5894,14 +5841,13 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceWith) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$replaceRoot",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
 //
 // Tests that the '$replaceWith' gets promoted before the
-// '$_internalChangeStreamCheckTopologyChange' if resume token is present as '$replaceRoot'.
+// '$_internalChangeStreamHandleTopologyChange' if resume token is present as '$replaceRoot'.
 //
 TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceWithAndResumeToken) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
@@ -5922,7 +5868,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceWithAndResumeToken) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$replaceRoot",
                            "$_internalChangeStreamHandleTopologyChange",
                            "$_internalChangeStreamEnsureResumeTokenPresent"});
@@ -5942,7 +5887,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsTrueDoesNotInjec
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
 
@@ -5961,7 +5905,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseInjectsMatc
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$match",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
@@ -5983,7 +5926,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseAndUserMatc
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$match",
                            "$_internalChangeStreamHandleTopologyChange"});
 }
@@ -6008,7 +5950,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseAndUserProj
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$match",
                            "$project",
                            "$_internalChangeStreamHandleTopologyChange"});
@@ -6043,7 +5984,6 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithAllStagesAndResumeToken) {
                            "$_internalChangeStreamTransform",
                            "$_internalChangeStreamCheckInvalidate",
                            "$_internalChangeStreamCheckResumability",
-                           "$_internalChangeStreamCheckTopologyChange",
                            "$match",
                            "$project",
                            "$project",

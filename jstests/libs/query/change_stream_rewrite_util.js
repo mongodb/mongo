@@ -147,11 +147,30 @@ export function isPlainObject(value) {
 }
 
 // Verifies the number of change streams events returned from a particular shard.
-export function assertNumChangeStreamDocsReturnedFromShard(stats, shardName, expectedTotalReturned) {
+export function assertNumChangeStreamDocsReturnedFromShard(
+    stats,
+    shardName,
+    expectedTotalReturned,
+    expectedMigrateChunkToNewShardEvents,
+) {
     assert(stats.shards.hasOwnProperty(shardName), stats);
     const stages = stats.shards[shardName].stages;
     const lastStage = stages[stages.length - 1];
-    assert.eq(lastStage.nReturned, expectedTotalReturned, stages);
+
+    const buildErrorMsg = () =>
+        `Expected ${expectedTotalReturned} events on shard ${shardName} but got ` +
+        `${lastStage.nReturned}. Stages:\n${tojson(stages)}\n` +
+        `ExpectedMigrateChunkToNewShardEvents ${tojson(expectedMigrateChunkToNewShardEvents)}`;
+
+    // In multiversion tests, it is possible that change streams on older mongods still emit the
+    // 'migrateChunkToNewShard' events, which is filtered out in newer versions. This is a known
+    // results difference, which we need to account for here.
+    // TODO SERVER-112325: Remove the special handling.
+    assert(
+        lastStage.nReturned == expectedTotalReturned ||
+            lastStage.nReturned == expectedTotalReturned - expectedMigrateChunkToNewShardEvents,
+        buildErrorMsg,
+    );
 }
 
 export function getExecutionStatsForShard(stats, shardName) {
@@ -168,18 +187,31 @@ export function getUnwindStageForShard(stats, shardName) {
 }
 
 // Verifies the number of oplog events read by a particular shard.
-export function assertNumMatchingOplogEventsForShard(stats, shardName, expectedTotalReturned) {
+export function assertNumMatchingOplogEventsForShard(
+    stats,
+    shardName,
+    expectedTotalReturned,
+    expectedMigrateChunkToNewShardEvents,
+) {
     const executionStats = getExecutionStatsForShard(stats, shardName);
     // We verify the number of documents from the unwind stage instead of the oplog cursor, so we
     // are testing that the filter is applied to the output of batched oplog entries as well.
     const unwindStage = getUnwindStageForShard(stats, shardName);
-    assert.eq(
-        unwindStage.nReturned,
-        expectedTotalReturned,
-        () =>
-            `Expected ${expectedTotalReturned} events on shard ${shardName} but got ` +
-            `${executionStats.nReturned}. Execution stats:\n${tojson(executionStats)}\n` +
-            `Unwind stage:\n${tojson(unwindStage)}`,
+
+    const buildErrorMsg = () =>
+        `Expected ${expectedTotalReturned} events on shard ${shardName} but got ` +
+        `${unwindStage.nReturned}. Execution stats:\n${tojson(executionStats)}\n` +
+        `Unwind stage:\n${tojson(unwindStage)}\nExpectedMigrateChunkToNewShardEvents ` +
+        `${tojson(expectedMigrateChunkToNewShardEvents)}`;
+
+    // In multiversion tests, it is possible that change streams on older mongods still emit the
+    // 'migrateChunkToNewShard' events, which is filtered out in newer versions. This is a known
+    // results difference, which we need to account for here.
+    // TODO SERVER-112325: Remove the special handling.
+    assert(
+        unwindStage.nReturned == expectedTotalReturned ||
+            unwindStage.nReturned == expectedTotalReturned - expectedMigrateChunkToNewShardEvents,
+        buildErrorMsg,
     );
 }
 
@@ -220,6 +252,7 @@ export function verifyChangeStreamOnWholeCluster({
     expectedResult,
     expectedOplogNReturnedPerShard,
     expectedChangeStreamDocsReturnedPerShard,
+    expectedMigrateChunkToNewShardEventsForEachShard = [0, 0],
 }) {
     changeStreamSpec["allChangesForCluster"] = true;
     const adminDB = st.s.getDB("admin");
@@ -289,19 +322,31 @@ export function verifyChangeStreamOnWholeCluster({
         () => `expecting stats to have 'shards' attribute, but got ${tojson(stats)}`,
     );
 
-    assertNumMatchingOplogEventsForShard(stats, st.shard0.shardName, expectedOplogNReturnedPerShard[0]);
-    assertNumMatchingOplogEventsForShard(stats, st.shard1.shardName, expectedOplogNReturnedPerShard[1]);
+    assertNumMatchingOplogEventsForShard(
+        stats,
+        st.shard0.shardName,
+        expectedOplogNReturnedPerShard[0],
+        expectedMigrateChunkToNewShardEventsForEachShard[0],
+    );
+    assertNumMatchingOplogEventsForShard(
+        stats,
+        st.shard1.shardName,
+        expectedOplogNReturnedPerShard[1],
+        expectedMigrateChunkToNewShardEventsForEachShard[1],
+    );
 
     if (expectedChangeStreamDocsReturnedPerShard !== undefined) {
         assertNumChangeStreamDocsReturnedFromShard(
             stats,
             st.shard0.shardName,
             expectedChangeStreamDocsReturnedPerShard[0],
+            expectedMigrateChunkToNewShardEventsForEachShard[0],
         );
         assertNumChangeStreamDocsReturnedFromShard(
             stats,
             st.shard1.shardName,
             expectedChangeStreamDocsReturnedPerShard[1],
+            expectedMigrateChunkToNewShardEventsForEachShard[1],
         );
     }
 }

@@ -34,16 +34,18 @@ Change Streams provide various guarantees:
   which the operations were applied to the oplog.
   In a sharded cluster, the events from multiple oplogs will be merged deterministically into a
   single, ordered stream of change events.
-- Durability: change streams are based on the internal oplog, which is part of the deployment's
-  replication mechanism. Change streams only deliver events after they have been committed to a
-  majority of nodes and durably persisted, ensuring they will not be rolled back.
+- Durability and reproducability: change streams are based on the internal oplog, which is part of
+  the deployment's replication mechanism. Change streams only deliver events after they have been
+  committed to a majority of nodes and durably persisted, ensuring they will not be rolled back.
+- Exactly-once delivery: every event in a change stream is emitted exactly once, and no event that
+  matches the change stream filter is skipped.
 - Resumability: change stream consumption can be interrupted due to transient errors (e.g. network
   issues, node failures, application errors), but it can be resumed from the exact point where
   the consumption stopped. This is made possible by the resume token (`_id` field) that accompanies
   every change event, which acts as a bookmark. This allows to the consumer to continue processing
   changes from the last known position without missing events.
 
-### Change Stream Scopes
+### Change Stream Namespace Scopes
 
 Change streams can be opened on different levels that control which events are emitted:
 
@@ -54,7 +56,10 @@ Change streams can be opened on different levels that control which events are e
 - all-cluster change streams: these change streams include events for all databases/collections in
   replica set or sharded cluster deployment.
 
-Change streams cannot be opened on views.
+Consumers can use additional filters to a change stream by adding `$match` stages to the change
+stream pipeline as needed.
+
+Change streams cannot be opened on views. This includes timeseries collections if they use views.
 
 Change streams respect the read permissions of the consumer. A consumer can only open change streams
 on collections or databases that they have access to.
@@ -135,6 +140,23 @@ db.adminCommand({
 ```
 
 The internal namespace that is used by all-cluster change streams is always `admin.$cmd.aggregate`.
+
+### Adding more Pipeline Stages
+
+As a `$changeStream` is a pipeline, additional pipeline stages can be added to it for filtering and
+transforming results, e.g.
+
+- `$addFields`
+- `$match`
+- `$project`
+- `$replaceRoot`
+- `$replaceWith`
+- `$redact`
+- `$set`
+- `$unset`
+
+There is also a change streams-specific stage `$changeStreamSplitLargeEvent` to split large events
+into smaller fragments, in order to avoid running into `BSONObjectTooLarge` errors.
 
 ### Change Stream Start Time
 
@@ -384,8 +406,11 @@ The following values are possible:
   abort the change stream with a `NoMatchingDocument` error.
 
 The latter two options rely on pre-images to be enabled for the target collection(s).
+When pre-images are enabled, they are written synchronously with the regular "update" oplog entry,
+and change stream events aren’t returned until both have been majority-committed.
 
-Post-images are added by the `ChangeStreamAddPostImage` stage [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_add_post_image_stage.cpp#L84).
+Post-images for "update" events are added to change events by the `ChangeStreamAddPostImage` stage
+[here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_add_post_image_stage.cpp#L84).
 
 ### `fullDocumentBeforeChange`
 
@@ -401,7 +426,8 @@ The following values are possible:
   if it exists. If no pre-image is available, aborts the change stream with a `NoMatchingDocument`
   error.
 
-  Pre-images are added by the `ChangeStreamAddPreImage` stage [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_add_pre_image_stage.cpp#L68).
+  Pre-images are added to change events by the `ChangeStreamAddPreImage` stage
+  [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_add_pre_image_stage.cpp#L68).
 
 ### Change Stream Flags
 
@@ -533,7 +559,6 @@ following internal stages:
 - `$_internalChangeStreamCheckInvalidate` (only used for collection-level and database-level change
   streams)
 - `$_internalChangeStreamCheckResumability`
-- `$_internalChangeStreamCheckTopologyChange`
 - `$_internalChangeStreamAddPreImage` (only used if `fullDocumentBeforeChange` is not set to `off`)
 - `$_internalChangeStreamAddPostImage` (only used if `fullDocument` is not set to `default`)
 - `$_internalChangeStreamHandleTopologyChange`
@@ -562,7 +587,6 @@ The shard pipeline will look like this:
 - `$_internalChangeStreamCheckInvalidate` (only used for collection-level and database-level change
   streams)
 - `$_internalChangeStreamCheckResumability`
-- `$_internalChangeStreamCheckTopologyChange`
 - `$_internalChangeStreamAddPreImage` (only used if `fullDocumentBeforeChange` is not set to `off`)
 - `$_internalChangeStreamAddPostImage` (only used if `fullDocument` is not set to `default`)
 
@@ -666,25 +690,12 @@ stream, it will throw a `ChangeStreamFatalError`.
 The `DocumentSourceChangeStreamEnsureResumeTokenPresent` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h#L50).
 The `ChangeStreamEnsureResumeTokenPresent` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_ensure_resume_token_present_stage.cpp#L67).
 
-#### `$_internalChangeStreamCheckTopologyChange`
-
-This stage is only present in sharded cluster change streams and is always part of a data shard
-pipeline. The stage detects change stream topology changes in the form of `kNewShardDetectedOpType`
-events and forwards these events directly to the outermost executor layer via an exception. Using an
-exception bypasses the rest of the pipeline, ensuring that the event cannot be filtered out or
-modified by user-specified stages and that it will ultimately be available to the _mongos_.
-
-The `DocumentSourceChangeStreamCheckTopologyChange` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_check_topology_change.h#L61).
-The `ChangeStreamCheckTopologyChange` code is [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_check_topology_change_stage.cpp#L63).
-
-The exception thrown by the stage is caught by the `PlanExecutorPipeline` [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/plan_executor_pipeline.cpp#L149).
-
 #### `$_internalChangeStreamHandleTopologyChange`
 
 This stage is only present in sharded cluster change streams and is always part of the _mongos_
 merge pipeline. The stage is responsible for opening additional cursors to shards that have been
-added to the cluster. It will handle the `kNewShardDetectedOpType` events produced by the
-`$_internalChangeStreamCheckTopologyChange` stage.
+added to the cluster. It will handle "insert" events into the `config.shards` collection that
+were observed from the config server.
 
 The `DocumentSourceChangeStreamHandleTopologyChange` code can be found [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/pipeline/document_source_change_stream_handle_topology_change.h#L58).
 The `ChangeStreamHandleTopologyChangeStage` code can be found [here](https://github.com/mongodb/mongo/blob/546ffe8f1c6a3996cff1e7b3cc65431d257289dd/src/mongo/db/exec/agg/change_stream_handle_topology_change_stage.cpp#L133).
