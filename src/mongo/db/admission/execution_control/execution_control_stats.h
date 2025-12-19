@@ -132,7 +132,7 @@ public:
 
     AtomicWord<int64_t> totalCPUUsageMicros{0};
     AtomicWord<int64_t> totalElapsedTimeMicros{0};
-    AtomicWord<int64_t> newAdmissionsLoadShed{0};
+    AtomicWord<int64_t> totalOpsLoadShed{0};
     AtomicWord<int64_t> totalCPUUsageLoadShed{0};
     AtomicWord<int64_t> totalElapsedTimeMicrosLoadShed{0};
     AtomicWord<int64_t> totalAdmissionsLoadShed{0};
@@ -156,7 +156,7 @@ public:
     AtomicWord<int64_t> totalTimeQueuedMicros{0};
     AtomicWord<int64_t> totalTimeProcessingMicros{0};
     AtomicWord<int64_t> totalAdmissions{0};
-    AtomicWord<int64_t> newAdmissions{0};
+    AtomicWord<int64_t> totalOpsFinished{0};
     DelinquencyStats delinquencyStats;
 };
 

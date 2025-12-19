@@ -359,7 +359,16 @@ void TicketHolder::_updateQueueStatsOnRelease(TicketHolder::QueueStats& queueSta
 void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
                                                         TicketHolder::QueueStats& queueStats,
                                                         AdmissionContext::Priority priority) {
-    if (admCtx->getAdmissions() == 0) {
+    // The admission context is shared across both normal and low priority ticket holders, so we
+    // need to check the priority-specific counter rather than total admissions.
+    bool isNewAdmission = false;
+    if (priority == AdmissionContext::Priority::kLow) {
+        isNewAdmission = admCtx->getLowAdmissions() == 0;
+    } else {
+        isNewAdmission = admCtx->getAdmissions() == 0;
+    }
+
+    if (isNewAdmission) {
         queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
     }
 

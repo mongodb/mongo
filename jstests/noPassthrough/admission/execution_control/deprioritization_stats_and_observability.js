@@ -533,7 +533,7 @@ describe("Execution control statistics and observability", function () {
             "totalTimeProcessingMicros",
             "totalTimeQueuedMicros",
             "totalAdmissions",
-            "newAdmissions",
+            "totalOpsFinished",
             "totalDelinquentAcquisitions",
             "totalAcquisitionDelinquencyMillis",
             "maxAcquisitionDelinquencyMillis",
@@ -543,7 +543,7 @@ describe("Execution control statistics and observability", function () {
         const finalizedStatsKeys = [
             "totalCPUUsageMicros",
             "totalElapsedTimeMicros",
-            "newAdmissionsLoadShed",
+            "totalOpsLoadShed",
             "totalCPUUsageLoadShed",
             "totalElapsedTimeMicrosLoadShed",
             "totalAdmissionsLoadShed",
@@ -605,27 +605,13 @@ describe("Execution control statistics and observability", function () {
                 executionStats.write.longRunning.totalAdmissions + executionStats.write.shortRunning.totalAdmissions,
                 "Write startedProcessing mismatch: " + tojson(executionStats),
             );
-            assert.gte(
-                executionStats.read.normalPriority.newAdmissions +
-                    executionStats.read.lowPriority.newAdmissions +
-                    executionStats.read.exempt.newAdmissions,
-                executionStats.read.longRunning.newAdmissions + executionStats.read.shortRunning.newAdmissions,
-                "Read newAdmissions mismatch: " + tojson(executionStats),
-            );
-            assert.gte(
-                executionStats.write.normalPriority.newAdmissions +
-                    executionStats.write.lowPriority.newAdmissions +
-                    executionStats.write.exempt.newAdmissions,
-                executionStats.write.longRunning.newAdmissions + executionStats.write.shortRunning.newAdmissions,
-                "Write newAdmissions mismatch: " + tojson(executionStats),
-            );
         }
 
         function assertExecutionShedStatsCorrect(executionStats) {
             assert.gt(
-                executionStats.shortRunning.newAdmissionsLoadShed + executionStats.longRunning.newAdmissionsLoadShed,
+                executionStats.shortRunning.totalOpsLoadShed + executionStats.longRunning.totalOpsLoadShed,
                 0,
-                "newAdmissionsLoadShed mismatch: " + tojson(executionStats),
+                "totalOpsLoadShed mismatch: " + tojson(executionStats),
             );
             assert.gt(
                 executionStats.shortRunning.totalElapsedTimeMicrosLoadShed +
@@ -737,6 +723,20 @@ describe("Execution control statistics and observability", function () {
                 "Missing write longRunning stats: " + tojson(executionStats.write),
             );
             assertPerAcquisitionStatsPresent(executionStats.write.longRunning);
+        });
+
+        it("should increment shortRunning stats for a single read", function () {
+            const beforeStats = getExecutionControlStats(mongod).read.shortRunning;
+            coll.find({_id: 1}).toArray();
+            const afterStats = getExecutionControlStats(mongod).read.shortRunning;
+            assert.gt(afterStats.totalOpsFinished, beforeStats.totalOpsFinished);
+        });
+
+        it("should increment shortRunning stats for a single write", function () {
+            const beforeStats = getExecutionControlStats(mongod).write.shortRunning;
+            coll.insertOne({x: 1});
+            const afterStats = getExecutionControlStats(mongod).write.shortRunning;
+            assert.gt(afterStats.totalOpsFinished, beforeStats.totalOpsFinished);
         });
 
         it("should report admissions histogram in serverStatus", function () {

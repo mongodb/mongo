@@ -626,6 +626,20 @@ void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
         _opsDeprioritized.fetchAndAddRelaxed(1);
     }
 
+    bool hadReadAdmissions = finalizedStats.readShort.totalAdmissions.loadRelaxed() > 0 ||
+        finalizedStats.readLong.totalAdmissions.loadRelaxed() > 0;
+    if (hadReadAdmissions) {
+        auto& bucket = wasDeprioritized ? _operationStats.readLong : _operationStats.readShort;
+        bucket.totalOpsFinished.fetchAndAddRelaxed(1);
+    }
+
+    bool hadWriteAdmissions = finalizedStats.writeShort.totalAdmissions.loadRelaxed() > 0 ||
+        finalizedStats.writeLong.totalAdmissions.loadRelaxed() > 0;
+    if (hadWriteAdmissions) {
+        auto& bucket = wasDeprioritized ? _operationStats.writeLong : _operationStats.writeShort;
+        bucket.totalOpsFinished.fetchAndAddRelaxed(1);
+    }
+
     _admissionsHistogram.record(ExecutionAdmissionContext::get(opCtx).getAdmissions());
 }
 

@@ -96,7 +96,7 @@ ExecutionAdmissionContext::FinalizedStats ExecutionAdmissionContext::finalizeSta
         if (getLoadShed()) {
             stats.totalCPUUsageLoadShed.fetchAndAddRelaxed(cpuUsageMicros);
             stats.totalElapsedTimeMicrosLoadShed.fetchAndAddRelaxed(elapsedMicros);
-            stats.newAdmissionsLoadShed.fetchAndAddRelaxed(1);
+            stats.totalOpsLoadShed.fetchAndAddRelaxed(1);
             stats.totalAdmissionsLoadShed.fetchAndAddRelaxed(getAdmissions());
             stats.totalQueuedTimeMicrosLoadShed.fetchAndAddRelaxed(totalTimeQueuedMicros().count());
         }
@@ -123,9 +123,6 @@ void ExecutionAdmissionContext::recordExecutionAcquisition() {
     }
 
     auto& stats = _getOperationExecutionStats();
-    if (getAdmissions() == 1) {
-        stats.newAdmissions.fetchAndAddRelaxed(1);
-    }
     stats.totalAdmissions.fetchAndAddRelaxed(1);
 }
 
