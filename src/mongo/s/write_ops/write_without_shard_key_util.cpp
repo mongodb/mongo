@@ -156,19 +156,25 @@ std::pair<BSONObj, BSONObj> generateUpsertDocument(
 BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
                                 const BSONObj& targetDoc,
                                 StringData commandName,
-                                bool appendPostImage) {
+                                bool appendPostImage,
+                                bool bulkWriteErrorsOnly) {
     BSONObj reply;
     auto upsertedId = IDLAnyTypeOwned::parseFromBSON(targetDoc.getField(kIdFieldName));
 
     if (commandName == BulkWriteCommandRequest::kCommandName) {
-        BulkWriteReplyItem replyItem(0);
-        replyItem.setOk(1);
-        replyItem.setN(writeRes.getN());
-        replyItem.setNModified(0);
-        replyItem.setUpserted(upsertedId);
+        auto items = std::vector<mongo::BulkWriteReplyItem>{};
+        // Only send a BulkWriteReplyItem if the errorsOnly parameter is false.
+        if (!bulkWriteErrorsOnly) {
+            BulkWriteReplyItem replyItem(0);
+            replyItem.setOk(1);
+            replyItem.setN(writeRes.getN());
+            replyItem.setNModified(0);
+            replyItem.setUpserted(upsertedId);
+            items.push_back(std::move(replyItem));
+        }
         BulkWriteCommandReply bulkWriteReply(
             BulkWriteCommandResponseCursor(
-                0, {replyItem}, NamespaceString::makeBulkWriteNSS(boost::none)),
+                0, std::move(items), NamespaceString::makeBulkWriteNSS(boost::none)),
             0 /* nErrors */,
             0 /* nInserted */,
             0 /* nMatched */,
@@ -376,13 +382,27 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(
                 auto writeRes = txnClient.runCRUDOpSync(insertRequest,
                                                         std::vector<StmtId>{kUninitializedStmtId});
 
+                const auto commandName = sharedBlock->cmdObj.firstElementFieldNameStringData();
+
+                bool bulkWriteErrorsOnly = false;
+                if (commandName == BulkWriteCommandRequest::kCommandName &&
+                    sharedBlock->cmdObj.hasField(BulkWriteCommandRequest::kErrorsOnlyFieldName)) {
+                    auto errorsOnlyElem =
+                        sharedBlock->cmdObj.getField(BulkWriteCommandRequest::kErrorsOnlyFieldName);
+
+                    if (errorsOnlyElem.type() == BSONType::boolean) {
+                        bulkWriteErrorsOnly = errorsOnlyElem.Bool();
+                    }
+                }
+
                 auto upsertResponse = constructUpsertResponse(
                     writeRes,
                     queryResponse.getUserUpsertDocForTimeseries()
                         ? queryResponse.getUserUpsertDocForTimeseries().get()
                         : queryResponse.getTargetDoc().get(),
-                    sharedBlock->cmdObj.firstElementFieldNameStringData(),
-                    sharedBlock->cmdObj.getBoolField("new"));
+                    commandName,
+                    sharedBlock->cmdObj.getBoolField("new"),
+                    bulkWriteErrorsOnly);
 
                 sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
                     std::move(upsertResponse),
