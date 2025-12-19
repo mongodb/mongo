@@ -44,6 +44,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 
+#include <algorithm>
 #include <initializer_list>
 #include <mutex>
 
@@ -580,7 +581,11 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     }
 
     // Append should include only the basic fields when just initialized.
-    ASSERT_EQ(static_cast<size_t>(bs.nFields()), basicFields.size());
+    for (const auto& elem : bs) {
+        ASSERT(std::find(basicFields.begin(), basicFields.end(), elem.fieldName()) !=
+               basicFields.end())
+            << "Unexpected extra field in output: " << elem.fieldName();
+    }
 }
 
 TEST(CurOpTest, ShouldUpdateMemoryStats) {
@@ -1144,6 +1149,45 @@ TEST(CurOpTest, SlowLogFinishesWithDuration) {
     ASSERT_GTE(attrs.size(), 1);
     std::string lastName = (attrs.end() - 1)->name;
     ASSERT_EQ("durationMillis", lastName);
+}
+
+TEST(CurOpTest, OpDebugAllowsMultipleQueryStatsInfos) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    CurOp* curOp = CurOp::get(*opCtx);
+    OpDebug& opDebug = curOp->debug();
+
+    // Create a new set of metrics for an operation at index 10.
+    const size_t opIndex = 10;
+    OpDebug::QueryStatsInfo& qsi = opDebug.setQueryStatsInfoAtOpIndex(opIndex);
+
+    // If we fetch the info with the getter, it should be the same object.
+    OpDebug::QueryStatsInfo& qsi2 = opDebug.getQueryStatsInfo(opIndex);
+    ASSERT_EQ(&qsi, &qsi2);
+
+    // The new set of metrics should be distinct from the one for the main operation.
+    OpDebug::QueryStatsInfo& mainQsi = opDebug.getQueryStatsInfo();
+    ASSERT_NE(&qsi, &mainQsi);
+}
+
+TEST(CurOpTest, OpDebugAllowsMultipleAdditiveMetrics) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    CurOp* curOp = CurOp::get(*opCtx);
+    OpDebug& opDebug = curOp->debug();
+
+    // Create a new set of metrics for an operation at index 10.
+    const size_t opIndex = 10;
+    OpDebug::QueryStatsInfo& qsi = opDebug.setQueryStatsInfoAtOpIndex(opIndex);
+    OpDebug::AdditiveMetrics& am = qsi.additiveMetrics;
+
+    // If we fetch the metrics with the getter, it whould be the same object.
+    OpDebug::AdditiveMetrics& am2 = opDebug.getAdditiveMetrics(opIndex);
+    ASSERT_EQ(&am, &am2);
+
+    // The new set of metrics should be distinct from the one for the main operation.
+    OpDebug::AdditiveMetrics& mainAm = opDebug.getAdditiveMetrics();
+    ASSERT_NE(&mainAm, &am);
 }
 
 }  // namespace

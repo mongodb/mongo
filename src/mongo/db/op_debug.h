@@ -80,6 +80,10 @@ public:
             return *this;
         }
 
+        // Define move constructor and assignment to avoid add() being invoked when moving.
+        AdditiveMetrics(AdditiveMetrics&&) noexcept = default;
+        AdditiveMetrics& operator=(AdditiveMetrics&&) noexcept = default;
+
         /**
          * Adds all the fields of another AdditiveMetrics object together with the fields of this
          * AdditiveMetrics instance.
@@ -465,16 +469,37 @@ public:
         // actually caring about the metrics for this specific operation. In those cases, we
         // use metricsRequested to indicate we should request metrics from other nodes.
         bool metricsRequested = false;
+
+        // Additive metrics to be accumulated across calls to getMore() and/or transactions.
+        AdditiveMetrics additiveMetrics;
     };
 
-    // Return the QueryStatsInfo for the current operation.
-    MONGO_MOD_PRIVATE QueryStatsInfo& getQueryStatsInfo() {
-        return _queryStatsInfo;
+    // Return the QueryStatsInfo for the given operation. By default, return the current operation.
+    MONGO_MOD_PRIVATE QueryStatsInfo& getQueryStatsInfo(size_t opIndex = kCurrentOpIndex) {
+        return _getQueryStatsInfoHelper(this, opIndex);
     }
 
-    // Return the QueryStatsInfo for the current operation (const friendly).
-    MONGO_MOD_PRIVATE const QueryStatsInfo& getQueryStatsInfo() const {
-        return _queryStatsInfo;
+    // Return the QueryStatsInfo for the given operation. By default, return the current main
+    // operation. Const version.
+    MONGO_MOD_PRIVATE const QueryStatsInfo& getQueryStatsInfo(
+        size_t opIndex = kCurrentOpIndex) const {
+        return _getQueryStatsInfoHelper(this, opIndex);
+    }
+
+    // Create a new default-constructed QueryStatsInfo for the given opIndex, and return a reference
+    // to it.
+    MONGO_MOD_PRIVATE QueryStatsInfo& setQueryStatsInfoAtOpIndex(size_t opIndex) {
+        uassert(11487700,
+                "cannot create QueryStatsInfo for current operation",
+                opIndex != kCurrentOpIndex);
+
+        ensureQueryStatsInfoForBatchWrites();
+        uassert(11487701,
+                fmt::format("QueryStatsInfo for opIndex {} already exists", opIndex),
+                !_queryStatsInfoForBatchWrites->contains(opIndex));
+
+        auto [it, _] = _queryStatsInfoForBatchWrites->emplace(opIndex, QueryStatsInfo{});
+        return it->second;
     }
 
     // The query framework that this operation used. Will be unknown for non query operations.
@@ -556,16 +581,19 @@ public:
     // Used to track the amount of time spent waiting for a response from remote operations.
     boost::optional<Microseconds> remoteOpWaitTime;
 
-    // Returns the current operation's count of these metrics. If they are needed to be accumulated
-    // elsewhere, they should be extracted by another aggregator (like the ClientCursor) to ensure
-    // these only ever reflect just this CurOp's consumption.
-    AdditiveMetrics& getAdditiveMetrics() {
-        return _additiveMetrics;
+    // By default, returns the current operation's additive metrics. If they are needed to be
+    // accumulated elsewhere, they should be extracted by another aggregator (like the ClientCursor)
+    // to ensure these only ever reflect just this CurOp's consumption.
+    //
+    // On the router, we may need to collect metrics for writes dispatched in batches to multiple
+    // shards. For this special case, an opIndex can be provided to aggregate metrics across shards.
+    AdditiveMetrics& getAdditiveMetrics(size_t opIndex = kCurrentOpIndex) {
+        return getQueryStatsInfo(opIndex).additiveMetrics;
     }
 
     // Const version of the above method.
-    const AdditiveMetrics& getAdditiveMetrics() const {
-        return _additiveMetrics;
+    const AdditiveMetrics& getAdditiveMetrics(size_t opIndex = kCurrentOpIndex) const {
+        return getQueryStatsInfo(opIndex).additiveMetrics;
     }
 
     // Stores storage statistics.
@@ -601,13 +629,48 @@ public:
     extension::host::OperationMetricsRegistry extensionMetrics;
 
 private:
-    // QueryStatsInfo for the current operation, accessible via accessor methods defined above.
-    QueryStatsInfo _queryStatsInfo;
+    /**
+     * Accessor helper that avoids having to repeat logic for both const and non-const "this."
+     *
+     * We want this be inlined to ensure the happy path stays fast. Except on the router when
+     * collecting query stats for batched writes, it will always be the case that
+     *     opIndex == kCurrentOpIndex.
+     */
+    template <typename This>
+    static auto _getQueryStatsInfoHelper(This* opDebug, size_t opIndex)
+        -> decltype((opDebug->_queryStatsInfo)) {
+        if (opIndex == opDebug->kCurrentOpIndex) {
+            return opDebug->_queryStatsInfo;
+        }
 
-    // Stores the current operation's count of these metrics. If they are needed to be accumulated
-    // elsewhere, they should be extracted by another aggregator (like the ClientCursor) to ensure
-    // these only ever reflect just this CurOp's consumption.
-    AdditiveMetrics _additiveMetrics;
+        opDebug->ensureQueryStatsInfoForBatchWrites();
+        uassert(11487702,
+                fmt::format("expected to find QueryStatsInfo at opIndex {} but did not", opIndex),
+                opDebug->_queryStatsInfoForBatchWrites->contains(opIndex));
+        return opDebug->_queryStatsInfoForBatchWrites->at(opIndex);
+    }
+
+    /**
+     * QueryStatsInfo for operations.
+     *
+     * Most of the time we only care about the current operation. However, when collecting
+     * stats for writes to sharded collections dispatched from the router, we need to be able to
+     * aggregate statistics for potentially more than one statement (since writes are typically
+     * batched). For this case, we want to be able to aggregate metrics received from the shards
+     * before updating the query stats store. This map is keyed on the index of the statements entry
+     * in the original write command.
+     */
+    QueryStatsInfo _queryStatsInfo;
+    mutable std::unique_ptr<absl::flat_hash_map<size_t, QueryStatsInfo>>
+        _queryStatsInfoForBatchWrites = nullptr;
+    static constexpr size_t kCurrentOpIndex = std::numeric_limits<size_t>::max();
+
+    void ensureQueryStatsInfoForBatchWrites() const {
+        if (!_queryStatsInfoForBatchWrites) {
+            _queryStatsInfoForBatchWrites =
+                std::make_unique<absl::flat_hash_map<size_t, QueryStatsInfo>>();
+        }
+    }
 
     // The hash of query_shape::QueryShapeHash.
     boost::optional<query_shape::QueryShapeHash> _queryShapeHash;
