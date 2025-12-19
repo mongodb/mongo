@@ -68,6 +68,18 @@ mongo_cc_library(
 )
 
 mongo_cc_unit_test(
+    name = "execution_control_stats_test",
+    srcs = [
+        "execution_control_stats_test.cpp",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":execution_control_stats",
+        "//src/mongo/unittest",
+    ],
+)
+
+mongo_cc_unit_test(
     name = "throughput_probing_test",
     srcs = [
         "throughput_probing_test.cpp",

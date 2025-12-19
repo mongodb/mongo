@@ -33,6 +33,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
+#include <array>
 #include <cstdint>
 #include <string>
 
@@ -50,6 +51,51 @@ enum class OperationType;
 enum class ExecutionStatsBucket {
     kShort,  // Operations that complete quickly (below admission threshold).
     kLong    // Operations that yield frequently or are explicitly low-priority.
+};
+
+/**
+ * Histogram tracking the distribution of completed operations by their total admission count.
+ *
+ * Each bucket counts operations that had a specific range of ticket acquisitions during their
+ * lifetime. This helps identify the distribution of short vs long-running operations.
+ *
+ * Bucket ranges: 1-2, 3-4, 5-8, 9-16, 17-32, 33-64, 65-128, 129-256, 257-512, 513-1024, 1025+
+ */
+class AdmissionsHistogram {
+public:
+    static constexpr size_t kNumBuckets = 11;
+
+    static constexpr std::array<StringData, kNumBuckets> kBucketNames = {"1-2"_sd,
+                                                                         "3-4"_sd,
+                                                                         "5-8"_sd,
+                                                                         "9-16"_sd,
+                                                                         "17-32"_sd,
+                                                                         "33-64"_sd,
+                                                                         "65-128"_sd,
+                                                                         "129-256"_sd,
+                                                                         "257-512"_sd,
+                                                                         "513-1024"_sd,
+                                                                         "1025+"_sd};
+
+    AdmissionsHistogram() = default;
+
+    /**
+     * Records a completed operation with the given number of admissions.
+     */
+    void record(int32_t admissions);
+
+    /**
+     * Appends the histogram to a BSON builder.
+     */
+    void appendStats(BSONObjBuilder& b) const;
+
+private:
+    /**
+     * Returns the bucket index for a given admission count.
+     */
+    size_t _getBucketIndex(int32_t admissions);
+
+    std::array<AtomicWord<int64_t>, kNumBuckets> _buckets{};
 };
 
 /**

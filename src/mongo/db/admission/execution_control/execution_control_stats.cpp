@@ -35,6 +35,28 @@
 
 namespace mongo::admission::execution_control {
 
+void AdmissionsHistogram::record(int32_t admissions) {
+    if (admissions <= 0) {
+        return;
+    }
+    size_t index = _getBucketIndex(admissions);
+    _buckets[index].fetchAndAddRelaxed(1);
+}
+
+void AdmissionsHistogram::appendStats(BSONObjBuilder& b) const {
+    for (size_t i = 0; i < kNumBuckets; ++i) {
+        b.append(kBucketNames[i], _buckets[i].loadRelaxed());
+    }
+}
+
+size_t AdmissionsHistogram::_getBucketIndex(int32_t admissions) {
+    if (admissions <= 2) {
+        return 0;
+    }
+    auto idx = static_cast<size_t>(std::ceil(std::log2(admissions))) - 1;
+    return std::min(idx, static_cast<size_t>(kNumBuckets - 1));
+}
+
 DelinquencyStats::DelinquencyStats(int64_t totalDelinquentAcquisitions,
                                    int64_t totalAcquisitionDelinquencyMillis,
                                    int64_t maxAcquisitionDelinquencyMillis)

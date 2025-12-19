@@ -347,6 +347,11 @@ private:
      * Accumulate long/short operation statistics for read and write operations.
      */
     AggregatedExecutionStats _operationStats;
+
+    /**
+     * Histogram tracking the distribution of completed operations by their total admission count.
+     */
+    AdmissionsHistogram _admissionsHistogram;
 };
 
 }  // namespace MONGO_MOD_PUBLIC execution_control

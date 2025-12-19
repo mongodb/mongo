@@ -738,6 +738,33 @@ describe("Execution control statistics and observability", function () {
             );
             assertPerAcquisitionStatsPresent(executionStats.write.longRunning);
         });
+
+        it("should report admissions histogram in serverStatus", function () {
+            let executionStats = db.serverStatus().queues.execution;
+            assert(
+                executionStats.hasOwnProperty("admissions"),
+                "Missing admissions histogram: " + tojson(executionStats),
+            );
+
+            const histogram = executionStats.admissions;
+            const expectedBuckets = [
+                "1-2",
+                "3-4",
+                "5-8",
+                "9-16",
+                "17-32",
+                "33-64",
+                "65-128",
+                "129-256",
+                "257-512",
+                "513-1024",
+                "1025+",
+            ];
+            for (const bucket of expectedBuckets) {
+                assert(histogram.hasOwnProperty(bucket), `Missing histogram bucket ${bucket}: ` + tojson(histogram));
+            }
+        });
+
         function configureExecutionControlState(enableDeprioritization, shedding) {
             setExecutionControlAlgorithm(mongod, kFixedConcurrentTransactionsAlgorithm);
 
