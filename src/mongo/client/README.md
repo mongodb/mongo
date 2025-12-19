@@ -8,7 +8,11 @@ $readPreference. Node eligibility depends on the type of a node (i.e primary, se
 its average network latency round-trip-time (RTT). For example, { $readPreference: secondary }
 requires the client to know which nodes are secondaries and, of those nodes, which nodes fit within
 a delta of the node with the smallest RTT. A FailedToSatisfyReadPreference error occurs when there
-is a host selection time out and no eligible nodes are found.
+is a host selection time out and no eligible nodes are found. `TargetingMetadata` can be used to
+provide hints to targeting. For instance, servers that have reported that they're overloaded by returning
+`SystemOverloadedError`-labeled errors are added to a list of deprioritized servers contained in the
+`TargetingMetadata`, which is then used in targeting to prioritize other available servers matching
+the provided readPreference.
 
 Nodes in a topology are discovered and monitored through replica set monitoring. Replica set
 monitoring entails periodically refreshing the local view of topologies for which the client needs
@@ -33,6 +37,17 @@ is measured by sending a 'ping' to each node in the topology at a fixed frequenc
 through the hello response latency. Aside from the RTT, the remaining information for satisfying
 read preferences is gathered through awaitable hello commands asynchronously sent to each node in
 the topology.
+
+## `RetryStrategy`
+
+`RetryStrategy` is a standard interface used for defining the conditions in which failures should be retried and how long a client should wait between retries. It also tracks metadata that can be used to inform retry targeting (`TargetingMetadata`), as well as callbacks for recording metrics about retries. Callers typically do not need to invoke `RetryStrategy` methods directly but, rather, pass a given `RetryStrategy` into a client that supports retries, such as `async_rpc` or `AsyncTry`. The `AsyncRequestsSender` (ARS) doesn't accept a `RetryStrategy` in its interface, but it internally uses a sharding-specific `RetryStrategy` based on the provided `Shard::RetryPolicy`. There also exists the standalone function `runWithRetryStrategy`, which will run the provided callable and retry as appropriate per the provided `RetryStrategy`. Lower level clients like `TaskExecutor` do not interface with `RetryStrategy` since they are used by higher level clients like the ARS, which do.
+
+Example implementations:
+
+- `DefaultRetryStrategy`: as its name suggests, is the basic retry strategy that others build on top of. It can be configured with custom retryability criteria, but by default it retries on retryable errors or if a retryable error label is present in the error response. It uses exponential backoff between errors that fail with the `SystemOverloadedError` label. Any server that returns a `SystemOverloadedError`-labeled error is added to the list of deprioritized servers in the strategy's `TargetingMetadata`.
+  - The parameters for this strategy are globally configurable via the `defaultClientBaseBackoffMillis`, `defaultClientMaxBackoffMillis`, and `defaultClientMaxRetryAttempts` server parameters.
+- `AdaptiveRetryStrategy`: a retry strategy that wraps another (by default `DefaultRetryStrategy`) and introdues the concept of a `RetryBudget`, which caps the number of retries using a token bucket. Tokens are taken from the bucket for every request that fails with a `SystemOverloadedError` error, and if one cannot be acquired a retry is not performed. On any other result (including errors), any token taken from the bucket to perform the retry plus a configurable amount is replenished. The effect of this budget is that retries will short-circuit in situations where many of them are failing, but they'll continue to be performed if they're mostly successful.
+- `Shard::RetryStrategy`: An `AdaptiveRetryStrategy` where the budget is applied to all nodes in a particular shard. It uses a `Shard::RetryPolicy` to determine which errors are retryable, rather than the default criteria.
 
 #### Code references
 
