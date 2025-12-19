@@ -51,10 +51,6 @@ using StageParamsToDocumentSourceFn = std::function<std::list<boost::intrusive_p
  * 'registrationName' is a unique name to give to the initializer function that does the
  * registration.
  *
- * TODO SERVER-114343: Remove stageName once parserMap no longer exists.
- * 'stageName' is the name of the stage (e.g., "$limit") used for validation that
- * the stage is not also registered in the old parserMap.
- *
  * 'stageParamsId' is a unique StageParams::Id that is assigned to the
  * StageParams class.
  *
@@ -62,14 +58,13 @@ using StageParamsToDocumentSourceFn = std::function<std::list<boost::intrusive_p
  * ExpressionContext, and returns a DocumentSource.
  */
 #define REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(                                    \
-    registrationName, stageName, stageParamsId, stageParamsToDocumentSourceFn)               \
+    registrationName, stageParamsId, stageParamsToDocumentSourceFn)                          \
     namespace {                                                                              \
     MONGO_INITIALIZER_GENERAL(registerStageParamsToDocumentSourceMapping_##registrationName, \
                               ("BeginStageParamsToDocumentSourceRegistration"),              \
                               ("EndStageParamsToDocumentSourceRegistration"))                \
     (InitializerContext*) {                                                                  \
-        registerStageParamsToDocumentSourceFn(                                               \
-            stageName, stageParamsId, stageParamsToDocumentSourceFn);                        \
+        registerStageParamsToDocumentSourceFn(stageParamsId, stageParamsToDocumentSourceFn); \
     }                                                                                        \
     }
 
@@ -82,17 +77,14 @@ using StageParamsToDocumentSourceFn = std::function<std::list<boost::intrusive_p
  */
 MONGO_MOD_PUBLIC  // Needed by enterprise hot backup registrations.
     void
-    registerStageParamsToDocumentSourceFn(StringData stageName,
-                                          StageParams::Id stageParamsId,
+    registerStageParamsToDocumentSourceFn(StageParams::Id stageParamsId,
                                           StageParamsToDocumentSourceFn fn);
 
 /**
  * Create the corresponding 'DocumentSource' object for the given instance of
  * 'LiteParsedDocumentSource' using its associated 'StageParams'.
- *
- * TODO SERVER-114343: Remove optional return value once all stages are migrated.
  */
-boost::optional<std::list<boost::intrusive_ptr<DocumentSource>>> buildDocumentSource(
+std::list<boost::intrusive_ptr<DocumentSource>> buildDocumentSource(
     const LiteParsedDocumentSource& liteParsed,
     const boost::intrusive_ptr<ExpressionContext>& expCtx);
 

@@ -77,12 +77,7 @@ namespace mongo {
 /**
  * Macros to register the LiteParsedDocumentSource parser.
  *
- * TODO SERVER-114343: Update these comments now that the DocumentSourceParse map is gone.
- * Use these macros for stages that have been migrated to use the new StageParams->DocumentSource
- * registry (via REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING). These stages should NOT be
- * registered in the old parserMap.
- *
- * Example usage pattern for migrated stages:
+ * Example usage pattern for default stages:
  *   REGISTER_LITE_PARSED_DOCUMENT_SOURCE(stageName, liteParser, allowedWithApiStrict);
  *   REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(stageName, kStageName, StageParams::id,
  * mappingFn);
@@ -164,13 +159,11 @@ namespace mongo {
             "$" #key, liteParser, allowedWithApiStrict, clientType);                            \
     }
 
-#define ALLOCATE_AND_REGISTER_STAGE_PARAMS(registrationName, DocSourceClass, StageParamsClass) \
-    ALLOCATE_STAGE_PARAMS_ID(registrationName, StageParamsClass::id);                          \
-    REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(                                          \
-        registrationName,                                                                      \
-        DocSourceClass::kStageName,                                                            \
-        StageParamsClass::id,                                                                  \
-        registrationName##StageParamsToDocumentSourceFn)
+#define ALLOCATE_AND_REGISTER_STAGE_PARAMS(registrationName, StageParamsClass) \
+    ALLOCATE_STAGE_PARAMS_ID(registrationName, StageParamsClass::id);          \
+    REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(                          \
+        registrationName, StageParamsClass::id, registrationName##StageParamsToDocumentSourceFn)
+
 /**
  * Convenience macros to register a DocumentSource with its corresponding StageParams.
  *
@@ -195,7 +188,7 @@ namespace mongo {
         auto* typedParams = dynamic_cast<StageParamsClass*>(stageParams.get());        \
         return DocSourceClass::createFromBson(typedParams->getOriginalBson(), expCtx); \
     }                                                                                  \
-    ALLOCATE_AND_REGISTER_STAGE_PARAMS(registrationName, DocSourceClass, StageParamsClass)
+    ALLOCATE_AND_REGISTER_STAGE_PARAMS(registrationName, StageParamsClass)
 
 
 #define REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(                              \
@@ -206,7 +199,7 @@ namespace mongo {
         auto* typedParams = dynamic_cast<StageParamsClass*>(stageParams.get());          \
         return {DocSourceClass::createFromBson(typedParams->getOriginalBson(), expCtx)}; \
     }                                                                                    \
-    ALLOCATE_AND_REGISTER_STAGE_PARAMS(registrationName, DocSourceClass, StageParamsClass)
+    ALLOCATE_AND_REGISTER_STAGE_PARAMS(registrationName, StageParamsClass)
 
 
 /**
@@ -448,32 +441,6 @@ public:
                           << " is not allowed with the current configuration. You may need to "
                              "enable the corresponding feature flag");
     }
-
-    /**
-     * Returns true if a stage with the given name is registered in the parserMap.
-     * Used for validation that stages are not registered in both the old and new registries.
-     * TODO SERVER-114343: Remove once parserMap no longer exists.
-     */
-    static bool isInParserMap(StringData stageName);
-
-    /**
-     * Registers a DocumentSource with a parsing function, so that when a stage with the given name
-     * is encountered, it will call 'parser' to construct that stage.
-     *
-     * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
-     * this file.
-     */
-    static void registerParser(std::string name, Parser parser, FeatureFlag* featureFlag = nullptr);
-    /**
-     * Convenience wrapper for the common case, when DocumentSource::Parser returns a list of one
-     * DocumentSource.
-     *
-     * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
-     * this file.
-     */
-    static void registerParser(std::string name,
-                               SimpleParser simpleParser,
-                               FeatureFlag* featureFlag = nullptr);
 
     /**
      * Allocate and return a new, unique DocumentSource::Id value.
@@ -747,29 +714,7 @@ protected:
         return shardId;
     }};
 
-    /**
-     * unregisterParser_forTest is only meant to be used in the context of unit tests. This is
-     * because the parserMap is not thread safe, so modifying it at runtime is unsafe.
-     */
-
-    MONGO_MOD_NEEDS_REPLACEMENT static void unregisterParser_forTest(const std::string& name);
-
 private:
-    // Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding
-    // it from all other stages.
-    friend class exec::agg::ListMqlEntitiesStage;
-
-    // Used to keep track of which DocumentSources are registered under which name. Initialized
-    // during process initialization and const thereafter.
-    static StringMap<ParserRegistration> parserMap;
-
-    /**
-     * Return the map of currently registered parsers.
-     */
-    static const StringMap<ParserRegistration>& getParserMap() {
-        return parserMap;
-    }
-
     /**
      * Create a Value that represents the document source.
      *

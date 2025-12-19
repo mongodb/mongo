@@ -113,11 +113,9 @@ DocumentSourceContainer internalUnpackBucketStageParamsToDocumentSourceFn(
 }
 
 ALLOCATE_STAGE_PARAMS_ID(_internalUnpackBucket, InternalUnpackBucketStageParams::id);
-REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(
-    _internalUnpackBucket,
-    DocumentSourceInternalUnpackBucket::kStageNameInternal,
-    InternalUnpackBucketStageParams::id,
-    internalUnpackBucketStageParamsToDocumentSourceFn)
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(_internalUnpackBucket,
+                                                 InternalUnpackBucketStageParams::id,
+                                                 internalUnpackBucketStageParamsToDocumentSourceFn)
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalUnpackBucket, DocumentSourceInternalUnpackBucket::id)
 
@@ -139,11 +137,9 @@ DocumentSourceContainer externalUnpackBucketStageParamsToDocumentSourceFn(
 }
 
 ALLOCATE_STAGE_PARAMS_ID(_unpackBucket, ExternalUnpackBucketStageParams::id);
-REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(
-    _unpackBucket,
-    DocumentSourceInternalUnpackBucket::kStageNameExternal,
-    ExternalUnpackBucketStageParams::id,
-    externalUnpackBucketStageParamsToDocumentSourceFn)
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(_unpackBucket,
+                                                 ExternalUnpackBucketStageParams::id,
+                                                 externalUnpackBucketStageParamsToDocumentSourceFn)
 
 namespace {
 using timeseries::BucketSpec;

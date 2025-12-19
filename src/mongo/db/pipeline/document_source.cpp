@@ -45,50 +45,8 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-StringMap<DocumentSource::ParserRegistration> DocumentSource::parserMap;
-
 DocumentSource::DocumentSource(StringData stageName, const intrusive_ptr<ExpressionContext>& pCtx)
     : _expCtx(pCtx) {}
-
-void DocumentSource::unregisterParser_forTest(const std::string& name) {
-    parserMap.erase(name);
-}
-
-// TODO SERVER-114343: Remove once parserMap no longer exists.
-bool DocumentSource::isInParserMap(StringData stageName) {
-    return parserMap.find(stageName) != parserMap.end();
-}
-
-void DocumentSource::registerParser(std::string name, Parser parser, FeatureFlag* featureFlag) {
-    // Set of aggregation stages that are allowed to be overridden (via extensions).
-    static const stdx::unordered_set<StringData> allowedOverrideStages = {
-        DocumentSourceVectorSearch::kStageName,
-    };
-
-    auto it = parserMap.find(name);
-
-    // Allow override only for stages in the allowed list, otherwise assert on duplicates.
-    if (it != parserMap.end() && !allowedOverrideStages.contains(name)) {
-        // Parser registration only takes place during startup, so any issues with parser
-        // registration should fail startup completely. For clarity, that is why we use fassert
-        // (shuts down the whole process) instead of tassert (fails an individual operation),
-        // although a tassert would technically fail the process anyways.
-        LOGV2_FATAL(28707, "Cannot register duplicate aggregation stage.", "stageName"_attr = name);
-    }
-
-    parserMap[std::move(name)] = {std::move(parser), featureFlag};
-}
-
-void DocumentSource::registerParser(std::string name,
-                                    SimpleParser simpleParser,
-                                    FeatureFlag* featureFlag) {
-    Parser parser = [simpleParser = std::move(simpleParser)](
-                        BSONElement stageSpec, const intrusive_ptr<ExpressionContext>& expCtx)
-        -> std::list<intrusive_ptr<DocumentSource>> {
-        return {simpleParser(std::move(stageSpec), expCtx)};
-    };
-    return registerParser(std::move(name), std::move(parser), featureFlag);
-}
 
 DocumentSource::Id DocumentSource::allocateId(StringData name) {
     static AtomicWord<Id> next{kUnallocatedId + 1};
@@ -122,27 +80,7 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
 std::list<intrusive_ptr<DocumentSource>> DocumentSource::parseFromLiteParsed(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const LiteParsedDocumentSource& liteParsed) {
-    if (auto ds = buildDocumentSource(liteParsed, expCtx)) {
-        // Note: Validation that stages are not registered in both the old parserMap and the new
-        // StageParams->DocumentSource registry happens at startup during registration in
-        // registerStageParamsToDocumentSourceFn.
-        return ds.value();
-    }
-
-    auto it = parserMap.find(liteParsed.getParseTimeName());
-
-    uassert(16436,
-            str::stream() << "Unrecognized pipeline stage name: '" << liteParsed.getParseTimeName()
-                          << "'",
-            it != parserMap.end());
-
-    auto& entry = it->second;
-    if (entry.featureFlag) {
-        expCtx->ignoreFeatureInParserOrRejectAndThrow(liteParsed.getParseTimeName(),
-                                                      *entry.featureFlag);
-    }
-
-    return it->second.parser(liteParsed.getOriginalBson(), expCtx);
+    return buildDocumentSource(liteParsed, expCtx);
 }
 
 BSONObj DocumentSource::serializeToBSONForDebug() const {

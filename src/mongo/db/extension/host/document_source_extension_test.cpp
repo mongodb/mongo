@@ -80,17 +80,6 @@ public:
         return BSON(std::string(stageName) << BSONObj());
     }
 
-    // Runs after each individual test
-    void tearDown() override {
-        DocumentSourceExtensionTest::unregisterParsers();
-    }
-
-    static void unregisterParsers() {
-        host::DocumentSourceExtension::unregisterParser_forTest(
-            sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
-        host::DocumentSourceExtension::unregisterParser_forTest("$noOp2");
-    }
-
 protected:
     NamespaceString _nss = NamespaceString::createNamespaceString_forTest(
         boost::none, "document_source_extension_test");

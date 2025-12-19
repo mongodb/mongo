@@ -64,7 +64,6 @@ DocumentSourceContainer _internalAllCollectionStatsStageParamsToDocumentSourceFn
 }
 
 ALLOCATE_AND_REGISTER_STAGE_PARAMS(_internalAllCollectionStats,
-                                   DocumentSourceInternalAllCollectionStats,
                                    InternalAllCollectionStatsStageParams);
 
 ALLOCATE_DOCUMENT_SOURCE_ID(_internalAllCollectionStats,

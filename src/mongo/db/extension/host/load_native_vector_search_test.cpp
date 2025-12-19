@@ -61,9 +61,7 @@ protected:
     }
 
     void tearDown() override {
-        host::DocumentSourceExtension::unregisterParser_forTest(kMetricsStageName);
         LiteParsedDocumentSource::unregisterParser_forTest(kMetricsStageName);
-        host::DocumentSourceExtension::unregisterParser_forTest(kNativeVectorSearchStageName);
         LiteParsedDocumentSource::unregisterParser_forTest(kNativeVectorSearchStageName);
         ExtensionLoader::unload_forTest("nativeVectorSearch");
     }

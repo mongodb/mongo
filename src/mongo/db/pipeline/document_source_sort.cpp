@@ -171,7 +171,6 @@ DocumentSourceContainer _internalBoundedSortStageParamsToDocumentSourceFn(
 
 ALLOCATE_STAGE_PARAMS_ID(_internalBoundedSort, InternalBoundedSortStageParams::id);
 REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(_internalBoundedSort,
-                                                 "$_internalBoundedSort",
                                                  InternalBoundedSortStageParams::id,
                                                  _internalBoundedSortStageParamsToDocumentSourceFn)
 

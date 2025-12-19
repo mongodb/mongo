@@ -295,18 +295,6 @@ public:
     // Declare DocumentSourceExtension to be pure virtual.
     ~DocumentSourceExtension() override = 0;
 
-private:
-    /**
-     * Give access to DocumentSourceExtensionTest/LoadExtensionsTest to unregister parser.
-     * unregisterParser_forTest is only meant to be used in the context of unit
-     * tests. This is because the parserMap is not thread safe, so modifying it at runtime is
-     * unsafe.
-     */
-    friend class mongo::extension::DocumentSourceExtensionTest;
-    friend class mongo::extension::host::LoadExtensionsTest;
-    friend class mongo::extension::host::LoadNativeVectorSearchTest;
-    static void unregisterParser_forTest(const std::string& name);
-
 protected:
     DocumentSourceExtension(StringData name,
                             const boost::intrusive_ptr<ExpressionContext>& exprCtx);

@@ -49,7 +49,6 @@ DocumentSourceContainer expandableStageParamsToDocumentSourceFn(
 }
 
 REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(expandable,
-                                                 "expandable",
                                                  ExpandableStageParams::id,
                                                  expandableStageParamsToDocumentSourceFn);
 
@@ -61,7 +60,6 @@ DocumentSourceContainer expandedStageParamsToDocumentSourceFn(
 }
 
 REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(expanded,
-                                                 "expanded",
                                                  ExpandedStageParams::id,
                                                  expandedStageParamsToDocumentSourceFn);
 
@@ -181,10 +179,6 @@ void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor)
 
     LiteParsedDocumentSource::registerParser(
         stageName, std::move(parser), AllowedWithApiStrict::kAlways, AllowedWithClientType::kAny);
-}
-
-void DocumentSourceExtension::unregisterParser_forTest(const std::string& name) {
-    DocumentSource::unregisterParser_forTest(name);
 }
 
 DocumentSourceExtension::DocumentSourceExtension(

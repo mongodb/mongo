@@ -62,10 +62,8 @@ protected:
     static inline const std::string kMatchTopNLibExtensionPath = "libmatch_topN_mongo_extension.so";
 
     void tearDown() override {
-        host::DocumentSourceExtension::unregisterParser_forTest(kTestFooStageName);
         LiteParsedDocumentSource::unregisterParser_forTest(kTestFooStageName);
         ExtensionLoader::unload_forTest("foo");
-        host::DocumentSourceExtension::unregisterParser_forTest(kMatchTopNStageName);
         LiteParsedDocumentSource::unregisterParser_forTest(kMatchTopNStageName);
         ExtensionLoader::unload_forTest("matchTopN");
     }

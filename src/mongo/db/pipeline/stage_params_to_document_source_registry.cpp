@@ -39,32 +39,15 @@ namespace {
 
 stdx::unordered_map<StageParams::Id, StageParamsToDocumentSourceFn> documentSourceBuildersMap;
 
-// Set of stage names registered in the new StageParams to DocumentSource registry.
-// Used for validation that stages are not registered in both the old and new registries.
-// TODO SERVER-114343: Remove once parserMap no longer exists.
-StringSet registeredStageNames;
-
 }  // namespace
 
-void registerStageParamsToDocumentSourceFn(StringData stageName,
-                                           StageParams::Id stageParamsId,
+void registerStageParamsToDocumentSourceFn(StageParams::Id stageParamsId,
                                            StageParamsToDocumentSourceFn fn) {
     const auto [itr_ignored, inserted] =
         documentSourceBuildersMap.insert(std::make_pair(stageParamsId, fn));
     tassert(11458700,
-            str::stream() << "Stage '" << stageName
-                          << "' is a duplicate in the StageParams to DocumentSource mapping",
+            "Attempted to insert a duplicate in the StageParams to DocumentSource mapping",
             inserted);
-
-    // Validate that the stage is not also registered in the old parserMap.
-    tassert(11458701,
-            str::stream() << "Stage '" << stageName
-                          << "' is registered in both the StageParams->DocumentSource "
-                          << "registry and the old parserMap. Stages should only be "
-                          << "registered in one or the other.",
-            !DocumentSource::isInParserMap(stageName));
-
-    registeredStageNames.insert(std::string(stageName));
 }
 
 // Populate 'StageParams' to 'DocumentSource' mapping function registry after every
@@ -78,9 +61,8 @@ MONGO_INITIALIZER_GROUP(EndStageParamsToDocumentSourceRegistration,
                         ("BeginStageParamsToDocumentSourceRegistration"),
                         ())
 
-boost::optional<DocumentSourceContainer> buildDocumentSource(
-    const LiteParsedDocumentSource& liteParsed,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+DocumentSourceContainer buildDocumentSource(const LiteParsedDocumentSource& liteParsed,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto stageParams = liteParsed.getStageParams();
 
     tassert(11458702, "stageParams should not be null", stageParams);
@@ -90,8 +72,9 @@ boost::optional<DocumentSourceContainer> buildDocumentSource(
         return (it->second)(stageParams, expCtx);
     }
 
-    // TODO SERVER-114343: tassert if there is no mapping found once all stages are migrated.
-    return boost::none;
+    tasserted(11434300,
+              str::stream() << "Stage '" << liteParsed.getParseTimeName()
+                            << "' does not exist in the parser map");
 }
 
 }  // namespace mongo

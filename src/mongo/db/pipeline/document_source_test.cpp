@@ -48,7 +48,6 @@ namespace mongo {
 namespace {
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(MockExtension)
-ALLOCATE_STAGE_PARAMS_ID(mockExtension, MockExtensionStageParams::id);
 
 class DocumentSourceMockExtension : public DocumentSource {
 public:
@@ -103,6 +102,13 @@ protected:
     }
 };
 
+// Register the mapping from MockExtensionStageParams to DocumentSourceMockExtension. This allows
+// DocumentSource::parse() to create DocumentSourceMockExtension instances when parsing stages that
+// use MockExtensionLiteParsed.
+REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(mockExtension,
+                                                   DocumentSourceMockExtension,
+                                                   MockExtensionStageParams);
+
 using DocumentSourceExtensionParserTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyregisterParser) {
@@ -110,7 +116,6 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyregisterParser) {
                                              MockExtensionLiteParsed::parse,
                                              AllowedWithApiStrict::kAlways,
                                              AllowedWithClientType::kAny);
-    DocumentSource::registerParser("$customExtension", DocumentSourceMockExtension::createFromBson);
 
     // Verify registration by parsing a stage with the new parser.
     BSONObj stageSpec = BSON("$customExtension" << BSON("field" << 1));
@@ -119,40 +124,12 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyregisterParser) {
 }
 
 using DocumentSourceExtensionParserTestDeathTest = DocumentSourceExtensionParserTest;
-DEATH_TEST_F(DocumentSourceExtensionParserTestDeathTest,
-             ShouldThrowOnDuplicateRegistration,
-             "28707") {
-    DocumentSource::registerParser("$duplicateTest", DocumentSourceMockExtension::createFromBson);
-
-    // Should throw assertion on duplicate registration.
-    DocumentSource::registerParser("$duplicateTest", DocumentSourceMockExtension::createFromBson);
-}
-
-TEST_F(DocumentSourceExtensionParserTest, ShouldAllowVectorSearchOverride) {
-    BSONObj vectorSearchSpec = BSON("$vectorSearch" << BSON("index" << "test"
-                                                                    << "path"
-                                                                    << "embedding"));
-    auto sourceList = DocumentSource::parse(getExpCtx(), vectorSearchSpec);
-    ASSERT_TRUE(sourceList.size() > 0);
-
-    // Allow $vectorSearch override without assertion.
-    DocumentSource::registerParser("$vectorSearch", DocumentSourceMockExtension::createFromBson);
-
-    // Test that we can override it multiple times.
-    DocumentSource::registerParser("$vectorSearch", DocumentSourceMockExtension::createFromBson);
-
-    // Global Initializers are only called once per unit test invocation, so if we change
-    // the parserMap for one test, that change will persist. We need to restore the original.
-    DocumentSource::registerParser("$vectorSearch", DocumentSourceVectorSearch::createFromBson);
-}
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldCreateDocumentSourceFromExtensionParser) {
     LiteParsedDocumentSource::registerParser("$workingExtension",
                                              MockExtensionLiteParsed::parse,
                                              AllowedWithApiStrict::kAlways,
                                              AllowedWithClientType::kAny);
-    DocumentSource::registerParser("$workingExtension",
-                                   DocumentSourceMockExtension::createFromBson);
 
     BSONObj stageSpec = BSON("$workingExtension" << BSON("field" << 1));
 
@@ -168,7 +145,6 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldIntegrateWithBuiltinStages) {
                                              MockExtensionLiteParsed::parse,
                                              AllowedWithApiStrict::kAlways,
                                              AllowedWithClientType::kAny);
-    DocumentSource::registerParser("$integrationTest", DocumentSourceMockExtension::createFromBson);
 
     // Check for both built-in and extension parsers using a vector to avoid duplication.
     std::vector<std::pair<std::string, BSONObj>> stageTests = {
