@@ -199,7 +199,7 @@ StatusWith<executor::TaskExecutor::EventHandle> BlockingResultsMerger::getNextEv
         }
 
         // Return the leftover event and clear '_leftoverEventFromLastTimeout'.
-        auto event = _leftoverEventFromLastTimeout;
+        auto event = std::move(_leftoverEventFromLastTimeout);
         _leftoverEventFromLastTimeout = executor::TaskExecutor::EventHandle();
         return event;
     }

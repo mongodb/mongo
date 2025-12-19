@@ -54,11 +54,10 @@
 #include "mongo/util/str.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 
-#include <boost/cstdint.hpp>
 #include <boost/iterator/filter_iterator.hpp>
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -71,6 +70,14 @@ const BSONObj AsyncResultsMerger::kWholeSortKeySortPattern =
     BSON(AsyncResultsMerger::kSortKeyField << 1);
 
 namespace {
+
+/**
+ * Error codes that are safe for retrying in 'releaseMemory()'.
+ */
+static constexpr std::array<ErrorCodes::Error, 3> kSafeErrorCodesForRetrying{
+    ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
+    ErrorCodes::CursorInUse,
+    ErrorCodes::CursorNotFound};
 
 /**
  * Returns an int less than 0 if 'leftSortKey' < 'rightSortKey', 0 if the two are equal, and an int
@@ -994,12 +1001,9 @@ Status AsyncResultsMerger::releaseMemory() {
         // 'safeErrorCodes' since for those errors we can guarantee that the data has not been
         // corrupted and it is safe to continue the execution. We must wait for the other shards
         // to be sure that none returned a fatal error.
-        // NOLINTNEXTLINE needs audit
-        static const std::unordered_set<ErrorCodes::Error> safeErrorCodes{
-            ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
-            ErrorCodes::CursorInUse,
-            ErrorCodes::CursorNotFound};
-        if (safeErrorCodes.find(status.code()) == safeErrorCodes.end()) {
+        if (std::find(kSafeErrorCodesForRetrying.begin(),
+                      kSafeErrorCodesForRetrying.end(),
+                      status.code()) == kSafeErrorCodesForRetrying.end()) {
             // The shard returned a fatal error. Return immediately since the cursor will be killed
             // anyway.
             sender->stopRetrying();
