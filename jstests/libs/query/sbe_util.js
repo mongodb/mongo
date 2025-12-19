@@ -112,6 +112,32 @@ export function checkSbeStatus(theDB) {
 }
 
 /**
+ * Checks the status of Join Order Optimization on any one node in the cluster
+ */
+export function checkJoinOptimizationStatus(theDB) {
+    if (theDB !== null) {
+        return discoverNodesAndCheck(theDB, (conn) => {
+            const getParam = conn.adminCommand({
+                getParameter: 1,
+                internalEnableJoinOptimization: 1,
+            });
+
+            if (!getParam.hasOwnProperty("internalEnableJoinOptimization")) {
+                return false;
+            } else {
+                return getParam.internalEnableJoinOptimization;
+            }
+        });
+    } else {
+        // If we don't have a database available, we can only look at the TestData to see what
+        // parameters resmoke was given.
+        return TestData.setParameters.internalEnableJoinOptimization
+            ? TestData.setParameters.internalEnableJoinOptimization
+            : false;
+    }
+}
+
+/**
  * Check if featureFlagSbeFull is enabled in the cluster.
  *
  * Quits test if there is no primary node and we are running in a mixed configuration.

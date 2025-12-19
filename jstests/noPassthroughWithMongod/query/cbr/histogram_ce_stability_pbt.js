@@ -33,7 +33,6 @@ const numRuns = 30;
 const numQueriesPerRun = 60;
 
 const experimentColl = db[jsTestName()];
-assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
 const planStabilityFn = createPlanStabilityProperty(experimentColl, true /* assertCeExists */);
 
 function histogramPlanStabilityProperty(getQuery, testHelpers, {numberBuckets}) {
@@ -51,4 +50,10 @@ function histogramPlanStabilityProperty(getQuery, testHelpers, {numberBuckets}) 
     return planStabilityFn(getQuery, testHelpers);
 }
 
-testProperty(histogramPlanStabilityProperty, {experimentColl}, createStabilityWorkload(numQueriesPerRun), numRuns);
+try {
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "histogramCE"}));
+    testProperty(histogramPlanStabilityProperty, {experimentColl}, createStabilityWorkload(numQueriesPerRun), numRuns);
+} finally {
+    // Reset the plan ranker mode to its default value.
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
+}

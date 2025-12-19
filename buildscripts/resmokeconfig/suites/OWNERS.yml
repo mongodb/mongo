@@ -21,6 +21,9 @@ filters:
   - "aggregation_facet_unwind_passthrough.yml":
     approvers:
       - 10gen/query-execution-classic
+  - "*join_optimization*":
+    approvers:
+      - 10gen/query-optimization
   - "aggregation_sharded_collections_causally_consistent_passthrough.yml":
     approvers:
       - 10gen/query-execution-classic

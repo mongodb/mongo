@@ -193,6 +193,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_repeat_queries_multiplan_single_solutions.yml @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_unsplittable_collections_on_random_shard_passthrough* @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_facet_unwind_passthrough.yml @10gen/query-execution-classic @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/*join_optimization* @10gen/query-optimization @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_sharded_collections_causally_consistent_passthrough.yml @10gen/query-execution-classic @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/aggregation_secondary_reads.yml @10gen/query-execution-classic @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/backup_restore.yml @10gen/server-backup-restore @svc-auto-approve-bot

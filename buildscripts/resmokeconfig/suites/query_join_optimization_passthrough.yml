@@ -1,0 +1,66 @@
+# Run tests that may contain $lookup using internalEnableJoinOptimization=true
+test_kind: js_test
+selector:
+  roots:
+    - jstests/sharding/**/*.js
+    - jstests/aggregation/**/*.js
+    - jstests/core/**/*.js
+    - jstests/core_standalone/**/*.js
+    - jstests/noPassthroughWithMongod/**/*.js
+    - jstests/noPassthrough/**/*.js
+  exclude_files:
+    - jstests/sharding/libs/**/*.js
+    - jstests/noPassthrough/shell/**/*.js
+    # Tests that require a replica set member or mongos
+    - jstests/core/txns/**/*.js
+    - jstests/core/query/query_settings/**/*.js
+    - jstests/core/query/queryable_encryption/query_settings_fle.js
+    - jstests/core/query/queryable_encryption/basic_crud.js
+    - jstests/noPassthrough/read_write_concern/read_write_concern_defaults_metrics.js
+    - jstests/sharding/cluster_cardinality_parameter_interrupt.js
+    - jstests/sharding/updates_to_rangedeletions_collection_trigger_range_deletions.js
+    - jstests/sharding/mongos_writes_wait_for_write_concern_transactions.js
+    - jstests/sharding/resharding_critical_section_abort_txns.js
+    - jstests/sharding/resharding_abort_while_monitoring_to_commit.js
+    - jstests/sharding/query/change_streams/change_stream_no_orphans.js
+    # Tests that expect a specific plan
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    - jstests/noPassthroughWithMongod/query/lookup_with_limit.js
+    - jstests/noPassthroughWithMongod/query/lookup_match_pushdown.js
+    - jstests/noPassthroughWithMongod/query/plan_selection_no_results.js
+    - jstests/noPassthroughWithMongod/query/plan_ranking/cbrForNoMPResults.js
+    - jstests/noPassthrough/memory_tracking/hash_lookup_unwind_reports_memory_metrics.js
+    - jstests/noPassthrough/query/spill_to_disk_server_status.js
+    - jstests/core/query/index_deduplication.js
+    - jstests/core/administrative/profile/*.js
+    - jstests/core/index/index_filter_commands.js
+    - jstests/core/query/explain/explain_multi_plan_count.js
+    - jstests/sharding/query/explain/explain_find_transformed_query.js
+    # Plan cache failures unrelated to Join Optimization
+    - jstests/sharding/query/sbe_plan_cache_does_not_block_range_deletion.js
+    - jstests/core/query/plan_cache/plan_cache_list_plans.js
+    - jstests/core/query/plan_cache/cache_usage_pbt.js
+    # Requires external sort
+    - jstests/core/query/sort/sortg.js
+    # Unrelated test times out for an unrelated reason
+    - jstests/noPassthroughWithMongod/ttl/ttl1.js
+    # TODO SERVER-114737 Timeseries not supported by Join Optimization
+    - jstests/core/timeseries/**/*.js
+    #  TODO SERVER-114739 Join optimization: collation disregarded when joining
+    - jstests/sharding/query/collation/collation_lookup.js
+    # TODO SERVER-114740 Join optimization: includeArrayIndex argument to $unwind is disregarded
+    - jstests/aggregation/sources/lookup/lookup_absorb_match.js
+    # TODO SERVER-115709 Join optimization: "Encountered unexpected array in NDV computation"
+    - jstests/core/query/release_memory/hash_lookup_unwind.js
+    - jstests/aggregation/sources/match/sbe_non_leading_match_pbt.js
+executor:
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalEnableJoinOptimization: true
