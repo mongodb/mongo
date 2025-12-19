@@ -199,6 +199,16 @@ DEATH_TEST_F(LiteParsedDocumentSourceParseTest, MustRegisterPrimaryAfterFallback
     registerFallbackParser(&mockFlag);
 }
 
+DEATH_TEST_F(LiteParsedDocumentSourceParseTest, CannotOverridePrimaryParser, "11534800") {
+    _stageName = "$cannotOverridePrimaryParser";
+
+    // Register the primary parser first.
+    registerPrimaryParser();
+
+    // Try to register another primary parser for the same stage, which should assert.
+    registerPrimaryParser();
+}
+
 TEST_F(LiteParsedDocumentSourceParseTest, FirstFallbackParserTakesPrecedence) {
     _stageName = "$firstFallbackParserTakesPrecedence";
 

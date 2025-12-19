@@ -74,7 +74,12 @@ struct LiteParserOptions {
 
 namespace exec::agg {
 class ListMqlEntitiesStage;
-}  // namespace exec::agg
+}
+
+namespace extension::host {
+class LoadExtensionsTest;
+class LoadNativeVectorSearchTest;
+}  // namespace extension::host
 
 // Forward declare LiteParsedDocumentSource.
 class LiteParsedDocumentSource;
@@ -477,6 +482,8 @@ private:
      */
     friend class LiteParserRegistrationTest;
     friend class LiteParsedDocumentSourceParseTest;
+    friend class extension::host::LoadExtensionsTest;
+    friend class extension::host::LoadNativeVectorSearchTest;
 
     /**
      * Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding

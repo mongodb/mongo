@@ -31,11 +31,14 @@
 
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
 
 #include <algorithm>
 
 #include <boost/optional/optional.hpp>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -48,6 +51,12 @@ namespace {
 inline static std::vector<LiteParsedPipeline> kNoSubPipeline = {};
 
 ParserMap parserMap;
+
+// Metrics are added to aggStageCounters upon LiteParsedDocumentSource registration. Considering
+// that LiteParsedDocumentSources can be unregistered in tests and metrics cannot be removed from
+// aggStageCounters, we need a data structure to track which metrics have already been registered in
+// order to prevent duplicate registration.
+StringSet metricsAlreadyRegistered;
 
 }  // namespace
 
@@ -104,13 +113,20 @@ void LiteParsedDocumentSource::registerParser(const std::string& name,
     // It's possible an extension stage is being registered to override an existing server stage
     // (like $vectorSearch), so we should skip re-initializing a counter. We do not assert that
     // this is legal since we do that validation in DocumentSource::registerParser().
-    if (!parserMap.contains(name)) {
+    if (!metricsAlreadyRegistered.contains(name)) {
         // Initialize a counter for this document source to track how many times it is used.
         aggStageCounters.addMetric(name);
+        metricsAlreadyRegistered.insert(name);
     }
 
     // Retrieve an existing or create a new registration.
     auto& registration = parserMap[name];
+
+    if (registration.isPrimarySet()) {
+        LOGV2_FATAL(11534800,
+                    "Cannot override primary parser on aggregation stage.",
+                    "stageName"_attr = name);
+    }
     registration.setPrimaryParser({parser, allowedWithApiStrict, allowedWithClientType});
 }
 
@@ -137,6 +153,7 @@ void LiteParsedDocumentSource::registerFallbackParser(const std::string& name,
 
     // Initialize a counter for this document source to track how many times it is used.
     aggStageCounters.addMetric(name);
+    metricsAlreadyRegistered.insert(name);
 
     // Create a new registration and save the parser as the fallback parser.
     auto& registration = parserMap[name];

@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
@@ -62,8 +63,10 @@ protected:
 
     void tearDown() override {
         host::DocumentSourceExtension::unregisterParser_forTest(kTestFooStageName);
+        LiteParsedDocumentSource::unregisterParser_forTest(kTestFooStageName);
         ExtensionLoader::unload_forTest("foo");
         host::DocumentSourceExtension::unregisterParser_forTest(kMatchTopNStageName);
+        LiteParsedDocumentSource::unregisterParser_forTest(kMatchTopNStageName);
         ExtensionLoader::unload_forTest("matchTopN");
     }
 
