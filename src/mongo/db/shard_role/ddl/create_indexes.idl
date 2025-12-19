@@ -28,9 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
-    # TODO (SERVER-114537): Uncomment the mod_visibility below and tag the respective command
-    # definitions as 'open'
-    # mod_visibility: public
+    mod_visibility: public
 
 imports:
     - "mongo/db/auth/action_type.idl"
@@ -205,6 +203,9 @@ commands:
                     resource_pattern: exact_namespace
                     action_type: createIndex
         reply_type: CreateIndexesReply
+        # TODO (SERVER-115805): Remove this module visibility override once this command’s API and
+        # implementation are part of the same module.
+        mod_visibility: unfortunately_open
         strict: true
         fields:
             v:

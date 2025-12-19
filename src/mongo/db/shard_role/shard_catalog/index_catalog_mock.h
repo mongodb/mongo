@@ -40,7 +40,7 @@ namespace mongo {
 /**
  * This class comprises a mock IndexCatalog for use in unit tests.
  */
-class IndexCatalogMock : public IndexCatalog {
+class MONGO_MOD_NEEDS_REPLACEMENT IndexCatalogMock : public IndexCatalog {
 public:
     /**
      * Creates a cloned IndexCatalogMock.

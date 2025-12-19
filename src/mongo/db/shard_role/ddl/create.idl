@@ -30,9 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/shard_role/ddl/create_command_validation.h"
-    # TODO (SERVER-114537): Uncomment the mod_visibility below and tag the respective command
-    # definitions as 'open'
-    # mod_visibility: public
+    mod_visibility: public
 
 imports:
     - "mongo/crypto/encryption_fields.idl"
@@ -227,6 +225,9 @@ commands:
                       action_type:
                           [remove, update, collStats, indexStats, planCacheRead]
         reply_type: CreateCommandReply
+        # TODO (SERVER-115805): Remove this module visibility override once this command’s API and
+        # implementation are part of the same module.
+        mod_visibility: unfortunately_open
         strict: true
         inline_chained_structs: true
         chained_structs:

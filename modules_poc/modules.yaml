@@ -287,8 +287,7 @@ catalog_and_routing.shard_role:
       bearing on the global catalog.
     slack: server-catalog-and-routing
     jira: Catalog and Routing
-    # TODO (SERVER-114537): Set this to `true` once all command definitions are tagged as `open`.
-    fully_marked: false
+    fully_marked: true
   files:
     - src/mongo/db/shard_role/**
     - src/mongo/db/service_entry_point_shard_role[._]*

@@ -28,9 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
-    # TODO (SERVER-114537): Uncomment the mod_visibility below and tag the respective command
-    # definitions as 'open'
-    # mod_visibility: public
+    mod_visibility: public
 
 imports:
     - "mongo/db/auth/access_checks.idl"
@@ -253,3 +251,6 @@ commands:
                 type: optionalBool
                 stability: internal
         reply_type: ListIndexesReply
+        # TODO (SERVER-115805): Remove this module visibility override once this command’s API and
+        # implementation are part of the same module.
+        mod_visibility: unfortunately_open
