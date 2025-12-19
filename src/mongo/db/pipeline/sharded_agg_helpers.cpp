@@ -55,6 +55,7 @@
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
@@ -713,7 +714,8 @@ std::unique_ptr<Pipeline> runPipelineDirectlyOnSingleShard(
 
             // We have not split the pipeline, and will execute entirely on the remote shard. Set up
             // an empty local pipeline which we will attach the merge cursors stage to.
-            auto mergePipeline = Pipeline::parse(std::vector<BSONObj>{}, expCtx);
+            auto mergePipeline = pipeline_factory::makePipeline(
+                std::vector<BSONObj>{}, expCtx, pipeline_factory::kOptionsMinimal);
 
             partitionAndAddMergeCursorsSource(mergePipeline.get(),
                                               std::move(ownedCursors),
@@ -1725,7 +1727,8 @@ std::unique_ptr<Pipeline> dispatchTargetedPipelineAndAddMergeCursors(
     } else {
         // We have not split the pipeline, and will execute entirely on the remote shards. Set up an
         // empty local pipeline which we will attach the merge cursors stage to.
-        mergePipeline = Pipeline::parse(std::vector<BSONObj>(), expCtx);
+        mergePipeline = pipeline_factory::makePipeline(
+            std::vector<BSONObj>(), expCtx, pipeline_factory::kOptionsMinimal);
     }
 
     partitionAndAddMergeCursorsSource(mergePipeline.get(),
@@ -1822,8 +1825,10 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursors(
                               },
                               [&](AggregateCommandRequest&& aggRequest) {
                                   auto rawPipeline = aggRequest.getPipeline();
-                                  return std::make_pair(std::move(aggRequest),
-                                                        Pipeline::parse(rawPipeline, expCtx));
+                                  return std::make_pair(
+                                      std::move(aggRequest),
+                                      pipeline_factory::makePipeline(
+                                          rawPipeline, expCtx, pipeline_factory::kOptionsMinimal));
                               },
                               [&](std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline>>&&
                                       aggRequestPipelinePair) {
