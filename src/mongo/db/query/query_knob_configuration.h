@@ -79,6 +79,8 @@ public:
     size_t getRandomJoinOrderSeed() const;
     JoinReorderModeEnum getJoinReorderMode() const;
     JoinPlanTreeShapeEnum getJoinPlanTreeShape() const;
+    size_t getMaxNodesInJoinGraph() const;
+    size_t getMaxEdgesInJoinGraph() const;
     size_t getMaxNumberNodesConsideredForImplicitEdges() const;
 
     /**
@@ -119,6 +121,8 @@ private:
     int64_t _randomJoinOrderSeed;
     JoinReorderModeEnum _joinReorderMode;
     JoinPlanTreeShapeEnum _joinPlanTreeShape;
+    int64_t _maxNodesInJoinGraph;
+    int64_t _maxEdgesInJoinGraph;
     int64_t _maxNumberNodesConsideredForImplicitEdges;
 
     int64_t _internalQuerySpillingMinAvailableDiskSpaceBytes;

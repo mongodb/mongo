@@ -34,6 +34,14 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
+/**
+ * Defines size limits for graphs during build and extend operations.
+ */
+struct AggModelBuildParams {
+    JoinGraphBuildParams joinGraphBuildParams;
+    size_t maxNumberNodesConsideredForImplicitEdges;
+};
+
 /** Represent an aggregation pipeline for join optimization. It takes a pipeline and parses a join
  * graph from it.
  */
@@ -50,8 +58,8 @@ struct AggJoinModel {
      * * `maxNumberNodesConsideredForImplicitEdges` is the maximum number of nodes allowed in a
      * connected component to be used for implicit edge finding.
      */
-    static StatusWith<AggJoinModel> constructJoinModel(
-        const Pipeline& pipeline, size_t maxNumberNodesConsideredForImplicitEdges);
+    static StatusWith<AggJoinModel> constructJoinModel(const Pipeline& pipeline,
+                                                       AggModelBuildParams buildParams);
 
     AggJoinModel(JoinGraph graph,
                  std::vector<ResolvedPath> resolvedPaths,

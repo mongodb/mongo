@@ -150,6 +150,10 @@ void addImplicitEdges(MutableJoinGraph& graph,
             const NodeId currentNodeId = resolvedPaths[currentPathId].nodeId;
             for (PathId pathId : pathSet) {
                 const NodeId nodeId = resolvedPaths[pathId].nodeId;
+                // The join graph limits 'maxEdgesInJoin' or 'maxPredicatesInEdge' can be hit here
+                // and the predicate wouldn't be added. This is fine because it doesn't affect the
+                // correctness of the query, only the size of the graph and the number of possible
+                // join plans.
                 graph.addSimpleEqualityEdge(nodeId, currentNodeId, pathId, currentPathId);
             }
             pathSet.push_back(currentPathId);
@@ -175,8 +179,8 @@ bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
     });
 }
 
-StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
-    const Pipeline& pipeline, size_t maxNumberNodesConsideredForImplicitEdges) {
+StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeline,
+                                                          AggModelBuildParams buildParams) {
     // Try to create a CanonicalQuery. We begin by cloning the pipeline (this includes
     // sub-pipelines!) to ensure that if we bail out, this stays idempotent.
     // TODO SERVER-111383: We should see if we can make createCanonicalQuery() idempotent instead.
@@ -193,7 +197,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     }
 
     // Initialize the JoinGraph & base NodeId.
-    MutableJoinGraph graph;
+    MutableJoinGraph graph{buildParams.joinGraphBuildParams};
     auto baseNodeId =
         graph.addNode(expCtx->getNamespaceString(), std::move(swCQ.getValue()), boost::none);
     if (!baseNodeId) {
@@ -207,9 +211,11 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
     // Go through the pipeline trying to find the maximal chain of join optimization eligible
     // $lookup+$unwinds pairs and turning them into CanonicalQueries. At the end only ineligible for
     // join optimization stages are left in the suffix.
-    // If we already reach the maximum number of edges we bail out from building the graph and put
-    // the remaining stages into the suffix.
-    while (!suffix->getSources().empty() && graph.numNodes() < kMaxNodesInJoin) {
+    // If we already reach the maximum number of nodes and/or edges we bail out from building the
+    // graph and put the remaining stages into the suffix.
+    while (!suffix->getSources().empty() &&
+           graph.numNodes() < buildParams.joinGraphBuildParams.maxNodesInJoin &&
+           graph.numEdges() < buildParams.joinGraphBuildParams.maxEdgesInJoin) {
         auto* stage = suffix->getSources().front().get();
         if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(stage); lookup) {
             if (!isLookupEligible(*lookup)) {
@@ -267,7 +273,7 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(
         return Status(ErrorCodes::QueryFeatureNotAllowed, "Join reordering not allowed");
     }
 
-    addImplicitEdges(graph, resolvedPaths, maxNumberNodesConsideredForImplicitEdges);
+    addImplicitEdges(graph, resolvedPaths, buildParams.maxNumberNodesConsideredForImplicitEdges);
 
     return AggJoinModel(JoinGraph(std::move(graph)),
                         std::move(resolvedPaths),

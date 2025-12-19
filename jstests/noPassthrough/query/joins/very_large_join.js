@@ -18,6 +18,7 @@ const config = {
         internalEnableJoinOptimization: true,
         internalJoinReorderMode: "random",
         internalRandomJoinOrderSeed: 42,
+        internalMaxNodesInJoinGraph: kMaxNodesInJoin,
     },
 };
 

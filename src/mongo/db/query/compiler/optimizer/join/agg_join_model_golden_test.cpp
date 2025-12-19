@@ -27,29 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
+#include "mongo/db/query/compiler/optimizer/join/agg_join_model_fixture.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
-class AggJoinModelGoldenTest : public AggregationContextFixture {
+class AggJoinModelGoldenTest : public AggJoinModelFixture {
 public:
     static constexpr size_t kMaxNumberNodesConsideredForImplicitEdges = 4;
 
-    AggJoinModelGoldenTest() : _cfg{"src/mongo/db/test_output/query/compiler/optimizer/join"} {
-        _opCtx = _serviceContext.makeOperationContext();
-    }
+    AggJoinModelGoldenTest() : _cfg{"src/mongo/db/test_output/query/compiler/optimizer/join"} {}
 
-    void runVariation(std::unique_ptr<Pipeline> pipeline, StringData variationName) {
+    void runVariation(std::unique_ptr<Pipeline> pipeline,
+                      StringData variationName,
+                      boost::optional<AggModelBuildParams> buildParams = boost::none) {
         unittest::GoldenTestContext ctx(&_cfg);
 
         ctx.outStream() << "VARIATION " << variationName << std::endl;
         ctx.outStream() << "input " << toString(pipeline) << std::endl;
 
-        auto joinModel =
-            AggJoinModel::constructJoinModel(*pipeline, kMaxNumberNodesConsideredForImplicitEdges);
+        auto joinModel = AggJoinModel::constructJoinModel(
+            *pipeline, buildParams.get_value_or(defaultBuildParams));
 
         if (joinModel.isOK()) {
             ctx.outStream() << "output: " << joinModel.getValue().toString(/*pretty*/ true)
@@ -61,55 +60,7 @@ public:
         ctx.outStream() << std::endl;
     }
 
-    auto makePipeline(std::vector<BSONObj> bsonStages, std::vector<StringData> collNames) {
-        stdx::unordered_set<NamespaceString> secondaryNamespaces;
-        for (auto&& collName : collNames) {
-            secondaryNamespaces.insert(
-                NamespaceString::createNamespaceString_forTest("test", collName));
-        }
-        auto expCtx = getExpCtx();
-        expCtx->addResolvedNamespaces(secondaryNamespaces);
-        auto pipeline = Pipeline::parse(bsonStages, expCtx);
-        pipeline_optimization::optimizePipeline(*pipeline);
-
-        return pipeline;
-    }
-
-    auto makePipeline(StringData query, std::vector<StringData> collNames) {
-
-
-        const auto bsonStages = pipelineFromJsonArray(query);
-        return makePipeline(std::move(bsonStages), std::move(collNames));
-    }
-
-private:
-    static std::string toString(const BSONObj& bson) {
-        return bson.jsonString(
-            /*format*/ ExtendedCanonicalV2_0_0,
-            /*pretty*/ true);
-    }
-
-    static std::string toString(const std::unique_ptr<Pipeline>& pipeline) {
-        auto bson = pipeline->serializeToBson();
-        BSONArrayBuilder ba{};
-        ba.append(bson.begin(), bson.end());
-        return toString(BSON("pipeline" << ba.arr()));
-    }
-
-    std::vector<BSONObj> pipelineFromJsonArray(StringData jsonArray) {
-        auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
-        ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
-        std::vector<BSONObj> rawPipeline;
-        for (auto&& stageElem : inputBson["pipeline"].Array()) {
-            ASSERT_EQUALS(stageElem.type(), BSONType::object);
-            rawPipeline.push_back(stageElem.embeddedObject().getOwned());
-        }
-        return rawPipeline;
-    }
-
     unittest::GoldenTestConfig _cfg;
-    QueryTestServiceContext _serviceContext;
-    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 TEST_F(AggJoinModelGoldenTest, longPrefix) {
@@ -127,17 +78,7 @@ TEST_F(AggJoinModelGoldenTest, longPrefix) {
 }
 
 TEST_F(AggJoinModelGoldenTest, veryLargePipeline) {
-    std::vector<BSONObj> stages;
-    constexpr size_t numJoins = kMaxNodesInJoin + 3;
-    for (size_t i = 0; i != numJoins; ++i) {
-        std::string asField = str::stream() << "from" << i;
-        stages.emplace_back(
-            BSON("$lookup" << BSON("from" << "A" << "localField" << "a" << "foreignField" << "b"
-                                          << "as" << asField)));
-        stages.emplace_back(BSON("$unwind" << ("$" + asField)));
-    }
-
-    auto pipeline = makePipeline(std::move(stages), {"A"});
+    auto pipeline = makePipelineOfSize(/*numJoins*/ kHardMaxNodesInJoin + 3);
     runVariation(std::move(pipeline), "veryLargePipeline");
 }
 

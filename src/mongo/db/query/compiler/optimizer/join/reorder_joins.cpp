@@ -226,7 +226,7 @@ JoinEdge getEdge(const JoinGraph& joinGraph, NodeSet left, NodeSet right) {
 }
 
 const JoinNode& findFirstNode(const JoinGraph& joinGraph, NodeSet set) {
-    for (size_t i = 0; i < kMaxNodesInJoin; i++) {
+    for (size_t i = 0; i < kHardMaxNodesInJoin; i++) {
         if (set.test(i)) {
             return joinGraph.getNode((NodeId)i);
         }

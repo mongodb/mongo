@@ -75,7 +75,6 @@ mongo_cc_unit_test(
         ":unit_test_helpers",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/exec/document_value:document_value_test_util",
-        "//src/mongo/db/pipeline:aggregation_context_fixture",
     ],
 )
 
@@ -94,7 +93,6 @@ mongo_cc_unit_test(
         ":join_ordering",
         ":unit_test_helpers",
         "//src/mongo/db:query_exec",
-        "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/query:query_request",
     ],
 )
@@ -145,11 +143,13 @@ mongo_cc_library(
 mongo_cc_library(
     name = "unit_test_helpers",
     srcs = [
+        "agg_join_model_fixture.cpp",
         "unit_test_helpers.cpp",
     ],
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
         "//src/mongo/unittest",
     ],

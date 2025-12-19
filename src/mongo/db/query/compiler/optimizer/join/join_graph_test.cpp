@@ -301,4 +301,59 @@ TEST(JoinGraph, GetEdgesForSubgraph) {
     assertEdgesEq(graph.getEdgesForSubgraph(makeNodeSet(a, b, c, d, e)),
                   (std::vector<EdgeId>{ab, bc, cd, de, ce}));
 }
+
+TEST(JoinGraph, BuildParams) {
+    JoinGraphBuildParams buildParams(16, 32, 64);
+    MutableJoinGraph mgraph(buildParams);
+
+    // Case 1: Validate the maximum number of nodes.
+    std::vector<NodeId> nodeIds;
+    nodeIds.reserve(buildParams.maxNodesInJoin);
+
+    for (size_t i = 0; i < buildParams.maxNodesInJoin + 10; ++i) {
+        auto nodeId = mgraph.addNode(makeNSS("a"), nullptr, boost::none);
+        if (nodeId.has_value()) {
+            nodeIds.emplace_back(*nodeId);
+        }
+    }
+    // Validate that the number of nodes is of the expected size.
+    ASSERT_EQ(mgraph.numNodes(), buildParams.maxNodesInJoin);
+    // Validate that the nodes creation status was correctly reported.
+    ASSERT_EQ(nodeIds.size(), buildParams.maxNodesInJoin);
+
+    PathId pathId{100};
+
+    // Case 2. Validate the maximum number of edges.
+    std::vector<EdgeId> edgeIds;
+    edgeIds.reserve(buildParams.maxEdgesInJoin);
+    for (auto left : nodeIds) {
+        for (auto right : nodeIds) {
+            if (left >= right) {
+                continue;
+            }
+            auto edgeId = mgraph.addSimpleEqualityEdge(left, right, pathId + 1, pathId + 2);
+            if (edgeId.has_value()) {
+                edgeIds.emplace_back(*edgeId);
+                pathId += 2;
+            }
+        }
+    }
+    // Validate that the number of edges is of the expected size.
+    ASSERT_EQ(mgraph.numEdges(), buildParams.maxEdgesInJoin);
+    // Validate that the edges creation status was correctly reported.
+    ASSERT_EQ(edgeIds.size(), buildParams.maxEdgesInJoin);
+
+    // Case 3. Validate the maximum number of predicates.
+    auto edge = mgraph.edges().back();
+    size_t numPredicates = mgraph.numEdges();
+    for (size_t i = 0; i < buildParams.maxPredicatesInJoin + 10; ++i) {
+        auto edgeId = mgraph.addSimpleEqualityEdge(edge.right, edge.left, pathId + 1, pathId + 2);
+        if (edgeId.has_value()) {
+            ++numPredicates;
+            pathId += 2;
+        }
+    }
+    // Validate that the predicates creation status was correctly reported.
+    ASSERT_EQ(numPredicates, buildParams.maxPredicatesInJoin);
+}
 }  // namespace mongo::join_ordering

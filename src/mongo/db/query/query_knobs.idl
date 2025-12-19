@@ -573,16 +573,46 @@ server_parameters:
             expr: JoinPlanTreeShapeEnum::kZigZag
         redact: false
 
+    internalMaxNodesInJoinGraph:
+        description: >-
+            The maximum number of nodes (1 for base collection + number of $lookup-$unwind pairs)
+            allowed for join optimization. Any $lookup-$unwind pairs exceeding this limit will not
+            be included in the join optimization and will be executed in the original order as 
+            specifified in the aggregation pipeline.
+        set_at: [startup, runtime]
+        cpp_varname: internalMaxNodesInJoinGraph
+        cpp_vartype: AtomicWord<int>
+        default: 10
+        validator:
+            gt: 1
+            lte: 64
+        redact: false
+
+    internalMaxEdgesInJoinGraph:
+        description: >-
+            The maximum number of edges considered for join optimization. Any edges exceeding this
+            limit will not be included in the join optimization and will be executed in the original
+            order as specifified in the aggregation pipeline.
+        set_at: [startup, runtime]
+        cpp_varname: internalMaxEdgesInJoinGraph
+        cpp_vartype: AtomicWord<int>
+        default: 256
+        validator:
+            gt: 0
+            lte: 4096
+        redact: false
+
     internalMaxNumberNodesConsideredForImplicitEdges:
         description: >-
-            the maximum number of nodes allowed in a connected component to be used for
-            implicit edge finding."
+            The maximum number of nodes allowed in a connected component to be used for
+            implicit edge finding.
         set_at: [startup, runtime]
         cpp_varname: internalMaxNumberNodesConsideredForImplicitEdges
         cpp_vartype: AtomicWord<int>
         default: 4
         validator:
             gte: 0
+            lte: 10
         redact: false
 
     internalQueryMaxPipelineRewrites:

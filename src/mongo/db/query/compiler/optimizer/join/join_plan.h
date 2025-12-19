@@ -85,7 +85,7 @@ struct JoinSubset {
     // Index of the lowest-cost plan in 'plans'.
     size_t bestPlanIndex;
 
-    std::string toString(size_t numNodesToPrint = kMaxNodesInJoin) const;
+    std::string toString(size_t numNodesToPrint = kHardMaxNodesInJoin) const;
 };
 
 /**
@@ -113,7 +113,7 @@ struct BaseNode {
     // Corresponds to node in the graph this represents a base table access to.
     const NodeId node;
 
-    std::string toString(size_t numNodesToPrint = kMaxNodesInJoin,
+    std::string toString(size_t numNodesToPrint = kHardMaxNodesInJoin,
                          std::string indentStr = "") const;
 };
 
@@ -130,7 +130,7 @@ struct INLJRHSNode {
     // Corresponds to node in the graph this represents a base table access to.
     const NodeId node;
 
-    std::string toString(size_t numNodesToPrint = kMaxNodesInJoin,
+    std::string toString(size_t numNodesToPrint = kHardMaxNodesInJoin,
                          std::string indentStr = "") const;
 };
 
@@ -145,7 +145,7 @@ struct JoiningNode {
     // Keeps a copy of the bitset representing the subgraph this originated from.
     const NodeSet bitset;
 
-    std::string toString(size_t numNodesToPrint = kMaxNodesInJoin,
+    std::string toString(size_t numNodesToPrint = kHardMaxNodesInJoin,
                          std::string indentStr = "") const;
 };
 
@@ -195,14 +195,15 @@ public:
     }
 
     std::string joinPlansToString(const JoinPlans& plans,
-                                  size_t numNodesToPrint = kMaxNodesInJoin,
+                                  size_t numNodesToPrint = kHardMaxNodesInJoin,
                                   std::string indentStr = "") const;
 
     std::string joinPlanNodeToString(JoinPlanNodeId node,
-                                     size_t numNodesToPrint = kMaxNodesInJoin,
+                                     size_t numNodesToPrint = kHardMaxNodesInJoin,
                                      std::string indentStr = "") const;
 
-    BSONObj joinPlanNodeToBSON(JoinPlanNodeId node, size_t numNodesToPrint = kMaxNodesInJoin) const;
+    BSONObj joinPlanNodeToBSON(JoinPlanNodeId node,
+                               size_t numNodesToPrint = kHardMaxNodesInJoin) const;
 
 private:
     std::vector<JoinPlanNode> _allJoinPlans;

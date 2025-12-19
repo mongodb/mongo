@@ -60,7 +60,7 @@ AdjacencyList makeAdjacencyList(const JoinGraph& joinGraph, size_t numNodes) {
 
     tassert(11509300,
             "Too many predicates in thejoin graph",
-            adjList.predicates.size() < kMaxNumberOfPredicates);
+            adjList.predicates.size() < kHardMaxPredicatesInJoin);
 
     return adjList;
 }

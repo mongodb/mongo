@@ -94,6 +94,8 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
     _joinPlanTreeShape = ServerParameterSet::getNodeParameterSet()
                              ->get<JoinPlanTreeShape>("internalJoinPlanTreeShape")
                              ->_data.get();
+    _maxNodesInJoinGraph = internalMaxNodesInJoinGraph.load();
+    _maxEdgesInJoinGraph = internalMaxEdgesInJoinGraph.load();
     _maxNumberNodesConsideredForImplicitEdges =
         internalMaxNumberNodesConsideredForImplicitEdges.load();
 }
@@ -137,6 +139,14 @@ JoinReorderModeEnum QueryKnobConfiguration::getJoinReorderMode() const {
 
 JoinPlanTreeShapeEnum QueryKnobConfiguration::getJoinPlanTreeShape() const {
     return _joinPlanTreeShape;
+}
+
+size_t QueryKnobConfiguration::getMaxNodesInJoinGraph() const {
+    return _maxNodesInJoinGraph;
+}
+
+size_t QueryKnobConfiguration::getMaxEdgesInJoinGraph() const {
+    return _maxEdgesInJoinGraph;
 }
 
 size_t QueryKnobConfiguration::getMaxNumberNodesConsideredForImplicitEdges() const {

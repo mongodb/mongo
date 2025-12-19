@@ -41,21 +41,21 @@
 namespace mongo::join_ordering {
 /** The maximum number of nodes which can participate in one join.
  */
-constexpr size_t kMaxNodesInJoin = 64;
+constexpr size_t kHardMaxNodesInJoin = 64;
 
 /** The maximum number of edges in a Join Graph.
  */
-constexpr size_t kMaxEdgesInJoin = std::numeric_limits<EdgeId>::max();
+constexpr size_t kHardMaxEdgesInJoin = 4096;
 
 /** The maximum number of predicates in a Join Graph.
  */
-constexpr size_t kMaxNumberOfPredicates = std::numeric_limits<PredicateId>::max();
+constexpr size_t kHardMaxPredicatesInJoin = std::numeric_limits<PredicateId>::max();
 
 /** NodeSet is a bitset representation of a subset of join nodes. It is used to efficiently
  * track which nodes are included in an intermediate join. This compact representation is highly
  * effective for the join reordering algorithm.
  */
-using NodeSet = std::bitset<kMaxNodesInJoin>;
+using NodeSet = std::bitset<kHardMaxNodesInJoin>;
 
 /**
  * Creates NodeSet from the list of node ids.
@@ -156,10 +156,46 @@ struct JoinEdge {
 };
 
 /**
+ * Defines size limits for graphs during build operation.
+ */
+struct JoinGraphBuildParams {
+    static size_t getInBounds(size_t value, size_t begin, size_t end) {
+        return std::max(begin, std::min(end, value));
+    }
+
+    JoinGraphBuildParams()
+        : JoinGraphBuildParams(kHardMaxNodesInJoin, kHardMaxEdgesInJoin, kHardMaxPredicatesInJoin) {
+    }
+
+    JoinGraphBuildParams(size_t maxNodes,
+                         size_t maxEdges,
+                         size_t maxPredicates = kHardMaxPredicatesInJoin)
+        : maxNodesInJoin(getInBounds(maxNodes, 2, kHardMaxNodesInJoin)),
+          maxEdgesInJoin(getInBounds(maxEdges, 1, kHardMaxEdgesInJoin)),
+          maxPredicatesInJoin(getInBounds(maxPredicates, 1, kHardMaxPredicatesInJoin)) {}
+
+    JoinGraphBuildParams(const JoinGraphBuildParams&) = default;
+
+    // Maximum number of nodes in a join. Must be in [2, kMaxNodesInJoin].
+    const size_t maxNodesInJoin{kHardMaxNodesInJoin};
+
+    // Maximum number of edges in a join. Must be in [1, kMaxEdgesInJoin].
+    const size_t maxEdgesInJoin{kHardMaxEdgesInJoin};
+
+    // Maximum number of edges in a join. Must be in [1, kMaxPredicatesInJoin].
+    const size_t maxPredicatesInJoin{kHardMaxPredicatesInJoin};
+};
+
+/**
  * Used to build a JoinGraph.
  */
 class MutableJoinGraph {
 public:
+    MutableJoinGraph() = default;
+    explicit MutableJoinGraph(JoinGraphBuildParams buildParams) : _buildParams(buildParams) {}
+    MutableJoinGraph(MutableJoinGraph&&) noexcept = default;
+    MutableJoinGraph& operator=(MutableJoinGraph&&) noexcept = default;
+
     /**
      * Adds a new node. Returns the id of the new node or boost::none if the maximum number of join
      * nodes has been reached.
@@ -225,6 +261,16 @@ private:
      * the conjunction of all predicates.
      */
     boost::optional<EdgeId> makeEdge(NodeId left, NodeId right, JoinEdge::PredicateList predicates);
+
+    /**
+     * Adds the predicates to the edge, returns EdgeId if the predicates were successfully added.
+     */
+    boost::optional<EdgeId> updateEdge(EdgeId edgeId,
+                                       NodeId leftSideOfPredicates,
+                                       JoinEdge::PredicateList predicates);
+
+    const JoinGraphBuildParams _buildParams;
+    size_t _numberOfAddedPredicates{0};
 
     std::vector<JoinNode> _nodes;
     std::vector<JoinEdge> _edges;

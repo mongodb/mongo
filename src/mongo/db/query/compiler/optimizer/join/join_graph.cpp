@@ -104,7 +104,7 @@ void JoinEdge::insertPredicate(JoinPredicate pred) {
 boost::optional<NodeId> MutableJoinGraph::addNode(NamespaceString collectionName,
                                                   std::unique_ptr<CanonicalQuery> cq,
                                                   boost::optional<FieldPath> embedPath) {
-    if (numNodes() >= kMaxNodesInJoin) {
+    if (numNodes() >= _buildParams.maxNodesInJoin) {
         return boost::none;
     }
 
@@ -120,12 +120,7 @@ boost::optional<EdgeId> MutableJoinGraph::addEdge(NodeId left,
     tassert(11180001, "Self edges are not permitted", left != right);
 
     if (auto edgeId = _edgeMap.find(makeNodeSet(left, right)); edgeId != _edgeMap.end()) {
-        auto&& edge = _edges[edgeId->second];
-        if (edge.left == right) {
-            swapPredicateSides(predicates);
-        }
-        edge.insertPredicates(predicates.begin(), predicates.end());
-        return edgeId->second;
+        return updateEdge(edgeId->second, left, std::move(predicates));
     }
 
     return makeEdge(left, right, std::move(predicates));
@@ -134,6 +129,11 @@ boost::optional<EdgeId> MutableJoinGraph::addEdge(NodeId left,
 boost::optional<EdgeId> MutableJoinGraph::makeEdge(NodeId left,
                                                    NodeId right,
                                                    JoinEdge::PredicateList predicates) {
+    if (_edges.size() >= _buildParams.maxEdgesInJoin ||
+        _numberOfAddedPredicates + predicates.size() > _buildParams.maxPredicatesInJoin) {
+        return boost::none;
+    }
+
     if (right < left) {
         std::swap(left, right);
         swapPredicateSides(predicates);
@@ -146,6 +146,24 @@ boost::optional<EdgeId> MutableJoinGraph::makeEdge(NodeId left,
     _edges.emplace_back(std::move(predicates), left, right);
 
     _edgeMap.emplace(key, edgeId);
+    _numberOfAddedPredicates += _edges[edgeId].predicates.size();
+    return edgeId;
+}
+
+boost::optional<EdgeId> MutableJoinGraph::updateEdge(EdgeId edgeId,
+                                                     NodeId leftSideOfPredicates,
+                                                     JoinEdge::PredicateList predicates) {
+    if (_numberOfAddedPredicates + predicates.size() > _buildParams.maxPredicatesInJoin) {
+        return boost::none;
+    }
+
+    auto&& edge = _edges[edgeId];
+    if (edge.left != leftSideOfPredicates) {
+        swapPredicateSides(predicates);
+    }
+    _numberOfAddedPredicates -= edge.predicates.size();
+    edge.insertPredicates(predicates.begin(), predicates.end());
+    _numberOfAddedPredicates += edge.predicates.size();
     return edgeId;
 }
 
