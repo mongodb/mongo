@@ -99,7 +99,7 @@ pyOpenSSL = "^25.0.0"
 pyparsing = "^2.4.7"
 service_identity = "^18.1.0"
 twisted = "^24.3.0"
-'zope.interface' = "^5.5.2"
+'zope.interface' = "^8.1.1"
 ldaptor = "19.0.0"
 
 [tool.poetry.group.idl.dependencies]
