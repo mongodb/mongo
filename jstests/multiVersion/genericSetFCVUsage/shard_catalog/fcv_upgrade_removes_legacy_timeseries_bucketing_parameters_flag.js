@@ -8,6 +8,7 @@
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const dbName = jsTestName();
 const collName = jsTestName();
@@ -38,7 +39,7 @@ const db = rst.getPrimary().getDB(dbName);
 
 const getCatalogEntry = () =>
     db
-        .getCollection(`system.buckets.${collName}`)
+        .getCollection(getTimeseriesCollForDDLOps(db, collName))
         .aggregate([{$listCatalog: {}}])
         .toArray()[0];
 

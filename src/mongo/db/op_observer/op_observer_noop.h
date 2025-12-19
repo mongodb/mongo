@@ -282,6 +282,10 @@ public:
                          int64_t bytesDeleted,
                          int64_t docsDeleted,
                          repl::OpTime& opTime) override {}
+
+    void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              const UUID& uuid) override {}
 };
 
 }  // namespace mongo

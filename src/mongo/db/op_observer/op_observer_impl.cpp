@@ -79,6 +79,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries_oplog_entry_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/version_context.h"
 #include "mongo/logv2/log.h"
@@ -2355,4 +2356,30 @@ void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
     oplogEntry.setObject(objectEntry.toBSON());
     opTime = logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
+
+void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const UUID& uuid) {
+    tassert(11450500,
+            "Expecting the main namespace for timeseries upgrade/downgrade ops",
+            !nss.isTimeseriesBucketsCollection());
+    tassert(11450501,
+            "All timeseries upgrade/downgrade paths are expected to acquire an Operation FCV",
+            VersionContext::getDecoration(opCtx).hasOperationFCV());
+
+    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
+        return;
+    }
+
+    UpgradeDowngradeViewlessTimeseriesOplogEntry objectEntry(std::string{nss.coll()});
+
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(nss.getCommandNS());
+    oplogEntry.setUuid(uuid);
+    oplogEntry.setObject(objectEntry.toBSON());
+
+    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+}
+
 }  // namespace mongo

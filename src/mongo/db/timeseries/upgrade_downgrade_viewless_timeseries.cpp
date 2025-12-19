@@ -29,6 +29,7 @@
 
 #include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
@@ -36,12 +37,15 @@
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
+#include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
+#include "mongo/db/shard_role/shard_catalog/database_holder.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/viewless_timeseries_collection_creation_helpers.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -50,21 +54,85 @@ namespace mongo {
 
 namespace timeseries {
 
-// Maximum time to acquire the locks over all affected entities. We do this since:
-// - Upgrade/downgrade is a low priority task, so guard against it holding locks for too long.
-// - Ensure that by locking all affected namespaces (buckets NS + main NS + system.views) we do not
-//   cause a deadlock.
-static const auto LOCK_TIMEOUT = Seconds(30);
+struct UpgradeDowngradeTimeseriesLocks {
+    AutoGetCollection mainColl;
+    AutoGetCollection bucketsColl;
+    boost::optional<Lock::CollectionLock> systemViewsLock;
+};
+
+UpgradeDowngradeTimeseriesLocks acquireLocksForTimeseriesUpgradeDowngrade(
+    OperationContext* opCtx, const NamespaceString& mainNs) {
+    LOGV2_DEBUG(11450504,
+                1,
+                "Locking collection for viewless timeseries upgrade/downgrade",
+                logAttrs(mainNs));
+    tassert(11450505,
+            "Expected 'mainNs' to not be a system.buckets namespace",
+            !mainNs.isTimeseriesBucketsCollection());
+
+    for (size_t numAttempts = 0;; numAttempts++) {
+        try {
+            // Maximum time to acquire the locks over all affected entities. We do this since:
+            // - Upgrade/downgrade is a low priority task, so guard against it holding locks for
+            //   too long.
+            // - Ensure that by locking all affected namespaces (buckets NS + main NS +
+            //   system.views) we do not cause a deadlock.
+            static const auto LOCK_TIMEOUT = Seconds(30);
+            auto lockDeadline = Date_t::now() + LOCK_TIMEOUT;
+
+            // Acquire locks over the affected namespaces. We use AutoGetCollection (rather than
+            // acquireCollections) because the buckets collection must be locked first, rather than
+            // following the canonical order (increasing ResourceId).
+            // AutoGetCollection also doesn't open a storage snapshot, which would break the catalog
+            // iteration method used in `forEachTimeseriesCollectionFromDb`.
+            AutoGetCollection bucketsColl(opCtx,
+                                          mainNs.makeTimeseriesBucketsNamespace(),
+                                          MODE_X,
+                                          auto_get_collection::Options{}.deadline(lockDeadline));
+            AutoGetCollection mainColl(opCtx,
+                                       mainNs,
+                                       MODE_X,
+                                       auto_get_collection::Options{}
+                                           .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
+                                           .deadline(lockDeadline));
+
+            // Locking system.views is needed to create or drop the timeseries view.
+            // Operations all lock system.views in the end to prevent deadlock.
+            boost::optional<Lock::CollectionLock> systemViewsLock;
+            if (auto db = mainColl.getDb()) {
+                systemViewsLock.emplace(opCtx, db->getSystemViewsName(), MODE_X, lockDeadline);
+            }
+
+            return UpgradeDowngradeTimeseriesLocks{
+                .mainColl = std::move(mainColl),
+                .bucketsColl = std::move(bucketsColl),
+                .systemViewsLock = std::move(systemViewsLock),
+            };
+        } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+            // This may happen while long running operations (e.g. dbHash) hold a collection
+            // lock, preventing the acquisition for upgrade/downgrade.
+            // Back off and retry it (instead of propagating the error to consumers like oplog
+            // application, which would trigger in a fatal assertion).
+            // TODO(SERVER-115831): Review the lock with deadline + indefinite retry strategy.
+            logAndBackoff(11450503,
+                          MONGO_LOGV2_DEFAULT_COMPONENT,
+                          logv2::LogSeverity::Info(),
+                          numAttempts,
+                          "Timed out acquiring locks for timeseries upgrade/downgrade, retrying");
+        }
+    }
+}
 
 void upgradeToViewlessTimeseries(OperationContext* opCtx,
-                                 const NamespaceString& mainNs,
+                                 UpgradeDowngradeTimeseriesLocks&& locks,
                                  const boost::optional<UUID>& expectedUUID) {
-    LOGV2(11483000, "Started upgrade to viewless timeseries", logAttrs(mainNs));
+    const auto& mainColl = locks.mainColl;
+    const auto& mainNs = mainColl.getNss();
+    const auto& bucketsColl = locks.bucketsColl;
+    const auto& bucketsNs = bucketsColl.getNss();
+    auto db = mainColl.getDb();
 
-    tassert(11483001,
-            "Expected 'mainNs' for timeseries upgrade to not be a system.buckets namespace",
-            !mainNs.isTimeseriesBucketsCollection());
-    auto bucketsNs = mainNs.makeTimeseriesBucketsNamespace();
+    LOGV2(11483000, "Started upgrade to viewless timeseries", logAttrs(mainNs));
 
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     tassert(11483002,
@@ -73,18 +141,6 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
                 VersionContext::getDecoration(opCtx)));
 
     writeConflictRetry(opCtx, "viewlessTimeseriesUpgrade", mainNs, [&] {
-        // Acquire locks over the affected namespaces. The buckets collection must be locked first.
-        auto lockDeadline = Date_t::now() + LOCK_TIMEOUT;
-        AutoGetDb autoDb(opCtx, mainNs.dbName(), MODE_IX, lockDeadline);
-        AutoGetCollection bucketsColl(
-            opCtx, bucketsNs, MODE_X, auto_get_collection::Options{}.deadline(lockDeadline));
-        AutoGetCollection mainColl(opCtx,
-                                   mainNs,
-                                   MODE_X,
-                                   auto_get_collection::Options{}
-                                       .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
-                                       .deadline(lockDeadline));
-
         // Idempotency check
         if (mainColl && mainColl->isTimeseriesCollection() &&
             mainColl->isNewTimeseriesWithoutView() && !bucketsColl) {
@@ -125,10 +181,6 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
             return;
         }
 
-        // Operations all lock system.views in the end to prevent deadlock.
-        Lock::CollectionLock systemViewsLock(
-            opCtx, autoDb.getDb()->getSystemViewsName(), MODE_X, lockDeadline);
-
         WriteUnitOfWork wuow(opCtx);
 
         // Run the timeseries upgrade steps without generating oplog entries.
@@ -136,9 +188,8 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
             repl::UnreplicatedWritesBlock uwb(opCtx);
 
             // Drop view and rename the buckets NSS over it.
-            uassertStatusOK(autoDb.getDb()->dropView(opCtx, mainNs));
-            uassertStatusOK(
-                autoDb.getDb()->renameCollection(opCtx, bucketsNs, mainNs, true /* stayTemp */));
+            uassertStatusOK(db->dropView(opCtx, mainNs));
+            uassertStatusOK(db->renameCollection(opCtx, bucketsNs, mainNs, true /* stayTemp */));
 
             // Clean up the buckets NSS metadata.
             CollectionWriter collWriter{opCtx, mainNs};
@@ -150,7 +201,8 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
         }
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.
-        // TODO(SERVER-114505): Call the OpObserver to emit an oplog entry
+        opCtx->getServiceContext()->getOpObserver()->onUpgradeDowngradeViewlessTimeseries(
+            opCtx, mainNs, bucketsColl->uuid());
 
         wuow.commit();
     });
@@ -158,15 +210,23 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
     LOGV2(11483008, "Finished upgrade to viewless timeseries", logAttrs(mainNs));
 }
 
-void downgradeFromViewlessTimeseries(OperationContext* opCtx,
-                                     const NamespaceString& mainNs,
-                                     const boost::optional<UUID>& expectedUUID) {
-    LOGV2(11483009, "Started downgrade of timeseries collection format", logAttrs(mainNs));
+void upgradeToViewlessTimeseries(OperationContext* opCtx,
+                                 const NamespaceString& mainNs,
+                                 const boost::optional<UUID>& expectedUUID) {
+    auto locks = acquireLocksForTimeseriesUpgradeDowngrade(opCtx, mainNs);
+    upgradeToViewlessTimeseries(opCtx, std::move(locks), expectedUUID);
+}
 
-    tassert(11483010,
-            "Expected 'mainNs' for timeseries downgrade to not be a system.buckets namespace",
-            !mainNs.isTimeseriesBucketsCollection());
-    auto bucketsNs = mainNs.makeTimeseriesBucketsNamespace();
+void downgradeFromViewlessTimeseries(OperationContext* opCtx,
+                                     UpgradeDowngradeTimeseriesLocks&& locks,
+                                     const boost::optional<UUID>& expectedUUID) {
+    const auto& mainColl = locks.mainColl;
+    const auto& mainNs = mainColl.getNss();
+    const auto& bucketsColl = locks.bucketsColl;
+    const auto& bucketsNs = bucketsColl.getNss();
+    auto db = mainColl.getDb();
+
+    LOGV2(11483009, "Started downgrade of timeseries collection format", logAttrs(mainNs));
 
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     tassert(11483011,
@@ -175,18 +235,6 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                 VersionContext::getDecoration(opCtx)));
 
     writeConflictRetry(opCtx, "viewlessTimeseriesDowngrade", mainNs, [&] {
-        // Acquire locks over the affected namespaces. The buckets collection must be locked first.
-        auto lockDeadline = Date_t::now() + LOCK_TIMEOUT;
-        AutoGetDb autoDb(opCtx, mainNs.dbName(), MODE_IX, lockDeadline);
-        AutoGetCollection bucketsColl(
-            opCtx, bucketsNs, MODE_X, auto_get_collection::Options{}.deadline(lockDeadline));
-        AutoGetCollection mainColl(opCtx,
-                                   mainNs,
-                                   MODE_X,
-                                   auto_get_collection::Options{}
-                                       .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
-                                       .deadline(lockDeadline));
-
         // Idempotency check
         if (bucketsColl && bucketsColl->isTimeseriesCollection() &&
             !bucketsColl->isNewTimeseriesWithoutView() && !mainColl && mainColl.getView() &&
@@ -211,11 +259,8 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                 "While downgrading viewless timeseries, we found a conflicting buckets collection",
                 !bucketsColl);
 
-        // Operations all lock system.views in the end to prevent deadlock.
-        Lock::CollectionLock systemViewsLock(
-            opCtx, autoDb.getDb()->getSystemViewsName(), MODE_X, lockDeadline);
         // Create system.views if it does not exist. This is done in a separate WUOW.
-        autoDb.getDb()->createSystemDotViewsIfNecessary(opCtx);
+        db->createSystemDotViewsIfNecessary(opCtx);
 
         WriteUnitOfWork wuow(opCtx);
 
@@ -224,8 +269,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
             repl::UnreplicatedWritesBlock uwb(opCtx);
 
             // Rename the collection to the buckets NSS and create the view on the main NSS.
-            uassertStatusOK(
-                autoDb.getDb()->renameCollection(opCtx, mainNs, bucketsNs, true /* stayTemp */));
+            uassertStatusOK(db->renameCollection(opCtx, mainNs, bucketsNs, true /* stayTemp */));
 
             CollectionOptions viewOptions;
             viewOptions.viewOn = std::string{bucketsNs.coll()};
@@ -233,8 +277,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
             constexpr bool asArray = true;
             viewOptions.pipeline =
                 timeseries::generateViewPipeline(*mainColl->getTimeseriesOptions(), asArray);
-            uassertStatusOK(
-                autoDb.getDb()->userCreateNS(opCtx, mainNs, viewOptions, /*createIdIndex=*/false));
+            uassertStatusOK(db->userCreateNS(opCtx, mainNs, viewOptions, /*createIdIndex=*/false));
 
             // Add validator to the buckets collection.
             CollectionWriter collWriter{opCtx, bucketsNs};
@@ -249,12 +292,97 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
         }
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.
-        // TODO(SERVER-114505): Call the OpObserver to emit an oplog entry
+        opCtx->getServiceContext()->getOpObserver()->onUpgradeDowngradeViewlessTimeseries(
+            opCtx, mainNs, mainColl->uuid());
 
         wuow.commit();
     });
 
     LOGV2(11483017, "Finished downgrade of timeseries collection format", logAttrs(mainNs));
+}
+
+void downgradeFromViewlessTimeseries(OperationContext* opCtx,
+                                     const NamespaceString& mainNs,
+                                     const boost::optional<UUID>& expectedUUID) {
+    auto locks = acquireLocksForTimeseriesUpgradeDowngrade(opCtx, mainNs);
+    downgradeFromViewlessTimeseries(opCtx, std::move(locks), expectedUUID);
+}
+
+/**
+ * Iterate over all viewful or viewless timeseries collections in the shard catalog.
+ * This acts similarly to `catalog::forEachCollectionFromDb`, but unlike it, it will
+ * lock both the main and buckets namespaces of the timeseries collection (in MODE_X).
+ */
+template <typename F>
+void forEachTimeseriesCollectionFromDb(OperationContext* opCtx,
+                                       const DatabaseName& dbName,
+                                       bool isViewless,
+                                       F&& callback) {
+    auto catalogForIteration = CollectionCatalog::get(opCtx);
+    for (auto&& coll : catalogForIteration->range(dbName)) {
+        auto uuid = coll->uuid();
+        if (!catalogForIteration->checkIfCollectionSatisfiable(
+                uuid, [&](const Collection* collection) {
+                    return collection->isTimeseriesCollection() &&
+                        collection->isNewTimeseriesWithoutView() == isViewless;
+                })) {
+            continue;
+        }
+
+        boost::optional<UpgradeDowngradeTimeseriesLocks> locks;
+
+        while (auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid)) {
+            // Lock both the buckets and main namespaces.
+            auto mainNs =
+                nss->isTimeseriesBucketsCollection() ? nss->getTimeseriesViewNamespace() : *nss;
+            locks.emplace(acquireLocksForTimeseriesUpgradeDowngrade(opCtx, mainNs));
+            const auto& acquiredColl =
+                nss->isTimeseriesBucketsCollection() ? locks->bucketsColl : locks->mainColl;
+
+            // Ensure that we didn't acquire an storage snapshot while taking locks.
+            // This ensures we refresh the collection catalog to latest while following a rename.
+            tassert(11450506,
+                    "Expected to not have an open storage snapshot while iterating the catalog",
+                    !shard_role_details::getRecoveryUnit(opCtx)->isActive());
+
+            if (acquiredColl && acquiredColl->uuid() == uuid) {
+                // Success: locked the namespace and the UUID still maps to it.
+                break;
+            }
+            // Failed: collection got renamed before locking it, so unlock and try again.
+            locks.reset();
+        }
+
+        // The NamespaceString couldn't be resolved from the uuid, so the collection was dropped.
+        if (!locks.has_value())
+            continue;
+
+        callback(std::move(*locks));
+    }
+}
+
+void upgradeAllTimeseriesToViewless(OperationContext* opCtx) {
+    for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
+
+        forEachTimeseriesCollectionFromDb(
+            opCtx, dbName, false /* isViewless */, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
+                timeseries::upgradeToViewlessTimeseries(
+                    opCtx, std::move(locks), boost::none /* expectedUUID */);
+            });
+    }
+};
+
+void downgradeAllTimeseriesFromViewless(OperationContext* opCtx) {
+    for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
+
+        forEachTimeseriesCollectionFromDb(
+            opCtx, dbName, true /* isViewless */, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
+                timeseries::downgradeFromViewlessTimeseries(
+                    opCtx, std::move(locks), boost::none /* expectedUUID */);
+            });
+    }
 }
 
 std::vector<BucketsCollectionInconsistency> checkBucketCollectionInconsistencies(

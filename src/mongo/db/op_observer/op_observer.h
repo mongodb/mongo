@@ -741,6 +741,25 @@ public:
                                  int64_t docsDeleted,
                                  repl::OpTime& opTime) = 0;
 
+    /**
+     * Called when a timeseries collection is upgraded from viewful to viewless format or viceversa.
+     *
+     * Logs an single oplog entry, so that all changes done for the upgrade/downgrade (create/drop
+     * view, rename system.buckets, metadata fixup) are replicated and applied atomically.
+     *
+     * The resulting format is the one consistent with the FCV; i.e. it is an upgrade if the
+     * viewless timeseries feature flag is enabled, and a downgrade if it is disabled.
+     *
+     * `nss` is the main namespace (i.e. without the 'system.buckets' prefix).
+     * `uuid` is the UUID associated of the time series collection.
+     * For viewful time series collections, that is the UUID of the system.buckets collection.
+
+     * TODO(SERVER-114573): Remove this method once 9.0 becomes lastLTS.
+     */
+    virtual void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const UUID& uuid) = 0;
+
     struct Times;
 
 protected:

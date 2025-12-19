@@ -104,6 +104,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/user_write_block/write_block_bypass.h"
@@ -1708,6 +1709,13 @@ private:
             maybeModifyDataOnDowngradeForTest(opCtx, requestedVersion, originalVersion);
         }
 
+        // TODO(SERVER-114816): Support timeseries downgrade on sharded clusters
+        // (`role` defined as ShardServer or ConfigServer).
+        if (!role &&
+            !gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledOnVersion(requestedVersion)) {
+            timeseries::downgradeAllTimeseriesFromViewless(opCtx);
+        }
+
         _cleanUpClusterParameters(opCtx, originalVersion, requestedVersion);
         _createAuthzSchemaVersionDocIfNeeded(opCtx);
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
@@ -1960,6 +1968,17 @@ private:
         // - No operations with OFCV lower than the target version will be running
         // - All operations acquiring the global lock in X/IX mode see the fully upgraded FCV state
         _waitForOperationsRelyingOnStaleFcvToComplete(opCtx, requestedVersion);
+
+        // Convert viewful timeseries collections to viewless. We do this after the feature flag is
+        // enabled, so no new viewful timeseries collections can be created during the conversion.
+        // Note that while the conversion is ongoing, CRUD and DDL operations are supported on both
+        // the viewful and viewless timeseries collection formats.
+        // TODO(SERVER-114816): Support timeseries upgrade on sharded clusters
+        // (`role` defined as ShardServer or ConfigServer).
+        if (!role &&
+            gFeatureFlagCreateViewlessTimeseriesCollections.isEnabledOnVersion(requestedVersion)) {
+            timeseries::upgradeAllTimeseriesToViewless(opCtx);
+        }
 
         // TODO (SERVER-100309): Remove once 9.0 becomes last lts.
         if (isConfigsvr &&

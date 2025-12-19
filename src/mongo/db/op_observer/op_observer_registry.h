@@ -642,6 +642,14 @@ public:
         }
     }
 
+    void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              const UUID& uuid) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers)
+            o->onUpgradeDowngradeViewlessTimeseries(opCtx, nss, uuid);
+    }
+
 private:
     static repl::OpTime _getOpTimeToReturn(const std::vector<repl::OpTime>& times) {
         if (times.empty()) {

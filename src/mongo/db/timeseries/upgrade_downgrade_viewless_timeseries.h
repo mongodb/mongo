@@ -77,6 +77,12 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                                      const boost::optional<UUID>& expectedUUID = boost::none);
 
 /**
+ * Bulk upgrade/downgrade over all collections in the shard catalog.
+ */
+void upgradeAllTimeseriesToViewless(OperationContext* opCtx);
+void downgradeAllTimeseriesFromViewless(OperationContext* opCtx);
+
+/**
  * Validate if a viewful timeseries collection is well-formed.
  *
  * `bucketsColl` is the system.buckets namespace of the collection (which must exist),

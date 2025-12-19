@@ -293,6 +293,10 @@ public:
                          int64_t docsDeleted,
                          repl::OpTime& opTime) final;
 
+    void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              const UUID& uuid) final;
+
 private:
     std::unique_ptr<OperationLogger> _operationLogger;
 };

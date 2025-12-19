@@ -137,6 +137,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
         "//src/mongo/db/shard_role/shard_catalog:database_holder",
         "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_operations",
         "//src/mongo/s:grid",

@@ -214,16 +214,27 @@ mongo_cc_library(
 )
 
 # TODO(SERVER-114573): Remove this target once 9.0 becomes lastLTS.
+idl_generator(
+    name = "upgrade_downgrade_viewless_timeseries_oplog_entry_gen",
+    src = "upgrade_downgrade_viewless_timeseries_oplog_entry.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+# TODO(SERVER-114573): Remove this target once 9.0 becomes lastLTS.
 mongo_cc_library(
     name = "upgrade_downgrade_viewless_timeseries",
     srcs = [
         "upgrade_downgrade_viewless_timeseries.cpp",
+        ":upgrade_downgrade_viewless_timeseries_oplog_entry_gen",
     ],
     deps = [
         ":timeseries_options",
         ":viewless_timeseries_collection_creation_helpers",
         "//src/mongo/db:server_base",
         "//src/mongo/db/shard_role",
+        "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
         "//src/mongo/db/shard_role/shard_catalog:collection_catalog",
     ],
 )

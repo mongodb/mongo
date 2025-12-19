@@ -122,6 +122,8 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries.h"
+#include "mongo/db/timeseries/upgrade_downgrade_viewless_timeseries_oplog_entry_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
@@ -1239,9 +1241,9 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& cmd = entry.getObject();
           // for truncateRange, the full namespace including database name is in the
           // first command element, rather than just the usual ns value without database name.
-          const auto& ns = NamespaceStringUtil::deserialize(boost::none,
-                                                            cmd.firstElement().valueStringData(),
-                                                            SerializationContext::stateDefault());
+          auto ns = NamespaceStringUtil::deserialize(boost::none,
+                                                     cmd.firstElement().valueStringData(),
+                                                     SerializationContext::stateDefault());
 
           const auto truncateRangeEntry = TruncateRangeOplogEntry::parse(cmd);
           writeConflictRetryWithLimit(opCtx, "applyOps_truncateRange", ns, [&] {
@@ -1270,6 +1272,29 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           return Status::OK();
       },
       {ErrorCodes::NamespaceNotFound}}},
+    {"upgradeDowngradeViewlessTimeseries",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+         const auto& entry = *op;
+         auto cmd = UpgradeDowngradeViewlessTimeseriesOplogEntry::parse(entry.getObject());
+
+         auto ns = NamespaceStringUtil::deserialize(entry.getNss().dbName(),
+                                                    cmd.getUpgradeDowngradeViewlessTimeseries());
+
+         tassert(11450502,
+                 "upgradeDowngradeViewlessTimeseries oplog entries must have an UUID",
+                 entry.getUuid().has_value());
+
+         auto isUpgrade = gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+             VersionContext::getDecoration(opCtx));
+         if (isUpgrade) {
+             timeseries::upgradeToViewlessTimeseries(opCtx, ns, entry.getUuid());
+         } else {
+             timeseries::downgradeFromViewlessTimeseries(opCtx, ns, entry.getUuid());
+         }
+
+         return Status::OK();
+     }}},
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write

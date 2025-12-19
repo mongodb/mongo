@@ -217,6 +217,31 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradedOptionsConsistentWithNe
 }
 
 /**
+ * Upgrade/downgrade all collections in the catalog.
+ */
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeMany) {
+    auto uuid1 = createViewfulTimeseriesCollection(nss1);
+    auto uuid2 = createViewfulTimeseriesCollection(nss2);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    upgradeAllTimeseriesToViewless(operationContext());
+    assertIsViewlessTimeseries(nss1, uuid1);
+    assertIsViewlessTimeseries(nss2, uuid2);
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeMany) {
+    auto uuid1 = createViewlessTimeseriesCollection(nss1);
+    auto uuid2 = createViewlessTimeseriesCollection(nss2);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    downgradeAllTimeseriesFromViewless(operationContext());
+    assertIsViewfulTimeseries(nss1, uuid1);
+    assertIsViewfulTimeseries(nss2, uuid2);
+}
+
+/**
  * Handling of inconsistent collections on upgrade.
  */
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeWithoutView) {

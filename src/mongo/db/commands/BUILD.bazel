@@ -1051,6 +1051,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:database_holder",
         "//src/mongo/db/stats:top",
         "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:upgrade_downgrade_viewless_timeseries",
         "//src/mongo/db/topology/user_write_block:set_user_write_block_mode_idl",
         "//src/mongo/db/topology/user_write_block:user_writes_recoverable_critical_section",
         "//src/mongo/db/transaction:transaction_api",
