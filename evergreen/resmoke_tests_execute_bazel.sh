@@ -94,16 +94,6 @@ find bazel-testlogs/ -type f -path "*TestLogs/**/*.log" -print0 |
         ln -sf $source $target
     done
 
-# Symlink data directories to where Resmoke normally puts them for compatibility with post tasks
-# that run for all Resmoke tasks.
-find bazel-testlogs/ -path '*data/job*' -name 'job*' -print0 |
-    while IFS= read -r -d '' test_outputs; do
-        source=${workdir}/src/$test_outputs
-        target=${workdir}/$(sed 's/.*\.outputs\///' <<<$test_outputs)
-        mkdir -p $(dirname $target)
-        ln -sf $source $target
-    done
-
 # Symlinks archived data directories from multiple tests/shards to a single folder. Evergreen needs a
 # single folder it can glob for s3.put. See the Evergreen function "upload mongodatafiles".
 target_from_undeclared_outputs() {

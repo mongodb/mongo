@@ -114,12 +114,20 @@ if __name__ == "__main__":
             ]
         )
 
-    if os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR"):
-        undeclared_output_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
-        resmoke_args.append(f"--dbpathPrefix={os.path.join(undeclared_output_dir,'data')}")
-        resmoke_args.append(f"--taskWorkDir={undeclared_output_dir}")
-        resmoke_args.append(f"--reportFile={os.path.join(undeclared_output_dir,'report.json')}")
-        os.chdir(undeclared_output_dir)
+    undeclared_output_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
+    resmoke_args.append(f"--taskWorkDir={undeclared_output_dir}")
+    resmoke_args.append(f"--reportFile={os.path.join(undeclared_output_dir,'report.json')}")
+    os.chdir(undeclared_output_dir)
+
+    # Locally, it is nice for the data directory to preserved in the test output. However, we
+    # don't want to save it in CI since we explicitly archive the data directory for failed
+    # tests already. It will add to the output tree size in remote execution which is wasteful.
+    dbpath = (
+        os.environ.get("TEST_TMPDIR")
+        if "--log=evg" in resmoke_args
+        else os.path.join(undeclared_output_dir, "data")
+    )
+    resmoke_args.append(f"--dbpathPrefix={dbpath}")
 
     if os.environ.get("TEST_SHARD_INDEX") and os.environ.get("TEST_TOTAL_SHARDS"):
         shard_count = os.environ.get("TEST_TOTAL_SHARDS")
