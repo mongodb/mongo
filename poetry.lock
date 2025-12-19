@@ -4356,20 +4356,25 @@ tests = ["coverage (>=4.2.0)", "pytest"]
 
 [[package]]
 name = "setuptools"
-version = "58.5.3"
+version = "80.9.0"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.9"
 groups = ["main", "compile", "jira-client"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
-    {file = "setuptools-58.5.3-py3-none-any.whl", hash = "sha256:a481fbc56b33f5d8f6b33dce41482e64c68b668be44ff42922903b03872590bf"},
-    {file = "setuptools-58.5.3.tar.gz", hash = "sha256:dae6b934a965c8a59d6d230d3867ec408bb95e73bd538ff77e71fedf1eaca729"},
+    {file = "setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"},
+    {file = "setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c"},
 ]
 
 [package.extras]
-docs = ["furo", "jaraco.packaging (>=8.2)", "jaraco.tidelift (>=1.4)", "pygments-github-lexers (==0.0.5)", "rst.linker (>=1.9)", "sphinx", "sphinx-inline-tabs", "sphinxcontrib-towncrier"]
-testing = ["flake8-2020", "jaraco.envs", "jaraco.path (>=3.2.0)", "mock", "paver", "pip (>=19.1)", "pytest (>=6)", "pytest-black (>=0.3.7)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=1.0.1)", "pytest-flake8", "pytest-mypy", "pytest-virtualenv (>=1.2.7)", "pytest-xdist", "sphinx", "virtualenv (>=13.0.0)", "wheel"]
+check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1)", "ruff (>=0.8.0)"]
+core = ["importlib_metadata (>=6)", "jaraco.functools (>=4)", "jaraco.text (>=3.7)", "more_itertools", "more_itertools (>=8.8)", "packaging (>=24.2)", "platformdirs (>=4.2.2)", "tomli (>=2.0.1)", "wheel (>=0.43.0)"]
+cover = ["pytest-cov"]
+doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "pygments-github-lexers (==0.0.5)", "pyproject-hooks (!=1.1)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-favicon", "sphinx-inline-tabs", "sphinx-lint", "sphinx-notfound-page (>=1,<2)", "sphinx-reredirects", "sphinxcontrib-towncrier", "towncrier (<24.7)"]
+enabler = ["pytest-enabler (>=2.2)"]
+test = ["build[virtualenv] (>=1.0.3)", "filelock (>=3.4.0)", "ini2toml[lite] (>=0.14)", "jaraco.develop (>=7.21)", "jaraco.envs (>=2.2)", "jaraco.path (>=3.7.2)", "jaraco.test (>=5.5)", "packaging (>=24.2)", "pip (>=19.1)", "pyproject-hooks (!=1.1)", "pytest (>=6,!=8.1.*)", "pytest-home (>=0.5)", "pytest-perf", "pytest-subprocess", "pytest-timeout", "pytest-xdist (>=3)", "tomli-w (>=1.0.0)", "virtualenv (>=13.0.0)", "wheel (>=0.44.0)"]
+type = ["importlib_metadata (>=7.0.2)", "jaraco.develop (>=7.21)", "mypy (==1.14.*)", "pytest-mypy"]
 
 [[package]]
 name = "shellingham"
@@ -5314,15 +5319,15 @@ urllib3 = ">=2"
 
 [[package]]
 name = "types-setuptools"
-version = "57.4.12"
+version = "80.9.0.20250822"
 description = "Typing stubs for setuptools"
 optional = false
-python-versions = "*"
+python-versions = ">=3.9"
 groups = ["lint"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
-    {file = "types-setuptools-57.4.12.tar.gz", hash = "sha256:415a1c23101a05da17eb66bed5d5a865702e5a69f74c66dbf1af643dce9492ab"},
-    {file = "types_setuptools-57.4.12-py3-none-any.whl", hash = "sha256:c3aa952535dedc78654459dfdee49c66974a6c67bdd8026e7e69ae39f80d590b"},
+    {file = "types_setuptools-80.9.0.20250822-py3-none-any.whl", hash = "sha256:53bf881cb9d7e46ed12c76ef76c0aaf28cfe6211d3fab12e0b83620b1a8642c3"},
+    {file = "types_setuptools-80.9.0.20250822.tar.gz", hash = "sha256:070ea7716968ec67a84c7f7768d9952ff24d28b65b6594797a464f1b3066f965"},
 ]
 
 [[package]]
@@ -5813,4 +5818,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "a176b048b2bf66c57b43facaed8170db68c5e94c15cce5dd575af97891382777"
+content-hash = "498c3d0b7159a6a3260cc5a7afa740b72eff690808c674427a4a6b65ae8f6f14"
