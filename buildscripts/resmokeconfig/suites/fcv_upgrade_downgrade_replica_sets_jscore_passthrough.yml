@@ -121,6 +121,7 @@ executor:
   hooks:
     - class: CheckReplOplogs
     - class: CheckReplDBHash
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: FCVUpgradeDowngradeInBackground
     - class: CleanEveryN

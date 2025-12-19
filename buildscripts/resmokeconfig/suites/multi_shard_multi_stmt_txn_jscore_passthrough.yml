@@ -296,6 +296,7 @@ executor:
     # validating the entire contents of the collection.
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

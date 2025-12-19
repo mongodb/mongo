@@ -18,6 +18,7 @@ executor:
       objcheck: ""
   hooks:
     - class: FuzzerRestoreSettings
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       shell_options:
         global_vars:

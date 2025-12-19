@@ -1175,6 +1175,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         excluded_config_collections = [
             "actionlog",
             "analyzeShardKeySplitPoints",
+            "availability_01994e24-d524-7b1c-a710-a2f978f41301",
             "cache.collections",
             "image_collection",
             "mongos",

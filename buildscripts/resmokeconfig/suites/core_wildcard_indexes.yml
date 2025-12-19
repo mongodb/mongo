@@ -71,6 +71,7 @@ executor:
         globalThis.testingReplication = true;
         await import("jstests/libs/override_methods/implicit_wildcard_indexes.js");
   hooks:
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

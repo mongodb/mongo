@@ -17,6 +17,7 @@ executor:
     shell_options:
       eval: await import("jstests/libs/override_methods/implicitly_wrap_pipelines_in_facets.js");
   hooks:
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

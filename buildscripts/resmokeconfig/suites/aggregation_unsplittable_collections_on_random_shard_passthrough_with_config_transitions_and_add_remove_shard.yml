@@ -151,6 +151,7 @@ executor:
           TestData:
             shardsAddedRemoved: true
             hasRandomShardsAddedRemoved: true
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

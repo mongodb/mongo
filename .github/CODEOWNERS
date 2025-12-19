@@ -280,6 +280,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/reconfig_background.py @10gen/server-jstest-infra @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/secondary_lag.py @10gen/server-jstest-infra @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/stepdown.py @10gen/server-jstest-infra @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/canary_workload_background.py @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/wait_for_replication.py @10gen/server-jstest-infra @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/generate_and_check_perf_results.py @10gen/devprod-performance-analysis @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/replicaset_transition_to_and_from_csrs.py @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot

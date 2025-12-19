@@ -20,6 +20,7 @@ executor:
     # validating the entire contents of the collection.
     - class: CheckReplOplogs
     - class: CheckReplDBHash
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
   fixture:
     class: ReplicaSetFixture

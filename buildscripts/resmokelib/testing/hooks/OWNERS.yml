@@ -48,6 +48,9 @@ filters:
   - "stepdown.py":
     approvers:
       - 10gen/server-jstest-infra
+  - "canary_workload_background.py":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "wait_for_replication.py":
     approvers:
       - 10gen/server-jstest-infra

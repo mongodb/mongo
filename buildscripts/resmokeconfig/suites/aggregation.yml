@@ -15,6 +15,7 @@ executor:
     shell_options:
       eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
   hooks:
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

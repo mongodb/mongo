@@ -73,6 +73,7 @@ executor:
     - class: CheckReplOplogs
     - class: CheckReplPreImagesConsistency
     - class: CheckReplDBHash
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       shell_options:
         global_vars:

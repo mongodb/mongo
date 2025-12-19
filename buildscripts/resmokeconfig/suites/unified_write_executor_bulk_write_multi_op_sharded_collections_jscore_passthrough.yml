@@ -218,6 +218,7 @@ executor:
         await import('jstests/libs/override_methods/multiple_crud_ops_as_bulk_write.js');
   hooks:
     - class: CheckReplDBHash
+    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20
