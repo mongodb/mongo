@@ -70,17 +70,20 @@ struct ExpressionSimplifierSettings {
         : ExpressionSimplifierSettings(
               /*maximumNumberOfUniquePredicates*/ std::numeric_limits<size_t>::max(),
               /*maximumNumberOfMinterms*/ std::numeric_limits<size_t>::max(),
+              /*maxNumPrimeImplicants*/ std::numeric_limits<size_t>::max(),
               /*maxSizeFactor*/ 1e6,
               /*doNotOpenContainedOrs*/ false,
               /*applyQuineMcCluskey*/ true) {}
 
     ExpressionSimplifierSettings(size_t maximumNumberOfUniquePredicates,
                                  size_t maximumNumberOfMinterms,
+                                 size_t maxNumPrimeImplicants,
                                  double maxSizeFactor,
                                  bool doNotOpenContainedOrs,
                                  bool applyQuineMcCluskey)
         : maximumNumberOfUniquePredicates(maximumNumberOfUniquePredicates),
           maximumNumberOfMinterms(maximumNumberOfMinterms),
+          maxNumPrimeImplicants(maxNumPrimeImplicants),
           maxSizeFactor(maxSizeFactor),
           doNotOpenContainedOrs(doNotOpenContainedOrs),
           applyQuineMcCluskey(applyQuineMcCluskey) {}
@@ -95,6 +98,12 @@ struct ExpressionSimplifierSettings {
      * Maximum number of minterms allowed during boolean transformations.
      */
     size_t maximumNumberOfMinterms;
+
+    /**
+     * Petrick's method has exponential complexity. This causes us to avoid calling Petrick's method
+     * when we have more than the specified upper limit of prime implicants.
+     */
+    size_t maxNumPrimeImplicants;
 
     /**
      * If the simplified expression is larger than the original expression's size times

@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/util/dynamic_bitset.h"
+#include "mongo/util/modules.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -36,9 +39,10 @@
 
 namespace mongo::boolean_simplification {
 /**
- * The list of original minterms covered by a derived minterm (a.k.a. prime implicant).
+ * A bitset whose set bits correspond to those original minterms covered by a derived minterm
+ * (a.k.a. prime implicant).
  */
-using CoveredOriginalMinterms = absl::InlinedVector<uint32_t, 2>;
+using CoveredOriginalMinterms = DynamicBitset<size_t, 2>;
 
 /**
  * Represents a list of prime implicants, identified by their indices.
@@ -62,6 +66,11 @@ using PrimeImplicantIndices = std::vector<uint32_t>;
  * only 2 prime implicants with indices 0 and 2 are enough to cover all 6 original minterms. It is
  * possible that we can get more than one coverage as output. For the given input: [[0, 1, 2], [2,
  * 3], [0, 3]] two coverages are possible: [[0, 1], [0, 2]].
+ *
+ * 'maxNumPrimeImplicants' specifies a threshold for the maximum number of prime implicants we may
+ * produce, in order to bound both the time complexity and memory footprint of this function. If we
+ * hit this limit, this returns an empty vector.
  */
-std::vector<PrimeImplicantIndices> petricksMethod(const std::vector<CoveredOriginalMinterms>& data);
+std::vector<PrimeImplicantIndices> petricksMethod(const std::vector<CoveredOriginalMinterms>& data,
+                                                  size_t maxNumPrimeImplicants);
 }  // namespace mongo::boolean_simplification
