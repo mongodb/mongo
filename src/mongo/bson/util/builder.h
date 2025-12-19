@@ -50,13 +50,12 @@
 #include "mongo/util/tracking/allocator.h"
 
 #include <cfloat>
+#include <cinttypes>
 #include <climits>
-#include <concepts>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <limits>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -741,6 +740,11 @@ class StringBuilderImpl {
 public:
     // Sizes are determined based on the number of characters in 64-bit + the trailing '\0'
     static const size_t MONGO_DBL_SIZE = 3 + DBL_MANT_DIG - DBL_MIN_EXP + 1;
+    static const size_t MONGO_S32_SIZE = 12;
+    static const size_t MONGO_U32_SIZE = 11;
+    static const size_t MONGO_S64_SIZE = 23;
+    static const size_t MONGO_U64_SIZE = 22;
+    static const size_t MONGO_S16_SIZE = 7;
     static const size_t MONGO_PTR_SIZE = 19;  // Accounts for the 0x prefix
 
     StringBuilderImpl() {}
@@ -749,25 +753,25 @@ public:
         return appendUsingFmt(x, MONGO_DBL_SIZE);
     }
     StringBuilderImpl& operator<<(int x) {
-        return appendIntegral(x);
+        return appendIntegral(x, MONGO_S32_SIZE);
     }
     StringBuilderImpl& operator<<(unsigned x) {
-        return appendIntegral(x);
+        return appendIntegral(x, MONGO_U32_SIZE);
     }
     StringBuilderImpl& operator<<(long x) {
-        return appendIntegral(x);
+        return appendIntegral(x, MONGO_S64_SIZE);
     }
     StringBuilderImpl& operator<<(unsigned long x) {
-        return appendIntegral(x);
+        return appendIntegral(x, MONGO_U64_SIZE);
     }
     StringBuilderImpl& operator<<(long long x) {
-        return appendIntegral(x);
+        return appendIntegral(x, MONGO_S64_SIZE);
     }
     StringBuilderImpl& operator<<(unsigned long long x) {
-        return appendIntegral(x);
+        return appendIntegral(x, MONGO_U64_SIZE);
     }
     StringBuilderImpl& operator<<(short x) {
-        return appendIntegral(x);
+        return appendIntegral(x, MONGO_S16_SIZE);
     }
     StringBuilderImpl& operator<<(const void* x) {
         return appendUsingFmt(x, MONGO_PTR_SIZE);
@@ -854,16 +858,14 @@ public:
     }
 
 private:
-    template <std::integral T>
-    StringBuilderImpl& appendIntegral(T val) {
-        // char shouldn't append as number.
-        static_assert(!std::is_same<T, char>());
-        // We rely on the ability to represent the magnitude of val in a uint64_t
-        static_assert(std::numeric_limits<T>::max() <= std::numeric_limits<uint64_t>::max());
+    template <typename T>
+    StringBuilderImpl& appendIntegral(T val, int maxSize) {
+        MONGO_STATIC_ASSERT(!std::is_same<T, char>());  // char shouldn't append as number.
+        MONGO_STATIC_ASSERT(std::is_integral<T>());
 
-        if (val < T(0)) {
+        if (val < 0) {
             *this << '-';
-            append(StringData(ItoA(-uint64_t(val))));  // Send the magnitude to ItoA.
+            append(StringData(ItoA(0 - uint64_t(val))));  // Send the magnitude to ItoA.
         } else {
             append(StringData(ItoA(uint64_t(val))));
         }
