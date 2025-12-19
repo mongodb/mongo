@@ -53,6 +53,27 @@ assert.commandWorked(sourceCollection.insert([{key: 200}, {key: -200}]));
 
 const txnCoordinator = st.rs1.getPrimary();
 
+// Create a thread which leaves the TransactionCoordinator in a state right before it tries to delete the coordinator doc. Set up a failpoint for after deleting the coordinator doc because commitTransaction will return before deleting the coordinator, and we want to ensure that we wait for the deletion to finish before we allow the test to proceed.
+const hangBeforeDeletingCoordinatorDocFp = configureFailPoint(txnCoordinator, "hangBeforeDeletingCoordinatorDoc");
+const hangAfterDeletingCoordinatorDocFp = configureFailPoint(txnCoordinator, "hangAfterDeletingCoordinatorDoc");
+const deleteCoordinatorDocThread = new Thread(
+    function runTwoPhaseCommitTxn(host, dbName, collName) {
+        const conn = new Mongo(host);
+        const session = conn.startSession({causalConsistency: false});
+        const sessionCollection = session.getDatabase(dbName).getCollection(collName);
+
+        session.startTransaction();
+        assert.commandWorked(sessionCollection.insert({key: 400}));
+        assert.commandWorked(sessionCollection.insert({key: -400}));
+        assert.commandWorked(session.commitTransaction_forTesting());
+    },
+    st.s.host,
+    sourceCollection.getDB().getName(),
+    sourceCollection.getName(),
+);
+deleteCoordinatorDocThread.start();
+hangBeforeDeletingCoordinatorDocFp.wait();
+
 // Create a thread which leaves the TransactionCoordinator in a state where prepareTransaction has
 // been run on both participant shards and it is about to write the commit decision locally to the
 // config.transaction_coordinators collection.
@@ -131,6 +152,15 @@ assert.soon(
     },
     () => `Failed to find prepare conflicts in $currentOp output: ${tojson(currentOp())}`,
 );
+
+// The commitTransaction command should not wait for the coordinator doc to be deleted.
+deleteCoordinatorDocThread.join();
+
+// Allow the deleteCoordinatorDocThread to proceed with deleting the doc. This tests that we skip write ticket acquisition for deleting the doc.
+hangBeforeDeletingCoordinatorDocFp.off();
+jsTestLog("Waiting for deleteCoordinatorDocThread to successfully delete the coordinator doc");
+hangAfterDeletingCoordinatorDocFp.wait();
+hangAfterDeletingCoordinatorDocFp.off();
 
 // Allow the commitTxnThread to proceed with preparing the transaction. This tests that we skip
 // write ticket acquisition when preparing a transaction.

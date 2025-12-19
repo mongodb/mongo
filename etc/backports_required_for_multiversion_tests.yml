@@ -111,6 +111,8 @@ last-continuous:
       ticket: SERVER-103955
     - test_file: jstests/sharding/query/javascript_heap_limit.js
       ticket: SERVER-109200
+    - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
+      ticket: SERVER-115594
   suites: null
 last-lts:
   all:
@@ -724,4 +726,6 @@ last-lts:
       ticket: SERVER-103955
     - test_file: jstests/sharding/query/javascript_heap_limit.js
       ticket: SERVER-109200
+    - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
+      ticket: SERVER-115594
   suites: null
