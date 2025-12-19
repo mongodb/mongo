@@ -117,17 +117,17 @@ TEST(UnifiedWriteExecutorProducerTest, BulkWriteOpProducerPeekAndAdvance) {
     // Repeated peek and advance three times.
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
-    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getIndex(), 0);
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
-    ASSERT_EQ(op2->getId(), 2);
+    ASSERT_EQ(op2->getIndex(), 2);
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -141,21 +141,21 @@ TEST(UnifiedWriteExecutorProducerTest, BulkWriteOpProducerRepeatedPeek) {
     // Peek the same write op three times then advance.
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
-    ASSERT_EQ(op0First->getId(), 0);
+    ASSERT_EQ(op0First->getIndex(), 0);
 
     auto op0Second = producer.peekNext();
     ASSERT_TRUE(op0Second.has_value());
-    ASSERT_EQ(op0Second->getId(), 0);
+    ASSERT_EQ(op0Second->getIndex(), 0);
 
     auto op0Third = producer.peekNext();
     ASSERT_TRUE(op0Third.has_value());
-    ASSERT_EQ(op0Third->getId(), 0);
+    ASSERT_EQ(op0Third->getIndex(), 0);
 
     producer.advance();
 
     auto op1Second = producer.peekNext();
     ASSERT_TRUE(op1Second.has_value());
-    ASSERT_EQ(op1Second->getId(), 1);
+    ASSERT_EQ(op1Second->getIndex(), 1);
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -168,11 +168,11 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerRepeatedAdvance) {
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
-    ASSERT_EQ(op0First->getId(), 0);
+    ASSERT_EQ(op0First->getIndex(), 0);
 
     auto op0Second = producer.peekNext();
     ASSERT_TRUE(op0Second.has_value());
-    ASSERT_EQ(op0Second->getId(), 0);
+    ASSERT_EQ(op0Second->getIndex(), 0);
 
     // Advance twice to skip a write op.
     producer.advance();
@@ -180,7 +180,7 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerRepeatedAdvance) {
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
-    ASSERT_EQ(op2->getId(), 2);
+    ASSERT_EQ(op2->getIndex(), 2);
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -193,7 +193,7 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerAdvancePastEnd) {
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
-    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getIndex(), 0);
     producer.advance();
 
     // Advance at the end keeps returning noop.
@@ -211,12 +211,12 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessSingle) {
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
-    ASSERT_EQ(op0First->getId(), 0);
+    ASSERT_EQ(op0First->getIndex(), 0);
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     producer.advance();
 
     producer.markOpReprocess(*op0First);
@@ -224,13 +224,13 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessSingle) {
     // Reprocess op0 generates op0 again.
     auto op0Second = producer.peekNext();
     ASSERT_TRUE(op0Second.has_value());
-    ASSERT_EQ(op0Second->getId(), 0);
+    ASSERT_EQ(op0Second->getIndex(), 0);
     producer.advance();
 
     // The op1 is not reprocessed so will not be generated again.
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
-    ASSERT_EQ(op2->getId(), 2);
+    ASSERT_EQ(op2->getIndex(), 2);
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -243,17 +243,17 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessLowThenHighId) {
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
-    ASSERT_EQ(op0First->getId(), 0);
+    ASSERT_EQ(op0First->getIndex(), 0);
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     producer.advance();
 
     auto op2First = producer.peekNext();
     ASSERT_TRUE(op2First.has_value());
-    ASSERT_EQ(op2First->getId(), 2);
+    ASSERT_EQ(op2First->getIndex(), 2);
     producer.advance();
 
     auto noopFirst = producer.peekNext();
@@ -265,13 +265,13 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessLowThenHighId) {
 
     auto op0Second = producer.peekNext();
     ASSERT_TRUE(op0Second.has_value());
-    ASSERT_EQ(op0Second->getId(), 0);
+    ASSERT_EQ(op0Second->getIndex(), 0);
     producer.advance();
 
     // The op1 between two reprocessed ops will not be generated.
     auto op2Second = producer.peekNext();
     ASSERT_TRUE(op2Second.has_value());
-    ASSERT_EQ(op2Second->getId(), 2);
+    ASSERT_EQ(op2Second->getIndex(), 2);
     producer.advance();
 
     auto noopSecond = producer.peekNext();
@@ -284,17 +284,17 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessHighThenLowId) {
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
-    ASSERT_EQ(op0First->getId(), 0);
+    ASSERT_EQ(op0First->getIndex(), 0);
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     producer.advance();
 
     auto op2First = producer.peekNext();
     ASSERT_TRUE(op2First.has_value());
-    ASSERT_EQ(op2First->getId(), 2);
+    ASSERT_EQ(op2First->getIndex(), 2);
     producer.advance();
 
     auto noopFirst = producer.peekNext();
@@ -306,13 +306,13 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessHighThenLowId) {
 
     auto op0Second = producer.peekNext();
     ASSERT_TRUE(op0Second.has_value());
-    ASSERT_EQ(op0Second->getId(), 0);
+    ASSERT_EQ(op0Second->getIndex(), 0);
     producer.advance();
 
     // The op1 between two reprocessed ops will not be generated.
     auto op2Second = producer.peekNext();
     ASSERT_TRUE(op2Second.has_value());
-    ASSERT_EQ(op2Second->getId(), 2);
+    ASSERT_EQ(op2Second->getIndex(), 2);
     producer.advance();
 
     auto noopSecond = producer.peekNext();
@@ -325,12 +325,12 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessSameOpAgain) {
 
     auto op0First = producer.peekNext();
     ASSERT_TRUE(op0First.has_value());
-    ASSERT_EQ(op0First->getId(), 0);
+    ASSERT_EQ(op0First->getIndex(), 0);
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     producer.advance();
 
     // Reprocess op0 the first time.
@@ -338,12 +338,12 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessSameOpAgain) {
 
     auto op0Second = producer.peekNext();
     ASSERT_TRUE(op0Second.has_value());
-    ASSERT_EQ(op0Second->getId(), 0);
+    ASSERT_EQ(op0Second->getIndex(), 0);
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
-    ASSERT_EQ(op2->getId(), 2);
+    ASSERT_EQ(op2->getIndex(), 2);
     producer.advance();
 
     // Reprocess op0 the second time still generates op0 again.
@@ -351,7 +351,7 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerReprocessSameOpAgain) {
 
     auto op0Third = producer.peekNext();
     ASSERT_TRUE(op0Third.has_value());
-    ASSERT_EQ(op0Third->getId(), 0);
+    ASSERT_EQ(op0Third->getIndex(), 0);
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -375,23 +375,23 @@ TEST(UnifiedWriteExecutorProducerTest, BulkWriteOpProducerDifferentNamespaces) {
     // Check ops with different namespaces and request contents.
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
-    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getIndex(), 0);
     ASSERT_EQ(op0->getNss(), nss0);
-    ASSERT_BSONOBJ_EQ(op0->getItemRef().getInsertOp().getDocument(), BSON("a" << 0));
+    ASSERT_BSONOBJ_EQ(op0->getInsertOp().getDocument(), BSON("a" << 0));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     ASSERT_EQ(op1->getNss(), nss1);
-    ASSERT_BSONOBJ_EQ(op1->getItemRef().getUpdateOp().getFilter(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(op1->getUpdateOp().getFilter(), BSON("a" << 1));
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
-    ASSERT_EQ(op2->getId(), 2);
+    ASSERT_EQ(op2->getIndex(), 2);
     ASSERT_EQ(op2->getNss(), nss2);
-    ASSERT_BSONOBJ_EQ(op2->getItemRef().getDeleteOp().getFilter(), BSON("a" << 2));
+    ASSERT_BSONOBJ_EQ(op2->getDeleteOp().getFilter(), BSON("a" << 2));
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -413,17 +413,17 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerPeekAndAdvance) {
         // Repeated peek and advance three times.
         auto op0 = producer.peekNext();
         ASSERT_TRUE(op0.has_value());
-        ASSERT_EQ(op0->getId(), 0);
+        ASSERT_EQ(op0->getIndex(), 0);
         producer.advance();
 
         auto op1 = producer.peekNext();
         ASSERT_TRUE(op1.has_value());
-        ASSERT_EQ(op1->getId(), 1);
+        ASSERT_EQ(op1->getIndex(), 1);
         producer.advance();
 
         auto op2 = producer.peekNext();
         ASSERT_TRUE(op2.has_value());
-        ASSERT_EQ(op2->getId(), 2);
+        ASSERT_EQ(op2->getIndex(), 2);
         producer.advance();
 
         auto noop = producer.peekNext();
@@ -442,27 +442,27 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerRepeatedPeek) {
         // Peek the same write op three times then advance.
         auto op0First = producer.peekNext();
         ASSERT_TRUE(op0First.has_value());
-        ASSERT_EQ(op0First->getId(), 0);
+        ASSERT_EQ(op0First->getIndex(), 0);
 
         auto op0Second = producer.peekNext();
         ASSERT_TRUE(op0Second.has_value());
-        ASSERT_EQ(op0Second->getId(), 0);
+        ASSERT_EQ(op0Second->getIndex(), 0);
 
         auto op0Third = producer.peekNext();
         ASSERT_TRUE(op0Third.has_value());
-        ASSERT_EQ(op0Third->getId(), 0);
+        ASSERT_EQ(op0Third->getIndex(), 0);
 
         producer.advance();
 
         auto op1Second = producer.peekNext();
         ASSERT_TRUE(op1Second.has_value());
-        ASSERT_EQ(op1Second->getId(), 1);
+        ASSERT_EQ(op1Second->getIndex(), 1);
 
         producer.advance();
 
         auto op2Second = producer.peekNext();
         ASSERT_TRUE(op2Second.has_value());
-        ASSERT_EQ(op2Second->getId(), 2);
+        ASSERT_EQ(op2Second->getIndex(), 2);
 
         producer.advance();
 
@@ -479,23 +479,23 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerInsertContents) {
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
-    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getIndex(), 0);
     ASSERT_EQ(op0->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op0->getItemRef().getInsertOp().getDocument(), BSON("x" << 0));
+    ASSERT_BSONOBJ_EQ(op0->getInsertOp().getDocument(), BSON("x" << 0));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     ASSERT_EQ(op1->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op1->getItemRef().getInsertOp().getDocument(), BSON("x" << 1));
+    ASSERT_BSONOBJ_EQ(op1->getInsertOp().getDocument(), BSON("x" << 1));
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
-    ASSERT_EQ(op2->getId(), 2);
+    ASSERT_EQ(op2->getIndex(), 2);
     ASSERT_EQ(op2->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op2->getItemRef().getInsertOp().getDocument(), BSON("x" << 2));
+    ASSERT_BSONOBJ_EQ(op2->getInsertOp().getDocument(), BSON("x" << 2));
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -510,23 +510,23 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerUpdateContents) {
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
-    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getIndex(), 0);
     ASSERT_EQ(op0->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op0->getItemRef().getUpdateOp().getFilter(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(op0->getUpdateOp().getFilter(), BSON("_id" << 1));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     ASSERT_EQ(op1->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op1->getItemRef().getUpdateOp().getFilter(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(op1->getUpdateOp().getFilter(), BSON("_id" << 2));
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
-    ASSERT_EQ(op2->getId(), 2);
+    ASSERT_EQ(op2->getIndex(), 2);
     ASSERT_EQ(op2->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op2->getItemRef().getUpdateOp().getFilter(), BSON("_id" << 3));
+    ASSERT_BSONOBJ_EQ(op2->getUpdateOp().getFilter(), BSON("_id" << 3));
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -541,26 +541,23 @@ TEST(UnifiedWriteExecutorProducerTest, BatchWriteOpProducerDeleteContents) {
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
-    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getIndex(), 0);
     ASSERT_EQ(op0->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op0->getItemRef().getDeleteOp().getFilter(),
-                      BSON("x" << GTE << -1 << LT << 2));
+    ASSERT_BSONOBJ_EQ(op0->getDeleteOp().getFilter(), BSON("x" << GTE << -1 << LT << 2));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     ASSERT_EQ(op1->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op1->getItemRef().getDeleteOp().getFilter(),
-                      BSON("x" << GTE << -2 << LT << 1));
+    ASSERT_BSONOBJ_EQ(op1->getDeleteOp().getFilter(), BSON("x" << GTE << -2 << LT << 1));
     producer.advance();
 
     auto op2 = producer.peekNext();
     ASSERT_TRUE(op2.has_value());
-    ASSERT_EQ(op2->getId(), 2);
+    ASSERT_EQ(op2->getIndex(), 2);
     ASSERT_EQ(op2->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op2->getItemRef().getDeleteOp().getFilter(),
-                      BSON("x" << GTE << -3 << LT << 0));
+    ASSERT_BSONOBJ_EQ(op2->getDeleteOp().getFilter(), BSON("x" << GTE << -3 << LT << 0));
     producer.advance();
 
     auto noop = producer.peekNext();
@@ -575,28 +572,25 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerConsumeAllOps) {
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
-    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getIndex(), 0);
     ASSERT_EQ(op0->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op0->getItemRef().getDeleteOp().getFilter(),
-                      BSON("x" << GTE << -1 << LT << 2));
+    ASSERT_BSONOBJ_EQ(op0->getDeleteOp().getFilter(), BSON("x" << GTE << -1 << LT << 2));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     ASSERT_EQ(op1->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op1->getItemRef().getDeleteOp().getFilter(),
-                      BSON("x" << GTE << -2 << LT << 1));
+    ASSERT_BSONOBJ_EQ(op1->getDeleteOp().getFilter(), BSON("x" << GTE << -2 << LT << 1));
 
     auto remainingOps = producer.consumeAllRemainingOps();
     ASSERT_EQ(remainingOps.size(), 2);
     ASSERT_EQ(remainingOps[0], op1);
 
     auto op2 = remainingOps[1];
-    ASSERT_EQ(op2.getId(), 2);
+    ASSERT_EQ(op2.getIndex(), 2);
     ASSERT_EQ(op2.getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op2.getItemRef().getDeleteOp().getFilter(),
-                      BSON("x" << GTE << -3 << LT << 0));
+    ASSERT_BSONOBJ_EQ(op2.getDeleteOp().getFilter(), BSON("x" << GTE << -3 << LT << 0));
 
     auto noop = producer.peekNext();
     ASSERT_FALSE(noop.has_value());
@@ -614,18 +608,16 @@ TEST(UnifiedWriteExecutorProducerTest, WriteOpProducerConsumeAllOpsStopProducing
 
     auto op0 = producer.peekNext();
     ASSERT_TRUE(op0.has_value());
-    ASSERT_EQ(op0->getId(), 0);
+    ASSERT_EQ(op0->getIndex(), 0);
     ASSERT_EQ(op0->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op0->getItemRef().getDeleteOp().getFilter(),
-                      BSON("x" << GTE << -1 << LT << 2));
+    ASSERT_BSONOBJ_EQ(op0->getDeleteOp().getFilter(), BSON("x" << GTE << -1 << LT << 2));
     producer.advance();
 
     auto op1 = producer.peekNext();
     ASSERT_TRUE(op1.has_value());
-    ASSERT_EQ(op1->getId(), 1);
+    ASSERT_EQ(op1->getIndex(), 1);
     ASSERT_EQ(op1->getNss(), nss);
-    ASSERT_BSONOBJ_EQ(op1->getItemRef().getDeleteOp().getFilter(),
-                      BSON("x" << GTE << -2 << LT << 1));
+    ASSERT_BSONOBJ_EQ(op1->getDeleteOp().getFilter(), BSON("x" << GTE << -2 << LT << 1));
 
     // Marking the producer as not producing ops should make 'consumeAllRemainingOps' return an
     // empty vector.

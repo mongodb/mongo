@@ -168,6 +168,7 @@ public:
      */
     void evaluateAndReplaceLetParams(OperationContext* opCtx);
 
+    write_ops::WriteCommandRequestBase& getWriteCommandRequestBase();
     const write_ops::WriteCommandRequestBase& getWriteCommandRequestBase() const;
     void setWriteCommandRequestBase(write_ops::WriteCommandRequestBase writeCommandBase);
 

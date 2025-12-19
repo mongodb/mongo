@@ -116,14 +116,13 @@ int BulkCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& shardI
     // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
     // corresponding to the statements that got routed to each individual shard, so they need to
     // be accounted in the potential request size so it does not exceed the max BSON size.
-    // TODO(SERVER-112764): determine if there is a performance hit from converting batch write ops
-    // to bulk write ops for size estimation in the UWE.
+    // TODO(SERVER-115826): Update size estimation logic now that WriteBatchExecutor uses
+    // insert/update/delete commands.
     int writeSizeBytes = op.estimateOpSizeInBytesAsBulkOp() +
         write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
         (_isRetryableWriteOrInTransaction
              ? write_ops::kStmtIdSize + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
              : 0);
-
 
     // Get the set of nsInfos we've accounted for on this shardId.
     auto iter = _accountedForNsInfos.find(shardId);
@@ -212,5 +211,93 @@ BulkWriteDeleteOp toBulkWriteDelete(const write_ops::DeleteOpEntry& op) {
     deleteOp.setFilter(op.getQ());
     return deleteOp;
 }
+
+BulkWriteOpVariant getOrMakeBulkWriteOp(WriteOpRef op) {
+    tassert(10394907,
+            "Unexpected findAndModify command to convert to bulkWrite op",
+            !op.isFindAndModify());
+    return op.visitOpData(OverloadedVisitor{
+        [&](const BSONObj& insertDoc) -> BulkWriteOpVariant {
+            return BulkWriteInsertOp(0, insertDoc);
+        },
+        [&](const write_ops::UpdateOpEntry& updateOp) -> BulkWriteOpVariant {
+            return write_op_helpers::toBulkWriteUpdate(updateOp);
+        },
+        [&](const write_ops::DeleteOpEntry& deleteOp) -> BulkWriteOpVariant {
+            return write_op_helpers::toBulkWriteDelete(deleteOp);
+        },
+        [&](const mongo::BulkWriteInsertOp& insertOp) -> BulkWriteOpVariant { return insertOp; },
+        [&](const mongo::BulkWriteUpdateOp& updateOp) -> BulkWriteOpVariant { return updateOp; },
+        [&](const mongo::BulkWriteDeleteOp& deleteOp) -> BulkWriteOpVariant { return deleteOp; },
+        [&](const write_ops::FindAndModifyCommandRequest&) -> BulkWriteOpVariant {
+            MONGO_UNREACHABLE;
+        }});
+}
+
+write_ops::UpdateOpEntry getOrMakeUpdateOpEntry(UpdateOpRef updateOp) {
+    auto cmdRef = updateOp.getCommand();
+
+    if (cmdRef.isBatchWriteCommand()) {
+        auto batchType = cmdRef.getBatchedCommandRequest().getBatchType();
+        tassert(11468100, "Expected update", batchType == BatchedCommandRequest::BatchType_Update);
+
+        const auto& request = cmdRef.getBatchedCommandRequest().getUpdateRequest();
+        auto idx = updateOp.getIndex();
+        const bool inBounds = (idx >= 0 && static_cast<size_t>(idx) < request.getUpdates().size());
+        tassert(11468113, "Expected index to be in bounds", inBounds);
+
+        return request.getUpdates()[idx];
+    }
+
+    // TODO SERVER-107545: Move this check to parse time and potentially convert this to a
+    // tassert.
+    uassert(ErrorCodes::FailedToParse,
+            "Cannot specify sort with multi=true",
+            !updateOp.getSort() || !updateOp.getMulti());
+
+    write_ops::UpdateOpEntry updateOpEntry;
+    updateOpEntry.setQ(updateOp.getFilter());
+    updateOpEntry.setMulti(updateOp.getMulti());
+    updateOpEntry.setC(updateOp.getConstants());
+    updateOpEntry.setU(updateOp.getUpdateMods());
+    updateOpEntry.setSort(updateOp.getSort());
+    updateOpEntry.setHint(updateOp.getHint());
+    updateOpEntry.setCollation(updateOp.getCollation());
+    updateOpEntry.setArrayFilters(updateOp.getArrayFilters());
+    updateOpEntry.setUpsert(updateOp.getUpsert());
+    updateOpEntry.setUpsertSupplied(updateOp.getUpsertSupplied());
+    updateOpEntry.setIncludeQueryStatsMetrics(updateOp.getIncludeQueryStatsMetrics());
+    updateOpEntry.setSampleId(updateOp.getSampleId());
+    updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+        updateOp.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
+
+    return updateOpEntry;
+}
+
+write_ops::DeleteOpEntry getOrMakeDeleteOpEntry(DeleteOpRef deleteOp) {
+    auto cmdRef = deleteOp.getCommand();
+
+    if (cmdRef.isBatchWriteCommand()) {
+        auto batchType = cmdRef.getBatchedCommandRequest().getBatchType();
+        tassert(11468101, "Expected delete", batchType == BatchedCommandRequest::BatchType_Delete);
+
+        const auto& request = cmdRef.getBatchedCommandRequest().getDeleteRequest();
+        auto idx = deleteOp.getIndex();
+        const bool inBounds = (idx >= 0 && static_cast<size_t>(idx) < request.getDeletes().size());
+        tassert(11468114, "Expected index to be in bounds", inBounds);
+
+        return request.getDeletes()[idx];
+    }
+
+    write_ops::DeleteOpEntry deleteOpEntry;
+    deleteOpEntry.setQ(deleteOp.getFilter());
+    deleteOpEntry.setMulti(deleteOp.getMulti());
+    deleteOpEntry.setHint(deleteOp.getHint());
+    deleteOpEntry.setCollation(deleteOp.getCollation());
+    deleteOpEntry.setSampleId(deleteOp.getSampleId());
+
+    return deleteOpEntry;
+}
+
 }  // namespace write_op_helpers
 }  // namespace mongo

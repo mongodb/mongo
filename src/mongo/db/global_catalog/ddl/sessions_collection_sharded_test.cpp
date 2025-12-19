@@ -100,26 +100,11 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionOKTest) {
         });
 
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
-                BulkWriteCommandReply reply(
-                    BulkWriteCommandResponseCursor(0,
-                                                   {BulkWriteReplyItem{0, Status::OK()}},
-                                                   NamespaceString::kLogicalSessionsNamespace),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0);
-                reply.setNModified(1);
-                return reply.toBSON();
-            } else {
-                BatchedCommandResponse response;
-                response.setStatus(Status::OK());
-                response.setNModified(1);
+            BatchedCommandResponse response;
+            response.setStatus(Status::OK());
+            response.setNModified(1);
 
-                return response.toBSON();
-            }
+            return response.toBSON();
         });
 
         future.default_timed_get();
@@ -186,28 +171,12 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
         });
 
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
-                BulkWriteCommandReply reply(
-                    BulkWriteCommandResponseCursor(
-                        0,
-                        {BulkWriteReplyItem{0, {ErrorCodes::NotWritablePrimary, "not primary"}}},
-                        NamespaceString::kLogicalSessionsNamespace),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0);
-                reply.setNModified(0);
-                return reply.toBSON();
-            } else {
-                BatchedCommandResponse response;
-                response.setStatus(Status::OK());
-                response.setNModified(0);
-                response.addToErrDetails(
-                    write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
-                return response.toBSON();
-            }
+            BatchedCommandResponse response;
+            response.setStatus(Status::OK());
+            response.setNModified(0);
+            response.addToErrDetails(
+                write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
+            return response.toBSON();
         });
 
         ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotWritablePrimary);
@@ -228,25 +197,10 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionOKTest) {
         });
 
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
-                BulkWriteCommandReply reply(
-                    BulkWriteCommandResponseCursor(0,
-                                                   {BulkWriteReplyItem{0, Status::OK()}},
-                                                   NamespaceString::kLogicalSessionsNamespace),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0);
-                reply.setNModified(1);
-                return reply.toBSON();
-            } else {
-                BatchedCommandResponse response;
-                response.setStatus(Status::OK());
-                response.setNModified(1);
-                return response.toBSON();
-            }
+            BatchedCommandResponse response;
+            response.setStatus(Status::OK());
+            response.setNModified(1);
+            return response.toBSON();
         });
 
         future.default_timed_get();
@@ -281,28 +235,12 @@ TEST_F(SessionsCollectionShardedTest, RemoveOneSessionWriteErrTest) {
         });
 
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
-                BulkWriteCommandReply reply(
-                    BulkWriteCommandResponseCursor(
-                        0,
-                        {BulkWriteReplyItem{0, {ErrorCodes::NotWritablePrimary, "not primary"}}},
-                        NamespaceString::kLogicalSessionsNamespace),
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0);
-                reply.setNModified(0);
-                return reply.toBSON();
-            } else {
-                BatchedCommandResponse response;
-                response.setStatus(Status::OK());
-                response.setNModified(0);
-                response.addToErrDetails(
-                    write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
-                return response.toBSON();
-            }
+            BatchedCommandResponse response;
+            response.setStatus(Status::OK());
+            response.setNModified(0);
+            response.addToErrDetails(
+                write_ops::WriteError(0, {ErrorCodes::NotWritablePrimary, "not primary"}));
+            return response.toBSON();
         });
 
         ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotWritablePrimary);

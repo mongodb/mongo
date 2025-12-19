@@ -62,7 +62,7 @@ std::vector<WriteOp> WriteOpProducer::consumeAllRemainingOps() {
 }
 
 void WriteOpProducer::markOpReprocess(const WriteOp& op) {
-    _activeIndices.insert(op.getId());
+    _activeIndices.insert(getWriteOpId(op));
 }
 
 }  // namespace unified_write_executor

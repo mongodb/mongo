@@ -102,6 +102,7 @@ public:
     };
 
     struct ShardResult {
+        boost::optional<BatchWriteCommandReply> batchWriteReply;
         boost::optional<BulkWriteCommandReply> bulkWriteReply;
         boost::optional<WriteConcernErrorDetail> wce;
         std::vector<std::pair<WriteOp, ItemVariant>> items;
@@ -220,6 +221,12 @@ private:
      * Process the counters and the list of retried stmtIds from the BulkWriteCommandReply. Note
      * that this method does not update _numOkResponses or _nErrors.
      */
+    void processCountersAndRetriedStmtIds(const BatchWriteCommandReply& parsedReply);
+
+    /**
+     * Process the counters and the list of retried stmtIds from the BulkWriteCommandReply. Note
+     * that this method does not update _numOkResponses or _nErrors.
+     */
     void processCountersAndRetriedStmtIds(const BulkWriteCommandReply& parsedReply);
 
     /**
@@ -283,6 +290,16 @@ private:
         OperationContext* opCtx, std::vector<std::pair<ShardId, ShardResult>>& shardResults) const;
 
     /**
+     * Gets the error details and upsert details from 'result.batchWriteReply', converts these
+     * details to BulkWriteReplyItems, and puts these BulkWriteReplyItems into 'result.items'.
+     */
+    void retrieveBatchWriteReplyItems(OperationContext* opCtx,
+                                      RoutingContext& routingCtx,
+                                      const ShardId& shardId,
+                                      const std::vector<WriteOp>& ops,
+                                      ShardResult& result);
+
+    /**
      * Gets the BulkWriteReplyItems from 'result.bulkWriteReply' and puts them into 'result.items'.
      */
     void retrieveBulkWriteReplyItems(OperationContext* opCtx,
@@ -291,6 +308,22 @@ private:
                                      const std::vector<WriteOp>& ops,
                                      bool errorsOnly,
                                      ShardResult& result);
+
+    /**
+     * Helper method used by retrieveBatchWriteReplyItems() and retrieveBulkWriteReplyItems().
+     */
+    void retrieveReplyItemsImpl(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
+                                const std::vector<WriteOp>& ops,
+                                const std::vector<BulkWriteReplyItem>& items,
+                                ShardResult& result);
+
+    /**
+     * This method scans 'items' and verifies that the "idx" values are valid.
+     */
+    void validateBatchWriteReplyItems(OperationContext* opCtx,
+                                      const std::vector<BulkWriteReplyItem>& items,
+                                      size_t numOps);
 
     /**
      * This method scans 'items' and verifies that the "idx" values are valid and that they appear

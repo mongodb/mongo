@@ -48,12 +48,11 @@ void WriteOpAnalyzerImpl::recordTargetingStats(OperationContext* opCtx,
         return;
     }
 
-    size_t nsIdx = BulkWriteCRUDOp(op.getBulkWriteOp()).getNsInfoIdx();
     _stats.recordTargetingStats(tr.endpoints,
-                                nsIdx,
+                                op.getNsInfoIdx(),
                                 targeter.isTargetedCollectionSharded(),
                                 targeter.getAproxNShardsOwningChunks(),
-                                op.getType());
+                                getWriteOpType(op));
 }
 
 StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
@@ -67,16 +66,15 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     CollectionRoutingInfoTargeter targeter(nss, routingCtx);
     // TODO SERVER-103146 Add kChangesOwnership.
     NSTargeter::TargetingResult tr;
-    switch (op.getType()) {
+    switch (getWriteOpType(op)) {
         case WriteType::kInsert: {
-            tr.endpoints.emplace_back(
-                targeter.targetInsert(opCtx, op.getItemRef().getInsertOp().getDocument()));
+            tr.endpoints.emplace_back(targeter.targetInsert(opCtx, op.getInsertOp().getDocument()));
         } break;
         case WriteType::kUpdate: {
-            tr = targeter.targetUpdate(opCtx, op.getItemRef());
+            tr = targeter.targetUpdate(opCtx, op);
         } break;
         case WriteType::kDelete: {
-            tr = targeter.targetDelete(opCtx, op.getItemRef());
+            tr = targeter.targetDelete(opCtx, op);
         } break;
         default: {
             MONGO_UNREACHABLE;
@@ -85,7 +83,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
 
     tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
     const bool isTimeseries = targeter.isTrackedTimeSeriesNamespace();
-    const bool isUpdate = op.getType() == WriteType::kUpdate;
+    const bool isUpdate = getWriteOpType(op) == WriteType::kUpdate;
     const bool isRetryableWrite = opCtx->isRetryableWrite();
     const bool inTxn = static_cast<bool>(TransactionRouter::get(opCtx));
     const bool isRawData = isRawDataOperation(opCtx);
@@ -101,8 +99,8 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     const bool enableMultiWriteBlockingMigrations =
         coordinate_multi_update_util::shouldCoordinateMultiWrite(
             opCtx, _pauseMigrationsDuringMultiUpdatesParameter);
-    const bool isMultiWrite = op.isMulti();
-    const bool isDelete = op.getType() == WriteType::kDelete;
+    const bool isMultiWrite = op.getMulti();
+    const bool isDelete = getWriteOpType(op) == WriteType::kDelete;
     const bool isMultiWriteBlockingMigrations =
         (isUpdate || isDelete) && isMultiWrite && enableMultiWriteBlockingMigrations;
 
@@ -113,7 +111,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     }
 
     auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
-        opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
+        opCtx, targeter.getNS(), op.getOpType(), tr.endpoints);
 
     if (tr.isNonTargetedRetryableWriteWithId) {
         recordTargetingStats(opCtx, targeter, tr, op);
@@ -157,7 +155,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         // endpoints. The exception to this is when 'onlyTargetDataOwningShardsForMultiWrites' is
         // true.
         const bool targetAllShards = (isUpdate || isDelete) &&
-            write_op_helpers::shouldTargetAllShardsSVIgnored(inTxn, op.isMulti());
+            write_op_helpers::shouldTargetAllShardsSVIgnored(inTxn, op.getMulti());
         if (targetAllShards) {
             auto endpoints = targeter.targetAllShards(opCtx);
 
@@ -168,7 +166,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
 
             // Regenerate the targetedSampleId since we changed the endpoints to target all shards.
             targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
-                opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
+                opCtx, targeter.getNS(), op.getOpType(), tr.endpoints);
         }
 
         recordTargetingStats(opCtx, targeter, tr, op);

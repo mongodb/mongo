@@ -164,7 +164,7 @@ public:
         for (const auto& shard : analysis.shardsAffected) {
             auto nss = writeOp.getNss();
             int estSizeBytesForWrite =
-                _sizeEstimator.getOpSizeEstimate(writeOp.getId(), shard.shardName);
+                _sizeEstimator.getOpSizeEstimate(getWriteOpId(writeOp), shard.shardName);
 
             auto it = _batch->requestByShardId.find(shard.shardName);
             if (it != _batch->requestByShardId.end()) {
@@ -203,7 +203,7 @@ public:
             const auto& targetedSampleId = analysis.targetedSampleId;
             if (targetedSampleId && targetedSampleId->isFor(shard.shardName)) {
                 auto& request = _batch->requestByShardId[shard.shardName];
-                request.sampleIds.emplace(writeOp.getId(), targetedSampleId->getId());
+                request.sampleIds.emplace(getWriteOpId(writeOp), targetedSampleId->getId());
             }
         }
     }
@@ -337,7 +337,7 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
         auto& analysis = swAnalysis.getValue();
 
         // Skips any operations for which all the shards already got successful replies.
-        removeSuccessfulShardsFromEndpoints(writeOp->getId(), analysis.shardsAffected);
+        removeSuccessfulShardsFromEndpoints(getWriteOpId(*writeOp), analysis.shardsAffected);
         if (analysis.shardsAffected.empty()) {
             _producer.advance();
             continue;
@@ -346,7 +346,7 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
         if (builder) {
             // If this is not the first op, see if it's compatible with the current batch.
             if (builder.isCompatibleWithBatch(writeOp->getNss(), analysis) &&
-                builder.wouldFitInBatch(writeOp->getId(), analysis)) {
+                builder.wouldFitInBatch(getWriteOpId(*writeOp), analysis)) {
                 // If 'writeOp', consume it and add it to the current batch, and keep looping to see
                 // if more ops can be added to the batch.
                 _producer.advance();
@@ -428,7 +428,8 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
                 auto analysis = swAnalysis.getValue();
 
                 // Skips any operations for which all the shards already got successful replies.
-                removeSuccessfulShardsFromEndpoints(writeOp->getId(), analysis.shardsAffected);
+                removeSuccessfulShardsFromEndpoints(getWriteOpId(*writeOp),
+                                                    analysis.shardsAffected);
                 if (analysis.shardsAffected.empty()) {
                     _producer.advance();
                     continue;
@@ -486,7 +487,7 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
             _producer.advance();
             // Check if 'writeOp' is compatible with the current batch.
             if (builder.isCompatibleWithBatch(writeOp.getNss(), analysis) &&
-                builder.wouldFitInBatch(writeOp.getId(), analysis)) {
+                builder.wouldFitInBatch(getWriteOpId(writeOp), analysis)) {
                 // Add 'writeOp' to the current batch.
                 builder.addOp(writeOp, analysis);
             } else {

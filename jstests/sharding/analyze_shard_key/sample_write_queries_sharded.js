@@ -72,7 +72,7 @@ const expectedSampledQueryDocs = [];
     const collation = QuerySamplingUtil.generateRandomCollation();
     const letField = {var1: {$literal: 1}};
     // When UWE is enabled, shards receive bulkWrite commands instead, so the test expectation changes accordingly.
-    const cmdName = uweEnabled ? "bulkWrite" : "update";
+    const cmdName = "update";
     const singleUpdate0 = {
         q: {x: 1},
         u: {$mul: {y: 10}, $set: {"z.$[element]": 10}},
@@ -90,12 +90,8 @@ const expectedSampledQueryDocs = [];
         upsert: false,
         collation,
     };
-    const updateOp0Filter = uweEnabled
-        ? {"cmd.ops.0.filter": bulkUpdateOp0.filter}
-        : {"cmd.updates.0.q": singleUpdate0.q};
-    const cmdObj0 = uweEnabled
-        ? {bulkWrite: 1, ops: [bulkUpdateOp0], let: letField}
-        : {update: collName, updates: [singleUpdate0], let: letField};
+    const updateOp0Filter = {"cmd.updates.0.q": singleUpdate0.q};
+    const cmdObj0 = {update: collName, updates: [singleUpdate0], let: letField};
     const diff0 = {y: "u", z: "u"};
     const shardNames0 = [st.rs1.name];
 
@@ -112,12 +108,8 @@ const expectedSampledQueryDocs = [];
         constants: {var0: 1},
         multi: true,
     };
-    const updateOp1Filter = uweEnabled
-        ? {"cmd.ops.0.filter": bulkUpdateOp1.filter}
-        : {"cmd.updates.0.q": singleUpdateOp1.q};
-    const cmdObj1 = uweEnabled
-        ? {bulkWrite: 1, ops: [bulkUpdateOp1], let: letField}
-        : {update: collName, updates: [singleUpdateOp1], let: letField};
+    const updateOp1Filter = {"cmd.updates.0.q": singleUpdateOp1.q};
+    const cmdObj1 = {update: collName, updates: [singleUpdateOp1], let: letField};
     const diff1 = {y: "u", w: "i"};
     const shardNames1 = [st.rs1.name, st.rs2.name];
 
@@ -211,7 +203,7 @@ const expectedSampledQueryDocs = [];
 
     const collation = QuerySamplingUtil.generateRandomCollation();
     // When UWE is enabled, shards receive bulkWrite commands instead, so the test expectation changes accordingly.
-    const cmdName = uweEnabled ? "bulkWrite" : "delete";
+    const cmdName = "delete";
     const singleDeleteOp0 = {
         q: {x: 3},
         limit: 1,
@@ -222,18 +214,14 @@ const expectedSampledQueryDocs = [];
         multi: false,
         collation,
     };
-    const deleteOp0Filter = uweEnabled
-        ? {"cmd.ops.0.filter": bulkDeleteOp0.filter}
-        : {"cmd.deletes.0.q": singleDeleteOp0.q};
-    const cmdObj0 = uweEnabled ? {bulkWrite: 1, ops: [bulkDeleteOp0]} : {delete: collName, deletes: [singleDeleteOp0]};
+    const deleteOp0Filter = {"cmd.deletes.0.q": singleDeleteOp0.q};
+    const cmdObj0 = {delete: collName, deletes: [singleDeleteOp0]};
     const shardNames0 = [st.rs1.name];
 
     const singleDeleteOp1 = {q: {x: {$gte: 4}}, limit: 0};
     const bulkDeleteOp1 = {filter: {x: {$gte: 4}}, multi: true};
-    const deleteOp1Filter = uweEnabled
-        ? {"cmd.ops.0.filter": bulkDeleteOp1.filter}
-        : {"cmd.deletes.0.q": singleDeleteOp1.q};
-    const cmdObj1 = uweEnabled ? {bulkWrite: 1, ops: [bulkDeleteOp1]} : {delete: collName, deletes: [singleDeleteOp1]};
+    const deleteOp1Filter = {"cmd.deletes.0.q": singleDeleteOp1.q};
+    const cmdObj1 = {delete: collName, deletes: [singleDeleteOp1]};
     const shardNames1 = [st.rs1.name, st.rs2.name];
 
     const originalCmdObj = {delete: collName, deletes: [singleDeleteOp0, singleDeleteOp1]};
@@ -340,7 +328,7 @@ const expectedSampledQueryDocs = [];
     });
 })();
 
-const cmdNames = uweEnabled ? ["bulkWrite", "findAndModify"] : ["update", "delete", "findAndModify"];
+const cmdNames = ["update", "delete", "findAndModify"];
 QuerySamplingUtil.assertSoonSampledQueryDocumentsAcrossShards(
     st,
     ns,

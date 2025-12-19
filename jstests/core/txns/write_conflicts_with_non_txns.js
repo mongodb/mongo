@@ -29,8 +29,6 @@ const collName = "write_conflicts_with_non_txns";
 const testDB = db.getSiblingDB(dbName);
 const testColl = testDB[collName];
 
-const uweEnabled = isUweEnabled(testDB);
-
 // Clean up and create test collection.
 testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
@@ -58,12 +56,7 @@ function writeStarted(opType) {
     // In the unified write executor, the opType is 'bulkWrite' instead of 'insert', 'update', or
     // 'remove' due to an internal implementation detail.
     return testDB.currentOp().inprog.some((op) => {
-        return (
-            op.active &&
-            op.ns === testColl.getFullName() &&
-            (op.op === opType || (uweEnabled && op.op === "bulkWrite")) &&
-            op.writeConflicts > 0
-        );
+        return op.active && op.ns === testColl.getFullName() && op.op === opType && op.writeConflicts > 0;
     });
 }
 
@@ -73,10 +66,8 @@ function validateWriteConflictsBeforeAndAfter(before, after, exact = false) {
     if (before != null && after != null) {
         // Transactions on sharded collections can land on multiple shards and increment the
         // total WCE metric by the number of shards involved. Similarly, BulkWriteOverride turns
-        // a single op into multiple writes and causes multiple WCEs. In the unified write executor,
-        // the opType is 'bulkWrite' instead of 'insert', 'update', or 'remove' due to an internal
-        // implementation detail.
-        if (FixtureHelpers.isSharded(testColl) || TestData.runningWithBulkWriteOverride || !exact || uweEnabled) {
+        // a single op into multiple writes and causes multiple WCEs.
+        if (FixtureHelpers.isSharded(testColl) || TestData.runningWithBulkWriteOverride || !exact) {
             assert.gte(after, before + 1);
         } else {
             assert.eq(after, before + 1);

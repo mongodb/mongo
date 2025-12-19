@@ -6,7 +6,6 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {isUweEnabled, mapUweShardCmdName, isUweShardCmdNameChanged} from "jstests/libs/query/uwe_utils.js";
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -18,7 +17,6 @@ const shardedColl = testDB.coll;
 const unshardedColl = testDB.unsharded;
 const shard0DB = st.shard0.getDB(jsTestName());
 const shard1DB = st.shard1.getDB(jsTestName());
-const uweEnabled = isUweEnabled(testDB);
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
@@ -72,11 +70,11 @@ function runCommentParamTest({
     if (!cmdName) {
         cmdName = Object.keys(command)[0];
     }
-    const shardCmdName = uweEnabled ? mapUweShardCmdName(cmdName) : cmdName;
+    const shardCmdName = cmdName;
     setPostCommandFailpointOnShards({
         mode: "alwaysOn",
         options: {
-            ns: uweEnabled && isUweShardCmdNameChanged(cmdName) ? "admin" : coll.getFullName(),
+            ns: coll.getFullName(),
             commands: [shardCmdName],
         },
     });

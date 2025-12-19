@@ -18,7 +18,6 @@
  */
 import {profilerHasSingleMatchingEntryOrThrow, profilerHasZeroMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // Test deliberately inserts orphans outside of migrations.
 TestData.skipCheckOrphans = true;
@@ -27,7 +26,6 @@ const st = new ShardingTest({shards: 2, mongos: 1, other: {enableBalancer: false
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB.test;
-const uweEnabled = isUweEnabled(mongosDB);
 
 const shard0DB = st.shard0.getDB(jsTestName());
 const shard1DB = st.shard1.getDB(jsTestName());
@@ -119,9 +117,7 @@ function runReplacementUpdateTestsForHashedShardKey() {
     // Verify that the update only targeted shard0 and that the resulting document appears as
     // expected.
     assert.docEq([{_id: -100, a: -100, msg: "update_extracted_id_from_query"}], mongosColl.find({_id: -100}).toArray());
-    let profilerFilter = uweEnabled
-        ? {op: "bulkWrite", "command.updateMods.msg": "update_extracted_id_from_query"}
-        : {op: "update", "command.u.msg": "update_extracted_id_from_query"};
+    let profilerFilter = {op: "update", "command.u.msg": "update_extracted_id_from_query"};
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard0DB,
         filter: profilerFilter,
@@ -145,9 +141,7 @@ function runReplacementUpdateTestsForHashedShardKey() {
     // a successful update, i.e. one which did not report a stale config exception.
     assert.docEq([{_id: 101, a: 101, msg: "upsert_extracted_id_from_query"}], mongosColl.find({_id: 101}).toArray());
     assert.docEq([{_id: 101, a: 101, msg: "upsert_extracted_id_from_query"}], shard1DB.test.find({_id: 101}).toArray());
-    profilerFilter = uweEnabled
-        ? {op: "bulkWrite", "command.updateMods.msg": "upsert_extracted_id_from_query"}
-        : {op: "update", "command.u.msg": "upsert_extracted_id_from_query"};
+    profilerFilter = {op: "update", "command.u.msg": "upsert_extracted_id_from_query"};
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard0DB,
         filter: profilerFilter,
@@ -177,9 +171,7 @@ function runReplacementUpdateTestsForCompoundShardKey() {
     // Verify that the update only targeted shard0 and that the resulting document appears as
     // expected.
     assert.docEq([{_id: -100, a: -100, msg: "update_extracted_id_from_query"}], mongosColl.find({_id: -100}).toArray());
-    const profilerFilter = uweEnabled
-        ? {op: "bulkWrite", "command.updateMods.msg": "update_extracted_id_from_query"}
-        : {op: "update", "command.u.msg": "update_extracted_id_from_query"};
+    const profilerFilter = {op: "update", "command.u.msg": "update_extracted_id_from_query"};
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard0DB,
         filter: profilerFilter,

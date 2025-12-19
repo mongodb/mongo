@@ -224,6 +224,10 @@ const OptionalBool& BatchedCommandRequest::getBypassEmptyTsReplacement() const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getBypassEmptyTsReplacement(); });
 };
 
+write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommandRequestBase() {
+    return _visit([](auto&& op) -> decltype(auto) { return op.getWriteCommandRequestBase(); });
+}
+
 const write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommandRequestBase()
     const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getWriteCommandRequestBase(); });

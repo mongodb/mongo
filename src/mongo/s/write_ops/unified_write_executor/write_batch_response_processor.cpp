@@ -141,7 +141,7 @@ void logOpsToRetry(const std::vector<WriteOp>& opsToRetry) {
         size_t numOpsInStream = 0;
 
         for (const auto& op : opsToRetry) {
-            opsStream << (numOpsInStream++ > 0 ? ", " : "") << op.getId();
+            opsStream << (numOpsInStream++ > 0 ? ", " : "") << getWriteOpId(op);
         }
 
         LOGV2_DEBUG(
@@ -205,9 +205,9 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                 }
             }
 
-            if (op.getType() == kUpdate) {
+            if (getWriteOpType(op) == kUpdate) {
                 getQueryCounters(opCtx).updateOneWithoutShardKeyWithIdRetryCount.increment(1);
-            } else if (op.getType() == kDelete) {
+            } else if (getWriteOpType(op) == kDelete) {
                 getQueryCounters(opCtx).deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
             }
         }
@@ -225,7 +225,9 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     // Update the counters (excluding _nErrors), update the list of retried stmtIds, and process
     // the write concern error (if any).
     for (const auto& [shardId, shardResult] : shardResults) {
-        if (shardResult.bulkWriteReply) {
+        if (shardResult.batchWriteReply) {
+            processCountersAndRetriedStmtIds(*shardResult.batchWriteReply);
+        } else if (shardResult.bulkWriteReply) {
             processCountersAndRetriedStmtIds(*shardResult.bulkWriteReply);
         }
         if (shardResult.wce) {
@@ -262,7 +264,7 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                 [&](const SucceededWithoutItem&) {
                     // Add a successful entry with no BulkWriteReplyItem to _results, and add
                     // 'shardId' to 'successfulShardSet'.
-                    successfulShardSet[op.getId()].insert(shardId);
+                    successfulShardSet[getWriteOpId(op)].insert(shardId);
                     recordResult(opCtx, op, boost::none);
                     return true;
                 },
@@ -271,7 +273,7 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                     if (!write_op_helpers::isRetryErrCode(status.code()) || inTransaction) {
                         // If 'item' has an OK status, add 'shardId' to 'successfulShardSet'.
                         if (status.isOK()) {
-                            successfulShardSet[op.getId()].insert(shardId);
+                            successfulShardSet[getWriteOpId(op)].insert(shardId);
                         }
                         // Add 'item' to _results.
                         recordResult(opCtx, op, std::move(item));
@@ -343,7 +345,6 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     const NoRetryWriteBatchResponse& response) {
     // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
     const auto& op = response.getOp();
-    const bool errorsOnly = response.getErrorsOnly();
 
     // Process write concern error (if any).
     if (response.getWriteConcernError()) {
@@ -370,37 +371,55 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
         return ProcessorResult{};
     }
 
-    visit(OverloadedVisitor(
-              [&](const BulkWriteCommandReply& parsedReply) {
-                  const auto& replyItems = parsedReply.getCursor().getFirstBatch();
+    // Helper lambda for processing BulkWriteReplyItems.
+    auto processItems = [&](const std::vector<BulkWriteReplyItem>& replyItems) {
+        // Get the BulkWriteReplyItem (if there is one) and store it in 'item'.
+        boost::optional<BulkWriteReplyItem> item;
 
+        if (!replyItems.empty()) {
+            item = replyItems.front();
+
+            tassert(10378001,
+                    fmt::format("reply with invalid opId {} when command only had 1 op",
+                                item->getIdx()),
+                    item->getIdx() == 0);
+
+            tassert(11222400,
+                    "Unexpected retryable error reply from NoRetryWriteBatchResponse",
+                    item->getStatus().isOK() ||
+                        !write_op_helpers::isRetryErrCode(item->getStatus().code()));
+
+            // Set the "idx" field to the ID of 'op'.
+            item->setIdx(getWriteOpId(op));
+        }
+
+        // Add 'item' to _results.
+        recordResult(opCtx, op, std::move(item));
+    };
+
+    visit(OverloadedVisitor(
+              [&](const BatchWriteCommandReply& parsedReply) {
+                  const std::vector<BulkWriteReplyItem>& replyItems = parsedReply.items;
+                  tassert(11468111,
+                          "Unexpected reply for NoRetryWriteBatchResponse",
+                          replyItems.size() <= 1);
+
+                  // Process the BulkWriteReplyItems in 'parsedReply'.
+                  processItems(replyItems);
+                  // Update the counters (excluding _nErrors) and the list of retried stmtIds.
+                  processCountersAndRetriedStmtIds(parsedReply);
+              },
+              [&](const BulkWriteCommandReply& parsedReply) {
+                  const bool errorsOnly = _cmdRef.getErrorsOnly().value_or(false);
+                  const std::vector<BulkWriteReplyItem>& replyItems =
+                      parsedReply.getCursor().getFirstBatch();
                   tassert(10378000,
                           "Unexpected reply for NoRetryWriteBatchResponse",
-                          replyItems.size() == 1 || (errorsOnly && replyItems.empty()));
+                          parsedReply.getCursor().getId() == 0 && replyItems.size() <= 1 &&
+                              (errorsOnly || replyItems.size() == 1));
 
-                  // Get the BulkWriteReplyItem (if there is one) and store it in 'item'.
-                  boost::optional<BulkWriteReplyItem> item;
-
-                  if (!replyItems.empty()) {
-                      item = replyItems.front();
-
-                      tassert(10378001,
-                              fmt::format("reply with invalid opId {} when command only had 1 op",
-                                          item->getIdx()),
-                              item->getIdx() == 0);
-
-                      tassert(11222400,
-                              "Unexpected retryable error reply from NoRetryWriteBatchResponse",
-                              item->getStatus().isOK() ||
-                                  !write_op_helpers::isRetryErrCode(item->getStatus().code()));
-
-                      // Set the "idx" field to the ID of 'op'.
-                      item->setIdx(op.getId());
-                  }
-
-                  // Add 'item' to _results.
-                  recordResult(opCtx, op, std::move(item));
-
+                  // Process the BulkWriteReplyItems in 'parsedReply'.
+                  processItems(replyItems);
                   // Update the counters (excluding _nErrors) and the list of retried stmtIds.
                   processCountersAndRetriedStmtIds(parsedReply);
               },
@@ -465,7 +484,6 @@ ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx
                                                          const ShardResponse& response) {
     const auto& ops = response.getOps();
     const auto& hostAndPort = response.getHostAndPort();
-    const bool errorsOnly = response.getErrorsOnly();
     const bool orderedOrInTxn = _cmdRef.getOrdered() || TransactionRouter::get(opCtx);
 
     ShardResult result;
@@ -518,7 +536,13 @@ ShardResult WriteBatchResponseProcessor::onShardResponse(OperationContext* opCtx
     }
 
     visit(OverloadedVisitor(
+              [&](const BatchWriteCommandReply& parsedReply) -> void {
+                  result.batchWriteReply.emplace(parsedReply);
+
+                  retrieveBatchWriteReplyItems(opCtx, routingCtx, shardId, ops, result);
+              },
               [&](const BulkWriteCommandReply& parsedReply) {
+                  const bool errorsOnly = _cmdRef.getErrorsOnly().value_or(false);
                   result.bulkWriteReply = parsedReply;
 
                   retrieveBulkWriteReplyItems(opCtx, routingCtx, shardId, ops, errorsOnly, result);
@@ -539,7 +563,7 @@ void WriteBatchResponseProcessor::recordResult(OperationContext* opCtx,
                                                boost::optional<BulkWriteReplyItem> item) {
     const bool isOK = item ? item->getStatus().isOK() : true;
 
-    auto [it, _] = _results.try_emplace(op.getId(), BulkWriteOpResults{});
+    auto [it, _] = _results.try_emplace(getWriteOpId(op), BulkWriteOpResults{});
     auto* opResults = get_if<BulkWriteOpResults>(&it->second);
     tassert(11182205, "Expected to find BulkWriteOpResults", opResults != nullptr);
 
@@ -590,7 +614,7 @@ void WriteBatchResponseProcessor::recordResult(OperationContext* opCtx,
         ++_nErrors;
     }
 
-    auto [_, inserted] = _results.try_emplace(op.getId(), std::move(item));
+    auto [_, inserted] = _results.try_emplace(getWriteOpId(op), std::move(item));
     tassert(11182206, "Expected no previous findAndModify result for op", inserted);
 }
 
@@ -604,8 +628,8 @@ void WriteBatchResponseProcessor::recordError(OperationContext* opCtx,
 
         recordResult(opCtx, op, std::move(item));
     } else {
-        auto item = BulkWriteReplyItem(op.getId(), status);
-        if (op.getType() == WriteType::kUpdate) {
+        auto item = BulkWriteReplyItem(getWriteOpId(op), status);
+        if (getWriteOpType(op) == WriteType::kUpdate) {
             item.setNModified(0);
         }
 
@@ -620,8 +644,8 @@ ItemVariant WriteBatchResponseProcessor::makeErrorItem(const WriteOp& op,
     if (op.isFindAndModify()) {
         return ItemVariant{FindAndModifyReplyItem{status}};
     } else {
-        auto item = BulkWriteReplyItem(op.getId(), status);
-        if (op.getType() == WriteType::kUpdate) {
+        auto item = BulkWriteReplyItem(getWriteOpId(op), status);
+        if (getWriteOpType(op) == WriteType::kUpdate) {
             item.setNModified(0);
         }
         return ItemVariant{std::move(item)};
@@ -665,13 +689,28 @@ GroupItemsResult WriteBatchResponseProcessor::groupItemsByOp(
 }
 
 void WriteBatchResponseProcessor::processCountersAndRetriedStmtIds(
+    const BatchWriteCommandReply& parsedReply) {
+    // Update the counters.
+    _nInserted += parsedReply.nInserted;
+    _nMatched += parsedReply.nMatched;
+    _nModified += parsedReply.nModified;
+    _nUpserted += parsedReply.nUpserted;
+    _nDeleted += parsedReply.nDeleted;
+
+    // Update the list of retried stmtIds.
+    for (auto retriedStmtId : parsedReply.retriedStmtIds) {
+        _retriedStmtIds.insert(retriedStmtId);
+    }
+}
+
+void WriteBatchResponseProcessor::processCountersAndRetriedStmtIds(
     const BulkWriteCommandReply& parsedReply) {
     // Update the counters.
     _nInserted += parsedReply.getNInserted();
-    _nDeleted += parsedReply.getNDeleted();
     _nMatched += parsedReply.getNMatched();
-    _nUpserted += parsedReply.getNUpserted();
     _nModified += parsedReply.getNModified();
+    _nUpserted += parsedReply.getNUpserted();
+    _nDeleted += parsedReply.getNDeleted();
 
     // Update the list of retried stmtIds.
     if (auto retriedStmtIds = parsedReply.getRetriedStmtIds();
@@ -680,6 +719,20 @@ void WriteBatchResponseProcessor::processCountersAndRetriedStmtIds(
             _retriedStmtIds.insert(retriedStmtId);
         }
     }
+}
+
+void WriteBatchResponseProcessor::retrieveBatchWriteReplyItems(OperationContext* opCtx,
+                                                               RoutingContext& routingCtx,
+                                                               const ShardId& shardId,
+                                                               const std::vector<WriteOp>& ops,
+                                                               ShardResult& result) {
+    tassert(11468110, "Expected BatchWriteCommandReply", result.batchWriteReply.has_value());
+    const BatchWriteCommandReply& parsedReply = *result.batchWriteReply;
+
+    // Validate the reply items.
+    validateBatchWriteReplyItems(opCtx, parsedReply.items, ops.size());
+
+    retrieveReplyItemsImpl(opCtx, routingCtx, ops, parsedReply.items, result);
 }
 
 void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* opCtx,
@@ -691,9 +744,6 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
     tassert(11182209, "Expected BulkWriteCommandReply", result.bulkWriteReply.has_value());
     const BulkWriteCommandReply& parsedReply = *result.bulkWriteReply;
 
-    const bool ordered = _cmdRef.getOrdered();
-    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-
     // Put all the reply items into a vector and then validate the reply items. Note that if the
     // BulkWriteCommandReply object contains a non-zero cursor ID, exhaustCursorForReplyItems()
     // will send commands over the network as needed to retrieve all the reply items from the
@@ -701,10 +751,17 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
     auto items = exhaustCursorForReplyItems(opCtx, shardId, parsedReply);
     validateBulkWriteReplyItems(opCtx, items, ops.size(), errorsOnly);
 
-    // When 'errorsOnly' is true, there will not be reply items for successful ops. In order to
-    // support errorsOnly=true, the loop below uses separate variables to track the current
-    // index in the 'items' vector and the current index in the 'ops' vector.
-    size_t itemIndex = 0;
+    retrieveReplyItemsImpl(opCtx, routingCtx, ops, items, result);
+}
+
+void WriteBatchResponseProcessor::retrieveReplyItemsImpl(
+    OperationContext* opCtx,
+    RoutingContext& routingCtx,
+    const std::vector<WriteOp>& ops,
+    const std::vector<BulkWriteReplyItem>& items,
+    ShardResult& result) {
+    const bool ordered = _cmdRef.getOrdered();
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     Status finalErrorForBatch = Status::OK();
     bool finalErrorForBatchIsRetryable = false;
@@ -713,6 +770,8 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
     const bool logOpsAfterFinalRetryableError =
         !inTransaction && shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4));
 
+    size_t itemIndex = 0;
+
     for (size_t shardOpId = 0; shardOpId < ops.size(); ++shardOpId) {
         const auto& op = ops[shardOpId];
 
@@ -720,12 +779,12 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
         if (itemIndex < items.size() &&
             shardOpId == static_cast<size_t>(items[itemIndex].getIdx())) {
             // Handle the case where we have a reply item.
-            auto& item = items[itemIndex];
+            auto item = items[itemIndex];
             ++itemIndex;
 
             // Update item's idx value to refer to the ID for this op from the original
             // write command issued by the client.
-            item.setIdx(op.getId());
+            item.setIdx(getWriteOpId(op));
 
             if (const auto& status = item.getStatus(); !status.isOK()) {
                 const bool isRetryableErr = write_op_helpers::isRetryErrCode(status.code());
@@ -767,7 +826,7 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
         std::stringstream opsStream;
         size_t numOpsInStream = 0;
         for (const auto& op : opsAfterFinalRetryableError) {
-            opsStream << (numOpsInStream++ > 0 ? ", " : "") << op.getId();
+            opsStream << (numOpsInStream++ > 0 ? ", " : "") << getWriteOpId(op);
         }
 
         LOGV2_DEBUG(11182210,
@@ -775,6 +834,16 @@ void WriteBatchResponseProcessor::retrieveBulkWriteReplyItems(OperationContext* 
                     "Retryable error occurred during batch, op(s) may need to be retried",
                     "opIdx"_attr = opsStream.str(),
                     "error"_attr = finalErrorForBatch);
+    }
+}
+
+void WriteBatchResponseProcessor::validateBatchWriteReplyItems(
+    OperationContext* opCtx, const std::vector<BulkWriteReplyItem>& items, size_t numOps) {
+    for (size_t i = 0; i < items.size(); ++i) {
+        auto& item = items[i];
+        tassert(11468115,
+                fmt::format("Shard replied with invalid opId {}", item.getIdx()),
+                item.getIdx() >= 0 && static_cast<size_t>(item.getIdx()) < numOps);
     }
 }
 
@@ -965,7 +1034,7 @@ void addActualCollectionForCollUUIDMismatchError(OperationContext* opCtx,
 void WriteBatchResponseProcessor::updateApproximateSize(const BulkWriteReplyItem& item) {
     // If the response is not an error and 'errorsOnly' is set, then we should not store this
     // reply and therefore shouldn't count the size.
-    if (item.getOk() && _cmdRef.getErrorsOnly() && *(_cmdRef.getErrorsOnly())) {
+    if (item.getOk() && _cmdRef.getErrorsOnly().value_or(false)) {
         return;
     }
 

@@ -6,7 +6,6 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
@@ -24,8 +23,6 @@ const st = new ShardingTest({
     },
     mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}},
 });
-
-const uweEnabled = isUweEnabled(st.s);
 
 const dbName = "testDb";
 const collName = "testColl";
@@ -59,7 +56,7 @@ const shardNames = [st.rs0.name];
     const collation = QuerySamplingUtil.generateRandomCollation();
     const letField = {var1: {$literal: 1}};
     // When UWE is enabled, shards receive bulkWrite commands instead, so the test expectation changes accordingly.
-    const cmdName = uweEnabled ? "bulkWrite" : "update";
+    const cmdName = "update";
     const singleUpdateOp0 = {
         q: {x: 1},
         u: {$mul: {y: 10}, $set: {"z.$[element]": 10}},
@@ -77,12 +74,8 @@ const shardNames = [st.rs0.name];
         upsert: false,
         collation,
     };
-    const updateOp0Filter = uweEnabled
-        ? {"cmd.ops.0.filter": bulkUpdateOp0.filter}
-        : {"cmd.updates.0.q": singleUpdateOp0.q};
-    const cmdObj0 = uweEnabled
-        ? {bulkWrite: 1, ops: [bulkUpdateOp0], let: letField}
-        : {update: collName, updates: [singleUpdateOp0], let: letField};
+    const updateOp0Filter = {"cmd.updates.0.q": singleUpdateOp0.q};
+    const cmdObj0 = {update: collName, updates: [singleUpdateOp0], let: letField};
     const diff0 = {y: "u", z: "u"};
 
     const singleUpdateOp1 = {
@@ -98,12 +91,8 @@ const shardNames = [st.rs0.name];
         constants: {var0: 1},
         multi: true,
     };
-    const updateOp1Filter = uweEnabled
-        ? {"cmd.ops.0.filter": bulkUpdateOp1.filter}
-        : {"cmd.updates.0.q": singleUpdateOp1.q};
-    const cmdObj1 = uweEnabled
-        ? {bulkWrite: 1, ops: [bulkUpdateOp1], let: letField}
-        : {update: collName, updates: [singleUpdateOp1], let: letField};
+    const updateOp1Filter = {"cmd.updates.0.q": singleUpdateOp1.q};
+    const cmdObj1 = {update: collName, updates: [singleUpdateOp1], let: letField};
     const diff1 = {y: "u", w: "i"};
 
     const originalCmdObj = {
@@ -142,7 +131,7 @@ const shardNames = [st.rs0.name];
 
     const collation = QuerySamplingUtil.generateRandomCollation();
     // When UWE is enabled, shards receive bulkWrite commands instead, so the test expectation changes accordingly.
-    const cmdName = uweEnabled ? "bulkWrite" : "delete";
+    const cmdName = "delete";
     const singleDeleteOp0 = {
         q: {x: 3},
         limit: 1,
@@ -153,17 +142,13 @@ const shardNames = [st.rs0.name];
         multi: false,
         collation,
     };
-    const deleteOp0Filter = uweEnabled
-        ? {"cmd.ops.0.filter": bulkDeleteOp0.filter}
-        : {"cmd.deletes.0.q": singleDeleteOp0.q};
-    const cmdObj0 = uweEnabled ? {bulkWrite: 1, ops: [bulkDeleteOp0]} : {delete: collName, deletes: [singleDeleteOp0]};
+    const deleteOp0Filter = {"cmd.deletes.0.q": singleDeleteOp0.q};
+    const cmdObj0 = {delete: collName, deletes: [singleDeleteOp0]};
 
     const singleDeleteOp1 = {q: {x: 4}, limit: 0};
     const bulkDeleteOp1 = {filter: {x: 4}, multi: true};
-    const deleteOp1Filter = uweEnabled
-        ? {"cmd.ops.0.filter": bulkDeleteOp1.filter}
-        : {"cmd.deletes.0.q": singleDeleteOp1.q};
-    const cmdObj1 = uweEnabled ? {bulkWrite: 1, ops: [bulkDeleteOp1]} : {delete: collName, deletes: [singleDeleteOp1]};
+    const deleteOp1Filter = {"cmd.deletes.0.q": singleDeleteOp1.q};
+    const cmdObj1 = {delete: collName, deletes: [singleDeleteOp1]};
 
     const originalCmdObj = {
         delete: collName,
@@ -225,7 +210,7 @@ const shardNames = [st.rs0.name];
     );
 }
 
-const cmdNames = uweEnabled ? ["bulkWrite", "findAndModify"] : ["update", "delete", "findAndModify"];
+const cmdNames = ["update", "delete", "findAndModify"];
 QuerySamplingUtil.assertSoonSampledQueryDocumentsAcrossShards(
     st,
     ns,

@@ -87,6 +87,13 @@ public:
         return BulkWriteCommandReply(BulkWriteCommandResponseCursor(0, {}, nss1), 0, 0, 0, 0, 0, 0);
     }
 
+    BatchedCommandResponse makeBatchWriteReply() {
+        BatchedCommandResponse bcr;
+        bcr.setStatus(Status::OK());
+        bcr.setN(0);
+        return bcr;
+    }
+
     BSONObj setTopLevelOK(BSONObj&& o) {
         return o.addFields(BSON("ok" << 1));
     }
@@ -116,10 +123,8 @@ TEST_F(WriteBatchResponseProcessorTest, OKReplies) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {{shard1Name, ShardResponse::make(rcr1, {}, inTransaction, errorsOnly)},
-             {shard2Name,
-              ShardResponse::make(
-                  rcr2, {WriteOp(request, 0), WriteOp(request, 1)}, inTransaction, errorsOnly)}}});
+            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, inTransaction)},
+             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 1)}, inTransaction)}}});
 
     auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
     ASSERT_EQ(clientReply.getNInserted(), 2);
@@ -145,10 +150,9 @@ TEST_F(WriteBatchResponseProcessorTest, OKRepliesWithUpdateCommand) {
     auto request = BatchedCommandRequest(updateRequest);
 
     const bool inTransaction = false;
-    const bool errorsOnly = true;
 
-    auto reply = makeReply();
-    reply.setNMatched(1);
+    auto reply = makeBatchWriteReply();
+    reply.setN(1);
     reply.setNModified(1);
     RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
     RemoteCommandResponse rcr2(host2, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
@@ -161,10 +165,8 @@ TEST_F(WriteBatchResponseProcessorTest, OKRepliesWithUpdateCommand) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {{shard1Name, ShardResponse::make(rcr1, {}, inTransaction, errorsOnly)},
-             {shard2Name,
-              ShardResponse::make(
-                  rcr2, {WriteOp(request, 0), WriteOp(request, 1)}, inTransaction, errorsOnly)}}});
+            {{shard1Name, ShardResponse::make(rcr1, {WriteOp(request, 0)}, inTransaction)},
+             {shard2Name, ShardResponse::make(rcr2, {WriteOp(request, 1)}, inTransaction)}}});
 
     // Generating a 'BatchedCommandResponse' should output the same statistics, save for 'n', which
     // is the combination of 'nInserted' and 'nMatched', and 'nModified', which is only set on
@@ -316,7 +318,7 @@ TEST_F(WriteBatchResponseProcessorTest, CreateCollection) {
     // One incomplete returned (op2).
     ASSERT_EQ(result.opsToRetry.size(), 1);
     ASSERT_EQ(result.opsToRetry[0].getNss(), nss2);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 1);
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), 1);
 
     // Assert nss2 was flagged for creation.
     ASSERT_EQ(result.collsToCreate.size(), 1);
@@ -393,9 +395,9 @@ TEST_F(WriteBatchResponseProcessorTest, SingleReplyItemForBatchOfThree) {
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     // Assert all ops were returned for retry even though there was only one item in the reply.
     ASSERT_EQ(result.opsToRetry.size(), 3);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 0);
-    ASSERT_EQ(result.opsToRetry[1].getId(), 1);
-    ASSERT_EQ(result.opsToRetry[2].getId(), 2);
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), 0);
+    ASSERT_EQ(result.opsToRetry[1].getIndex(), 1);
+    ASSERT_EQ(result.opsToRetry[2].getIndex(), 2);
     // Assert nss1 was flagged for creation.
 
     ASSERT_EQ(result.collsToCreate.size(), 1);
@@ -467,10 +469,10 @@ TEST_F(WriteBatchResponseProcessorTest, TwoShardMixedNamespaceExistence) {
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     // Assert all the errors were returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 4);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 1);
-    ASSERT_EQ(result.opsToRetry[1].getId(), 2);
-    ASSERT_EQ(result.opsToRetry[2].getId(), 4);
-    ASSERT_EQ(result.opsToRetry[3].getId(), 5);
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), 1);
+    ASSERT_EQ(result.opsToRetry[1].getIndex(), 2);
+    ASSERT_EQ(result.opsToRetry[2].getIndex(), 4);
+    ASSERT_EQ(result.opsToRetry[3].getIndex(), 5);
     // Assert nss2 and nss3 were flagged for creation.
     ASSERT_EQ(result.collsToCreate.size(), 2);
     ASSERT(result.collsToCreate.contains(nss2));
@@ -541,7 +543,7 @@ TEST_F(WriteBatchResponseProcessorTest, IdxsCorrectlyRewrittenInReplyItems) {
 
     // Assert all the errors were returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 1);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 0);
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), 0);
     // Assert nss2 was flagged for creation.
     ASSERT_EQ(result.collsToCreate.size(), 1);
     ASSERT(result.collsToCreate.contains(nss1));
@@ -613,9 +615,9 @@ TEST_F(WriteBatchResponseProcessorTest, RetryStalenessErrors) {
 
     // Assert all the op was returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 2);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 0);
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), 0);
     ASSERT_EQ(result.opsToRetry[0].getNss(), nss1);
-    ASSERT_EQ(result.opsToRetry[1].getId(), 1);
+    ASSERT_EQ(result.opsToRetry[1].getIndex(), 1);
     ASSERT_EQ(result.opsToRetry[1].getNss(), nss2);
     ASSERT(result.collsToCreate.empty());
 
@@ -682,9 +684,9 @@ TEST_F(WriteBatchResponseProcessorTest, MixedStalenessErrorsAndOk) {
 
     // Assert failed ops were returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 2);
-    ASSERT_EQ(result.opsToRetry[0].getId(), op1.getId());
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), op1.getIndex());
     ASSERT_EQ(result.opsToRetry[0].getNss(), nss1);
-    ASSERT_EQ(result.opsToRetry[1].getId(), op2.getId());
+    ASSERT_EQ(result.opsToRetry[1].getIndex(), op2.getIndex());
     ASSERT_EQ(result.opsToRetry[1].getNss(), nss1);
 
     // Assert that 2 OK items were processed.
@@ -756,13 +758,13 @@ TEST_F(WriteBatchResponseProcessorTest, RetryableWriteWithIdMixedStalenessErrors
 
     // Assert that all ops were returned for retry (regardless of whether they succeeded or not).
     ASSERT_EQ(result.opsToRetry.size(), 4);
-    ASSERT_EQ(result.opsToRetry[0].getId(), op1.getId());
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), op1.getIndex());
     ASSERT_EQ(result.opsToRetry[0].getNss(), nss1);
-    ASSERT_EQ(result.opsToRetry[1].getId(), op2.getId());
+    ASSERT_EQ(result.opsToRetry[1].getIndex(), op2.getIndex());
     ASSERT_EQ(result.opsToRetry[1].getNss(), nss1);
-    ASSERT_EQ(result.opsToRetry[2].getId(), op3.getId());
+    ASSERT_EQ(result.opsToRetry[2].getIndex(), op3.getIndex());
     ASSERT_EQ(result.opsToRetry[2].getNss(), nss2);
-    ASSERT_EQ(result.opsToRetry[3].getId(), op4.getId());
+    ASSERT_EQ(result.opsToRetry[3].getIndex(), op4.getIndex());
     ASSERT_EQ(result.opsToRetry[3].getNss(), nss2);
 
     // Assert that no OK items were processed.
@@ -810,7 +812,7 @@ TEST_F(WriteBatchResponseProcessorTest, RetryShardsCannotRefreshDueToLocksHeldEr
 
     // Assert the only op1 was returned for retry.
     ASSERT_EQ(result.opsToRetry.size(), 1);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 0);
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), 0);
     ASSERT_EQ(result.opsToRetry[0].getNss(), nss1);
     ASSERT(result.collsToCreate.empty());
 
@@ -1061,7 +1063,7 @@ TEST_F(WriteBatchResponseProcessorTest, IncrementApproxSizeOnceForRetry) {
     // One incomplete returned (op2).
     ASSERT_EQ(result.opsToRetry.size(), 1);
     ASSERT_EQ(result.opsToRetry[0].getNss(), nss2);
-    ASSERT_EQ(result.opsToRetry[0].getId(), 1);
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), 1);
 
     // We should not have exceeded the max size because we've only incremented the non-retry item.
     ASSERT_FALSE(processor.checkBulkWriteReplyMaxSize(opCtx));
@@ -1101,12 +1103,10 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseOk) {
     auto request = BatchedCommandRequest(updateRequest);
 
     const bool inTransaction = false;
-    const bool errorsOnly = true;
 
-    auto reply = makeReply();
-    reply.setNMatched(1);
+    auto reply = makeBatchWriteReply();
+    reply.setN(1);
     reply.setNModified(1);
-    reply.setCursor(BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
 
     WriteCommandRef cmdRef(request);
     Stats stats;
@@ -1114,11 +1114,10 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseOk) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(reply.toBSON()),
+        NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(setTopLevelOK(reply.toBSON())),
                                         /*wce*/ boost::none,
                                         WriteOp(request, 0),
-                                        inTransaction,
-                                        errorsOnly));
+                                        inTransaction));
     ASSERT_TRUE(result.opsToRetry.empty());
     ASSERT_TRUE(result.collsToCreate.empty());
 
@@ -1139,13 +1138,11 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseError) {
     auto request = BatchedCommandRequest(updateRequest);
 
     const bool inTransaction = false;
-    const bool errorsOnly = true;
 
-    auto reply = makeReply();
-    reply.setNMatched(1);
+    auto reply = makeBatchWriteReply();
+    reply.setN(1);
     reply.setNModified(0);
-    reply.setCursor(BulkWriteCommandResponseCursor(
-        0, {BulkWriteReplyItem{0, Status(ErrorCodes::BadValue, "Wrong argument")}}, nss1));
+    reply.addToErrDetails(write_ops::WriteError{0, Status(ErrorCodes::BadValue, "Wrong argument")});
 
     WriteCommandRef cmdRef(request);
     Stats stats;
@@ -1154,11 +1151,10 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessesNoRetryResponseError) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(reply.toBSON()),
+        NoRetryWriteBatchResponse::make(StatusWith<BSONObj>(setTopLevelOK(reply.toBSON())),
                                         /*wce*/ boost::none,
                                         WriteOp(request, 0),
-                                        inTransaction,
-                                        errorsOnly));
+                                        inTransaction));
     ASSERT_TRUE(result.opsToRetry.empty());
     ASSERT_TRUE(result.collsToCreate.empty());
 
@@ -1879,7 +1875,7 @@ TEST_F(WriteBatchResponseProcessorTest, ProcessFindAndModifyRetryResponse) {
         opCtx, routingCtx, SimpleWriteBatchResponse{{{shard1, ShardResponse::make(rcr1, {op})}}});
     ASSERT_EQ(result.collsToCreate.size(), 0);
     ASSERT_EQ(result.opsToRetry.size(), 1);
-    ASSERT_EQ(result.opsToRetry[0].getId(), op.getId());
+    ASSERT_EQ(result.opsToRetry[0].getIndex(), op.getIndex());
 
     ASSERT_EQ(processor.getNumOkItemsProcessed(), 0);
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
@@ -2406,7 +2402,7 @@ TEST_F(WriteBatchResponseProcessorTest, SimpleWriteErrorsOnlyModeNoError) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {{shard1Name, ShardResponse::make(rcr1, {op1, op2}, inTransaction, errorsOnly)}}});
+            {{shard1Name, ShardResponse::make(rcr1, {op1, op2}, inTransaction)}}});
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
     ASSERT_EQ(result.opsToRetry.size(), 0);
@@ -2454,7 +2450,7 @@ TEST_F(WriteBatchResponseProcessorTest, SimpleWriteErrorsOnlyModeWithError) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {{shard1Name, ShardResponse::make(rcr1, {op1, op2}, inTransaction, errorsOnly)}}});
+            {{shard1Name, ShardResponse::make(rcr1, {op1, op2}, inTransaction)}}});
     // An error should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 1);
     ASSERT_EQ(result.opsToRetry.size(), 0);
@@ -2509,7 +2505,7 @@ TEST_F(WriteBatchResponseProcessorTest, SimpleWriteErrorsOnlyModeUnordered) {
         opCtx,
         routingCtx,
         SimpleWriteBatchResponse{
-            {{shard1Name, ShardResponse::make(rcr1, {op1, op2, op3}, inTransaction, errorsOnly)}}});
+            {{shard1Name, ShardResponse::make(rcr1, {op1, op2, op3}, inTransaction)}}});
 
     // Errors should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 2);
@@ -2550,8 +2546,7 @@ TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeNoError) {
     auto result = processor.onWriteBatchResponse(
         opCtx,
         routingCtx,
-        NoRetryWriteBatchResponse::make(
-            BSONObj(), /*wce*/ boost::none, op1, inTransaction, errorsOnly));
+        NoRetryWriteBatchResponse::make(BSONObj(), /*wce*/ boost::none, op1, inTransaction));
 
     // No errors.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 0);
@@ -2587,7 +2582,7 @@ TEST_F(WriteBatchResponseProcessorTest, TwoPhaseWriteErrorsOnlyModeWithError) {
         opCtx,
         routingCtx,
         NoRetryWriteBatchResponse::make(
-            Status(ErrorCodes::BadValue, ""), /*wce*/ boost::none, op1, inTransaction, errorsOnly));
+            Status(ErrorCodes::BadValue, ""), /*wce*/ boost::none, op1, inTransaction));
 
     // An error should have occurred.
     ASSERT_EQ(processor.getNumErrorsRecorded(), 1);

@@ -12,7 +12,6 @@ import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {isUweEnabled, mapUweShardCmdName} from "jstests/libs/query/uwe_utils.js";
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on the shards and cause them to refresh theirsharding metadata.
@@ -212,12 +211,9 @@ withRetryOnTransientTxnError(
 
     failPoint.wait();
 
-    const uweEnabled = isUweEnabled(st.s);
     let matchingOps;
     assert.soon(() => {
-        const filter = uweEnabled
-            ? {"command.ops.0.update": {$exists: true}, "command.nsInfo.0.ns": `${kDatabaseName}.TestConvoyColl`}
-            : {"command.update": "TestConvoyColl"};
+        const filter = {"command.update": "TestConvoyColl"};
         matchingOps = st.shard0
             .getDB("admin")
             .aggregate([{$currentOp: {"allUsers": true, "idleConnections": true}}, {$match: filter}])

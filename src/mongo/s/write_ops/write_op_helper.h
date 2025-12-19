@@ -122,7 +122,6 @@ ItemType getFirstNonRetryableError(const std::vector<ItemType>& items, GetCodeFn
  */
 bool shouldTargetAllShardsSVIgnored(bool inTransaction, bool isMulti);
 
-
 /**
  * Used to check if a partially applied (successful on some shards but not others)operation has an
  * errors that is safe to ignore. UUID mismatch errors are safe to ignore if the actualCollection is
@@ -138,6 +137,12 @@ int computeBaseSizeEstimate(OperationContext* opCtx, WriteCommandRef cmdRef);
 BulkWriteDeleteOp toBulkWriteDelete(const write_ops::DeleteOpEntry& op);
 
 BulkWriteUpdateOp toBulkWriteUpdate(const write_ops::UpdateOpEntry& op);
+
+BulkWriteOpVariant getOrMakeBulkWriteOp(WriteOpRef op);
+
+write_ops::UpdateOpEntry getOrMakeUpdateOpEntry(UpdateOpRef updateOp);
+
+write_ops::DeleteOpEntry getOrMakeDeleteOpEntry(DeleteOpRef deleteOp);
 
 }  // namespace write_op_helpers
 }  // namespace mongo

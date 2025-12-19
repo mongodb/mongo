@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
+#include "mongo/s/write_ops/unified_write_executor/write_op.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -133,6 +134,66 @@ public:
                                  << "nDeleted" << nDeleted);
         });
     }
+
+    void expectInsertShardRequest(std::vector<BSONObj> opList, const NamespaceString& nss, int n) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            auto opMsg = static_cast<OpMsgRequest>(request);
+            BatchedCommandRequest bcr = BatchedCommandRequest::parseInsert(opMsg);
+            WriteCommandRef cmdRef(bcr);
+
+            ASSERT_EQ(opList.size(), cmdRef.getNumOps());
+
+            for (size_t i = 0; i < opList.size(); i++) {
+                auto bulkWriteOp = write_op_helpers::getOrMakeBulkWriteOp(cmdRef.getOp(i));
+                ASSERT_BSONOBJ_EQ(BulkWriteCRUDOp(bulkWriteOp).toBSON(), opList[i]);
+            }
+
+            ASSERT_EQ(nss, bcr.getNS());
+
+            return BSON("ok" << 1 << "n" << n);
+        });
+    }
+
+    void expectUpdateShardRequest(std::vector<BSONObj> opList,
+                                  const NamespaceString& nss,
+                                  int n,
+                                  int nModified) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            auto opMsg = static_cast<OpMsgRequest>(request);
+            BatchedCommandRequest bcr = BatchedCommandRequest::parseUpdate(opMsg);
+            WriteCommandRef cmdRef(bcr);
+
+            ASSERT_EQ(opList.size(), cmdRef.getNumOps());
+
+            for (size_t i = 0; i < opList.size(); i++) {
+                auto bulkWriteOp = write_op_helpers::getOrMakeBulkWriteOp(cmdRef.getOp(i));
+                ASSERT_BSONOBJ_EQ(BulkWriteCRUDOp(bulkWriteOp).toBSON(), opList[i]);
+            }
+
+            ASSERT_EQ(nss, bcr.getNS());
+
+            return BSON("ok" << 1 << "n" << n << "nModified" << nModified);
+        });
+    }
+
+    void expectDeleteShardRequest(std::vector<BSONObj> opList, const NamespaceString& nss, int n) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            auto opMsg = static_cast<OpMsgRequest>(request);
+            BatchedCommandRequest bcr = BatchedCommandRequest::parseDelete(opMsg);
+            WriteCommandRef cmdRef(bcr);
+
+            ASSERT_EQ(opList.size(), cmdRef.getNumOps());
+
+            for (size_t i = 0; i < opList.size(); i++) {
+                auto bulkWriteOp = write_op_helpers::getOrMakeBulkWriteOp(cmdRef.getOp(i));
+                ASSERT_BSONOBJ_EQ(BulkWriteCRUDOp(bulkWriteOp).toBSON(), opList[i]);
+            }
+
+            ASSERT_EQ(nss, bcr.getNS());
+
+            return BSON("ok" << 1 << "n" << n);
+        });
+    }
 };
 
 TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
@@ -223,19 +284,10 @@ TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
     expectCollectionRoutingRequest(nss, shardId1);
 
     // Single insert batch.
-    expectBulkWriteShardRequest({BSON("insert" << 0 << "document" << BSON("x" << 1)),
-                                 BSON("insert" << 0 << "document" << BSON("x" << 2))} /* opList */,
-                                {nss} /* nssList */,
-                                shardId1 /* shardId */,
-                                {BSON("ok" << 1.0 << "idx" << 0 << "n" << 1),
-                                 BSON("ok" << 1.0 << "idx" << 1 << "n" << 1)} /* replyItems */,
-                                0 /* nErrors */,
-                                2 /* nInserted */,
-                                0 /* nMatched */,
-                                0 /* nModified */,
-                                0 /* nUpserted */,
-                                0 /* nDelete */
-    );
+    expectInsertShardRequest({BSON("insert" << 0 << "document" << BSON("x" << 1)),
+                              BSON("insert" << 0 << "document" << BSON("x" << 2))},
+                             nss,
+                             2);
 
     future.default_timed_get();
 
@@ -253,30 +305,22 @@ TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
         return updateOp;
     }());
 
-
     auto updateFuture = launchAsync([&]() {
         auto resp = write(operationContext(), updateRequest);
         ASSERT(resp.getOk());
         ASSERT_FALSE(resp.isErrDetailsSet());
-        ASSERT_EQ(resp.getN(), 0);
+        ASSERT_EQ(resp.getN(), 1);
         ASSERT_EQ(resp.getNModified(), 1);
         ASSERT_FALSE(resp.isUpsertDetailsSet());
     });
 
     // Single update batch.
-    expectBulkWriteShardRequest(
+    expectUpdateShardRequest(
         {BSON("update" << 0 << "filter" << BSON("x" << 2) << "multi" << false << "updateMods"
-                       << BSON("x" << 3) << "upsert" << false)} /* opList */,
-        {nss} /* nssList */,
-        shardId1 /* shardId */,
-        {BSON("ok" << 1.0 << "idx" << 0 << "n" << 1)} /* replyItems */,
-        0 /* nErrors */,
-        0 /* nInserted */,
-        0 /* nMatched */,
-        1 /* nModified */,
-        0 /* nUpserted */,
-        0 /* nDelete */
-    );
+                       << BSON("x" << 3) << "upsert" << false)},
+        nss,
+        1,
+        1);
 
     updateFuture.default_timed_get();
 
@@ -302,18 +346,8 @@ TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
     });
 
     // Single delete batch.
-    expectBulkWriteShardRequest(
-        {BSON("delete" << 0 << "filter" << BSON("x" << 3) << "multi" << false)} /* opList */,
-        {nss} /* nssList */,
-        shardId1 /* shardId */,
-        {BSON("ok" << 1.0 << "idx" << 0 << "n" << 1)} /* replyItems */,
-        0 /* nErrors */,
-        0 /* nInserted */,
-        0 /* nMatched */,
-        0 /* nModified */,
-        0 /* nUpserted */,
-        1 /* nDelete */
-    );
+    expectDeleteShardRequest(
+        {BSON("delete" << 0 << "filter" << BSON("x" << 3) << "multi" << false)}, nss, 1);
 
     deleteFuture.default_timed_get();
 }

@@ -49,10 +49,6 @@ struct EmptyBatch {
     std::set<NamespaceString> getInvolvedNamespaces() const {
         return std::set<NamespaceString>{};
     }
-
-    bool isFindAndModify() const {
-        return false;
-    }
 };
 
 struct SimpleWriteBatch {
@@ -80,7 +76,7 @@ struct SimpleWriteBatch {
 
         for (const auto& [_, req] : requestByShardId) {
             for (const auto& op : req.ops) {
-                if (dedup.insert(op.getId()).second) {
+                if (dedup.insert(getWriteOpId(op)).second) {
                     result.emplace_back(op);
                 }
             }
@@ -98,10 +94,6 @@ struct SimpleWriteBatch {
         }
         return result;
     }
-
-    bool isFindAndModify() const {
-        return requestByShardId.begin()->second.ops.front().isFindAndModify();
-    }
 };
 
 struct TwoPhaseWriteBatch {
@@ -118,10 +110,6 @@ struct TwoPhaseWriteBatch {
     std::set<NamespaceString> getInvolvedNamespaces() const {
         return {op.getNss()};
     }
-
-    bool isFindAndModify() const {
-        return op.isFindAndModify();
-    }
 };
 
 struct InternalTransactionBatch {
@@ -136,10 +124,6 @@ struct InternalTransactionBatch {
 
     std::set<NamespaceString> getInvolvedNamespaces() const {
         return {op.getNss()};
-    }
-
-    bool isFindAndModify() const {
-        return op.isFindAndModify();
     }
 };
 
@@ -156,10 +140,6 @@ struct MultiWriteBlockingMigrationsBatch {
 
     std::set<NamespaceString> getInvolvedNamespaces() const {
         return {op.getNss()};
-    }
-
-    bool isFindAndModify() const {
-        return op.isFindAndModify();
     }
 };
 
@@ -189,10 +169,6 @@ struct WriteBatch {
 
     std::set<NamespaceString> getInvolvedNamespaces() const {
         return std::visit([](const auto& inner) { return inner.getInvolvedNamespaces(); }, data);
-    }
-
-    bool isFindAndModify() const {
-        return std::visit([](const auto& inner) { return inner.isFindAndModify(); }, data);
     }
 };
 

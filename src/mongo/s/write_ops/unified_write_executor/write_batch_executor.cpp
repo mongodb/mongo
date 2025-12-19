@@ -50,6 +50,40 @@ namespace mongo {
 namespace unified_write_executor {
 
 namespace {
+BatchWriteCommandReply parseBatchWriteCommandReply(const BSONObj& responseData,
+                                                   BatchedCommandRequest::BatchType batchType) {
+    BatchedCommandResponse reply;
+    std::string errMsg;
+
+    if (!reply.parseBSON(responseData, &errMsg)) {
+        uassertStatusOK(Status{ErrorCodes::FailedToParse, errMsg});
+    }
+
+    return BatchWriteCommandReply::make(reply, batchType);
+}
+
+BatchWriteCommandReply parseBatchWriteCommandReplySingleOp(
+    const BSONObj& responseData, BatchedCommandRequest::BatchType batchType) {
+    // If we're parsing a BatchedCommandResponse for a single op and 'responseData' is empty, that
+    // means the two-phase write completed successfully without updating or deleting anything
+    // (because nothing matched the filter).
+    //
+    // In this case, we create a BatchedCommandResponse containing a single response item with an
+    // OK status and all counters set to 0.
+    if (responseData.isEmpty()) {
+        BatchedCommandResponse reply;
+        reply.setStatus(Status::OK());
+        reply.setN(0);
+        if (batchType == BatchedCommandRequest::BatchType_Update) {
+            reply.setNModified(0);
+        }
+
+        return BatchWriteCommandReply::make(reply, batchType);
+    }
+
+    return parseBatchWriteCommandReply(responseData, batchType);
+}
+
 BulkWriteCommandReply parseBulkWriteCommandReply(const BSONObj& responseData) {
     return BulkWriteCommandReply::parse(responseData,
                                         IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"));
@@ -66,7 +100,7 @@ BulkWriteCommandReply parseBulkWriteCommandReplySingleOp(const BSONObj& response
     if (responseData.isEmpty()) {
         BulkWriteReplyItem replyItem(0, Status::OK());
         replyItem.setN(0);
-        if (op.getType() == WriteType::kUpdate) {
+        if (getWriteOpType(op) == WriteType::kUpdate) {
             replyItem.setNModified(0);
         }
 
@@ -108,18 +142,6 @@ void appendWriteConcern(OperationContext* opCtx, BSONObjBuilder& builder) {
     }
 }
 
-DatabaseName getExecutionDatabase(const WriteBatch& batch) {
-    // If the batch is generated from a findAndModify command, we send to the requested database.
-    // Otherwise, we send to admin database because bulkWrite like commands may contain multiple
-    // namespaces.
-    if (batch.isFindAndModify()) {
-        auto namespaces = batch.getInvolvedNamespaces();
-        tassert(10394900, "Expected only a single namespace", namespaces.size() == 1);
-        return namespaces.begin()->dbName();
-    }
-    return DatabaseName::kAdmin;
-}
-
 bool isTransientTxnError(bool inTransaction,
                          const Status& status,
                          boost::optional<const BSONObj&> responseData = boost::none) {
@@ -139,10 +161,139 @@ template <typename T>
 void filterGenericArgumentsForEmbeddedCommand(OperationContext* opCtx, T& request) {
     // When the command is embedded, we should filter out all the generic arguments other than
     // "rawData", which is need to preserve the semantics on the timeseries bucket collection.
-    request.setRawData(isRawDataOperation(opCtx));
     coordinate_multi_update_util::filterRequestGenericArguments(request.getGenericArguments());
 }
+
+template <typename ResponseType, typename RequestType>
+NoRetryWriteBatchResponse executeOpInInternalTransaction(OperationContext* opCtx,
+                                                         const RequestType& request,
+                                                         const WriteOp& writeOp) {
+    static_assert(std::is_same_v<RequestType, BatchedCommandRequest> ||
+                  std::is_same_v<RequestType, BulkWriteCommandRequest>);
+    static_assert(std::is_same_v<ResponseType, BatchWriteCommandReply> ||
+                  std::is_same_v<ResponseType, BulkWriteCommandReply>);
+
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+
+    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, executor, /*resourceYielder*/ nullptr, inlineExecutor);
+
+    ResponseType response;
+    auto swRes = txn.runNoThrow(
+        opCtx, [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            if constexpr (std::is_same_v<RequestType, BatchedCommandRequest>) {
+                // The "stmtIds" field has already been added to 'request', so we pass in an empty
+                // vector here to avoid adding a duplicate "stmtId"/"stmtIds" field.
+                auto crudOpResponse = txnClient.runCRUDOpSync(request, std::vector<StmtId>{});
+                // Assert that 'crudOpResponse' does not have a top-level error.
+                uassertStatusOK(crudOpResponse.getTopLevelStatus());
+                // Convert the BatchedCommandResponse into a BatchWriteCommandReply and store it
+                // into 'response'.
+                auto batchType = request.getBatchType();
+                response = BatchWriteCommandReply::make(std::move(crudOpResponse), batchType);
+                return SemiFuture<void>::makeReady();
+            } else {
+                auto crudOpResponse = txnClient.runCRUDOpSync(request);
+                response = std::move(crudOpResponse);
+                return SemiFuture<void>::makeReady();
+            }
+        });
+
+    const bool swResIsOK = swRes.getStatus().isOK();
+
+    auto wce = swResIsOK && !swRes.getValue().wcError.toStatus().isOK()
+        ? boost::make_optional(swRes.getValue().wcError)
+        : boost::none;
+
+    auto swResponse = swResIsOK && swRes.getValue().cmdStatus.isOK()
+        ? StatusWith(std::move(response))
+        : StatusWith<ResponseType>(!swResIsOK ? swRes.getStatus() : swRes.getValue().cmdStatus);
+
+    return NoRetryWriteBatchResponse::make(
+        std::move(swResponse), std::move(wce), writeOp, inTransaction);
+}
 }  // namespace
+
+BatchWriteCommandReply BatchWriteCommandReply::make(const BatchedCommandResponse& bcr,
+                                                    BatchedCommandRequest::BatchType batchType) {
+    tassert(11468103, "Expected OK top-level status", bcr.getTopLevelStatus().isOK());
+    tassert(11468104, "Expected 'n' to be non-negative", bcr.getN() >= 0);
+    tassert(11468105, "Expected 'nModified' to be non-negative", bcr.getNModified() >= 0);
+
+    unsigned long long n = static_cast<unsigned long long>(bcr.getN());
+    unsigned long long nUpserted = bcr.isUpsertDetailsSet() ? bcr.sizeUpsertDetails() : 0;
+    unsigned long long nModified =
+        bcr.getNModifiedOpt() ? static_cast<unsigned long long>(*bcr.getNModifiedOpt()) : 0;
+    tassert(11468106, "Expected 'nUpserted' to be less than or equal to 'n'", nUpserted <= n);
+
+    using BatchWriteReplyItem = std::tuple<int, Status, boost::optional<IDLAnyTypeOwned>>;
+
+    BatchWriteCommandReply reply;
+    std::vector<BatchWriteReplyItem> details;
+
+    if (batchType == BatchedCommandRequest::BatchType_Insert) {
+        reply.nInserted = n;
+    } else if (batchType == BatchedCommandRequest::BatchType_Update) {
+        reply.nMatched = n - nUpserted;
+        reply.nModified = nModified;
+        reply.nUpserted = nUpserted;
+    } else if (batchType == BatchedCommandRequest::BatchType_Delete) {
+        reply.nDeleted = n;
+    }
+
+    if (bcr.isErrDetailsSet()) {
+        reply.nErrors = bcr.sizeErrDetails();
+
+        for (const write_ops::WriteError& writeError : bcr.getErrDetails()) {
+            details.emplace_back(writeError.getIndex(), writeError.getStatus(), boost::none);
+        }
+    }
+    if (bcr.isUpsertDetailsSet()) {
+        for (const BatchedUpsertDetail* detail : bcr.getUpsertDetails()) {
+            if (detail->isUpsertedIDSet()) {
+                auto upsertedId = IDLAnyTypeOwned(detail->getUpsertedID().firstElement());
+                details.emplace_back(detail->getIndex(), Status::OK(), std::move(upsertedId));
+            }
+        }
+    }
+
+    auto tupleLt = [](const auto& lhs, const auto& rhs) {
+        return std::get<0>(lhs) < std::get<0>(rhs);
+    };
+    auto tupleEq = [](const auto& lhs, const auto& rhs) {
+        return std::get<0>(lhs) == std::get<0>(rhs);
+    };
+
+    std::stable_sort(details.begin(), details.end(), std::move(tupleLt));
+    details.erase(std::unique(details.begin(), details.end(), std::move(tupleEq)), details.end());
+
+    for (auto& [idx, status, upsertedId] : details) {
+        BulkWriteReplyItem item(idx, std::move(status));
+        item.setN(0);
+        if (batchType == BatchedCommandRequest::BatchType_Update) {
+            item.setNModified(0);
+        }
+
+        if (upsertedId) {
+            item.setN(1);
+            item.setUpserted(std::move(*upsertedId));
+        }
+
+        reply.items.emplace_back(std::move(item));
+    }
+
+    if (bcr.isWriteConcernErrorSet()) {
+        reply.wcErrors = *bcr.getWriteConcernError();
+    }
+
+    if (bcr.areRetriedStmtIdsSet()) {
+        reply.retriedStmtIds = bcr.getRetriedStmtIds();
+    }
+
+    return reply;
+}
 
 const Status& BasicResponse::getStatus() const {
     tassert(11272100, "Expected OK status or error", !isEmpty());
@@ -190,13 +341,154 @@ WriteBatchResponse WriteBatchExecutor::execute(OperationContext* opCtx,
         batch.data);
 }
 
-BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
+BatchedCommandRequest WriteBatchExecutor::buildBatchWriteRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
-    bool errorsOnly,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+    IsEmbeddedCommand isEmbeddedCommand,
+    BatchedCommandRequest::BatchType batchType,
+    const NamespaceString& nss,
+    boost::optional<UUID> collectionUuid,
+    const boost::optional<mongo::EncryptionInformation>& encryptionInformation) const {
+    tassert(11468107, "Expected at least one write op", !ops.empty());
+
+    // Translate timeseries collection to bucket namespace if detected by the analyzer.
+    NamespaceString targetedNss = nss;
+    bool isTimeseriesNamespace = false;
+    if (nssIsViewfulTimeseries.contains(nss)) {
+        targetedNss = nss.makeTimeseriesBucketsNamespace();
+
+        if (!isRawDataOperation(opCtx)) {
+            isTimeseriesNamespace = true;
+        }
+    }
+
+    BatchedCommandRequest request([&]() -> BatchedCommandRequest {
+        if (batchType == BatchedCommandRequest::BatchType_Insert) {
+            std::vector<BSONObj> insertDocs;
+            for (auto& op : ops) {
+                insertDocs.emplace_back(op.getInsertOp().getDocument());
+            }
+
+            write_ops::InsertCommandRequest insertRequest(targetedNss);
+            insertRequest.setDocuments(std::move(insertDocs));
+            return std::move(insertRequest);
+        } else if (batchType == BatchedCommandRequest::BatchType_Update) {
+            // Copy the UpdateOpEntry from the original command, and then update the "sampleId"
+            // and "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery" fields appropriately.
+            std::vector<write_ops::UpdateOpEntry> updateOps;
+            for (auto& op : ops) {
+                auto updateOpEntry = write_op_helpers::getOrMakeUpdateOpEntry(op.getUpdateOp());
+
+                auto sampleIdIt = sampleIds.find(getWriteOpId(op));
+                updateOpEntry.setSampleId(sampleIdIt != sampleIds.end()
+                                              ? boost::make_optional(sampleIdIt->second)
+                                              : boost::none);
+
+                if (allowShardKeyUpdatesWithoutFullShardKeyInQuery.has_value()) {
+                    updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+                        *allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+                } else {
+                    updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(OptionalBool{});
+                }
+
+                updateOps.emplace_back(std::move(updateOpEntry));
+            }
+
+            write_ops::UpdateCommandRequest updateRequest(targetedNss);
+            updateRequest.setUpdates(std::move(updateOps));
+            return std::move(updateRequest);
+        } else if (batchType == BatchedCommandRequest::BatchType_Delete) {
+            // Copy the DeleteOpEntry from the original command, and then update the "sampleId"
+            // field appropriately.
+            std::vector<write_ops::DeleteOpEntry> deleteOps;
+            for (auto& op : ops) {
+                auto deleteOpEntry = write_op_helpers::getOrMakeDeleteOpEntry(op.getDeleteOp());
+
+                auto sampleIdIt = sampleIds.find(getWriteOpId(op));
+                deleteOpEntry.setSampleId(sampleIdIt != sampleIds.end()
+                                              ? boost::make_optional(sampleIdIt->second)
+                                              : boost::none);
+
+                deleteOps.emplace_back(std::move(deleteOpEntry));
+            }
+
+            write_ops::DeleteCommandRequest deleteRequest(targetedNss);
+            deleteRequest.setDeletes(std::move(deleteOps));
+            return deleteRequest;
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }());
+
+    auto& wcb = request.getWriteCommandRequestBase();
+
+    wcb.setCollectionUUID(collectionUuid);
+    wcb.setEncryptionInformation(encryptionInformation);
+    if (isTimeseriesNamespace) {
+        wcb.setIsTimeseriesNamespace(true);
+    }
+
+    wcb.setOrdered(_cmdRef.getOrdered());
+    wcb.setBypassDocumentValidation(_cmdRef.getBypassDocumentValidation());
+    wcb.setBypassEmptyTsReplacement(_cmdRef.getBypassEmptyTsReplacement());
+    request.setLet(_cmdRef.getLet());
+    request.getGenericArguments().setComment(_cmdRef.getComment());
+
+    if (const auto& lrc = _cmdRef.getLegacyRuntimeConstants()) {
+        request.setLegacyRuntimeConstants(*lrc);
+    }
+
+    if (opCtx->isRetryableWrite()) {
+        std::vector<int> stmtIds;
+        stmtIds.reserve(ops.size());
+        for (auto& op : ops) {
+            stmtIds.push_back(op.getEffectiveStmtId());
+        }
+
+        wcb.setStmtIds(std::move(stmtIds));
+    }
+
+    // Don't set "maxTimeMS" on the requests that get sent to the shards. If the router exceeds
+    // its time limit, it will close the connections to the shards and return a MaxTimeMSExceeded
+    // error to the client. We also don't need to set "$_originalQuery" or "$_originalCollation".
+    // These fields are only used by ClusterWriteWithoutShardKeyCmd.
+
+    // Append shard versions if needed.
+    if (!versionByNss.empty()) {
+        auto versionIt = versionByNss.find(nss);
+        tassert(11468108,
+                "The shard version info should be present in the batch",
+                versionIt != versionByNss.end());
+        auto& version = versionIt->second;
+
+        if (version.shardVersion) {
+            request.setShardVersion(*version.shardVersion);
+        }
+
+        if (version.databaseVersion) {
+            request.setDbVersion(*version.databaseVersion);
+        }
+    }
+
+    if (isEmbeddedCommand) {
+        request.getGenericArguments().setRawData(isRawDataOperation(opCtx));
+        filterGenericArgumentsForEmbeddedCommand(opCtx, request);
+    }
+
+    return request;
+}
+
+BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequest(
+    OperationContext* opCtx,
+    const std::vector<WriteOp>& ops,
+    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+    const std::set<NamespaceString>& nssIsViewfulTimeseries,
+    const std::map<WriteOpId, UUID>& sampleIds,
+    boost::optional<bool> errorsOnly,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
     IsEmbeddedCommand isEmbeddedCommand) const {
     const bool isRetryableWrite = opCtx->isRetryableWrite();
@@ -210,7 +502,7 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
     }
 
     for (auto& op : ops) {
-        auto bulkOp = op.getBulkWriteOp();
+        auto bulkOp = write_op_helpers::getOrMakeBulkWriteOp(op);
         auto& nss = op.getNss();
 
         NamespaceInfoEntry nsInfo(nss);
@@ -246,13 +538,13 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
         auto nsIndex = nsIndexMap[nss];
         visit([&](auto& value) { return value.setNsInfoIdx(nsIndex); }, bulkOp);
 
-        if (op.getType() == WriteType::kUpdate &&
+        if (getWriteOpType(op) == WriteType::kUpdate &&
             allowShardKeyUpdatesWithoutFullShardKeyInQuery.has_value()) {
             get<BulkWriteUpdateOp>(bulkOp).setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
                 *allowShardKeyUpdatesWithoutFullShardKeyInQuery);
         }
 
-        auto sampleIdIt = sampleIds.find(op.getId());
+        auto sampleIdIt = sampleIds.find(getWriteOpId(op));
         if (sampleIdIt != sampleIds.end()) {
             visit(OverloadedVisitor{
                       [&](mongo::BulkWriteInsertOp& op) { return; },
@@ -275,48 +567,32 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
     bulkRequest.setBypassEmptyTsReplacement(_cmdRef.getBypassEmptyTsReplacement());
     bulkRequest.setLet(_cmdRef.getLet());
     bulkRequest.setComment(_cmdRef.getComment());
-    bulkRequest.setMaxTimeMS(_cmdRef.getMaxTimeMS());
 
-    bulkRequest.setErrorsOnly(errorsOnly);
+    bulkRequest.setErrorsOnly(errorsOnly.value_or(false));
 
     if (isEmbeddedCommand) {
+        bulkRequest.getGenericArguments().setRawData(isRawDataOperation(opCtx));
         filterGenericArgumentsForEmbeddedCommand(opCtx, bulkRequest);
     }
 
     if (isRetryableWrite) {
-        bulkRequest.setStmtIds(stmtIds);
+        bulkRequest.setStmtIds(std::move(stmtIds));
     }
     return bulkRequest;
 }
 
-BSONObj WriteBatchExecutor::buildBulkWriteRequest(
-    OperationContext* opCtx,
-    const std::vector<WriteOp>& ops,
-    const std::map<NamespaceString, ShardEndpoint>& versionByNss,
-    const std::set<NamespaceString>& nssIsViewfulTimeseries,
-    const std::map<WriteOpId, UUID>& sampleIds,
-    bool errorsOnly,
-    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-    IsEmbeddedCommand isEmbeddedCommand,
-    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
-    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
+namespace {
+template <typename RequestType>
+BSONObj buildWriteCommandRequestObj(OperationContext* opCtx,
+                                    const RequestType& request,
+                                    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+                                    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) {
     BSONObjBuilder builder;
-
-    auto bulkRequest =
-        buildBulkWriteRequestWithoutTxnInfo(opCtx,
-                                            ops,
-                                            versionByNss,
-                                            nssIsViewfulTimeseries,
-                                            sampleIds,
-                                            errorsOnly,
-                                            allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                                            isEmbeddedCommand);
-    bulkRequest.serialize(&builder);
+    request.serialize(&builder);
 
     if (shouldAppendLsidAndTxnNumber) {
         logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
     }
-
     if (shouldAppendReadWriteConcern) {
         appendWriteConcern(opCtx, builder);
     }
@@ -324,34 +600,63 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
     return builder.obj();
 }
 
-BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
+void unsetLegacyRuntimeConstants(CommandRequestVariant& requestVar) {
+    std::visit(OverloadedVisitor(
+                   [&](BatchedCommandRequest& request) { request.unsetLegacyRuntimeConstants(); },
+                   [&](BulkWriteCommandRequest& request) {},
+                   [&](write_ops::FindAndModifyCommandRequest& request) {
+                       request.setLegacyRuntimeConstants(boost::none);
+                   }),
+               requestVar);
+}
+}  // namespace
+
+BSONObj WriteBatchExecutor::buildBatchWriteRequestObj(
+    OperationContext* opCtx,
+    const BatchedCommandRequest& batchRequest,
+    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
+    return buildWriteCommandRequestObj(
+        opCtx, batchRequest, shouldAppendLsidAndTxnNumber, shouldAppendReadWriteConcern);
+}
+
+BSONObj WriteBatchExecutor::buildBulkWriteRequestObj(
+    OperationContext* opCtx,
+    const BulkWriteCommandRequest& bulkRequest,
+    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
+    return buildWriteCommandRequestObj(
+        opCtx, bulkRequest, shouldAppendLsidAndTxnNumber, shouldAppendReadWriteConcern);
+}
+
+write_ops::FindAndModifyCommandRequest WriteBatchExecutor::buildFindAndModifyRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-    IsEmbeddedCommand isEmbeddedCommand,
-    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
-    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
+    IsEmbeddedCommand isEmbeddedCommand) const {
+    tassert(10394902, "Expected a findAndModify request", _cmdRef.isFindAndModifyCommand());
     tassert(10394901, "Expected a single write op for the findAndModify command", ops.size() == 1);
-    const auto& op = ops.front();
-    tassert(10394902, "Expected a findAndModify request", op.getCommand().isFindAndModifyCommand());
 
+    const auto& op = ops.front();
     auto& nss = op.getNss();
 
     // Make a copy of the original request and clear attributes that we may append later.
-    auto request = op.getCommand().getFindAndModifyCommandRequest();
+    auto request = _cmdRef.getFindAndModifyCommandRequest();
     request.setLsid(boost::none);
     request.setTxnNumber(boost::none);
     request.setWriteConcern(boost::none);
     request.setReadConcern(boost::none);
+    request.setShardVersion(boost::none);
+    request.setDatabaseVersion(boost::none);
+    request.setIsTimeseriesNamespace(false);
+    request.setSampleId(boost::none);
+    request.setStmtId(boost::none);
+    request.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(OptionalBool{});
 
-    auto versionIt = versionByNss.find(nss);
-    if (versionIt != versionByNss.end()) {
-        request.setShardVersion(versionIt->second.shardVersion);
-        request.setDatabaseVersion(versionIt->second.databaseVersion);
-    }
+    request.setNamespace(nss);
 
     if (nssIsViewfulTimeseries.contains(nss)) {
         request.setNamespace(nss.makeTimeseriesBucketsNamespace());
@@ -360,18 +665,25 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
         }
     }
 
-    auto sampleIdIt = sampleIds.find(op.getId());
+    auto versionIt = versionByNss.find(nss);
+    if (versionIt != versionByNss.end()) {
+        request.setShardVersion(versionIt->second.shardVersion);
+        request.setDatabaseVersion(versionIt->second.databaseVersion);
+    }
+
+    auto sampleIdIt = sampleIds.find(getWriteOpId(op));
     if (sampleIdIt != sampleIds.end()) {
         request.setSampleId(sampleIdIt->second);
     }
 
-    if (op.getType() == WriteType::kUpdate &&
+    if (getWriteOpType(op) == WriteType::kUpdate &&
         allowShardKeyUpdatesWithoutFullShardKeyInQuery.has_value()) {
         request.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
             *allowShardKeyUpdatesWithoutFullShardKeyInQuery);
     }
 
     if (isEmbeddedCommand) {
+        request.getGenericArguments().setRawData(isRawDataOperation(opCtx));
         filterGenericArgumentsForEmbeddedCommand(opCtx, request);
     }
 
@@ -379,6 +691,14 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
         request.setStmtId(op.getEffectiveStmtId());
     }
 
+    return request;
+}
+
+BSONObj WriteBatchExecutor::buildFindAndModifyRequestObj(
+    OperationContext* opCtx,
+    write_ops::FindAndModifyCommandRequest request,
+    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
     auto cmdObj = request.toBSON();
 
     if (shouldAppendReadWriteConcern) {
@@ -410,40 +730,77 @@ BSONObj WriteBatchExecutor::buildFindAndModifyRequest(
     return cmdObj;
 }
 
-BSONObj WriteBatchExecutor::buildRequest(
+CommandRequestVariant WriteBatchExecutor::buildRequest(
     OperationContext* opCtx,
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::set<NamespaceString>& nssIsViewfulTimeseries,
     const std::map<WriteOpId, UUID>& sampleIds,
-    bool errorsOnly,
+    boost::optional<bool> errorsOnly,
     boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-    IsEmbeddedCommand isEmbeddedCommand,
-    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
-    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
-    tassert(10394903, "Expected at least one write op", !ops.empty());
-    if (ops.front().isFindAndModify()) {
-        return buildFindAndModifyRequest(opCtx,
+    IsEmbeddedCommand isEmbeddedCommand) const {
+    return _cmdRef.visitRequest(OverloadedVisitor(
+        [&](const BatchedCommandRequest& bcr) -> CommandRequestVariant {
+            const auto& encryptionInfo =
+                bcr.getWriteCommandRequestBase().getEncryptionInformation();
+            return buildBatchWriteRequest(opCtx,
+                                          ops,
+                                          versionByNss,
+                                          nssIsViewfulTimeseries,
+                                          sampleIds,
+                                          allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                                          isEmbeddedCommand,
+                                          bcr.getBatchType(),
+                                          bcr.getNS(),
+                                          bcr.getCollectionUUID(),
+                                          encryptionInfo);
+        },
+        [&](const BulkWriteCommandRequest&) -> CommandRequestVariant {
+            return buildBulkWriteRequest(opCtx,
                                          ops,
                                          versionByNss,
                                          nssIsViewfulTimeseries,
                                          sampleIds,
+                                         errorsOnly,
                                          allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                                         isEmbeddedCommand,
-                                         shouldAppendLsidAndTxnNumber,
-                                         shouldAppendReadWriteConcern);
-    } else {
-        return buildBulkWriteRequest(opCtx,
-                                     ops,
-                                     versionByNss,
-                                     nssIsViewfulTimeseries,
-                                     sampleIds,
-                                     errorsOnly,
-                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                                     isEmbeddedCommand,
-                                     shouldAppendLsidAndTxnNumber,
-                                     shouldAppendReadWriteConcern);
-    }
+                                         isEmbeddedCommand);
+        },
+        [&](const write_ops::FindAndModifyCommandRequest&) -> CommandRequestVariant {
+            return buildFindAndModifyRequest(opCtx,
+                                             ops,
+                                             versionByNss,
+                                             nssIsViewfulTimeseries,
+                                             sampleIds,
+                                             allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                                             isEmbeddedCommand);
+        }));
+}
+
+BSONObj WriteBatchExecutor::buildRequestObj(
+    OperationContext* opCtx,
+    CommandRequestVariant request,
+    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+    ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const {
+    return std::visit(OverloadedVisitor(
+                          [&](BatchedCommandRequest& request) {
+                              return buildBatchWriteRequestObj(opCtx,
+                                                               std::move(request),
+                                                               shouldAppendLsidAndTxnNumber,
+                                                               shouldAppendReadWriteConcern);
+                          },
+                          [&](BulkWriteCommandRequest& request) {
+                              return buildBulkWriteRequestObj(opCtx,
+                                                              request,
+                                                              shouldAppendLsidAndTxnNumber,
+                                                              shouldAppendReadWriteConcern);
+                          },
+                          [&](write_ops::FindAndModifyCommandRequest& request) {
+                              return buildFindAndModifyRequestObj(opCtx,
+                                                                  std::move(request),
+                                                                  shouldAppendLsidAndTxnNumber,
+                                                                  shouldAppendReadWriteConcern);
+                          }),
+                      request);
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
@@ -455,10 +812,11 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> swResponse,
                                   std::vector<WriteOp> ops,
                                   bool inTransaction,
-                                  bool errorsOnly,
                                   boost::optional<HostAndPort> hostAndPort,
                                   boost::optional<const ShardId&> shardId) {
-    const bool isFindAndModifyCommand = (ops.size() == 1 && ops.front().isFindAndModify());
+    tassert(11468109, "Expected at least one write op", !ops.empty());
+
+    WriteCommandRef cmdRef = ops.front().getCommand();
 
     // If there was a local error, return a ShardResponse that reports this local error.
     if (!swResponse.isOK()) {
@@ -478,7 +836,6 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
                              boost::none /*wce*/,
                              std::move(ops),
                              transientTxnError,
-                             errorsOnly,
                              std::move(hostAndPort)};
     }
 
@@ -487,7 +844,7 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
     boost::optional<WriteConcernErrorDetail> wce;
 
     // If this is a findAndModify command, populate 'wce' now.
-    if (isFindAndModifyCommand) {
+    if (cmdRef.isFindAndModifyCommand()) {
         if (auto wcStatus = getWriteConcernStatusFromCommandResult(response.data);
             !wcStatus.isOK()) {
             wce = WriteConcernErrorDetail{std::move(wcStatus)};
@@ -496,7 +853,7 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
 
     // If there was a top-level error, return a ShardResponse that reports this top-level error.
     if (!status.isOK()) {
-        if (!isFindAndModifyCommand) {
+        if (!cmdRef.isFindAndModifyCommand()) {
             status = status.withContext(str::stream() << "cluster write results unavailable from "
                                                       << response.target);
         }
@@ -514,7 +871,6 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
                              std::move(wce),
                              std::move(ops),
                              transientTxnError,
-                             errorsOnly,
                              response.target};
     }
 
@@ -526,11 +882,19 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
                 "response"_attr = response.data,
                 "host"_attr = response.target);
 
-    auto swReply = [&]() -> StatusWith<CommandReplyVariant> {
-        if (isFindAndModifyCommand) {
-            return parseFindAndModifyCommandReply(
-                CommandHelpers::filterCommandReplyForPassthrough(response.data));
-        } else {
+    auto swReply = cmdRef.visitRequest(OverloadedVisitor(
+        [&](const BatchedCommandRequest& bcr) -> StatusWith<CommandReplyVariant> {
+            auto batchType = bcr.getBatchType();
+            auto parsedReply = parseBatchWriteCommandReply(response.data, batchType);
+
+            // If this is not a findAndModify command, then we populate 'wce' here.
+            if (parsedReply.wcErrors) {
+                wce = *parsedReply.wcErrors;
+            }
+
+            return CommandReplyVariant{std::move(parsedReply)};
+        },
+        [&](const BulkWriteCommandRequest&) -> StatusWith<CommandReplyVariant> {
             auto parsedReply = parseBulkWriteCommandReply(response.data);
 
             // If this is not a findAndModify command, then we populate 'wce' here.
@@ -539,68 +903,122 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
                     Status(ErrorCodes::Error(wcError->getCode()), wcError->getErrmsg())};
             }
 
-            return std::move(parsedReply);
-        }
-    }();
+            return CommandReplyVariant{std::move(parsedReply)};
+        },
+        [&](const write_ops::FindAndModifyCommandRequest&) -> StatusWith<CommandReplyVariant> {
+            return CommandReplyVariant{parseFindAndModifyCommandReply(
+                CommandHelpers::filterCommandReplyForPassthrough(response.data))};
+        }));
 
     return ShardResponse{std::move(swReply),
                          std::move(wce),
                          std::move(ops),
                          false /*transientTxnError*/,
-                         errorsOnly,
                          response.target};
 }
 
-ShardResponse ShardResponse::makeEmpty(std::vector<WriteOp> ops, bool errorsOnly) {
-    return ShardResponse{boost::none /*swReply*/,
-                         boost::none /*wce*/,
-                         std::move(ops),
-                         false /*transientTxnError*/,
-                         errorsOnly};
+ShardResponse ShardResponse::makeEmpty(std::vector<WriteOp> ops) {
+    return ShardResponse{
+        boost::none /*swReply*/, boost::none /*wce*/, std::move(ops), false /*transientTxnError*/};
+}
+
+NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
+    Status status,
+    boost::optional<WriteConcernErrorDetail> wce,
+    const WriteOp& op,
+    bool inTransaction) {
+    tassert(11468112, "Expected non-OK status", !status.isOK());
+    const bool transientTxnError = isTransientTxnError(inTransaction, status);
+
+    return NoRetryWriteBatchResponse{StatusWith<CommandReplyVariant>(std::move(status)),
+                                     std::move(wce),
+                                     std::vector<WriteOp>{op},
+                                     transientTxnError};
+}
+
+NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
+    StatusWith<BatchWriteCommandReply> swResponse,
+    boost::optional<WriteConcernErrorDetail> wce,
+    const WriteOp& op,
+    bool inTransaction) {
+    return makeImpl(std::move(swResponse), std::move(wce), op, inTransaction);
+}
+
+NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
+    StatusWith<BulkWriteCommandReply> swResponse,
+    boost::optional<WriteConcernErrorDetail> wce,
+    const WriteOp& op,
+    bool inTransaction) {
+    return makeImpl(std::move(swResponse), std::move(wce), op, inTransaction);
+}
+
+NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
+    StatusWith<write_ops::FindAndModifyCommandReply> swResponse,
+    boost::optional<WriteConcernErrorDetail> wce,
+    const WriteOp& op,
+    bool inTransaction) {
+    return makeImpl(std::move(swResponse), std::move(wce), op, inTransaction);
+}
+
+template <typename ResponseType>
+NoRetryWriteBatchResponse NoRetryWriteBatchResponse::makeImpl(
+    StatusWith<ResponseType> swResponse,
+    boost::optional<WriteConcernErrorDetail> wce,
+    const WriteOp& op,
+    bool inTransaction) {
+    const auto& status = swResponse.getStatus();
+    const bool transientTxnError = isTransientTxnError(inTransaction, status);
+
+    auto swReply = status.isOK() ? StatusWith(CommandReplyVariant{std::move(swResponse.getValue())})
+                                 : StatusWith<CommandReplyVariant>(status);
+
+    return NoRetryWriteBatchResponse{
+        std::move(swReply), std::move(wce), std::vector<WriteOp>{op}, transientTxnError};
 }
 
 NoRetryWriteBatchResponse NoRetryWriteBatchResponse::make(
     const StatusWith<BSONObj>& swResponse,
     boost::optional<WriteConcernErrorDetail> wce,
     const WriteOp& op,
-    bool inTransaction,
-    bool errorsOnly) {
+    bool inTransaction) {
+    WriteCommandRef cmdRef = op.getCommand();
     const auto& status = swResponse.getStatus();
-    const bool transientTxnError = isTransientTxnError(inTransaction, status);
 
-    auto swReply = [&]() -> StatusWith<CommandReplyVariant> {
-        if (status.isOK()) {
-            const auto& response = swResponse.getValue();
-            return op.isFindAndModify()
-                ? CommandReplyVariant{parseFindAndModifyCommandReply(response)}
-                : CommandReplyVariant{parseBulkWriteCommandReplySingleOp(response, op)};
-        } else {
-            return status;
-        }
-    }();
+    return cmdRef.visitRequest(OverloadedVisitor(
+        [&](const BatchedCommandRequest& bcr) {
+            auto batchType = bcr.getBatchType();
+            auto swReply = status.isOK()
+                ? StatusWith(parseBatchWriteCommandReplySingleOp(swResponse.getValue(), batchType))
+                : StatusWith<BatchWriteCommandReply>(status);
 
-    return NoRetryWriteBatchResponse{std::move(swReply),
-                                     std::move(wce),
-                                     std::vector<WriteOp>{op},
-                                     transientTxnError,
-                                     errorsOnly};
+            return make(std::move(swReply), std::move(wce), op, inTransaction);
+        },
+        [&](const BulkWriteCommandRequest&) {
+            auto swReply = status.isOK()
+                ? StatusWith(parseBulkWriteCommandReplySingleOp(swResponse.getValue(), op))
+                : StatusWith<BulkWriteCommandReply>(status);
+
+            return make(std::move(swReply), std::move(wce), op, inTransaction);
+        },
+        [&](const write_ops::FindAndModifyCommandRequest&) {
+            auto swReply = status.isOK()
+                ? StatusWith(parseFindAndModifyCommandReply(swResponse.getValue()))
+                : StatusWith<write_ops::FindAndModifyCommandReply>(status);
+
+            return make(std::move(swReply), std::move(wce), op, inTransaction);
+        }));
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const SimpleWriteBatch& batch) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    const boost::optional<bool> errorsOnly = _cmdRef.getErrorsOnly();
 
     std::vector<AsyncRequestsSender::Request> requestsToSend;
-    absl::flat_hash_map<ShardId, bool> errorsOnlyByShardId;
 
     for (auto& [shardId, shardRequest] : batch.requestByShardId) {
-        // Determine if the "errorsOnly" parameter should be set to true or false when sending a
-        // command to 'shardId'.
-        const bool errorsOnly = getErrorsOnlyForShardRequest(shardRequest.ops);
-        errorsOnlyByShardId[shardId] = errorsOnly;
-
-        auto requestObj =
+        auto request =
             buildRequest(opCtx,
                          shardRequest.ops,
                          shardRequest.versionByNss,
@@ -608,9 +1026,11 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                          shardRequest.sampleIds,
                          errorsOnly,
                          boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-                         IsEmbeddedCommand::No,
-                         ShouldAppendLsidAndTxnNumber::Yes,
-                         ShouldAppendReadWriteConcern::Yes);
+                         IsEmbeddedCommand::No);
+        auto requestObj = buildRequestObj(opCtx,
+                                          std::move(request),
+                                          ShouldAppendLsidAndTxnNumber::Yes,
+                                          ShouldAppendReadWriteConcern::Yes);
 
         LOGV2_DEBUG(10605503,
                     4,
@@ -624,7 +1044,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     // Note we check this rather than `isRetryableWrite()` because we do not want to retry
     // commands within retryable internal transactions.
     bool shouldRetry = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
-    auto databaseName = getExecutionDatabase(WriteBatch{batch});
+    auto databaseName = getExecutionDatabase();
     auto sender = MultiStatementTransactionRequestsSender(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
@@ -647,12 +1067,10 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         auto& shardId = arsResponse.shardId;
 
         const auto& shardRequest = batch.requestByShardId.at(shardId);
-        const bool errorsOnly = errorsOnlyByShardId.at(shardId);
 
         ShardResponse shardResponse = ShardResponse::make(std::move(arsResponse.swResponse),
                                                           shardRequest.ops,
                                                           inTransaction,
-                                                          errorsOnly,
                                                           std::move(arsResponse.shardHostAndPort),
                                                           shardId);
 
@@ -702,9 +1120,8 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         for (const auto& [shardId, _] : batch.requestByShardId) {
             if (!shardIdSet.count(shardId)) {
                 const auto& shardRequest = batch.requestByShardId.at(shardId);
-                const bool errorsOnly = errorsOnlyByShardId.at(shardId);
-                resp.shardResponses.emplace_back(
-                    shardId, ShardResponse::makeEmpty(shardRequest.ops, errorsOnly));
+                resp.shardResponses.emplace_back(shardId,
+                                                 ShardResponse::makeEmpty(shardRequest.ops));
             }
         }
     }
@@ -720,6 +1137,7 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const TwoPhaseWriteBatch& batch) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    const boost::optional<bool> errorsOnly = _cmdRef.getErrorsOnly();
 
     const WriteOp& writeOp = batch.op;
     const auto& nss = writeOp.getNss();
@@ -729,27 +1147,25 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
 
     std::map<WriteOpId, UUID> sampleIds;
     if (batch.sampleId) {
-        sampleIds.emplace(writeOp.getId(), *batch.sampleId);
+        sampleIds.emplace(getWriteOpId(writeOp), *batch.sampleId);
     }
-
-    // Determine if the "errorsOnly" parameter should be set to true or false when sending a command
-    // to the shards.
-    const bool errorsOnly = getErrorsOnlyForShardRequest({writeOp});
 
     std::set<NamespaceString> nssIsViewfulTimeseries;
     if (batch.isViewfulTimeseries) {
         nssIsViewfulTimeseries.emplace(nss);
     }
-    auto cmdObj = buildRequest(opCtx,
-                               {writeOp},
-                               {},                                /* versionByNss */
-                               std::move(nssIsViewfulTimeseries), /* nssIsViewfulTimeseries */
-                               sampleIds,
-                               errorsOnly,
-                               allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                               IsEmbeddedCommand::Yes,
-                               ShouldAppendLsidAndTxnNumber::No,
-                               ShouldAppendReadWriteConcern::No);
+    auto request = buildRequest(opCtx,
+                                {writeOp},
+                                {},
+                                std::move(nssIsViewfulTimeseries),
+                                sampleIds,
+                                errorsOnly,
+                                allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                                IsEmbeddedCommand::Yes);
+    auto cmdObj = buildRequestObj(opCtx,
+                                  std::move(request),
+                                  ShouldAppendLsidAndTxnNumber::No,
+                                  ShouldAppendReadWriteConcern::No);
 
     boost::optional<WriteConcernErrorDetail> wce;
     auto swRes =
@@ -758,122 +1174,96 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     auto swResponse = swRes.isOK() ? StatusWith{swRes.getValue().getResponse().getOwned()}
                                    : StatusWith<BSONObj>{swRes.getStatus()};
 
-    return NoRetryWriteBatchResponse::make(
-        swResponse, std::move(wce), writeOp, inTransaction, errorsOnly);
+    return NoRetryWriteBatchResponse::make(swResponse, std::move(wce), writeOp, inTransaction);
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const InternalTransactionBatch& batch) {
-    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
-
+    const boost::optional<bool> errorsOnly = _cmdRef.getErrorsOnly();
     const WriteOp& writeOp = batch.op;
 
     std::map<WriteOpId, UUID> sampleIds;
     if (batch.sampleId) {
-        sampleIds.emplace(writeOp.getId(), *batch.sampleId);
+        sampleIds.emplace(getWriteOpId(writeOp), *batch.sampleId);
     }
 
-    // Determine if the "errorsOnly" parameter should be set to true or false when sending a command
-    // to the shards.
-    const bool errorsOnly = getErrorsOnlyForShardRequest({writeOp});
+    auto requestVar = buildRequest(opCtx,
+                                   {writeOp},
+                                   {}, /* versionByNss */
+                                   {}, /* nssIsViewfulTimeseries */
+                                   sampleIds,
+                                   errorsOnly,
+                                   boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
+                                   IsEmbeddedCommand::No);
 
-    tassert(11288300, "Unexpected findAndModify command type", !batch.isFindAndModify());
-    auto singleUpdateRequest = buildBulkWriteRequestWithoutTxnInfo(
-        opCtx,
-        {writeOp},
-        {}, /* versionByNss */
-        {}, /* nssIsViewfulTimeseries */
-        sampleIds,
-        errorsOnly,
-        boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */,
-        IsEmbeddedCommand::No);
+    // Remove the "legacyRuntimeConstants" field if it's present.
+    unsetLegacyRuntimeConstants(requestVar);
 
-    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, /*resourceYielder*/ nullptr, inlineExecutor);
-    BulkWriteCommandReply bulkWriteResponse;
+    // Execute the op in an internal transaction, then return a NoRetryWriteBatchResponse
+    // containing the result.
+    using RetT = WriteBatchResponse;
 
-    // Execute the singleUpdateRequest (a bulkWrite command) in an internal transaction to
-    // perform the retryable timeseries update operation. This separate bulkWrite command will
-    // get executed on its own via unified_write_executor::bulkWrite() logic again as a transaction,
-    // which handles retries of all kinds. This function is just a client of the internal
-    // transaction spawned. As a result, we must only receive a single final (non-retryable)
-    // response for the timeseries update operation.
-    auto swResult = txn.runNoThrow(
-        opCtx, [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            auto updateResponse = txnClient.runCRUDOpSync(singleUpdateRequest);
-            bulkWriteResponse = std::move(updateResponse);
-
-            return SemiFuture<void>::makeReady();
-        });
-
-    Status responseStatus = swResult.getStatus();
-    boost::optional<WriteConcernErrorDetail> wce;
-    if (responseStatus.isOK()) {
-        if (!swResult.getValue().wcError.toStatus().isOK()) {
-            wce = swResult.getValue().wcError;
-        }
-
-        if (!swResult.getValue().cmdStatus.isOK()) {
-            responseStatus = swResult.getValue().cmdStatus;
-        }
-    }
-
-    auto swResponse = responseStatus.isOK() ? StatusWith(bulkWriteResponse.toBSON().getOwned())
-                                            : StatusWith<BSONObj>(responseStatus);
-
-    return NoRetryWriteBatchResponse::make(
-        swResponse, std::move(wce), writeOp, inTransaction, errorsOnly);
+    return visit(OverloadedVisitor(
+                     [&](const BatchedCommandRequest& request) -> RetT {
+                         return executeOpInInternalTransaction<BatchWriteCommandReply>(
+                             opCtx, request, writeOp);
+                     },
+                     [&](const BulkWriteCommandRequest& request) -> RetT {
+                         return executeOpInInternalTransaction<BulkWriteCommandReply>(
+                             opCtx, request, writeOp);
+                     },
+                     [&](const write_ops::FindAndModifyCommandRequest& request) -> RetT {
+                         tasserted(11288300, "Unexpected findAndModify command type");
+                     }),
+                 requestVar);
 }
 
 WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                 RoutingContext& routingCtx,
                                                 const MultiWriteBlockingMigrationsBatch& batch) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
+    const boost::optional<bool> errorsOnly = _cmdRef.getErrorsOnly();
 
     const WriteOp& writeOp = batch.op;
     const auto& nss = writeOp.getNss();
 
-    // Determine if the "errorsOnly" parameter should be set to true or false when sending a command
-    // to the shards.
-    const bool errorsOnly = getErrorsOnlyForShardRequest({writeOp});
-
-    auto cmdObj = buildRequest(opCtx,
-                               {writeOp},
-                               {}, /* versionByNss */
-                               {}, /* nssIsViewfulTimeseries */
-                               {}, /* sampleIds */
-                               errorsOnly,
-                               boost::none, /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */
-                               IsEmbeddedCommand::Yes,
-                               ShouldAppendLsidAndTxnNumber::Yes,
-                               ShouldAppendReadWriteConcern::No);
+    auto request = buildRequest(opCtx,
+                                {writeOp},
+                                {}, /* versionByNss */
+                                {}, /* nssIsViewfulTimeseries */
+                                {}, /* sampleIds */
+                                errorsOnly,
+                                boost::none, /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */
+                                IsEmbeddedCommand::Yes);
+    auto cmdObj = buildRequestObj(opCtx,
+                                  std::move(request),
+                                  ShouldAppendLsidAndTxnNumber::Yes,
+                                  ShouldAppendReadWriteConcern::No);
 
     StatusWith<BSONObj> reply = [&]() {
         try {
-            return StatusWith(
-                coordinate_multi_update_util::executeCoordinateMultiUpdate(opCtx, nss, cmdObj));
+            BSONObj res =
+                coordinate_multi_update_util::executeCoordinateMultiUpdate(opCtx, nss, cmdObj);
+            auto status = getStatusFromCommandResult(res);
+
+            return status.isOK() ? StatusWith(std::move(res))
+                                 : StatusWith<BSONObj>(std::move(status));
         } catch (const DBException& e) {
             return StatusWith<BSONObj>(e.toStatus());
         }
     }();
 
-    return NoRetryWriteBatchResponse::make(
-        reply, /*wce*/ boost::none, writeOp, inTransaction, errorsOnly);
+    return NoRetryWriteBatchResponse::make(reply, /*wce*/ boost::none, writeOp, inTransaction);
 }
 
-bool WriteBatchExecutor::getErrorsOnlyForShardRequest(const std::vector<WriteOp>& ops) const {
+DatabaseName WriteBatchExecutor::getExecutionDatabase() const {
     return _cmdRef.visitRequest(OverloadedVisitor(
-        [&](const BatchedCommandRequest&) {
-            // For BatchedCommandRequests, we set "errorsOnly" to false if the command has upsert
-            // ops (because we need info from the individual reply items to construct the response
-            // for the client), otherwise we set "errorsOnly" to true.
-            return std::none_of(ops.begin(), ops.end(), [](auto&& op) { return op.isUpsert(); });
-        },
-        [&](const BulkWriteCommandRequest&) { return _cmdRef.getErrorsOnly().value_or(false); },
-        [&](const write_ops::FindAndModifyCommandRequest&) { return false; }));
+        [&](const BatchedCommandRequest& request) { return request.getNS().dbName(); },
+        [&](const BulkWriteCommandRequest&) { return DatabaseName::kAdmin; },
+        [&](const write_ops::FindAndModifyCommandRequest& request) {
+            return request.getNamespace().dbName();
+        }));
 }
 
 }  // namespace unified_write_executor

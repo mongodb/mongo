@@ -16,7 +16,7 @@ import {
 import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
-import {isUweEnabled, mapUweShardCmdName} from "jstests/libs/query/uwe_utils.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
@@ -80,7 +80,7 @@ restartProfiling();
 
 // Test to verify that insert operations are routed to correct shard and succeeds on the respective
 // shards.
-let shardCmdName = uweEnabled ? mapUweShardCmdName("insert") : "insert";
+let shardCmdName = "insert";
 for (let i = 20; i < 40; i++) {
     assert.commandWorked(coll.insert({a: i, b: {subObj: "str_" + (i % 13)}, c: NumberInt(i % 10)}));
     profilerHasZeroMatchingEntriesOrThrow({
@@ -159,7 +159,7 @@ let updateObj = {a: 22, b: {subObj: "str_0"}, c: "update", p: 1};
 let res = assert.commandWorked(coll.update({a: 26, b: {subObj: "str_0"}, c: 6}, updateObj));
 assert.eq(res.nModified, 1, res);
 assert.eq(coll.count(updateObj), 1);
-shardCmdName = uweEnabled ? mapUweShardCmdName("update") : "update";
+shardCmdName = "update";
 profilerHasSingleMatchingEntryOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": shardCmdName}});
 profilerHasZeroMatchingEntriesOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": shardCmdName}});
 
@@ -191,7 +191,7 @@ restartProfiling();
 res = assert.commandWorked(coll.remove({a: {$lte: -1}}));
 assert.eq(res.nRemoved, 21, res);
 assert.eq(coll.count({a: {$lte: -1}}), 0);
-shardCmdName = uweEnabled ? mapUweShardCmdName("remove") : "remove";
+shardCmdName = "remove";
 profilerHasSingleMatchingEntryOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": shardCmdName}});
 profilerHasZeroMatchingEntriesOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": shardCmdName}});
 
@@ -234,7 +234,7 @@ function verifyProfilerEntryOnCorrectShard(fieldValue, filter) {
 // shards.
 restartProfiling();
 let profileFilter = {};
-shardCmdName = uweEnabled ? mapUweShardCmdName("insert") : "insert";
+shardCmdName = "insert";
 for (let i = -10; i < 10; i++) {
     profileFilter = {
         ns: ns,
@@ -291,7 +291,7 @@ assert.eq(res.nModified, 1, res);
 assert.eq(coll.count({a: 0, p: testName}), 1);
 
 // Verify that the update has been routed to the correct shard.
-shardCmdName = uweEnabled ? mapUweShardCmdName("update") : "update";
+shardCmdName = "update";
 profileFilter = {
     ns: ns,
     "op": shardCmdName,
@@ -309,7 +309,7 @@ res = assert.commandWorked(coll.deleteOne({a: 1, b: {subObj: "str_1"}, c: 1}));
 assert.eq(res.deletedCount, 1, res);
 assert.eq(coll.count({a: 1, b: {subObj: "str_1"}, c: 1}), 0);
 
-shardCmdName = uweEnabled ? mapUweShardCmdName("remove") : "remove";
+shardCmdName = "remove";
 profileFilter = {
     ns: ns,
     "op": shardCmdName,

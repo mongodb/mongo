@@ -8,7 +8,6 @@
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {moveDatabaseAndUnshardedColls} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
-import {isUweEnabled, mapUweShardCmdName} from "jstests/libs/query/uwe_utils.js";
 
 const dbName = "test";
 const collName = "collTest";
@@ -16,7 +15,6 @@ const ns = dbName + "." + collName;
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1, configShard: true, enableBalancer: true});
 const adminDB = st.s.getDB("admin");
 const distributed_txn_insert_count = 10;
-const uweEnabled = isUweEnabled(st.s);
 
 function waitUntilOpCountIs(opFilter, num, st) {
     assert.soon(() => {
@@ -71,11 +69,7 @@ const performFsyncLockUnlockWithReadWriteOperations = function () {
 
     let writeOpHandle = startParallelShell(codeToRun, st.s.port);
 
-    waitUntilOpCountIs(
-        {op: uweEnabled ? mapUweShardCmdName("insert") : "insert", ns: "test.collTest", waitingForLock: true},
-        1,
-        st,
-    );
+    waitUntilOpCountIs({op: "insert", ns: "test.collTest", waitingForLock: true}, 1, st);
 
     // Make sure reads can still run even though there is a pending write and also that the write
     // didn't get through.

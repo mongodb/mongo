@@ -190,7 +190,7 @@ public:
     /**
      * Returns the "bypassEmptyTsReplacement" parameter if present, otherwise returns boost::none.
      */
-    const OptionalBool& getBypassEmptyTsReplacement() const;
+    OptionalBool getBypassEmptyTsReplacement() const;
 
     /**
      * Returns the "comment" parameter if present, otherwise returns boost::none.
@@ -237,7 +237,7 @@ public:
     /**
      * Returns the "stmtIds" parameter if present, otherwise returns boost::none.
      */
-    boost::optional<std::vector<std::int32_t>> getStmtIds() const;
+    const boost::optional<std::vector<std::int32_t>>& getStmtIds() const;
 
     /**
      * Returns an estimate of how much space, in bytes, the specified write op would add to a
@@ -281,6 +281,12 @@ public:
     const BSONObj& getFilter(int index) const;
 
     /**
+     * Returns the specified write op's "hint" field if present, otherwise returns an empty
+     * object.
+     */
+    const BSONObj& getHint(int index) const;
+
+    /**
      * If the specified write op is an update or delete with the "multi" parameter set to true,
      * returns true. Otherwise returns false.
      */
@@ -290,6 +296,16 @@ public:
      * Returns the collection namespace targeted by the specified write op.
      */
     const NamespaceString& getNss(int index) const;
+
+    /**
+     * Returns the "NsInfo index" of collection namespace targeted by the specified write op.
+     */
+    size_t getNsInfoIdx(int index) const;
+
+    /**
+     * Returns the sampleId for the specified write op (if there is one).
+     */
+    boost::optional<UUID> getSampleId(int index) const;
 
     /**
      * Returns the collection UUID targeted by the specified write op.
@@ -314,6 +330,24 @@ public:
     bool getUpsert(int index) const;
 
     /**
+     * Returns the specified write op's "upsertSupplied" field if present, otherwise returns
+     * boost::none.
+     */
+    OptionalBool getUpsertSupplied(int index) const;
+
+    /**
+     * Returns the specified write op's "includeQueryStatsMetrics" field if present, otherwise
+     * returns boost::none.
+     */
+    OptionalBool getIncludeQueryStatsMetrics(int index) const;
+
+    /**
+     * Returns the specified write op's "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery" field
+     * if present, otherwise returns boost::none.
+     */
+    OptionalBool getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(int index) const;
+
+    /**
      * Returns the encryption information for the command nss.
      */
     const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation(int index) const;
@@ -321,7 +355,7 @@ public:
     /**
      * Returns whether the command operates on the timeseries bucket raw data.
      */
-    const OptionalBool& getRawData() const;
+    OptionalBool getRawData() const;
 
     /**
      * Returns the specified "sort" field if present.
@@ -483,7 +517,7 @@ public:
     /**
      * Returns the "bypassEmptyTsReplacement" parameter if present, otherwise returns boost::none.
      */
-    const OptionalBool& getBypassEmptyTsReplacement() const;
+    OptionalBool getBypassEmptyTsReplacement() const;
 
     /**
      * Returns the "comment" parameter if present, otherwise returns boost::none.
@@ -530,7 +564,7 @@ public:
     /**
      * Returns the "stmtIds" parameter if present, otherwise returns boost::none.
      */
-    boost::optional<std::vector<std::int32_t>> getStmtIds() const;
+    const boost::optional<std::vector<std::int32_t>>& getStmtIds() const;
 
     /**
      * Returns an estimate of how much space, in bytes, the referred-to write op would add to a
@@ -574,6 +608,12 @@ public:
     const BSONObj& getFilter(int index) const;
 
     /**
+     * Returns the specified write op's "hint" field if present, otherwise returns an empty
+     * object.
+     */
+    const BSONObj& getHint(int index) const;
+
+    /**
      * If the specified write op is an update or delete and the "multi" field is set to true,
      * returns true. Otherwise, returns false.
      */
@@ -583,6 +623,16 @@ public:
      * Returns the collection namespace targeted by the specified write op.
      */
     const NamespaceString& getNss(int index) const;
+
+    /**
+     * Returns the "NsInfo index" of collection namespace targeted by the specified write op.
+     */
+    size_t getNsInfoIdx(int index) const;
+
+    /**
+     * Returns the sampleId for the specified write op (if there is one).
+     */
+    boost::optional<UUID> getSampleId(int index) const;
 
     /**
      * Returns the collection UUID targeted by the specified write op.
@@ -607,6 +657,24 @@ public:
     bool getUpsert(int index) const;
 
     /**
+     * Returns the specified write op's "upsertSupplied" field if present, otherwise returns
+     * boost::none.
+     */
+    OptionalBool getUpsertSupplied(int index) const;
+
+    /**
+     * Returns the specified write op's "includeQueryStatsMetrics" field if present, otherwise
+     * returns boost::none.
+     */
+    OptionalBool getIncludeQueryStatsMetrics(int index) const;
+
+    /**
+     * Returns the specified write op's "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery" field
+     * if present, otherwise returns boost::none.
+     */
+    OptionalBool getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(int index) const;
+
+    /**
      * Returns the encryption information of the specified write op.
      */
     const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation(int index) const;
@@ -614,7 +682,7 @@ public:
     /**
      * Returns whether the command operates on the timeseries bucket raw data.
      */
-    const OptionalBool& getRawData() const;
+    OptionalBool getRawData() const;
 
     /**
      * Returns the specified "sort" field if present.
@@ -743,7 +811,7 @@ public:
     /**
      * Returns the "bypassEmptyTsReplacement" parameter if present, otherwise returns boost::none.
      */
-    const OptionalBool& getBypassEmptyTsReplacement() const;
+    OptionalBool getBypassEmptyTsReplacement() const;
 
     /**
      * Returns the "comment" parameter if present, otherwise returns boost::none.
@@ -756,8 +824,7 @@ public:
     boost::optional<bool> getErrorsOnly() const;
 
     /**
-     * BulkWriteCommandRequest does not allow the "runtimeConstants" parameter to be specified, so
-     * BulkWriteCommandRefImpl::getLegacyRuntimeConstants() will always return boost::none.
+     * Returns the "runtimeConstants" parameter if present, otherwise returns boost::none.
      */
     const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const;
 
@@ -790,7 +857,7 @@ public:
     /**
      * Returns the "stmtIds" parameter if present, otherwise returns boost::none.
      */
-    boost::optional<std::vector<std::int32_t>> getStmtIds() const;
+    const boost::optional<std::vector<std::int32_t>>& getStmtIds() const;
 
     /**
      * Returns an estimate of how much space, in bytes, the referred-to write op would add to a
@@ -840,6 +907,12 @@ public:
     const BSONObj& getFilter(int index) const;
 
     /**
+     * Returns the specified write op's "hint" field if present, otherwise returns an empty
+     * object.
+     */
+    const BSONObj& getHint(int index) const;
+
+    /**
      * If the specified write op is an update or delete and the "multi" field is set to true,
      * returns true. Otherwise, returns false.
      */
@@ -849,6 +922,16 @@ public:
      * Returns the collection namespace targeted by the specified write op.
      */
     const NamespaceString& getNss(int index) const;
+
+    /**
+     * Returns the "NsInfo index" of collection namespace targeted by the specified write op.
+     */
+    size_t getNsInfoIdx(int index) const;
+
+    /**
+     * Returns the sampleId for the specified write op (if there is one).
+     */
+    boost::optional<UUID> getSampleId(int index) const;
 
     /**
      * This method will always return boost::none since a findAndModify command does not have
@@ -874,6 +957,24 @@ public:
     bool getUpsert(int index) const;
 
     /**
+     * Returns the specified write op's "upsertSupplied" field if present, otherwise returns
+     * boost::none.
+     */
+    OptionalBool getUpsertSupplied(int index) const;
+
+    /**
+     * Returns the specified write op's "includeQueryStatsMetrics" field if present, otherwise
+     * returns boost::none.
+     */
+    OptionalBool getIncludeQueryStatsMetrics(int index) const;
+
+    /**
+     * Returns the specified write op's "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery" field
+     * if present, otherwise returns boost::none.
+     */
+    OptionalBool getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(int index) const;
+
+    /**
      * Returns the encryption information of the specified write op.
      */
     const boost::optional<mongo::EncryptionInformation>& getEncryptionInformation(int index) const;
@@ -881,7 +982,7 @@ public:
     /**
      * Returns whether the command operates on the timeseries bucket raw data.
      */
-    const OptionalBool& getRawData() const;
+    OptionalBool getRawData() const;
 
     /**
      * Returns the specified "sort" field if present.
@@ -1271,6 +1372,13 @@ public:
     }
 
     /**
+     * Returns true if this OpRef holds a FindAndModifyCommandRefImpl, otherwise returns false.
+     */
+    bool isFindAndModify() const {
+        return _cmdRef.isFindAndModifyCommand();
+    }
+
+    /**
      * Methods for testing if the referred-to write op is an insert, update, or delete.
      */
     decltype(auto) getOpType() const {
@@ -1297,6 +1405,15 @@ public:
     inline UpdateOpRef getUpdateOp() const;
     inline DeleteOpRef getDeleteOp() const;
 
+    int getEffectiveStmtId() const {
+        if (auto stmtIds = _cmdRef.getStmtIds()) {
+            return stmtIds->at(_index);
+        } else {
+            int firstStmtId = _cmdRef.getStmtId() ? *_cmdRef.getStmtId() : 0;
+            return firstStmtId + _index;
+        }
+    }
+
     /**
      * Helper methods that forward to the specific implementation held in '_cmdRef._impl'.
      */
@@ -1309,6 +1426,9 @@ public:
     }
     decltype(auto) getNss() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getNss(_index); });
+    }
+    decltype(auto) getNsInfoIdx() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) { return r.getNsInfoIdx(_index); });
     }
     decltype(auto) getCollectionUUID() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getCollectionUUID(_index); });
@@ -1399,8 +1519,26 @@ public:
     decltype(auto) getFilter() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getFilter(_index); });
     }
+    decltype(auto) getHint() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) { return r.getHint(_index); });
+    }
+    decltype(auto) getSampleId() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) { return r.getSampleId(_index); });
+    }
     decltype(auto) getUpdateMods() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getUpdateMods(_index); });
+    }
+    decltype(auto) getUpsertSupplied() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) { return r.getUpsertSupplied(_index); });
+    }
+    decltype(auto) getIncludeQueryStatsMetrics() const {
+        return visitImpl(
+            [&](auto&& r) -> decltype(auto) { return r.getIncludeQueryStatsMetrics(_index); });
+    }
+    decltype(auto) getAllowShardKeyUpdatesWithoutFullShardKeyInQuery() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) {
+            return r.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(_index);
+        });
     }
 
     friend bool operator==(const UpdateOpRef& lhs, const UpdateOpRef& rhs) = default;
@@ -1427,6 +1565,12 @@ public:
     }
     decltype(auto) getFilter() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getFilter(_index); });
+    }
+    decltype(auto) getHint() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) { return r.getHint(_index); });
+    }
+    decltype(auto) getSampleId() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) { return r.getSampleId(_index); });
     }
 
     friend bool operator==(const DeleteOpRef& lhs, const DeleteOpRef& rhs) = default;

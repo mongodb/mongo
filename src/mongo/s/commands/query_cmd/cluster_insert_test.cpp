@@ -58,54 +58,24 @@ protected:
 
     void expectInspectRequest(int shardIndex, InspectionCallback cb) override {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
-                cb(request);
-                BulkWriteReplyItem item(0, Status::OK());
-                item.setN(1);
-                BulkWriteCommandReply reply(
-                    BulkWriteCommandResponseCursor(0, {std::move(item)}, kNss), 0, 0, 0, 0, 0, 0);
-                reply.setNInserted(1);
-                BSONObjBuilder bob(reply.toBSON());
-                appendTxnResponseMetadata(bob);
-                return bob.obj();
-            } else {
-                ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
-                cb(request);
+            ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
+            cb(request);
 
-                BSONObjBuilder bob;
-                bob.append("nInserted", 1);
-                appendTxnResponseMetadata(bob);
-                return bob.obj();
-            }
+            BSONObjBuilder bob;
+            bob.append("nInserted", 1);
+            appendTxnResponseMetadata(bob);
+            return bob.obj();
         });
     }
 
     void expectReturnsSuccess(int shardIndex) override {
         onCommandForPoolExecutor([this, shardIndex](const executor::RemoteCommandRequest& request) {
-            if (feature_flags::gFeatureFlagUnifiedWriteExecutor.checkEnabled()) {
-                auto cmd = request.cmdObj;
-                auto ops = cmd["ops"].Array();
-                auto size = ops.size();
-                std::vector<BulkWriteReplyItem> items;
-                for (size_t i = 0; i < size; i++) {
-                    BulkWriteReplyItem item(i, Status::OK());
-                    item.setN(1);
-                    items.emplace_back(std::move(item));
-                }
-                BulkWriteCommandReply reply(
-                    BulkWriteCommandResponseCursor(0, std::move(items), kNss), 0, 0, 0, 0, 0, 0);
-                reply.setNInserted(size);
-                BSONObjBuilder bob(reply.toBSON());
-                appendTxnResponseMetadata(bob);
-                return bob.obj();
-            } else {
-                ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
+            ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
 
-                BSONObjBuilder bob;
-                bob.append("nInserted", 1);
-                appendTxnResponseMetadata(bob);
-                return bob.obj();
-            }
+            BSONObjBuilder bob;
+            bob.append("nInserted", 1);
+            appendTxnResponseMetadata(bob);
+            return bob.obj();
         });
     }
 };

@@ -123,7 +123,6 @@ public:
         boost::optional<bool> expectedErrorsOnly = boost::none,
         boost::optional<mongo::BSONObj> expectedLet = boost::none,
         boost::optional<mongo::IDLAnyTypeOwned> expectedComment = boost::none,
-        boost::optional<std::int64_t> expectedMaxTimeMS = boost::none,
         boost::optional<std::vector<StmtId>> expectedStmtIds = boost::none) {
         BSONObjBuilder builder;
         builder.appendElements(cmdObj);
@@ -179,15 +178,15 @@ public:
             ASSERT_EQ(expectedComment->getElement().checkAndGetStringData(),
                       cmdObj.getField("comment").checkAndGetStringData());
         }
-        if (expectedMaxTimeMS) {
-            ASSERT_EQ(*expectedMaxTimeMS, cmdObj.getField("maxTimeMS").number());
-        }
         if (expectedStmtIds) {
             ASSERT_EQ(expectedStmtIds->size(), bulkWrite.getStmtIds()->size());
             for (size_t i = 0; i < expectedStmtIds->size(); i++) {
                 ASSERT_EQ(expectedStmtIds->at(i), bulkWrite.getStmtIds()->at(i));
             }
         }
+
+        // Assert that the "maxTimeMs" field is not set.
+        ASSERT_TRUE(cmdObj.getField("maxTimeMS").eoo());
     }
 };
 
@@ -373,8 +372,7 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSpecifiedWriteOptions) {
                                bulkRequest.getBypassDocumentValidation(),
                                bulkRequest.getErrorsOnly(),
                                bulkRequest.getLet(),
-                               bulkRequest.getComment(),
-                               bulkRequest.getMaxTimeMS());
+                               bulkRequest.getComment());
         return emptyBulkWriteCommandReplyObj;
     });
 
@@ -510,7 +508,6 @@ TEST_F(WriteBatchExecutorTest, ExecuteSimpleWriteBatchSetsStmtIds) {
             lsid,
             txnNumber,
             operationContext()->getWriteConcern(),
-            boost::none,
             boost::none,
             boost::none,
             boost::none,

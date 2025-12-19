@@ -41,8 +41,32 @@
 namespace mongo {
 namespace unified_write_executor {
 
-using CommandReplyVariant =
-    std::variant<BulkWriteCommandReply, write_ops::FindAndModifyCommandReply>;
+/**
+ * This class holds info needed by UWE that's extracted/computed from a BatchedCommandResponse.
+ *
+ * Note this class doesn't copy all of the fields from a BatchedCommandResponse (ex. "electionId",
+ * "lastOp") and is not intended to be a general purpose replacement of BatchedCommandResponse.
+ */
+struct BatchWriteCommandReply {
+    static BatchWriteCommandReply make(const BatchedCommandResponse& bcr,
+                                       BatchedCommandRequest::BatchType batchType);
+
+    size_t nErrors{0};
+    size_t nInserted{0};
+    size_t nMatched{0};
+    size_t nModified{0};
+    size_t nUpserted{0};
+    size_t nDeleted{0};
+    std::vector<BulkWriteReplyItem> items;
+    boost::optional<WriteConcernErrorDetail> wcErrors;
+    std::vector<StmtId> retriedStmtIds;
+};
+
+using CommandRequestVariant = std::
+    variant<BatchedCommandRequest, BulkWriteCommandRequest, write_ops::FindAndModifyCommandRequest>;
+
+using CommandReplyVariant = std::
+    variant<BatchWriteCommandReply, BulkWriteCommandReply, write_ops::FindAndModifyCommandReply>;
 
 class BasicResponse {
 public:
@@ -50,13 +74,11 @@ public:
                   boost::optional<WriteConcernErrorDetail> wce,
                   std::vector<WriteOp> ops,
                   bool transientTxnError,
-                  bool errorsOnly,
                   boost::optional<HostAndPort> hostAndPort = boost::none)
         : _swReply(std::move(swReply)),
           _wce(std::move(wce)),
           _ops(std::move(ops)),
           _transientTxnError(transientTxnError),
-          _errorsOnly(errorsOnly),
           _hostAndPort(std::move(hostAndPort)) {}
 
     bool isOK() const {
@@ -69,7 +91,7 @@ public:
         return !_swReply;
     }
 
-    // Returns the status of this ShardResponse. This method may only be called when either 'isOK()'
+    // Returns the status of this BasicResponse. This method may only be called when either 'isOK()'
     // is true or 'isError()' is true.
     const Status& getStatus() const;
 
@@ -86,28 +108,24 @@ public:
         return _ops;
     }
 
-    // Returns true if this ShardResponse contains a transient transaction error, otherwise returns
+    // Returns true if this BasicResponse contains a transient transaction error, otherwise returns
     // false.
     bool hasTransientTxnError() const {
         return isError() && _transientTxnError;
     }
 
-    // Returns the transient transaction error contained within this NoRetryWriteBatchResponse.
+    // Returns the transient transaction error contained within this BasicResponse.
     // This method may only be called if hasTransientTxnError() is true.
     const Status& getTransientTxnError() const {
         tassert(11272106, "Expected transient transaction error", hasTransientTxnError());
         return getStatus();
     }
 
-    bool getErrorsOnly() const {
-        return _errorsOnly;
-    }
-
     const boost::optional<HostAndPort>& getHostAndPort() const {
         return _hostAndPort;
     }
 
-    // Returns true if this ShardResponse contains a WouldChangeOwningShard error.
+    // Returns true if this BasicResponse contains a WouldChangeOwningShard error.
     bool isWouldChangeOwningShardError() const {
         return isError() && getStatus() == ErrorCodes::WouldChangeOwningShard;
     }
@@ -130,9 +148,6 @@ private:
     // This field indicates if 'swReply' contains a transient transaction error.
     bool _transientTxnError = false;
 
-    // This flag indicates if the shard request had the 'errorsOnly' parameter set to true.
-    bool _errorsOnly = false;
-
     // For debugging purposes.
     boost::optional<HostAndPort> _hostAndPort;
 };
@@ -147,7 +162,6 @@ public:
     static ShardResponse make(StatusWith<executor::RemoteCommandResponse> swResponse,
                               std::vector<WriteOp> ops,
                               bool inTransaction = false,
-                              bool errorsOnly = false,
                               boost::optional<HostAndPort> hostAndPort = boost::none,
                               boost::optional<const ShardId&> shardId = boost::none);
 
@@ -155,7 +169,7 @@ public:
      * Creates an "empty" ShardResponse. This method is used when there is no RemoteCommandResponse
      * for a given 'shardId' (in cases where we decided to break out of the ARS loop early).
      */
-    static ShardResponse makeEmpty(std::vector<WriteOp> ops, bool errorsOnly = false);
+    static ShardResponse makeEmpty(std::vector<WriteOp> ops);
 };
 
 struct EmptyBatchResponse {};
@@ -174,22 +188,86 @@ public:
     using BasicResponse::BasicResponse;
 
     /**
+     * Creates a NoRetryWriteBatchResponse from the supplied Status.
+     */
+    static NoRetryWriteBatchResponse make(Status status,
+                                          boost::optional<WriteConcernErrorDetail> wce,
+                                          const WriteOp& op,
+                                          bool inTransaction);
+
+    /**
+     * Creates a NoRetryWriteBatchResponse from the supplied BatchWriteCommandReply.
+     */
+    static NoRetryWriteBatchResponse make(StatusWith<BatchWriteCommandReply> swResponse,
+                                          boost::optional<WriteConcernErrorDetail> wce,
+                                          const WriteOp& op,
+                                          bool inTransaction);
+
+    /**
+     * Creates a NoRetryWriteBatchResponse from the supplied BulkWriteCommandReply.
+     */
+    static NoRetryWriteBatchResponse make(StatusWith<BulkWriteCommandReply> swResponse,
+                                          boost::optional<WriteConcernErrorDetail> wce,
+                                          const WriteOp& op,
+                                          bool inTransaction);
+
+    /**
+     * Creates a NoRetryWriteBatchResponse from the supplied FindAndModifyCommandReply.
+     */
+    static NoRetryWriteBatchResponse make(
+        StatusWith<write_ops::FindAndModifyCommandReply> swResponse,
+        boost::optional<WriteConcernErrorDetail> wce,
+        const WriteOp& op,
+        bool inTransaction);
+
+    /**
      * Creates a NoRetryWriteBatchResponse from the supplied BSONObj response.
      */
     static NoRetryWriteBatchResponse make(const StatusWith<BSONObj>& swResponse,
                                           boost::optional<WriteConcernErrorDetail> wce,
                                           const WriteOp& op,
-                                          bool inTransaction,
-                                          bool errorsOnly);
+                                          bool inTransaction);
 
     const WriteOp& getOp() const {
         tassert(11182200, "Expected vector to contain exactly one op", getOps().size() == 1);
         return getOps().front();
     }
+
+private:
+    template <typename ResponseType>
+    static NoRetryWriteBatchResponse makeImpl(StatusWith<ResponseType> swResponse,
+                                              boost::optional<WriteConcernErrorDetail> wce,
+                                              const WriteOp& op,
+                                              bool inTransaction);
 };
 
 using WriteBatchResponse =
     std::variant<EmptyBatchResponse, SimpleWriteBatchResponse, NoRetryWriteBatchResponse>;
+
+struct IsEmbeddedCommand {
+    enum Value : bool { No = false, Yes = true };
+    Value value;
+    constexpr IsEmbeddedCommand(Value v) : value(v) {}
+    constexpr explicit operator bool() const {
+        return static_cast<bool>(value);
+    }
+};
+struct ShouldAppendLsidAndTxnNumber {
+    enum Value : bool { No = false, Yes = true };
+    Value value;
+    constexpr ShouldAppendLsidAndTxnNumber(Value v) : value(v) {}
+    constexpr explicit operator bool() const {
+        return static_cast<bool>(value);
+    }
+};
+struct ShouldAppendReadWriteConcern {
+    enum Value : bool { No = false, Yes = true };
+    Value value;
+    constexpr ShouldAppendReadWriteConcern(Value v) : value(v) {}
+    constexpr explicit operator bool() const {
+        return static_cast<bool>(value);
+    }
+};
 
 class WriteBatchExecutor {
 public:
@@ -213,31 +291,6 @@ public:
                                const WriteBatch& batch);
 
 private:
-    struct IsEmbeddedCommand {
-        enum Value : bool { No = false, Yes = true };
-        Value value;
-        constexpr IsEmbeddedCommand(Value v) : value(v) {}
-        constexpr explicit operator bool() const {
-            return static_cast<bool>(value);
-        }
-    };
-    struct ShouldAppendLsidAndTxnNumber {
-        enum Value : bool { No = false, Yes = true };
-        Value value;
-        constexpr ShouldAppendLsidAndTxnNumber(Value v) : value(v) {}
-        constexpr explicit operator bool() const {
-            return static_cast<bool>(value);
-        }
-    };
-    struct ShouldAppendReadWriteConcern {
-        enum Value : bool { No = false, Yes = true };
-        Value value;
-        constexpr ShouldAppendReadWriteConcern(Value v) : value(v) {}
-        constexpr explicit operator bool() const {
-            return static_cast<bool>(value);
-        }
-    };
-
     WriteBatchResponse _execute(OperationContext* opCtx,
                                 RoutingContext& routingCtx,
                                 const EmptyBatch& batch);
@@ -258,51 +311,72 @@ private:
                                 RoutingContext& routingCtx,
                                 const MultiWriteBlockingMigrationsBatch& batch);
 
-    BulkWriteCommandRequest buildBulkWriteRequestWithoutTxnInfo(
+    BatchedCommandRequest buildBatchWriteRequest(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::set<NamespaceString>& nssIsViewfulTimeseries,
         const std::map<WriteOpId, UUID>& sampleIds,
-        bool errorsOnly,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+        IsEmbeddedCommand isEmbeddedCommand,
+        BatchedCommandRequest::BatchType batchType,
+        const NamespaceString& nss,
+        boost::optional<UUID> collectionUuid,
+        const boost::optional<mongo::EncryptionInformation>& encryptionInformation) const;
+
+    BSONObj buildBatchWriteRequestObj(
+        OperationContext* opCtx,
+        const BatchedCommandRequest& batchWriteRequest,
+        ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+        ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
+
+    BulkWriteCommandRequest buildBulkWriteRequest(
+        OperationContext* opCtx,
+        const std::vector<WriteOp>& ops,
+        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        const std::set<NamespaceString>& nssIsViewfulTimeseries,
+        const std::map<WriteOpId, UUID>& sampleIds,
+        boost::optional<bool> errorsOnly,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
         IsEmbeddedCommand isEmbeddedCommand) const;
 
-    BSONObj buildBulkWriteRequest(
+    BSONObj buildBulkWriteRequestObj(
         OperationContext* opCtx,
-        const std::vector<WriteOp>& ops,
-        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
-        const std::set<NamespaceString>& nssIsViewfulTimeseries,
-        const std::map<WriteOpId, UUID>& sampleIds,
-        bool errorsOnly,
-        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-        IsEmbeddedCommand isEmbeddedCommand,
+        const BulkWriteCommandRequest& bulkRequest,
         ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
         ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
 
-    BSONObj buildFindAndModifyRequest(
+    write_ops::FindAndModifyCommandRequest buildFindAndModifyRequest(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::set<NamespaceString>& nssIsViewfulTimeseries,
         const std::map<WriteOpId, UUID>& sampleIds,
         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-        IsEmbeddedCommand isEmbeddedCommand,
+        IsEmbeddedCommand isEmbeddedCommand) const;
+
+    BSONObj buildFindAndModifyRequestObj(
+        OperationContext* opCtx,
+        write_ops::FindAndModifyCommandRequest request,
         ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
         ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
 
-    BSONObj buildRequest(OperationContext* opCtx,
-                         const std::vector<WriteOp>& ops,
-                         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
-                         const std::set<NamespaceString>& nssIsViewfulTimeseries,
-                         const std::map<WriteOpId, UUID>& sampleIds,
-                         bool errorsOnly,
-                         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
-                         IsEmbeddedCommand isEmbeddedCommand,
-                         ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
-                         ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
+    CommandRequestVariant buildRequest(
+        OperationContext* opCtx,
+        const std::vector<WriteOp>& ops,
+        const std::map<NamespaceString, ShardEndpoint>& versionByNss,
+        const std::set<NamespaceString>& nssIsViewfulTimeseries,
+        const std::map<WriteOpId, UUID>& sampleIds,
+        boost::optional<bool> errorsOnly,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+        IsEmbeddedCommand isEmbeddedCommand) const;
 
-    bool getErrorsOnlyForShardRequest(const std::vector<WriteOp>& ops) const;
+    BSONObj buildRequestObj(OperationContext* opCtx,
+                            CommandRequestVariant request,
+                            ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+                            ShouldAppendReadWriteConcern shouldAppendReadWriteConcern) const;
+
+    DatabaseName getExecutionDatabase() const;
 
     const WriteCommandRef _cmdRef;
     const BSONObj _originalCmdObj;

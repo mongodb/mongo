@@ -12,7 +12,6 @@ import {
 } from "jstests/libs/query/command_diagnostic_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {setParameter} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
-import {isUweEnabled, mapUweShardCmdName} from "jstests/libs/query/uwe_utils.js";
 
 // This test triggers an unclean shutdown, which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;
@@ -130,8 +129,6 @@ const defaultExpCtxLog = [
 const shardKeyLog = `\'shardKeyPattern\': { a: 1.0, b: 1.0, c: 1.0 }`;
 
 function runTests(onMongos = false) {
-    const uweEnabled = isUweEnabled(mongosConn);
-
     // Find
     runTest({
         description: "find",
@@ -214,7 +211,7 @@ function runTests(onMongos = false) {
         },
         expectedDiagnosticInfo: [
             // When UWE is enabled, the shard gets a bulkWrite command instead.
-            `{\'currentOp\': { op: \\"${uweEnabled && !onMongos ? mapUweShardCmdName("remove") : "remove"}\\", ns: \\"${ns}\\"`,
+            `{\'currentOp\': { op: \\"remove\\", ns: \\"${ns}\\"`,
             "'opDescription': ",
             shardKeyLog,
         ],
@@ -230,7 +227,7 @@ function runTests(onMongos = false) {
         },
         expectedDiagnosticInfo: [
             // When UWE is enabled, the shard gets a bulkWrite command instead.
-            `{\'currentOp\': { op: \\"${uweEnabled && !onMongos ? mapUweShardCmdName("update") : "update"}\\", ns: \\"${ns}\\"`,
+            `{\'currentOp\': { op: \\"update\\", ns: \\"${ns}\\"`,
             "'opDescription': ",
             shardKeyLog,
         ],

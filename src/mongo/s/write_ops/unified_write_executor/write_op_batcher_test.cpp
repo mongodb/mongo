@@ -48,7 +48,7 @@ public:
     StatusWith<Analysis> analyze(OperationContext* opCtx,
                                  RoutingContext& routingCtx,
                                  const WriteOp& writeOp) override {
-        auto it = _opAnalysis.find(writeOp.getId());
+        auto it = _opAnalysis.find(writeOp.getIndex());
         tassert(
             10346702, "Write op id should be found in the analysis data", it != _opAnalysis.end());
         return it->second;
@@ -100,7 +100,7 @@ public:
             ASSERT_NOT_EQUALS(shardRequestIt, simpleBatch.requestByShardId.end());
             auto& shardRequest = shardRequestIt->second;
             ASSERT_EQ(shardRequest.ops.size(), 1);
-            ASSERT_EQ(shardRequest.ops.front().getId(), expectedOpId);
+            ASSERT_EQ(shardRequest.ops.front().getIndex(), expectedOpId);
             ASSERT_EQ(shardRequest.versionByNss.size(), 1);
             ASSERT_EQ(shardRequest.versionByNss.begin()->second, expectedShard);
 
@@ -126,7 +126,7 @@ public:
         auto& simpleBatch = std::get<SimpleWriteBatch>(batch.data);
         for (auto& [shardId, request] : simpleBatch.requestByShardId) {
             for (auto& op : request.ops) {
-                if (reprocessOpIds.contains(op.getId())) {
+                if (reprocessOpIds.contains(op.getIndex())) {
                     batcher.markOpReprocess({op});
                 }
             }
@@ -140,7 +140,7 @@ public:
         ASSERT_TRUE(std::holds_alternative<TwoPhaseWriteBatch>(batch.data));
         auto& twoPhaseWriteBatch = std::get<TwoPhaseWriteBatch>(batch.data);
         const auto& op = twoPhaseWriteBatch.op;
-        ASSERT_EQ(op.getId(), expectedOpId);
+        ASSERT_EQ(op.getIndex(), expectedOpId);
         ASSERT_EQ(twoPhaseWriteBatch.isViewfulTimeseries, expectedIsViewfulTimeseries);
         ASSERT_EQ(twoPhaseWriteBatch.sampleId, expectedSampleId);
     }
@@ -151,7 +151,7 @@ public:
         ASSERT_TRUE(std::holds_alternative<InternalTransactionBatch>(batch.data));
         auto& internalTransactionBatch = std::get<InternalTransactionBatch>(batch.data);
         const auto& op = internalTransactionBatch.op;
-        ASSERT_EQ(op.getId(), expectedOpId);
+        ASSERT_EQ(op.getIndex(), expectedOpId);
         ASSERT_EQ(internalTransactionBatch.sampleId, expectedSampleId);
     }
 
@@ -163,7 +163,7 @@ public:
         auto& multiWriteBlockingMigrations =
             std::get<MultiWriteBlockingMigrationsBatch>(batch.data);
         const auto& op = multiWriteBlockingMigrations.op;
-        ASSERT_EQ(op.getId(), expectedOpId);
+        ASSERT_EQ(op.getIndex(), expectedOpId);
         ASSERT_EQ(multiWriteBlockingMigrations.sampleId, expectedSampleId);
     }
 
@@ -200,7 +200,7 @@ public:
         ASSERT_EQ(shardRequest.ops.size(), expectedShardVersions.size());
         for (size_t i = 0; i < shardRequest.ops.size(); i++) {
             const auto& op = shardRequest.ops[i];
-            ASSERT_EQ(op.getId(), expectedOpIds[i]);
+            ASSERT_EQ(op.getIndex(), expectedOpIds[i]);
 
             auto opShard = shardRequest.versionByNss.find(op.getNss());
             ASSERT_TRUE(opShard != shardRequest.versionByNss.end());
@@ -236,7 +236,7 @@ public:
 
             for (size_t i = 0; i < expectedShardRequest.ops.size(); i++) {
                 const auto& op = shardRequest.ops[i];
-                ASSERT_EQ(op.getId(), expectedShardRequest.ops[i].getId());
+                ASSERT_EQ(op.getIndex(), expectedShardRequest.ops[i].getIndex());
 
                 auto opShard = shardRequest.versionByNss.find(op.getNss());
                 ASSERT_TRUE(opShard != shardRequest.versionByNss.end());
@@ -1138,8 +1138,8 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherTargetErrorsNon
     assertUnorderedSimpleWriteBatch(result2.batch, expectedBatch2);
 
     ASSERT_TRUE(result2.opsWithErrors.size() == 2);
-    ASSERT_TRUE(result2.opsWithErrors[0].first.getId() == 1);
-    ASSERT_TRUE(result2.opsWithErrors[1].first.getId() == 2);
+    ASSERT_TRUE(result2.opsWithErrors[0].first.getIndex() == 1);
+    ASSERT_TRUE(result2.opsWithErrors[1].first.getIndex() == 2);
 }
 
 TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,

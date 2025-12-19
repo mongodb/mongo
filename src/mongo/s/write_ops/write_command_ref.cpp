@@ -44,7 +44,7 @@ bool BatchWriteCommandRefImpl::getBypassDocumentValidation() const {
     return getRequest().getBypassDocumentValidation();
 }
 
-const OptionalBool& BatchWriteCommandRefImpl::getBypassEmptyTsReplacement() const {
+OptionalBool BatchWriteCommandRefImpl::getBypassEmptyTsReplacement() const {
     return getRequest().getBypassEmptyTsReplacement();
 }
 
@@ -83,7 +83,7 @@ boost::optional<std::int32_t> BatchWriteCommandRefImpl::getStmtId() const {
     return getRequest().getWriteCommandRequestBase().getStmtId();
 }
 
-boost::optional<std::vector<std::int32_t>> BatchWriteCommandRefImpl::getStmtIds() const {
+const boost::optional<std::vector<std::int32_t>>& BatchWriteCommandRefImpl::getStmtIds() const {
     return getRequest().getWriteCommandRequestBase().getStmtIds();
 }
 
@@ -91,7 +91,7 @@ bool BulkWriteCommandRefImpl::getBypassDocumentValidation() const {
     return getRequest().getBypassDocumentValidation();
 }
 
-const OptionalBool& BulkWriteCommandRefImpl::getBypassEmptyTsReplacement() const {
+OptionalBool BulkWriteCommandRefImpl::getBypassEmptyTsReplacement() const {
     return getRequest().getBypassEmptyTsReplacement();
 }
 
@@ -133,7 +133,7 @@ boost::optional<std::int32_t> BulkWriteCommandRefImpl::getStmtId() const {
     return getRequest().getStmtId();
 }
 
-boost::optional<std::vector<std::int32_t>> BulkWriteCommandRefImpl::getStmtIds() const {
+const boost::optional<std::vector<std::int32_t>>& BulkWriteCommandRefImpl::getStmtIds() const {
     return getRequest().getStmtIds();
 }
 
@@ -260,6 +260,17 @@ const BSONObj& BatchWriteCommandRefImpl::getFilter(int index) const {
             }});
 }
 
+const BSONObj& BatchWriteCommandRefImpl::getHint(int index) const {
+    using RetT = const BSONObj&;
+    return visitUpdateOrDeleteOpData(
+        index,
+        OverloadedVisitor{
+            [&](const write_ops::UpdateOpEntry& updateOp) -> RetT { return updateOp.getHint(); },
+            [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT {
+                return deleteOp.getHint();
+            }});
+}
+
 const BSONObj& BatchWriteCommandRefImpl::getDocument(int index) const {
     using RetT = const BSONObj&;
     return visitInsertOpData(index, [&](const BSONObj& insertDoc) -> RetT { return insertDoc; });
@@ -278,6 +289,22 @@ bool BatchWriteCommandRefImpl::getMulti(int index) const {
 
 const NamespaceString& BatchWriteCommandRefImpl::getNss(int index) const {
     return getRequest().getNS();
+}
+
+size_t BatchWriteCommandRefImpl::getNsInfoIdx(int index) const {
+    return 0;
+}
+
+boost::optional<UUID> BatchWriteCommandRefImpl::getSampleId(int index) const {
+    using RetT = boost::optional<UUID>;
+    return visitUpdateOrDeleteOpData(
+        index,
+        OverloadedVisitor{[&](const write_ops::UpdateOpEntry& updateOp) -> RetT {
+                              return updateOp.getSampleId();
+                          },
+                          [&](const write_ops::DeleteOpEntry& deleteOp) -> RetT {
+                              return deleteOp.getSampleId();
+                          }});
 }
 
 boost::optional<UUID> BatchWriteCommandRefImpl::getCollectionUUID(int index) const {
@@ -305,12 +332,31 @@ bool BatchWriteCommandRefImpl::getUpsert(int index) const {
                                          }});
 }
 
+OptionalBool BatchWriteCommandRefImpl::getUpsertSupplied(int index) const {
+    return visitUpdateOpData(index, [&](const write_ops::UpdateOpEntry& updateOp) -> OptionalBool {
+        return updateOp.getUpsertSupplied();
+    });
+}
+
+OptionalBool BatchWriteCommandRefImpl::getIncludeQueryStatsMetrics(int index) const {
+    return visitUpdateOpData(index, [&](const write_ops::UpdateOpEntry& updateOp) {
+        return updateOp.getIncludeQueryStatsMetrics();
+    });
+}
+
+OptionalBool BatchWriteCommandRefImpl::getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+    int index) const {
+    return visitUpdateOpData(index, [&](const write_ops::UpdateOpEntry& updateOp) -> OptionalBool {
+        return updateOp.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery();
+    });
+}
+
 const boost::optional<mongo::EncryptionInformation>&
 BatchWriteCommandRefImpl::getEncryptionInformation(int index) const {
     return getRequest().getWriteCommandRequestBase().getEncryptionInformation();
 }
 
-const OptionalBool& BatchWriteCommandRefImpl::getRawData() const {
+OptionalBool BatchWriteCommandRefImpl::getRawData() const {
     return getRequest().getGenericArguments().getRawData();
 }
 
@@ -420,6 +466,28 @@ const BSONObj& BulkWriteCommandRefImpl::getFilter(int index) const {
             }});
 }
 
+boost::optional<UUID> BulkWriteCommandRefImpl::getSampleId(int index) const {
+    using RetT = boost::optional<UUID>;
+    return visitUpdateOrDeleteOpData(
+        index,
+        OverloadedVisitor{
+            [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getSampleId(); },
+            [&](const BulkWriteDeleteOp& deleteOp) -> RetT {
+                return deleteOp.getSampleId();
+            }});
+}
+
+const BSONObj& BulkWriteCommandRefImpl::getHint(int index) const {
+    using RetT = const BSONObj&;
+    return visitUpdateOrDeleteOpData(
+        index,
+        OverloadedVisitor{
+            [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getHint(); },
+            [&](const BulkWriteDeleteOp& deleteOp) -> RetT {
+                return deleteOp.getHint();
+            }});
+}
+
 const BSONObj& BulkWriteCommandRefImpl::getDocument(int index) const {
     using RetT = const BSONObj&;
     return visitInsertOpData(
@@ -437,13 +505,15 @@ bool BulkWriteCommandRefImpl::getMulti(int index) const {
 }
 
 const NamespaceString& BulkWriteCommandRefImpl::getNss(int index) const {
-    auto nsInfoIdx = visitOpData(index, [](const auto& op) { return op.getNsInfoIdx(); });
-    return getRequest().getNsInfo()[nsInfoIdx].getNs();
+    return getRequest().getNsInfo()[getNsInfoIdx(index)].getNs();
+}
+
+size_t BulkWriteCommandRefImpl::getNsInfoIdx(int index) const {
+    return visitOpData(index, [](const auto& op) { return op.getNsInfoIdx(); });
 }
 
 boost::optional<UUID> BulkWriteCommandRefImpl::getCollectionUUID(int index) const {
-    auto nsInfoIdx = visitOpData(index, [](const auto& op) { return op.getNsInfoIdx(); });
-    return getRequest().getNsInfo()[nsInfoIdx].getCollectionUUID();
+    return getRequest().getNsInfo()[getNsInfoIdx(index)].getCollectionUUID();
 }
 
 BatchedCommandRequest::BatchType BulkWriteCommandRefImpl::getOpType(int index) const {
@@ -463,6 +533,23 @@ const write_ops::UpdateModification& BulkWriteCommandRefImpl::getUpdateMods(int 
         index, [&](const BulkWriteUpdateOp& updateOp) -> RetT { return updateOp.getUpdateMods(); });
 }
 
+OptionalBool BulkWriteCommandRefImpl::getUpsertSupplied(int index) const {
+    return visitUpdateOpData(index, [&](const BulkWriteUpdateOp& updateOp) -> OptionalBool {
+        return updateOp.getUpsertSupplied();
+    });
+}
+
+OptionalBool BulkWriteCommandRefImpl::getIncludeQueryStatsMetrics(int index) const {
+    return OptionalBool{};
+}
+
+OptionalBool BulkWriteCommandRefImpl::getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+    int index) const {
+    return visitUpdateOpData(index, [&](const BulkWriteUpdateOp& updateOp) -> OptionalBool {
+        return updateOp.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery();
+    });
+}
+
 bool BulkWriteCommandRefImpl::getUpsert(int index) const {
     return visitOpData(
         index,
@@ -475,11 +562,10 @@ bool BulkWriteCommandRefImpl::getUpsert(int index) const {
 
 const boost::optional<mongo::EncryptionInformation>&
 BulkWriteCommandRefImpl::getEncryptionInformation(int index) const {
-    auto nsInfoIdx = visitOpData(index, [](const auto& op) { return op.getNsInfoIdx(); });
-    return getRequest().getNsInfo()[nsInfoIdx].getEncryptionInformation();
+    return getRequest().getNsInfo()[getNsInfoIdx(index)].getEncryptionInformation();
 }
 
-const OptionalBool& BulkWriteCommandRefImpl::getRawData() const {
+OptionalBool BulkWriteCommandRefImpl::getRawData() const {
     return getRequest().getRawData();
 }
 
@@ -511,7 +597,7 @@ bool FindAndModifyCommandRefImpl::getBypassDocumentValidation() const {
     return getRequest().getBypassDocumentValidation().value_or(false);
 }
 
-const OptionalBool& FindAndModifyCommandRefImpl::getBypassEmptyTsReplacement() const {
+OptionalBool FindAndModifyCommandRefImpl::getBypassEmptyTsReplacement() const {
     return getRequest().getBypassEmptyTsReplacement();
 }
 
@@ -520,13 +606,12 @@ const boost::optional<IDLAnyTypeOwned>& FindAndModifyCommandRefImpl::getComment(
 }
 
 boost::optional<bool> FindAndModifyCommandRefImpl::getErrorsOnly() const {
-    return false;
+    return boost::none;
 }
 
 const boost::optional<LegacyRuntimeConstants>&
 FindAndModifyCommandRefImpl::getLegacyRuntimeConstants() const {
-    static const boost::optional<LegacyRuntimeConstants> kMissingLegacyRuntimeConstants;
-    return kMissingLegacyRuntimeConstants;
+    return getRequest().getLegacyRuntimeConstants();
 }
 
 const boost::optional<BSONObj>& FindAndModifyCommandRefImpl::getLet() const {
@@ -551,8 +636,9 @@ boost::optional<std::int32_t> FindAndModifyCommandRefImpl::getStmtId() const {
     return getRequest().getStmtId();
 }
 
-boost::optional<std::vector<std::int32_t>> FindAndModifyCommandRefImpl::getStmtIds() const {
-    return getRequest().getStmtId().map([](auto stmtId) { return std::vector<int32_t>{stmtId}; });
+const boost::optional<std::vector<std::int32_t>>& FindAndModifyCommandRefImpl::getStmtIds() const {
+    static const boost::optional<std::vector<std::int32_t>> kMissingStmtIds;
+    return kMissingStmtIds;
 }
 
 const boost::optional<std::vector<BSONObj>>& FindAndModifyCommandRefImpl::getArrayFilters(
@@ -572,6 +658,10 @@ const BSONObj& FindAndModifyCommandRefImpl::getFilter(int index) const {
     return getRequest().getQuery();
 }
 
+const BSONObj& FindAndModifyCommandRefImpl::getHint(int index) const {
+    return getRequest().getHint();
+}
+
 const BSONObj& FindAndModifyCommandRefImpl::getDocument(int index) const {
     return BSONObj::kEmptyObject;
 }
@@ -582,6 +672,14 @@ bool FindAndModifyCommandRefImpl::getMulti(int index) const {
 
 const NamespaceString& FindAndModifyCommandRefImpl::getNss(int index) const {
     return getRequest().getNamespace();
+}
+
+size_t FindAndModifyCommandRefImpl::getNsInfoIdx(int index) const {
+    return 0;
+}
+
+boost::optional<UUID> FindAndModifyCommandRefImpl::getSampleId(int index) const {
+    return getRequest().getSampleId();
 }
 
 boost::optional<UUID> FindAndModifyCommandRefImpl::getCollectionUUID(int index) const {
@@ -611,12 +709,25 @@ bool FindAndModifyCommandRefImpl::getUpsert(int index) const {
     return getRequest().getUpsert().value_or(false);
 }
 
+OptionalBool FindAndModifyCommandRefImpl::getUpsertSupplied(int index) const {
+    return OptionalBool{};
+}
+
+OptionalBool FindAndModifyCommandRefImpl::getIncludeQueryStatsMetrics(int index) const {
+    return OptionalBool{};
+}
+
+OptionalBool FindAndModifyCommandRefImpl::getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+    int index) const {
+    return getRequest().getAllowShardKeyUpdatesWithoutFullShardKeyInQuery();
+}
+
 const boost::optional<mongo::EncryptionInformation>&
 FindAndModifyCommandRefImpl::getEncryptionInformation(int index) const {
     return getRequest().getEncryptionInformation();
 }
 
-const OptionalBool& FindAndModifyCommandRefImpl::getRawData() const {
+OptionalBool FindAndModifyCommandRefImpl::getRawData() const {
     return getRequest().getRawData();
 }
 
