@@ -272,8 +272,11 @@ void RangeDeleterService::_joinAndResetState() {
     // Join and destruct the processor
     _readyRangeDeletionsProcessorPtr.reset();
 
-    // Clear range deletions potentially created during recovery
-    _rangeDeletionTasks.clear();
+    // Clear range deletions potentially created during recovery.
+    {
+        auto lock = _acquireMutexUnconditionally();
+        _rangeDeletionTasks.clear();
+    }
 }
 
 void RangeDeleterService::_stopService() {
@@ -359,9 +362,6 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
     SemiFuture<void>&& waitForActiveQueriesToComplete,
     TaskPending pending) {
 
-    auto overlappingRangeDeletions =
-        _rangeDeletionTasks.getOverlappingTasks(rdt.getCollectionUuid(), rdt.getRange());
-
     auto scheduleRangeDeletionChain = [&](SharedSemiFuture<void> pendingFuture) {
         (void)pendingFuture.thenRunOn(_executor)
             .then([this]() {
@@ -369,12 +369,24 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
                 return getServiceUpFuture();
             })
             .then([this,
-                   overlappingTasks = std::move(overlappingRangeDeletions),
+                   collectionUuid = rdt.getCollectionUuid(),
+                   range = rdt.getRange(),
                    registrationTime = rdt.getTimestamp().value_or(
                        Timestamp(getGlobalServiceContext()->getFastClockSource()->now())),
                    taskId = rdt.getId()]() {
+                // Acquire lock to safely access the range deletion tasks tracker.
+                auto lock = _acquireMutexUnconditionally();
+                auto overlappingTasks =
+                    _rangeDeletionTasks.getOverlappingTasks(collectionUuid, range);
+
                 std::vector<ExecutorFuture<void>> futures;
                 for (const auto& [_, task] : overlappingTasks) {
+                    // The current task is now in the map since we call
+                    // getOverlappingTasks() after registration. We do not want to wait on
+                    // ourselves, so skip.
+                    if (task->getTaskId() == taskId) {
+                        continue;
+                    }
                     if ((task->getRegistrationTime() < registrationTime) ||
                         (task->getRegistrationTime() == registrationTime &&
                          taskId < task->getTaskId())) {
