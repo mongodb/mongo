@@ -57,8 +57,6 @@ constexpr size_t kHardMaxPredicatesInJoin = std::numeric_limits<PredicateId>::ma
  */
 using NodeSet = std::bitset<kHardMaxNodesInJoin>;
 
-std::string nodeSetToString(const NodeSet& set, size_t numNodesToPrint = kHardMaxNodesInJoin);
-
 /**
  * Creates NodeSet from the list of node ids.
  */

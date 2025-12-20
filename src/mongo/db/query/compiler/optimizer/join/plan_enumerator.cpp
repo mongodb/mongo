@@ -49,7 +49,7 @@ bool PlanEnumeratorContext::canPlanBeEnumerated(PlanTreeShape type,
                                                 JoinMethod method,
                                                 const JoinSubset& left,
                                                 const JoinSubset& right,
-                                                const JoinSubset& subset) {
+                                                const JoinSubset& subset) const {
     if ((method == JoinMethod::NLJ || method == JoinMethod::INLJ) &&
         !right.isBaseCollectionAccess()) {
         // NLJ plans perform poorly when the right hand side is not a collection access, while INLJ
@@ -57,36 +57,84 @@ bool PlanEnumeratorContext::canPlanBeEnumerated(PlanTreeShape type,
         return false;
     }
 
-    if (type == PlanTreeShape::LEFT_DEEP && !right.isBaseCollectionAccess()) {
-        // Left-deep tree must have a "base" collection and not an intermediate join on the right.
-        return false;
-    }
-    if (type == PlanTreeShape::RIGHT_DEEP && !left.isBaseCollectionAccess()) {
-        // Right-deep tree must have a "base" collection and not an intermediate join on the left.
-        return false;
-    }
-    if (type == PlanTreeShape::ZIG_ZAG && !left.isBaseCollectionAccess() &&
-        !right.isBaseCollectionAccess()) {
-        // Zig-zag is the least strict: at least one of the left or right must be a base collection.
-        return false;
+    switch (type) {
+        case PlanTreeShape::LEFT_DEEP:
+            // We create a left-deep tree by only generating plans that add a "base" join subset on
+            // the right.
+            return right.isBaseCollectionAccess();
+
+        case PlanTreeShape::RIGHT_DEEP:
+            // We create a right-deep tree by only generating plans that add a "base" join subset on
+            // the left.
+            return left.isBaseCollectionAccess();
+
+        case PlanTreeShape::ZIG_ZAG:
+            // We create a zig-zag plan by alternating which side we add a "base" join subset to.
+            // TODO SERVER-115147: Pick based on which side has smaller CE.
+            if (left.isBaseCollectionAccess() && right.isBaseCollectionAccess()) {
+                /**
+                 * We always allow a join like this as a base case:
+                 *
+                 *      J
+                 *     / \
+                 *    B   B
+                 *
+                 */
+                return true;
+
+            } else if (!left.isBaseCollectionAccess()) {
+                /**
+                 * Accept two subtree shapes here for the tree we're trying to construct.
+                 * (1)         J
+                 *            /  \
+                 * 'left' -> J    *
+                 *          / \
+                 *         B   B
+                 *
+                 * (2)         J
+                 *            /  \
+                 * 'left' -> J    *
+                 *          / \
+                 *         *   J
+                 *            / \
+                 *           *   *
+                 *
+                 */
+                const auto& leftJoin = _registry.getAs<JoiningNode>(left.bestPlan());
+                return _registry.isOfType<JoiningNode>(leftJoin.right) ||
+                    (!_registry.isOfType<JoiningNode>(leftJoin.right) &&
+                     !_registry.isOfType<JoiningNode>(leftJoin.left));
+
+            } else if (!right.isBaseCollectionAccess()) {
+                /**
+                 * Accept two subtree shapes here for the tree we're trying to construct.
+                 * (1)   J
+                 *      /  \
+                 *     *    J <- 'right'
+                 *         / \
+                 *        B   B
+                 *
+                 * (2)   J
+                 *      /  \
+                 *     *    J <- 'right'
+                 *         / \
+                 *        J   *
+                 *       / \
+                 *      *   *
+                 *
+                 */
+                const auto& rightJoin = _registry.getAs<JoiningNode>(right.bestPlan());
+                return _registry.isOfType<JoiningNode>(rightJoin.left) ||
+                    (!_registry.isOfType<JoiningNode>(rightJoin.right) &&
+                     !_registry.isOfType<JoiningNode>(rightJoin.left));
+            }
+            break;
+
+        default:
+            break;
     }
 
-    // Pruning heuristic: Disallow plans where the larger CE is on the build side of a HJ. This
-    // should kick in only when we know that we will also enumerate the other order (left and right
-    // swapped), otherwise it may impact our ability to find a solution. That is, try to prune when
-    // we're enumerating:
-    // - Zig-zag plans, since these can have intermediate joins on either side of the HJ, OR
-    // - A join between two base collections, since these can be reordered regardless of plan shape.
-    bool bothBaseColls = left.isBaseCollectionAccess() && right.isBaseCollectionAccess();
-    bool eligibleToPrune = _enableHJOrderPruning && method == JoinMethod::HJ &&
-        (type == PlanTreeShape::ZIG_ZAG || bothBaseColls);
-    if (eligibleToPrune &&
-        _estimator->getOrEstimateSubsetCardinality(left.subset) >
-            _estimator->getOrEstimateSubsetCardinality(right.subset)) {
-        return false;
-    }
-
-    return true;
+    MONGO_UNREACHABLE_TASSERT(11336906);
 }
 
 void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
@@ -224,7 +272,6 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
 std::string PlanEnumeratorContext::toString() const {
     const auto numNodes = _ctx.joinGraph.numNodes();
     std::stringstream ss;
-    ss << "HJ order pruning enabled: " << _enableHJOrderPruning << "\n";
     for (size_t level = 0; level < _joinSubsets.size(); level++) {
         ss << "Level " << level << ":\n";
         const auto n = _joinSubsets[level].size();

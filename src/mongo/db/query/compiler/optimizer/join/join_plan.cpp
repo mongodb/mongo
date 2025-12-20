@@ -47,6 +47,13 @@ NodeSet getBitset(const JoinPlanNode& node) {
 }
 
 /**
+ * Helper to pretty-print NodeSet.
+ */
+std::string nodeSetToString(const NodeSet& set, size_t numNodesToPrint = kHardMaxNodesInJoin) {
+    return set.to_string().substr(kHardMaxNodesInJoin - numNodesToPrint, numNodesToPrint);
+}
+
+/**
  * Helper to pretty-print join method.
  */
 std::string joinMethodToString(JoinMethod method) {

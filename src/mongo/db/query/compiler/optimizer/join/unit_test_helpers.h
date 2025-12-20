@@ -31,7 +31,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
-#include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -177,28 +176,6 @@ private:
     CardinalityEstimate _collCard;
     stdx::unordered_map<std::vector<FieldPath>, CardinalityEstimate> _fakeEstimates;
 };
-
-/**
- * Tests that assert on join order enumeration but not the winning plan typically need
- * statistics that will provide consistent CE results, but they need not be meaningful.
- * This helper gives all node sets representing bitset 'b' a CE of b.to_ullong().
- */
-class FakeJoinCardinalityEstimator : public JoinCardinalityEstimator {
-public:
-    FakeJoinCardinalityEstimator(const JoinReorderingContext& jCtx)
-        : JoinCardinalityEstimator(
-              jCtx,
-              EdgeSelectivities(jCtx.joinGraph.numEdges(), cost_based_ranker::zeroSel),
-              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::oneCE)) {};
-
-    cost_based_ranker::CardinalityEstimate getOrEstimateSubsetCardinality(
-        const NodeSet& nodes) override {
-        return cost_based_ranker::CardinalityEstimate(
-            cost_based_ranker::CardinalityType(nodes.to_ullong()),
-            cost_based_ranker::EstimationSource::Code);
-    }
-};
-
 
 /**
  * Small utility function to make a namepace string from collection name.

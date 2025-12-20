@@ -57,8 +57,7 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
  * Sellinger-style join optimization.
  */
 ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx,
-                                                std::unique_ptr<JoinCardinalityEstimator> estimator,
-                                                PlanTreeShape shape,
-                                                bool enableHJOrderPruning);
+                                                JoinCardinalityEstimator estimator,
+                                                PlanTreeShape shape);
 
 }  // namespace mongo::join_ordering

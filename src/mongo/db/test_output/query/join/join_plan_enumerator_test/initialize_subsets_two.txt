@@ -1,5 +1,4 @@
 LEFT DEEP, 2 Nodes
-HJ order pruning enabled: 0
 Level 0:
 01, 10
 Level 1:
@@ -32,7 +31,6 @@ Output plans (best plan 0):
 
 
 RIGHT DEEP, 2 Nodes
-HJ order pruning enabled: 0
 Level 0:
 01, 10
 Level 1:

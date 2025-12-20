@@ -44,14 +44,7 @@ JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& 
       _edgeSelectivities(std::move(edgeSelectivities)),
       _nodeCardinalities(std::move(nodeCardinalities)),
       _cycleBreaker(
-          GraphCycleBreaker(_ctx.joinGraph, _edgeSelectivities, _ctx.resolvedPaths.size())) {
-    tassert(11514700,
-            "Missing edge selectivities",
-            _edgeSelectivities.size() == _ctx.joinGraph.numEdges());
-    tassert(11514701,
-            "Missing node cardinalities",
-            _nodeCardinalities.size() == _ctx.joinGraph.numNodes());
-}
+          GraphCycleBreaker(_ctx.joinGraph, _edgeSelectivities, _ctx.resolvedPaths.size())) {}
 
 JoinCardinalityEstimator JoinCardinalityEstimator::make(
     const JoinReorderingContext& ctx,
@@ -230,7 +223,7 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
     LOGV2_DEBUG(11514603,
                 5,
                 "Estimating cardinality for subset",
-                "subset"_attr = nodeSetToString(nodes, _ctx.joinGraph.numNodes()),
+                "subset"_attr = nodes.to_string(),
                 "cardinalityEstimate"_attr = ce);
 
     _subsetCardinalities.emplace(nodes, ce);
