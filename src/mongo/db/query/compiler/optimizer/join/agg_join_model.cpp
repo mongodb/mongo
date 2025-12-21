@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
+#include "mongo/db/query/compiler/optimizer/join/predicate_extractor.h"
 #include "mongo/db/query/util/disjoint_set.h"
 
 #include <memory>
@@ -60,28 +61,59 @@ std::unique_ptr<CanonicalQuery> makeFullScanCQ(boost::intrusive_ptr<ExpressionCo
         .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{.findCommand = std::move(fcr)}});
 }
 
-StatusWith<std::unique_ptr<CanonicalQuery>> makeCQFromLookup(
+StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    NamespaceString nss,
+    std::unique_ptr<MatchExpression> expr) {
+    auto pfc = ParsedFindCommand::withExistingFilter(expCtx,
+                                                     nullptr,
+                                                     std::move(expr),
+                                                     std::make_unique<FindCommandRequest>(nss),
+                                                     ProjectionPolicies::findProjectionPolicies());
+    CanonicalQueryParams params{.expCtx = expCtx, .parsedFind = std::move(pfc.getValue())};
+    return CanonicalQuery::make(std::move(params));
+}
+
+struct Predicates {
+    std::unique_ptr<CanonicalQuery> canonicalQuery;
+    std::vector<boost::intrusive_ptr<const Expression>> joinPredicates;
+};
+
+StatusWith<Predicates> extractPredicatesFromLookup(
     DocumentSourceLookUp* stage, boost::intrusive_ptr<ExpressionContext> pipelineExpCtx) {
     auto expCtx = stage->getSubpipelineExpCtx();
     if (stage->hasPipeline()) {
         stage = dynamic_cast<DocumentSourceLookUp*>(stage);
-        auto swCQ = createCanonicalQuery(
-            expCtx, stage->getFromNs(), stage->getResolvedIntrospectionPipeline());
-        if (swCQ.isOK()) {
-            auto cq = std::move(swCQ.getValue());
-            if (!stage->getResolvedIntrospectionPipeline().getSources().empty()) {
-                // We failed to pushdown the whole subpipeline into SBE- bail out without modifying
-                // the document source.
-                return Status(ErrorCodes::QueryFeatureNotAllowed,
-                              "Join reordering is not enabled for $lookups with sub-pipelines that "
-                              "can't be fully pushed down into a CanonicalQuery");
-            }
-            return std::move(cq);
+        auto ds = stage->getResolvedIntrospectionPipeline().peekFront();
+        auto match = dynamic_cast<DocumentSourceMatch*>(ds);
+        tassert(11317205, "expected $match stage as leading stage in subpipeline", match);
+        // Attempt to split
+        auto splitRes = splitJoinAndSingleCollectionPredicates(match->getMatchExpression(),
+                                                               stage->getLetVariables());
+        if (!splitRes.has_value()) {
+            return Status(ErrorCodes::QueryFeatureNotAllowed,
+                          "Encountered subpipeline with $match containing non-equijoin correlated "
+                          "predicates");
         }
-        // Bail out.
-        return swCQ;
+
+        std::unique_ptr<CanonicalQuery> cq;
+        if (splitRes->singleTablePredicates) {
+            auto swCq = createCanonicalQuery(
+                pipelineExpCtx, stage->getFromNs(), std::move(splitRes->singleTablePredicates));
+            if (!swCq.isOK()) {
+                return swCq.getStatus();
+            }
+            cq = std::move(swCq.getValue());
+        } else {
+            cq = makeFullScanCQ(expCtx);
+        }
+
+        return {{
+            .canonicalQuery = std::move(cq),
+            .joinPredicates = std::move(splitRes->joinPredicates),
+        }};
     }
-    return makeFullScanCQ(expCtx);
+    return {{.canonicalQuery = makeFullScanCQ(expCtx)}};
 }
 
 BSONObj resolvedPathToBSON(const ResolvedPath& rp) {
@@ -101,20 +133,9 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
         return false;
     }
 
-    if (!lookup.hasLocalFieldForeignFieldJoin()) {
-        // TODO SERVER-111164: once we start adding edge from $expr we need to remove check for
-        // hasLocalFieldForeignFieldJoin().
-        return false;
-    }
-
     if (!lookup.hasPipeline()) {
         // A $lookup with no sub-pipeline is eligible.
         return true;
-    }
-
-    if (lookup.getLetVariables().size() > 0) {
-        // TODO SERVER-111164: permit let variables/ correlated sub-pipelines.
-        return false;
     }
 
     // If the $lookup has a sub-pipeline, then it may only contain a $match stage.
@@ -160,6 +181,74 @@ void addImplicitEdges(MutableJoinGraph& graph,
         }
     }
 }
+
+// Checked cast which performs a tassert if it fails.
+template <typename U, typename V>
+U tassert_cast(V* v) {
+    auto ret = dynamic_cast<U>(v);
+    if (!ret) {
+        tasserted(11317202, "cast failed");
+    }
+    return ret;
+}
+
+// Compute the field path which the given variable ID refers to in the local collection of a
+// $lookup. We assume that the given a set of let variables from $lookup all are defined to be
+// simple FieldPaths (i.e.are of the form {foo: '$foo'}). This allows us resolve a variable to
+// underlying FieldPath.
+FieldPath localCollectionFieldPath(const std::vector<LetVariable>& letVars, Variables::Id id) {
+    auto varIt =
+        std::find_if(letVars.cbegin(), letVars.cend(), [&id](auto&& var) { return var.id == id; });
+    tassert(
+        11317201, "variable ID not found in given set of let variables", varIt != letVars.cend());
+    auto& var = *varIt;
+    auto localFieldPath = tassert_cast<const ExpressionFieldPath*>(var.expression.get());
+    return localFieldPath->getFieldPathWithoutCurrentPrefix();
+}
+
+// Insert the given join predicates into the given join graph. Assumes that the join predicates are
+// agg expressions of the form {$eq: ['$foreignCollFieldPath', '$$localCollVar']}.
+void addExprJoinPredicates(MutableJoinGraph& graph,
+                           const std::vector<boost::intrusive_ptr<const Expression>>& joinPreds,
+                           PathResolver& pathResolver,
+                           const std::vector<LetVariable>& letVars,
+                           NodeId localColl,
+                           NodeId foreignColl) {
+    for (auto&& joinPred : joinPreds) {
+        auto eqNode = tassert_cast<const ExpressionCompare*>(joinPred.get());
+        auto left = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[0].get());
+        auto right = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[1].get());
+
+        boost::optional<PathId> localPath;
+        boost::optional<PathId> foreignPath;
+
+        if (left->isVariableReference()) {
+            // LHS is referencing a field from local collection
+            // RHS is referencing a field from the foreign collection
+            localPath = pathResolver.addPath(
+                localColl, localCollectionFieldPath(letVars, left->getVariableId()));
+            foreignPath =
+                pathResolver.addPath(foreignColl, right->getFieldPathWithoutCurrentPrefix());
+        } else if (right->isVariableReference()) {
+            // LHS is referencing a field from the foreign collection
+            // RHS is referencing a field from local collection
+            localPath = pathResolver.addPath(
+                localColl, localCollectionFieldPath(letVars, right->getVariableId()));
+            foreignPath =
+                pathResolver.addPath(foreignColl, left->getFieldPathWithoutCurrentPrefix());
+        } else {
+            // We expect one of the children of the ExpressionCompare to be a variable and the other
+            // to be a field path.
+            MONGO_UNREACHABLE_TASSERT(11317203);
+        }
+        tassert(11317204,
+                "expected to resolve both local and foreign paths",
+                localPath.has_value() && foreignPath.has_value());
+        // TODO SERVER-112608: Account for different semantics of $expr equality.
+        graph.addSimpleEqualityEdge(localColl, foreignColl, *localPath, *foreignPath);
+    }
+}
+
 }  // namespace
 
 bool AggJoinModel::pipelineEligibleForJoinReordering(const Pipeline& pipeline) {
@@ -222,18 +311,24 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 break;
             }
 
-            auto swCQ = makeCQFromLookup(lookup, lookup->getSubpipelineExpCtx());
-            if (!swCQ.isOK()) {
+            // Attempt to extract join predicates and single table predicates from the $lookup
+            // expressed as $expr in $match stage. If there is no subpipeline, this returns no join
+            // predicates and a CanonicalQuery with empty predicate. If this returns a bad status,
+            // then this extraction failed due to an inelgible stage/expression.
+            auto swPreds = extractPredicatesFromLookup(lookup, lookup->getSubpipelineExpCtx());
+            if (!swPreds.isOK()) {
                 break;
             }
 
-            auto foreignNodeId = graph.addNode(
-                lookup->getFromNs(), std::move(swCQ.getValue()), lookup->getAsField());
+            auto foreignNodeId = graph.addNode(lookup->getFromNs(),
+                                               std::move(swPreds.getValue().canonicalQuery),
+                                               lookup->getAsField());
 
             if (!foreignNodeId) {
                 return Status(ErrorCodes::BadValue, "Graph is too big: too many nodes");
             }
 
+            // Add join predicate expressed as local/foreign field syntax to join graph.
             if (lookup->hasLocalFieldForeignFieldJoin()) {
                 // The order of resolving the paths are important here: localPathId shouln't be
                 // resolved to the foreign collection even if it is prefixed by the foreign
@@ -254,7 +349,13 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 pathResolver.addNode(*foreignNodeId, lookup->getAsField());
             }
 
-            // TODO SERVER-111164: add edges from $expr's
+            // Add join predicates expressed as $expr in subpipelines to join graph.
+            addExprJoinPredicates(graph,
+                                  swPreds.getValue().joinPredicates,
+                                  pathResolver,
+                                  lookup->getLetVariables(),
+                                  *baseNodeId,
+                                  *foreignNodeId);
 
             auto next = suffix->popFront();
             if (prefix->getSources().empty()) {

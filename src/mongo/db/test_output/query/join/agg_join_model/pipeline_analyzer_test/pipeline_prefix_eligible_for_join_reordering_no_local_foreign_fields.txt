@@ -14,6 +14,17 @@
                     "filter": {}
                 },
                 "embedPath": "fromA"
+            },
+            {
+                "collectionName": "test.B",
+                "accessPath": {
+                    "filter": {
+                        "a": {
+                            "$eq": {"$numberInt":"1"}
+                        }
+                    }
+                },
+                "embedPath": "fromB"
             }
         ],
         "edges": [
@@ -53,9 +64,7 @@
             "$unwind": {
                 "path": "$fromA"
             }
-        }
-    ],
-    "suffix": [
+        },
         {
             "$lookup": {
                 "from": "B",
@@ -75,5 +84,6 @@
                 "path": "$fromB"
             }
         }
-    ]
+    ],
+    "suffix": []
 }

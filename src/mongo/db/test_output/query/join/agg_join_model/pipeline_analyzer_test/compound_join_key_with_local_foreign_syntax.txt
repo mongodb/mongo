@@ -1,0 +1,218 @@
+{
+    "graph": {
+        "nodes": [
+            {
+                "collectionName": "test.pipeline_test",
+                "accessPath": {
+                    "filter": {}
+                },
+                "embedPath": ""
+            },
+            {
+                "collectionName": "test.A",
+                "accessPath": {
+                    "filter": {
+                        "$and": [
+                            {
+                                "$expr": {
+                                    "$eq": [
+                                        "$baz",
+                                        {
+                                            "$const": {"$numberInt":"5"}
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "baz": {
+                                    "$_internalExprEq": {"$numberInt":"5"}
+                                }
+                            }
+                        ]
+                    }
+                },
+                "embedPath": "a"
+            },
+            {
+                "collectionName": "test.B",
+                "accessPath": {
+                    "filter": {
+                        "$and": [
+                            {
+                                "$expr": {
+                                    "$eq": [
+                                        "$baz",
+                                        {
+                                            "$const": {"$numberInt":"6"}
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "baz": {
+                                    "$_internalExprEq": {"$numberInt":"6"}
+                                }
+                            }
+                        ]
+                    }
+                },
+                "embedPath": "b"
+            }
+        ],
+        "edges": [
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"1"}
+                    },
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"2"},
+                        "right": {"$numberInt":"3"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"1"}
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"0"},
+                        "right": {"$numberInt":"4"}
+                    },
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"2"},
+                        "right": {"$numberInt":"5"}
+                    }
+                ],
+                "left": {"$numberInt":"0"},
+                "right": {"$numberInt":"2"}
+            },
+            {
+                "predicates": [
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"1"},
+                        "right": {"$numberInt":"4"}
+                    },
+                    {
+                        "op": "eq",
+                        "left": {"$numberInt":"3"},
+                        "right": {"$numberInt":"5"}
+                    }
+                ],
+                "left": {"$numberInt":"1"},
+                "right": {"$numberInt":"2"}
+            }
+        ]
+    },
+    "resolvedPaths": [
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "foo"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "foo"
+        },
+        {
+            "nodeId": {"$numberInt":"0"},
+            "fieldName": "bar"
+        },
+        {
+            "nodeId": {"$numberInt":"1"},
+            "fieldName": "bar"
+        },
+        {
+            "nodeId": {"$numberInt":"2"},
+            "fieldName": "foo"
+        },
+        {
+            "nodeId": {"$numberInt":"2"},
+            "fieldName": "bar"
+        }
+    ],
+    "prefix": [
+        {
+            "$lookup": {
+                "from": "A",
+                "as": "a",
+                "localField": "foo",
+                "foreignField": "foo",
+                "let": {
+                    "bar": "$bar"
+                },
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$and": [
+                                    {
+                                        "$eq": [
+                                            "$bar",
+                                            "$$bar"
+                                        ]
+                                    },
+                                    {
+                                        "$eq": [
+                                            "$baz",
+                                            {"$numberInt":"5"}
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$a"
+            }
+        },
+        {
+            "$lookup": {
+                "from": "B",
+                "as": "b",
+                "localField": "foo",
+                "foreignField": "foo",
+                "let": {
+                    "bar": "$bar"
+                },
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$and": [
+                                    {
+                                        "$eq": [
+                                            "$bar",
+                                            "$$bar"
+                                        ]
+                                    },
+                                    {
+                                        "$eq": [
+                                            "$baz",
+                                            {"$numberInt":"6"}
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$b"
+            }
+        }
+    ],
+    "suffix": []
+}
