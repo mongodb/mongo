@@ -13,7 +13,8 @@
  *
  *   # Earlier versions of the server do not define the "featureFlagInDevelopmentForTest" server
  *   # parameter.
- *   requires_fcv_82
+ *   requires_fcv_82,
+ *   backport_required_multiversion,
  * ]
  */
 
@@ -54,20 +55,52 @@ assert("numToggles" in initialDishStatus, initialDishStatus);
 
 // Check that it's possible to change the feature flag's value at runtime.
 const newFeatureFlagInDevelopmentForTestValue = !initialFeatureFlagInDevelopmentForTestValue;
-assert.commandWorked(db.adminCommand(
-    {setParameter: 1, featureFlagInDevelopmentForTest: newFeatureFlagInDevelopmentForTestValue}));
-assert.eq(queryIncrementalFeatureFlagViaGetParameter("featureFlagInDevelopmentForTest"),
-          newFeatureFlagInDevelopmentForTestValue);
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagInDevelopmentForTest: newFeatureFlagInDevelopmentForTestValue
+    }),
+);
+assert.eq(
+    queryIncrementalFeatureFlagViaGetParameter("featureFlagInDevelopmentForTest"),
+    newFeatureFlagInDevelopmentForTestValue,
+);
+
+// Check that it's possible to change the feature flag's value at runtime using the following
+// format: `featureFlag: {value: <bool>}, similar to what the getParameter output looks like.
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagInDevelopmentForTest: {value: initialFeatureFlagInDevelopmentForTestValue},
+    }),
+);
+assert.eq(
+    queryIncrementalFeatureFlagViaGetParameter("featureFlagInDevelopmentForTest"),
+    initialFeatureFlagInDevelopmentForTestValue,
+);
+// Reset the value of the "featureFlagInDevelopmentForTest".
+assert.commandWorked(
+    db.adminCommand({
+        setParameter: 1,
+        featureFlagInDevelopmentForTest: {value: newFeatureFlagInDevelopmentForTestValue},
+    }),
+);
+assert.eq(
+    queryIncrementalFeatureFlagViaGetParameter("featureFlagInDevelopmentForTest"),
+    newFeatureFlagInDevelopmentForTestValue,
+);
 
 // Check that changing the value of the feature flag increments its "numToggles" count but not the
 // "falseChecks" or "trueChecks" counts.
 const updatedDishStatus =
     queryIncrementalFeatureFlagViaServerStatus("featureFlagInDevelopmentForTest");
-assert.docEq(Object.assign({}, initialDishStatus, {
-    value: newFeatureFlagInDevelopmentForTestValue,
-    numToggles: initialDishStatus.numToggles + 1
-}),
-             updatedDishStatus);
+assert.docEq(
+    Object.assign({}, initialDishStatus, {
+        value: newFeatureFlagInDevelopmentForTestValue,
+        numToggles: initialDishStatus.numToggles + 1 + 2 /* the extra toggles with new format */,
+    }),
+    updatedDishStatus,
+);
 
 // Check that a no-op "setParameter" command that sets the flag to its existing value does not
 // increment its "numToggles" count.
