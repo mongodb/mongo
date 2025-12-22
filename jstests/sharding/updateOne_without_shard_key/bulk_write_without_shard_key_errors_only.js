@@ -3,8 +3,6 @@
  *
  * @tags: [
  *    requires_sharding,
- *   # Older versions don't honor errorsOnly for this case.
- *    requires_fcv_83,
  * ]
  */
 

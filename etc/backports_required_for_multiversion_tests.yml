@@ -113,6 +113,8 @@ last-continuous:
       ticket: SERVER-109200
     - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
       ticket: SERVER-115594
+    - test_file: jstests/sharding/updateOne_without_shard_key/bulk_write_without_shard_key_errors_only.js
+      ticket: SERVER-113344
   suites: null
 last-lts:
   all:
@@ -728,4 +730,6 @@ last-lts:
       ticket: SERVER-109200
     - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
       ticket: SERVER-115594
+    - test_file: jstests/sharding/updateOne_without_shard_key/bulk_write_without_shard_key_errors_only.js
+      ticket: SERVER-113344
   suites: null
