@@ -149,6 +149,16 @@ public:
         const auto& allElem = cmdObj["all"];
         bool includeAllSections = stdx::to_underlying(allElem.type()) ? allElem.trueValue() : false;
 
+        const auto& noneElem = cmdObj["none"];
+        bool excludeAllSections =
+            stdx::to_underlying(noneElem.type()) ? noneElem.trueValue() : false;
+
+        if (MONGO_unlikely(includeAllSections && excludeAllSections)) {
+            // {all: 1} and {none: 1} cannot both be specified.
+            uasserted(ErrorCodes::InvalidOptions, "Cannot provide both 'all' and 'none' options");
+        }
+
+
         // --- all sections
         auto registry = ServerStatusSectionRegistry::instance();
         for (auto i = registry->begin(); i != registry->end(); ++i) {
@@ -158,7 +168,7 @@ public:
                 continue;
             }
 
-            bool include = section->includeByDefault();
+            bool include = !excludeAllSections && section->includeByDefault();
             const auto& elem = cmdObj[section->getSectionName()];
             if (stdx::to_underlying(elem.type())) {
                 include = elem.trueValue();
@@ -191,7 +201,7 @@ public:
 
         // --- counters
         auto metricsEl = cmdObj["metrics"_sd];
-        if (metricsEl.eoo() || metricsEl.trueValue()) {
+        if ((!excludeAllSections && metricsEl.eoo()) || metricsEl.trueValue()) {
             // Always gather the role-agnostic metrics. If `opCtx` has a role,
             // additionally merge that role's associated metrics.
             std::vector<const MetricTree*> metricTrees;
