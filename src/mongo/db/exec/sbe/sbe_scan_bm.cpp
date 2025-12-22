@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/json.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/generic_scan.h"
@@ -36,7 +35,6 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"

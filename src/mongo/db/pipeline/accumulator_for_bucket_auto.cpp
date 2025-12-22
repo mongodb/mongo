@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/accumulator_for_bucket_auto.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulator.h"
@@ -46,7 +45,6 @@
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {

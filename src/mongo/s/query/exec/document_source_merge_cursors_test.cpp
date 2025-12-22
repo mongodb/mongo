@@ -33,7 +33,6 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -60,7 +59,6 @@
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
@@ -68,7 +66,6 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/idl/idl_parser.h"
@@ -76,25 +73,18 @@
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 
 #include <cstddef>
 #include <memory>
 #include <string>
-#include <system_error>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
 
 namespace mongo {
 namespace {

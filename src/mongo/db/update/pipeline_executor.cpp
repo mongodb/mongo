@@ -37,7 +37,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/element.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -47,12 +46,9 @@
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
-#include <list>
 #include <typeinfo>
 
 #include <boost/optional/optional.hpp>

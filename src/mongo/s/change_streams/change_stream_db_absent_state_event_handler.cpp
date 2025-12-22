@@ -31,7 +31,6 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/pipeline/change_stream.h"
-#include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 

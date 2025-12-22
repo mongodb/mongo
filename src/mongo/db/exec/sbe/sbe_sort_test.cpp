@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
@@ -41,7 +39,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
-#include <limits>
 #include <memory>
 #include <utility>
 #include <vector>

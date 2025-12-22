@@ -33,8 +33,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 
-#include <string>
-
 #include <fmt/format.h>
 
 namespace mongo {

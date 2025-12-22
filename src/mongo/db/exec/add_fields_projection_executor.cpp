@@ -33,7 +33,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 #include <iterator>

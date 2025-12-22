@@ -40,7 +40,6 @@
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/shard_role/resource_yielders.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
@@ -58,7 +57,6 @@
 #include <string>
 #include <vector>
 
-#include <fmt/format.h>
 
 namespace mongo {
 

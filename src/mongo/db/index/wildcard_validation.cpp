@@ -31,11 +31,9 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <memory>
 #include <utility>
 #include <vector>
 
-#include <boost/container/small_vector.hpp>
 
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 

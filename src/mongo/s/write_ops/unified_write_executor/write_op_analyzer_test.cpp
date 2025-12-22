@@ -29,7 +29,6 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
-#include "mongo/bson/json.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -39,7 +38,6 @@
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/s/session_catalog_router.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
 

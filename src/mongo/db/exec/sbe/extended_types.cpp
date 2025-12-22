@@ -28,21 +28,13 @@
  */
 
 
-#include "mongo/base/compare_numbers.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/in_list.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
-#include "mongo/db/matcher/in_list_data.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/storage/key_string/key_string.h"
-#include "mongo/util/errno_util.h"
 #include "mongo/util/pcre_util.h"
 
 namespace mongo::sbe {

@@ -40,7 +40,6 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
-#include "mongo/db/server_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 

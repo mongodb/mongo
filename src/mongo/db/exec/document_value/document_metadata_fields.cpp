@@ -33,9 +33,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/rank_fusion_util.h"
 #include "mongo/util/string_map.h"
 

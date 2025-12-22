@@ -42,7 +42,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
 
-#include <boost/optional.hpp>
 
 namespace mongo::query_settings {
 

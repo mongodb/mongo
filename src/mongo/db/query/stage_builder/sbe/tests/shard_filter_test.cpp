@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
@@ -37,7 +35,6 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer_mock.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
@@ -55,7 +52,6 @@
 #include <utility>
 #include <vector>
 
-#include <fmt/format.h>
 
 namespace mongo {
 

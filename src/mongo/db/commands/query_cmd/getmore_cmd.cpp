@@ -31,11 +31,9 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/client/read_preference.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
@@ -48,9 +46,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_in_use_info.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/query/canonical_query.h"
@@ -69,18 +65,14 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_support_result.h"
-#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/top.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -102,18 +94,15 @@
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <set>
 #include <string>
 #include <utility>
 
 #include <boost/cstdint.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 

@@ -34,7 +34,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
-#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/logv2/log.h"
@@ -44,8 +43,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
 
-#include <memory>
-#include <mutex>
 #include <string>
 #include <utility>
 

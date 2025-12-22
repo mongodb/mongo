@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
-#include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/abt_lower.h"
@@ -40,7 +39,6 @@
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_literals.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/db/query/stage_builder/sbe/type_checker.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>

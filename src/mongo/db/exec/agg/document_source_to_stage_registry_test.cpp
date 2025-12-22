@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 
-#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/death_test.h"

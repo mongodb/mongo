@@ -33,7 +33,6 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/unittest/unittest.h"
 
-#include <ostream>
 
 namespace mongo {
 namespace unittest {

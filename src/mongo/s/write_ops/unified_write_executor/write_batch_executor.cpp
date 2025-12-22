@@ -30,19 +30,16 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
 #include "mongo/db/error_labels.h"
-#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/transaction/transaction_api.h"
-#include "mongo/s/request_types/coordinate_multi_update_gen.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/wc_error.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/exit.h"
 
-#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

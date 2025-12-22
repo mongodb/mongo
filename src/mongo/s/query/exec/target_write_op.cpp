@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/feature_flag.h"
@@ -48,7 +47,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/sharding_environment/grid.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -57,16 +55,12 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/query/shard_key_pattern_query_util.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <memory>
-#include <string>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>

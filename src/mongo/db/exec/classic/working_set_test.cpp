@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/classic/working_set.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/document.h"

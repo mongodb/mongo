@@ -33,7 +33,6 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 
-#include <memory>
 #include <string>
 
 namespace mongo {

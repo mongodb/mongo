@@ -33,7 +33,6 @@
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <tuple>
 #include <vector>

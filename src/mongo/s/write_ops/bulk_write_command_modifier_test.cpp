@@ -29,7 +29,6 @@
 
 #include "mongo/s/write_ops/bulk_write_command_modifier.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -44,10 +43,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <initializer_list>
-#include <memory>
-#include <string>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

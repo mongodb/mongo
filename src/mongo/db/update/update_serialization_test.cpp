@@ -33,12 +33,10 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <map>
 #include <memory>

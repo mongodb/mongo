@@ -32,7 +32,6 @@
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
-#include <boost/algorithm/string/case_conv.hpp>
 
 namespace mongo {
 

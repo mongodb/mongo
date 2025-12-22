@@ -30,7 +30,6 @@
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/global_catalog/type_shard.h"

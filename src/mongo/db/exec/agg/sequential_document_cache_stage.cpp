@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/agg/sequential_document_cache_stage.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"

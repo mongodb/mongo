@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/accumulator_multi.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
@@ -45,7 +44,6 @@
 #include <iterator>
 
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {

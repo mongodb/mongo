@@ -32,8 +32,6 @@
 
 #include <string>
 
-#include "boost/none_t.hpp"
-
 
 extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) try {
     // Need at least 9 bytes: 1 control byte and 8 bytes for pivot

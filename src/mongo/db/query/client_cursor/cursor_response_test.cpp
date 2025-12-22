@@ -31,7 +31,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/exec/document_value/document.h"

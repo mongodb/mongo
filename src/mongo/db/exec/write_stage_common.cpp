@@ -35,7 +35,6 @@
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/repl/replication_coordinator.h"

@@ -49,7 +49,6 @@
 #include "mongo/util/time_support.h"
 
 #include <boost/optional/optional.hpp>
-#include <fmt/format.h>
 
 namespace mongo {
 

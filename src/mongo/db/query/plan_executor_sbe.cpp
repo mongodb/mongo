@@ -30,7 +30,6 @@
 #include "mongo/db/query/plan_executor_sbe.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -44,18 +43,14 @@
 #include "mongo/db/query/sbe_plan_ranker.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/s/resharding/resume_token_gen.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/shared_buffer.h"
-#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
 
 #include <cstddef>
 #include <cstdint>

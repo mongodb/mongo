@@ -32,7 +32,6 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/util/str.h"
 
-#include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
 
 namespace mongo::multikey_paths {

@@ -37,9 +37,6 @@
 #include "mongo/db/query/util/validate_id.h"
 #include "mongo/util/str.h"
 
-#include <cstdint>
-#include <memory>
-
 #include <boost/functional/hash.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>

@@ -38,10 +38,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
-#include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
-#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/unittest/unittest.h"
 
 using mongo::AllowedIndicesFilter;

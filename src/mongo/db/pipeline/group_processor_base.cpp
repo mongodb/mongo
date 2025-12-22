@@ -35,7 +35,6 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 

@@ -30,7 +30,6 @@
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 
 #include <boost/none.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"

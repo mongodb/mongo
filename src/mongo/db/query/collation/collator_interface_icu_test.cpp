@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/collation/collator_interface_icu.h"
 
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

@@ -32,7 +32,6 @@
  */
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
@@ -45,7 +44,6 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"

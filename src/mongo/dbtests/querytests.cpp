@@ -87,7 +87,6 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <iostream>
 #include <list>
 #include <memory>
@@ -96,7 +95,6 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-#include <fmt/format.h>
 
 namespace mongo {
 namespace {

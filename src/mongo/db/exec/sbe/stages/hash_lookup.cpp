@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 
-#include <set>
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/curop.h"
@@ -39,7 +38,6 @@
 #include "mongo/db/exec/sbe/stages/stage_visitors.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {

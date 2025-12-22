@@ -42,7 +42,6 @@
 #include "mongo/util/time_support.h"
 
 #include <memory>
-#include <mutex>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -33,7 +33,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

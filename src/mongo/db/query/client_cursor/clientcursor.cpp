@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/client_cursor/clientcursor.h"
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -37,20 +36,14 @@
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/query/client_cursor/cursor_server_params.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/query_knob_configuration.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/shard_role/shard_catalog/external_data_source_scope_guard.h"
-#include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 
-#include <iosfwd>
-#include <mutex>
-#include <ratio>
 #include <string>
 
 #include <boost/cstdint.hpp>

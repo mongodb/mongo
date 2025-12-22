@@ -30,12 +30,6 @@
 #include "mongo/db/exec/classic/recordid_deduplicator.h"
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/pipeline/spilling/spill_table_batch_writer.h"
-#include "mongo/db/query/util/spill_util.h"
-#include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -28,21 +28,17 @@
  */
 
 #include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
 #include "mongo/db/global_catalog/type_chunk.h"
-#include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -54,13 +50,9 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
-#include "mongo/db/query/client_cursor/cursor_id.h"
-#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/executor/network_test_env.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -69,12 +61,9 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <set>
 #include <string>
-#include <system_error>
-#include <utility>
 #include <vector>
 
 namespace mongo {

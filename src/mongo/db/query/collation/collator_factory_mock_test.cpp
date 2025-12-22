@@ -30,10 +30,8 @@
 #include "mongo/db/query/collation/collator_factory_mock.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {

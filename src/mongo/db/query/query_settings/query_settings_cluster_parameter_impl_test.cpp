@@ -48,7 +48,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
 
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::query_settings {

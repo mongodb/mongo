@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -42,7 +41,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
-#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -54,7 +52,6 @@
 #include <deque>
 #include <memory>
 #include <utility>
-#include <vector>
 
 #include <boost/none.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>

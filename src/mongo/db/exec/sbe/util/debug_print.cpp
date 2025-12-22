@@ -32,7 +32,6 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 
 #include <cstddef>
-#include <memory>
 
 namespace mongo {
 namespace sbe {

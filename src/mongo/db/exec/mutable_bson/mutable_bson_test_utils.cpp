@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/mutable_bson/algorithm.h"
@@ -39,7 +38,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <string>
 #include <vector>
 
 namespace mongo {

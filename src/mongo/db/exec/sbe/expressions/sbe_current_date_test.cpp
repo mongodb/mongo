@@ -27,13 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>

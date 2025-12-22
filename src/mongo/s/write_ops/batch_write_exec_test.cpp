@@ -27,19 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/router_role/collection_routing_info_targeter.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
-#include "mongo/rpc/write_concern_error_gen.h"
 #include "mongo/util/fail_point.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
@@ -71,7 +66,6 @@
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
@@ -88,7 +82,6 @@
 #include <iterator>
 #include <memory>
 #include <string>
-#include <system_error>
 #include <vector>
 
 namespace mongo {

@@ -31,7 +31,7 @@
 #include "mongo/db/exec/sort_executor.h"
 
 #include "mongo/db/exec/classic/working_set.h"
-#include "mongo/db/sorter/sorter_template_defs.h"
+#include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
 
 namespace mongo {
 template class SortExecutor<Document>;

@@ -29,14 +29,12 @@
 
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/unittest/unittest.h"
 

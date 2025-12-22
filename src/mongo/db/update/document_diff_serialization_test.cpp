@@ -30,7 +30,6 @@
 
 #include "mongo/db/update/document_diff_serialization.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/update/document_diff_test_helpers.h"

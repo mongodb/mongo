@@ -38,8 +38,6 @@
 
 #include <utility>
 
-#include <absl/container/flat_hash_set.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

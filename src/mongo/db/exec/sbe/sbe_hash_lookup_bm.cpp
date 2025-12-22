@@ -32,8 +32,6 @@
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/unittest/test_info.h"
 
-#include <sstream>
-
 #include <benchmark/benchmark.h>
 
 namespace mongo::sbe {

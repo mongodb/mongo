@@ -28,7 +28,6 @@
  */
 
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/update/document_diff_calculator.h"

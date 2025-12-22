@@ -39,7 +39,6 @@
 #include <string>
 
 #include <boost/optional/optional.hpp>
-#include <fmt/format.h>
 
 namespace mongo::update_oplog_entry {
 BSONObj makeDeltaOplogEntry(const doc_diff::Diff& diff) {

@@ -41,7 +41,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
-#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/change_stream_reader_builder.h"
 #include "mongo/db/pipeline/change_stream_reader_builder_mock.h"

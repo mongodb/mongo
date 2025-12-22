@@ -32,14 +32,13 @@
 #include "mongo/db/pipeline/change_stream_reader_context_mock.h"
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/s/change_streams/change_stream_db_absent_state_event_handler.h"
+#include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler_mock.h"
-#include "mongo/s/change_streams/collection_change_stream_db_absent_state_event_handler.h"
-#include "mongo/s/change_streams/collection_change_stream_db_present_state_event_handler.h"
 #include "mongo/s/change_streams/control_events.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
 #include <memory>
 #include <vector>

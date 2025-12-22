@@ -34,7 +34,6 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-#include <boost/optional.hpp>
 
 namespace mongo {
 

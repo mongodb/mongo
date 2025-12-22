@@ -41,14 +41,11 @@
 #include <sys/wait.h>
 #endif  // __linux__
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/sysprofile_gen.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/quick_exit.h"                   // IWYU pragma: keep
+#include "mongo/util/signal_handlers_synchronous.h"  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

@@ -50,7 +50,6 @@
 #include "mongo/util/str.h"
 
 #include <cstddef>
-#include <map>
 
 namespace mongo {
 

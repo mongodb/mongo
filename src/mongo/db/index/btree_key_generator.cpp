@@ -32,12 +32,10 @@
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/dynamic_bitset/dynamic_bitset.hpp>
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/dotted_path/dotted_path_support.h"
@@ -49,8 +47,6 @@
 
 #include <algorithm>
 #include <iterator>
-#include <memory>
-#include <ostream>
 #include <string>
 #include <utility>
 

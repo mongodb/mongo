@@ -30,43 +30,27 @@
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/dbhelpers.h"
-#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/write_ops/write_ops.h"
-#include "mongo/db/record_id_helpers.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
-#include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
-#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_request_util.h"
-#include "mongo/db/write_concern_idl.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
 #include <string>
-#include <type_traits>
 #include <utility>
 
 #include <boost/cstdint.hpp>

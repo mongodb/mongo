@@ -34,7 +34,6 @@
 #include <memory>
 #include <vector>
 
-#include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/requires_index_stage.h"

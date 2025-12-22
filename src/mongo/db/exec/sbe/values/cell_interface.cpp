@@ -30,7 +30,6 @@
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
-#include "mongo/db/exec/sbe/values/path_request.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
 #include <memory>

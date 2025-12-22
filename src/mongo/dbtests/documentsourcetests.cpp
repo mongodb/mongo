@@ -33,14 +33,11 @@
 
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/exec/agg/cursor_stage.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/classic/collection_scan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
@@ -81,16 +78,12 @@
 #include "mongo/util/scopeguard.h"
 
 #include <memory>
-#include <mutex>
-#include <string>
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
 
 namespace mongo {
 namespace {

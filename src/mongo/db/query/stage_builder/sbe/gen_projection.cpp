@@ -48,7 +48,6 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::stage_builder {
 ProjectActionType ProjectAction::type() const {

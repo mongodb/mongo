@@ -32,7 +32,6 @@
 #include <cstddef>
 
 #include <absl/container/btree_set.h>
-#include <boost/container/small_vector.hpp>
 
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 

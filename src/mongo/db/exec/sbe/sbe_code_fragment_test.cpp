@@ -38,7 +38,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include <cstdint>
-#include <memory>
 #include <ostream>
 #include <utility>
 

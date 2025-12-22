@@ -29,7 +29,6 @@
 
 #include "mongo/db/shard_role/shard_catalog/document_validation.h"
 
-#include <utility>
 
 namespace mongo {
 const OperationContext::Decoration<DocumentValidationSettings> DocumentValidationSettings::get =

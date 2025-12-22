@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
@@ -39,7 +38,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include <functional>
-#include <initializer_list>
 #include <tuple>
 
 

@@ -33,7 +33,6 @@
 
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/classic/limit.h"
@@ -46,18 +45,14 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <algorithm>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

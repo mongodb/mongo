@@ -31,8 +31,6 @@
 
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
-#include "mongo/db/router_role/cluster_commands_helpers.h"
-#include "mongo/db/server_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

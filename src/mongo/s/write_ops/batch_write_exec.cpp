@@ -36,23 +36,17 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
-#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/sharding_environment/client/num_hosts_targeted_metrics.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/mongos_server_parameters_gen.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
@@ -80,7 +74,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

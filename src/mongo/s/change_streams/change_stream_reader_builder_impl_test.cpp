@@ -29,8 +29,7 @@
 
 #include "mongo/s/change_streams/change_stream_reader_builder_impl.h"
 
-#include "mongo/db/exec/classic/filter.h"
-#include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"

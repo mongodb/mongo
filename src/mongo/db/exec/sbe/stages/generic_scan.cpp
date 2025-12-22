@@ -29,32 +29,18 @@
 
 #include "mongo/db/exec/sbe/stages/generic_scan.h"
 
-#include "mongo/base/data_type_endian.h"
-#include "mongo/base/data_view.h"
-#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/client.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/generic_scan.h"
-#include "mongo/db/exec/sbe/stages/random_scan.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/storage/record_data.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
-#include "mongo/util/str.h"
 
-#include <cstdint>
 #include <cstring>
-#include <set>
 
 #include <boost/optional/optional.hpp>
 

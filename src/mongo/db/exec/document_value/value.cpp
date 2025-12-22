@@ -50,15 +50,12 @@
 #include <limits>
 #include <memory>
 #include <ostream>
-#include <type_traits>
 #include <typeinfo>
 
 #include <absl/hash/hash.h>
 #include <absl/strings/string_view.h>
 #include <boost/cstdint.hpp>
 #include <boost/functional/hash.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {

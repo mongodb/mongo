@@ -33,7 +33,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/unittest/unittest.h"
 
-#include <memory>
 
 namespace mongo {
 namespace {

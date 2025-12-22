@@ -38,7 +38,6 @@
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
-#include "mongo/db/exec/sbe/stages/extract_field_paths.h"
 #include "mongo/db/exec/sbe/stages/search_cursor.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
@@ -101,10 +100,8 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <absl/container/inlined_vector.h>
-#include <absl/meta/type_traits.h>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

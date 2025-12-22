@@ -38,9 +38,6 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
-#include <climits>
-#include <cmath>
-#include <limits>
 
 namespace mongo {
 namespace expression_evaluation_test {

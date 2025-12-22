@@ -38,19 +38,15 @@
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/exec/mutable_bson/element.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 #include <cstddef>
 #include <map>
-#include <memory>
 #include <vector>
 
 #include <boost/optional/optional.hpp>

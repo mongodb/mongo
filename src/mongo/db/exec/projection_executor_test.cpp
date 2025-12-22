@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/projection_executor.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"

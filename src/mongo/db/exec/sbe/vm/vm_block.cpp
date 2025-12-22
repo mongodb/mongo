@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/in_list.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
@@ -35,10 +34,7 @@
 #include "mongo/db/exec/sbe/values/generic_compare.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/exec/sbe/vm/vm_printer.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
 

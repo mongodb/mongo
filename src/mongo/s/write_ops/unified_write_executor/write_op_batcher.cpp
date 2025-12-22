@@ -30,7 +30,6 @@
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 
 #include "mongo/db/error_labels.h"
-#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/transaction_router.h"
 

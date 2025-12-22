@@ -35,7 +35,6 @@
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
 #include "mongo/db/router_role/collection_routing_info_targeter.h"
 #include "mongo/db/router_role/ns_targeter.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
 #include "mongo/s/write_ops/fle.h"
@@ -44,7 +43,6 @@
 
 #include <memory>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

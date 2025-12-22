@@ -36,7 +36,6 @@
 #include <utility>
 
 #include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage

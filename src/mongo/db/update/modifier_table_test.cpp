@@ -31,7 +31,6 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include <memory>
 
 namespace {
 

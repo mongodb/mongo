@@ -30,7 +30,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,7 +39,6 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
-#include <memory>
 
 namespace mongo {
 namespace {

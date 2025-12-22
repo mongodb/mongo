@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/exclusion_projection_executor.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
@@ -48,9 +46,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
-#include <bitset>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>

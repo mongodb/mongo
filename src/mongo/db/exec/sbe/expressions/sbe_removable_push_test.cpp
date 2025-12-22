@@ -27,20 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <tuple>
 #include <vector>
 
 namespace mongo::sbe {

@@ -36,14 +36,8 @@
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
-#include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/stats/top.h"
-
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
 
 #include <boost/optional/optional.hpp>
 

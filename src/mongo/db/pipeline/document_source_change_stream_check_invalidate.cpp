@@ -39,7 +39,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

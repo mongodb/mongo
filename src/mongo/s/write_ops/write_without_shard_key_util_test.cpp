@@ -30,13 +30,8 @@
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/shard_key_pattern.h"
-#include "mongo/db/global_catalog/type_collection.h"
-#include "mongo/db/query/client_cursor/cursor_id.h"
-#include "mongo/db/query/client_cursor/cursor_response.h"
-#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
@@ -44,15 +39,12 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache_test_fixture.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/executor/network_test_env.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

@@ -34,7 +34,6 @@
 #include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 

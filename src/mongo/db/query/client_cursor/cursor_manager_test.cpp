@@ -37,7 +37,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/queued_data_stage.h"
@@ -61,7 +60,6 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/intrusive_counter.h"
@@ -70,14 +68,12 @@
 
 #include <cstddef>
 #include <memory>
-#include <mutex>
 #include <set>
 #include <utility>
 #include <vector>
 
 #include <boost/none.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
 
 namespace mongo {
 namespace {

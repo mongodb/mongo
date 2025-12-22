@@ -52,13 +52,11 @@
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/db/shard_role/resource_yielder.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
-#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/update/update_driver.h"
@@ -67,7 +65,6 @@
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/query/shard_key_pattern_query_util.h"
@@ -76,17 +73,14 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/out_of_line_executor.h"
 
 #include <memory>
 #include <string>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

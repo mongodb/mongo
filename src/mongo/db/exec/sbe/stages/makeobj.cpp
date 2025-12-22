@@ -43,7 +43,6 @@
 #include <cstdint>
 #include <cstring>
 
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {

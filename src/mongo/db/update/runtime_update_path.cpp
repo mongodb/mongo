@@ -29,7 +29,6 @@
 
 #include "mongo/db/update/runtime_update_path.h"
 
-#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 void RuntimeUpdatePath::reportError() const {

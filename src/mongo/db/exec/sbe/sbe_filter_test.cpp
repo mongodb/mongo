@@ -32,7 +32,6 @@
  */
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
@@ -45,9 +44,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
-#include <type_traits>
 #include <utility>
-#include <vector>
 
 
 namespace mongo::sbe {

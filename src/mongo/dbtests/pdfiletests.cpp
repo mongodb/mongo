@@ -31,7 +31,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -48,16 +47,13 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
-#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
 #include <string>
-#include <vector>
 
-#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace PdfileTests {

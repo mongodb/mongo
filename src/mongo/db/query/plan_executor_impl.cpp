@@ -49,7 +49,6 @@
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/exceptions.h"
@@ -66,7 +65,6 @@
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 

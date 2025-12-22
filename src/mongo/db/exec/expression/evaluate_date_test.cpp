@@ -29,7 +29,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
@@ -41,18 +40,12 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
-#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
 
-#include <algorithm>
 #include <initializer_list>
-#include <ostream>
-#include <set>
 #include <string>
 #include <vector>
 

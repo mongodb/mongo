@@ -46,8 +46,6 @@
 #include <cstring>
 #include <limits>
 #include <memory>
-#include <ostream>
-#include <ratio>
 #include <utility>
 
 #include <timelib.h>

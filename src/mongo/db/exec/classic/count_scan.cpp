@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/classic/count_scan.h"
 
-#include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"

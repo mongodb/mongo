@@ -38,9 +38,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 
-#include <boost/optional.hpp>
 
 namespace mongo {
 namespace {

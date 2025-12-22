@@ -42,7 +42,6 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/type_traits/decay.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

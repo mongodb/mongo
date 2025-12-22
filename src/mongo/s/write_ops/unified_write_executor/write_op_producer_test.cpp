@@ -29,7 +29,6 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_producer.h"
 
-#include "mongo/bson/json.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"

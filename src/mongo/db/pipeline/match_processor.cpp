@@ -30,9 +30,7 @@
 #include "mongo/db/pipeline/match_processor.h"
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/matcher/matcher.h"
-#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_path_support.h"
 
 namespace mongo {

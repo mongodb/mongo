@@ -34,7 +34,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -42,7 +41,6 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/preallocated_container_pool.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
@@ -60,9 +58,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/shared_buffer_fragment.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
-#include "mongo/util/time_support.h"
 
 #include <algorithm>
 #include <cstddef>

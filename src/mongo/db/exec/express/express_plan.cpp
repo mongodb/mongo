@@ -30,7 +30,6 @@
 #include "mongo/db/exec/express/express_plan.h"
 
 #include "mongo/db/shard_role/transaction_resources.h"
-#include "mongo/util/stacktrace.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -36,7 +36,6 @@
 
 #include <algorithm>
 
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::query_settings {

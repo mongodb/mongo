@@ -37,7 +37,6 @@
 
 #include <climits>
 #include <cstdint>
-#include <ostream>
 
 #include <fmt/format.h>
 

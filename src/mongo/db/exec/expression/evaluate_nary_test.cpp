@@ -29,8 +29,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
@@ -44,17 +42,12 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
-#include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 #include <cmath>
-#include <iterator>
 #include <limits>
-#include <set>
 #include <string>
 #include <vector>
 

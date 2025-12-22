@@ -40,7 +40,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
-#include <utility>
 
 namespace mongo {
 namespace {

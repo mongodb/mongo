@@ -31,7 +31,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"

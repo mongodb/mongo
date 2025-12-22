@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/document_value/value_comparator.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/exec/document_value/document.h"

@@ -38,7 +38,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
 
 #include <utility>
 

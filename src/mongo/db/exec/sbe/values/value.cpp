@@ -54,7 +54,6 @@
 #include <absl/hash/hash.h>
 #include <absl/strings/string_view.h>
 #include <boost/cstdint.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

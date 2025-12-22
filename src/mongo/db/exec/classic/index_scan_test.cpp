@@ -35,7 +35,6 @@
 #include "mongo/db/exec/classic/collection_scan.h"
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"

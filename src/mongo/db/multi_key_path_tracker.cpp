@@ -29,7 +29,6 @@
 
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
 #include <boost/container/flat_set.hpp>
-#include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 // IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
@@ -42,9 +41,7 @@
 #include <cstddef>
 #include <iterator>
 #include <sstream>
-#include <utility>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

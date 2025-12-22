@@ -40,7 +40,6 @@
 #include "mongo/s/commands/query_cmd/cluster_getmore_cmd.h"
 #include "mongo/util/assert_util.h"
 
-#include <memory>
 #include <set>
 #include <string>
 

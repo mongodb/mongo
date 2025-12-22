@@ -40,8 +40,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
-#include <memory>
-
 
 namespace mongo {
 namespace {

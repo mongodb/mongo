@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -39,7 +38,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <tuple>
 #include <vector>
 
 namespace mongo::sbe {

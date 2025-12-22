@@ -37,7 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_file_name.h"
-#include "mongo/db/sorter/sorter_template_defs.h"
+#include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 
 #include <cstddef>

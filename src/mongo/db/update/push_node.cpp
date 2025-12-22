@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/mutable_bson/algorithm.h"
@@ -44,10 +43,8 @@
 #include <iterator>
 #include <limits>
 #include <numeric>
-#include <set>
 #include <string>
 #include <type_traits>
-#include <utility>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>

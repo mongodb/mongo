@@ -38,7 +38,6 @@
 
 #include <cstddef>
 #include <string>
-#include <utility>
 
 namespace mongo::stage_builder::abt_lower {
 namespace {

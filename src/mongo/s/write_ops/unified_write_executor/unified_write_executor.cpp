@@ -30,7 +30,6 @@
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/write_ops/fle.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"

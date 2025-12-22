@@ -29,9 +29,6 @@
 
 #include "mongo/db/change_stream_pre_images_truncate_manager.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/oid.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/collection_crud/collection_write_path.h"

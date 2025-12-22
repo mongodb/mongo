@@ -32,9 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/topology/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
@@ -46,12 +44,7 @@
 #include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/util/assert_util.h"
 
-#include <algorithm>
-#include <ostream>
-#include <string>
-
 #include <absl/container/flat_hash_set.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

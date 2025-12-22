@@ -30,7 +30,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -39,14 +38,12 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

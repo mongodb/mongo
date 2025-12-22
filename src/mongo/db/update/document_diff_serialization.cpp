@@ -30,7 +30,6 @@
 #include <boost/container/flat_map.hpp>
 #include <boost/container/static_vector.hpp>
 #include <boost/container/vector.hpp>
-#include <fmt/format.h>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 // IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
 #include "mongo/base/checked_cast.h"

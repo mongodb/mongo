@@ -30,21 +30,15 @@
 #include "mongo/db/exec/sbe/util/spilling.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
-#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
-#include "mongo/util/str.h"
 
 #include <boost/optional/optional.hpp>
 

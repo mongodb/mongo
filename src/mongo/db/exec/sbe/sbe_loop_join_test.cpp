@@ -31,8 +31,6 @@
  * This file contains tests for sbe::LoopJoinStage.
  */
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
@@ -40,7 +38,6 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
-#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>

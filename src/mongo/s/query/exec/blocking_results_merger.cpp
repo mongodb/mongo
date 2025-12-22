@@ -35,7 +35,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

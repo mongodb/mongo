@@ -31,8 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/operation_context.h"
@@ -47,15 +45,11 @@
 
 #include <iterator>
 #include <list>
-#include <type_traits>
 #include <vector>
 
 #include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <fmt/format.h>
 
 namespace mongo {
 namespace {

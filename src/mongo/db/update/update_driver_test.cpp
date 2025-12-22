@@ -33,7 +33,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
@@ -51,12 +50,10 @@
 
 #include <map>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
-#include <fmt/format.h>
 
 namespace mongo {
 namespace {

@@ -39,7 +39,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/safe_num.h"
 
-#include <memory>
 
 namespace {
 

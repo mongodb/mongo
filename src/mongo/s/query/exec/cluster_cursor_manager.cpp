@@ -31,8 +31,6 @@
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
@@ -47,17 +45,13 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
 #include <type_traits>
 
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
-#include <absl/meta/type_traits.h>
 #include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

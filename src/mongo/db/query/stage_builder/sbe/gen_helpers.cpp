@@ -30,7 +30,6 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <absl/container/inlined_vector.h>
-#include <absl/meta/type_traits.h>
 #include <boost/container/flat_set.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>

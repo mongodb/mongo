@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
@@ -45,7 +43,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {

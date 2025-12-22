@@ -28,10 +28,7 @@
  */
 
 
-#include "mongo/db/update/update_array_node.h"
-
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/mutable_bson/algorithm.h"
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"

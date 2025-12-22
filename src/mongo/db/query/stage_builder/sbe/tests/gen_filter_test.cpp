@@ -30,12 +30,9 @@
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -43,14 +40,9 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/expression_type.h"
-#include "mongo/db/matcher/expression_where.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
-#include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
-#include <cstdint>
 #include <memory>
 #include <utility>
 #include <vector>

@@ -34,7 +34,6 @@
 #include <cstddef>
 #include <fstream>  // IWYU pragma: keep
 #include <iostream>
-#include <utility>
 
 
 namespace mongo::stage_builder::abt_lower {

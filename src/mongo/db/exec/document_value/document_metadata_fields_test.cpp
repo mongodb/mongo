@@ -30,7 +30,6 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/idl/server_parameter_test_controller.h"

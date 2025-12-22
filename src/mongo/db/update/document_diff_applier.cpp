@@ -38,7 +38,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/storage/damage_vector.h"
-#include "mongo/db/update_index_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"

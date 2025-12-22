@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 
-#include "mongo/base/init.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/search/document_source_search.h"

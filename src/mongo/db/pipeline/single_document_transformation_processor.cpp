@@ -31,10 +31,6 @@
 #include "mongo/db/pipeline/single_document_transformation_processor.h"
 
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/document_source_limit.h"
-#include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/expression.h"
 
 
 namespace mongo {

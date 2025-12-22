@@ -30,11 +30,8 @@
 #include "mongo/db/query/stage_builder/sbe/value_lifetime.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/algebra/operator.h"
 #include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/stage_builder/sbe/abt/comparison_op.h"
-#include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/tests/abt_unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
 

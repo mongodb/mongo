@@ -30,7 +30,6 @@
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -51,7 +50,6 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::query_settings {
 namespace {

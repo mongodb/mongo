@@ -30,9 +30,6 @@
 #include "mongo/db/query/plan_executor.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
-#include "mongo/db/shard_role/shard_catalog/collection_sharding_state.h"
-#include "mongo/db/shard_role/shard_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"

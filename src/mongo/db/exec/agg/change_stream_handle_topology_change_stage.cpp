@@ -34,8 +34,8 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/pipeline/change_stream_topology_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
-#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
+#include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/query/exec/shard_tag.h"
 
 namespace mongo {

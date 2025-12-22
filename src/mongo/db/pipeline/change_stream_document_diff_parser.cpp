@@ -37,7 +37,6 @@
 
 #include <cstddef>
 #include <list>
-#include <memory>
 #include <string>
 #include <utility>
 #include <variant>

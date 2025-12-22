@@ -31,8 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
@@ -41,10 +39,8 @@
 #include "mongo/s/query/exec/router_stage_mock.h"
 #include "mongo/unittest/unittest.h"
 
-#include <mutex>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

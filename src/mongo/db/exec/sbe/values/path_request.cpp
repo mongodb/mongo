@@ -29,7 +29,7 @@
 
 #include "mongo/db/exec/sbe/values/path_request.h"
 
-#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/str.h"
 
 namespace mongo::sbe::value {
 std::string pathToString(const Path& p) {

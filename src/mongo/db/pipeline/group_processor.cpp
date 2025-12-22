@@ -36,7 +36,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/sorter/sorter_file_name.h"
-#include "mongo/db/sorter/sorter_template_defs.h"
+#include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {

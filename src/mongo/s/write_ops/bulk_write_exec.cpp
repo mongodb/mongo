@@ -47,7 +47,6 @@
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
-#include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
@@ -55,10 +54,6 @@
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/db/versioning_protocol/chunk_version.h"
-#include "mongo/db/versioning_protocol/database_version.h"
-#include "mongo/db/versioning_protocol/shard_version.h"
-#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_response.h"
@@ -76,19 +71,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <numeric>
 #include <string>
 #include <utility>
 #include <variant>
 
 #include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

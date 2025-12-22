@@ -31,7 +31,6 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -39,7 +38,6 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
 

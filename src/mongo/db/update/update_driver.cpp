@@ -35,7 +35,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/mutable_bson/document.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/query/canonical_query.h"

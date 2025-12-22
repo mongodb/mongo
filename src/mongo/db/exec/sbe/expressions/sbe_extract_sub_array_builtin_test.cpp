@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -42,7 +41,6 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-#include <fmt/format.h>
 
 namespace mongo::sbe {
 

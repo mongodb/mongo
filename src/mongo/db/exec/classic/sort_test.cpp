@@ -34,7 +34,6 @@
 #include "mongo/db/exec/classic/sort.h"
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -51,9 +50,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 #include <memory>

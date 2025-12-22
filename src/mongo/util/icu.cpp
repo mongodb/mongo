@@ -40,13 +40,11 @@
 #include <memory>
 #include <vector>
 
-#include <absl/base/attributes.h>
-#include <boost/move/utility_core.hpp>
-#include <unicode/uchar.h>
+#include <unicode/uchar.h>  // IWYU pragma: keep
 #include <unicode/umachine.h>
 #include <unicode/usprep.h>
-#include <unicode/ustring.h>
-#include <unicode/utf8.h>
+#include <unicode/ustring.h>  // IWYU pragma: keep
+#include <unicode/utf8.h>     // IWYU pragma: keep
 #include <unicode/utypes.h>
 
 namespace mongo {

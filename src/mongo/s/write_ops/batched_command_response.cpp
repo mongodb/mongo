@@ -40,11 +40,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 
-#include <iosfwd>
-
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <fmt/ostream.h>
 
 namespace mongo {
 namespace {

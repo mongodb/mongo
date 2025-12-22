@@ -36,7 +36,6 @@
 #include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 #include <cmath>

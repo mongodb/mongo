@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/window.h"

@@ -36,7 +36,6 @@
 
 #include <array>
 #include <initializer_list>
-#include <ostream>
 
 #include <fmt/format.h>
 

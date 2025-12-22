@@ -29,18 +29,14 @@
 
 #include "mongo/bson/dotted_path/dotted_path_support.h"
 
-#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/ctype.h"
 
 #include <cstddef>
 #include <cstring>
-#include <limits>
 #include <string>
 
 namespace mongo {

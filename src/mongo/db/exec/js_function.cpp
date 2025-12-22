@@ -41,7 +41,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/assert_util.h"
 
-#include <ostream>
 #include <utility>
 
 

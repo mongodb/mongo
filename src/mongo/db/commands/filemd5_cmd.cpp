@@ -52,7 +52,6 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
-#include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"

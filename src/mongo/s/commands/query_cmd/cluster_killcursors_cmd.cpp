@@ -30,22 +30,14 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/killcursors_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/client_cursor/cursor_id.h"
-#include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

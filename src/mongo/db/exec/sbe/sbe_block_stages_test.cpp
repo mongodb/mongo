@@ -40,11 +40,9 @@
 #include "mongo/db/exec/sbe/stages/ts_bucket_to_cell_block.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/unittest/unittest.h"
 
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <tuple>

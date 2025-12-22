@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -38,7 +37,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_stddev.h"
-#include "mongo/util/assert_util.h"
 
 #include <cmath>
 
