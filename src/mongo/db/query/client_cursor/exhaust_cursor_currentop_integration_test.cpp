@@ -484,9 +484,9 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
 
     // Test that the cursor's lastKnownCommittedOpTime is eventually advanced to the
     // new lastAppliedOpTime.
-    curOpMatch = BSON("command.collection" << testNSS.coll() << "command.getMore" << queryCursorId
-                                           << "cursor.lastKnownCommittedOpTime"
-                                           << BSON("$gte" << lastAppliedOpTime));
+    curOpMatch =
+        BSON("command.collection" << testNSS.coll() << "command.getMore" << queryCursorId
+                                  << "cursor.lastKnownCommittedOpTime" << lastAppliedOpTime);
     ASSERT(confirmCurrentOpContents(conn, curOpMatch));
 }
 }  // namespace mongo

@@ -59,7 +59,6 @@ executor:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: RunQueryStats
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

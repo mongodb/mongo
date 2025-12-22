@@ -35,7 +35,6 @@ executor:
     num_shards: 2
   hooks:
     - class: CheckReplDBHash
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

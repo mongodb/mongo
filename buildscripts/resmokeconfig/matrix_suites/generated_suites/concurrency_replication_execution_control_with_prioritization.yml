@@ -32,7 +32,6 @@ executor:
     - class: CheckReplDBHashInBackground
     - class: ValidateCollectionsInBackground
     - class: CheckReplDBHash
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanupConcurrencyWorkloads
 matrix_suite: true

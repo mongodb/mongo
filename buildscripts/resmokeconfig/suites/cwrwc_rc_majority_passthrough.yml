@@ -43,7 +43,6 @@ executor:
     # validating the entire contents of the collection.
     - class: CheckReplOplogs
     - class: CheckReplDBHash
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

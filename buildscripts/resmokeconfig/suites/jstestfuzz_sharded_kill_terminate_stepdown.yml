@@ -39,7 +39,6 @@ executor:
         global_vars:
           TestData:
             mayForgeReshardingTempCollections: true
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       shell_options:
         global_vars:

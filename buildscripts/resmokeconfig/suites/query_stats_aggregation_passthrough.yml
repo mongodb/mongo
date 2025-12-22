@@ -29,7 +29,6 @@ executor:
     # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
     # That way the fixture restart can't cause any trouble for the other hooks.
     - class: RunQueryStats
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

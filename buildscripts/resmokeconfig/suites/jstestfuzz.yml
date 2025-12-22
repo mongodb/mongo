@@ -16,7 +16,6 @@ executor:
     - class: FuzzerRestoreSettings
     - class: RunQueryStats
       allow_feature_not_supported: true
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       shell_options:
         global_vars:

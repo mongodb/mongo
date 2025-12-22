@@ -22,7 +22,6 @@ executor:
         enableTestCommands: 1
         internalQueryFindCommandBatchSize: 2
   hooks:
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       shell_options:
         global_vars:

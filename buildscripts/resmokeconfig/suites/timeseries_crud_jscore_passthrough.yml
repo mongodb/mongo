@@ -46,7 +46,6 @@ executor:
   hooks:
     # ValidateCollections may issue direct system.buckets commands, so run CheckSystemBucketsMetrics first.
     - class: CheckSystemBucketsMetrics
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

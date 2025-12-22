@@ -71,7 +71,6 @@ executor:
   hooks:
     - class: CheckReplDBHashInBackground
     - class: CheckReplDBHash
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

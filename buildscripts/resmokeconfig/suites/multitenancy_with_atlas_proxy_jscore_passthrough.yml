@@ -61,7 +61,6 @@ executor:
   hooks:
     - class: CheckReplOplogs
     - class: CheckReplDBHash
-    - class: RunCanaryWorkloadInBackground
     - class: ValidateCollections
       use_legacy_validate: true
     - class: CleanEveryN
