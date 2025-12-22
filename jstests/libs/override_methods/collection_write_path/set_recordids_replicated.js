@@ -12,9 +12,11 @@
  */
 
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {isValidCollectionName} from "jstests/libs/namespace_utils.js";
 
 const commandsToOverride = new Set(["create", "insert", "update", "createIndexes"]);
-const createdCollections = new Set();
+// The set of collections already seen by this override and thus ignored.
+const collectionsKnownToExist = new Set();
 
 function hasError(res) {
     return res.ok !== 1 || res.writeErrors || (res.hasOwnProperty("nErrors") && res.nErrors != 0);
@@ -24,15 +26,20 @@ function runCommandWithRecordIdsReplicated(conn, dbName, commandName, commandObj
     const collName = commandObj[commandName];
     const ns = dbName + "." + collName;
     if (commandName === "drop") {
-        createdCollections.delete(ns);
+        collectionsKnownToExist.delete(ns);
         return func.apply(conn, makeFuncArgs(commandObj));
     }
     if (
         !commandsToOverride.has(commandName) ||
-        createdCollections.has(ns) ||
+        collectionsKnownToExist.has(ns) ||
         typeof commandObj !== "object" ||
         commandObj === null
     ) {
+        return func.apply(conn, makeFuncArgs(commandObj));
+    }
+    if (!isValidCollectionName(collName)) {
+        // Avoid issuing listCollections for invalid namespaces (e.g., embedded nulls) so we don't
+        // mask the command's own InvalidNamespace error with our override logic.
         return func.apply(conn, makeFuncArgs(commandObj));
     }
     if (commandName === "create") {
@@ -51,7 +58,7 @@ function runCommandWithRecordIdsReplicated(conn, dbName, commandName, commandObj
             jsTestLog("create error: " + tojsononeline(res));
         }
         if (!hasError(res) || res.code === ErrorCodes.NamespaceExists) {
-            createdCollections.add(ns);
+            collectionsKnownToExist.add(ns);
         }
         return res;
     } else {
@@ -59,7 +66,7 @@ function runCommandWithRecordIdsReplicated(conn, dbName, commandName, commandObj
             const clustered = "clustered";
             const clusteredTrue = commandObj["indexes"].some((obj) => clustered in obj && obj.unique === true);
             if (clusteredTrue) {
-                createdCollections.add(ns);
+                collectionsKnownToExist.add(ns);
                 return func.apply(conn, makeFuncArgs(commandObj));
             }
         }
@@ -70,20 +77,48 @@ function runCommandWithRecordIdsReplicated(conn, dbName, commandName, commandObj
                 return func.apply(conn, makeFuncArgs(commandObj));
             }
         }
+        // If the collection already existed, don't clean up even if the inner command fails.
+        const collExists = conn.getDB(dbName).getCollectionInfos({name: collName}).length > 0;
+        if (collExists) {
+            collectionsKnownToExist.add(ns);
+            return func.apply(conn, makeFuncArgs(commandObj));
+        }
         const createObj = {create: collName, recordIdsReplicated: true};
         ["lsid", "$clusterTime", "writeConcern", "collectionUUID"].forEach((option) => {
             if (commandObj.hasOwnProperty(option)) {
                 createObj[option] = commandObj[option];
             }
         });
-        const res = func.apply(conn, makeFuncArgs(createObj));
-        if (hasError(res)) {
-            jsTestLog("create error: " + tojsononeline(res));
+
+        const createRes = func.apply(conn, makeFuncArgs(createObj));
+        let createdByOverride = false;
+        if (hasError(createRes)) {
+            jsTest.log.info(
+                "Error while creating collection for set_recordids_replicated.js override: " + tojsononeline(createRes),
+            );
+        } else {
+            createdByOverride = true;
         }
-        if (!hasError(res) || res.code === ErrorCodes.NamespaceExists) {
-            createdCollections.add(ns);
+        if (!hasError(createRes) || createRes.code === ErrorCodes.NamespaceExists) {
+            collectionsKnownToExist.add(ns);
         }
-        return func.apply(conn, makeFuncArgs(commandObj));
+
+        const wrappedCmdRes = func.apply(conn, makeFuncArgs(commandObj));
+        if (createdByOverride && hasError(wrappedCmdRes) && commandName === "createIndexes") {
+            jsTest.log.info(
+                "Cleaning up collection created for set_recordids_replicated.js override after createIndexes error: " +
+                    tojsononeline(wrappedCmdRes),
+            );
+            const dropRes = func.apply(conn, makeFuncArgs({drop: collName}));
+            if (hasError(dropRes)) {
+                jsTest.log.info(
+                    "Error while cleaning up collection for set_recordids_replicated.js override: " +
+                        tojsononeline(dropRes),
+                );
+            }
+            collectionsKnownToExist.delete(ns);
+        }
+        return wrappedCmdRes;
     }
 }
 

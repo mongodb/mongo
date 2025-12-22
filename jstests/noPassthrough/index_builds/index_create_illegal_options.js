@@ -2,7 +2,6 @@
  * Ensures that a createIndexes command request fails when creating an index with illegal options.
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 
 describe("Specifying index type in the createIndex command", function () {
@@ -37,14 +36,11 @@ describe("Specifying index type in the createIndex command", function () {
                 this.db[this.testCollName].createIndex({"foo": indexType}),
                 expectedErrorCodes,
             );
-            // TODO(SERVER-114308): Primary-driven index builds eagerly create the collection, this assertion will fail on those build variants.
-            if (!FeatureFlagUtil.isPresentAndEnabled(this.db, "PrimaryDrivenIndexBuilds")) {
-                assert.doesNotContain(
-                    this.db.getCollectionNames(),
-                    [this.testCollName],
-                    `The ${this.testCollName} collection should not be implicitly created upon failing to create the index.`,
-                );
-            }
+            assert.doesNotContain(
+                this.db.getCollectionNames(),
+                [this.testCollName],
+                `The ${this.testCollName} collection should not be implicitly created upon failing to create the index.`,
+            );
         });
     });
 
