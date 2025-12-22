@@ -196,6 +196,9 @@ selector:
     - requires_getmore
     # Map reduce gets overrided to include the sharded option which won't work on the normal cluster.
     - uses_map_reduce_with_temp_collections
+    # The command overrides in multiple_crud_ops_as_bulk_write.js expect queries to always return
+    # documents with their original field order, which is not guaranteed by time-series collections.
+    - writes_timeseries_collection
 
 executor:
   archive:

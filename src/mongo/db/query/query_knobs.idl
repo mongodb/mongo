@@ -635,6 +635,19 @@ server_parameters:
         on_update: plan_cache_util::clearSbeCacheOnParameterChange
         redact: false
 
+    internalMaxGroupAccumulatorsInSbe:
+        description: >-
+            A $group stage will prefer to run in the Classic engine over SBE when it has more
+            accumulators than this maximum. The limit does not apply for $group on a time-series
+            collection or for pipelines forced to use SBE by featureFlagSbeFull.
+        set_at: [startup, runtime]
+        cpp_vartype: "AtomicWord<long long>"
+        cpp_varname: gInternalMaxGroupAccumulatorsInSbe
+        default: 16
+        validator:
+            gte: 0
+        redact: false
+
     #
     # Query execution
     #

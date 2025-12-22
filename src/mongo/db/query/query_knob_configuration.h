@@ -94,6 +94,12 @@ public:
     bool getMeasureQueryExecutionTimeInNanoseconds() const;
     bool getUseMultiplannerForSingleSolutions() const;
 
+    /**
+     * Returns the limit on how many accumulators a $group can have and still run in SBE, even when
+     * the limit is unenforced because of featureFlagSbeFull.
+     */
+    int64_t getMaxGroupAccumulatorsInSbe() const;
+
 private:
     QueryFrameworkControlEnum _queryFrameworkControlValue;
     QueryPlanRankerModeEnum _planRankerMode;
@@ -126,5 +132,6 @@ private:
     int64_t _maxNumberNodesConsideredForImplicitEdges;
 
     int64_t _internalQuerySpillingMinAvailableDiskSpaceBytes;
+    int64_t _internalMaxGroupAccumulatorsInSbe;
 };
 }  // namespace mongo

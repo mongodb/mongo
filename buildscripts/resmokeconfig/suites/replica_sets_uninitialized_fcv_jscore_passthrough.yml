@@ -19,8 +19,6 @@ selector:
     # against their test collections.
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/geo_s2cursorlimitskip.js
-    # Having duplicate namespaces is not supported and will cause initial sync to fail.
-    - jstests/core/catalog/views/duplicate_ns.js
     # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
     - jstests/core/**/profile_agg.js
     - jstests/core/**/profile_count.js
@@ -34,10 +32,6 @@ selector:
     - jstests/core/**/profile_sampling.js
     - jstests/core/**/profile_update.js
     - jstests/core/txns/transactions_profiling.js
-    # The downstream syncing node affects the top output.
-    - jstests/core/**/query/top/top.js
-    # Change stream pre-images are not cloned during initial sync.
-    - jstests/core/**/write_change_stream_pit_preimage.js
 
     # Will fail all commands including those needed to forward command to initial sync node.
     - jstests/core/testing/failcommand_failpoint.js
@@ -54,12 +48,10 @@ selector:
     - jstests/core/query/release_memory/sort.js
     - jstests/core/query/release_memory/text_or.js
     - jstests/core/timeseries/query/timeseries_internal_bounded_sort_release_memory.js
-    # Time-outs waiting for a response to setServerParameter command because
-    # the node in init sync state ignores it and never responds to it.
-    - jstests/core/timeseries/query/timeseries_raw_data_internal_getmore.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
+    - incompatible_with_initial_sync
     # These tests run many aggregations, and the override slows them down enough to hit the evergreen timeout.
     - query_intensive_pbt
 

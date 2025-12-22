@@ -171,6 +171,9 @@ selector:
     - uses_prepare_transaction
     # auth does not get correctly applied to both clusters
     - requires_auth
+    # The command overrides in multiple_crud_ops_as_bulk_write.js expect queries to always return
+    # documents with their original field order, which is not guaranteed by time-series collections.
+    - writes_timeseries_collection
 
 executor:
   archive:

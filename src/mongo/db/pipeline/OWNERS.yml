@@ -278,7 +278,7 @@ filters:
       - 10gen/query-execution-change-streams
   - "sbe_pushdown*":
     approvers:
-      - 10gen/query-optimization
+      - 10gen/query-execution-sbe
   - "semantic_analysis*":
     approvers:
       - 10gen/query-optimization

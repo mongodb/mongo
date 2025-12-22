@@ -2461,7 +2461,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/plan_explainer* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/plan_executor_pipeline* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/resume_token* @10gen/query-execution-change-streams @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/sbe_pushdown* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/sbe_pushdown* @10gen/query-execution-sbe @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/semantic_analysis* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/sequential_document_cache* @10gen/query-execution-classic @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/tee_buffer* @10gen/query-execution-classic @svc-auto-approve-bot

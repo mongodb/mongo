@@ -52,6 +52,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <cstdlib>
+#include <limits>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -151,6 +152,7 @@ bool pushDownPipelineStageIfCompatible(
     const boost::intrusive_ptr<DocumentSource>& stage,
     SbeCompatibility minRequiredCompatibility,
     const CompatiblePipelineStages& allowedStages,
+    size_t maxGroupAccumulators,
     const std::map<NamespaceString, CollectionInfo>& collectionsInfo,
     std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
     const MultipleCollectionAccessor& collections) {
@@ -165,9 +167,10 @@ bool pushDownPipelineStageIfCompatible(
         stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceGroup::id) {
-        if (!allowedStages.group || static_cast<DocumentSourceGroup*>(stage.get())->doingMerge() ||
-            static_cast<DocumentSourceGroup*>(stage.get())->sbeCompatibility() <
-                minRequiredCompatibility) {
+        auto groupStage = static_cast<DocumentSourceGroup*>(stage.get());
+        if (!allowedStages.group || groupStage->doingMerge() ||
+            groupStage->getAccumulationStatements().size() > maxGroupAccumulators ||
+            groupStage->sbeCompatibility() < minRequiredCompatibility) {
             return false;
         }
         stagesForPushdown.emplace_back(std::move(stage));
@@ -572,6 +575,19 @@ bool findSbeCompatibleStagesForPushdown(
             cq->getExpCtx()->getSbePipelineCompatibility() == SbeCompatibility::noRequirements,
     };
 
+    // A $group stage with a large number of accumulators may be bottlenecked by the time it takes
+    // to evaluate accumulator inputs and compute the aggregated results. For now, we prefer Classic
+    // when there are a lot of accumulators, unless 'featureFlagSbeFull' is in force.
+    //
+    // This policy change is gated by a feature flag so that it can be deployed using the IFR
+    // process.
+    size_t maxGroupAccumulators = std::numeric_limits<size_t>::max();
+    if (!sbeFullEnabled &&
+        cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagSbeAccumulators)) {
+        maxGroupAccumulators = queryKnob.getMaxGroupAccumulatorsInSbe();
+    }
+
     bool allStagesPushedDown = true;
     for (auto itr = sources.begin(); itr != sources.end(); ++itr) {
         // Push down at most kMaxPipelineStages stages for execution in SBE.
@@ -593,12 +609,19 @@ bool findSbeCompatibleStagesForPushdown(
                                                *itr,
                                                minRequiredCompatibility,
                                                allowedStages,
+                                               maxGroupAccumulators,
                                                plannerParams->secondaryCollectionsInfo,
                                                stagesForPushdown,
                                                collections)) {
             // Stop pushing stages down once we hit an incompatible stage.
             allStagesPushedDown = false;
             break;
+        }
+
+        // Waive the accumulator limit on $group if it will be processing time-series data. We
+        // strongly prefer SBE for $group operations that may process block-based data.
+        if ((*itr)->getId() == DocumentSourceInternalUnpackBucket::id) {
+            maxGroupAccumulators = std::numeric_limits<size_t>::max();
         }
     }
 
