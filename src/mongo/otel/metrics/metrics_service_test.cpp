@@ -77,7 +77,7 @@ TEST_F(MetricsServiceTest, SerializeMetrics) {
     // TODO(SERVER-115756): Create counter and histogram metrics, record metrics, and check
     // serialization output.
     auto& metricsService = MetricsService::get(getServiceContext());
-    metricsService.createInt64Counter("counter", "description", MetricUnit::kSeconds);
+    metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
     ASSERT_BSONOBJ_EQ(metricsService.serializeMetrics(), BSON("otelMetrics" << Document()));
 }
 
@@ -86,22 +86,23 @@ using CreateInt64CounterTest = MetricsServiceTest;
 TEST_F(CreateInt64CounterTest, SameCounterReturnedOnSameCreate) {
     auto& metricsService = MetricsService::get(getServiceContext());
     Counter<int64_t>* counter_1 =
-        metricsService.createInt64Counter("counter", "description", MetricUnit::kSeconds);
+        metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
     Counter<int64_t>* counter_2 =
-        metricsService.createInt64Counter("counter", "description", MetricUnit::kSeconds);
+        metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
     ASSERT_EQ(counter_1, counter_2);
 }
 
 TEST_F(CreateInt64CounterTest, ExceptionWhenSameNameButDifferentParameters) {
     auto& metricsService = MetricsService::get(getServiceContext());
-    metricsService.createInt64Counter("name", "description", MetricUnit::kSeconds);
-    ASSERT_THROWS_CODE(
-        metricsService.createInt64Counter("name", "different_description", MetricUnit::kSeconds),
-        DBException,
-        ErrorCodes::ObjectAlreadyExists);
-    ASSERT_THROWS_CODE(metricsService.createInt64Counter("name", "description", MetricUnit::kBytes),
+    metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_THROWS_CODE(metricsService.createInt64Counter(
+                           MetricNames::kTest1, "different_description", MetricUnit::kSeconds),
                        DBException,
                        ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(
+        metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kBytes),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
 }
 
 // TODO SERVER-115164 or SERVER-114955 or SERVER-114954 add a test that verifies that creating
@@ -110,10 +111,10 @@ TEST_F(CreateInt64CounterTest, ExceptionWhenSameNameButDifferentParameters) {
 TEST_F(CreateInt64CounterTest, RecordsValues) {
     OtelMetricsCapturer metricsCapturer;
     auto& metricsService = MetricsService::get(getServiceContext());
-    Counter<int64_t>* counter_1 =
-        metricsService.createInt64Counter("counter_1", "description1", MetricUnit::kSeconds);
+    Counter<int64_t>* counter_1 = metricsService.createInt64Counter(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     Counter<int64_t>* counter_2 =
-        metricsService.createInt64Counter("counter_2", "description2", MetricUnit::kBytes);
+        metricsService.createInt64Counter(MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
     counter_1->add(10);
     counter_2->add(1);
@@ -121,11 +122,11 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
     counter_2->add(1);
     counter_2->add(1);
 
-    ASSERT_EQ(metricsCapturer.readInt64Counter("counter_1"), 15);
-    ASSERT_EQ(metricsCapturer.readInt64Counter("counter_2"), 3);
+    ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 15);
+    ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 3);
 
     counter_1->add(5);
-    ASSERT_EQ(metricsCapturer.readInt64Counter("counter_1"), 20);
+    ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 20);
 }
 
 }  // namespace

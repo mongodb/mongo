@@ -26,25 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/otel/metrics/metric_names.h"
 
-#include "mongo/otel/metrics/metrics_test_util.h"
-
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::otel::metrics {
-
-class OtelMetricsCapturerTest : public ServiceContextTest {};
-
-TEST_F(OtelMetricsCapturerTest, ReadInt64ThrowsExceptionIfMetricNotFound) {
-    OtelMetricsCapturer metricsCapturer;
-    ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest1),
-                       DBException,
-                       ErrorCodes::KeyNotFound);
+TEST(GetNameTest, Works) {
+    ASSERT_EQ(MetricNames::kTest1.getName(), "test_only.metric1");
 }
-
-// TODO SERVER-115164 or SERVER-114955 or SERVER-114954 Add some tests for if the name is correct
-// but the type is wrong.
-
 }  // namespace mongo::otel::metrics

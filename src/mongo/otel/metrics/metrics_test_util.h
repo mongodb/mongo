@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/modules.h"
 
 #include <opentelemetry/exporters/memory/in_memory_data.h>
@@ -104,7 +105,7 @@ public:
     }
 
     // Gets the value of an Int64 counter, and throws an exception if it is not found.
-    int64_t readInt64Counter(StringData name);
+    int64_t readInt64Counter(MetricName name);
 
 private:
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagOtelMetrics", true};

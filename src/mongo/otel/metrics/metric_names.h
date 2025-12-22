@@ -26,25 +26,47 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
-#include "mongo/otel/metrics/metrics_test_util.h"
-
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/otel/metrics/metrics_service.h"
-#include "mongo/unittest/unittest.h"
+MONGO_MOD_PUBLIC;
 
 namespace mongo::otel::metrics {
 
-class OtelMetricsCapturerTest : public ServiceContextTest {};
+/**
+ * Wrapper class around a string to ensure `MetricName`s are only constructed in the class
+ * definition of `MetricNames`.
+ */
+class MetricName {
+public:
+    constexpr StringData getName() const {
+        return _name;
+    };
 
-TEST_F(OtelMetricsCapturerTest, ReadInt64ThrowsExceptionIfMetricNotFound) {
-    OtelMetricsCapturer metricsCapturer;
-    ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest1),
-                       DBException,
-                       ErrorCodes::KeyNotFound);
-}
+    bool operator==(const MetricName& other) const {
+        return getName() == other.getName();
+    }
 
-// TODO SERVER-115164 or SERVER-114955 or SERVER-114954 Add some tests for if the name is correct
-// but the type is wrong.
+private:
+    friend class MetricNames;
+    constexpr MetricName(StringData name) : _name(name) {};
+    StringData _name;
+};
+
+/**
+ * Central registry of OpenTelemetry metric names used in the server. When adding a new metric to
+ * the server, please add an entry to MetricNames grouped under your team name.
+ *
+ * This ensures that the N&O team has full ownership over new OTel metrics in the server for
+ * centralized collaboration with downstream OTel consumers. OTel metrics are stored in time-series
+ * DBs by the SRE team, and a sudden increase in metrics will result in operational costs ballooning
+ * for the SRE team, which is why N&O owns this registry.
+ */
+class MetricNames {
+public:
+    // Test-only
+    static constexpr MetricName kTest1 = {"test_only.metric1"};
+    static constexpr MetricName kTest2 = {"test_only.metric2"};
+};
 
 }  // namespace mongo::otel::metrics

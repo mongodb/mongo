@@ -54,25 +54,25 @@ OtelMetricsCapturer::OtelMetricsCapturer() {
     opentelemetry::metrics::Provider::SetMeterProvider(std::move(provider));
 }
 
-int64_t OtelMetricsCapturer::readInt64Counter(StringData name) {
+int64_t OtelMetricsCapturer::readInt64Counter(MetricName name) {
     _metrics->Clear();
     _reader->triggerMetricExport();
 
     const SimpleAggregateInMemoryMetricData::AttributeToPoint& attributeToPoint =
         _metrics->Get(std::string(toStdStringViewForInterop(MetricsService::kMeterName)),
-                      std::string(toStdStringViewForInterop(name)));
+                      std::string(toStdStringViewForInterop(name.getName())));
     auto it = attributeToPoint.find({});
     massert(ErrorCodes::KeyNotFound,
-            fmt::format("No metric with name {} exists", name),
+            fmt::format("No metric with name {} exists", name.getName()),
             it != attributeToPoint.end());
 
     massert(ErrorCodes::TypeMismatch,
-            fmt::format("Metric {} does not have counter values", name),
+            fmt::format("Metric {} does not have counter values", name.getName()),
             std::holds_alternative<SumPointData>(it->second));
 
     const SumPointData& sumPointData = std::get<SumPointData>(it->second);
     massert(ErrorCodes::TypeMismatch,
-            fmt::format("Metric {} has non-int64_t value", name),
+            fmt::format("Metric {} has non-int64_t value", name.getName()),
             std::holds_alternative<int64_t>(sumPointData.value_));
 
     return std::get<int64_t>(sumPointData.value_);

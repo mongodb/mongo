@@ -59,6 +59,6 @@ StringData toString(MetricUnit unit) {
         case MetricUnit::kConnections:
             return "connections";
     }
-    LOGV2_FATAL(11494600, "Unknown MetricUnit value", "value"_attr = unit);
+    LOGV2_FATAL(11494600, "Unknown MetricUnit value", "value"_attr = static_cast<int>(unit));
 }
 }  // namespace mongo::otel::metrics

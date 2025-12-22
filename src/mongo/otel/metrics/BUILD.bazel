@@ -95,6 +95,12 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "metric_names_test",
+    srcs = ["metric_names_test.cpp"],
+    tags = ["mongo_unittest_third_group"],
+)
+
 mongo_cc_library(
     name = "metric_units",
     srcs = ["metric_units.cpp"],

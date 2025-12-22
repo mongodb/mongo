@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/db/service_context.h"
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_units.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
@@ -60,10 +61,9 @@ public:
      * Creates a counter with the provided parameters. The result is never null but will throw an
      * exception if the counter would collide with an existing metric (i.e., same name but different
      * type or other parameters).
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
-    Counter<int64_t>* createInt64Counter(std::string name,
-                                         std::string description,
-                                         MetricUnit unit);
+    Counter<int64_t>* createInt64Counter(MetricName name, std::string description, MetricUnit unit);
 
     // TODO SERVER-114954 Implement MetricsService::createUInt64Gauge
     // TODO SERVER-114955 Implement MetricsService::createDoubleGauge
@@ -112,9 +112,7 @@ public:
 
     static MetricsService& get(ServiceContext*);
 
-    Counter<int64_t>* createInt64Counter(std::string name,
-                                         std::string description,
-                                         MetricUnit unit);
+    Counter<int64_t>* createInt64Counter(MetricName name, std::string description, MetricUnit unit);
 
 private:
     stdx::mutex _mutex;

@@ -7,16 +7,32 @@ This module provides an OpenTelemetry-compatible metrics API for instrumenting M
 Metrics are created through the [`MetricsService`](https://github.com/mongodb/mongo/blob/a013280e0e5dc374f78adbc4cb68b4d190c1d9ed/src/mongo/otel/metrics/metrics_service.h), which is accessed via the `ServiceContext`:
 
 ```cpp
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_service.h"
 
 void initializeMetrics(ServiceContext* svcCtx) {
     auto& metricsService = MetricsService::get(svcCtx);
 
     auto* operationsCounter = metricsService.createInt64Counter(
-        "query.count",                  // name
+        MetricNames::kQueryCount,        // name
         "Number of queries executed",   // description
         MetricUnit::kQueries);          // unit
 }
+```
+
+### MetricName Registry
+
+All metric names must be registered in the `MetricNames` class. This central registry ensures the N&O team has full ownership over new OTel metrics in the server for centralized collaboration with downstream OTel consumers. OTel metrics are stored in time-series DBs by the SRE team, and a sudden increase in metrics will result in operational costs ballooning for the SRE team, which is why N&O owns this registry.
+
+When adding a new metric, add a `static constexpr MetricName` entry to the `MetricNames` class in `metric_names.h`, grouped under your team name:
+
+```cpp
+class MetricNames {
+public:
+    // Query Team Metrics
+    static constexpr MetricName kQueryCount = {"query.count"};
+    static constexpr MetricName kQueryLatency = {"query.latency"};
+};
 ```
 
 ### Naming Conventions
@@ -49,7 +65,7 @@ Choose the appropriate metric type based on what you're measuring:
 
 ```cpp
 auto* counter = MetricsService::get(svcCtx).createInt64Counter(
-    "operations.total",
+    MetricNames::kOperationsTotal,
     "Total number of operations performed",
     MetricUnit::kOperations);
 
@@ -88,6 +104,7 @@ The [`metrics_test_util.h`](https://github.com/mongodb/mongo/blob/a013280e0e5dc3
 The [`OtelMetricsCapturer`](https://github.com/mongodb/mongo/blob/a013280e0e5dc374f78adbc4cb68b4d190c1d9ed/src/mongo/otel/metrics/metrics_test_util.h#L96) sets up an in-memory metrics exporter that captures all metrics created during a test. **It must be constructed before creating any metrics** to ensure they are captured.
 
 ```cpp
+#include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/unittest/unittest.h"
@@ -98,12 +115,12 @@ TEST(MyFeatureTest, RecordsMetrics) {
     OtelMetricsCapturer capturer;
 
     auto* counter = MetricsService::get(getServiceContext()).createInt64Counter(
-        "myfeature.events",
+        MetricNames::kMyFeatureEvents,
         "Number of events processed",
         MetricUnit::kOperations);
     counter->add(5);
 
-    ASSERT_EQ(metricsCapturer.readInt64Counter("myfeature.events"), 5);
+    ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kMyFeatureEvents), 5);
 }
 
 }  // namespace mongo::otel::metrics
