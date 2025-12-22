@@ -132,6 +132,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_sixth_group"],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
+        ":metric_units",
         "//src/third_party/opentelemetry-cpp/api",
     ],
 )

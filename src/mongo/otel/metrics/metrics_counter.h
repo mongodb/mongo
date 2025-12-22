@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -38,7 +39,7 @@
 namespace mongo::otel::metrics {
 
 template <typename T>
-class MONGO_MOD_PUBLIC Counter {
+class MONGO_MOD_PUBLIC Counter : public Metric {
 public:
     virtual ~Counter() = default;
 
@@ -78,6 +79,8 @@ public:
         return _unit;
     }
 
+    BSONObj serializeToBson(const std::string& key) const override;
+
 private:
     std::string _name;
     std::string _description;
@@ -99,4 +102,9 @@ void CounterImpl<T>::add(T value) {
     _value.fetchAndAddRelaxed(value);
 }
 
+template <typename T>
+BSONObj CounterImpl<T>::serializeToBson(const std::string& key) const {
+    // TODO(SERVER-115756): Implement.
+    return {};
+}
 }  // namespace mongo::otel::metrics

@@ -58,8 +58,7 @@ void observableCounterCallback(opentelemetry::metrics::ObserverResult observer_r
 Counter<int64_t>* MetricsService::createInt64Counter(std::string name,
                                                      std::string description,
                                                      MetricUnit unit) {
-    MetricIdentifier identifier{
-        .name = name, .description = description, .unit = unit, .type = MetricType::kCounter};
+    MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
     if (auto it = _metrics.find(name); it != _metrics.end()) {
         massert(ErrorCodes::ObjectAlreadyExists,
@@ -67,7 +66,12 @@ Counter<int64_t>* MetricsService::createInt64Counter(std::string name,
                             "already exists.",
                             name),
                 it->second.identifier == identifier);
-        return it->second.metric.get();
+        massert(ErrorCodes::ObjectAlreadyExists,
+                "Tried to create an int64_t counter, but a metric with a different type parameter"
+                "already exists.",
+                std::holds_alternative<std::unique_ptr<Counter<int64_t>>>(it->second.metric));
+
+        return std::get<std::unique_ptr<Counter<int64_t>>>(it->second.metric).get();
     }
 
     // Make the raw counter.
@@ -89,6 +93,21 @@ Counter<int64_t>* MetricsService::createInt64Counter(std::string name,
     _observableInstruments.push_back(std::move(observableCounter));
 
     return counter_ptr;
+}
+
+BSONObj MetricsService::serializeMetrics() const {
+    BSONObjBuilder builder;
+    stdx::lock_guard lock(_mutex);
+    for (const auto& [name, identifierAndMetric] : _metrics) {
+        std::visit(
+            [&](const auto& metric) {
+                builder.append("otelMetrics",
+                               metric->serializeToBson(fmt::format(
+                                   "{}_{}", name, toString(identifierAndMetric.identifier.unit))));
+            },
+            identifierAndMetric.metric);
+    }
+    return builder.obj();
 }
 #else
 Counter<int64_t>* MetricsService::createInt64Counter(std::string name,

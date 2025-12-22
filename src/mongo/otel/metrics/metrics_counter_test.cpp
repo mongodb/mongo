@@ -84,4 +84,5 @@ TEST(Int64CounterImplTest, ConcurrentAdds) {
     ASSERT_EQ(counter.value(), kNumThreads * kIncrementsPerThread);
 }
 
+// TODO(SERVER-115756): Test serialization of counter.
 }  // namespace mongo::otel::metrics

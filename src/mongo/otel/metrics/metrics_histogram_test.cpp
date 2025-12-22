@@ -80,4 +80,26 @@ TEST_F(OtelMetricsHistogramTest, DoubleHistogram) {
     histogram.record(1);
     ASSERT_THROWS_CODE(histogram.record(-1), DBException, ErrorCodes::BadValue);
 }
+
+TEST_F(OtelMetricsHistogramTest, HistogramSerialization) {
+    auto histogram = HistogramImpl<int64_t>(
+        opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter").get(),
+        "name",
+        "description",
+        "unit");
+
+    const auto document1 = histogram.serializeToBson("histogram_seconds");
+    ASSERT_BSONOBJ_EQ(document1,
+                      BSON("histogram_seconds" << BSON("average" << 0.0 << "count" << 0)));
+
+    histogram.record(10);
+    const auto document2 = histogram.serializeToBson("histogram_seconds");
+    ASSERT_BSONOBJ_EQ(document2,
+                      BSON("histogram_seconds" << BSON("average" << 10.0 << "count" << 1)));
+
+    ASSERT_THROWS_CODE(histogram.record(-1), DBException, ErrorCodes::BadValue);
+    const auto document3 = histogram.serializeToBson("histogram_seconds");
+    ASSERT_BSONOBJ_EQ(document3,
+                      BSON("histogram_seconds" << BSON("average" << 10.0 << "count" << 1)));
+}
 }  // namespace mongo::otel::metrics

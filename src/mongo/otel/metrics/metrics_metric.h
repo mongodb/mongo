@@ -29,32 +29,20 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/util/modules.h"
-
-MONGO_MOD_PUBLIC;
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo::otel::metrics {
 
-// Used to denote the unit of measurement in a metric.
-enum class MetricUnit {
-    // Time
-    kMicroseconds,
-    kMilliseconds,
-    kSeconds,
-
-    // Space
-    kBytes,
-
-    // Database
-    kOperations,
-    kQueries,
-
-    // Networking
-    kConnections,
+/**
+ * An abstract class for operations that are common among all metrics.
+ */
+class Metric {
+public:
+    /**
+     * Serializes the derived class to BSON.
+     *
+     * This is useful for reporting metrics through server status.
+     */
+    virtual BSONObj serializeToBson(const std::string& key) const = 0;
 };
-
-// Converts any of the above units to a string.
-StringData toString(MetricUnit unit);
-
 }  // namespace mongo::otel::metrics

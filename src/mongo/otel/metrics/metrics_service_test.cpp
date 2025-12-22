@@ -73,6 +73,14 @@ TEST_F(MetricsServiceTest, ServiceContextInitBeforeMeterProvider) {
         meterProvider->GetMeter(toStdStringViewForInterop(MetricsService::kMeterName)).get()));
 }
 
+TEST_F(MetricsServiceTest, SerializeMetrics) {
+    // TODO(SERVER-115756): Create counter and histogram metrics, record metrics, and check
+    // serialization output.
+    auto& metricsService = MetricsService::get(getServiceContext());
+    metricsService.createInt64Counter("counter", "description", MetricUnit::kSeconds);
+    ASSERT_BSONOBJ_EQ(metricsService.serializeMetrics(), BSON("otelMetrics" << Document()));
+}
+
 using CreateInt64CounterTest = MetricsServiceTest;
 
 TEST_F(CreateInt64CounterTest, SameCounterReturnedOnSameCreate) {
