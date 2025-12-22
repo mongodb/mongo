@@ -38,20 +38,29 @@
 
 #include <string_view>
 
+namespace mongo::extension {
+namespace sdk {
+class QueryShapeOptsAPI;
+}
 
-namespace mongo::extension::sdk {
+template <>
+struct c_api_to_cpp_api<::MongoExtensionHostQueryShapeOpts> {
+    using CppApi_t = sdk::QueryShapeOptsAPI;
+};
+
+namespace sdk {
 
 /**
  * Wrapper for ::MongoExtensionHostQueryShapeOpts, providing safe access to its public API through
  * the underlying vtable.
  *
- * This is an unowned handle, meaning the object is fully owned by the host, and
- * ownership is never transferred to the extension.
+ * Typically ownership of MongoExtensionHostQueryShapeOpts pointer is never transferred to the
+ * extension, so this API is expected to only be used with an UnownedHandle.
  */
-class QueryShapeOptsHandle : public UnownedHandle<const ::MongoExtensionHostQueryShapeOpts> {
+class QueryShapeOptsAPI : public VTableAPI<::MongoExtensionHostQueryShapeOpts> {
 public:
-    QueryShapeOptsHandle(const ::MongoExtensionHostQueryShapeOpts* ctx)
-        : UnownedHandle<const ::MongoExtensionHostQueryShapeOpts>(ctx) {}
+    QueryShapeOptsAPI(::MongoExtensionHostQueryShapeOpts* ctx)
+        : VTableAPI<::MongoExtensionHostQueryShapeOpts>(ctx) {}
 
     std::string serializeIdentifier(const std::string& identifier) const;
 
@@ -61,8 +70,7 @@ public:
                        StringData fieldName,
                        const BSONElement& bsonElement) const;
 
-private:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         sdk_tassert(11136800,
                     "HostQueryShapeOpts' 'serializeIdentifier' is null",
                     vtable.serialize_identifier != nullptr);
@@ -74,6 +82,7 @@ private:
                     vtable.serialize_literal != nullptr);
     };
 
+private:
     /**
      * A templated helper function for vtable functions that take a byte view and populate a byte
      * buf output. The `transformViewToReturn` callback receives read-only byte view extracted
@@ -88,4 +97,7 @@ private:
         const std::function<T(MongoExtensionByteView)>& transformViewToReturn) const;
 };
 
-}  // namespace mongo::extension::sdk
+using QueryShapeOptsHandle = UnownedHandle<const ::MongoExtensionHostQueryShapeOpts>;
+
+}  // namespace sdk
+}  // namespace mongo::extension

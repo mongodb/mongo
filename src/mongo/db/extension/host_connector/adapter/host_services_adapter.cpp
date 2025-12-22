@@ -37,9 +37,6 @@
 
 namespace mongo::extension::host_connector {
 
-// Initialize the static instance of HostServicesAdapter.
-HostServicesAdapter HostServicesAdapter::_hostServicesAdapter;
-
 ::MongoExtensionStatus* HostServicesAdapter::_extUserAsserted(
     ::MongoExtensionByteView structuredErrorMessage) {
     // We throw the exception here so that we get a stack trace that looks like a host exception but

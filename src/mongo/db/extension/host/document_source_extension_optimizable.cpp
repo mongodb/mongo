@@ -42,11 +42,11 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
             opts.isKeepingLiteralsUnchanged());
 
     if (opts.isSerializingForExplain()) {
-        return Value(_logicalStage.explain(*opts.verbosity));
+        return Value(_logicalStage->explain(*opts.verbosity));
     }
 
     // Serialize the stage for query execution.
-    return Value(_logicalStage.serialize());
+    return Value(_logicalStage->serialize());
 }
 
 StageConstraints DocumentSourceExtensionOptimizable::constraints(
@@ -102,7 +102,7 @@ DepsTracker::State DocumentSourceExtensionOptimizable::getDependencies(DepsTrack
 
 boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceExtensionOptimizable::distributedPlanLogic() {
-    auto dplHandle = _logicalStage.getDistributedPlanLogic();
+    auto dplHandle = _logicalStage->getDistributedPlanLogic();
 
     if (!dplHandle.isValid()) {
         return boost::none;
@@ -133,7 +133,7 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic() {
                     uassert(11513800,
                             "an extension logical stage in a distributed plan pipeline must be the "
                             "same type as its originating stage",
-                            dplLogicalStage.getName() == _logicalStage.getName());
+                            dplLogicalStage->getName() == _logicalStage->getName());
                     return std::list<boost::intrusive_ptr<DocumentSource>>{
                         DocumentSourceExtensionOptimizable::create(
                             getExpCtx(), std::move(dplLogicalStage), _properties)};
@@ -144,7 +144,7 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic() {
     DistributedPlanLogic logic;
 
     // Convert shardsPipeline.
-    auto shardsPipeline = dplHandle.extractShardsPipeline();
+    auto shardsPipeline = dplHandle->extractShardsPipeline();
     if (!shardsPipeline.empty()) {
         tassert(11420601,
                 "Shards pipeline must have exactly one element per API specification",
@@ -157,14 +157,14 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic() {
     }
 
     // Convert mergingPipeline.
-    auto mergingPipeline = dplHandle.extractMergingPipeline();
+    auto mergingPipeline = dplHandle->extractMergingPipeline();
     for (auto& handle : mergingPipeline) {
         auto stages = convertDPLHandleToDocumentSources(handle);
         logic.mergingStages.splice(logic.mergingStages.end(), stages);
     }
 
     // Convert sortPattern.
-    const auto sortPattern = dplHandle.getSortPattern();
+    const auto sortPattern = dplHandle->getSortPattern();
     if (!sortPattern.isEmpty()) {
         logic.mergeSortPattern = sortPattern.getOwned();
     }

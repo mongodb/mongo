@@ -51,7 +51,7 @@ public:
             return mongo::extension::ExtensionGetNextResult::eof();
         }
 
-        auto nextInput = _getSource().getNext(execCtx.get());
+        auto nextInput = _getSource()->getNext(execCtx.get());
         if (nextInput.code == mongo::extension::GetNextCode::kAdvanced) {
             ++_nReturned;
         }

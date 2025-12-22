@@ -157,7 +157,7 @@ public:
 
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                    MongoExtensionExecAggStage* execStag) override {
-        auto input = _getSource().getNext(execCtx.get());
+        auto input = _getSource()->getNext(execCtx.get());
         if (input.code == GetNextCode::kPauseExecution) {
             return ExtensionGetNextResult::pauseExecution();
         }
@@ -263,7 +263,7 @@ public:
     // $addFields behavior.
     ExtensionGetNextResult getNext(const sdk::QueryExecutionContextHandle& execCtx,
                                    MongoExtensionExecAggStage* execStage) override {
-        auto input = _getSource().getNext(execCtx.get());
+        auto input = _getSource()->getNext(execCtx.get());
         if (input.code == GetNextCode::kPauseExecution) {
             return ExtensionGetNextResult::pauseExecution();
         }

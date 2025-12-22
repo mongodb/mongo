@@ -134,7 +134,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
     const NamespaceString& nss,
     const LiteParserOptions& options) {
     LiteParsedList outExpanded;
-    auto expanded = parseNodeHandle.expand();
+    auto expanded = parseNodeHandle->expand();
 
     helper::visitExpandedNodes(
         expanded,
@@ -143,7 +143,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
             outExpanded.emplace_back(LiteParsedDocumentSource::parse(nss, spec, options));
         },
         [&](const AggStageParseNodeHandle& handle) {
-            const auto stageName = std::string(handle.getName());
+            const auto stageName = std::string(handle->getName());
             ExpansionValidationFrame frame{state, stageName};
             auto children = expandImpl(handle, state, nss, options);
             outExpanded.splice(outExpanded.end(), children);
@@ -154,7 +154,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
         },
         [&](AggStageAstNodeHandle handle) {
             outExpanded.emplace_back(std::make_unique<LiteParsedExpanded>(
-                std::string(handle.getName()), std::move(handle), nss));
+                std::string(handle->getName()), std::move(handle), nss));
         });
 
     return outExpanded;
@@ -162,7 +162,7 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
 
 // static
 void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor) {
-    auto nameStringData = descriptor.getName();
+    auto nameStringData = descriptor->getName();
     auto stageName = std::string(nameStringData);
 
     using LiteParseFn = std::function<std::unique_ptr<LiteParsedDocumentSource>(

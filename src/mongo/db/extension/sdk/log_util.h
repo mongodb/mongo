@@ -36,7 +36,7 @@ inline void sdk_log(const std::string& message,
                     std::int32_t code,
                     MongoExtensionLogSeverity severity,
                     const std::vector<ExtensionLogAttribute>& attrs) {
-    sdk::HostServicesHandle::getHostServices()->getLogger().log(message, code, severity, attrs);
+    sdk::HostServicesAPI::getInstance()->getLogger()->log(message, code, severity, attrs);
 }
 
 inline void sdk_log(const std::string& message, std::int32_t code) {
@@ -59,7 +59,7 @@ inline void sdk_logDebug(const std::string& message,
                          std::int32_t code,
                          std::int32_t level,
                          const std::vector<ExtensionLogAttribute>& attrs) {
-    sdk::HostServicesHandle::getHostServices()->getLogger().logDebug(message, code, level, attrs);
+    sdk::HostServicesAPI::getInstance()->getLogger()->logDebug(message, code, level, attrs);
 }
 
 inline void sdk_logDebug(const std::string& message, std::int32_t code) {

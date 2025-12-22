@@ -45,7 +45,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionExpandabl
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const AggStageParseNodeHandle& parseNodeHandle) {
     std::list<boost::intrusive_ptr<DocumentSource>> outExpanded;
-    std::vector<VariantNodeHandle> expanded = parseNodeHandle.expand();
+    std::vector<VariantNodeHandle> expanded = parseNodeHandle->expand();
 
     helper::visitExpandedNodes(
         expanded,
@@ -77,7 +77,7 @@ Value DocumentSourceExtensionExpandable::serialize(const SerializationOptions& o
             !opts.isKeepingLiteralsUnchanged());
 
     host_connector::QueryShapeOptsAdapter adapter{&opts};
-    return Value(_parseNode.getQueryShape(adapter));
+    return Value(_parseNode->getQueryShape(adapter));
 }
 
 DocumentSource::Id DocumentSourceExtensionExpandable::getId() const {

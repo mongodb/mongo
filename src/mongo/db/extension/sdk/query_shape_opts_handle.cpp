@@ -37,7 +37,7 @@
 namespace mongo::extension::sdk {
 
 template <typename T>
-T QueryShapeOptsHandle::serializeUsingOptsHelper(
+T QueryShapeOptsAPI::serializeUsingOptsHelper(
     MongoExtensionByteView byteView,
     const std::function<MongoExtensionStatus*(const MongoExtensionHostQueryShapeOpts*,
                                               MongoExtensionByteView,
@@ -46,9 +46,8 @@ T QueryShapeOptsHandle::serializeUsingOptsHelper(
     assertValid();
 
     ::MongoExtensionByteBuf* buf{nullptr};
-    auto* ptr = get();
 
-    invokeCAndConvertStatusToException([&]() { return apiFunc(ptr, byteView, &buf); });
+    invokeCAndConvertStatusToException([&]() { return apiFunc(get(), byteView, &buf); });
 
     sdk_tassert(
         11188202, "buffer returned from serialize function must not be null", buf != nullptr);
@@ -56,11 +55,11 @@ T QueryShapeOptsHandle::serializeUsingOptsHelper(
     // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory
     // into a string to be returned.
     ExtensionByteBufHandle ownedBuf{buf};
-    return transformViewToReturn(ownedBuf.getByteView());
+    return transformViewToReturn(ownedBuf->getByteView());
 }
 
 
-std::string QueryShapeOptsHandle::serializeIdentifier(const std::string& identifier) const {
+std::string QueryShapeOptsAPI::serializeIdentifier(const std::string& identifier) const {
     auto byteView = stringViewAsByteView(identifier);
 
     auto transformViewToReturn = [](MongoExtensionByteView bv) {
@@ -71,7 +70,7 @@ std::string QueryShapeOptsHandle::serializeIdentifier(const std::string& identif
         byteView, vtable().serialize_identifier, transformViewToReturn);
 }
 
-std::string QueryShapeOptsHandle::serializeFieldPath(const std::string& fieldPath) const {
+std::string QueryShapeOptsAPI::serializeFieldPath(const std::string& fieldPath) const {
     auto byteView = stringViewAsByteView(fieldPath);
 
     auto transformViewToReturn = [](MongoExtensionByteView bv) {
@@ -82,9 +81,9 @@ std::string QueryShapeOptsHandle::serializeFieldPath(const std::string& fieldPat
         byteView, vtable().serialize_field_path, transformViewToReturn);
 }
 
-void QueryShapeOptsHandle::appendLiteral(BSONObjBuilder& builder,
-                                         StringData fieldName,
-                                         const BSONElement& bsonElement) const {
+void QueryShapeOptsAPI::appendLiteral(BSONObjBuilder& builder,
+                                      StringData fieldName,
+                                      const BSONElement& bsonElement) const {
     uint64_t bufSize = bsonElement.size();
     MongoExtensionByteView byteView{reinterpret_cast<const uint8_t*>(bsonElement.rawdata()),
                                     bufSize};

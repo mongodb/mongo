@@ -131,7 +131,7 @@ private:
     }
 
     static ::MongoExtensionStatus* _extGetSortPattern(
-        ::MongoExtensionDistributedPlanLogic* distributedPlanLogic,
+        const ::MongoExtensionDistributedPlanLogic* distributedPlanLogic,
         ::MongoExtensionByteBuf** output) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
             *output = nullptr;

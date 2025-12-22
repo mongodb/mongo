@@ -79,9 +79,9 @@ public:
         const mongo::extension::sdk::QueryExecutionContextHandle& execCtx,
         ::MongoExtensionExecAggStage* execStage) override {
         // Get metrics from the execution context (stored on OperationContext).
-        auto metrics = execCtx.getMetrics(execStage);
+        auto metrics = execCtx->getMetrics(execStage);
 
-        auto input = _getSource().getNext(execCtx.get());
+        auto input = _getSource()->getNext(execCtx.get());
         if (input.code == mongo::extension::GetNextCode::kPauseExecution) {
             return mongo::extension::ExtensionGetNextResult::pauseExecution();
         }
@@ -92,8 +92,8 @@ public:
         auto doc = input.resultDocument->getUnownedBSONObj();
         if (doc.hasField(kCounterField)) {
             int64_t counterDelta = doc[kCounterField].numberInt();
-            metrics.update(MongoExtensionByteView{reinterpret_cast<const uint8_t*>(&counterDelta),
-                                                  sizeof(int64_t)});
+            metrics->update(MongoExtensionByteView{reinterpret_cast<const uint8_t*>(&counterDelta),
+                                                   sizeof(int64_t)});
         }
 
         return mongo::extension::ExtensionGetNextResult::advanced(

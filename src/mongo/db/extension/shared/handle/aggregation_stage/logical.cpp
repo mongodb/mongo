@@ -37,14 +37,12 @@
 
 namespace mongo::extension {
 
-StringData LogicalAggStageHandle::getName() const {
-    assertValid();
+StringData LogicalAggStageAPI::getName() const {
     auto stringView = byteViewAsStringView(vtable().get_name(get()));
     return StringData{stringView.data(), stringView.size()};
 }
 
-BSONObj LogicalAggStageHandle::serialize() const {
-    assertValid();
+BSONObj LogicalAggStageAPI::serialize() const {
     ::MongoExtensionByteBuf* buf{nullptr};
     invokeCAndConvertStatusToException([&]() { return vtable().serialize(get(), &buf); });
 
@@ -56,15 +54,14 @@ BSONObj LogicalAggStageHandle::serialize() const {
     // BSONObj to return to the caller.
     // TODO: SERVER-112442 Avoid the BSON copy in getOwned() once the work is completed.
     ExtensionByteBufHandle ownedBuf{buf};
-    return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+    return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
 
-BSONObj LogicalAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosity) const {
-    assertValid();
+BSONObj LogicalAggStageAPI::explain(mongo::ExplainOptions::Verbosity verbosity) const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    auto extVerbosity = convertHostVerbosityToExtVerbosity(verbosity);
-    invokeCAndConvertStatusToException(
-        [&]() { return vtable().explain(get(), extVerbosity, &buf); });
+    invokeCAndConvertStatusToException([&]() {
+        return vtable().explain(get(), convertHostVerbosityToExtVerbosity(verbosity), &buf);
+    });
 
     tassert(11239400, "buffer returned from explain must not be null", buf);
 
@@ -72,19 +69,17 @@ BSONObj LogicalAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosit
     // BSONObj to return to the host.
     // TODO: SERVER-112442 Avoid the BSON copy in getOwned() once the work is completed.
     ExtensionByteBufHandle ownedBuf{buf};
-    return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+    return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
 
-ExecAggStageHandle LogicalAggStageHandle::compile() const {
-    assertValid();
+ExecAggStageHandle LogicalAggStageAPI::compile() const {
     ::MongoExtensionExecAggStage* execAggStage{nullptr};
     invokeCAndConvertStatusToException([&]() { return vtable().compile(get(), &execAggStage); });
 
     return ExecAggStageHandle(execAggStage);
 }
 
-DistributedPlanLogicHandle LogicalAggStageHandle::getDistributedPlanLogic() const {
-    assertValid();
+DistributedPlanLogicHandle LogicalAggStageAPI::getDistributedPlanLogic() const {
     ::MongoExtensionDistributedPlanLogic* dpl{nullptr};
     invokeCAndConvertStatusToException(
         [&]() { return vtable().get_distributed_plan_logic(get(), &dpl); });

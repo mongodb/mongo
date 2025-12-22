@@ -28,28 +28,37 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host_connector/handle/host_operation_metrics_handle.h"
 #include "mongo/db/extension/shared/get_next_result.h"
 #include "mongo/db/extension/shared/handle/handle.h"
+#include "mongo/db/extension/shared/handle/operation_metrics_handle.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension {
+
+class ExecAggStageAPI;
+
+template <>
+struct c_api_to_cpp_api<::MongoExtensionExecAggStage> {
+    using CppApi_t = ExecAggStageAPI;
+};
+
+using ExecAggStageHandle = OwnedHandle<::MongoExtensionExecAggStage>;
+using UnownedExecAggStageHandle = UnownedHandle<::MongoExtensionExecAggStage>;
+
 /**
  * ExecAggStageHandle is a wrapper around a MongoExtensionExecAggStage.
  */
-class ExecAggStageHandle : public OwnedHandle<::MongoExtensionExecAggStage> {
+class ExecAggStageAPI : public VTableAPI<::MongoExtensionExecAggStage> {
 public:
-    ExecAggStageHandle(::MongoExtensionExecAggStage* execAggStage)
-        : OwnedHandle<::MongoExtensionExecAggStage>(execAggStage) {
-        _assertValidVTable();
-    }
+    ExecAggStageAPI(::MongoExtensionExecAggStage* execAggStage)
+        : VTableAPI<::MongoExtensionExecAggStage>(execAggStage) {}
 
     ExtensionGetNextResult getNext(MongoExtensionQueryExecutionContext* execCtxPtr);
 
     std::string_view getName() const;
 
-    host_connector::HostOperationMetricsHandle createMetrics() const;
+    OwnedOperationMetricsHandle createMetrics() const;
 
     void setSource(const ExecAggStageHandle& input);
 
@@ -64,8 +73,7 @@ public:
      */
     BSONObj explain(ExplainOptions::Verbosity verbosity) const;
 
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(10956800, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
         tassert(11213503, "ExecAggStage 'get_name' is null", vtable.get_name != nullptr);
         tassert(
@@ -76,41 +84,4 @@ protected:
         tassert(11216707, "ExecAggStage 'close' is null", vtable.close != nullptr);
     }
 };
-
-/**
- * An unowned wrapper around a MongoExtensionExecAggStage. This is used when passing a
- * MongoExtensionExecAggStage through the API boundary, but the callee callsite should not take
- * ownership of the agg stage.
- */
-class UnownedExecAggStageHandle : public UnownedHandle<::MongoExtensionExecAggStage> {
-public:
-    UnownedExecAggStageHandle(::MongoExtensionExecAggStage* execAggStage)
-        : UnownedHandle<::MongoExtensionExecAggStage>(execAggStage) {
-        _assertValidVTable();
-    }
-
-    ExtensionGetNextResult getNext(MongoExtensionQueryExecutionContext* execCtxPtr);
-
-    std::string_view getName() const;
-
-    host_connector::HostOperationMetricsHandle createMetrics() const;
-
-    void open();
-
-    void reopen();
-
-    void close();
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10957201, "ExecAggStage 'get_next' is null", vtable.get_next != nullptr);
-        tassert(11213502, "ExecAggStage 'get_name' is null", vtable.get_name != nullptr);
-        tassert(
-            11213506, "ExecAggStage 'create_metrics' is null", vtable.create_metrics != nullptr);
-        tassert(11216710, "ExecAggStage 'open' is null", vtable.open != nullptr);
-        tassert(11216711, "ExecAggStage 'reopen' is null", vtable.reopen != nullptr);
-        tassert(11216712, "ExecAggStage 'close' is null", vtable.close != nullptr);
-    }
-};
-
 }  // namespace mongo::extension

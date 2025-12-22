@@ -39,9 +39,7 @@ namespace mongo::extension {
 MONGO_FAIL_POINT_DEFINE(failExtensionExpand);
 MONGO_FAIL_POINT_DEFINE(failExtensionDPL);
 
-BSONObj AggStageParseNodeHandle::getQueryShape(
-    const ::MongoExtensionHostQueryShapeOpts& opts) const {
-    assertValid();
+BSONObj AggStageParseNodeAPI::getQueryShape(const ::MongoExtensionHostQueryShapeOpts& opts) const {
     ::MongoExtensionByteBuf* buf{nullptr};
 
     invokeCAndConvertStatusToException(
@@ -52,7 +50,7 @@ BSONObj AggStageParseNodeHandle::getQueryShape(
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.
     ExtensionByteBufHandle ownedBuf{buf};
-    return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+    return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
 
 template <>
@@ -71,12 +69,12 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
         }
         switch (elt.type) {
             case kParseNode: {
-                handle = VariantNodeHandle(elt.parseOrAst.parse);
+                handle = VariantNodeHandle(AggStageParseNodeHandle{elt.parseOrAst.parse});
                 elt.parseOrAst.parse = nullptr;
                 break;
             }
             case kAstNode: {
-                handle = VariantNodeHandle(elt.parseOrAst.ast);
+                handle = VariantNodeHandle(AggStageAstNodeHandle{elt.parseOrAst.ast});
                 elt.parseOrAst.ast = nullptr;
                 break;
             }
@@ -88,8 +86,7 @@ struct ArrayElemAsRaii<::MongoExtensionExpandedArrayElement> {
     }
 };
 
-std::vector<VariantNodeHandle> AggStageParseNodeHandle::expand() const {
-    assertValid();
+std::vector<VariantNodeHandle> AggStageParseNodeAPI::expand() const {
     // Host allocates buffer with the expected size.
     const auto expandedSize = getExpandedSize();
     tassert(11113803, "AggStageParseNode getExpandedSize() must be >= 1", expandedSize >= 1);
@@ -115,12 +112,12 @@ struct ArrayElemAsRaii<::MongoExtensionDPLArrayElement> {
         }
         switch (elt.type) {
             case kParse: {
-                handle = VariantDPLHandle(elt.element.parseNode);
+                handle = VariantDPLHandle(AggStageParseNodeHandle{elt.element.parseNode});
                 elt.element.parseNode = nullptr;
                 break;
             }
             case kLogical: {
-                handle = VariantDPLHandle(elt.element.logicalStage);
+                handle = VariantDPLHandle(LogicalAggStageHandle{elt.element.logicalStage});
                 elt.element.logicalStage = nullptr;
                 break;
             }

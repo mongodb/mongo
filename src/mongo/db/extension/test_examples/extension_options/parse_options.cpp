@@ -69,7 +69,7 @@ public:
 class MyExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
-        YAML::Node node = portal.getExtensionOptions();
+        YAML::Node node = portal->getExtensionOptions();
         sdk_uassert(10999107, "Extension options must include 'checkMax'", node["checkMax"]);
         ExtensionOptions::checkMax = node["checkMax"].as<bool>();
         if (ExtensionOptions::checkMax) {

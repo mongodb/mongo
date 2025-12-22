@@ -39,22 +39,25 @@
 
 namespace mongo::extension {
 
+class AggStageAstNodeAPI;
+
+template <>
+struct c_api_to_cpp_api<::MongoExtensionAggStageAstNode> {
+    using CppApi_t = AggStageAstNodeAPI;
+};
+
 /**
- * AggStageAstNodeHandle is an owned handle wrapper around a
- * MongoExtensionAggStageAstNode.
+ * AggStageAstNodeHandle is a wrapper around a MongoExtensionAggStageAstNode vtable API.
  */
-class AggStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggStageAstNode> {
+class AggStageAstNodeAPI : public VTableAPI<::MongoExtensionAggStageAstNode> {
 public:
-    AggStageAstNodeHandle(::MongoExtensionAggStageAstNode* ptr)
-        : OwnedHandle<::MongoExtensionAggStageAstNode>(ptr) {
-        _assertValidVTable();
-    }
+    AggStageAstNodeAPI(::MongoExtensionAggStageAstNode* ptr)
+        : VTableAPI<::MongoExtensionAggStageAstNode>(ptr) {}
 
     /**
      * Returns a StringData containing the name of this aggregation stage.
      */
     StringData getName() const {
-        assertValid();
         auto stringView = byteViewAsStringView(vtable().get_name(get()));
         return StringData{stringView.data(), stringView.size()};
     }
@@ -71,12 +74,13 @@ public:
      */
     LogicalAggStageHandle bind() const;
 
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
         tassert(
             11347800, "AggStageAstNode 'get_properties' is null", vtable.get_properties != nullptr);
         tassert(11113700, "AggStageAstNode 'bind' is null", vtable.bind != nullptr);
     }
 };
+
+using AggStageAstNodeHandle = OwnedHandle<::MongoExtensionAggStageAstNode>;
 }  // namespace mongo::extension

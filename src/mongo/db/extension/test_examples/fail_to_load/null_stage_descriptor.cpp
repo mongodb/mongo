@@ -33,7 +33,7 @@ namespace sdk = mongo::extension::sdk;
 class NullStageExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) {
-        portal.registerStageDescriptor(nullptr);
+        portal->registerStageDescriptor(nullptr);
     }
 };
 

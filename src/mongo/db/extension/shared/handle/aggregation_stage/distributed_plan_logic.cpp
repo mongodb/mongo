@@ -36,8 +36,7 @@
 
 namespace mongo::extension {
 
-std::vector<VariantDPLHandle> DistributedPlanLogicHandle::extractShardsPipeline() {
-    assertValid();
+std::vector<VariantDPLHandle> DistributedPlanLogicAPI::extractShardsPipeline() {
     ::MongoExtensionDPLArrayContainer* container = nullptr;
     invokeCAndConvertStatusToException(
         [&]() { return vtable().extract_shards_pipeline(get(), &container); });
@@ -47,11 +46,10 @@ std::vector<VariantDPLHandle> DistributedPlanLogicHandle::extractShardsPipeline(
     }
 
     DPLArrayContainerHandle handle(container);
-    return handle.transfer();
+    return handle->transfer();
 }
 
-std::vector<VariantDPLHandle> DistributedPlanLogicHandle::extractMergingPipeline() {
-    assertValid();
+std::vector<VariantDPLHandle> DistributedPlanLogicAPI::extractMergingPipeline() {
     ::MongoExtensionDPLArrayContainer* container = nullptr;
     invokeCAndConvertStatusToException(
         [&]() { return vtable().extract_merging_pipeline(get(), &container); });
@@ -61,11 +59,10 @@ std::vector<VariantDPLHandle> DistributedPlanLogicHandle::extractMergingPipeline
     }
 
     DPLArrayContainerHandle handle(container);
-    return handle.transfer();
+    return handle->transfer();
 }
 
-BSONObj DistributedPlanLogicHandle::getSortPattern() const {
-    assertValid();
+BSONObj DistributedPlanLogicAPI::getSortPattern() const {
     ::MongoExtensionByteBuf* buf = nullptr;
     invokeCAndConvertStatusToException([&]() { return vtable().get_sort_pattern(get(), &buf); });
 
@@ -74,7 +71,7 @@ BSONObj DistributedPlanLogicHandle::getSortPattern() const {
     }
 
     ExtensionByteBufHandle ownedBuf{buf};
-    return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+    return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
 
 }  // namespace mongo::extension

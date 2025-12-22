@@ -64,7 +64,7 @@ public:
         int level = bsonSpec.getIntField(kDebugLogLevelField);
 
         // This tests the functionality of the shouldLog host service.
-        if (sdk::HostServicesHandle::getHostServices()->getLogger().shouldLog(
+        if (sdk::HostServicesAPI::getInstance()->getLogger()->shouldLog(
                 ::MongoExtensionLogSeverity(level), ::MongoExtensionLogType::kDebug)) {
             sdk::sdk_log("Log level is enough", 11134101, ::MongoExtensionLogSeverity::kWarning);
         } else {

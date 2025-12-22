@@ -31,13 +31,11 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/handle/handle.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <exception>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <string_view>
 
@@ -237,24 +235,31 @@ private:
     std::string _reason;
     std::exception_ptr _exception;
 };
+
+class StatusAPI;
+
+template <>
+struct c_api_to_cpp_api<::MongoExtensionStatus> {
+    using CppApi_t = StatusAPI;
+};
+
+using StatusHandle = OwnedHandle<::MongoExtensionStatus>;
+
 /**
- * StatusHandle is an owned handle wrapper around a MongoExtensionStatus.
+ * StatusAPI is a wrapper around a MongoExtensionStatus.
  *
  * Typically this is a handle around a MongoExtensionStatus allocated by the host whose ownership
  * has been transferred to the extension. Note that this includes assertion exceptions that are
  * allocated by the host but were triggered/conceptually thrown by the extension.
  */
-class StatusHandle : public OwnedHandle<::MongoExtensionStatus> {
+class StatusAPI : public VTableAPI<::MongoExtensionStatus> {
 public:
-    StatusHandle(::MongoExtensionStatus* status) : OwnedHandle<::MongoExtensionStatus>(status) {
-        _assertValidVTable();
-    }
+    StatusAPI(::MongoExtensionStatus* status) : VTableAPI<::MongoExtensionStatus>(status) {}
 
     /**
      * Return a non-zero code associated with `error`.
      */
     int getCode() const {
-        assertValid();
         return vtable().get_code(get());
     }
 
@@ -262,36 +267,21 @@ public:
      * Return a utf-8 string associated with `MongoExtensionStatus`. May be empty.
      */
     std::string_view getReason() const {
-        assertValid();
         return byteViewAsStringView(vtable().get_reason(get()));
     }
 
     void setCode(int code);
 
-    void setReason(const std::string& reason);
+    void setReason(std::string_view reason);
 
     StatusHandle clone() const;
 
-    static void assertValidStatus(const ::MongoExtensionStatus* status) {
-        tassert(11186307, "Provided MongoExtensionStatus was invalid", status != nullptr);
-        tassert(11186308,
-                "Provided MongoExtensionStatus VTable was invalid",
-                status->vtable != nullptr);
-        assertVTableConstraintsHelper(*status->vtable);
-    }
-
-    // TODO SERVER-115110: Refactor Status API from Owned/Unowned concept.
-    static void assertVTableConstraintsHelper(const VTable_t& vtable) {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(10930105, "HostStatus 'get_code' is null", vtable.get_code != nullptr);
         tassert(10930106, "HostStatus 'get_reason' is null", vtable.get_reason != nullptr);
         tassert(11186306, "HostStatus 'set_code' is null", vtable.set_code != nullptr);
         tassert(11186309, "HostStatus 'set_reason' is null", vtable.set_reason != nullptr);
         tassert(11186310, "HostStatus 'clone' is null", vtable.clone != nullptr);
-    }
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        assertVTableConstraintsHelper(vtable);
     };
 };
 
@@ -314,12 +304,12 @@ class ExtensionDBException final : public DBException {
 public:
     using DBException::DBException;
     ExtensionDBException(StatusHandle extensionStatus)
-        : DBException(error_details::makeStatus(extensionStatus.getCode(),
-                                                std::string(extensionStatus.getReason()))),
+        : DBException(error_details::makeStatus(extensionStatus->getCode(),
+                                                std::string(extensionStatus->getReason()))),
           _extensionStatus(std::move(extensionStatus)) {}
 
     ExtensionDBException(const ExtensionDBException& other)
-        : DBException(other), _extensionStatus(other._extensionStatus.clone()) {}
+        : DBException(other), _extensionStatus(other._extensionStatus->clone()) {}
 
     ExtensionDBException(ExtensionDBException&& other)
         : DBException(std::move(other)),
@@ -327,7 +317,7 @@ public:
 
     ExtensionDBException& operator=(const ExtensionDBException& other) {
         DBException::operator=(other);
-        _extensionStatus = other._extensionStatus.clone();
+        _extensionStatus = other._extensionStatus->clone();
         return *this;
     }
 
@@ -393,7 +383,7 @@ void convertStatusToException(StatusHandle status);
 template <typename Fn>
 void invokeCAndConvertStatusToException(Fn&& fn) {
     StatusHandle status(fn());
-    if (auto code = status.getCode(); MONGO_unlikely(code != MONGO_EXTENSION_STATUS_OK)) {
+    if (auto code = status->getCode(); MONGO_unlikely(code != MONGO_EXTENSION_STATUS_OK)) {
         return convertStatusToException(std::move(status));
     }
 }

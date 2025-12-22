@@ -84,13 +84,12 @@ public:
     HostServicesAdapter(HostServicesAdapter&&) = delete;
     HostServicesAdapter& operator=(HostServicesAdapter&&) = delete;
 
-    static HostServicesAdapter* get() {
-        return &_hostServicesAdapter;
+    static HostServicesAdapter& get() {
+        static HostServicesAdapter sInstance;
+        return sInstance;
     }
 
 private:
-    static HostServicesAdapter _hostServicesAdapter;
-
     static ::MongoExtensionLogger* _extGetLogger() {
         return LoggerAdapter::get();
     }

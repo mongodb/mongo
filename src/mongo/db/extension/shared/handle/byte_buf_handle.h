@@ -38,22 +38,25 @@
 
 namespace mongo::extension {
 
+class ExtensionByteBufAPI;
+
+template <>
+struct c_api_to_cpp_api<::MongoExtensionByteBuf> {
+    using CppApi_t = ExtensionByteBufAPI;
+};
+
 /**
- * ExtensionByteBufHandle is an owned handle wrapper around a
- * MongoExtensionByteBuf.
+ * ExtensionByteBufVTable is a wrapper around a MongoExtensionByteBuf.
  */
-class ExtensionByteBufHandle : public OwnedHandle<::MongoExtensionByteBuf> {
+class ExtensionByteBufAPI : public VTableAPI<::MongoExtensionByteBuf> {
 public:
-    ExtensionByteBufHandle(::MongoExtensionByteBuf* byteBufPtr)
-        : OwnedHandle<::MongoExtensionByteBuf>(byteBufPtr) {
-        _assertValidVTable();
-    }
+    ExtensionByteBufAPI(::MongoExtensionByteBuf* byteBufPtr)
+        : VTableAPI<::MongoExtensionByteBuf>(byteBufPtr) {}
 
     /**
      * Get a read-only byte view of the contents of ByteBuf.
      */
     MongoExtensionByteView getByteView() const {
-        assertValid();
         return vtable().get_view(get());
     }
 
@@ -61,13 +64,13 @@ public:
      * Get a read-only string view of the contents of ByteBuf.
      */
     std::string_view getStringView() const {
-        assertValid();
         return byteViewAsStringView(vtable().get_view(get()));
     }
 
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(10806301, "ByteBuf 'get_view' is null", vtable.get_view != nullptr);
     };
 };
+
+using ExtensionByteBufHandle = OwnedHandle<::MongoExtensionByteBuf>;
 }  // namespace mongo::extension

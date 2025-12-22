@@ -83,19 +83,16 @@ void convertStatusToException(StatusHandle status) {
     throw ExtensionDBException(std::move(status));
 }
 
-void StatusHandle::setCode(int code) {
-    assertValid();
+void StatusAPI::setCode(int code) {
     vtable().set_code(get(), code);
 }
 
-void StatusHandle::setReason(const std::string& reason) {
-    assertValid();
+void StatusAPI::setReason(std::string_view reason) {
     auto byteView = stringViewAsByteView(reason);
     invokeCAndConvertStatusToException([&]() { return vtable().set_reason(get(), byteView); });
 }
 
-StatusHandle StatusHandle::clone() const {
-    assertValid();
+StatusHandle StatusAPI::clone() const {
     ::MongoExtensionStatus* cloneTarget{nullptr};
     invokeCAndConvertStatusToException([&]() { return vtable().clone(get(), &cloneTarget); });
     return StatusHandle(cloneTarget);

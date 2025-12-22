@@ -37,18 +37,22 @@
 
 namespace mongo::extension {
 
-class DistributedPlanLogicHandle;
+using DistributedPlanLogicHandle = OwnedHandle<::MongoExtensionDistributedPlanLogic>;
+
+class LogicalAggStageAPI;
+
+template <>
+struct c_api_to_cpp_api<::MongoExtensionLogicalAggStage> {
+    using CppApi_t = LogicalAggStageAPI;
+};
 
 /**
- * LogicalAggStageHandle is an owned handle wrapper around a
- * MongoExtensionLogicalAggStage.
+ * LogicalAggStageHandle is a wrapper around a MongoExtensionLogicalAggStage vtable API.
  */
-class LogicalAggStageHandle : public OwnedHandle<::MongoExtensionLogicalAggStage> {
+class LogicalAggStageAPI : public VTableAPI<::MongoExtensionLogicalAggStage> {
 public:
-    LogicalAggStageHandle(::MongoExtensionLogicalAggStage* ptr)
-        : OwnedHandle<::MongoExtensionLogicalAggStage>(ptr) {
-        _assertValidVTable();
-    }
+    LogicalAggStageAPI(::MongoExtensionLogicalAggStage* ptr)
+        : VTableAPI<::MongoExtensionLogicalAggStage>(ptr) {}
 
     StringData getName() const;
 
@@ -70,8 +74,7 @@ public:
      */
     DistributedPlanLogicHandle getDistributedPlanLogic() const;
 
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(
             11420603, "ExtensionLogicalAggStage 'get_name' is null", vtable.get_name != nullptr);
         tassert(
@@ -83,4 +86,7 @@ protected:
                 vtable.get_distributed_plan_logic != nullptr);
     }
 };
+
+using LogicalAggStageHandle = OwnedHandle<::MongoExtensionLogicalAggStage>;
+
 }  // namespace mongo::extension

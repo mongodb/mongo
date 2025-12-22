@@ -34,12 +34,11 @@
 #include <memory>
 
 namespace mongo::extension {
-namespace {
 
 /**
- * DestroyableAPI is an abstraction that allows an object that crosses the extension API boundary.
+ * DestroyableCAPI is an abstraction that allows an object that crosses the extension API boundary.
  */
-struct DestroyableAPI {
+struct DestroyableCAPI {
     const struct DestroyableVTable* const vtable;
 };
 
@@ -48,19 +47,19 @@ struct DestroyableAPI {
  */
 struct DestroyableVTable {
     /**
-     * Destroy `DestroyableAPI` and free all associated resources.
+     * Destroy `DestroyableCAPI` and free all associated resources.
      */
-    void (*destroy)(DestroyableAPI* ptr);
+    void (*destroy)(DestroyableCAPI* ptr);
 };
 
 /**
- * DestroyableImpl is an implementation for a DestroyableAPI by the extension side of the API.
+ * DestroyableImpl is an implementation for a DestroyableCAPI by the extension side of the API.
  */
-class DestroyableImpl final : public DestroyableAPI {
+class DestroyableImpl final : public DestroyableCAPI {
 public:
     static const DestroyableVTable VTABLE;
 
-    explicit DestroyableImpl() : DestroyableAPI(&VTABLE) {};
+    explicit DestroyableImpl() : DestroyableCAPI(&VTABLE) {};
     ~DestroyableImpl() {
         ++sDestroyCount;
     };
@@ -73,7 +72,7 @@ public:
         sDestroyCount = 0;
     }
 
-    static void destroy(DestroyableAPI* ptr) {
+    static void destroy(DestroyableCAPI* ptr) {
         delete reinterpret_cast<DestroyableImpl*>(ptr);
     }
 
@@ -85,32 +84,31 @@ private:
 const DestroyableVTable DestroyableImpl::VTABLE =
     DestroyableVTable{.destroy = &DestroyableImpl::destroy};
 
-class OwnedDestroyableHandle : public OwnedHandle<DestroyableAPI> {
-public:
-    explicit OwnedDestroyableHandle(DestroyableAPI* ptr) : OwnedHandle<DestroyableAPI>(ptr) {
-        _assertValidVTable();
-    }
+class DestroyableAPI;
 
-protected:
-    void _assertVTableConstraints(const VTable_t&) const override {}
+template <>
+struct c_api_to_cpp_api<DestroyableCAPI> {
+    using CppApi_t = DestroyableAPI;
 };
 
-class UnownedDestroyableHandle : public UnownedHandle<DestroyableAPI> {
+class DestroyableAPI : public VTableAPI<DestroyableCAPI> {
 public:
-    explicit UnownedDestroyableHandle(DestroyableAPI* ptr) : UnownedHandle<DestroyableAPI>(ptr) {
-        _assertValidVTable();
-    }
-
-protected:
-    void _assertVTableConstraints(const VTable_t&) const override {}
+    explicit DestroyableAPI(DestroyableCAPI* ptr) : VTableAPI<DestroyableCAPI>(ptr) {}
+    static void assertVTableConstraints(const VTable_t&) {}
 };
 
 
+using OwnedDestroyableHandle = OwnedHandle<DestroyableCAPI>;
+using UnownedDestroyableHandle = UnownedHandle<DestroyableCAPI>;
+
+using UnownedConstDestroyableHandle = UnownedHandle<const DestroyableCAPI>;
+
+namespace {
 TEST(HandleTest, ownedHandleMoveAndDestroy) {
     DestroyableImpl::resetDestroyCount();
     OwnedDestroyableHandle handle(new DestroyableImpl());
     ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
-    handle.assertValid();
+    handle->assertValid();
     {
         // Create invalid handle, which we will move our valid handle into.
         OwnedDestroyableHandle targetHandle(nullptr);
@@ -129,10 +127,7 @@ TEST(HandleTest, ownedHandleMoveAndDestroy) {
         ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 1);
     }
 
-
-    // Assign ownership of new pointer to target handle via getMutablePtr;
     {
-        // Create invalid handle, which we will assign into via getMutablePtr().
         OwnedDestroyableHandle targetHandle(nullptr);
         auto destroyableImpl = std::make_unique<DestroyableImpl>();
         const auto* destroyableImplPtr = destroyableImpl.get();
@@ -145,9 +140,36 @@ TEST(HandleTest, ownedHandleMoveAndDestroy) {
     ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 2);
 }
 
+TEST(HandleTest, ownedHandleMoveAndDestroyConst) {
+    DestroyableImpl::resetDestroyCount();
+    OwnedDestroyableHandle ownedHandle(new DestroyableImpl());
+
+    UnownedConstDestroyableHandle handle(ownedHandle.get());
+    ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
+    handle->assertValid();
+    {
+        // Create invalid handle, which we will move our valid handle into.
+        UnownedConstDestroyableHandle targetHandle(nullptr);
+        ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
+        ASSERT_FALSE(targetHandle.isValid());
+
+        targetHandle = std::move(handle);
+        // Ensure moved from handle is now invalid, and target handle is valid.
+        ASSERT_TRUE(targetHandle.isValid());
+        ASSERT_FALSE(handle.isValid());  // NOLINT(bugprone-use-after-move)
+        ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
+
+        // Reassign to invalid handle, should not call destroy.
+        targetHandle = UnownedConstDestroyableHandle(nullptr);
+        ASSERT_FALSE(targetHandle.isValid());
+        ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
+    }
+    ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
+}
+
 DEATH_TEST(HandleTestDeathTest, ownedHandleAssertValid, "10596403") {
     OwnedDestroyableHandle handle(nullptr);
-    handle.assertValid();
+    handle->assertValid();
 }
 
 TEST(HandleTest, unownedHandleMoveAndDestroy) {
@@ -157,7 +179,7 @@ TEST(HandleTest, unownedHandleMoveAndDestroy) {
 
         UnownedDestroyableHandle handle(destroyableImplPtr.get());
         ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
-        handle.assertValid();
+        handle->assertValid();
         {
             // Create invalid handle, which we will copy our valid handle into.
             UnownedDestroyableHandle targetHandle(nullptr);
@@ -187,9 +209,12 @@ TEST(HandleTest, unownedHandleMoveAndDestroy) {
             UnownedDestroyableHandle targetHandle(std::move(handle));
             ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
             ASSERT_TRUE(targetHandle.isValid());
-            ASSERT_TRUE(handle.isValid());  // NOLINT(bugprone-use-after-move)
+            ASSERT_FALSE(handle.isValid());  // NOLINT(bugprone-use-after-move)
         }
         ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
+        handle = UnownedDestroyableHandle(destroyableImplPtr.get());
+        ASSERT_TRUE(handle.isValid());
+
         {
             // Create invalid handle, which we will move our valid handle into.
             UnownedDestroyableHandle targetHandle(nullptr);
@@ -200,11 +225,12 @@ TEST(HandleTest, unownedHandleMoveAndDestroy) {
             ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
 
             ASSERT_TRUE(targetHandle.isValid());
-            ASSERT_TRUE(handle.isValid());  // NOLINT(bugprone-use-after-move)
+            ASSERT_FALSE(handle.isValid());  // NOLINT(bugprone-use-after-move)
             ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
         }
         ASSERT_EQUALS(DestroyableImpl::getDestroyCount(), 0);
-
+        handle = UnownedDestroyableHandle(destroyableImplPtr.get());
+        ASSERT_TRUE(handle.isValid());
         {
             // Create invalid handle, which we will move our valid handle into.
             UnownedDestroyableHandle targetHandle(nullptr);
@@ -224,18 +250,18 @@ TEST(HandleTest, unownedHandleMoveAndDestroy) {
 }
 
 DEATH_TEST(HandleTestDeathTest, ownedHandleConstructorRejectsNullVtable, "10596404") {
-    DestroyableAPI obj{nullptr};
+    DestroyableCAPI obj{nullptr};
     OwnedDestroyableHandle handle(&obj);
 }
 
 DEATH_TEST(HandleTestDeathTest, unownedHandleConstructorRejectsNullVtable, "10596404") {
-    DestroyableAPI obj{nullptr};
-    OwnedDestroyableHandle handle(&obj);
+    DestroyableCAPI obj{nullptr};
+    UnownedDestroyableHandle handle(&obj);
 }
 
 DEATH_TEST(HandleTestDeathTest, ownedHandleConstructorRejectsNullDestroyPointer, "10930100") {
     DestroyableVTable invalidVtable{.destroy = nullptr};
-    DestroyableAPI obj{&invalidVtable};
+    DestroyableCAPI obj{&invalidVtable};
     OwnedDestroyableHandle handle(&obj);
 }
 }  // namespace

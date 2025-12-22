@@ -63,7 +63,7 @@ protected:
         auto stageDesc =
             std::make_unique<ExtensionAggStageDescriptor>(std::make_unique<StageDescriptor>());
 
-        portal.registerStageDescriptor(stageDesc.get());
+        portal->registerStageDescriptor(stageDesc.get());
 
         _stageDescriptors.emplace(StageDescriptor::kStageName, std::move(stageDesc));
     }
@@ -108,7 +108,7 @@ private:
         const ::MongoExtensionHostServices* hostServices) noexcept {
         // Immediately set the static HostServices instance so that the extension can access it
         // during initialization if needed.
-        HostServicesHandle::setHostServices(hostServices);
+        HostServicesAPI::setHostServices(hostServices);
 
         return wrapCXXAndConvertExceptionToStatus([&]() {
             // The host portal will go out of scope on the host side after initialization, so we

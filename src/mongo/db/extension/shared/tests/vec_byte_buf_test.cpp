@@ -39,7 +39,7 @@ namespace {
 TEST(ByteBufTest, EmptyCtorHasEmptyView) {
     auto buf = new ByteBuf();
     ExtensionByteBufHandle handle{buf};
-    auto sv = handle.getStringView();
+    auto sv = handle->getStringView();
     ASSERT_EQ(sv.size(), 0U);
 }
 
@@ -49,7 +49,7 @@ TEST(ByteBufTest, AssignFromRawBytesCopiesAndIsStable) {
     buf->assign(bytes, sizeof(bytes));
 
     ExtensionByteBufHandle handle{buf};
-    auto sv = handle.getStringView();
+    auto sv = handle->getStringView();
     ASSERT_EQ(sv.size(), sizeof(bytes));
     ASSERT_EQ(std::memcmp(sv.data(), bytes, sizeof(bytes)), 0);
 }
@@ -60,7 +60,7 @@ TEST(ByteBufTest, AssignToZeroClearsBuffer) {
     buf->assign(nullptr, 0);
 
     ExtensionByteBufHandle handle{buf};
-    ASSERT_TRUE(handle.getStringView().empty());
+    ASSERT_TRUE(handle->getStringView().empty());
 }
 
 TEST(ByteBufTest, ConstructFromBSONCopiesBytesIndependentLifetime) {
@@ -78,7 +78,7 @@ TEST(ByteBufTest, ConstructFromBSONCopiesBytesIndependentLifetime) {
 
     // 'original' and 'bob' have gone and out of scope and are destroyed here. Buffer must remain
     // valid after its source is gone. Reconstruct BSON from the buffer bytes and verify.
-    auto roundTrip = bsonObjFromByteView(handle.getByteView());
+    auto roundTrip = bsonObjFromByteView(handle->getByteView());
     ASSERT_EQ(roundTrip.getIntField("x"), 42);
 }
 
@@ -87,7 +87,7 @@ TEST(ByteBufTest, RoundTripBSONWorks) {
     auto buf = new ByteBuf(doc);
     ExtensionByteBufHandle handle{buf};
 
-    auto from = bsonObjFromByteView(handle.getByteView());
+    auto from = bsonObjFromByteView(handle->getByteView());
     ASSERT_EQ(from.toString(), doc.toString());
 }
 
@@ -96,31 +96,15 @@ DEATH_TEST(ByteBufDeathTest, AssignNullWithPositiveLenFails, "10806300") {
     buf.assign(nullptr, 4);
 }
 
-class ExtensionByteBufVTableTest : public unittest::Test {
-public:
-    // This special handle class is only used within this fixture so that we can unit test the
-    // assertVTableConstraints functionality of the handle.
-    class TestExtensionByteBufVTableHandle : public ExtensionByteBufHandle {
-    public:
-        TestExtensionByteBufVTableHandle(::MongoExtensionByteBuf* byteBufPtr)
-            : ExtensionByteBufHandle(byteBufPtr) {};
-
-        void assertVTableConstraints(const VTable_t& vtable) {
-            _assertVTableConstraints(vtable);
-        }
-    };
-};
-
-using ExtensionByteBufVTableTestDeathTest = ExtensionByteBufVTableTest;
-DEATH_TEST_F(ExtensionByteBufVTableTestDeathTest,
-             InvalidExtensionByteBufVTableFailsGetView,
-             "10806301") {
+DEATH_TEST(ExtensionByteBufVTableTestDeathTest,
+           InvalidExtensionByteBufVTableFailsGetView,
+           "10806301") {
     auto buf = new ByteBuf();
-    auto handle = TestExtensionByteBufVTableHandle{buf};
+    auto handle = ExtensionByteBufHandle{buf};
 
-    auto vtable = handle.vtable();
+    auto vtable = handle->vtable();
     vtable.get_view = nullptr;
-    handle.assertVTableConstraints(vtable);
+    ExtensionByteBufAPI::assertVTableConstraints(vtable);
 };
 
 }  // namespace

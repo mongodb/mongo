@@ -37,16 +37,20 @@
 
 namespace mongo::extension {
 
+class DistributedPlanLogicAPI;
+
+template <>
+struct c_api_to_cpp_api<::MongoExtensionDistributedPlanLogic> {
+    using CppApi_t = DistributedPlanLogicAPI;
+};
+
 /**
- * DistributedPlanLogicHandle is an owned handle wrapper around a
- * MongoExtensionDistributedPlanLogic.
+ * DistributedPlanLogicHandle is a wrapper around a MongoExtensionDistributedPlanLogic vtable API.
  */
-class DistributedPlanLogicHandle : public OwnedHandle<::MongoExtensionDistributedPlanLogic> {
+class DistributedPlanLogicAPI : public VTableAPI<::MongoExtensionDistributedPlanLogic> {
 public:
-    DistributedPlanLogicHandle(::MongoExtensionDistributedPlanLogic* dpl)
-        : OwnedHandle<::MongoExtensionDistributedPlanLogic>(dpl) {
-        _assertValidVTable();
-    }
+    DistributedPlanLogicAPI(::MongoExtensionDistributedPlanLogic* dpl)
+        : VTableAPI<::MongoExtensionDistributedPlanLogic>(dpl) {}
 
     std::vector<VariantDPLHandle> extractShardsPipeline();
 
@@ -54,8 +58,7 @@ public:
 
     BSONObj getSortPattern() const;
 
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11027300,
                 "DistributedPlanLogic 'extract_shards_pipeline' is null",
                 vtable.extract_shards_pipeline != nullptr);
@@ -68,5 +71,6 @@ protected:
     }
 };
 
+using DistributedPlanLogicHandle = OwnedHandle<::MongoExtensionDistributedPlanLogic>;
 }  // namespace mongo::extension
 

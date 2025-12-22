@@ -35,22 +35,22 @@
 #define MAKE_EXCEPTION_INFO(code, message) \
     BSON("message" << message << "errorCode" << static_cast<int>(code));
 
-#define sdk_uasserted(code, message)                                                           \
-    do {                                                                                       \
-        auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                               \
-        mongo::extension::invokeCAndConvertStatusToException([&]() {                           \
-            return mongo::extension::sdk::HostServicesHandle::getHostServices()->userAsserted( \
-                mongo::extension::objAsByteView(exceptionInfo));                               \
-        });                                                                                    \
+#define sdk_uasserted(code, message)                                                    \
+    do {                                                                                \
+        auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                        \
+        mongo::extension::invokeCAndConvertStatusToException([&]() {                    \
+            return mongo::extension::sdk::HostServicesAPI::getInstance()->userAsserted( \
+                mongo::extension::objAsByteView(exceptionInfo));                        \
+        });                                                                             \
     } while (false)
 
-#define sdk_tasserted(code, message)                                                               \
-    do {                                                                                           \
-        auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                                   \
-        mongo::extension::invokeCAndConvertStatusToException([&]() {                               \
-            return mongo::extension::sdk::HostServicesHandle::getHostServices()->tripwireAsserted( \
-                mongo::extension::objAsByteView(exceptionInfo));                                   \
-        });                                                                                        \
+#define sdk_tasserted(code, message)                                                        \
+    do {                                                                                    \
+        auto exceptionInfo = MAKE_EXCEPTION_INFO(code, message);                            \
+        mongo::extension::invokeCAndConvertStatusToException([&]() {                        \
+            return mongo::extension::sdk::HostServicesAPI::getInstance()->tripwireAsserted( \
+                mongo::extension::objAsByteView(exceptionInfo));                            \
+        });                                                                                 \
     } while (false)
 
 #define sdk_uassert(code, message, condition) \

@@ -36,25 +36,35 @@
 
 #include <yaml-cpp/yaml.h>
 
-namespace mongo::extension::sdk {
+namespace mongo::extension {
+
+namespace sdk {
+class HostPortalAPI;
+}
+template <>
+struct c_api_to_cpp_api<::MongoExtensionHostPortal> {
+    using CppApi_t = sdk::HostPortalAPI;
+};
+namespace sdk {
+using HostPortalHandle = UnownedHandle<const ::MongoExtensionHostPortal>;
 
 /**
- * Wrapper for ::MongoExtensionHostPortal providing safe access to its public API via the vtable.
+ * Wrapper for ::MongoExtensionHostPortal providing safe access to its public API via the
+ * vtable.
  *
- * This is an unowned handle, meaning the host portal remains fully owned by the host, and ownership
- * is never transferred to the extension.
+ * The HostPortal always remains fully owned by the host, and ownership is never transferred to the
+ * extension. Therefore, the extension should only use this API via an UnownedHandle.
  *
- * Note that the host portal pointer is only valid during initialization and should not be retained
- * by the extension.
+ * Note that the host portal pointer is only valid during initialization and should not be
+ * retained by the extension.
  */
-class HostPortalHandle : public UnownedHandle<const ::MongoExtensionHostPortal> {
+class HostPortalAPI : public VTableAPI<::MongoExtensionHostPortal> {
 public:
-    HostPortalHandle(const ::MongoExtensionHostPortal* portal)
-        : UnownedHandle<const ::MongoExtensionHostPortal>(portal) {}
+    HostPortalAPI(::MongoExtensionHostPortal* portal)
+        : VTableAPI<::MongoExtensionHostPortal>(portal) {}
 
     void registerStageDescriptor(const ExtensionAggStageDescriptor* stageDesc) const {
         invokeCAndConvertStatusToException([&] {
-            assertValid();
             return vtable().register_stage_descriptor(
                 get(), reinterpret_cast<const ::MongoExtensionAggStageDescriptor*>(stageDesc));
         });
@@ -71,12 +81,10 @@ public:
     }
 
     YAML::Node getExtensionOptions() const {
-        assertValid();
         return YAML::Load(std::string(byteViewAsStringView(vtable().get_extension_options(get()))));
     }
 
-private:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         sdk_tassert(10926401,
                     "Extension 'register_stage_descriptor' is null",
                     vtable.register_stage_descriptor != nullptr);
@@ -85,5 +93,6 @@ private:
                     vtable.get_extension_options != nullptr);
     };
 };
+}  // namespace sdk
 
-}  // namespace mongo::extension::sdk
+}  // namespace mongo::extension

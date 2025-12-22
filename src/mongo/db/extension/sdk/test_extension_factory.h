@@ -45,7 +45,7 @@ public:
     mongo::extension::ExtensionGetNextResult getNext(
         const mongo::extension::sdk::QueryExecutionContextHandle& execCtx,
         ::MongoExtensionExecAggStage* execStage) override {
-        return _getSource().getNext(execCtx.get());
+        return _getSource()->getNext(execCtx.get());
     }
 
     void open() override {}
@@ -117,8 +117,8 @@ public:
     std::vector<mongo::extension::VariantNodeHandle> expand() const override {
         std::vector<mongo::extension::VariantNodeHandle> expanded;
         expanded.reserve(getExpandedSize());
-        expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<AstNodeType>(getName(), _arguments)));
+        expanded.emplace_back(AggStageAstNodeHandle{new sdk::ExtensionAggStageAstNode(
+            std::make_unique<AstNodeType>(getName(), _arguments))});
         return expanded;
     }
     mongo::BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {

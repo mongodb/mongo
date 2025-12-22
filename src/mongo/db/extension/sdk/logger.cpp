@@ -63,11 +63,10 @@ void populateLogMessageCommon(MongoExtensionLogMessage& logMessage,
 }
 }  // namespace
 
-LogMessageGuard LoggerHandle::createLogMessageStruct(
-    const std::string& message,
-    std::int32_t code,
-    MongoExtensionLogSeverity severity,
-    const std::vector<ExtensionLogAttribute>& attrs) {
+LogMessageGuard LoggerAPI::createLogMessageStruct(const std::string& message,
+                                                  std::int32_t code,
+                                                  MongoExtensionLogSeverity severity,
+                                                  const std::vector<ExtensionLogAttribute>& attrs) {
     ::MongoExtensionLogMessage logMessage;
 
     // Populate common fields for the log struct.
@@ -80,7 +79,7 @@ LogMessageGuard LoggerHandle::createLogMessageStruct(
     return LogMessageGuard(logMessage);
 }
 
-LogMessageGuard LoggerHandle::createDebugLogMessageStruct(
+LogMessageGuard LoggerAPI::createDebugLogMessageStruct(
     const std::string& message,
     std::int32_t code,
     std::int32_t level,
@@ -97,7 +96,7 @@ LogMessageGuard LoggerHandle::createDebugLogMessageStruct(
     return LogMessageGuard(logMessage);
 }
 
-void LoggerHandle::_assertVTableConstraints(const VTable_t& vtable) const {
+void LoggerAPI::assertVTableConstraints(const VTable_t& vtable) {
     sdk_tassert(11188200, "Logger's 'log' is null", vtable.log != nullptr);
     sdk_tassert(11288201, "Logger's 'should_log' is null", vtable.should_log != nullptr);
 }

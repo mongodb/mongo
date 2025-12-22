@@ -85,7 +85,7 @@ public:
     void setUp() override {
         // Initialize HostServices so that aggregation stages will be able to access member
         // functions, e.g. to run assertions.
-        sdk::HostServicesHandle::setHostServices(host_connector::HostServicesAdapter::get());
+        sdk::HostServicesAPI::setHostServices(&host_connector::HostServicesAdapter::get());
         _execCtx = std::make_unique<host_connector::QueryExecutionContextAdapter>(
             std::make_unique<shared_test_stages::MockQueryExecutionContext>());
     }
@@ -106,8 +106,7 @@ public:
     std::vector<mongo::extension::VariantNodeHandle> expand() const override {
         std::vector<mongo::extension::VariantNodeHandle> expanded;
         auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
-        expanded.emplace_back(
-            extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(spec));
+        expanded.emplace_back(extension::sdk::HostServicesAPI::getInstance()->createIdLookup(spec));
         return expanded;
     }
 
@@ -125,11 +124,11 @@ TEST_F(AggStageTest, CountingParseExpansionSucceedsTest) {
         new ExtensionAggStageParseNode(shared_test_stages::CountingParse::make());
     auto handle = extension::AggStageParseNodeHandle{countingParseNode};
 
-    auto expanded = handle.expand();
+    auto expanded = handle->expand();
     ASSERT_EQUALS(expanded.size(), 1);
 
     const auto& astHandle = asAst(expanded[0]);
-    ASSERT_EQ(astHandle.getName(), stringViewToStringData(shared_test_stages::kCountingName));
+    ASSERT_EQ(astHandle->getName(), stringViewToStringData(shared_test_stages::kCountingName));
 }
 
 TEST_F(AggStageTest, NestedExpansionSucceedsTest) {
@@ -137,24 +136,25 @@ TEST_F(AggStageTest, NestedExpansionSucceedsTest) {
         new ExtensionAggStageParseNode(shared_test_stages::NestedDesugaringParseNode::make());
     auto handle = extension::AggStageParseNodeHandle{nestedDesugarParseNode};
 
-    auto expanded = handle.expand();
+    auto expanded = handle->expand();
     ASSERT_EQUALS(expanded.size(), 2);
 
     // First element is the AstNode.
     const auto& firstAstHandle = asAst(expanded[0]);
-    ASSERT_EQ(firstAstHandle.getName(), stringViewToStringData(shared_test_stages::kCountingName));
+    ASSERT_EQ(firstAstHandle->getName(), stringViewToStringData(shared_test_stages::kCountingName));
 
     // Second element is the nested ParseNode.
     const auto& nestedParseHandle = asParse(expanded[1]);
-    ASSERT_EQ(nestedParseHandle.getName(),
+    ASSERT_EQ(nestedParseHandle->getName(),
               stringViewToStringData(shared_test_stages::kCountingName));
 
     // Expand the nested node.
-    auto nestedExpanded = nestedParseHandle.expand();
+    auto nestedExpanded = nestedParseHandle->expand();
     ASSERT_EQUALS(nestedExpanded.size(), 1);
 
     const auto& nestedAstHandle = asAst(nestedExpanded[0]);
-    ASSERT_EQ(nestedAstHandle.getName(), stringViewToStringData(shared_test_stages::kCountingName));
+    ASSERT_EQ(nestedAstHandle->getName(),
+              stringViewToStringData(shared_test_stages::kCountingName));
 }
 
 TEST_F(AggStageTest, ExpansionToHostParseNodeSucceeds) {
@@ -164,13 +164,13 @@ TEST_F(AggStageTest, ExpansionToHostParseNodeSucceeds) {
     // Transfer ownership from the SDK-style unique_ptr to the OwnedHandle.
     auto handle = extension::AggStageParseNodeHandle{expandToHostParseNode.release()};
 
-    auto expanded = handle.expand();
+    auto expanded = handle->expand();
     ASSERT_EQUALS(expanded.size(), 1);
 
     ASSERT_TRUE(std::holds_alternative<extension::AggStageParseNodeHandle>(expanded[0]));
 
     const auto& expandHandle = asParse(expanded[0]);
-    ASSERT_EQUALS(expandHandle.getName(),
+    ASSERT_EQUALS(expandHandle->getName(),
                   stringViewToStringData(shared_test_stages::kExpandToHostName));
 }
 
@@ -181,13 +181,13 @@ TEST_F(AggStageTest, ExpansionToIdLookupSucceeds) {
     // Transfer ownership from the SDK-style unique_ptr to the OwnedHandle.
     auto handle = extension::AggStageParseNodeHandle{expandToIdLookupAstNode.release()};
 
-    auto expanded = handle.expand();
+    auto expanded = handle->expand();
     ASSERT_EQUALS(expanded.size(), 1);
 
     ASSERT_TRUE(std::holds_alternative<extension::AggStageAstNodeHandle>(expanded[0]));
 
     const auto& expandHandle = asAst(expanded[0]);
-    ASSERT_EQUALS(expandHandle.getName(), "$_internalSearchIdLookup");
+    ASSERT_EQUALS(expandHandle->getName(), "$_internalSearchIdLookup");
 }
 
 TEST_F(AggStageTest, HandlesPreventMemoryLeaksOnSuccess) {
@@ -200,7 +200,7 @@ TEST_F(AggStageTest, HandlesPreventMemoryLeaksOnSuccess) {
     {
         auto handle = extension::AggStageParseNodeHandle{nestedDesugarParseNode};
 
-        [[maybe_unused]] auto expanded = handle.expand();
+        [[maybe_unused]] auto expanded = handle->expand();
         ASSERT_EQUALS(shared_test_stages::CountingAst::alive, 1);
         ASSERT_EQUALS(shared_test_stages::CountingParse::alive, 1);
     }
@@ -225,7 +225,7 @@ TEST_F(AggStageTest, HandlesPreventMemoryLeaksOnFailure) {
 
     ASSERT_THROWS_CODE(
         [&] {
-            [[maybe_unused]] auto expanded = handle.expand();
+            [[maybe_unused]] auto expanded = handle->expand();
         }(),
         DBException,
         11113805);
@@ -251,7 +251,7 @@ TEST_F(AggStageTest, ExtExpandPreventsMemoryLeaksOnFailure) {
 
     ASSERT_THROWS_CODE(
         [&] {
-            [[maybe_unused]] auto expanded = handle.expand();
+            [[maybe_unused]] auto expanded = handle->expand();
         }(),
         DBException,
         11197200);
@@ -267,14 +267,14 @@ TEST_F(AggStageTest, TransformAstNodeTest) {
         new ExtensionAggStageAstNode(shared_test_stages::TransformAggStageAstNode::make());
     auto handle = extension::AggStageAstNodeHandle{transformAggStageAstNode};
 
-    [[maybe_unused]] auto logicalStageHandle = handle.bind();
+    [[maybe_unused]] auto logicalStageHandle = handle->bind();
 }
 
 TEST_F(AggStageTest, TransformAstNodeWithDefaultGetPropertiesSucceeds) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
         sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    auto props = handle.getProperties();
+    auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
     ASSERT_EQ(props.getHostType(), MongoExtensionHostTypeRequirementEnum::kNone);
     ASSERT_EQ(props.getRequiresInputDocSource(), true);
@@ -287,7 +287,7 @@ TEST_F(AggStageTest, NonePosAstNodeSucceeds) {
     auto astNode =
         new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NonePosAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    auto props = handle.getProperties();
+    auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
 }
 
@@ -295,7 +295,7 @@ TEST_F(AggStageTest, FirstPosAstNodeSucceeds) {
     auto astNode =
         new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::FirstPosAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    auto props = handle.getProperties();
+    auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
 }
 
@@ -303,7 +303,7 @@ TEST_F(AggStageTest, LastPosAstNodeSucceeds) {
     auto astNode =
         new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::LastPosAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    auto props = handle.getProperties();
+    auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kLast);
 }
 
@@ -311,21 +311,21 @@ TEST_F(AggStageTest, BadPosAstNodeFails) {
     auto astNode =
         new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::BadPosAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    ASSERT_THROWS_CODE(handle.getProperties(), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::BadValue);
 }
 
 TEST_F(AggStageTest, BadPosTypeAstNodeFails) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
         sdk::shared_test_stages::BadPosTypeAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    ASSERT_THROWS_CODE(handle.getProperties(), DBException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::TypeMismatch);
 }
 
 TEST_F(AggStageTest, UnknownPropertyAstNodeIsIgnored) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
         sdk::shared_test_stages::UnknownPropertyAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    auto props = handle.getProperties();
+    auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
 }
 
@@ -333,7 +333,7 @@ TEST_F(AggStageTest, TransformAggStageAstNodeSucceeds) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
         sdk::shared_test_stages::TransformAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    auto props = handle.getProperties();
+    auto props = handle->getProperties();
     ASSERT_EQ(props.getRequiresInputDocSource(), true);
 }
 
@@ -341,7 +341,7 @@ TEST_F(AggStageTest, SearchLikeSourceAggStageAstNodeSucceeds) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
         sdk::shared_test_stages::SearchLikeSourceAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    auto props = handle.getProperties();
+    auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
     ASSERT_EQ(props.getHostType(), MongoExtensionHostTypeRequirementEnum::kAnyShard);
     ASSERT_FALSE(props.getRequiresInputDocSource());
@@ -363,7 +363,7 @@ TEST_F(AggStageTest, BadRequiresInputDocSourceTypeAggStageAstNodeFails) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
         sdk::shared_test_stages::BadRequiresInputDocSourceTypeAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    ASSERT_THROWS_CODE(handle.getProperties(), DBException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::TypeMismatch);
 }
 
 class InvalidResourcePatternRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
@@ -433,20 +433,20 @@ TEST_F(AggStageTest, InvalidResourcePatternRequiredPrivilegesAggStageAstNodeFail
     auto astNode = new sdk::ExtensionAggStageAstNode(
         InvalidResourcePatternRequiredPrivilegesAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    ASSERT_THROWS_CODE(handle.getProperties(), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::BadValue);
 }
 
 TEST_F(AggStageTest, InvalidActionTypeRequiredPrivilegesAggStageAstNodeFails) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
         InvalidActionTypeRequiredPrivilegesAggStageAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    ASSERT_THROWS_CODE(handle.getProperties(), DBException, ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::BadValue);
 }
 
 TEST_F(AggStageTest, BadTypeRequiredPrivilegesAstNodeFails) {
     auto astNode = new sdk::ExtensionAggStageAstNode(BadTypeRequiredPrivilegesAstNode::make());
     auto handle = AggStageAstNodeHandle{astNode};
-    ASSERT_THROWS_CODE(handle.getProperties(), DBException, ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::TypeMismatch);
 }
 
 class SimpleSerializationLogicalStage : public LogicalAggStage {
@@ -482,7 +482,7 @@ TEST(AggregationStageTest, SimpleSerializationSucceeds) {
         new extension::sdk::ExtensionLogicalAggStage(SimpleSerializationLogicalStage::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
 
-    auto serialized = handle.serialize();
+    auto serialized = handle->serialize();
     ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
                            << SimpleSerializationLogicalStage::kStageSpec),
                       serialized);
@@ -496,21 +496,21 @@ TEST(AggregationStageTest, ExplainQueryPlanner) {
     // Test that different verbosity levels can be passed through to the extension implementation
     // correctly.
     {
-        auto output = handle.explain(ExplainOptions::Verbosity::kQueryPlanner);
+        auto output = handle->explain(ExplainOptions::Verbosity::kQueryPlanner);
         ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
                                << ::MongoExtensionExplainVerbosity::kQueryPlanner),
                           output);
     }
 
     {
-        auto output = handle.explain(ExplainOptions::Verbosity::kExecStats);
+        auto output = handle->explain(ExplainOptions::Verbosity::kExecStats);
         ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
                                << ::MongoExtensionExplainVerbosity::kExecStats),
                           output);
     }
 
     {
-        auto output = handle.explain(ExplainOptions::Verbosity::kExecAllPlans);
+        auto output = handle->explain(ExplainOptions::Verbosity::kExecAllPlans);
         ASSERT_BSONOBJ_EQ(BSON(SimpleSerializationLogicalStage::kStageName
                                << ::MongoExtensionExplainVerbosity::kExecAllPlans),
                           output);
@@ -526,21 +526,21 @@ TEST(AggregationStageTest, ExplainExecutionStats) {
     // Test that different verbosity levels can be passed through to the extension implementation
     // correctly.
     {
-        auto output = handle.explain(ExplainOptions::Verbosity::kQueryPlanner);
+        auto output = handle->explain(ExplainOptions::Verbosity::kQueryPlanner);
         ASSERT_BSONOBJ_EQ(BSON("execField" << "execMetric" << "verbosity"
                                            << ::MongoExtensionExplainVerbosity::kQueryPlanner),
                           output);
     }
 
     {
-        auto output = handle.explain(ExplainOptions::Verbosity::kExecStats);
+        auto output = handle->explain(ExplainOptions::Verbosity::kExecStats);
         ASSERT_BSONOBJ_EQ(BSON("execField" << "execMetric" << "verbosity"
                                            << ::MongoExtensionExplainVerbosity::kExecStats),
                           output);
     }
 
     {
-        auto output = handle.explain(ExplainOptions::Verbosity::kExecAllPlans);
+        auto output = handle->explain(ExplainOptions::Verbosity::kExecAllPlans);
         ASSERT_BSONOBJ_EQ(BSON("execField" << "execMetric" << "verbosity"
                                            << ::MongoExtensionExplainVerbosity::kExecAllPlans),
                           output);
@@ -578,7 +578,7 @@ TEST_F(AggStageTest, SimpleComputeQueryShapeSucceeds) {
 
     SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
-    auto queryShape = handle.getQueryShape(adapter);
+    auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(
         BSON(SimpleQueryShapeParseNode::kStageName << SimpleQueryShapeParseNode::kStageSpec),
         queryShape);
@@ -605,7 +605,7 @@ public:
         sdk::QueryShapeOptsHandle ctxHandle(ctx);
         BSONObjBuilder builder;
 
-        builder.append(kIndexFieldName, ctxHandle.serializeIdentifier(std::string(kIndexValue)));
+        builder.append(kIndexFieldName, ctxHandle->serializeIdentifier(std::string(kIndexValue)));
 
         return BSON(kStageName << builder.obj());
     }
@@ -626,7 +626,7 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation
 
     SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
-    auto queryShape = handle.getQueryShape(adapter);
+    auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(BSON(IdentifierQueryShapeParseNode::kStageName
                            << BSON(IdentifierQueryShapeParseNode::kIndexFieldName
                                    << IdentifierQueryShapeParseNode::kIndexValue)),
@@ -642,7 +642,7 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) 
     opts.transformIdentifiersCallback = IdentifierQueryShapeParseNode::applyHmacForTest;
 
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
-    auto queryShape = handle.getQueryShape(adapter);
+    auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(BSON(IdentifierQueryShapeParseNode::kStageName
                            << BSON(IdentifierQueryShapeParseNode::kIndexFieldName
                                    << IdentifierQueryShapeParseNode::applyHmacForTest(
@@ -657,9 +657,9 @@ TEST_F(AggStageTest, DesugarToEmptyDescriptorParseTest) {
 
     BSONObj stageBson =
         BSON(shared_test_stages::TransformAggStageDescriptor::kStageName << BSON("foo" << true));
-    auto parseNodeHandle = handle.parse(stageBson);
+    auto parseNodeHandle = handle->parse(stageBson);
 
-    auto expanded = parseNodeHandle.expand();
+    auto expanded = parseNodeHandle->expand();
 
     ASSERT_EQUALS(expanded.size(), 1);
     ASSERT_TRUE(std::holds_alternative<extension::AggStageAstNodeHandle>(expanded[0]));
@@ -672,9 +672,9 @@ TEST_F(AggStageTest, SourceStageParseTest) {
 
     BSONObj stageBson =
         BSON(shared_test_stages::FruitsAsDocumentsSourceStageDescriptor::kStageName << BSONObj());
-    auto parseNodeHandle = handle.parse(stageBson);
+    auto parseNodeHandle = handle->parse(stageBson);
     ASSERT_EQ(shared_test_stages::FruitsAsDocumentsSourceStageDescriptor::kStageName,
-              handle.getName());
+              handle->getName());
 }
 
 class FieldPathQueryShapeParseNode : public sdk::AggStageParseNode {
@@ -699,9 +699,9 @@ public:
         BSONObjBuilder builder;
 
         builder.append(kSingleFieldPath,
-                       ctxHandle.serializeFieldPath(std::string(kSingleFieldPath)));
+                       ctxHandle->serializeFieldPath(std::string(kSingleFieldPath)));
         builder.append(kNestedFieldPath,
-                       ctxHandle.serializeFieldPath(std::string(kNestedFieldPath)));
+                       ctxHandle->serializeFieldPath(std::string(kNestedFieldPath)));
 
         return BSON(kStageName << builder.obj());
     }
@@ -721,7 +721,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithNoTransformation)
 
     SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
-    auto queryShape = handle.getQueryShape(adapter);
+    auto queryShape = handle->getQueryShape(adapter);
 
     ASSERT_BSONOBJ_EQ(BSON(FieldPathQueryShapeParseNode::kStageName
                            << BSON(FieldPathQueryShapeParseNode::kSingleFieldPath
@@ -740,7 +740,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformation) {
     opts.transformIdentifiersCallback = FieldPathQueryShapeParseNode::applyHmacForTest;
 
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
-    auto queryShape = handle.getQueryShape(adapter);
+    auto queryShape = handle->getQueryShape(adapter);
 
     auto transformedSingleField =
         opts.transformIdentifiersCallback(FieldPathQueryShapeParseNode::kSingleFieldPath);
@@ -795,10 +795,10 @@ public:
 
         // Build the query shape.
         BSONObjBuilder builder;
-        ctxHandle.appendLiteral(builder, kStringField, spec[kStringField]);
-        ctxHandle.appendLiteral(builder, kNumberField, spec[kNumberField]);
-        ctxHandle.appendLiteral(builder, kObjectField, spec[kObjectField]);
-        ctxHandle.appendLiteral(builder, kDateField, spec[kDateField]);
+        ctxHandle->appendLiteral(builder, kStringField, spec[kStringField]);
+        ctxHandle->appendLiteral(builder, kNumberField, spec[kNumberField]);
+        ctxHandle->appendLiteral(builder, kObjectField, spec[kObjectField]);
+        ctxHandle->appendLiteral(builder, kDateField, spec[kDateField]);
         return BSON(kStageName << builder.obj());
     }
 
@@ -820,7 +820,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
 
     SerializationOptions opts{};
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
-    auto queryShape = handle.getQueryShape(adapter);
+    auto queryShape = handle->getQueryShape(adapter);
 
     BSONObjBuilder specBuilder;
     specBuilder.append(LiteralQueryShapeParseNode::kStringField,
@@ -842,7 +842,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
 
     SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
-    auto queryShape = handle.getQueryShape(adapter);
+    auto queryShape = handle->getQueryShape(adapter);
 
     BSONObjBuilder specBuilder;
     specBuilder.append(LiteralQueryShapeParseNode::kStringField, "?string");
@@ -860,7 +860,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
 
     SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
     extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
-    auto queryShape = handle.getQueryShape(adapter);
+    auto queryShape = handle->getQueryShape(adapter);
 
     BSONObjBuilder specBuilder;
     specBuilder.append(LiteralQueryShapeParseNode::kStringField, "?");
@@ -925,19 +925,19 @@ TEST_F(AggStageTest, ValidExecAggStageVTableGetNextSucceeds) {
         shared_test_stages::ValidExtensionExecAggStage::make());
     auto handle = extension::ExecAggStageHandle{validExecAggStage};
 
-    auto getNext = handle.getNext(_execCtx.get());
+    auto getNext = handle->getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
     ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.resultDocument->getUnownedBSONObj());
 
-    getNext = handle.getNext(_execCtx.get());
+    getNext = handle->getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
     ASSERT_EQ(boost::none, getNext.resultDocument);
 
-    getNext = handle.getNext(_execCtx.get());
+    getNext = handle->getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
     ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.resultDocument->getUnownedBSONObj());
 
-    getNext = handle.getNext(_execCtx.get());
+    getNext = handle->getNext(_execCtx.get());
     ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
     ASSERT_EQ(boost::none, getNext.resultDocument);
 };
@@ -988,10 +988,10 @@ public:
     extension::ExtensionGetNextResult getNext(
         const extension::sdk::QueryExecutionContextHandle& execCtx,
         MongoExtensionExecAggStage* execAggStage) override {
-        auto metrics = execCtx.getMetrics(execAggStage);
-        metrics.update(MongoExtensionByteView{nullptr, 0});
+        auto metrics = execCtx->getMetrics(execAggStage);
+        metrics->update(MongoExtensionByteView{nullptr, 0});
 
-        auto metricsBson = metrics.serialize();
+        auto metricsBson = metrics->serialize();
         auto counterVal = metricsBson["counter"].Int();
         if (counterVal == 1) {
             return extension::ExtensionGetNextResult::advanced(
@@ -1040,12 +1040,12 @@ TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
     host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
 
     // Call getNext which triggers the getMetrics call logic.
-    auto getNext = handle.getNext(&adapter);
+    auto getNext = handle->getNext(&adapter);
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced,
                   getNext.code);  // should return Advanced, since the metrics counter should be 1.
 
     // Call getNext again, which should build on the existing metrics from the last call.
-    getNext = handle.getNext(&adapter);
+    getNext = handle->getNext(&adapter);
     ASSERT_EQUALS(extension::GetNextCode::kEOF,
                   getNext.code);  // should return EOF, since the metrics counter should be 2.
 
@@ -1055,7 +1055,7 @@ TEST(AggregationStageTest, GetMetricsExtensionExecAggStageSucceeds) {
     expCtx->setOperationContext(newOpCtx.get());
 
     // Call getNext which triggers the getMetrics call logic.
-    getNext = handle.getNext(&adapter);
+    getNext = handle->getNext(&adapter);
     ASSERT_EQUALS(extension::GetNextCode::kAdvanced,
                   getNext.code);  // should return Advanced, since the metrics counter should be 1.
 }
@@ -1065,32 +1065,32 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledLogicalAggStage) {
         shared_test_stages::TestLogicalStageCompile::make());
     auto handle = extension::LogicalAggStageHandle{logicalStage};
 
-    auto compiledExecAggStageHandle = handle.compile();
+    auto compiledExecAggStageHandle = handle->compile();
 
     // Test getNext() on compiled ExecAggStage from LogicalStage.
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(BSON("meow" << "adithi"), getNext.resultDocument->getUnownedBSONObj());
         ASSERT_BSONOBJ_EQ(BSON("$searchScore" << 1.0), getNext.resultMetadata->getUnownedBSONObj());
     }
 
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kPauseExecution, getNext.code);
         ASSERT_EQ(boost::none, getNext.resultDocument);
         ASSERT_EQ(boost::none, getNext.resultMetadata);
     }
 
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(BSON("meow" << "cedric"), getNext.resultDocument->getUnownedBSONObj());
         ASSERT_BSONOBJ_EQ(BSON("$textScore" << 2.0), getNext.resultMetadata->getUnownedBSONObj());
     }
 
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
         ASSERT_EQ(boost::none, getNext.resultDocument);
         ASSERT_EQ(boost::none, getNext.resultMetadata);
@@ -1103,32 +1103,32 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledSourceLogicalAggStage) {
             shared_test_stages::kFruitsAsDocumentsName, BSONObj()));
     auto handle = extension::LogicalAggStageHandle{logicalStage};
 
-    auto compiledExecAggStageHandle = handle.compile();
+    auto compiledExecAggStageHandle = handle->compile();
 
     // Test getNext() on compiled ExecAggStage from LogicalStage.
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "apples" << "red"),
                           getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "oranges" << 5),
                           getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(BSON("_id" << 3 << "bananas" << false),
                           getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(
             BSON("_id" << 4 << "tropical fruits" << BSON_ARRAY("rambutan" << "durian" << "lychee")),
@@ -1136,14 +1136,14 @@ TEST_F(AggStageTest, TestValidExecAggStageFromCompiledSourceLogicalAggStage) {
     }
 
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kAdvanced, getNext.code);
         ASSERT_BSONOBJ_EQ(BSON("_id" << 5 << "pie" << 3.14159),
                           getNext.resultDocument->getUnownedBSONObj());
     }
 
     {
-        auto getNext = compiledExecAggStageHandle.getNext(_execCtx.get());
+        auto getNext = compiledExecAggStageHandle->getNext(_execCtx.get());
         ASSERT_EQUALS(extension::GetNextCode::kEOF, getNext.code);
         ASSERT_EQ(boost::none, getNext.resultDocument);
     }
@@ -1158,17 +1158,17 @@ TEST_F(AggStageTest, ValidateExecAggStageLifecycleFunctions) {
     auto handle = ExecAggStageHandle{trackingExecAggStage};
 
     // Open allocates resources.
-    handle.open();
+    handle->open();
     ASSERT_TRUE(trackingExecAggStageImplPtr->isResourceAllocated());
     ASSERT_TRUE(trackingExecAggStageImplPtr->isInitialized());
 
     // Reopen reinitializes the stage without cleaning up resources.
-    handle.reopen();
+    handle->reopen();
     ASSERT_TRUE(trackingExecAggStageImplPtr->isResourceAllocated());
     ASSERT_TRUE(trackingExecAggStageImplPtr->isInitialized());
 
     // Close cleans up all resources.
-    handle.close();
+    handle->close();
     ASSERT_FALSE(trackingExecAggStageImplPtr->isResourceAllocated());
     ASSERT_FALSE(trackingExecAggStageImplPtr->isInitialized());
 }
@@ -1278,10 +1278,10 @@ TEST_F(AggStageTest, TestDPLArrayContainerRoundTrip) {
         sdk::DPLArrayContainer(std::move(sdkElements)));
 
     DPLArrayContainerHandle arrayContainer(sdkAdapter.release());
-    ASSERT_EQ(arrayContainer.size(), 2U);
+    ASSERT_EQ(arrayContainer->size(), 2U);
 
     // Transfer the elements to a vector of RAII handles.
-    auto roundTripVector = arrayContainer.transfer();
+    auto roundTripVector = arrayContainer->transfer();
     ASSERT_EQ(roundTripVector.size(), 2U);
     ASSERT_TRUE(std::holds_alternative<extension::LogicalAggStageHandle>(roundTripVector[0]));
     ASSERT_TRUE(std::holds_alternative<extension::AggStageParseNodeHandle>(roundTripVector[1]));
@@ -1327,7 +1327,7 @@ TEST_F(AggStageTest, TestDPLWithCountingStages) {
 
     // Confirm extractShardsPipeline() returns a vector with 2 logical stages.
     {
-        auto shardsPipeline = handle.extractShardsPipeline();
+        auto shardsPipeline = handle->extractShardsPipeline();
         ASSERT_EQ(shardsPipeline.size(), 2U);
         ASSERT_TRUE(std::holds_alternative<LogicalAggStageHandle>(shardsPipeline[0]));
         ASSERT_TRUE(std::holds_alternative<LogicalAggStageHandle>(shardsPipeline[1]));
@@ -1341,7 +1341,7 @@ TEST_F(AggStageTest, TestDPLWithCountingStages) {
 
     // Confirm extractMergingPipeline() returns a vector with 1 logical stage.
     {
-        auto mergingPipeline = handle.extractMergingPipeline();
+        auto mergingPipeline = handle->extractMergingPipeline();
         ASSERT_EQ(mergingPipeline.size(), 1U);
         ASSERT_TRUE(std::holds_alternative<LogicalAggStageHandle>(mergingPipeline[0]));
 
@@ -1353,7 +1353,7 @@ TEST_F(AggStageTest, TestDPLWithCountingStages) {
 
     // Confirm getSortPattern() returns the appropriate sort pattern.
     {
-        auto sortPattern = handle.getSortPattern();
+        auto sortPattern = handle->getSortPattern();
         ASSERT_BSONOBJ_EQ(BSON("_id" << 1), sortPattern);
     }
 }
@@ -1364,19 +1364,19 @@ TEST_F(AggStageTest, TestEmptyDistributedPlanLogic) {
 
     // Verify that extractShardsPipeline() returns an empty vector when the C returns nullptr.
     {
-        auto shardsPipeline = handle.extractShardsPipeline();
+        auto shardsPipeline = handle->extractShardsPipeline();
         ASSERT_EQ(shardsPipeline.size(), 0U);
     }
 
     // Verify that extractMergingPipeline() returns an empty vector when the C API returns nullptr.
     {
-        auto mergingPipeline = handle.extractMergingPipeline();
+        auto mergingPipeline = handle->extractMergingPipeline();
         ASSERT_EQ(mergingPipeline.size(), 0U);
     }
 
     // Verify that getSortPattern() returns an empty BSONObj.
     {
-        auto sortPattern = handle.getSortPattern();
+        auto sortPattern = handle->getSortPattern();
         ASSERT_BSONOBJ_EQ(BSONObj(), sortPattern);
     }
 }
@@ -1404,16 +1404,16 @@ TEST_F(AggStageTest, TestMergeOnlyDistributedPlanLogic) {
     auto logicalStageHandle = LogicalAggStageHandle(
         new sdk::ExtensionLogicalAggStage(std::make_unique<MergeOnlyLogicalStage>()));
 
-    auto dpl = logicalStageHandle.getDistributedPlanLogic();
+    auto dpl = logicalStageHandle->getDistributedPlanLogic();
     // Confirm that the dpl is valid; it must run on the merge pipeline.
     ASSERT_TRUE(dpl.isValid());
 
     // Verify shards pipeline is empty; it cannot fully run on shards.
-    auto shardsPipeline = dpl.extractShardsPipeline();
+    auto shardsPipeline = dpl->extractShardsPipeline();
     ASSERT_EQ(shardsPipeline.size(), 0U);
 
     // Verify merging pipeline has one MergeOnlyLogicalStage.
-    auto mergingPipeline = dpl.extractMergingPipeline();
+    auto mergingPipeline = dpl->extractMergingPipeline();
     ASSERT_EQ(mergingPipeline.size(), 1U);
     ASSERT_TRUE(std::holds_alternative<LogicalAggStageHandle>(mergingPipeline[0]));
 }

@@ -83,8 +83,8 @@ public:
     static void threadFunction() {
         sleep(1);
         do {
-            auto idleThreadHandle = sdk::HostServicesHandle::getHostServices()->markIdleThread(
-                MONGO_EXTENSION_IDLE_LOCATION);
+            auto idleThreadHandle =
+                sdk::HostServicesAPI::getInstance()->markIdleThread(MONGO_EXTENSION_IDLE_LOCATION);
             sleep(1);
         } while (false);
         sleep(1);

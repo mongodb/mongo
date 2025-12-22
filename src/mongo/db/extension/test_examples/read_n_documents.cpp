@@ -144,7 +144,7 @@ public:
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
             std::make_unique<ProduceIdsAstNode>("$produceIds", _arguments)));
         expanded.emplace_back(
-            extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(kIdLookupSpec));
+            extension::sdk::HostServicesAPI::getInstance()->createIdLookup(kIdLookupSpec));
         return expanded;
     }
 

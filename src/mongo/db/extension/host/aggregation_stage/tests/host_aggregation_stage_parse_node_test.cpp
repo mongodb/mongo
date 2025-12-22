@@ -65,21 +65,6 @@ public:
     }
 };
 
-class HostParseNodeVTableTest : public unittest::Test {
-public:
-    // This special handle class is only used within this fixture so that we can unit test the
-    // assertVTableConstraints functionality of the handle.
-    class TestHostParseNodeVTableHandle : public AggStageParseNodeHandle {
-    public:
-        TestHostParseNodeVTableHandle(absl::Nonnull<::MongoExtensionAggStageParseNode*> parseNode)
-            : AggStageParseNodeHandle(parseNode) {};
-
-        void assertVTableConstraints(const VTable_t& vtable) {
-            _assertVTableConstraints(vtable);
-        }
-    };
-};
-
 TEST(HostParseNodeTest, GetSpec) {
     auto spec = BSON("foo" << BSON("bar" << 0));
 
@@ -109,45 +94,42 @@ TEST(HostParseNodeTest, IsNotHostAllocated) {
     ASSERT_FALSE(host::HostAggStageParseNode::isHostAllocated(*handle.get()));
 }
 
-using HostParseNodeVTableTestDeathTest = HostParseNodeVTableTest;
-DEATH_TEST_F(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsGetName, "11217600") {
+DEATH_TEST(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsGetName, "11217600") {
     auto noOpParseNode = std::make_unique<host::HostAggStageParseNode>(NoOpHostParseNode::make({}));
-    auto handle = TestHostParseNodeVTableHandle{noOpParseNode.release()};
+    auto handle = AggStageParseNodeHandle{noOpParseNode.release()};
 
-    auto vtable = handle.vtable();
+    auto vtable = handle->vtable();
     vtable.get_name = nullptr;
-    handle.assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
-DEATH_TEST_F(HostParseNodeVTableTestDeathTest,
-             InvalidParseNodeVTableFailsGetQueryShape,
-             "10977600") {
+DEATH_TEST(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsGetQueryShape, "10977600") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
-    auto handle = TestHostParseNodeVTableHandle{noOpParseNode};
+    auto handle = AggStageParseNodeHandle{noOpParseNode};
 
-    auto vtable = handle.vtable();
+    auto vtable = handle->vtable();
     vtable.get_query_shape = nullptr;
-    handle.assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
-DEATH_TEST_F(HostParseNodeVTableTestDeathTest,
-             InvalidParseNodeVTableFailsGetExpandedSize,
-             "11113800") {
+DEATH_TEST(HostParseNodeVTableTestDeathTest,
+           InvalidParseNodeVTableFailsGetExpandedSize,
+           "11113800") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
-    auto handle = TestHostParseNodeVTableHandle{noOpParseNode};
+    auto handle = AggStageParseNodeHandle{noOpParseNode};
 
-    auto vtable = handle.vtable();
+    auto vtable = handle->vtable();
     vtable.get_expanded_size = nullptr;
-    handle.assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
-DEATH_TEST_F(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsExpand, "10977601") {
+DEATH_TEST(HostParseNodeVTableTestDeathTest, InvalidParseNodeVTableFailsExpand, "10977601") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
-    auto handle = TestHostParseNodeVTableHandle{noOpParseNode};
+    auto handle = AggStageParseNodeHandle{noOpParseNode};
 
-    auto vtable = handle.vtable();
+    auto vtable = handle->vtable();
     vtable.expand = nullptr;
-    handle.assertVTableConstraints(vtable);
+    AggStageParseNodeAPI::assertVTableConstraints(vtable);
 };
 
 DEATH_TEST(HostParseNodeTestDeathTest, HostGetQueryShapeUnimplemented, "10977800") {
@@ -155,19 +137,19 @@ DEATH_TEST(HostParseNodeTestDeathTest, HostGetQueryShapeUnimplemented, "10977800
     auto handle = AggStageParseNodeHandle{noOpParseNode};
 
     ::MongoExtensionByteBuf* shape = {};
-    handle.vtable().get_query_shape(noOpParseNode, nullptr, &shape);
+    handle->vtable().get_query_shape(noOpParseNode, nullptr, &shape);
 }
 
 DEATH_TEST(HostParseNodeTestDeathTest, HostGetExpandedSizeUnimplemented, "11113803") {
     auto noOpParseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make({}));
     auto handle = AggStageParseNodeHandle{noOpParseNode};
 
-    ASSERT_EQ(handle.vtable().get_expanded_size(noOpParseNode), 0);
+    ASSERT_EQ(handle->vtable().get_expanded_size(noOpParseNode), 0);
 
     // get_expanded_size cannot tassert because the return type is size_t, but the host
     // implementation of get_expanded_size still correctly fails because this expand call checks
     // that the return value of get_expanded_size is > 0.
-    [[maybe_unused]] auto expanded = handle.expand();
+    [[maybe_unused]] auto expanded = handle->expand();
 }
 
 DEATH_TEST(HostParseNodeTestDeathTest, HostExpandUnimplemented, "10977801") {
@@ -175,7 +157,7 @@ DEATH_TEST(HostParseNodeTestDeathTest, HostExpandUnimplemented, "10977801") {
     auto handle = AggStageParseNodeHandle{noOpParseNode};
 
     ::MongoExtensionExpandedArray expanded = {};
-    handle.vtable().expand(noOpParseNode, &expanded);
+    handle->vtable().expand(noOpParseNode, &expanded);
 }
 }  // namespace
 }  // namespace mongo::extension

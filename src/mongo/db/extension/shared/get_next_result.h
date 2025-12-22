@@ -132,7 +132,7 @@ private:
                 // ExtensionByteBufHandle must remain consistent for the same lifetime as the
                 // BSONObj.
                 auto tmpHandle = ExtensionByteBufHandle{container.bytes.buf};
-                _bson = bsonObjFromByteView(tmpHandle.getByteView());
+                _bson = bsonObjFromByteView(tmpHandle->getByteView());
                 _holder = std::move(tmpHandle);
             } break;
             case kByteView:
@@ -157,7 +157,7 @@ private:
 
     explicit ExtensionBSONObj(ExtensionByteBufHandle bufHandle) {
         if (bufHandle.isValid()) {
-            _bson = bsonObjFromByteView(bufHandle.getByteView());
+            _bson = bsonObjFromByteView(bufHandle->getByteView());
             _holder = std::move(bufHandle);
         }
     }

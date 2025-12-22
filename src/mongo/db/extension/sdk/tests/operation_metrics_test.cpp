@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/db/extension/host_connector/handle/host_operation_metrics_handle.h"
-#include "mongo/db/extension/sdk/extension_operation_metrics_handle.h"
 #include "mongo/db/extension/sdk/operation_metrics_adapter.h"
+#include "mongo/db/extension/shared/handle/operation_metrics_handle.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -54,32 +53,32 @@ private:
     int _counter = 0;
 };
 
-TEST(OperationMetricsHandle, canUpdateAndSerialize) {
+TEST(OwnedOperationMetricsHandle, canUpdateAndSerialize) {
     // Create metrics.
     auto adapter = new sdk::OperationMetricsAdapter(std::make_unique<TestExtensionMetrics>());
 
     // Create handles.
-    host_connector::HostOperationMetricsHandle hostHandle(adapter);
-    sdk::ExtensionOperationMetricsHandle extHandle(adapter);
+    OwnedOperationMetricsHandle hostHandle(adapter);
+    UnownedOperationMetricsHandle extHandle(adapter);
 
     // Update the metrics (mimics getNext() call).
     int incr = 2;
     auto byteView = MongoExtensionByteView{reinterpret_cast<const uint8_t*>(&incr), sizeof(int*)};
-    extHandle.update(byteView);
+    extHandle->update(byteView);
 
     // Check serialize calls.
-    auto hostSerializedObj = hostHandle.serialize();
-    ASSERT_BSONOBJ_EQ(extHandle.serialize(), hostSerializedObj);
+    auto hostSerializedObj = hostHandle->serialize();
+    ASSERT_BSONOBJ_EQ(extHandle->serialize(), hostSerializedObj);
     ASSERT_BSONOBJ_EQ(BSON(TestExtensionMetrics::kStageName << 2), hostSerializedObj);
 
     // Update the metrics again.
     incr = 3;
     // No need to update the byte view here because it's a pointer to the same int.
-    extHandle.update(byteView);
+    extHandle->update(byteView);
 
     // Check serialize calls.
-    hostSerializedObj = hostHandle.serialize();
-    ASSERT_BSONOBJ_EQ(extHandle.serialize(), hostSerializedObj);
+    hostSerializedObj = hostHandle->serialize();
+    ASSERT_BSONOBJ_EQ(extHandle->serialize(), hostSerializedObj);
     ASSERT_BSONOBJ_EQ(BSON(TestExtensionMetrics::kStageName << 5), hostSerializedObj);
 }
 

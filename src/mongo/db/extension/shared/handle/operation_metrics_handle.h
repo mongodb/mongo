@@ -33,23 +33,28 @@
 #include "mongo/db/extension/shared/handle/byte_buf_handle.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
 
-class HostOperationMetricsHandle : public OwnedHandle<::MongoExtensionOperationMetrics> {
+class OperationMetricsAPI;
+
+template <>
+struct c_api_to_cpp_api<::MongoExtensionOperationMetrics> {
+    using CppApi_t = OperationMetricsAPI;
+};
+
+using OwnedOperationMetricsHandle = OwnedHandle<::MongoExtensionOperationMetrics>;
+using UnownedOperationMetricsHandle = UnownedHandle<::MongoExtensionOperationMetrics>;
+
+class OperationMetricsAPI : public VTableAPI<::MongoExtensionOperationMetrics> {
 public:
-    HostOperationMetricsHandle(::MongoExtensionOperationMetrics* ctx)
-        : OwnedHandle<::MongoExtensionOperationMetrics>(ctx) {
-        _assertValidVTable();
-    }
+    OperationMetricsAPI(::MongoExtensionOperationMetrics* ctx)
+        : VTableAPI<::MongoExtensionOperationMetrics>(ctx) {}
 
     // Call the underlying object's serialize function and return the resulting BSON object.
     BSONObj serialize() const {
-        assertValid();
-
         ::MongoExtensionByteBuf* buf{nullptr};
-        auto* ptr = get();
 
-        invokeCAndConvertStatusToException([&]() { return vtable().serialize(ptr, &buf); });
+        invokeCAndConvertStatusToException([&]() { return vtable().serialize(get(), &buf); });
 
         tassert(
             11265503, "buffer returned from serialize function must not be null", buf != nullptr);
@@ -57,17 +62,15 @@ public:
         // Take ownership of the returned buffer so that it gets cleaned up, then copy the memory
         // into a BSON object to be returned.
         ExtensionByteBufHandle ownedBuf{buf};
-        return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+        return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
     }
 
-    // Note that we purposefully do not implement `update` on this handle - the host handle should
-    // not be calling `update`. `update` should instead be called from within the extension, using
-    // an ExtensionOperationMetricsHandle.
+    void update(const MongoExtensionByteView& byteView) {
+        invokeCAndConvertStatusToException([&]() { return vtable().update(get(), byteView); });
+    }
 
-private:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11265504, "HostOperationMetrics' 'serialize' is null", vtable.serialize != nullptr);
     };
 };
-
-}  // namespace mongo::extension::host_connector
+}  // namespace mongo::extension

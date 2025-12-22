@@ -102,7 +102,7 @@ public:
         const sdk::QueryExecutionContextHandle& execCtx,
         MongoExtensionExecAggStage* execStage) override {
         // Get metrics from the execution context (stored on OperationContext).
-        auto metrics = execCtx.getMetrics(execStage);
+        auto metrics = execCtx->getMetrics(execStage);
 
         _latestStart = Date_t::now();
         BSONObjBuilder updateBuilder;
@@ -111,9 +111,9 @@ public:
 
         auto bson = updateBuilder.obj();
         auto updateBuf = mongo::extension::objAsByteView(bson);
-        metrics.update(updateBuf);
+        metrics->update(updateBuf);
 
-        return _getSource().getNext(execCtx.get());
+        return _getSource()->getNext(execCtx.get());
     }
 
     void open() override {}
@@ -271,7 +271,7 @@ public:
         std::vector<mongo::extension::VariantNodeHandle> out;
         out.reserve(getExpandedSize());
 
-        auto* host = sdk::HostServicesHandle::getHostServices();
+        auto& host = sdk::HostServicesAPI::getInstance();
 
         auto metrics = std::make_unique<MetricsAstNode>(_metric);
         out.emplace_back(new sdk::ExtensionAggStageAstNode(std::move(metrics)));

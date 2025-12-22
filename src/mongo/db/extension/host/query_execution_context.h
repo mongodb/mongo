@@ -55,7 +55,7 @@ public:
         return _ctx->getOperationContext()->checkForInterruptNoAssert();
     }
 
-    host_connector::HostOperationMetricsHandle* getMetrics(
+    UnownedOperationMetricsHandle getMetrics(
         const std::string& stageName, const UnownedExecAggStageHandle& execStage) const override {
         auto& opDebug = CurOp::get(_ctx->getOperationContext())->debug();
         auto& opDebugMetrics = opDebug.extensionMetrics;

@@ -28,9 +28,9 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host_connector/handle/host_operation_metrics_handle.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
+#include "mongo/db/extension/shared/handle/operation_metrics_handle.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::host_connector {
@@ -55,7 +55,7 @@ public:
     QueryExecutionContextBase() = default;
     virtual ~QueryExecutionContextBase() = default;
     virtual Status checkForInterrupt() const = 0;
-    virtual HostOperationMetricsHandle* getMetrics(
+    virtual UnownedOperationMetricsHandle getMetrics(
         const std::string& stageName, const UnownedExecAggStageHandle& execStage) const = 0;
 };
 

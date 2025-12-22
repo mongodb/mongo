@@ -106,7 +106,7 @@ public:
                                                                const NamespaceString& nss,
                                                                const BSONElement& spec,
                                                                const LiteParserOptions& options) {
-            auto parseNode = descriptor.parse(spec.wrap());
+            auto parseNode = descriptor->parse(spec.wrap());
             return std::make_unique<LiteParsedExpandable>(spec, std::move(parseNode), nss, options);
         }
 
@@ -223,7 +223,7 @@ public:
             // LiteParsedPipeline.
             : LiteParsedDocumentSource(BSON(stageName << BSONObj()).firstElement()),
               _astNode(std::move(astNode)),
-              _properties(_astNode.getProperties()),
+              _properties(_astNode->getProperties()),
               _nss(nss) {}
 
         std::unique_ptr<StageParams> getStageParams() const override {

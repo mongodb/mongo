@@ -276,7 +276,7 @@ public:
         std::vector<VariantNodeHandle> out;
         out.reserve(kExpansionSize);
         out.emplace_back(
-            extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(kIdLookupSpec));
+            extension::sdk::HostServicesAPI::getInstance()->createIdLookup(kIdLookupSpec));
         return out;
     }
 
@@ -323,7 +323,7 @@ public:
             new sdk::ExtensionAggStageParseNode(std::make_unique<TransformAggStageParseNode>()));
         out.emplace_back(new host::HostAggStageParseNode(TransformHostParseNode::make(kMatchSpec)));
         out.emplace_back(
-            extension::sdk::HostServicesHandle::getHostServices()->createIdLookup(kIdLookupSpec));
+            extension::sdk::HostServicesAPI::getInstance()->createIdLookup(kIdLookupSpec));
         return out;
     }
 
@@ -864,7 +864,7 @@ public:
         std::vector<mongo::extension::VariantNodeHandle> expanded;
         auto spec = BSON(stringViewToStringData(kExpandToHostName) << BSONObj());
         expanded.emplace_back(
-            sdk::HostServicesHandle::getHostServices()->createHostAggStageParseNode(spec));
+            sdk::HostServicesAPI::getInstance()->createHostAggStageParseNode(spec));
         return expanded;
     }
 
@@ -929,9 +929,9 @@ public:
         return Status::OK();
     }
 
-    host_connector::HostOperationMetricsHandle* getMetrics(
+    UnownedOperationMetricsHandle getMetrics(
         const std::string& stageName, const UnownedExecAggStageHandle& execStage) const override {
-        return nullptr;
+        return UnownedOperationMetricsHandle{nullptr};
     }
 };
 

@@ -112,7 +112,7 @@ public:
         }
         mongo::BSONObjBuilder loafBuilder;
         while (_currentSlice < _numSlices) {
-            auto input = _getSource().getNext(execCtx.get());
+            auto input = _getSource()->getNext(execCtx.get());
 
             if (input.code == mongo::extension::GetNextCode::kPauseExecution) {
                 return mongo::extension::ExtensionGetNextResult::pauseExecution();
@@ -145,7 +145,7 @@ private:
         // If the predecessor stage is $loaf, then we are dealing with directly nested loaves,
         // so use "loaf" instead of "slice". This is pretty meaningless, I just wanted to check that
         // the getName() logic works as expected.
-        std::string keyPrefix = (_getSource().getName() == getName()) ? "loaf" : "slice";
+        std::string keyPrefix = (_getSource()->getName() == getName()) ? "loaf" : "slice";
         loafBuilder.append(keyPrefix + std::to_string(_currentSlice++), toastBuilder.done());
     }
 
@@ -258,7 +258,7 @@ using ToastBagelStageDescriptor =
 class ToasterExtension : public sdk::Extension {
 public:
     void initialize(const sdk::HostPortalHandle& portal) override {
-        YAML::Node node = portal.getExtensionOptions();
+        YAML::Node node = portal->getExtensionOptions();
         sdk_uassert(11285300,
                     "Extension options must include both 'maxToasterHeat' and 'allowBagels'",
                     node["maxToasterHeat"] && node["allowBagels"]);

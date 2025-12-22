@@ -39,13 +39,9 @@ MongoExtensionStatus* QueryExecutionContextAdapter::_extCheckForInterrupt(
         Status interrupted = execCtx.checkForInterrupt();
         // Ensure output query status is valid before accessing it.
         if (!interrupted.isOK()) {
-            StatusHandle::assertValidStatus(queryStatus);
-            MongoExtensionByteView reasonByteView{stringViewAsByteView(interrupted.reason())};
-            // Note that we don't need invokeCAndConvertStatusToException here because
-            // set_code does not throw errors.
-            queryStatus->vtable->set_code(queryStatus, interrupted.code());
-            invokeCAndConvertStatusToException(
-                [&]() { return queryStatus->vtable->set_reason(queryStatus, reasonByteView); });
+            auto statusAPI = StatusAPI(queryStatus);
+            statusAPI.setCode(interrupted.code());
+            statusAPI.setReason(interrupted.reason());
         }
     });
 }
@@ -58,9 +54,9 @@ MongoExtensionStatus* QueryExecutionContextAdapter::_extGetMetrics(
         const auto& execCtx = static_cast<const QueryExecutionContextAdapter*>(ctx)->getCtxImpl();
 
         auto execStageHandle = UnownedExecAggStageHandle(execAggStage);
-        const std::string stageName = std::string(execStageHandle.getName());
+        const std::string stageName = std::string(execStageHandle->getName());
 
-        *metrics = execCtx.getMetrics(stageName, execStageHandle)->get();
+        *metrics = execCtx.getMetrics(stageName, execStageHandle).get();
     });
 }
 

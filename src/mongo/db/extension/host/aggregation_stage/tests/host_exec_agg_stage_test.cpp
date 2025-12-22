@@ -84,17 +84,17 @@ TEST_F(ExecAggStageTest, GetNextResult) {
     auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
     auto handle = ExecAggStageHandle{hostExecAggStage};
 
-    auto hostGetNextResult = handle.getNext(_execCtx.get());
+    auto hostGetNextResult = handle->getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kPauseExecution, hostGetNextResult.code);
     ASSERT_EQ(boost::none, hostGetNextResult.resultDocument);
 
-    hostGetNextResult = handle.getNext(_execCtx.get());
+    hostGetNextResult = handle->getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kAdvanced, hostGetNextResult.code);
     ASSERT_TRUE(hostGetNextResult.resultDocument.has_value());
     ASSERT_BSONOBJ_EQ(BSON("a" << 1), hostGetNextResult.resultDocument->getUnownedBSONObj());
 
     // Note that the match clause is "a": 1 so the documents where "a": 2 will be passed over.
-    hostGetNextResult = handle.getNext(_execCtx.get());
+    hostGetNextResult = handle->getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kEOF, hostGetNextResult.code);
     ASSERT_EQ(boost::none, hostGetNextResult.resultDocument);
 
@@ -132,7 +132,7 @@ TEST_F(ExecAggStageTest, GetNextResultEdgeCaseEof) {
     auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
     auto handle = ExecAggStageHandle{hostExecAggStage};
 
-    auto hostGetNextResult = handle.getNext(_execCtx.get());
+    auto hostGetNextResult = handle->getNext(_execCtx.get());
     ASSERT_EQ(extension::GetNextCode::kEOF, hostGetNextResult.code);
     ASSERT_EQ(boost::none, hostGetNextResult.resultDocument);
 }
@@ -165,7 +165,7 @@ DEATH_TEST_F(ExecAggStageTestDeathTest, InvalidReturnStatusCode, "11019500") {
 
     // This getNext() call should hit the tassert because the C API doesn't have a
     // kAdvancedControlDocument value for GetNextCode.
-    handle.getNext(_execCtx.get());
+    handle->getNext(_execCtx.get());
 }
 
 TEST_F(ExecAggStageTest, IsHostAllocated) {
@@ -192,7 +192,7 @@ TEST_F(ExecAggStageTest, GetNameFromExtensionStage) {
         new sdk::ExtensionExecAggStage(sdk::shared_test_stages::TransformExecAggStage::make());
     auto handle = ExecAggStageHandle{transformExecAggStage};
 
-    ASSERT_EQ(handle.getName(), sdk::shared_test_stages::kTransformName);
+    ASSERT_EQ(handle->getName(), sdk::shared_test_stages::kTransformName);
 }
 
 TEST_F(ExecAggStageTest, GetNameFromHostStage) {
@@ -208,7 +208,7 @@ TEST_F(ExecAggStageTest, GetNameFromHostStage) {
     auto hostExecAggStage = new host_connector::HostExecAggStageAdapter(std::move(execAggStage));
     auto handle = ExecAggStageHandle{hostExecAggStage};
 
-    ASSERT_EQ(handle.getName(), "$match");
+    ASSERT_EQ(handle->getName(), "$match");
 }
 
 TEST_F(ExecAggStageTest, DeletedCopyAndMoveConstructors) {

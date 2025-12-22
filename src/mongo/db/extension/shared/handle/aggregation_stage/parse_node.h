@@ -37,9 +37,16 @@
 
 namespace mongo::extension {
 
-class AggStageParseNodeHandle;
-class LogicalAggStageHandle;
+class AggStageParseNodeAPI;
 
+template <>
+struct c_api_to_cpp_api<::MongoExtensionAggStageParseNode> {
+    using CppApi_t = AggStageParseNodeAPI;
+};
+
+using AggStageParseNodeHandle = OwnedHandle<::MongoExtensionAggStageParseNode>;
+
+using LogicalAggStageHandle = OwnedHandle<::MongoExtensionLogicalAggStage>;
 /**
  * Represents the possible types of nodes created during expansion, as owned handles.
  *
@@ -53,7 +60,8 @@ class LogicalAggStageHandle;
  * AggStageParseNode::expand() without knowing the underlying implementation of host-defined
  * nodes.
  *
- * The host is responsible for differentiating between host- and extension-defined nodes later on.
+ * The host is responsible for differentiating between host- and extension-defined nodes later
+ * on.
  */
 using VariantNodeHandle = std::variant<AggStageParseNodeHandle, AggStageAstNodeHandle>;
 
@@ -74,21 +82,18 @@ using VariantDPLHandle = std::variant<AggStageParseNodeHandle, LogicalAggStageHa
 std::vector<VariantDPLHandle> dplArrayToRaiiVector(::MongoExtensionDPLArray& arr);
 
 /**
- * AggStageParseNodeHandle is a wrapper around a MongoExtensionAggStageParseNode.
+ * AggStageParseNodeHandle is a wrapper around a MongoExtensionAggStageParseNode vtable API.
  */
-class AggStageParseNodeHandle : public OwnedHandle<::MongoExtensionAggStageParseNode> {
+class AggStageParseNodeAPI : public VTableAPI<::MongoExtensionAggStageParseNode> {
 public:
-    AggStageParseNodeHandle(::MongoExtensionAggStageParseNode* parseNode)
-        : OwnedHandle<::MongoExtensionAggStageParseNode>(parseNode) {
-        _assertValidVTable();
-    }
+    AggStageParseNodeAPI(::MongoExtensionAggStageParseNode* parseNode)
+        : VTableAPI<::MongoExtensionAggStageParseNode>(parseNode) {}
 
 
     /**
      * Returns a StringData containing the name of this aggregation stage.
      */
     StringData getName() const {
-        assertValid();
         auto stringView = byteViewAsStringView(vtable().get_name(get()));
         return StringData{stringView.data(), stringView.size()};
     }
@@ -108,8 +113,7 @@ public:
      */
     std::vector<VariantNodeHandle> expand() const;
 
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11217600, "AggStageParseNode 'get_name' is null", vtable.get_name != nullptr);
         tassert(10977600,
                 "AggStageParseNode 'get_query_shape' is null",

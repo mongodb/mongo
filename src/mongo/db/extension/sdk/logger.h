@@ -33,7 +33,18 @@
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::extension::sdk {
+namespace mongo::extension {
+
+namespace sdk {
+class LoggerAPI;
+}
+
+template <>
+struct c_api_to_cpp_api<::MongoExtensionLogger> {
+    using CppApi_t = sdk::LoggerAPI;
+};
+
+namespace sdk {
 
 /**
  * A simple named struct that allows an extension to specify the name/value of a desired log
@@ -66,10 +77,11 @@ public:
     }
 };
 
-class LoggerHandle : public UnownedHandle<const ::MongoExtensionLogger> {
+using LoggerHandle = UnownedHandle<const ::MongoExtensionLogger>;
+
+class LoggerAPI : public VTableAPI<::MongoExtensionLogger> {
 public:
-    LoggerHandle(const ::MongoExtensionLogger* services)
-        : UnownedHandle<const ::MongoExtensionLogger>(services) {}
+    LoggerAPI(::MongoExtensionLogger* services) : VTableAPI<::MongoExtensionLogger>(services) {}
 
     /**
      * Creates a MongoExtensionLogMessage struct for regular log messages.
@@ -94,7 +106,6 @@ public:
              std::int32_t code,
              MongoExtensionLogSeverity severity,
              const std::vector<ExtensionLogAttribute>& attrs) const {
-        assertValid();
 
         // Prevent materializing log messages that would not be logged.
         if (!shouldLog(severity, ::MongoExtensionLogType::kLog)) {
@@ -109,7 +120,6 @@ public:
                   std::int32_t code,
                   std::int32_t level,
                   const std::vector<ExtensionLogAttribute>& attrs) const {
-        assertValid();
 
         // Prevent materializing log messages that would not be logged.
         if (!shouldLog(::MongoExtensionLogSeverity(level), ::MongoExtensionLogType::kDebug)) {
@@ -122,15 +132,13 @@ public:
 
     bool shouldLog(::MongoExtensionLogSeverity levelOrSeverity,
                    ::MongoExtensionLogType logType) const {
-        assertValid();
         bool out = false;
         invokeCAndConvertStatusToException(
             [&]() { return vtable().should_log(levelOrSeverity, logType, &out); });
         return out;
     }
 
-private:
-    void _assertVTableConstraints(const VTable_t& vtable) const override;
+    static void assertVTableConstraints(const VTable_t& vtable);
 };
-
-}  // namespace mongo::extension::sdk
+}  // namespace sdk
+}  // namespace mongo::extension

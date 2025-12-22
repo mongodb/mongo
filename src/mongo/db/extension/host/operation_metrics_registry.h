@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/extension/host_connector/handle/host_operation_metrics_handle.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/executable_agg_stage.h"
+#include "mongo/db/extension/shared/handle/operation_metrics_handle.h"
 #include "mongo/util/modules.h"
 
 #include <map>
@@ -43,7 +43,7 @@ namespace mongo::extension::host {
  * OperationMetricsRegistry manages a collection of operation metrics for extension-executed
  * aggregation stages during query execution.
  *
- * This registry maintains owned HostOperationMetricsHandle instances, one per unique aggregation
+ * This registry maintains owned OwnedOperationMetricsHandle instances, one per unique aggregation
  * stage name, allowing metrics to be collected incrementally throughout pipeline execution.
  * It provides the following capabilities:
  *
@@ -69,11 +69,11 @@ public:
 
     BSONObj serialize() const;
 
-    extension::host_connector::HostOperationMetricsHandle* getOrCreateMetrics(
-        const std::string& stageName, UnownedExecAggStageHandle execStage);
+    UnownedOperationMetricsHandle getOrCreateMetrics(const std::string& stageName,
+                                                     UnownedExecAggStageHandle execStage);
 
 private:
-    std::map<std::string, extension::host_connector::HostOperationMetricsHandle> _metrics;
+    std::map<std::string, extension::OwnedOperationMetricsHandle> _metrics;
 };
 
 };  // namespace mongo::extension::host

@@ -61,7 +61,7 @@ TEST_F(QueryExecutionContextTestFixture, CheckForInterruptOk) {
     host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
     sdk::QueryExecutionContextHandle handle(&adapter);
 
-    ASSERT_EQ(handle.checkForInterrupt(), ExtensionGenericStatus());
+    ASSERT_EQ(handle->checkForInterrupt(), ExtensionGenericStatus());
 }
 
 TEST_F(QueryExecutionContextTestFixture, CheckForInterruptDefaultKillCode) {
@@ -71,9 +71,9 @@ TEST_F(QueryExecutionContextTestFixture, CheckForInterruptDefaultKillCode) {
         std::make_unique<host::QueryExecutionContext>(_expCtx.get());
     host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
     sdk::QueryExecutionContextHandle handle(&adapter);
-    auto status = handle.checkForInterrupt();
+    auto status = handle->checkForInterrupt();
 
-    ASSERT_EQ(handle.checkForInterrupt(),
+    ASSERT_EQ(handle->checkForInterrupt(),
               ExtensionGenericStatus(ErrorCodes::Interrupted, "operation was interrupted"));
 }
 
@@ -86,7 +86,7 @@ TEST_F(QueryExecutionContextTestFixture, CheckForInterruptCustomKillCode) {
     host_connector::QueryExecutionContextAdapter adapter(std::move(wrappedCtx));
     sdk::QueryExecutionContextHandle handle(&adapter);
 
-    ASSERT_EQ(handle.checkForInterrupt(),
+    ASSERT_EQ(handle->checkForInterrupt(),
               ExtensionGenericStatus(customKillCode, "operation was interrupted"));
 }
 

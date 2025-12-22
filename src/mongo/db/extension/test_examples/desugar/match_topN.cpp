@@ -65,7 +65,7 @@ public:
         // 3) Host $limit (TODO SERVER-115424 make this an extension $limit if $extensionLimit
         // deterministically returns the same results as native $limit for sharded collections.
         // Currently, $extensionLimit does not.)
-        auto* hostServices = sdk::HostServicesHandle::getHostServices();
+        auto& hostServices = sdk::HostServicesAPI::getInstance();
         out.emplace_back(hostServices->createHostAggStageParseNode(_matchSpec));
         out.emplace_back(hostServices->createHostAggStageParseNode(_sortSpec));
         out.emplace_back(hostServices->createHostAggStageParseNode(_limitSpec));

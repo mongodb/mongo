@@ -80,7 +80,7 @@ public:
 protected:
     DocumentSourceExtensionExpandable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       AggStageParseNodeHandle parseNode)
-        : DocumentSourceExtension(parseNode.getName(), expCtx), _parseNode(std::move(parseNode)) {}
+        : DocumentSourceExtension(parseNode->getName(), expCtx), _parseNode(std::move(parseNode)) {}
 
 private:
     const AggStageParseNodeHandle _parseNode;
@@ -88,8 +88,8 @@ private:
     DocumentSourceExtensionExpandable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       BSONObj rawStage,
                                       extension::AggStageDescriptorHandle staticDescriptor)
-        : DocumentSourceExtension(staticDescriptor.getName(), expCtx),
-          _parseNode(staticDescriptor.parse(rawStage)) {}
+        : DocumentSourceExtension(staticDescriptor->getName(), expCtx),
+          _parseNode(staticDescriptor->parse(rawStage)) {}
 };
 
 }  // namespace mongo::extension::host

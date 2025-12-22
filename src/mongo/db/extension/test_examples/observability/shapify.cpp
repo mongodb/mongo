@@ -85,16 +85,16 @@ private:
                              << "path field must be of type string, but found type " << elt.type()),
                             elt.type() == BSONType::string);
 
-                builder.append(fieldName, ctxHandle.serializeFieldPath(elt.String()));
+                builder.append(fieldName, ctxHandle->serializeFieldPath(elt.String()));
             } else if (str::startsWith(fieldName, "ident_")) {
                 sdk_uassert(11173602,
                             (str::stream() << "ident field must be of type string, but found type "
                                            << elt.type()),
                             elt.type() == BSONType::string);
 
-                builder.append(fieldName, ctxHandle.serializeIdentifier(elt.String()));
+                builder.append(fieldName, ctxHandle->serializeIdentifier(elt.String()));
             } else {
-                ctxHandle.appendLiteral(builder, fieldName, elt);
+                ctxHandle->appendLiteral(builder, fieldName, elt);
             }
         }
     }

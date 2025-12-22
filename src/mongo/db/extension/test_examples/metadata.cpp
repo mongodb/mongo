@@ -47,7 +47,7 @@ public:
     mongo::extension::ExtensionGetNextResult getNext(
         const sdk::QueryExecutionContextHandle& execCtx,
         ::MongoExtensionExecAggStage* execStage) override {
-        auto input = _getSource().getNext(execCtx.get());
+        auto input = _getSource()->getNext(execCtx.get());
         if (input.code == mongo::extension::GetNextCode::kPauseExecution) {
             return mongo::extension::ExtensionGetNextResult::pauseExecution();
         }

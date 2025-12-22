@@ -53,8 +53,8 @@ public:
 
     void setUp() override {
         AggregationContextFixture::setUp();
-        extension::sdk::HostServicesHandle::setHostServices(
-            extension::host_connector::HostServicesAdapter::get());
+        extension::sdk::HostServicesAPI::setHostServices(
+            &extension::host_connector::HostServicesAdapter::get());
     }
 
 protected:

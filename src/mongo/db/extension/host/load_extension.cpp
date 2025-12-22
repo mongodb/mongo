@@ -219,7 +219,7 @@ void ExtensionLoader::load(const std::string& name, const ExtensionConfig& confi
     host_connector::ExtensionHandle extHandle = getMongoExtension(*extensionLib, extensionPath);
     // Validate that the major and minor versions from the extension implementation are compatible
     // with the host API version.
-    assertVersionCompatibility(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extHandle.getVersion());
+    assertVersionCompatibility(&MONGO_EXTENSION_API_VERSIONS_SUPPORTED, extHandle->getVersion());
 
     // Get the max wire version of the server. During unit testing, return max wire version 0.
     const auto& maxWireVersion = TestingProctor::instance().isEnabled()
@@ -229,11 +229,11 @@ void ExtensionLoader::load(const std::string& name, const ExtensionConfig& confi
                .maxWireVersion);
 
     std::unique_ptr<HostPortal> hostPortal = std::make_unique<HostPortal>();
-    host_connector::HostPortalAdapter portal{extHandle.getVersion(),
+    host_connector::HostPortalAdapter portal{extHandle->getVersion(),
                                              maxWireVersion,
                                              YAML::Dump(config.extOptions),
                                              std::move(hostPortal)};
-    extHandle.initialize(&portal, host_connector::HostServicesAdapter::get());
+    extHandle->initialize(&portal, &host_connector::HostServicesAdapter::get());
 }
 
 stdx::unordered_map<std::string, ExtensionConfig> ExtensionLoader::getLoadedExtensions() {

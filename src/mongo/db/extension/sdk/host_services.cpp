@@ -34,11 +34,13 @@
 
 namespace mongo::extension::sdk {
 
-// The static instance of HostServicesHandle is initially set to nullptr. It will be set "for real"
-// at the very start of extension initialization, before any extension should attempt to access it.
-HostServicesHandle HostServicesHandle::_hostServices(nullptr);
+// The static handle is initially set to nullptr. It will be set "for real" at the
+//  very start of extension initialization, before any extension should attempt to access it.
+// TODO: This static pointer should be able to initialize inline, since extensions should build
+// statically.
+UnownedHandle<const ::MongoExtensionHostServices> HostServicesAPI::_sHostServices{nullptr};
 
-void HostServicesHandle::_assertVTableConstraints(const VTable_t& vtable) const {
+void HostServicesAPI::assertVTableConstraints(const VTable_t& vtable) {
     sdk_tassert(
         11097801, "Host services' 'user_asserted' is null", vtable.user_asserted != nullptr);
     sdk_tassert(11338300, "Host services' 'get_logger' is null", vtable.get_logger != nullptr);

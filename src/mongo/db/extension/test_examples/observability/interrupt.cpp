@@ -65,7 +65,7 @@ public:
         // Call checkForInterrupt to check if the operation has been interrupted.
         // If the checkForInterruptFail failpoint is active, this will mark the
         // operation as killed and cause checkForInterrupt to return a killed code.
-        auto cancelled = execCtx.checkForInterrupt();
+        auto cancelled = execCtx->checkForInterrupt();
         if (cancelled.getCode() != 0) {
             sdk_uassert(11213401,
                         "$interruptTest must receive ErrorCodes::Interrupted",
@@ -74,7 +74,7 @@ public:
         }
 
         auto input =
-            _getSource().getNext(const_cast<MongoExtensionQueryExecutionContext*>(execCtx.get()));
+            _getSource()->getNext(const_cast<MongoExtensionQueryExecutionContext*>(execCtx.get()));
 
         if (input.code == mongo::extension::GetNextCode::kPauseExecution) {
             return mongo::extension::ExtensionGetNextResult::pauseExecution();

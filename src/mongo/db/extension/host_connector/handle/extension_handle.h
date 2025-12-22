@@ -33,19 +33,27 @@
 #include "mongo/db/extension/shared/handle/handle.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::extension::host_connector {
+namespace mongo::extension {
+
+namespace host_connector {
+class ExtensionAPI;
+}
+
+template <>
+struct c_api_to_cpp_api<::MongoExtension> {
+    using CppApi_t = host_connector::ExtensionAPI;
+};
+
+namespace host_connector {
 
 /**
  * Wrapper for ::MongoExtension providing safe access to its public API via the vtable.
  * This is an unowned handle, meaning extensions remain fully owned by themselves, and ownership
  * is never transferred to the host.
  */
-class ExtensionHandle : public UnownedHandle<const ::MongoExtension> {
-
+class ExtensionAPI : public VTableAPI<::MongoExtension> {
 public:
-    ExtensionHandle(const ::MongoExtension* ext) : UnownedHandle<const ::MongoExtension>(ext) {
-        _assertValidVTable();
-    }
+    ExtensionAPI(::MongoExtension* ext) : VTableAPI<::MongoExtension>(ext) {}
 
     /**
      * Initialize the extension by providing it with a HostPortal and HostServices.
@@ -57,10 +65,8 @@ public:
      */
     void initialize(const MongoExtensionHostPortal* portal,
                     const MongoExtensionHostServices* hostServices) const {
-        invokeCAndConvertStatusToException([&] {
-            assertValid();
-            return vtable().initialize(get(), portal, hostServices);
-        });
+        invokeCAndConvertStatusToException(
+            [&] { return vtable().initialize(get(), portal, hostServices); });
     }
 
     ::MongoExtensionAPIVersion getVersion() const {
@@ -68,10 +74,11 @@ public:
         return get()->version;
     }
 
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
+    static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(10930101, "Extension 'initialize' is null", vtable.initialize != nullptr);
     };
 };
 
-}  // namespace mongo::extension::host_connector
+using ExtensionHandle = UnownedHandle<const ::MongoExtension>;
+}  // namespace host_connector
+}  // namespace mongo::extension

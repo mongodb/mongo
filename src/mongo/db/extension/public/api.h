@@ -187,7 +187,7 @@ const int32_t MONGO_EXTENSION_STATUS_OK = 0;
  * metrics would be exposed via the host in the format {$stageName: {counter: 1}}.
  */
 typedef struct MongoExtensionOperationMetrics {
-    const struct MongoExtensionOperationMetricsVTable* vtable;
+    const struct MongoExtensionOperationMetricsVTable* const vtable;
 } MongoExtensionOperationMetrics;
 
 typedef struct MongoExtensionOperationMetricsVTable {
@@ -217,7 +217,7 @@ typedef struct MongoExtensionOperationMetricsVTable {
  * functionality on a wrapped ExpressionContext. It is owned by the host and used by an extension.
  */
 typedef struct MongoExtensionQueryExecutionContext {
-    const struct MongoExtensionQueryExecutionContextVTable* vtable;
+    const struct MongoExtensionQueryExecutionContextVTable* const vtable;
 } MongoExtensionQueryExecutionContext;
 
 // Forward declare
@@ -256,7 +256,7 @@ typedef struct MongoExtensionQueryExecutionContextVTable {
  * extension.
  */
 typedef struct MongoExtensionHostQueryShapeOpts {
-    const struct MongoExtensionHostQueryShapeOptsVTable* vtable;
+    const struct MongoExtensionHostQueryShapeOptsVTable* const vtable;
 } MongoExtensionHostQueryShapeOpts;
 
 typedef struct MongoExtensionHostQueryShapeOptsVTable {
@@ -587,7 +587,8 @@ typedef struct MongoExtensionDistributedPlanLogicVTable {
      * not setting the sort key metadata on output documents will result in a runtime error.
      */
     MongoExtensionStatus* (*get_sort_pattern)(
-        MongoExtensionDistributedPlanLogic* distributedPlanLogic, MongoExtensionByteBuf** output);
+        const MongoExtensionDistributedPlanLogic* distributedPlanLogic,
+        MongoExtensionByteBuf** output);
 } MongoExtensionDistributedPlanLogicVTable;
 
 /**
@@ -817,7 +818,7 @@ typedef struct MongoExtensionExecAggStageVTable {
  * register custom aggregation stages.
  */
 typedef struct MongoExtensionHostPortal {
-    const struct MongoExtensionHostPortalVTable* vtable;
+    const struct MongoExtensionHostPortalVTable* const vtable;
     /**
      * The version of the Extensions API that the host and extension agreed upon when creating
      * the MongoExtension.
@@ -930,7 +931,7 @@ typedef struct MongoExtensionIdleThreadBlockVTable {
  * and emit debug traces conditionally based on server log level configuration.
  */
 typedef struct MongoExtensionLogger {
-    const struct MongoExtensionLoggerVTable* vtable;
+    const struct MongoExtensionLoggerVTable* const vtable;
 } MongoExtensionLogger;
 
 /**
@@ -960,7 +961,7 @@ typedef struct MongoExtensionLoggerVTable {
  * Currently, the VTable struct is a placeholder for future services.
  */
 typedef struct MongoExtensionHostServices {
-    const struct MongoExtensionHostServicesVTable* vtable;
+    const struct MongoExtensionHostServicesVTable* const vtable;
 } MongoExtensionHostServices;
 
 /**

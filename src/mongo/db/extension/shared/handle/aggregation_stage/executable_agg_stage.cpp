@@ -33,92 +33,49 @@
 
 namespace mongo::extension {
 
-void ExecAggStageHandle::setSource(const ExecAggStageHandle& input) {
-    assertValid();
+void ExecAggStageAPI::setSource(const ExecAggStageHandle& input) {
     invokeCAndConvertStatusToException([&]() { return vtable().set_source(get(), input.get()); });
 }
 
-namespace {
-ExtensionGetNextResult _internalGetNext(const MongoExtensionExecAggStageVTable& vtable,
-                                        MongoExtensionExecAggStage* stage,
-                                        MongoExtensionQueryExecutionContext* execCtxPtr) {
+ExtensionGetNextResult ExecAggStageAPI::getNext(MongoExtensionQueryExecutionContext* execCtxPtr) {
     ::MongoExtensionGetNextResult result = createDefaultExtensionGetNext();
     invokeCAndConvertStatusToException(
-        [&]() { return vtable.get_next(stage, execCtxPtr, &result); });
+        [&]() { return vtable().get_next(get(), execCtxPtr, &result); });
 
     return ExtensionGetNextResult::makeFromApiResult(result);
 }
 
-std::string_view _internalGetName(const MongoExtensionExecAggStageVTable& vtable,
-                                  const MongoExtensionExecAggStage* stage) {
-    return byteViewAsStringView(vtable.get_name(stage));
+std::string_view ExecAggStageAPI::getName() const {
+    return byteViewAsStringView(vtable().get_name(get()));
 }
 
-host_connector::HostOperationMetricsHandle _internalCreateMetrics(
-    const MongoExtensionExecAggStageVTable& vtable, const MongoExtensionExecAggStage* stage) {
+OwnedOperationMetricsHandle ExecAggStageAPI::createMetrics() const {
     MongoExtensionOperationMetrics* metrics = nullptr;
-    invokeCAndConvertStatusToException([&]() { return vtable.create_metrics(stage, &metrics); });
+    invokeCAndConvertStatusToException([&]() { return vtable().create_metrics(get(), &metrics); });
 
     tassert(11213505, "Result of `create_metrics` was nullptr", metrics != nullptr);
 
     // Take ownership of the created metrics and return the result.
-    return host_connector::HostOperationMetricsHandle(metrics);
-}
-}  // namespace
-
-ExtensionGetNextResult ExecAggStageHandle::getNext(
-    MongoExtensionQueryExecutionContext* execCtxPtr) {
-    assertValid();
-    return _internalGetNext(vtable(), get(), execCtxPtr);
+    return OwnedOperationMetricsHandle(metrics);
 }
 
-std::string_view ExecAggStageHandle::getName() const {
-    assertValid();
-    return _internalGetName(vtable(), get());
-}
-
-host_connector::HostOperationMetricsHandle ExecAggStageHandle::createMetrics() const {
-    assertValid();
-    return _internalCreateMetrics(vtable(), get());
-}
-
-std::string_view UnownedExecAggStageHandle::getName() const {
-    assertValid();
-    return _internalGetName(vtable(), get());
-}
-
-host_connector::HostOperationMetricsHandle UnownedExecAggStageHandle::createMetrics() const {
-    assertValid();
-    return _internalCreateMetrics(vtable(), get());
-}
-
-ExtensionGetNextResult UnownedExecAggStageHandle::getNext(
-    MongoExtensionQueryExecutionContext* execCtxPtr) {
-    assertValid();
-    return _internalGetNext(vtable(), get(), execCtxPtr);
-}
-
-void ExecAggStageHandle::open() {
-    assertValid();
+void ExecAggStageAPI::open() {
     invokeCAndConvertStatusToException([&]() { return vtable().open(get()); });
 }
 
-void ExecAggStageHandle::reopen() {
-    assertValid();
+void ExecAggStageAPI::reopen() {
     invokeCAndConvertStatusToException([&]() { return vtable().reopen(get()); });
 }
 
-void ExecAggStageHandle::close() {
-    assertValid();
+void ExecAggStageAPI::close() {
     invokeCAndConvertStatusToException([&]() { return vtable().close(get()); });
 }
 
-BSONObj ExecAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosity) const {
-    assertValid();
+BSONObj ExecAggStageAPI::explain(mongo::ExplainOptions::Verbosity verbosity) const {
     ::MongoExtensionByteBuf* buf{nullptr};
-    auto extVerbosity = convertHostVerbosityToExtVerbosity(verbosity);
-    invokeCAndConvertStatusToException(
-        [&]() { return vtable().explain(get(), extVerbosity, &buf); });
+    invokeCAndConvertStatusToException([&]() {
+        return vtable().explain(get(), convertHostVerbosityToExtVerbosity(verbosity), &buf);
+    });
 
     tassert(11239500, "buffer returned from explain must not be null", buf);
 
@@ -126,7 +83,7 @@ BSONObj ExecAggStageHandle::explain(mongo::ExplainOptions::Verbosity verbosity) 
     // BSONObj to return to the host.
     // TODO: SERVER-112442 Avoid the BSON copy in getOwned() once the work is completed.
     ExtensionByteBufHandle ownedBuf{buf};
-    return bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
+    return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
 
 }  // namespace mongo::extension

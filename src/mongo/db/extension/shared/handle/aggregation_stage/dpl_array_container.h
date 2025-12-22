@@ -36,18 +36,22 @@
 
 namespace mongo::extension {
 
+class DPLArrayContainerAPI;
+
+template <>
+struct c_api_to_cpp_api<::MongoExtensionDPLArrayContainer> {
+    using CppApi_t = DPLArrayContainerAPI;
+};
+
 /**
  * DPLArrayContainerHandle is a wrapper around a MongoExtensionDPLArrayContainer.
  */
-class DPLArrayContainerHandle : public OwnedHandle<::MongoExtensionDPLArrayContainer> {
+class DPLArrayContainerAPI : public VTableAPI<::MongoExtensionDPLArrayContainer> {
 public:
-    DPLArrayContainerHandle(::MongoExtensionDPLArrayContainer* container)
-        : OwnedHandle<::MongoExtensionDPLArrayContainer>(container) {
-        _assertValidVTable();
-    }
+    DPLArrayContainerAPI(::MongoExtensionDPLArrayContainer* container)
+        : VTableAPI<::MongoExtensionDPLArrayContainer>(container) {}
 
     size_t size() const {
-        assertValid();
         return vtable().size(get());
     }
 
@@ -55,7 +59,6 @@ public:
      * Transfers ownership of the elements in the container into a vector of RAII handles.
      */
     std::vector<VariantDPLHandle> transfer() {
-        assertValid();
         const auto arraySize = size();
         std::vector<::MongoExtensionDPLArrayElement> sdkAbiArray{arraySize};
 
@@ -63,6 +66,11 @@ public:
         _transferInternal(targetArray);
 
         return dplArrayToRaiiVector(targetArray);
+    }
+
+    static void assertVTableConstraints(const VTable_t& vtable) {
+        tassert(11368301, "DPLArrayContainer 'size' is null", vtable.size != nullptr);
+        tassert(11368302, "DPLArrayContainer 'transfer' is null", vtable.transfer != nullptr);
     }
 
 protected:
@@ -73,12 +81,9 @@ protected:
     void _transferInternal(::MongoExtensionDPLArray& arr) {
         invokeCAndConvertStatusToException([&]() { return vtable().transfer(get(), &arr); });
     }
-
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(11368301, "DPLArrayContainer 'size' is null", vtable.size != nullptr);
-        tassert(11368302, "DPLArrayContainer 'transfer' is null", vtable.transfer != nullptr);
-    }
 };
+
+using DPLArrayContainerHandle = OwnedHandle<::MongoExtensionDPLArrayContainer>;
 
 }  // namespace mongo::extension
 

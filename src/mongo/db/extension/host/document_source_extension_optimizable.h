@@ -81,7 +81,7 @@ public:
 
     // Wrapper around the LogicalAggStageHandle::compile() method. Returns an ExecAggStageHandle.
     ExecAggStageHandle compile() {
-        return _logicalStage.compile();
+        return _logicalStage->compile();
     }
 
 protected:
@@ -90,14 +90,14 @@ protected:
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        AggStageAstNodeHandle astNode)
-        : DocumentSourceExtension(astNode.getName(), expCtx),
-          _properties(astNode.getProperties()),
-          _logicalStage(astNode.bind()) {}
+        : DocumentSourceExtension(astNode->getName(), expCtx),
+          _properties(astNode->getProperties()),
+          _logicalStage(astNode->bind()) {}
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        LogicalAggStageHandle logicalStage,
                                        const MongoExtensionStaticProperties& properties)
-        : DocumentSourceExtension(logicalStage.getName(), expCtx),
+        : DocumentSourceExtension(logicalStage->getName(), expCtx),
           _properties(properties),
           _logicalStage(std::move(logicalStage)) {}
 };

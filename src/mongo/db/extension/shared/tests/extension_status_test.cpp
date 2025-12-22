@@ -42,8 +42,8 @@ TEST(ExtensionStatusTest, extensionStatusOKTest) {
     auto* const statusOKSingleton = &ExtensionStatusOK::getInstance();
     {
         StatusHandle statusHandle(statusOKSingleton);
-        ASSERT_EQUALS(statusHandle.getCode(), 0);
-        ASSERT_EQUALS(statusHandle.getReason().size(), 0);
+        ASSERT_EQUALS(statusHandle->getCode(), 0);
+        ASSERT_EQUALS(statusHandle->getReason().size(), 0);
     }
 
     ASSERT_TRUE(statusOKSingleton == &ExtensionStatusOK::getInstance());
@@ -58,12 +58,12 @@ TEST(ExtensionStatusTest, extensionStatusOKCloneTest) {
     auto* const statusOKSingleton = &ExtensionStatusOK::getInstance();
     {
         StatusHandle statusHandle(statusOKSingleton);
-        ASSERT_EQUALS(statusHandle.getCode(), 0);
-        ASSERT_EQUALS(statusHandle.getReason().size(), 0);
+        ASSERT_EQUALS(statusHandle->getCode(), 0);
+        ASSERT_EQUALS(statusHandle->getReason().size(), 0);
 
-        auto clonedHandle = statusHandle.clone();
-        ASSERT_EQUALS(statusHandle.getCode(), 0);
-        ASSERT_EQUALS(statusHandle.getReason().size(), 0);
+        auto clonedHandle = statusHandle->clone();
+        ASSERT_EQUALS(statusHandle->getCode(), 0);
+        ASSERT_EQUALS(statusHandle->getReason().size(), 0);
         ASSERT_EQUALS(ExtensionStatusOK::getInstanceCount(), 1);
     }
 
@@ -76,18 +76,18 @@ TEST(ExtensionStatusTest, extensionStatusOKCloneTest) {
 
 TEST(ExtensionStatusTest, extensionGenericStatusCloneTest) {
     StatusHandle statusHandle(new ExtensionGenericStatus(1, std::string("reason")));
-    auto clonedHandle = statusHandle.clone();
-    ASSERT_EQUALS(statusHandle.getCode(), clonedHandle.getCode());
-    ASSERT_EQUALS(statusHandle.getReason(), clonedHandle.getReason());
+    auto clonedHandle = statusHandle->clone();
+    ASSERT_EQUALS(statusHandle->getCode(), clonedHandle->getCode());
+    ASSERT_EQUALS(statusHandle->getReason(), clonedHandle->getReason());
 }
 
 TEST(ExtensionStatusTest, ExtensionStatusExceptionCloneTest) {
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
-        [&]() { uasserted(11186305, "Failed with uassert in $noOpExtension parse."); }));
+        [&]() { uasserted(11511001, "Failed with uassert in $noOpExtension parse."); }));
 
-    auto clonedHandle = status.clone();
-    ASSERT_EQUALS(status.getCode(), clonedHandle.getCode());
-    ASSERT_EQUALS(status.getReason(), clonedHandle.getReason());
+    auto clonedHandle = status->clone();
+    ASSERT_EQUALS(status->getCode(), clonedHandle->getCode());
+    ASSERT_EQUALS(status->getReason(), clonedHandle->getReason());
 
     auto exceptionPtr = ExtensionStatusException::extractException(*status.get());
     ASSERT(exceptionPtr);
@@ -101,7 +101,7 @@ TEST(ExtensionStatusTest, ExtensionStatusExceptionCloneTest) {
 TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_stdException) {
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { throw std::runtime_error("Runtime exception in $noOpExtension parse."); }));
-    ASSERT_TRUE(status.getCode() == MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
+    ASSERT_TRUE(status->getCode() == MONGO_EXTENSION_STATUS_RUNTIME_ERROR);
 }
 
 // Test that a std::exception can be rethrown when it crosses from a C++ context through the C API
@@ -122,7 +122,7 @@ TEST(
 TEST(ExtensionStatusTest, extensionStatusWrapCXXAndConvertExceptionToStatus_AssertionException) {
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { uasserted(10596408, "Failed with uassert in $noOpExtension parse."); }));
-    ASSERT_TRUE(status.getCode() == 10596408);
+    ASSERT_TRUE(status->getCode() == 10596408);
 }
 
 // Test that a DBException (uassert) can be rethrown when it crosses from a C++ context through the
@@ -178,62 +178,62 @@ TEST(ExtensionStatusTest, extensionStatusInvokeCAndConvertStatusToException_Exte
 
 DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsGetCode, "10930105") {
     StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status.vtable();
+    auto vtable = status->vtable();
     vtable.get_code = nullptr;
-    StatusHandle::assertVTableConstraintsHelper(vtable);
+    StatusAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsGetReason, "10930106") {
     StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status.vtable();
+    auto vtable = status->vtable();
     vtable.get_reason = nullptr;
-    StatusHandle::assertVTableConstraintsHelper(vtable);
+    StatusAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsSetCode, "11186306") {
     StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status.vtable();
+    auto vtable = status->vtable();
     vtable.set_code = nullptr;
-    StatusHandle::assertVTableConstraintsHelper(vtable);
+    StatusAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsSetReason, "11186309") {
     StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status.vtable();
+    auto vtable = status->vtable();
     vtable.set_reason = nullptr;
-    StatusHandle::assertVTableConstraintsHelper(vtable);
+    StatusAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsClone, "11186310") {
     StatusHandle status(new ExtensionGenericStatus());
-    auto vtable = status.vtable();
+    auto vtable = status->vtable();
     vtable.clone = nullptr;
-    StatusHandle::assertVTableConstraintsHelper(vtable);
+    StatusAPI::assertVTableConstraints(vtable);
 }
 
 DEATH_TEST(ExtensionStatusTest, ExtensionStatusOKSetReasonFails, "11186303") {
     StatusHandle status(&ExtensionStatusOK::getInstance());
-    status.setReason(std::string(""));
+    status->setReason("");
 }
 
 TEST(ExtensionStatusTest, ExtensionStatusOKSetCodeNoOp) {
     StatusHandle status(&ExtensionStatusOK::getInstance());
-    status.setCode(100);
-    ASSERT_EQ(status.getCode(), 0);
+    status->setCode(100);
+    ASSERT_EQ(status->getCode(), 0);
 }
 
 DEATH_TEST(ExtensionStatusTest, ExtensionStatusExceptionSetReasonFails, "11186304") {
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { uasserted(11186311, "Failed with uassert in $noOpExtension parse."); }));
-    status.setReason(std::string(""));
+    status->setReason("");
 }
 
 TEST(ExtensionStatusTest, ExtensionStatusExceptionSetCodeNoOp) {
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { uasserted(11186312, "Failed with uassert in $noOpExtension parse."); }));
-    ASSERT_EQ(status.getCode(), 11186312);
-    status.setCode(0);
-    ASSERT_EQ(status.getCode(), 11186312);
+    ASSERT_EQ(status->getCode(), 11186312);
+    status->setCode(0);
+    ASSERT_EQ(status->getCode(), 11186312);
 }
 
 }  // namespace
