@@ -310,3 +310,35 @@ class test_config04(wttest.WiredTigerTestCase):
     def test_transactional(self):
         # Note: this will have functional tests in the future.
         self.common_test('')
+
+    def test_removed_metadata_config(self):
+        '''
+        We still need to support all the removed configurations that may remain in the metadata, as
+        removing them could cause issues when upgrading to a newer version.
+        '''
+        self.conn = self.wiredtiger_open('.', 'create,statistics=(fast)')
+        self.session = self.conn.open_session(None)
+
+        create_args_base = 'key_format=S,value_format=S'
+        config_variants = [
+            ',lsm=(auto_throttle=)',
+            ',lsm=(bloom=)',
+            ',lsm=(bloom_bit_count=)',
+            ',lsm=(bloom_config=)',
+            ',lsm=(bloom_hash_count=)',
+            ',lsm=(bloom_oldest=)',
+            ',lsm=(chunk_count_limit=)',
+            ',lsm=(chunk_max=)',
+            ',lsm=(chunk_size=)',
+            ',lsm=(merge_custom=(prefix=))',
+            ',lsm=(merge_custom=(start_generation=))',
+            ',lsm=(merge_custom=(suffix=))',
+            ',lsm=(merge_max=)',
+            ',lsm=(merge_min=)',
+        ]
+
+        table_idx = 1
+        for config_variant in config_variants:
+            self.session.create("table:" + self.table_name1 + str(table_idx),
+                                create_args_base + config_variant)
+            table_idx += 1

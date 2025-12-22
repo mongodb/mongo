@@ -169,6 +169,16 @@ lsm_config = [
             removed option, preserved to allow parsing old metadata''', undoc=True),
         Config('chunk_size', 'none', r'''
             removed option, preserved to allow parsing old metadata''', undoc=True),
+        Config('merge_custom', '', r'''
+            removed option, preserved to allow parsing old metadata''',
+            type='category', undoc=True, subconfig=[
+            Config('prefix', '', r'''
+                removed option, preserved to allow parsing old metadata''', undoc=True),
+            Config('start_generation', '', r'''
+                removed option, preserved to allow parsing old metadata''', undoc=True),
+            Config('suffix', '', r'''
+                removed option, preserved to allow parsing old metadata''', undoc=True),
+            ]),
         Config('merge_max', 'none', r'''
             removed option, preserved to allow parsing old metadata''', undoc=True),
         Config('merge_min', 'none', r'''
