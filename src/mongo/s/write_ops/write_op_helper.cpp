@@ -116,8 +116,6 @@ int BulkCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& shardI
     // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
     // corresponding to the statements that got routed to each individual shard, so they need to
     // be accounted in the potential request size so it does not exceed the max BSON size.
-    // TODO(SERVER-115826): Update size estimation logic now that WriteBatchExecutor uses
-    // insert/update/delete commands.
     int writeSizeBytes = op.estimateOpSizeInBytesAsBulkOp() +
         write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
         (_isRetryableWriteOrInTransaction

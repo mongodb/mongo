@@ -50,8 +50,6 @@
 namespace mongo::unified_write_executor {
 namespace {
 
-// TODO: SERVER-108526 remove undeed creation of operation context if it's added to
-// 'WriteCommandContext'.
 class WriteBatchResponseProcessorTest : public ServiceContextTest {
 public:
     using RemoteCommandResponse = executor::RemoteCommandResponse;
