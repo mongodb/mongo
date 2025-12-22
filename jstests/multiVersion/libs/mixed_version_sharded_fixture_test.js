@@ -192,3 +192,139 @@ export function testPerformUpgradeSharded({
         afterFCVBump: whenFullyUpgraded,
     });
 }
+
+/**
+ * Simulates a granular config server upgrade using individual node upgrades and calls assertion
+ * callbacks at each step. This enables testing mixed-version config server scenarios.
+ * The procedure works like this:
+ *   1. Spin up a sharded cluster with 3 config servers on startingVersion.
+ *   2. Call setupFn() and beforeRestart() assertions.
+ *   3. Upgrade config server at index 0 with restartVersion.
+ *   4. Call afterFirstConfigUpgraded() assertions.
+ *   5. Upgrade config server at index 1 with restartVersion.
+ *   6. Call afterSecondConfigUpgraded() assertions.
+ *   7. Upgrade config server at index 2 with restartVersion.
+ *   8. Call afterAllConfigsUpgraded() assertions.
+ */
+export function testPerformIndividualConfigServerUpgrade({
+    startingVersion = latestVersion,
+    restartVersion = latestVersion,
+    startingNodeOptions = {},
+    restartNodeOptions = {},
+    setupFn,
+    beforeRestart,
+    afterFirstConfigUpgraded,
+    afterSecondConfigUpgraded,
+    afterAllConfigsUpgraded,
+}) {
+    jsTest.log.info(
+        "Starting a sharded cluster with 3 config servers on version " +
+            tojsononeline(startingVersion) +
+            " with options " +
+            tojsononeline(startingNodeOptions),
+    );
+
+    const st = new ShardingTest({
+        shards: 1,
+        mongos: 1,
+        config: 3,
+        other: {
+            mongosOptions: {...startingVersion, ...copyJSON(startingNodeOptions)},
+            configOptions: {...startingVersion, ...copyJSON(startingNodeOptions)},
+            rsOptions: {...startingVersion, ...copyJSON(startingNodeOptions)},
+        },
+    });
+    st.configRS.awaitReplication();
+
+    jsTest.log.info("Calling the setup function");
+    setupFn(st.s, st);
+
+    jsTest.log.info("Calling the beforeRestart function");
+    beforeRestart(st.s);
+
+    const justWaitForStable = {
+        upgradeShards: false,
+        upgradeMongos: false,
+        upgradeConfigs: false,
+        waitUntilStable: true,
+    };
+
+    // Upgrade first config server
+    jsTest.log.info(
+        "Upgrading config server at index 0 with version " +
+            tojsononeline(restartVersion) +
+            " and options " +
+            tojsononeline(restartNodeOptions),
+    );
+    st.upgradeCluster(
+        restartVersion.binVersion,
+        {...justWaitForStable, upgradeOneConfigNode: 0},
+        copyJSON(restartNodeOptions),
+    );
+
+    jsTest.log.info("Calling the afterFirstConfigUpgraded function");
+    afterFirstConfigUpgraded(st.s);
+
+    // Upgrade second config server
+    jsTest.log.info(
+        "Upgrading config server at index 1 with version " +
+            tojsononeline(restartVersion) +
+            " and options " +
+            tojsononeline(restartNodeOptions),
+    );
+    st.upgradeCluster(
+        restartVersion.binVersion,
+        {...justWaitForStable, upgradeOneConfigNode: 1},
+        copyJSON(restartNodeOptions),
+    );
+
+    jsTest.log.info("Calling the afterSecondConfigUpgraded function");
+    afterSecondConfigUpgraded(st.s);
+
+    // Upgrade third config server
+    jsTest.log.info(
+        "Upgrading config server at index 2 with version " +
+            tojsononeline(restartVersion) +
+            " and options " +
+            tojsononeline(restartNodeOptions),
+    );
+    st.upgradeCluster(
+        restartVersion.binVersion,
+        {...justWaitForStable, upgradeOneConfigNode: 2},
+        copyJSON(restartNodeOptions),
+    );
+
+    jsTest.log.info("Calling the afterAllConfigsUpgraded function");
+    afterAllConfigsUpgraded(st.s);
+
+    // Ensure config replica set is stable before stopping
+    jsTest.log.info("Ensuring config replica set is stable before cleanup...");
+    st.configRS.awaitReplication();
+    st.configRS.awaitSecondaryNodes();
+    let configPrimary = st.configRS.getPrimary();
+    assert.contains(configPrimary, st.configRS.nodes, "Config primary not found in configRS.nodes");
+
+    st.stop();
+}
+
+export function testPerformIndividualConfigUpgrade({
+    startingNodeOptions = {},
+    restartNodeOptions = {},
+    setupFn,
+    beforeRestart,
+    afterFirstConfigUpgraded,
+    afterSecondConfigUpgraded,
+    afterAllConfigsUpgraded,
+}) {
+    testPerformIndividualConfigServerUpgrade({
+        startingVersion: lastLTSVersion,
+        restartVersion: latestVersion,
+        startingNodeOptions,
+        restartNodeOptions,
+        setupFn,
+        beforeRestart,
+        afterFirstConfigUpgraded,
+        afterSecondConfigUpgraded,
+        afterAllConfigsUpgraded,
+    });
+}

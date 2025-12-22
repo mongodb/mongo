@@ -19,6 +19,7 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
  *     upgradeShards: <bool>, // defaults to true
  *     upgradeOneShard: <rs> // defaults to false,
  *     upgradeConfigs: <bool>, // defaults to true
+ *     upgradeOneConfigNode: <number> // defaults to -1, index of config server node to upgrade, -1 means no single node upgrade
  *     upgradeMongos: <bool>, // defaults to true
  *     waitUntilStable: <bool>, // defaults to false since it provides a more realistic
  *                                 approximation of real-world upgrade behaviour, even though
@@ -30,6 +31,7 @@ ShardingTest.prototype.upgradeCluster = function (binVersion, upgradeOptions, no
     if (upgradeOptions.upgradeShards == undefined) upgradeOptions.upgradeShards = true;
     if (upgradeOptions.upgradeOneShard == undefined) upgradeOptions.upgradeOneShard = false;
     if (upgradeOptions.upgradeConfigs == undefined) upgradeOptions.upgradeConfigs = true;
+    if (upgradeOptions.upgradeOneConfigNode == undefined) upgradeOptions.upgradeOneConfigNode = -1;
     if (upgradeOptions.upgradeMongos == undefined) upgradeOptions.upgradeMongos = true;
     if (upgradeOptions.waitUntilStable == undefined) upgradeOptions.waitUntilStable = false;
 
@@ -52,6 +54,31 @@ ShardingTest.prototype.upgradeCluster = function (binVersion, upgradeOptions, no
 
             this["config" + i] = this["c" + i] = this.configRS.nodes[i] = configSvr;
         }
+    } else if (upgradeOptions.upgradeOneConfigNode >= 0) {
+        // Upgrade one specific config server node by index
+        jsTest.log.info(`Upgrading config server node index: ${upgradeOptions.upgradeOneConfigNode}`);
+        const nodeIndex = upgradeOptions.upgradeOneConfigNode;
+        assert(nodeIndex < this.configRS.nodes.length);
+        let configNode = this.configRS.nodes[nodeIndex];
+
+        MongoRunner.stopMongod(configNode);
+        // Must copy the nodeOptions since they are modified by callee.
+        const configSvrOptions = copyJSON(nodeOptions);
+        configNode = MongoRunner.runMongod({
+            restart: configNode,
+            binVersion: binVersion,
+            appendOptions: true,
+            ...configSvrOptions,
+        });
+        this.configRS.awaitSecondaryNodes(this.configRS.timeoutMS, [configNode]);
+
+        jsTest.log.info(`Upgraded config server node index: ${upgradeOptions.upgradeOneConfigNode}, ${configNode}`);
+
+        // Update the reference in the configRS nodes array and shortcuts
+        this["config" + nodeIndex] = this["c" + nodeIndex] = this.configRS.nodes[nodeIndex] = configNode;
+
+        this.configRS.awaitNodesAgreeOnPrimary();
+        jsTest.log.info(`Config node ${nodeIndex} successfully restarted and rejoined`);
     }
 
     if (upgradeOptions.upgradeShards) {
@@ -106,6 +133,7 @@ ShardingTest.prototype.downgradeCluster = function (binVersion, downgradeOptions
     if (downgradeOptions.downgradeShards == undefined) downgradeOptions.downgradeShards = true;
     if (downgradeOptions.downgradeOneShard == undefined) downgradeOptions.downgradeOneShard = false;
     if (downgradeOptions.downgradeConfigs == undefined) downgradeOptions.downgradeConfigs = true;
+    if (downgradeOptions.downgradeOneConfig == undefined) downgradeOptions.downgradeOneConfig = -1;
     if (downgradeOptions.downgradeMongos == undefined) downgradeOptions.downgradeMongos = true;
     if (downgradeOptions.waitUntilStable == undefined) downgradeOptions.waitUntilStable = false;
 
@@ -171,6 +199,30 @@ ShardingTest.prototype.downgradeCluster = function (binVersion, downgradeOptions
 
             this["config" + i] = this["c" + i] = this.configRS.nodes[i] = configSvr;
         }
+    } else if (downgradeOptions.downgradeOneConfig >= 0) {
+        // Downgrade one specific config server node by index
+        const nodeIndex = downgradeOptions.downgradeOneConfig;
+        assert(nodeIndex < this.configRS.nodes.length);
+        let configNode = this.configRS.nodes[nodeIndex];
+
+        // Must copy the nodeOptions since they are modified by callee.
+        const configSvrOptions = copyJSON(nodeOptions);
+        MongoRunner.stopMongod(configNode);
+        configNode = MongoRunner.runMongod({
+            restart: configNode,
+            binVersion: binVersion,
+            appendOptions: true,
+            ...configSvrOptions,
+        });
+        this.configRS.awaitSecondaryNodes(this.configRS.timeoutMS, [configNode]);
+
+        jsTest.log.info(`Downgraded config server node index: ${downgradeOptions.downgradeOneConfig}, ${configNode}`);
+
+        // Update the reference in the configRS nodes array and shortcuts
+        this["config" + nodeIndex] = this["c" + nodeIndex] = this.configRS.nodes[nodeIndex] = configNode;
+
+        this.configRS.awaitNodesAgreeOnPrimary();
+        jsTest.log.info(`Config node ${nodeIndex} successfully restarted and rejoined`);
     }
 
     if (downgradeOptions.waitUntilStable) {
