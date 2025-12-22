@@ -117,8 +117,10 @@ public:
             const auto& progress =
                 topology_change_helpers::startShardDraining(opCtx, *shardId, ddlLock);
 
+            // The returned progress is empty if the shard is already in draining state, indicating
+            // the transition to dedicated config server has already started
             if (isTransitionToDedicatedCS &&
-                progress->getState() == ShardDrainingStateEnum::kStarted) {
+                (progress && progress->getState() == ShardDrainingStateEnum::kStarted)) {
                 ShardingStatistics::get(opCtx)
                     .countTransitionToDedicatedConfigServerStarted.addAndFetch(1);
             }
