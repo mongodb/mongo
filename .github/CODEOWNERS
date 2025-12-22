@@ -86,6 +86,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/bazel_rules_mongo/OWNERS.yml
 /buildscripts/bazel_rules_mongo/ @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 
+# The following patterns are parsed from ./buildscripts/bazel_rules_mongo/engflow_auth/OWNERS.yml
+/buildscripts/bazel_rules_mongo/engflow_auth/ @10gen/devprod-build @svc-auto-approve-bot
+
 # The following patterns are parsed from ./buildscripts/bazel_testbuilds/OWNERS.yml
 /buildscripts/bazel_testbuilds/ @10gen/devprod-build @svc-auto-approve-bot
 

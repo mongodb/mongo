@@ -2,6 +2,7 @@
 Install engflow_auth binary if not on system and authenticate if token is expired.
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -84,12 +85,22 @@ def install(verbose: bool) -> str:
     return binary_path
 
 
-def update_bazelrc(binary_path: str, verbose: bool):
+def update_bazelrc(binary_path: str, repo_root: str, verbose: bool):
     norm_path = os.path.normpath(binary_path).replace("\\", "/")
     lines = []
-    bazelrc_path = f"{os.path.expanduser('~')}/.bazelrc"
+    if not repo_root:
+        if verbose:
+            print(
+                "Repository root path not provided. Using current directory to write engflow credentials."
+            )
+        base_dir = os.getcwd()
+    else:
+        base_dir = repo_root
+
+    bazelrc_path = f"{base_dir}/.bazelrc.engflow_creds"
     if verbose:
         print(f"Updating {bazelrc_path}")
+
     if os.path.exists(bazelrc_path):
         with open(bazelrc_path, "r") as bazelrc:
             for line in bazelrc.readlines():
@@ -176,17 +187,27 @@ def authenticate(binary_path: str, verbose: bool) -> bool:
     return True
 
 
-def setup_auth(verbose: bool = True) -> bool:
+def setup_auth(verbose: bool = True, repo_root: str = None) -> bool:
     path = install(verbose)
     authenticated = authenticate(path, verbose)
     if not authenticated:
         return False
-    update_bazelrc(path, verbose)
+
+    update_bazelrc(path, repo_root, verbose)
     return True
 
 
 def main():
-    return 0 if setup_auth() else 1
+    """Main function for engflow_auth script."""
+
+    # If we are running in bazel, default the directory to the workspace
+    repo_root = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
+    if not repo_root:
+        print("Failed to find Bazel root workspace directory.")
+        print("Falling back to current working directory.")
+        repo_root = os.getcwd()
+
+    return 0 if setup_auth(repo_root=repo_root) else 1
 
 
 if __name__ == "__main__":

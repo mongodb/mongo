@@ -526,8 +526,8 @@ common:mod-scanner --aspects //modules_poc:mod_scanner.bzl%mod_scanner_aspect
 common:mod-scanner --remote_download_regex=.*\.mod_scanner_decls.json$
 
 --config=symbol-checker
-common:symbol-checker --aspects //bazel/symbol_checker:symbol_checker.bzl%symbol_checker_aspect  
-common:symbol-checker --output_groups=symbol_checker 
+common:symbol-checker --aspects //bazel/symbol_checker:symbol_checker.bzl%symbol_checker_aspect
+common:symbol-checker --output_groups=symbol_checker
 common:symbol-checker --skip_archive=False
 common:symbol-checker --keep_going
 
@@ -612,6 +612,9 @@ try-import %workspace%/.bazelrc.bazelisk
 
 # Flags synced from Flag Sync
 try-import %workspace%/.bazelrc.sync
+
+# Engflow auth credentials
+try-import %workspace%/.bazelrc.engflow_creds
 
 # Repository root absolute path to set --execution_log_compact_file
 try-import %workspace%/.bazelrc.exec_log_file

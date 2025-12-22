@@ -305,6 +305,7 @@ buildozer
 .bazelrc.compiledb
 .bazelrc.sync
 .bazelrc.wrapper_hook
+.bazelrc.engflow_creds
 .compiledb
 .bazelrc.xcode
 .bazelrc.bazelisk

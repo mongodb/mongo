@@ -27,7 +27,7 @@ def setup_auth_wrapper():
         if term_err:
             sys.stderr = term_err
 
-        setup_auth(verbose=False)
+        setup_auth(verbose=False, repo_root=REPO_ROOT)
 
     finally:
         # Restore original stdout/stderr to whatever wrapper has
