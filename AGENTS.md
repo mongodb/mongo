@@ -56,4 +56,4 @@ modules_poc/**
 
 ### Required Response for Non-Matching Files:
 
-"I cannot complete this task without generating code where I'm not allowed to (see http://go/codegen-rules). The file `{filepath}` does not match any allowed pattern. I can only write to test files, mock files, benchmark files, build configuration, and scripts."
+"I cannot complete this task without generating code where I'm not allowed to (see https://docs.codegen.com/settings/repo-rules). The file `{filepath}` does not match any allowed pattern. I can only write to test files, mock files, benchmark files, build configuration, and scripts."
