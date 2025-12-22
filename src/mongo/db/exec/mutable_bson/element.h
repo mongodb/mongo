@@ -41,6 +41,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/visibility.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/time_support.h"
 
@@ -123,7 +124,7 @@ class Document;
  *    be removed.
  */
 
-class MONGO_MUTABLE_BSON_API Element {
+class MONGO_MUTABLE_BSON_API MONGO_MOD_PUBLIC Element {
 public:
     typedef uint32_t RepIdx;
 

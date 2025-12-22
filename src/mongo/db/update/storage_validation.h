@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
@@ -52,10 +53,10 @@ namespace storage_validation {
  * 'containsDotsAndDollarsField' is set to true if there exists any field name containing '.'/'$'
  * during validation.
  */
-void scanDocument(const mutablebson::Document& doc,
-                  bool allowTopLevelDollarPrefixes,
-                  bool shouldValidate,
-                  bool* containsDotsAndDollarsField);
+MONGO_MOD_PUBLIC void scanDocument(const mutablebson::Document& doc,
+                                   bool allowTopLevelDollarPrefixes,
+                                   bool shouldValidate,
+                                   bool* containsDotsAndDollarsField);
 
 /**
  * Validates that the MutableBSON element 'elem' is acceptable for storage in a collection and

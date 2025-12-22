@@ -35,6 +35,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/update/update_node.h"
+#include "mongo/util/modules.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

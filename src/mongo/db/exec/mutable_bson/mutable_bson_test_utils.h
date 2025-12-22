@@ -33,6 +33,7 @@
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 

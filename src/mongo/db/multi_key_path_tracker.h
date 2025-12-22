@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <string>
@@ -43,7 +44,7 @@
 
 namespace mongo {
 
-struct MultikeyPathInfo {
+struct MONGO_MOD_PUBLIC MultikeyPathInfo {
     NamespaceString nss;
     UUID collectionUUID;
     std::string indexName;
@@ -51,7 +52,7 @@ struct MultikeyPathInfo {
     MultikeyPaths multikeyPaths;
 };
 
-using WorkerMultikeyPathInfo = std::vector<MultikeyPathInfo>;
+using WorkerMultikeyPathInfo MONGO_MOD_PUBLIC = std::vector<MultikeyPathInfo>;
 
 /**
  * An OperationContext decoration that tracks which indexes should be made multikey. This is used
@@ -59,7 +60,7 @@ using WorkerMultikeyPathInfo = std::vector<MultikeyPathInfo>;
  * secondary oplog application. This both marks if the multikey path information should be tracked
  * instead of set immediately and saves the multikey path information for later if needed.
  */
-class MultikeyPathTracker {
+class MONGO_MOD_PUBLIC MultikeyPathTracker {
 public:
     static const OperationContext::Decoration<MultikeyPathTracker> get;
 

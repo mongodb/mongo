@@ -31,6 +31,7 @@
 
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 
 #include <boost/intrusive_ptr.hpp>
 
@@ -45,7 +46,7 @@ namespace mongo {
  * CollectionIndexUsageTracker needs a wrapper class (this class) to initialize it with a clock
  * source.
  */
-class CollectionIndexUsageTrackerDecoration {
+class MONGO_MOD_PUBLIC CollectionIndexUsageTrackerDecoration {
 public:
     /**
      * Performs a copy of the CollectionIndexUsageTracker and stores the new instance in the

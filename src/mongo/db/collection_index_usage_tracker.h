@@ -34,6 +34,7 @@
 #include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
@@ -135,9 +136,9 @@ public:
      * Must be called under an exclusive collection lock in order to serialize calls to
      * registerIndex() and unregisterIndex().
      */
-    void registerIndex(StringData indexName,
-                       const BSONObj& indexKey,
-                       const IndexFeatures& features);
+    MONGO_MOD_PUBLIC void registerIndex(StringData indexName,
+                                        const BSONObj& indexKey,
+                                        const IndexFeatures& features);
 
     /**
      * Erase statistics for index 'indexName'. Can be safely called even if indexName is not
@@ -146,7 +147,7 @@ public:
      * Must be called under an exclusive collection lock in order to serialize calls to
      * registerIndex() and unregisterIndex().
      */
-    void unregisterIndex(StringData indexName);
+    MONGO_MOD_PUBLIC void unregisterIndex(StringData indexName);
 
     /**
      * Get the current state of the usage statistics map. This map will only include indexes that

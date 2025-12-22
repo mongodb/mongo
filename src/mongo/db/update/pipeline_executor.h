@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/update/update_executor.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>

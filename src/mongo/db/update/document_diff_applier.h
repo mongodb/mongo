@@ -34,6 +34,7 @@
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update_index_data.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer.h"
 
 namespace mongo {
@@ -57,11 +58,11 @@ struct DamagesOutput {
  * 'verifierFunction' is an optional parameter that, if set, will perform a check on the BSONObj
  * that is created as a result of the application of 'diff' onto 'pre'.
  */
-using VerifierFunc = std::function<void(const BSONObj& post, const BSONObj& pre)>;
-BSONObj applyDiff(const BSONObj& pre,
-                  const Diff& diff,
-                  bool mustCheckExistenceForInsertOperations,
-                  VerifierFunc verifierFunction = nullptr);
+using VerifierFunc MONGO_MOD_PUBLIC = std::function<void(const BSONObj& post, const BSONObj& pre)>;
+MONGO_MOD_PUBLIC BSONObj applyDiff(const BSONObj& pre,
+                                   const Diff& diff,
+                                   bool mustCheckExistenceForInsertOperations,
+                                   VerifierFunc verifierFunction = nullptr);
 
 /**
  * Computes the damage events from the diff for 'pre' and return the pre-image, damage source, and
@@ -70,8 +71,8 @@ BSONObj applyDiff(const BSONObj& pre,
  * set to true, unless the caller has knowledge of the pre-image and the diff, and can guarantee
  * that we will not re-insert anything.
  */
-DamagesOutput computeDamages(const BSONObj& pre,
-                             const Diff& diff,
-                             bool mustCheckExistenceForInsertOperations);
+MONGO_MOD_PUBLIC DamagesOutput computeDamages(const BSONObj& pre,
+                                              const Diff& diff,
+                                              bool mustCheckExistenceForInsertOperations);
 }  // namespace doc_diff
 }  // namespace mongo

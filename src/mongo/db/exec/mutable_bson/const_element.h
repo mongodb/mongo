@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/mutable_bson/api.h"
 #include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace mutablebson {

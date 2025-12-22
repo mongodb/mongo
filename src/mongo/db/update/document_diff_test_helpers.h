@@ -35,6 +35,7 @@
 #include "mongo/db/exec/mutable_bson/document.h"
 #include "mongo/db/update/update_executor.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

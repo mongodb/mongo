@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <compare>

@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -42,7 +43,7 @@ namespace mongo {
  * Holds pre-processed index spec information to allow update to quickly determine if an update
  * can be applied as a delta to a document, or if the document must be re-indexed.
  */
-class UpdateIndexData {
+class MONGO_MOD_PUBLIC UpdateIndexData {
 public:
     UpdateIndexData();
 

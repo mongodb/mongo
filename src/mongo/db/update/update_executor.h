@@ -34,6 +34,7 @@
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update_index_data.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

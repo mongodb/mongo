@@ -56,6 +56,7 @@
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>
@@ -71,7 +72,7 @@ namespace mongo {
 class CollatorInterface;
 class OperationContext;
 
-class UpdateDriver {
+class MONGO_MOD_PUBLIC UpdateDriver {
 public:
     enum class UpdateType { kOperator, kReplacement, kPipeline, kDelta, kTransform };
 

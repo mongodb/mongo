@@ -39,6 +39,7 @@
 #include "mongo/db/update/update_leaf_node.h"
 #include "mongo/db/update/update_node.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <map>

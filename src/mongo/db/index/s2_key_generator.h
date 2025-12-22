@@ -37,6 +37,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
+MONGO_MOD_PUBLIC;
 namespace mongo::index2dsphere {
 /**
  * Generates keys for S2 access method, used for 2dsphere index type.

@@ -36,6 +36,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/update/modifier_node.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>

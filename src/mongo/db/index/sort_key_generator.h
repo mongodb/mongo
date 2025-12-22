@@ -46,6 +46,7 @@
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -54,6 +55,7 @@
 
 #include <boost/optional/optional.hpp>
 
+MONGO_MOD_PUBLIC;
 namespace mongo {
 
 class SortKeyGenerator {

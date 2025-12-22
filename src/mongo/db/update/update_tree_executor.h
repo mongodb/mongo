@@ -33,6 +33,7 @@
 #include "mongo/db/update/update_node.h"
 #include "mongo/db/update/update_object_node.h"
 #include "mongo/db/update/v2_log_builder.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

@@ -36,6 +36,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
+MONGO_MOD_PUBLIC;
 namespace mongo::index2d {
 
 /**

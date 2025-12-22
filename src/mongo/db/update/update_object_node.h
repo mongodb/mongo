@@ -36,6 +36,7 @@
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_internal_node.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>

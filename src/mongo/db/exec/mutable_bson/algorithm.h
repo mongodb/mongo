@@ -32,6 +32,7 @@
 #include "mongo/base/string_data_comparator.h"
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/exec/mutable_bson/element.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -81,7 +82,7 @@ inline ElementType findElement(ElementType first, FieldNameEquals predicate) {
 
 /** A convenience wrapper around findElement<ElementType, FieldNameEquals>. */
 template <typename ElementType>
-inline ElementType findElementNamed(ElementType first, StringData fieldName) {
+MONGO_MOD_PUBLIC inline ElementType findElementNamed(ElementType first, StringData fieldName) {
     return findElement(first, FieldNameEquals(fieldName));
 }
 
@@ -105,7 +106,7 @@ inline ElementType findFirstChild(ElementType parent, FieldNameEquals predicate)
  *  Element is found, the returned Element's 'ok' method will return false.
  */
 template <typename ElementType>
-inline ElementType findFirstChildNamed(ElementType parent, StringData fieldName) {
+MONGO_MOD_PUBLIC inline ElementType findFirstChildNamed(ElementType parent, StringData fieldName) {
     return findFirstChild(parent, FieldNameEquals(fieldName));
 }
 

@@ -33,6 +33,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_node.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <string>

@@ -31,16 +31,17 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /*
  * Validate wildcard index key pattern.
  */
-Status validateWildcardIndex(const BSONObj& keyPattern);
+MONGO_MOD_PUBLIC Status validateWildcardIndex(const BSONObj& keyPattern);
 
 /*
  * Validate wildcardProjection field.
  */
-Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& pathProjection);
+MONGO_MOD_PUBLIC Status validateWildcardProjection(const BSONObj& keyPattern,
+                                                   const BSONObj& pathProjection);
 }  // namespace mongo

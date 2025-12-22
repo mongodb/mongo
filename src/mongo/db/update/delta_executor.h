@@ -36,6 +36,7 @@
 #include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 

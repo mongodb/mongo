@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
@@ -42,6 +43,7 @@
 /**
  * This provides helpers for creating oplog entries.
  */
+MONGO_MOD_PUBLIC;
 namespace mongo::update_oplog_entry {
 static inline constexpr StringData kDiffObjectFieldName = "diff"_sd;
 

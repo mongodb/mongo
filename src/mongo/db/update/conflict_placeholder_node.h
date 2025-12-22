@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/update/update_leaf_node.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>

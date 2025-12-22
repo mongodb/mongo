@@ -41,6 +41,7 @@
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/db/update/update_node.h"
 #include "mongo/db/update/update_node_visitor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

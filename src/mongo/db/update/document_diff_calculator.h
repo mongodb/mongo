@@ -34,6 +34,7 @@
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/dynamic_bitset.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -57,7 +58,7 @@ namespace mongo::doc_diff {
  * can be used for a collection. A collection likely has less than 64 indexes, and in this case all
  * excess bits are set to 0.
  */
-using IndexSet = DynamicBitset<std::uint64_t, 1>;
+using IndexSet MONGO_MOD_PUBLIC = DynamicBitset<std::uint64_t, 1>;
 
 /**
  * This class can quickly answer which indexes (if any) of a collection need to be maintained
@@ -66,7 +67,7 @@ using IndexSet = DynamicBitset<std::uint64_t, 1>;
  * For each ready and in progress index, a later call to 'addIndex' is expected later, to set
  * the appropriate bits in the IndexSets managed by the object.
  */
-class IndexUpdateIdentifier {
+class MONGO_MOD_PUBLIC IndexUpdateIdentifier {
 public:
     /**
      * Creates the object. The number of indexes here is the number of (ready and in progress)
@@ -165,9 +166,9 @@ private:
  * 'boost::none'. The 'paddingForDiff' represents the additional size that needs be added to the
  * size of the diff, while comparing whether the diff is viable.
  */
-boost::optional<Diff> computeOplogDiff(const BSONObj& pre,
-                                       const BSONObj& post,
-                                       size_t paddingForDiff);
+MONGO_MOD_PUBLIC boost::optional<Diff> computeOplogDiff(const BSONObj& pre,
+                                                        const BSONObj& post,
+                                                        size_t paddingForDiff);
 
 /**
  * Same as 'computeOplogDiff(...)', but also returns the diff if it is larger than the 'post'

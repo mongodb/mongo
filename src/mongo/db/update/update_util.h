@@ -37,6 +37,7 @@
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/safe_num.h"
 
 #include <boost/optional/optional.hpp>

@@ -36,6 +36,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::write_ops_exec {
 
@@ -43,8 +44,9 @@ namespace mongo::write_ops_exec {
  * Sets the Client's LastOp to the system OpTime if needed. This is especially helpful for
  * adjusting the client opTime for cases when batched write performed multiple writes, but
  * when the last write was a no-op (which will not advance the client opTime).
+ * TODO SERVER-115820 remove external dependencies on this class.
  */
-class LastOpFixer {
+class MONGO_MOD_NEEDS_REPLACEMENT LastOpFixer {
 public:
     LastOpFixer(OperationContext* opCtx);
 
@@ -68,6 +70,6 @@ private:
     repl::OpTime _opTimeAtLastOpStart;
 };
 
-void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss);
+MONGO_MOD_PUBLIC void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace mongo::write_ops_exec
