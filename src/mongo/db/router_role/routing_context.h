@@ -112,6 +112,28 @@ public:
     /**
      * Utility to trigger CatalogCache refreshes for staleness errors directly from the
      * RoutingContext.
+     *
+     * This method should only be called with errors of category StaleShardVersionError or
+     * StaleDbVersion. It processes the error's ExtraInfo to determine which routing information
+     * needs to be refreshed.
+     *
+     * @param status - A Status object containing a StaleShardVersionError or StaleDbVersion error.
+     *                 Must be one of:
+     *                 - ErrorCodes::StaleDbVersion (with StaleDbRoutingVersion ExtraInfo)
+     *                 - ErrorCodes::StaleConfig (with StaleConfigInfo ExtraInfo)
+     *                 - ErrorCodes::StaleEpoch (with optional StaleEpochInfo ExtraInfo)
+     *                 Other error codes will trigger a tassert failure.
+     *
+     * @param nss - Optional namespace to invalidate. This parameter exists to handle legacy
+     *              StaleEpoch errors that may not contain ExtraInfo with namespace information.
+     *
+     *              This parameter is only consulted for StaleEpoch errors without ExtraInfo.
+     *              For errors with ExtraInfo (StaleConfigInfo, StaleEpochInfo,
+     *              StaleDbRoutingVersion), the namespace is extracted from the ExtraInfo
+     *              and this parameter is ignored.
+     *
+     * @note TODO(SERVER-109793): Remove the nss parameter once all StaleShardVersion errors
+     *       are guaranteed to contain ExtraInfo with namespace information.
      */
     virtual void onStaleError(const Status& status,
                               boost::optional<const NamespaceString&> nss = boost::none);

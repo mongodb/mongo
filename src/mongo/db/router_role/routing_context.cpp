@@ -184,6 +184,13 @@ void RoutingContext::onRequestSentForNss(const NamespaceString& nss) {
 
 void RoutingContext::onStaleError(const Status& status,
                                   boost::optional<const NamespaceString&> nss) {
+
+    tassert(11451300,
+            str::stream() << "onStaleError called with invalid error category: " << status.code()
+                          << ". Expected StaleShardVersionError or StaleDbVersion",
+            status.code() == ErrorCodes::StaleDbVersion ||
+                ErrorCodes::isStaleShardVersionError(status));
+
     if (status.code() == ErrorCodes::StaleDbVersion) {
         auto si = status.extraInfo<StaleDbRoutingVersion>();
         // If the database version is stale, refresh its entry in the catalog cache.
@@ -203,15 +210,30 @@ void RoutingContext::onStaleError(const Status& status,
             } else {
                 _catalogCache->onStaleCollectionVersion(sei->getNss(), versionWanted);
             }
-        } else if (nss.has_value()) {
-            _catalogCache->invalidateCollectionEntry_LINEARIZABLE(*nss);
         } else {
-            // Let's refresh all the namespaces assigned to this RoutingContext if there is no way
-            // to know what are the namespaces with stale routing info
-            // TODO: SERVER-109793 once StaleEpochInfo becomes non-optional, it won't be possible to
-            // reach this `else`. Therefore, we should replace the for below and add a tassert.
-            for (const auto& [nss, _] : _nssRoutingInfoMap) {
-                _catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+            // StaleEpoch errors may not contain ExtraInfo with namespace information.
+            // In such cases, we require the namespace to be passed as a parameter to properly
+            // invalidate the routing cache. This is a legacy behavior that should be removed
+            // once all StaleEpoch errors are guaranteed to contain namespace information.
+            // TODO: SERVER-109793 Remove the optional nss parameter once all StaleShardVersion
+            // errors contain ExtraInfo with namespace information.
+
+            tassert(11451301,
+                    str::stream() << "StaleShardVersion error without ExtraInfo must be "
+                                  << "StaleEpoch error. Error code: " << status.code(),
+                    status.code() == ErrorCodes::StaleEpoch);
+
+            if (nss.has_value()) {
+                _catalogCache->invalidateCollectionEntry_LINEARIZABLE(*nss);
+            } else {
+                // Let's refresh all the namespaces assigned to this RoutingContext if there is no
+                // way to know what are the namespaces with stale routing info
+                // TODO: SERVER-109793 once StaleEpochInfo becomes non-optional, it won't be
+                // possible to reach this `else`. Therefore, we should replace the for below and add
+                // a tassert.
+                for (const auto& [nss, _] : _nssRoutingInfoMap) {
+                    _catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+                }
             }
         }
     }
