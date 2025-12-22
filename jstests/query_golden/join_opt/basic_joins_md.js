@@ -324,3 +324,12 @@ runBasicJoinTest([
     {$lookup: {from: foreignColl2.getName(), as: "y", localField: "b", foreignField: "b"}},
     {$unwind: "$y"},
 ]);
+
+section("Basic example with a $project reducing the documents of the base collection to a single field");
+runBasicJoinTest([
+    {$project: {a: true}},
+    {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+    {$unwind: "$x"},
+    {$lookup: {from: foreignColl3.getName(), as: "z", localField: "x.c", foreignField: "c"}},
+    {$unwind: "$z"},
+]);

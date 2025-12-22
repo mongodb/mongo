@@ -1668,13 +1668,15 @@ std::pair<SbStage, PlanStageSlots> generateJoinResult(const BinaryJoinEmbeddingN
             nodes.emplace_back(leftOutputs.has(key) ? leftOutputs.get(key) : rightOutputs.get(key));
         }
     }
-    auto [resultSlot, embedStage] = buildLookupResultObject(std::move(stage),
-                                                            rootDocumentSlot,
-                                                            std::move(nodes),
-                                                            std::move(paths),
-                                                            node->nodeId(),
-                                                            state,
-                                                            true /* shouldProduceBson */);
+    auto [resultSlot, embedStage] = buildLookupResultObject(
+        std::move(stage),
+        fieldEffect.getDefaultEffect() == FieldEffect::kDrop ? SbSlot{state.getNothingSlot()}
+                                                             : rootDocumentSlot,
+        std::move(nodes),
+        std::move(paths),
+        node->nodeId(),
+        state,
+        true /* shouldProduceBson */);
 
     PlanStageSlots outputs;
     outputs.setResultObj(resultSlot);
