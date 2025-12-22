@@ -45,6 +45,20 @@ timestamp_manager::decimal_to_hex(uint64_t value)
     return (res);
 }
 
+uint64_t
+timestamp_manager::hex_to_decimal(const std::string &timestamp)
+{
+    testutil_assert(!timestamp.empty());
+
+    uint64_t value = 0;
+    std::stringstream ss;
+    ss << std::hex << timestamp;
+    ss >> value;
+
+    testutil_assert(!ss.fail() && "hex parse failed");
+    return value;
+}
+
 timestamp_manager::timestamp_manager(configuration *config) : component("timestamp_manager", config)
 {
 }

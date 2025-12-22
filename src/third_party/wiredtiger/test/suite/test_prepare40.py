@@ -87,7 +87,7 @@ class test_prepare40(test_prepare_preserve_prepare_base):
         session3 = self.conn.open_session()
         # Check that we're writing updates as prepared again
         if 'disagg' in self.hook_names:
-            # In disagg, we write an empty delta
+            # In disagg, we should skip writing the page
             self.checkpoint_and_verify_stats({
                 wiredtiger.stat.dsrc.rec_page_delta_leaf: False,
             }, self.uri, session3)

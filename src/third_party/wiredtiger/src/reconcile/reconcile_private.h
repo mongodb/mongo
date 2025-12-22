@@ -196,6 +196,9 @@ struct __wti_reconcile {
     /* Track if any key is removed from the disk image due to its delete is globally visible. */
     bool key_removed_from_disk_image;
 
+    /* Track if we write anything that is newer than the previous reconciliation. */
+    bool newer_updates_than_last_rec_used;
+
     /*
      * When we can't mark the page clean after reconciliation (for example, checkpoint or eviction
      * found some uncommitted updates), there's a leave-dirty flag.
@@ -445,8 +448,8 @@ struct __wti_update_select {
         (r)->ref->page->modify->mod_multi_entries == 1))
 
 /* Called after building the disk image. */
-#define WT_BUILD_DELTA_LEAF(session, r)                                                      \
-    (WT_DELTA_LEAF_ENABLED((session)) && !F_ISSET_ATOMIC_16(r->page, WT_PAGE_INMEM_SPLIT) && \
+#define WT_BUILD_DELTA_LEAF(session, r)                                                        \
+    (WT_DELTA_LEAF_ENABLED((session)) && !F_ISSET_ATOMIC_16((r)->page, WT_PAGE_INMEM_SPLIT) && \
       (r)->multi_next == 1 && WT_REC_RESULT_SINGLE_PAGE((session), (r)))
 
 /*

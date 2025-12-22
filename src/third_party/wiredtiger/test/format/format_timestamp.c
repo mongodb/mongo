@@ -107,6 +107,7 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
 
     /* Ensure timestamps are used. */
     testutil_assert(g.transaction_timestamps_config);
+    testutil_assert(session != NULL);
 
     conn = g.wts_conn;
 

@@ -49,6 +49,11 @@ __rec_update_save(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins, WT
         r->supd_memsize += upd_memsize;
     } else
         WT_ASSERT(session, !F_ISSET(r, WT_REC_EVICT) || upd_memsize == 0);
+
+    if (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) && !r->newer_updates_than_last_rec_used &&
+      __rec_selected_key_changed(session, supd))
+        r->newer_updates_than_last_rec_used = true;
+
     return (0);
 }
 
@@ -145,7 +150,7 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
             break;
     }
 
-    bool delta_enabled = WT_DELTA_LEAF_ENABLED(session);
+    bool is_disagg = F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED);
     /*
      * Additionally, we need to append a tombstone before the onpage value we're about to append to
      * the list, if the onpage value has a valid stop time point. Imagine a case where we insert and
@@ -192,7 +197,7 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
             tombstone->upd_start_ts = unpack->tw.stop_ts;
             tombstone->upd_durable_ts = unpack->tw.durable_stop_ts;
             F_SET(tombstone, WT_UPDATE_RESTORED_FROM_DS);
-            if (delta_enabled)
+            if (is_disagg)
                 F_SET(tombstone, WT_UPDATE_DURABLE);
         } else {
             /*
@@ -237,7 +242,7 @@ __rec_append_orig_value(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd,
         append->upd_start_ts = unpack->tw.start_ts;
         append->upd_durable_ts = unpack->tw.durable_start_ts;
         F_SET(append, WT_UPDATE_RESTORED_FROM_DS);
-        if (delta_enabled)
+        if (is_disagg)
             F_SET(append, WT_UPDATE_DURABLE);
     }
 
@@ -375,6 +380,7 @@ static WT_INLINE bool
 __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELECT *upd_select,
   WT_CELL_UNPACK_KV *vpack, bool supd_restore)
 {
+    WT_BTREE *btree;
     WT_UPDATE *upd;
     bool visible_all;
 
@@ -387,13 +393,15 @@ __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELEC
     if (supd_restore)
         return (true);
 
-    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) || F_ISSET(S2BT(session), WT_BTREE_IN_MEMORY))
+    btree = S2BT(session);
+
+    if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) || F_ISSET(btree, WT_BTREE_IN_MEMORY))
         return (false);
     /*
-     * We need to save the update chain to build the delta. Don't save the update chain if the
-     * selected update is already durable.
+     * We need to save the update chain to check whether the reconciliation makes progress for
+     * disaggregated btrees. Don't save the update chain if the selected update is already durable.
      */
-    if (upd_select->upd != NULL && WT_DELTA_LEAF_ENABLED(session)) {
+    if (upd_select->upd != NULL && F_ISSET(btree, WT_BTREE_DISAGGREGATED)) {
         if (upd_select->tombstone != NULL) {
             if (!F_ISSET(upd_select->tombstone, WT_UPDATE_DURABLE | WT_UPDATE_PREPARE_DURABLE))
                 return (true);
@@ -1353,12 +1361,13 @@ __rec_fill_tw_from_upd_select(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_U
          * currently we either append the onpage value and return that, or return the tombstone
          * itself; there is no case that returns no update but sets the time window.)
          *
-         * If the tombstone is restored from the disk except for building delta or the history
+         * If the tombstone is restored from the disk except for disaggregated btrees or the history
          * store, the onpage value and the history store value should have been restored together.
          * Therefore, we should not end up here.
          */
         WT_ASSERT_ALWAYS(session,
-          (WT_DELTA_LEAF_ENABLED(session) && !F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_HS)) ||
+          (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&
+            !F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_HS)) ||
             (!F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)),
           "A tombstone written to the disk image except for disaggregated storage or history store "
           "should be accompanied by the full value.");
@@ -1617,7 +1626,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
 
     __wti_rec_time_window_clear_obsolete(session, upd_select, NULL, r);
 
-    if (WT_DELTA_LEAF_ENABLED(session)) {
+    if (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED)) {
         if (WT_TIME_WINDOW_HAS_START_PREPARE(&upd_select->tw)) {
             WT_UPDATE *first_committed_upd = upd_select->upd->next;
             for (; first_committed_upd != NULL; first_committed_upd = first_committed_upd->next) {
@@ -1634,7 +1643,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
 
             /*
              * Clear the durable flags on the first committed update to ensure it can be included in
-             * the next delta if the prepared update is rolled back.
+             * the next write if the prepared update is rolled back.
              */
             if (first_committed_upd != NULL)
                 F_CLR(first_committed_upd, WT_UPDATE_DURABLE | WT_UPDATE_DELETE_DURABLE);
@@ -1642,7 +1651,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
             /*
              * When only writing a prepared tombstone, ensure the durable flags on the on-page value
              * are cleared. Otherwise, if the prepared tombstone is rolled back, the on-page value
-             * may be missed in the next delta.
+             * may be missed in the next write.
              */
             F_CLR(upd_select->upd, WT_UPDATE_DURABLE | WT_UPDATE_DELETE_DURABLE);
     }

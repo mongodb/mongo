@@ -512,6 +512,14 @@ if __name__ == '__main__':
         testargs.append(arg)
 
     if asan:
+        # FIXME-WT-16067: Investigate the reason of hidden warnings.
+        # For some reason, when tests are executed with ASAN by many processes in parallel,
+        # many warnings get hidden. While the reason is unknown, the simplest solution is to
+        # restrict parallel test execution when ASAN is enabled.
+        if parallel > 1:
+            print("ASAN is incompatible with running tests in parallel.")
+            sys.exit(1)
+
         # To run ASAN, we need to ensure these environment variables are set:
         #    ASAN_SYMBOLIZER_PATH    full path to the llvm-symbolizer program
         #    LD_LIBRARY_PATH         includes path with wiredtiger shared object

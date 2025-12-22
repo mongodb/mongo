@@ -3,3 +3,50 @@
 leak:InitModule
 # ARM64 python leaks memory from an unclear source. This suppresses that one leak.
 leak:PyObject_Malloc
+
+# FIXME-WT-16324: test_verify
+leak:__tiered_open
+
+# FIXME-WT-16291: test_verify.test_verify.test_verify_api_75pct_null
+leak:__wt_blkcache_read_multi
+
+# FIXME-WT-16321: test_backup11
+leak:__backup_list_append
+leak:__backup_config
+
+# FIXME-WT-16325: test_bug035
+leak:__wt_metadata_btree_id_to_uri
+
+# FIXME-WT-16322: test_checkpoint13
+leak:__curfile_create
+
+# FIXME-WT-16326: test_chunkcache01
+leak:__tier_do_operation
+leak:__create_and_populate_chunk
+leak:__wt_chunkcache_setup
+
+# FIXME-WT-16327: test_chunkcache02
+leak:__chunkcache_metadata_queue_internal
+
+# FIXME-WT-16328: test_layered08
+leak:__wt_dlopen
+
+# FIXME-WT-16329: test_layered44
+leak:__wt_meta_ckptlist_set
+
+# FIXME-WT-16323: test_prefetch01
+leak:__wt_txn_init
+
+# FIXME-WT-16330: test_schema02
+leak:__schema_open_table
+
+# FIXME-WT-16331: test_tiered04
+leak:__tiered_name_str
+
+# FIXME-WT-16332: test_tiered18
+leak:__create_colgroup
+
+# FIXME-WT-16083: Resolve the warnings and remove the suppressions.
+leak:_PyBytes_FromSize
+leak:_wrap__wiredtiger_calc_modify
+leak:__cursor_prepared_discover_setup

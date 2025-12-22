@@ -168,6 +168,9 @@ func_ok()
         -e '/int index_compare_S$/d' \
         -e '/int index_compare_primary$/d' \
         -e '/int index_compare_u$/d' \
+        -e '/int kp_load_key$/d' \
+        -e '/int kp_on_key_update$/d' \
+        -e '/int kp_terminate$/d' \
         -e '/int log_print_err_worker$/d' \
         -e '/int lz4_error$/d' \
         -e '/int lz4_pre_size$/d' \

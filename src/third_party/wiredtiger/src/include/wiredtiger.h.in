@@ -5770,6 +5770,11 @@ struct __wt_key_provider {
      * function again to fetch the new key. The extension should copy the new key into the
      * WT_CRYPT_KEYS::keys::data field up to WT_CRYPT_KEYS::keys::size.
      *
+     * Important: Key provider implementations should ensure that the keys are stable between
+     * calls within the same checkpoint. Once WiredTiger calls this function for a key size,
+     * it expects the same key to be returned when called again to retrieve key data.
+     * In other words, keys should not change between calls within the same checkpoint.
+     *
      * @param kp the WT_KEY_PROVIDER instance.
      * @param session the current WiredTiger session.
      * @param[out] crypt the WT_CRYPT_KEYS to hold the new key (if changed).
@@ -8207,171 +8212,171 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_REC_PAGE_MODS_GT500		1785
 /*! reconciliation: cursor next/prev calls during HS wrapup search_near */
 #define	WT_STAT_CONN_REC_HS_WRAPUP_NEXT_PREV_CALLS	1786
-/*! reconciliation: empty deltas skipped in disaggregated storage */
-#define	WT_STAT_CONN_REC_SKIP_EMPTY_DELTAS		1787
 /*! reconciliation: fast-path pages deleted */
-#define	WT_STAT_CONN_REC_PAGE_DELETE_FAST		1788
+#define	WT_STAT_CONN_REC_PAGE_DELETE_FAST		1787
 /*! reconciliation: full internal pages written instead of a page delta */
-#define	WT_STAT_CONN_REC_PAGE_FULL_IMAGE_INTERNAL	1789
+#define	WT_STAT_CONN_REC_PAGE_FULL_IMAGE_INTERNAL	1788
 /*! reconciliation: full leaf pages written instead of a page delta */
-#define	WT_STAT_CONN_REC_PAGE_FULL_IMAGE_LEAF		1790
+#define	WT_STAT_CONN_REC_PAGE_FULL_IMAGE_LEAF		1789
 /*! reconciliation: internal page delta keys deleted */
-#define	WT_STAT_CONN_REC_PAGE_DELTA_INTERNAL_KEY_DELETED	1791
+#define	WT_STAT_CONN_REC_PAGE_DELTA_INTERNAL_KEY_DELETED	1790
 /*! reconciliation: internal page delta keys updated/inserted */
-#define	WT_STAT_CONN_REC_PAGE_DELTA_INTERNAL_KEY_UPDATED	1792
+#define	WT_STAT_CONN_REC_PAGE_DELTA_INTERNAL_KEY_UPDATED	1791
 /*! reconciliation: internal page deltas written */
-#define	WT_STAT_CONN_REC_PAGE_DELTA_INTERNAL		1793
+#define	WT_STAT_CONN_REC_PAGE_DELTA_INTERNAL		1792
 /*! reconciliation: internal page multi-block writes */
-#define	WT_STAT_CONN_REC_MULTIBLOCK_INTERNAL		1794
+#define	WT_STAT_CONN_REC_MULTIBLOCK_INTERNAL		1793
 /*! reconciliation: leaf page deltas written */
-#define	WT_STAT_CONN_REC_PAGE_DELTA_LEAF		1795
+#define	WT_STAT_CONN_REC_PAGE_DELTA_LEAF		1794
 /*! reconciliation: leaf page multi-block writes */
-#define	WT_STAT_CONN_REC_MULTIBLOCK_LEAF		1796
+#define	WT_STAT_CONN_REC_MULTIBLOCK_LEAF		1795
 /*! reconciliation: leaf-page overflow keys */
-#define	WT_STAT_CONN_REC_OVERFLOW_KEY_LEAF		1797
+#define	WT_STAT_CONN_REC_OVERFLOW_KEY_LEAF		1796
 /*! reconciliation: max deltas seen on internal page during reconciliation */
-#define	WT_STAT_CONN_REC_MAX_INTERNAL_PAGE_DELTAS	1798
+#define	WT_STAT_CONN_REC_MAX_INTERNAL_PAGE_DELTAS	1797
 /*! reconciliation: max deltas seen on leaf page during reconciliation */
-#define	WT_STAT_CONN_REC_MAX_LEAF_PAGE_DELTAS		1799
+#define	WT_STAT_CONN_REC_MAX_LEAF_PAGE_DELTAS		1798
 /*! reconciliation: maximum milliseconds spent in a reconciliation call */
-#define	WT_STAT_CONN_REC_MAXIMUM_MILLISECONDS		1800
+#define	WT_STAT_CONN_REC_MAXIMUM_MILLISECONDS		1799
 /*!
  * reconciliation: maximum milliseconds spent in building a disk image in
  * a reconciliation
  */
-#define	WT_STAT_CONN_REC_MAXIMUM_IMAGE_BUILD_MILLISECONDS	1801
+#define	WT_STAT_CONN_REC_MAXIMUM_IMAGE_BUILD_MILLISECONDS	1800
 /*!
  * reconciliation: maximum milliseconds spent in moving updates to the
  * history store in a reconciliation
  */
-#define	WT_STAT_CONN_REC_MAXIMUM_HS_WRAPUP_MILLISECONDS	1802
+#define	WT_STAT_CONN_REC_MAXIMUM_HS_WRAPUP_MILLISECONDS	1801
 /*!
  * reconciliation: number of keys that are garbage collected form the
  * disk images in the ingest btrees for disaggregated storage
  */
-#define	WT_STAT_CONN_REC_INGEST_GARBAGE_COLLECTION_KEYS_DISK_IMAGE	1803
+#define	WT_STAT_CONN_REC_INGEST_GARBAGE_COLLECTION_KEYS_DISK_IMAGE	1802
 /*!
  * reconciliation: number of keys that are garbage collected form the
  * update chains in the ingest btrees for disaggregated storage
  */
-#define	WT_STAT_CONN_REC_INGEST_GARBAGE_COLLECTION_KEYS_UPDATE_CHAIN	1804
+#define	WT_STAT_CONN_REC_INGEST_GARBAGE_COLLECTION_KEYS_UPDATE_CHAIN	1803
 /*! reconciliation: overflow values written */
-#define	WT_STAT_CONN_REC_OVERFLOW_VALUE			1805
+#define	WT_STAT_CONN_REC_OVERFLOW_VALUE			1804
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1806
+#define	WT_STAT_CONN_REC_PAGES				1805
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1807
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1806
 /*! reconciliation: page reconciliation calls for pages between 1 and 10MB */
-#define	WT_STAT_CONN_REC_PAGES_SIZE_1MB_TO_10MB		1808
+#define	WT_STAT_CONN_REC_PAGES_SIZE_1MB_TO_10MB		1807
 /*!
  * reconciliation: page reconciliation calls for pages between 10 and
  * 100MB
  */
-#define	WT_STAT_CONN_REC_PAGES_SIZE_10MB_TO_100MB	1809
+#define	WT_STAT_CONN_REC_PAGES_SIZE_10MB_TO_100MB	1808
 /*!
  * reconciliation: page reconciliation calls for pages between 100MB and
  * 1GB
  */
-#define	WT_STAT_CONN_REC_PAGES_SIZE_100MB_TO_1GB	1810
+#define	WT_STAT_CONN_REC_PAGES_SIZE_100MB_TO_1GB	1809
 /*! reconciliation: page reconciliation calls for pages over 1GB */
-#define	WT_STAT_CONN_REC_PAGES_SIZE_1GB_PLUS		1811
+#define	WT_STAT_CONN_REC_PAGES_SIZE_1GB_PLUS		1810
 /*!
  * reconciliation: page reconciliation calls that resulted in values with
  * prepared transaction metadata
  */
-#define	WT_STAT_CONN_REC_PAGES_WITH_PREPARE		1812
+#define	WT_STAT_CONN_REC_PAGES_WITH_PREPARE		1811
 /*!
  * reconciliation: page reconciliation calls that resulted in values with
  * timestamps
  */
-#define	WT_STAT_CONN_REC_PAGES_WITH_TS			1813
+#define	WT_STAT_CONN_REC_PAGES_WITH_TS			1812
 /*!
  * reconciliation: page reconciliation calls that resulted in values with
  * transaction ids
  */
-#define	WT_STAT_CONN_REC_PAGES_WITH_TXN			1814
+#define	WT_STAT_CONN_REC_PAGES_WITH_TXN			1813
 /*! reconciliation: pages deleted */
-#define	WT_STAT_CONN_REC_PAGE_DELETE			1815
+#define	WT_STAT_CONN_REC_PAGE_DELETE			1814
 /*!
  * reconciliation: pages written including an aggregated newest start
  * durable timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	1816
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	1815
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * durable timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	1817
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	1816
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_TS	1818
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_TS	1817
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * transaction ID
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_TXN	1819
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_TXN	1818
 /*!
  * reconciliation: pages written including an aggregated newest
  * transaction ID
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_TXN		1820
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_TXN		1819
 /*!
  * reconciliation: pages written including an aggregated oldest start
  * timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_OLDEST_START_TS	1821
+#define	WT_STAT_CONN_REC_TIME_AGGR_OLDEST_START_TS	1820
 /*! reconciliation: pages written including an aggregated prepare */
-#define	WT_STAT_CONN_REC_TIME_AGGR_PREPARED		1822
+#define	WT_STAT_CONN_REC_TIME_AGGR_PREPARED		1821
 /*! reconciliation: pages written including at least one prepare state */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_PREPARED	1823
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_PREPARED	1822
 /*!
  * reconciliation: pages written including at least one start durable
  * timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	1824
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	1823
 /*! reconciliation: pages written including at least one start timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_START_TS	1825
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_START_TS	1824
 /*!
  * reconciliation: pages written including at least one start transaction
  * ID
  */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_START_TXN	1826
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_START_TXN	1825
 /*!
  * reconciliation: pages written including at least one stop durable
  * timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	1827
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	1826
 /*! reconciliation: pages written including at least one stop timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_STOP_TS	1828
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_STOP_TS	1827
 /*!
  * reconciliation: pages written including at least one stop transaction
  * ID
  */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_STOP_TXN	1829
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_STOP_TXN	1828
 /*! reconciliation: pages written with at least one internal page delta */
-#define	WT_STAT_CONN_REC_PAGES_WITH_INTERNAL_DELTAS	1830
+#define	WT_STAT_CONN_REC_PAGES_WITH_INTERNAL_DELTAS	1829
 /*! reconciliation: pages written with at least one leaf page delta */
-#define	WT_STAT_CONN_REC_PAGES_WITH_LEAF_DELTAS		1831
+#define	WT_STAT_CONN_REC_PAGES_WITH_LEAF_DELTAS		1830
 /*! reconciliation: records written including a prepare state */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PREPARED		1832
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PREPARED		1831
 /*! reconciliation: records written including a start durable timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_DURABLE_START_TS	1833
+#define	WT_STAT_CONN_REC_TIME_WINDOW_DURABLE_START_TS	1832
 /*! reconciliation: records written including a start timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_START_TS		1834
+#define	WT_STAT_CONN_REC_TIME_WINDOW_START_TS		1833
 /*! reconciliation: records written including a start transaction ID */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_START_TXN		1835
+#define	WT_STAT_CONN_REC_TIME_WINDOW_START_TXN		1834
 /*! reconciliation: records written including a stop durable timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_DURABLE_STOP_TS	1836
+#define	WT_STAT_CONN_REC_TIME_WINDOW_DURABLE_STOP_TS	1835
 /*! reconciliation: records written including a stop timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_STOP_TS		1837
+#define	WT_STAT_CONN_REC_TIME_WINDOW_STOP_TS		1836
 /*! reconciliation: records written including a stop transaction ID */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_STOP_TXN		1838
+#define	WT_STAT_CONN_REC_TIME_WINDOW_STOP_TXN		1837
 /*! reconciliation: split bytes currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1839
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1838
 /*! reconciliation: split objects currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1840
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1839
+/*! reconciliation: writes skipped in disaggregated storage */
+#define	WT_STAT_CONN_REC_SKIP_WRITE			1840
 /*! session: attempts to remove a local object and the object is in use */
 #define	WT_STAT_CONN_LOCAL_OBJECTS_INUSE		1841
 /*! session: flush_tier failed calls */
@@ -9641,157 +9646,157 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_HS_WRAPUP_NEXT_PREV_CALLS	2310
 /*! reconciliation: dictionary matches */
 #define	WT_STAT_DSRC_REC_DICTIONARY			2311
-/*! reconciliation: empty deltas skipped in disaggregated storage */
-#define	WT_STAT_DSRC_REC_SKIP_EMPTY_DELTAS		2312
 /*! reconciliation: fast-path pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2313
+#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2312
 /*! reconciliation: full internal pages written instead of a page delta */
-#define	WT_STAT_DSRC_REC_PAGE_FULL_IMAGE_INTERNAL	2314
+#define	WT_STAT_DSRC_REC_PAGE_FULL_IMAGE_INTERNAL	2313
 /*! reconciliation: full leaf pages written instead of a page delta */
-#define	WT_STAT_DSRC_REC_PAGE_FULL_IMAGE_LEAF		2315
+#define	WT_STAT_DSRC_REC_PAGE_FULL_IMAGE_LEAF		2314
 /*! reconciliation: internal page delta keys deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELTA_INTERNAL_KEY_DELETED	2316
+#define	WT_STAT_DSRC_REC_PAGE_DELTA_INTERNAL_KEY_DELETED	2315
 /*! reconciliation: internal page delta keys updated/inserted */
-#define	WT_STAT_DSRC_REC_PAGE_DELTA_INTERNAL_KEY_UPDATED	2317
+#define	WT_STAT_DSRC_REC_PAGE_DELTA_INTERNAL_KEY_UPDATED	2316
 /*! reconciliation: internal page deltas written */
-#define	WT_STAT_DSRC_REC_PAGE_DELTA_INTERNAL		2318
+#define	WT_STAT_DSRC_REC_PAGE_DELTA_INTERNAL		2317
 /*!
  * reconciliation: internal page key bytes discarded using suffix
  * compression
  */
-#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2319
+#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2318
 /*! reconciliation: internal page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2320
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2319
 /*!
  * reconciliation: leaf delta page key bytes discarded using prefix
  * compression
  */
-#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION_DELTA	2321
+#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION_DELTA	2320
 /*!
  * reconciliation: leaf full page key bytes discarded using prefix
  * compression
  */
-#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION_FULL	2322
+#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION_FULL	2321
 /*! reconciliation: leaf page deltas written */
-#define	WT_STAT_DSRC_REC_PAGE_DELTA_LEAF		2323
+#define	WT_STAT_DSRC_REC_PAGE_DELTA_LEAF		2322
 /*! reconciliation: leaf page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2324
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2323
 /*! reconciliation: leaf-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2325
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2324
 /*! reconciliation: max deltas seen on internal page during reconciliation */
-#define	WT_STAT_DSRC_REC_MAX_INTERNAL_PAGE_DELTAS	2326
+#define	WT_STAT_DSRC_REC_MAX_INTERNAL_PAGE_DELTAS	2325
 /*! reconciliation: max deltas seen on leaf page during reconciliation */
-#define	WT_STAT_DSRC_REC_MAX_LEAF_PAGE_DELTAS		2327
+#define	WT_STAT_DSRC_REC_MAX_LEAF_PAGE_DELTAS		2326
 /*! reconciliation: maximum blocks required for a page */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2328
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2327
 /*!
  * reconciliation: number of keys that are garbage collected form the
  * disk images in the ingest btrees for disaggregated storage
  */
-#define	WT_STAT_DSRC_REC_INGEST_GARBAGE_COLLECTION_KEYS_DISK_IMAGE	2329
+#define	WT_STAT_DSRC_REC_INGEST_GARBAGE_COLLECTION_KEYS_DISK_IMAGE	2328
 /*!
  * reconciliation: number of keys that are garbage collected form the
  * update chains in the ingest btrees for disaggregated storage
  */
-#define	WT_STAT_DSRC_REC_INGEST_GARBAGE_COLLECTION_KEYS_UPDATE_CHAIN	2330
+#define	WT_STAT_DSRC_REC_INGEST_GARBAGE_COLLECTION_KEYS_UPDATE_CHAIN	2329
 /*! reconciliation: overflow values written */
-#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2331
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2330
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2332
+#define	WT_STAT_DSRC_REC_PAGES				2331
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2333
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2332
 /*! reconciliation: page reconciliation calls for pages between 1 and 10MB */
-#define	WT_STAT_DSRC_REC_PAGES_SIZE_1MB_TO_10MB		2334
+#define	WT_STAT_DSRC_REC_PAGES_SIZE_1MB_TO_10MB		2333
 /*!
  * reconciliation: page reconciliation calls for pages between 10 and
  * 100MB
  */
-#define	WT_STAT_DSRC_REC_PAGES_SIZE_10MB_TO_100MB	2335
+#define	WT_STAT_DSRC_REC_PAGES_SIZE_10MB_TO_100MB	2334
 /*!
  * reconciliation: page reconciliation calls for pages between 100MB and
  * 1GB
  */
-#define	WT_STAT_DSRC_REC_PAGES_SIZE_100MB_TO_1GB	2336
+#define	WT_STAT_DSRC_REC_PAGES_SIZE_100MB_TO_1GB	2335
 /*! reconciliation: page reconciliation calls for pages over 1GB */
-#define	WT_STAT_DSRC_REC_PAGES_SIZE_1GB_PLUS		2337
+#define	WT_STAT_DSRC_REC_PAGES_SIZE_1GB_PLUS		2336
 /*! reconciliation: pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2338
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2337
 /*!
  * reconciliation: pages written including an aggregated newest start
  * durable timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	2339
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	2338
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * durable timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	2340
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	2339
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TS	2341
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TS	2340
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * transaction ID
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TXN	2342
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TXN	2341
 /*!
  * reconciliation: pages written including an aggregated newest
  * transaction ID
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_TXN		2343
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_TXN		2342
 /*!
  * reconciliation: pages written including an aggregated oldest start
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_OLDEST_START_TS	2344
+#define	WT_STAT_DSRC_REC_TIME_AGGR_OLDEST_START_TS	2343
 /*! reconciliation: pages written including an aggregated prepare */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_PREPARED		2345
+#define	WT_STAT_DSRC_REC_TIME_AGGR_PREPARED		2344
 /*! reconciliation: pages written including at least one prepare state */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_PREPARED	2346
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_PREPARED	2345
 /*!
  * reconciliation: pages written including at least one start durable
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	2347
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	2346
 /*! reconciliation: pages written including at least one start timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TS	2348
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TS	2347
 /*!
  * reconciliation: pages written including at least one start transaction
  * ID
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TXN	2349
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TXN	2348
 /*!
  * reconciliation: pages written including at least one stop durable
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	2350
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	2349
 /*! reconciliation: pages written including at least one stop timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TS	2351
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TS	2350
 /*!
  * reconciliation: pages written including at least one stop transaction
  * ID
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TXN	2352
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TXN	2351
 /*! reconciliation: pages written with at least one internal page delta */
-#define	WT_STAT_DSRC_REC_PAGES_WITH_INTERNAL_DELTAS	2353
+#define	WT_STAT_DSRC_REC_PAGES_WITH_INTERNAL_DELTAS	2352
 /*! reconciliation: pages written with at least one leaf page delta */
-#define	WT_STAT_DSRC_REC_PAGES_WITH_LEAF_DELTAS		2354
+#define	WT_STAT_DSRC_REC_PAGES_WITH_LEAF_DELTAS		2353
 /*! reconciliation: records written including a prepare state */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PREPARED		2355
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PREPARED		2354
 /*! reconciliation: records written including a start durable timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_START_TS	2356
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_START_TS	2355
 /*! reconciliation: records written including a start timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TS		2357
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TS		2356
 /*! reconciliation: records written including a start transaction ID */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TXN		2358
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TXN		2357
 /*! reconciliation: records written including a stop durable timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_STOP_TS	2359
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_STOP_TS	2358
 /*! reconciliation: records written including a stop timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TS		2360
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TS		2359
 /*! reconciliation: records written including a stop transaction ID */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TXN		2361
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TXN		2360
+/*! reconciliation: writes skipped in disaggregated storage */
+#define	WT_STAT_DSRC_REC_SKIP_WRITE			2361
 /*! session: object compaction */
 #define	WT_STAT_DSRC_SESSION_COMPACT			2362
 /*!

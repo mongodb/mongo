@@ -76,9 +76,10 @@ extern "C" {
 #define DIR_STORE "dir_store"
 #define S3_STORE "s3_store"
 
-#define TESTUTIL_ENV_CONFIG_DISAGG         \
-    ",disaggregated=(role=%s,page_log=%s)" \
-    ",precise_checkpoint=true"             \
+/* FIXME-WT-16269: Make drain_threads configurable in test format. */
+#define TESTUTIL_ENV_CONFIG_DISAGG                         \
+    ",disaggregated=(role=%s,page_log=%s,drain_threads=4)" \
+    ",precise_checkpoint=true"                             \
     ",page_delta=(internal_page_delta=%s,leaf_page_delta=%s)"
 #define TESTUTIL_ENV_CONFIG_DISAGG_EXT                                                   \
     "\"%s/ext/page_log/%s/libwiredtiger_%s.so\"=("                                       \
@@ -563,6 +564,7 @@ void testutil_copy(const char *, const char *);
 void testutil_copy_data(void);
 void testutil_copy_data_opt(const char *);
 void testutil_copy_ext(const char *, const char *, const WT_FILE_COPY_OPTS *opts);
+void testutil_copy_fast(const char *, const char *);
 void testutil_copy_file(WT_SESSION *, const char *);
 void testutil_copy_if_exists(WT_SESSION *, const char *);
 void testutil_create_backup_directory(const char *, uint64_t, bool);

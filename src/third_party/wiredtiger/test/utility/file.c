@@ -30,6 +30,7 @@
 #ifndef _WIN32
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <dirent.h>
 #include <glob.h>
 #include <libgen.h>
@@ -415,6 +416,42 @@ void
 testutil_copy(const char *source, const char *dest)
 {
     testutil_copy_ext(source, dest, NULL);
+}
+
+/*
+ * testutil_copy_fast --
+ *     Fast recursive copy. On Unix, uses system cp command. On Windows, falls back to slow copy.
+ *     Fail the test on error.
+ */
+void
+testutil_copy_fast(const char *source, const char *dest)
+{
+#ifndef _WIN32
+    pid_t pid;
+    int status;
+
+    pid = fork();
+    if (pid < 0)
+        testutil_die(errno, "fork failed during copy of %s to %s", source, dest);
+
+    if (pid == 0) {
+        /* Child process: exec cp command. */
+        execlp("cp", "cp", "-R", "-p", source, dest, (char *)NULL);
+        /* If exec returns, it failed. */
+        testutil_die(errno, "exec cp failed during copy of %s to %s", source, dest);
+    }
+
+    /* Parent process: wait for child to complete. */
+    if (waitpid(pid, &status, 0) < 0)
+        testutil_die(errno, "waitpid failed during copy of %s to %s", source, dest);
+
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        testutil_die(EINVAL, "cp command failed during copy of %s to %s (exit status: %d)", source,
+          dest, WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+#else
+    /* On Windows, fall back to the regular copy implementation. */
+    testutil_copy(source, dest);
+#endif
 }
 
 /*

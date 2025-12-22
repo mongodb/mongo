@@ -494,3 +494,40 @@ __wti_rec_get_row_leaf_key(WT_SESSION_IMPL *session, WT_BTREE *btree, WTI_RECONC
 
     return (0);
 }
+
+/*
+ * __rec_selected_key_changed --
+ *     Check whether the selected update is different from the previous successful reconciliation.
+ */
+static WT_INLINE bool
+__rec_selected_key_changed(WT_SESSION_IMPL *session, WT_SAVE_UPD *supd)
+{
+    if (supd->onpage_tombstone == NULL && supd->onpage_upd == NULL)
+        return (false);
+
+    if (supd->onpage_upd == NULL) {
+        if (F_ISSET(supd->onpage_tombstone, WT_UPDATE_DELETE_DURABLE))
+            return (false);
+    } else {
+        WT_ASSERT(session, supd->onpage_upd->type != WT_UPDATE_TOMBSTONE);
+        if (supd->onpage_tombstone != NULL) {
+            if (F_ISSET(supd->onpage_tombstone, WT_UPDATE_DURABLE))
+                return (false);
+
+            /* Skip writing the prepared update that has already been written. */
+            if (F_ISSET(supd->onpage_tombstone, WT_UPDATE_PREPARE_DURABLE) &&
+              WT_TIME_WINDOW_HAS_STOP_PREPARE(&supd->tw))
+                return (false);
+        } else {
+            if (F_ISSET(supd->onpage_upd, WT_UPDATE_DURABLE))
+                return (false);
+
+            /* Skip writing the prepared update that has already been written. */
+            if (F_ISSET(supd->onpage_upd, WT_UPDATE_PREPARE_DURABLE) &&
+              WT_TIME_WINDOW_HAS_START_PREPARE(&supd->tw))
+                return (false);
+        }
+    }
+
+    return (true);
+}

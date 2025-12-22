@@ -92,6 +92,16 @@ class PageType(enum.Enum):
     WT_PAGE_ROW_INT = 6
     WT_PAGE_ROW_LEAF = 7
 
+class PageFlags(enum.IntFlag):
+    '''
+    Page flags from btmem.h.
+    '''
+    WT_PAGE_COMPRESSED = 0x01
+    WT_PAGE_EMPTY_V_ALL = 0x02
+    WT_PAGE_EMPTY_V_NONE = 0x04
+    WT_PAGE_ENCRYPTED = 0x08
+    WT_PAGE_UNUSED = 0x10
+    WT_PAGE_FT_UPDATE = 0x20
 
 class PageHeader(object):
     '''
@@ -102,17 +112,9 @@ class PageHeader(object):
     memsize: int
     entries: int # Or: overflow data length
     type: PageType
-    flags: int
+    flags: PageFlags
     unused: int
     version: int
-
-    # Flags
-    WT_PAGE_COMPRESSED: typing.Final[int] = 0x01
-    WT_PAGE_EMPTY_V_ALL: typing.Final[int] = 0x02
-    WT_PAGE_EMPTY_V_NONE: typing.Final[int] = 0x04
-    WT_PAGE_ENCRYPTED: typing.Final[int] = 0x08
-    WT_PAGE_UNUSED: typing.Final[int] = 0x10
-    WT_PAGE_FT_UPDATE: typing.Final[int] = 0x20
 
     def __init__(self) -> None:
         '''
@@ -139,14 +141,33 @@ class PageHeader(object):
         h.mem_size = b.read_uint32()
         h.entries = b.read_uint32()
         h.type = PageType(b.read_uint8())
-        h.flags = b.read_uint8()
+        h.flags = PageFlags(b.read_uint8())
         h.unused = b.read_uint8()
         h.version = b.read_uint8()
         return h
 
+    def __str__(self):
+        header_string = (
+            f"Page Header:\n"
+            f"  recno: {str(self.recno)}\n"
+            f"  writegen: {str(self.write_gen)}\n"
+            f"  memsize: {str(self.mem_size)}\n"
+            f"  ncells (overflow len): {str(self.entries)}\n"
+            f"  page type: {str(self.type.value)} ({self.type.name})\n"
+            f"  page flags: {str(self.flags)}\n"
+            f"  version: {str(self.version)}"
+        )
+        
+        return header_string
 #
 # Block
 #
+
+class BlockFlags(enum.IntFlag):
+    '''
+    Block flags from block.h
+    '''
+    WT_BLOCK_DATA_CKSUM = 0x1
 
 class BlockHeader(object):
     '''
@@ -154,13 +175,8 @@ class BlockHeader(object):
     '''
     disk_size: int
     checksum: int
-    flags: int
+    flags: BlockFlags
     unused: int
-
-    # Flags
-    WT_BLOCK_DATA_CKSUM: typing.Final[int] = 0x1
-    WT_BLOCK_DISAGG_ENCRYPTED: typing.Final[int] = 0x2  # disagg only
-    WT_BLOCK_DISAGG_COMPRESSED: typing.Final[int] = 0x4 # disagg only
 
     def __init__(self) -> None:
         '''
@@ -172,32 +188,98 @@ class BlockHeader(object):
         self.unused = 0
 
     @staticmethod
-    def parse(b: binary_data.BinaryFile, disagg = False) -> 'BlockHeader':
+    def parse(b: binary_data.BinaryFile) -> 'BlockHeader':
         '''
         Parse a block header.
         '''
         # WT_BLOCK_HEADER in block.h (12 bytes)
         h = BlockHeader()
-        if disagg:
-            # Disagg sets additional fields.  If they are examined
-            # by non-disagg code, an exception will be thrown (by design).
-            h.disagg_magic = b.read_uint8()
-            h.disagg_version = b.read_uint8()
-            h.disagg_compatible_version = b.read_uint8()
-            h.disagg_header_size = b.read_uint8()
-            h.checksum = b.read_uint32()
-            h.disagg_previous_checksum = b.read_uint32()
-            h.disagg_reconciliation_id = b.read_uint8()
-            h.flags = b.read_uint8()
-            h.unused = int.from_bytes(b.read(2), byteorder='little')
-        else:
-            h.disk_size = b.read_uint32()
-            h.checksum = b.read_uint32()
-            h.flags = b.read_uint8()
-            h.unused = int.from_bytes(b.read(3), byteorder='little')
+        h.disk_size = b.read_uint32()
+        h.checksum = b.read_uint32()
+        h.flags = BlockFlags(b.read_uint8())
+        h.unused = int.from_bytes(b.read(3), byteorder='little')
         return h
+    
+    def __str__(self):
+        header_string = (
+            f"Block Header:\n"
+            f"  disk_size: {str(self.disk_size)}"
+            f"  checksum: {str(self.checksum)}"
+            f"  flags: {str(self.flags)}"
+        )
+        return header_string
 
+class BlockDisaggFlags(enum.IntFlag):
+    '''
+    Disagg block flags from block.h
+    '''
+    WT_BLOCK_DISAGG_DATA_CKSUM = 0x1
+    WT_BLOCK_DISAGG_ENCRYPTED = 0x2
+    WT_BLOCK_DISAGG_COMPRESSED = 0x4
 
+class BlockDisaggHeader(object):
+    '''
+    A block header (WT_BLOCK_DISAGG_HEADER). Disagg uses additional header fields in the block 
+    header in comparison to standard WiredTiger blocks. This class should only be used for disagg 
+    blocks.
+    '''
+    magic: int
+    version: int
+    compatible_version: int
+    header_size: int
+    checksum: int
+    previous_checksum: int
+    flags: BlockDisaggFlags
+    unused: int
+
+    # Block types (magic byte)
+    WT_BLOCK_DISAGG_MAGIC_BASE: typing.Final[int] = 0xdb
+    WT_BLOCK_DISAGG_MAGIC_DELTA: typing.Final[int] = 0xdd
+
+    def __init__(self) -> None:
+        '''
+        Initialize the instance with default values.
+        '''
+        self.magic = 0
+        self.version = 0
+        self.compatible_version = 0
+        self.header_size = 0
+        self.checksum = 0
+        self.previous_checksum = 0
+        self.flags = 0
+        self.unused = 0
+
+    @staticmethod
+    def parse(b: binary_data.BinaryFile, disagg = False) -> 'BlockDisaggHeader':
+        '''
+        Parse a block header.
+        '''
+        # WT_BLOCK_DISAGG_HEADER in block.h (16 bytes)
+        h = BlockDisaggHeader()
+        h.magic = b. read_uint8()
+        h.version = b.read_uint8()
+        h.compatible_version = b.read_uint8()
+        h.header_size = b.read_uint8()
+        h.checksum = b.read_uint32()
+        h.previous_checksum = b.read_uint32()
+        h.flags = BlockDisaggFlags(b.read_uint8())
+        h.unused = int.from_bytes(b.read(2), byteorder='little')
+        return h
+    
+    def __str__(self):
+        header_string = (
+            f"Block Disagg Header:\n"
+            f"  magic: {hex(self.magic)} ({'delta' if self.magic == self.WT_BLOCK_DISAGG_MAGIC_DELTA else 'full image'})\n"
+            f"  version: {str(self.version)}\n"
+            f"  compatible_version: {str(self.compatible_version)}\n"
+            f"  header_size: {str(self.header_size)}\n"
+            f"  checksum: {str(self.checksum)}\n"
+            f"  previous_checksum: {str(self.previous_checksum)}\n"
+            f"  flags: {str(self.flags)}"
+        )
+        
+        return header_string
+    
 #
 # Cell
 #
@@ -432,4 +514,3 @@ class Cell(object):
         Check if this cell belongs to a prepared transaction.
         '''
         return self.extra_descriptor & Cell.WT_CELL_PREPARE != 0
-

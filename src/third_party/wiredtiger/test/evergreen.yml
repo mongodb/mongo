@@ -418,7 +418,8 @@ functions:
           # Compiling with CMake generated Ninja file.
           cd cmake_build
           if [ "${cmake_generator|Ninja}" = "Ninja" ]; then
-            ninja -j ${num_jobs} 2>&1
+            # Ninja runs compilation in parallel by default, so there's no need to pass -j.
+            ninja 2>&1
           else
             make -j ${num_jobs} 2>&1
           fi
@@ -2910,7 +2911,6 @@ tasks:
     patch_only: true
     depends_on:
     - name: compile
-    run_on: ubuntu2004-medium
     commands:
       - func: "fetch artifacts"
       - func: "unit test"
@@ -6437,9 +6437,14 @@ buildvariants:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
-      export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+      export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:allocator_may_return_null=1:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
+    # Parallel execution hides ASAN warnings for python tests. Force sequential execution of python
+    # tests by setting num_jobs to 1.
+    # FIXME-WT-16067: AFAIS even with num_jobs=1 some tests (e.g. format.sh) could be executed in
+    # a separate process. It's worth investigating whether it could lead to hiding some warnings.
+    num_jobs: 1
     # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
+    unit_test_ignore: test/suite/asan.fail
     unit_test_variant_args: --asan
     ctest_extra_args: -E "wt12015_backup_corruption"
     additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
@@ -6456,9 +6461,12 @@ buildvariants:
     - name: ".stress-test-asan"
     - name: ".stress-test-disagg"
       distros: ubuntu2004-large
+    # FIXME-WT-16302: Split unit tests into more buckets
     - name: ".unit_test"
     - name: ".unit_test_long"
 
+# FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
+# Investigate whether a similar thing could happen for TSAN.
 - name: ubuntu2004-tsan
   display_name: "! Ubuntu 20.04 TSAN"
   run_on:
@@ -6555,6 +6563,8 @@ buildvariants:
     - name: catch2-test
     - name: examples-c-test
 
+# FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
+# Investigate whether a similar thing could happen for MSAN.
 - name: ubuntu2004-msan
   display_name: "! Ubuntu 20.04 MSAN"
   run_on:
@@ -6586,6 +6596,8 @@ buildvariants:
     - name: make-check-test
       distros: ubuntu2004-large
 
+# FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
+# Investigate whether a similar thing could happen for UBSAN.
 - name: ubuntu2004-ubsan
   display_name: "! Ubuntu 20.04 UBSAN"
   run_on:
@@ -7317,12 +7329,17 @@ buildvariants:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     ENABLE_TCMALLOC: 0
     additional_env_vars: |
-      export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+      export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:allocator_may_return_null=1:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
+    # Parallel execution hides ASAN warnings for python tests. Force sequential execution of python
+    # tests by setting num_jobs to 1.
+    # FIXME-WT-16067: AFAIS even with num_jobs=1 some tests (e.g. format.sh) could be executed in
+    # a separate process. It's worth investigating whether it could lead to hiding some warnings.
+    num_jobs: 1
     # Exclude wt12015_backup_corruption for ASan builds. It creates false positives when it deliberately kills processes that invoke corruption.
-    ctest_extra_args: -E "wt12015_backup_corruption"
+    unit_test_ignore: test/suite/asan.fail
     unit_test_variant_args: --asan
     additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
+    ctest_extra_args: -E "wt12015_backup_corruption"
   tasks:
     - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test"
     - name: examples-c-test
@@ -7335,9 +7352,12 @@ buildvariants:
     - name: ".stress-test-asan"
     - name: ".stress-test-disagg"
       distros: amazon2023-arm64-latest-large-m8g
+    # FIXME-WT-16302: Split unit tests into more buckets
     - name: ".unit_test"
     - name: ".unit_test_long"
 
+# FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
+# Investigate whether a similar thing could happen for TSAN.
 - name: amazon2023-armv9-tsan
   display_name: "(ARMV9) Amazon Linux 2023 TSAN"
   run_on:
@@ -7363,6 +7383,8 @@ buildvariants:
     - name: generate-tsan-metric-timestamp
     - name: generate-tsan-metric-disagg-timestamp
 
+# FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
+# Investigate whether a similar thing could happen for MSAN.
 - name: amazon2023-armv9-msan
   display_name: "(ARMV9) Amazon Linux 2023 MSAN"
   run_on:
@@ -7397,6 +7419,8 @@ buildvariants:
       distros: amazon2023-arm64-latest-large-m8g
       batchtime: 1440 # once a day
 
+# FIXME-WT-16067: ASAN could hide warnings when tests are executed by many processes simultaneously.
+# Investigate whether a similar thing could happen for UBSAN.
 - name: amazon2023-armv9-ubsan
   display_name: "(ARMV9) Amazon Linux 2023 UBSAN"
   run_on:

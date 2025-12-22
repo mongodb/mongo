@@ -182,15 +182,14 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
 
             /*
              * If we restore an update chain in update restore eviction, there should be no update
-             * or a restored tombstone on the existing update chain except for btrees with leaf
-             * delta enabled or a prepared update if the preserve prepared config is enabled. FIXME-
-             * WT-16211: No need to consider the delta case if we have implemented delta
-             * consolidation.
+             * or a restored tombstone on the existing update chain except for disaggregated btrees
+             * or a prepared update if the preserve prepared config is enabled.
              */
             WT_ASSERT_ALWAYS(session,
               !restore ||
                 (*upd_entry == NULL ||
-                  (WT_DELTA_LEAF_ENABLED(session) && (*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
+                  (F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) &&
+                    (*upd_entry)->type == WT_UPDATE_TOMBSTONE &&
                     F_ISSET(*upd_entry, WT_UPDATE_RESTORED_FROM_DS)) ||
                   (F_ISSET(S2C(session), WT_CONN_PRESERVE_PREPARED) &&
                     F_ISSET(*upd_entry, WT_UPDATE_PREPARE_RESTORED_FROM_DS))),
@@ -253,12 +252,12 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value,
             __wt_upd_value_assign(cbt->modify_update, upd);
         } else {
             /*
-             * If this refers to the delta-enabled case, we can skip the following checks. We either
+             * If this refers to the disaggregated case, we can skip the following checks. We either
              * insert a tombstone with a standard update or only a standard update to the history
              * store if we write a prepared update to the data store.
              */
             WT_ASSERT(session,
-              WT_DELTA_LEAF_ENABLED(session) || !WT_IS_HS(S2BT(session)->dhandle) ||
+              F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) || !WT_IS_HS(S2BT(session)->dhandle) ||
                 (upd_arg->type == WT_UPDATE_TOMBSTONE && upd_arg->next != NULL &&
                   upd_arg->next->type == WT_UPDATE_STANDARD && upd_arg->next->next == NULL) ||
                 (upd_arg->type == WT_UPDATE_STANDARD && upd_arg->next == NULL));

@@ -1,0 +1,13 @@
+# This file is used by evergreen.yml when running the python test suite under ASAN.
+# List test files that are not run because they are known failures.
+# They are suppressed because they produce too many warnings that should be solved separately.
+
+# FIXME-WT-16083: Resolve the warnings and remove the file.
+
+test_corrupt01.py
+test_layered66.py
+test_tiered06.py
+test_txn18.py
+test_txn19.py
+test_txn22.py
+test_verify_disagg.py

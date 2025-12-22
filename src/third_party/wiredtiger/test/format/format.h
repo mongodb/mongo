@@ -472,6 +472,7 @@ void key_gen_teardown(WT_ITEM *);
 void key_init(TABLE *, void *);
 void lock_destroy(WT_SESSION *, RWLOCK *);
 void lock_init(WT_SESSION *, RWLOCK *);
+void locks_init(WT_CONNECTION *);
 void operations(u_int, u_int, u_int);
 void path_setup(const char *);
 void set_alarm(u_int);

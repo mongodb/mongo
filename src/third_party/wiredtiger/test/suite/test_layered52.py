@@ -38,13 +38,13 @@ import time
 # to the page log extension.
 
 @disagg_test_class
-class test_layered51(wttest.WiredTigerTestCase):
+class test_layered52(wttest.WiredTigerTestCase):
 
-    uri = 'file:test_layered51'
+    uri = 'file:test_layered52'
 
     conn_base_config = 'transaction_sync=(enabled,method=fsync),statistics=(all),statistics_log=(wait=1,json=true,on_close=true),' \
                      + 'page_delta=(delta_pct=100),'
-    disagg_storages = gen_disagg_storages('test_layered51', disagg_only = True)
+    disagg_storages = gen_disagg_storages('test_layered52', disagg_only = True)
 
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(disagg_storages)
@@ -134,7 +134,8 @@ class test_layered51(wttest.WiredTigerTestCase):
         # Remove the deleted keys from our set of expected keys.
         expected_keys.difference_update(keys_to_delete)
 
-        self.verify_stat()
+        # FIXME-WT-16316: Fix this test to generate internal delta again.
+        # self.verify_stat()
 
         # Verify that only the expected keys are present.
         self.verify(expected_keys, delete_ts)

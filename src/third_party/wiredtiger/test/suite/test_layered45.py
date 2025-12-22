@@ -90,7 +90,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         cursor2 = session2.open_cursor(self.uri, None, None)
         cursor2[str(2)] = value1
 
-        # We should build an empty delta
+        # We should skip writing the page
         self.session.checkpoint()
 
         stat_cursor = self.session.open_cursor('statistics:' + self.uri)
@@ -134,7 +134,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         cursor2 = session2.open_cursor(self.uri, None, None)
         cursor2[str(2)] = value1
 
-        # We should build an empty delta
+        # We should skip writing the page
         self.session.checkpoint()
 
         stat_cursor = self.session.open_cursor('statistics:' + self.uri)
@@ -159,7 +159,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         cursor2 = session2.open_cursor(self.uri, None, None)
         cursor2[str(2)] = value1
 
-        # We should build an empty delta
+        # We should skip writing the page
         self.session.checkpoint()
 
         stat_cursor = self.session.open_cursor('statistics:' + self.uri)
@@ -203,7 +203,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         cursor2 = session2.open_cursor(self.uri, None, None)
         cursor2[str(5)] = value1
 
-        # Evict the data and we should build an empty delta
+        # Evict the data and we should skip writing the page
         session3 = self.conn.open_session("debug=(release_evict_page)")
         evict_cursor = session3.open_cursor(self.uri, None, None)
         session3.begin_transaction()
@@ -235,7 +235,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         cursor2 = session2.open_cursor(self.uri, None, None)
         cursor2[str(2)] = value1
 
-        # We should build an empty delta
+        # We should skip writing the page
         self.session.checkpoint()
 
         stat_cursor = self.session.open_cursor('statistics:' + self.uri)
@@ -285,7 +285,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         cursor2[str(2)] = value1
         cursor2.reset()
 
-        # We should build an empty delta
+        # We should skip writing the page
         session2.checkpoint()
 
         stat_cursor = session2.open_cursor('statistics:' + self.uri)
@@ -302,7 +302,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
-        # We should build an empty delta
+        # We should skip writing the page
         session2.checkpoint()
 
         stat_cursor = session2.open_cursor('statistics:' + self.uri)
@@ -354,7 +354,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         cursor2[str(2)] = value1
         cursor2.reset()
 
-        # We should build an empty delta
+        # We should skip writing the page
         session2.checkpoint()
 
         stat_cursor = session2.open_cursor('statistics:' + self.uri)
@@ -371,7 +371,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
-        # We should build an empty delta
+        # We should skip writing the page
         session2.checkpoint()
 
         stat_cursor = session2.open_cursor('statistics:' + self.uri)
@@ -424,7 +424,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         cursor2[str(2)] = value1
         cursor2.reset()
 
-        # We should build an empty delta
+        # We should skip writing the page
         session2.checkpoint()
 
         stat_cursor = session2.open_cursor('statistics:' + self.uri)
@@ -441,7 +441,7 @@ class test_layered45(wttest.WiredTigerTestCase):
         self.assertEqual(stat_cursor[stat.dsrc.rec_page_delta_leaf][2], 2)
         stat_cursor.close()
 
-        # We should build an empty delta
+        # We should skip writing the page
         session2.checkpoint()
 
         stat_cursor = session2.open_cursor('statistics:' + self.uri)

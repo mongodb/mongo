@@ -126,6 +126,47 @@ err:
     return (ret);
 }
 
+/*
+ * __block_bitflip_detect --
+ *     Check if flipping a single bit in the data would match the expected checksum. This helps
+ *     diagnose single-bit memory corruption. Skip check for blocks larger than a defined size to
+ *     avoid excessive CPU usage.
+ */
+static bool
+__block_bitflip_detect(
+  void *data, size_t check_size, uint32_t expected_checksum, size_t *bit_position)
+{
+    size_t byte_index, bit_index;
+    uint8_t *bytes;
+
+    if (check_size > WT_BITFLIP_MAX_SIZE)
+        return (false);
+
+    bytes = (uint8_t *)data;
+
+    /* Try flipping each bit in the data. */
+    for (byte_index = 0; byte_index < check_size; ++byte_index) {
+        for (bit_index = 0; bit_index < 8; ++bit_index) {
+            /* Flip the bit. */
+            bytes[byte_index] ^= (1U << bit_index);
+
+            /* Check if it matches the expected checksum. */
+            if (__wt_checksum_match(data, check_size, expected_checksum)) {
+                /* Found a single bit flip that would produce the expected checksum. */
+                *bit_position = byte_index * 8 + bit_index;
+                /* Flip the bit back before returning. */
+                bytes[byte_index] ^= (1U << bit_index);
+                return (true);
+            }
+
+            /* Flip the bit back. */
+            bytes[byte_index] ^= (1U << bit_index);
+        }
+    }
+
+    return (false);
+}
+
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_block_read_off_blind --
@@ -282,7 +323,29 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
               "B block at offset %" PRIuMAX ": block header checksum of %#" PRIx32
               " doesn't match expected checksum of %#" PRIx32,
               block->name, size, (uintmax_t)offset, swap.checksum, checksum);
+
+        /*
+         * Dump the corrupted block for analysis prior to bitflip detection in case detection takes
+         * too long.
+         */
         WT_IGNORE_RET(__wt_bm_corrupt_dump(session, buf, objectid, offset, size, checksum));
+
+        /*
+         * Attempt to detect single-bit flips in the data. This can help diagnose memory corruption
+         * issues.
+         */
+        if (full_checksum_mismatch) {
+            size_t bit_position = 0;
+            if (__block_bitflip_detect(buf->mem, check_size, checksum, &bit_position))
+                __wt_errx(session,
+                  "%s: single-bit flip detected at bit position %" WT_SIZET_FMT
+                  " (byte %" WT_SIZET_FMT ", bit %" WT_SIZET_FMT
+                  ") would produce the expected checksum",
+                  block->name, bit_position, bit_position / 8, bit_position % 8);
+            else
+                __wt_errx(session, "%s: bitflip detection performed but no single-bit flip found",
+                  block->name);
+        }
     }
 
     /* Panic if a checksum fails during an ordinary read. */
@@ -295,3 +358,12 @@ __wti_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, ui
 
     WT_RET_PANIC(session, WT_ERROR, "%s: fatal read error", block->name);
 }
+
+#ifdef HAVE_UNITTEST
+bool
+__ut_block_bitflip_detect(
+  void *data, size_t check_size, uint32_t expected_checksum, size_t *bit_position)
+{
+    return (__block_bitflip_detect(data, check_size, expected_checksum, bit_position));
+}
+#endif

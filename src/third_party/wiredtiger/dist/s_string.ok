@@ -129,6 +129,7 @@ ETIMEDOUT
 EXTLIST
 EXTLIST's
 EXTSUBPATH
+Emplace
 Encryptor
 Encryptors
 Enqueue
@@ -145,6 +146,7 @@ FLv
 FNV
 FOREACH
 FS
+FTDC
 FULLFSYNC
 FUNCSIG
 Failpoint
@@ -527,6 +529,7 @@ bitcnt
 bitfield
 bitfields
 bitflip
+bitflips
 bitpack
 bitstr
 bitstring
@@ -764,6 +767,7 @@ extern
 extlist
 fadvise
 fahrenheit
+failover
 failpoint
 fallocate
 fallthrough
@@ -895,6 +899,7 @@ inmemory
 inserters
 instantiation
 interruptible
+intialized
 intl
 intnum
 intpack
@@ -938,6 +943,7 @@ las
 lazyfs
 lbrace
 lbracket
+lc
 ld
 ldapr
 ldaprb
@@ -1442,6 +1448,7 @@ valuev
 variadic
 vd
 vdata
+ve
 vec
 vectorized
 verifier
@@ -1463,6 +1470,7 @@ waker
 wakeup
 wakeups
 warmup
+wc
 whitespace
 wiredTiger
 wiredTigerTables
