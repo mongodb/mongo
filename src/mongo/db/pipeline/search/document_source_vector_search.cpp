@@ -50,10 +50,6 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE(vectorSearch,
-                                     VectorSearchLiteParsed::parse,
-                                     AllowedWithApiStrict::kNeverInVersion1);
-
 // Register the legacy parser as a fallback. This parser will be used when
 // featureFlagVectorSearchExtension is disabled or when the vector search extension has not been
 // loaded.
