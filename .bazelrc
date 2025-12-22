@@ -90,6 +90,8 @@ common:macos --repo_env=LLVM_VERSION=19
 
 # Pin down the Microsoft Visual compiler. If you would like to use
 # the default compiler version installed in this host, comment the line.
+common:windows --repo_env=BAZEL_VS="C:/Program Files/Microsoft Visual Studio/2022/Professional"
+common:windows --repo_env=BAZEL_VC="C:/Program Files/Microsoft Visual Studio/2022/Professional/VC"
 common:windows --repo_env=BAZEL_VC_FULL_VERSION=14.31.31103
 
 # Default the Visual C Redistribution to v14.3 for Windows installer.
