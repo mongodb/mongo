@@ -45,6 +45,15 @@ TEST(Int64CounterImplTest, Adds) {
     ASSERT_EQ(counter.value(), 11);
 }
 
+TEST(DoubleCounterImplTest, Adds) {
+    CounterImpl<double> counter("name", "description", "unit");
+    ASSERT_EQ(counter.value(), 0.0);
+    counter.add(1.1);
+    ASSERT_APPROX_EQUAL(counter.value(), 1.1, 0.01);
+    counter.add(10.5);
+    ASSERT_APPROX_EQUAL(counter.value(), 11.6, 0.01);
+}
+
 TEST(Int64CounterImplTest, AddsZero) {
     CounterImpl<int64_t> counter("name", "description", "unit");
     ASSERT_EQ(counter.value(), 0);
@@ -55,11 +64,27 @@ TEST(Int64CounterImplTest, AddsZero) {
     ASSERT_EQ(counter.value(), 10);
 }
 
+TEST(DoubleCounterImplTest, AddsZero) {
+    CounterImpl<double> counter("name", "description", "unit");
+    ASSERT_EQ(counter.value(), 0.0);
+    counter.add(0.0);
+    ASSERT_EQ(counter.value(), 0.0);
+    counter.add(0.1);
+    counter.add(0.0);
+    ASSERT_APPROX_EQUAL(counter.value(), 0.1, 0.01);
+}
+
 TEST(Int64CounterImplTest, ExceptionOnNegativeAdd) {
     CounterImpl<int64_t> counter("name", "description", "unit");
     counter.add(1);
     counter.add(3);
     ASSERT_THROWS_CODE(counter.add(-1), DBException, ErrorCodes::BadValue);
+}
+
+TEST(DoubleCounterImplTest, ExceptionOnNegativeAdd) {
+    CounterImpl<int64_t> counter("name", "description", "unit");
+    counter.add(1.0);
+    ASSERT_THROWS_CODE(counter.add(-1.0), DBException, ErrorCodes::BadValue);
 }
 
 // Any issues with thread safety should be caught by tsan on this test.

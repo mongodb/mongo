@@ -46,8 +46,8 @@ enum class Category { kBasic, kArithmetic, kUnsigned };
 
 template <typename T>
 constexpr Category getCategory() {
-    if (std::is_integral<T>() && !std::is_same<T, bool>()) {
-        if (std::is_unsigned<T>() && !std::is_same<T, char>()) {
+    if (std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) {
+        if (std::is_unsigned_v<T> && !std::is_same_v<T, char>) {
             return Category::kUnsigned;
         }
         return Category::kArithmetic;
