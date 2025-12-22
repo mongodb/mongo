@@ -40,7 +40,7 @@ const st = new ShardingTest({
     mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}},
 });
 
-// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
+// TODO SERVER-114992: failed to find sampled query.
 let uweEnabled = false;
 st.forEachConnection((conn) => {
     uweEnabled = uweEnabled || isUweEnabled(conn);

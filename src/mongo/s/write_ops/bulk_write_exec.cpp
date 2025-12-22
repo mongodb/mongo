@@ -242,6 +242,9 @@ void BulkWriteExecStats::noteTwoPhaseWriteProtocol(const BulkWriteCommandRequest
 void BulkWriteExecStats::updateMetrics(OperationContext* opCtx,
                                        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
                                        bool updatedShardKey) {
+    if (_ignore) {
+        return;
+    }
     // Record the number of shards targeted by this bulkWrite.
     CurOp::get(opCtx)->debug().nShards = _targetedShards.size();
 

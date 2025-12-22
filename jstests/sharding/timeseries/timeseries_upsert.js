@@ -14,11 +14,8 @@ import {
     testDB,
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 setUpShardedCluster();
-
-const uweEnabled = isUweEnabled(testDB);
 
 const collName = "sharded_timeseries_upsert";
 const dateTime = new ISODate();
@@ -287,22 +284,19 @@ function runTest({collConfig, updateOp, upsertedDoc, errorCode, updateShardKey =
     });
 })();
 
-// TODO SERVER-104122: Handle WCOS error in UWE.
-if (!uweEnabled) {
-    (function testSingleUpdateReplacementDocWouldChangeOwningShard() {
-        runTest({
-            collConfig: metaShardKey,
-            updateOp: {
-                q: {[metaFieldName]: -1},
-                u: {[metaFieldName]: 10, [timeFieldName]: dateTime, f: 15},
-                multi: false,
-                upsert: true,
-            },
-            upsertedDoc: {[metaFieldName]: 10, [timeFieldName]: dateTime, f: 15},
-            updateShardKey: true,
-        });
-    })();
-}
+(function testSingleUpdateReplacementDocWouldChangeOwningShard() {
+    runTest({
+        collConfig: metaShardKey,
+        updateOp: {
+            q: {[metaFieldName]: -1},
+            u: {[metaFieldName]: 10, [timeFieldName]: dateTime, f: 15},
+            multi: false,
+            upsert: true,
+        },
+        upsertedDoc: {[metaFieldName]: 10, [timeFieldName]: dateTime, f: 15},
+        updateShardKey: true,
+    });
+})();
 
 (function testSingleUpdateReplacementDocWithNoShardKey() {
     runTest({

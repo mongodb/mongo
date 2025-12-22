@@ -6,22 +6,11 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const st = new ShardingTest({
     mongos: 1,
     shards: {rs0: {nodes: 1}, rs1: {nodes: 1}},
 });
-
-// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
-let uweEnabled = false;
-st.forEachConnection((conn) => {
-    uweEnabled = uweEnabled || isUweEnabled(conn);
-});
-if (uweEnabled) {
-    st.stop();
-    quit();
-}
 
 const coll = st.s.getDB("test").getCollection(jsTestName());
 
@@ -66,6 +55,7 @@ assert.commandWorked(
 const retrySession = st.s.startSession({retryWrites: true});
 const sessionColl = retrySession.getDatabase(coll.getDB().getName()).getCollection(coll.getName());
 
+// TODO SERVER-114994 findAndModify support for UWE.
 assert.docEq(badDoc, sessionColl.findAndModify({query: {_id: 1}, update: {$set: {shard: 2}}}));
 assert.docEq({shard: 2}, sessionColl.findOne({_id: 1}, {_id: 0, shard: 1}));
 

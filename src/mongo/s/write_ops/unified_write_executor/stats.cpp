@@ -61,7 +61,7 @@ void Stats::recordTargetingStats(const std::vector<ShardEndpoint>& targetedShard
 
 void Stats::updateMetrics(OperationContext* opCtx) {
     // Record the number of shards targeted by this write.
-    // TODO SERVER-104122 increment 'nShards' by 1 if we've targeted shards and updated the shard
+    // TODO SERVER-114992 increment 'nShards' by 1 if we've targeted shards and updated the shard
     // key.
     CurOp::get(opCtx)->debug().nShards = _targetedShards.size();
 
@@ -72,7 +72,7 @@ void Stats::updateMetrics(OperationContext* opCtx) {
         for (const auto& [writeType, shards] : targetingStats.targetedShardsByWriteType) {
             const int perWriteNShards = shards.size();
 
-            // TODO SERVER-104122: add one to 'nShards' if updated shard key. This information is
+            // TODO SERVER-114992: add one to 'nShards' if updated shard key. This information is
             // returned from WCOS handling, see batch_write_exec.cpp
             NumHostsTargetedMetrics::QueryType metricsWriteType;
             switch (writeType) {

@@ -154,7 +154,7 @@ const expectedSampledQueryDocs = [];
         }),
     );
 
-    // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
+    // TODO SERVER-114992: failed to find sampled query.
     if (uweEnabled) {
         return;
     }
@@ -297,7 +297,7 @@ const expectedSampledQueryDocs = [];
         mongosDB.runCommand({explain: {findAndModify: collName, query: {x: 501}, update: {$set: {y: 501}}}}),
     );
 
-    // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
+    // TODO SERVER-114992: failed to find sampled query.
     if (uweEnabled) {
         return;
     }

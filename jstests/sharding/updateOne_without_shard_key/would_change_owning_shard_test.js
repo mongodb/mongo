@@ -13,7 +13,6 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // Make sure we're testing with no implicit session.
 TestData.disableImplicitSessions = true;
@@ -27,13 +26,6 @@ const splitPoint = 0;
 const shardKey1 = -2;
 const shardKey2 = 2;
 const docsToInsert = [{_id: 0, x: shardKey1, y: 1}];
-
-// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
-const uweEnabled = isUweEnabled(st.s);
-if (uweEnabled) {
-    st.stop();
-    quit();
-}
 
 // Sets up a 2 shard cluster using 'x' as a shard key where Shard 0 owns x <
 // splitPoint and Shard 1 splitPoint >= 0.
@@ -62,6 +54,7 @@ let testCases = [
         opType: WriteWithoutShardKeyTestUtil.OperationType.updateOne,
     },
     {
+        // TODO SERVER-114994 findAndModify support for UWE.
         logMessage: "Running WouldChangeOwningShard findAndModify without shard key",
         docsToInsert: docsToInsert,
         cmdObj: {

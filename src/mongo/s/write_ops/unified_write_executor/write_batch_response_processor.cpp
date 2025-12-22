@@ -343,7 +343,6 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     OperationContext* opCtx,
     RoutingContext& routingCtx,
     const NoRetryWriteBatchResponse& response) {
-    // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
     const auto& op = response.getOp();
 
     // Process write concern error (if any).
@@ -356,7 +355,6 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     if (response.isError()) {
         const auto& status = response.getStatus();
 
-        // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
         LOGV2_DEBUG(10896500,
                     4,
                     "Cluster write op executing in internal transaction failed with error",
@@ -1221,8 +1219,8 @@ WriteCommandResponse WriteBatchResponseProcessor::generateClientResponse(Operati
         }});
 }
 
-BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulkWriteCommand(
-    OperationContext* opCtx) {
+bulk_write_exec::BulkWriteReplyInfo
+WriteBatchResponseProcessor::generateClientResponseForBulkWriteCommand(OperationContext* opCtx) {
     const bool errorsOnly = _cmdRef.getErrorsOnly().value_or(false);
 
     std::vector<BulkWriteReplyItem> results;
@@ -1256,9 +1254,15 @@ BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulk
         info.wcErrors = BulkWriteWriteConcernError{totalWcError->toStatus().code(),
                                                    totalWcError->toStatus().reason()};
     }
+    return info;
+}
 
-    return populateCursorReply(
-        opCtx, _cmdRef.getBulkWriteCommandRequest(), _originalCommand, std::move(info));
+BulkWriteCommandReply WriteBatchResponseProcessor::generateClientResponseForBulkWriteForTest(
+    OperationContext* opCtx) {
+    return populateCursorReply(opCtx,
+                               _cmdRef.getBulkWriteCommandRequest(),
+                               _originalCommand,
+                               generateClientResponseForBulkWriteCommand(opCtx));
 }
 
 BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBatchedCommand(

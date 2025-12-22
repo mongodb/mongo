@@ -150,9 +150,15 @@ public:
 
     BatchedCommandResponse generateClientResponseForBatchedCommand(OperationContext* opCtx);
 
-    BulkWriteCommandReply generateClientResponseForBulkWriteCommand(OperationContext* opCtx);
+    bulk_write_exec::BulkWriteReplyInfo generateClientResponseForBulkWriteCommand(
+        OperationContext* opCtx);
 
     FindAndModifyCommandResponse generateClientResponseForFindAndModifyCommand();
+
+    /**
+     * Seralizes bulkWriteCommand for use in unit testing.
+     */
+    BulkWriteCommandReply generateClientResponseForBulkWriteForTest(OperationContext* opCtx);
 
     /**
      * This method is called by the scheduler to record target errors that occurred during batch

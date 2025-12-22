@@ -18,7 +18,6 @@ import {
     assertCanUpdatePartialShardKey,
     assertCanUpdatePrimitiveShardKey,
 } from "jstests/sharding/libs/update_shard_key_helpers.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const st = new ShardingTest({
     mongos: 1,
@@ -50,6 +49,7 @@ const changeShardKeyOptions = [
 changeShardKeyOptions.forEach(function (updateConfig) {
     let runInTxn, isFindAndModify, upsert;
     [runInTxn, isFindAndModify, upsert] = [updateConfig[0], updateConfig[1], updateConfig[2]];
+    // TODO SERVER-114994 findAndModify support in UWE.
 
     jsTestLog(
         "Testing changing the shard key using pipeline style update and " +
@@ -168,13 +168,6 @@ changeShardKeyOptions.forEach(function (updateConfig) {
         }
     }
 });
-
-// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
-const uweEnabled = isUweEnabled(st.s);
-if (uweEnabled) {
-    st.stop();
-    quit();
-}
 
 // Test pipeline updates where the document being updated will move shards.
 

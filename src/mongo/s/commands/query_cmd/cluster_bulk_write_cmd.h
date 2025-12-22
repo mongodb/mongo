@@ -252,8 +252,10 @@ public:
                 bulkRequest.setLet(expCtx->variables.toBSON(expCtx->variablesParseState, *let));
             }
 
+            bulk_write_exec::BulkWriteExecStats execStats;
+            bulk_write_exec::BulkWriteReplyInfo replyInfo;
             if (unified_write_executor::isEnabled(opCtx)) {
-                response = unified_write_executor::bulkWrite(opCtx, bulkRequest);
+                replyInfo = unified_write_executor::bulkWrite(opCtx, bulkRequest);
             } else {
                 // This is used only for the ScopedDebugInfo construction below.
                 stdx::unordered_map<NamespaceString, boost::optional<BSONObj>>
@@ -288,8 +290,7 @@ public:
                 //   a transaction, where per-operation WC settings are not supported);
                 // - Once done, The original WC is re-established to allow populateCursorReply
                 //   evaluating whether a reply needs to be returned to the external client.
-                bulk_write_exec::BulkWriteExecStats execStats;
-                auto bulkWriteReply = [&] {
+                replyInfo = [&] {
                     WriteConcernOptions originalWC = opCtx->getWriteConcern();
                     ScopeGuard resetWriteConcernGuard(
                         [opCtx, &originalWC] { opCtx->setWriteConcern(originalWC); });
@@ -300,16 +301,15 @@ public:
                     }
                     return cluster::bulkWrite(opCtx, bulkRequest, targeters, execStats);
                 }();
-
-                bool updatedShardKey = handleWouldChangeOwningShardError(
-                    opCtx, bulkRequest, bulkWriteReply, targeters);
-                // TODO SERVER-83869 handle BulkWriteExecStats for batches of size > 1 containing
-                // updates that modify a document’s owning shard.
-                execStats.updateMetrics(opCtx, targeters, updatedShardKey);
-
-                response = populateCursorReply(
-                    opCtx, bulkRequest, request.body, std::move(bulkWriteReply));
             }
+            bool updatedShardKey =
+                handleWouldChangeOwningShardError(opCtx, bulkRequest, replyInfo, targeters);
+            // TODO SERVER-83869 handle BulkWriteExecStats for batches of size > 1 containing
+            // updates that modify a document’s owning shard.
+            execStats.updateMetrics(opCtx, targeters, updatedShardKey);
+
+            response = populateCursorReply(opCtx, bulkRequest, request.body, std::move(replyInfo));
+
             result.appendElements(response.toBSON());
             return true;
         }
@@ -394,7 +394,7 @@ public:
             // targeted namespace for the first op, as a write that change's a document's owning
             // shard must be the only write in the incoming request.
             auto firstWriteNSIndex = BulkWriteCRUDOp(request.getOps()[0]).getNsInfoIdx();
-            auto nss = targeters[firstWriteNSIndex]->getNS();
+            auto nss = request.getNsInfo()[firstWriteNSIndex].getNs();
 
             bool updatedShardKey = false;
             boost::optional<BSONObj> upsertedId;

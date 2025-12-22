@@ -15,20 +15,12 @@ import {
     enableCoordinateCommitReturnImmediatelyAfterPersistingDecision,
     waitForFailpoint,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 let st = new ShardingTest({mongos: 1, shards: 2});
 let kDbName = "db";
 let mongos = st.s0;
 let ns = kDbName + ".foo";
 let db = mongos.getDB(kDbName);
-
-// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
-const uweEnabled = isUweEnabled(st.s);
-if (uweEnabled) {
-    st.stop();
-    quit();
-}
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));

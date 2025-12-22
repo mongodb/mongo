@@ -20,12 +20,9 @@ import {
     st,
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 setUpShardedCluster();
 const testDB = getTestDB();
-
-const uweEnabled = isUweEnabled(testDB);
 
 const runTest = function ({
     initialDocList,
@@ -175,20 +172,17 @@ const runTest = function ({
     });
 })();
 
-// TODO SERVER-104122: Handle WCOS error in UWE.
-if (!uweEnabled) {
-    (function testTargetSingleShardretryableWriteByReplacementChangeShard() {
-        runTest({
-            initialDocList: [doc2_a_f101, doc4_b_f103],
-            query: {[metaFieldName]: "B"},
-            update: {[metaFieldName]: "A", [timeFieldName]: generateTimeValue(4), f: 110},
-            replacement: true,
-            nModified: 1,
-            resultDocList: [doc2_a_f101, {_id: 4, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(4), f: 110}],
-            retryableWrite: true,
-        });
-    })();
-}
+(function testTargetSingleShardretryableWriteByReplacementChangeShard() {
+    runTest({
+        initialDocList: [doc2_a_f101, doc4_b_f103],
+        query: {[metaFieldName]: "B"},
+        update: {[metaFieldName]: "A", [timeFieldName]: generateTimeValue(4), f: 110},
+        replacement: true,
+        nModified: 1,
+        resultDocList: [doc2_a_f101, {_id: 4, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(4), f: 110}],
+        retryableWrite: true,
+    });
+})();
 
 (function testTwoPhaseUpdate() {
     runTest({

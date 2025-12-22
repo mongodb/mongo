@@ -13,11 +13,12 @@ selector:
     - jstests/sharding/analyze_shard_key/sample_rates_sharded.js
     - jstests/sharding/analyze_shard_key/sample_write_queries_unsharded.js
     - jstests/sharding/analyze_shard_key/sample_write_queries_sharded.js
+    - jstests/sharding/analyze_shard_key/shard_key_updates.js
     # - jstests/sharding/applyOps_multiple_namespaces.js
     - jstests/sharding/batched_writes_with_id_without_shard_key_basic.js
     - jstests/sharding/batched_writes_with_id_without_shard_key_stale_config.js
     - jstests/sharding/chunk_migration_with_bulk_write.js
-    - jstests/sharding/compound_hashed_shard_key_targeting.js
+    - jstests/sharding/query/compound_hashed_shard_key_targeting.js
     # - jstests/sharding/database_versioning_all_commands.js
     - jstests/sharding/deleteOne_with_id_without_shard_key_basic.js
     - jstests/sharding/deleteOne_with_id_without_shard_key_stale_config.js
@@ -30,6 +31,7 @@ selector:
     - jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
     - jstests/sharding/migration_blocking_operation/mongos_calls_shardsvr_coordinate_multi_update_command.js
     - jstests/sharding/migration_blocking_operation/pause_during_multi_updates_cluster_parameter_requires_feature_flag.js
+    - jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
     - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     - jstests/sharding/num_hosts_targeted_metrics.js
     - jstests/sharding/query/bulk_write_basic.js
@@ -38,9 +40,16 @@ selector:
     - jstests/sharding/query/find_and_modify/*.js
     - jstests/sharding/query/let_rand.js
     - jstests/sharding/query/out_merge/**/*.js
-    # - jstests/sharding/query/update/update_shard_key_bulk_write.js
+    - jstests/sharding/query/update/update_compound_shard_key.js
+    - jstests/sharding/query/update/update_shard_key_bulk_write.js
     # - jstests/sharding/query/update_delete_many_metrics.js
+    - jstests/sharding/query/update/update_shard_key_conflicting_writes.js
+    - jstests/sharding/query/update/update_shard_key_doc_moves_shards.js
+    - jstests/sharding/query/update/update_shard_key_pipeline_update.js
+    - jstests/sharding/query/update/update_shard_key_with_dollar_fields.js
+    - jstests/sharding/query/update/update_shard_key_without_shard_key.js
     - jstests/sharding/read_write_concern_defaults_application.js
+    - jstests/sharding/resharding_update_shard_key_in_retryable_write.js
     - jstests/sharding/retryable_update_one_by_id_chunk_migration.js
     - jstests/sharding/retryable_upsert_single_write_shard.js
     - jstests/sharding/retryable_write_error_labels.js
@@ -50,7 +59,13 @@ selector:
     - jstests/sharding/stale_mongos_and_restarted_shards_agree_on_shard_version.js
     - jstests/sharding/swallow_unnecessary_uuid_mismatch_error.js
     - jstests/sharding/timeseries/**/*.js
+    - jstests/sharding/timeseries/timeseries_buckets_find_and_modify.js
+    - jstests/sharding/timeseries/timeseries_find_and_modify_update.js
+    - jstests/sharding/timeseries/timeseries_shardkey_update.js
+    - jstests/sharding/timeseries/timeseries_update_one.js
+    - jstests/sharding/timeseries/timeseries_upsert.js
     - jstests/sharding/txn*.js
+    - jstests/sharding/unshard_collection_update_shard_key_in_retryable_write.js
     - jstests/sharding/updateOne_with_id_without_shard_key_basic.js
     - jstests/sharding/updateOne_with_id_without_shard_key_stale_config.js
     - jstests/sharding/updateOne_without_shard_key/deleteOne_without_shard_key_basic.js
@@ -59,6 +74,8 @@ selector:
     - jstests/sharding/updateOne_without_shard_key/find_and_modify_without_shard_key_sort.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
     - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_sort.js
+    - jstests/sharding/updateOne_without_shard_key/would_change_owning_shard_test.js
+    - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_metrics.js
     - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_single_shard_data_placement_change.js
     - jstests/sharding/updateOne_without_shard_key/bulk_write_without_shard_key_errors_only.js
 

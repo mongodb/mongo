@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/bulk_write_reply_info.h"
 #include "mongo/s/write_ops/write_command_ref.h"
 #include "mongo/util/modules.h"
 
@@ -43,8 +44,9 @@ struct FindAndModifyCommandResponse {
     StatusWith<write_ops::FindAndModifyCommandReply> swReply;
     boost::optional<WriteConcernErrorDetail> wce;
 };
-using WriteCommandResponse =
-    std::variant<BatchedCommandResponse, BulkWriteCommandReply, FindAndModifyCommandResponse>;
+using WriteCommandResponse = std::variant<BatchedCommandResponse,
+                                          bulk_write_exec::BulkWriteReplyInfo,
+                                          FindAndModifyCommandResponse>;
 
 /**
  * This function will execute the specified write command and return a response.
@@ -64,9 +66,9 @@ BatchedCommandResponse write(OperationContext* opCtx,
 /**
  * Helper function for executing bulk commands.
  */
-BulkWriteCommandReply bulkWrite(OperationContext* opCtx,
-                                const BulkWriteCommandRequest& request,
-                                BSONObj originalCommand = BSONObj());
+bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
+                                              const BulkWriteCommandRequest& request,
+                                              BSONObj originalCommand = BSONObj());
 
 /**
  * Helper function for executing findAndModify commands.

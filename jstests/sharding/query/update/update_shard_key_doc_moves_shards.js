@@ -31,20 +31,12 @@ import {
     runUpdateCmdSuccess,
     shardCollectionMoveChunks,
 } from "jstests/sharding/libs/update_shard_key_helpers.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const st = new ShardingTest({
     mongos: 1,
     shards: {rs0: {nodes: 3}, rs1: {nodes: 3}},
     rsOptions: {setParameter: {maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS}},
 });
-
-// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
-const uweEnabled = isUweEnabled(st.s);
-if (uweEnabled) {
-    st.stop();
-    quit();
-}
 
 const kDbName = "db";
 const mongos = st.s0;

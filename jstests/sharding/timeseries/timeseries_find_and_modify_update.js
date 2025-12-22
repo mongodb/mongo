@@ -23,17 +23,15 @@ import {
     makeBucketFilter,
     metaFieldName,
     setUpShardedCluster,
-    testDB,
     tearDownShardedCluster,
+    testDB,
     testFindOneAndUpdateOnShardedCollection,
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
 
 setUpShardedCluster();
-const uweEnabled = isUweEnabled(testDB);
 
 (function testSortOptionFailsOnShardedCollection() {
     testFindOneAndUpdateOnShardedCollection({
@@ -68,34 +66,31 @@ const uweEnabled = isUweEnabled(testDB);
 // Verifies that the collation is properly propagated to the bucket-level filter when the
 // query-level collation overrides the collection default collation. This is a two phase update due
 // to the user-specified collation. This should run in a transaction.
-// TODO SERVER-104122: Handle WCOS error in UWE.
-if (!uweEnabled) {
-    (function testTwoPhaseUpdateCanHonorCollationOnShardedCollection() {
-        const returnDoc = Object.assign({}, doc3_a_f102, {[metaFieldName]: "C"});
-        const copyDocs = docs.map((doc) => Object.assign({}, doc));
-        const resultDocList = copyDocs.filter((doc) => doc._id !== 3);
-        resultDocList.push(returnDoc);
+(function testTwoPhaseUpdateCanHonorCollationOnShardedCollection() {
+    const returnDoc = Object.assign({}, doc3_a_f102, {[metaFieldName]: "C"});
+    const copyDocs = docs.map((doc) => Object.assign({}, doc));
+    const resultDocList = copyDocs.filter((doc) => doc._id !== 3);
+    resultDocList.push(returnDoc);
 
-        testFindOneAndUpdateOnShardedCollection({
-            initialDocList: docs,
-            startTxn: true,
-            cmd: {
-                filter: {[metaFieldName]: "a", f: 102},
-                // This excercises the shard key update in the two phase update.
-                update: {$set: {[metaFieldName]: "C"}},
-                returnNew: true,
-                // caseInsensitive collation
-                collation: {locale: "en", strength: 2},
-            },
-            res: {
-                resultDocList: resultDocList,
-                returnDoc: returnDoc,
-                writeType: "twoPhaseProtocol",
-                dataBearingShard: "primary",
-            },
-        });
-    })();
-}
+    testFindOneAndUpdateOnShardedCollection({
+        initialDocList: docs,
+        startTxn: true,
+        cmd: {
+            filter: {[metaFieldName]: "a", f: 102},
+            // This excercises the shard key update in the two phase update.
+            update: {$set: {[metaFieldName]: "C"}},
+            returnNew: true,
+            // caseInsensitive collation
+            collation: {locale: "en", strength: 2},
+        },
+        res: {
+            resultDocList: resultDocList,
+            returnDoc: returnDoc,
+            writeType: "twoPhaseProtocol",
+            dataBearingShard: "primary",
+        },
+    });
+})();
 
 // Query on the meta field and 'f' field leads to a targeted update but no measurement is updated.
 (function testTargetedUpdateByNonMatchingFilter() {
@@ -208,22 +203,20 @@ const replacementDoc = {
 // Query on the 'f' field leads to a two phase update. Replacement-style update. The meta value
 // makes the measurement belong to a different shard and the request runs in a transaction. This
 // should succeed.
-// TODO SERVER-104122: Handle WCOS error in UWE.
-if (!uweEnabled) {
-    (function testTwoPhaseShardKeyUpdateByFieldFilter() {
-        testFindOneAndUpdateOnShardedCollection({
-            initialDocList: docs,
-            startTxn: true,
-            cmd: {filter: {f: 106}, update: replacementDoc, returnNew: true},
-            // Don't validate the resultDocList because we don't know which doc will be replaced.
-            res: {
-                returnDoc: replacementDoc,
-                writeType: "twoPhaseProtocol",
-                dataBearingShard: "other",
-            },
-        });
-    })();
-}
+
+(function testTwoPhaseShardKeyUpdateByFieldFilter() {
+    testFindOneAndUpdateOnShardedCollection({
+        initialDocList: docs,
+        startTxn: true,
+        cmd: {filter: {f: 106}, update: replacementDoc, returnNew: true},
+        // Don't validate the resultDocList because we don't know which doc will be replaced.
+        res: {
+            returnDoc: replacementDoc,
+            writeType: "twoPhaseProtocol",
+            dataBearingShard: "other",
+        },
+    });
+})();
 
 // Query on the meta field and 'f' field leads to a targeted update when the meta field is not
 // included in the shard key. Replacement-style update. The new meta value makes the measurement
@@ -239,47 +232,42 @@ if (!uweEnabled) {
 // Query on the meta field and 'f' field leads to a targeted update when the meta field is included
 // in the shard key. Replacement-style update. The new meta value makes the measurement belong to a
 // different shard. This should run in a transaction.
-// TODO SERVER-104122: Handle WCOS error in UWE.
-if (!uweEnabled) {
-    (function testTargetedShardKeyUpdateByMetaAndFieldFilter() {
-        const copyDocs = docs.map((doc) => Object.assign({}, doc));
-        const resultDocList = copyDocs.filter((doc) => doc._id !== 4);
-        resultDocList.push(replacementDoc);
+(function testTargetedShardKeyUpdateByMetaAndFieldFilter() {
+    const copyDocs = docs.map((doc) => Object.assign({}, doc));
+    const resultDocList = copyDocs.filter((doc) => doc._id !== 4);
+    resultDocList.push(replacementDoc);
 
-        testFindOneAndUpdateOnShardedCollection({
-            initialDocList: docs,
-            startTxn: true,
-            cmd: {filter: {[metaFieldName]: "B", f: 103}, update: replacementDoc, returnNew: true},
-            res: {
-                resultDocList: resultDocList,
-                returnDoc: replacementDoc,
-                writeType: "targeted",
-                dataBearingShard: "other",
-                // We can't verify explain output because explain can't run in a transaction.
-            },
-        });
-    })();
-}
+    testFindOneAndUpdateOnShardedCollection({
+        initialDocList: docs,
+        startTxn: true,
+        cmd: {filter: {[metaFieldName]: "B", f: 103}, update: replacementDoc, returnNew: true},
+        res: {
+            resultDocList: resultDocList,
+            returnDoc: replacementDoc,
+            writeType: "targeted",
+            dataBearingShard: "other",
+            // We can't verify explain output because explain can't run in a transaction.
+        },
+    });
+})();
 
 // Meta filter matches all docs with tag: "B" but only update one. The replacement doc has tag: "A"
 // and so, the measurement will be moved to a different shard. This should run in a transaction and
 // succeed.
-// TODO SERVER-104122: Handle WCOS error in UWE.
-if (!uweEnabled) {
-    (function testTargetedShardKeyUpdateByMetaFilter() {
-        testFindOneAndUpdateOnShardedCollection({
-            initialDocList: docs,
-            startTxn: true,
-            cmd: {filter: {[metaFieldName]: "B"}, update: replacementDoc, returnNew: true},
-            // Don't validate the resultDocList because we don't know which doc will be replaced.
-            res: {
-                returnDoc: replacementDoc,
-                writeType: "targeted",
-                dataBearingShard: "other",
-            },
-        });
-    })();
-}
+
+(function testTargetedShardKeyUpdateByMetaFilter() {
+    testFindOneAndUpdateOnShardedCollection({
+        initialDocList: docs,
+        startTxn: true,
+        cmd: {filter: {[metaFieldName]: "B"}, update: replacementDoc, returnNew: true},
+        // Don't validate the resultDocList because we don't know which doc will be replaced.
+        res: {
+            returnDoc: replacementDoc,
+            writeType: "targeted",
+            dataBearingShard: "other",
+        },
+    });
+})();
 
 // The update is targeted but there's actually no match. So, the update becomes an upsert.
 (function testTargetedPipelineUpsertByMetaAndFieldFilter() {
@@ -320,35 +308,32 @@ if (!uweEnabled) {
 
 // The update is targeted but there's actually no match. The update becomes an upsert but the
 // replacement document has a different shard key value.
-// TODO SERVER-104122: Handle WCOS error in UWE.
-if (!uweEnabled) {
-    (function testTargetedReplacementUpsertByMetaAndFieldFilter() {
-        const replacementDoc = Object.assign(
-            {},
-            {_id: -100, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(10), f: 2345},
-        );
-        const resultDocList = docs.map((doc) => Object.assign({}, doc));
-        resultDocList.push(replacementDoc);
+(function testTargetedReplacementUpsertByMetaAndFieldFilter() {
+    const replacementDoc = Object.assign(
+        {},
+        {_id: -100, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(10), f: 2345},
+    );
+    const resultDocList = docs.map((doc) => Object.assign({}, doc));
+    resultDocList.push(replacementDoc);
 
-        testFindOneAndUpdateOnShardedCollection({
-            initialDocList: docs,
-            startTxn: true,
-            cmd: {
-                filter: {[metaFieldName]: "B", f: 2345},
-                update: replacementDoc,
-                upsert: true,
-                returnNew: true,
-            },
-            res: {
-                resultDocList: resultDocList,
-                returnDoc: replacementDoc,
-                writeType: "targeted",
-                dataBearingShard: "other",
-                nUpserted: 1,
-            },
-        });
-    })();
-}
+    testFindOneAndUpdateOnShardedCollection({
+        initialDocList: docs,
+        startTxn: true,
+        cmd: {
+            filter: {[metaFieldName]: "B", f: 2345},
+            update: replacementDoc,
+            upsert: true,
+            returnNew: true,
+        },
+        res: {
+            resultDocList: resultDocList,
+            returnDoc: replacementDoc,
+            writeType: "targeted",
+            dataBearingShard: "other",
+            nUpserted: 1,
+        },
+    });
+})();
 
 (function testTwoPhaseReplacementUpsertByFieldFilter() {
     const replacementDoc = Object.assign(
@@ -358,6 +343,7 @@ if (!uweEnabled) {
     const resultDocList = docs.map((doc) => Object.assign({}, doc));
     resultDocList.push(replacementDoc);
 
+    // TODO SERVER-114994 findAndModify support in UWE.
     testFindOneAndUpdateOnShardedCollection({
         initialDocList: docs,
         cmd: {

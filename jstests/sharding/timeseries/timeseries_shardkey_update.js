@@ -29,18 +29,10 @@ import {
     timeFieldName,
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const docs = [doc1_a_nofields, doc2_a_f101, doc3_a_f102, doc4_b_f103, doc5_b_f104, doc6_c_f105, doc7_c_f106];
 
 setUpShardedCluster();
-
-// TODO SERVER-104122: Handle WCOS error in UWE.
-const uweEnabled = isUweEnabled(testDB);
-if (uweEnabled) {
-    tearDownShardedCluster();
-    quit();
-}
 
 (function testUpdateMultiModifyingShardKey() {
     // This will create a sharded collection with 2 chunks: (MinKey, meta: "A"] and [meta: "B",
@@ -108,6 +100,7 @@ if (uweEnabled) {
     // MaxKey).
     const coll = prepareShardedCollection({collName: getCallerName(1), initialDocList: docs, includeMeta: true});
 
+    // TODO SERVER-114994 findAndModify support in UWE.
     // This findAndModify command tries to update doc5_b_f104 into {_id: 5, meta: "A", f: 104}. The
     // owning shard would be the shard that owns (MinKey, meta: "A"].
     const findOneAndUpdateCmd = {

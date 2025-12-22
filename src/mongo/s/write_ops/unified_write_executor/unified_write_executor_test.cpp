@@ -30,6 +30,7 @@
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
+#include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op.h"
 #include "mongo/unittest/unittest.h"
 
@@ -205,7 +206,8 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
         {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
 
     auto future = launchAsync([&]() {
-        auto reply = bulkWrite(operationContext(), request);
+        auto replyInfo = bulkWrite(operationContext(), request);
+        auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 2);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(), BSON("ok" << 1.0 << "idx" << 0 << "n" << 1));
@@ -359,7 +361,8 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteImplicitCollectionCreation) {
                                     {NamespaceInfoEntry(nss1)});
 
     auto future = launchAsync([&]() {
-        auto reply = bulkWrite(operationContext(), request);
+        auto replyInfo = bulkWrite(operationContext(), request);
+        auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 1);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(), BSON("ok" << 1.0 << "idx" << 0 << "n" << 1));
@@ -429,7 +432,8 @@ TEST_F(UnifiedWriteExecutorTest, OrderedBulkWriteErrorsAndStops) {
     request.setOrdered(true);
 
     auto future = launchAsync([&]() {
-        auto reply = bulkWrite(operationContext(), request);
+        auto replyInfo = bulkWrite(operationContext(), request);
+        auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 1);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(),
@@ -478,7 +482,8 @@ TEST_F(UnifiedWriteExecutorTest, UnorderedBulkWriteErrorsAndStops) {
 
 
     auto future = launchAsync([&]() {
-        auto reply = bulkWrite(operationContext(), request);
+        auto replyInfo = bulkWrite(operationContext(), request);
+        auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 2);
         ASSERT_BSONOBJ_EQ(replyItems[0].toBSON(),

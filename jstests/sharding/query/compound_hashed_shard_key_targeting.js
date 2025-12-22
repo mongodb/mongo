@@ -174,7 +174,7 @@ res = assert.commandWorked(coll.update({a: 22, b: {subObj: "str_0"}, c: "update"
 assert.eq(res.nModified, 1, res);
 
 // Verify that the 'update' command gets targeted to 'shard1DB'.
-// TODO SERVER-104122: Handle WCOS error in UWE.
+// TODO SERVER-114992: couldn't find matching bulkWrite.
 if (!uweEnabled) {
     profilerHasAtLeastOneMatchingEntryOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": shardCmdName}});
     profilerHasZeroMatchingEntriesOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": shardCmdName}});

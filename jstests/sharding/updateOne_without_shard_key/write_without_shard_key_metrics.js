@@ -10,7 +10,6 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {WriteWithoutShardKeyTestUtil} from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // 2 shards single node, 1 mongos, 1 config server 3-node.
 const st = new ShardingTest({});
@@ -56,6 +55,7 @@ function runCommandAndCheckError(testCase) {
     const res = st.getDB(dbName).runCommand(testCase.cmdObj);
     assert.commandFailedWithCode(res, testCase.errorCode);
 
+    // TODO SERVER-114994 findAndModify support in UWE.
     // FindAndModify is not a batch command, thus will not have a writeErrors field.
     if (!testCase.cmdObj.findAndModify) {
         res.writeErrors.forEach((writeError) => {
@@ -304,27 +304,23 @@ const WCOStestCases = [
     },
 ];
 
-// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
-const uweEnabled = isUweEnabled(st.s);
-if (!uweEnabled) {
-    WCOStestCases.forEach((testCase) => {
-        jsTest.log(testCase.logMessage);
-        runCommandAndVerify(testCase);
-    });
+WCOStestCases.forEach((testCase) => {
+    jsTest.log(testCase.logMessage);
+    runCommandAndVerify(testCase);
+});
 
-    mongosServerStatus = st.s.getDB(dbName).adminCommand({serverStatus: 1});
+mongosServerStatus = st.s.getDB(dbName).adminCommand({serverStatus: 1});
 
-    // Verify all counter metrics were updated correctly after the wcos write commands.
-    assert.eq(2, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
-    assert.eq(3, mongosServerStatus.metrics.query.deleteOneTargetedShardedCount);
-    assert.eq(1, mongosServerStatus.metrics.query.findAndModifyTargetedShardedCount);
-    assert.eq(1, mongosServerStatus.metrics.query.updateOneUnshardedCount);
-    assert.eq(1, mongosServerStatus.metrics.query.deleteOneUnshardedCount);
-    assert.eq(1, mongosServerStatus.metrics.query.findAndModifyUnshardedCount);
-    assert.eq(7, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
-    assert.eq(4, mongosServerStatus.metrics.query.deleteOneNonTargetedShardedCount);
-    assert.eq(3, mongosServerStatus.metrics.query.findAndModifyNonTargetedShardedCount);
-}
+// Verify all counter metrics were updated correctly after the wcos write commands.
+assert.eq(2, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
+assert.eq(3, mongosServerStatus.metrics.query.deleteOneTargetedShardedCount);
+assert.eq(1, mongosServerStatus.metrics.query.findAndModifyTargetedShardedCount);
+assert.eq(1, mongosServerStatus.metrics.query.updateOneUnshardedCount);
+assert.eq(1, mongosServerStatus.metrics.query.deleteOneUnshardedCount);
+assert.eq(1, mongosServerStatus.metrics.query.findAndModifyUnshardedCount);
+assert.eq(7, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
+assert.eq(4, mongosServerStatus.metrics.query.deleteOneNonTargetedShardedCount);
+assert.eq(3, mongosServerStatus.metrics.query.findAndModifyNonTargetedShardedCount);
 
 // Insert Docs for error testing.
 const insertDocs = [
@@ -429,20 +425,17 @@ errorTestCases.forEach((testCase) => {
     runCommandAndCheckError(testCase);
 });
 
-// TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
-if (!uweEnabled) {
-    mongosServerStatus = st.s.getDB(dbName).adminCommand({serverStatus: 1});
+mongosServerStatus = st.s.getDB(dbName).adminCommand({serverStatus: 1});
 
-    // Verify all counter metrics were not updated after the error write commands.
-    assert.eq(2, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
-    assert.eq(3, mongosServerStatus.metrics.query.deleteOneTargetedShardedCount);
-    assert.eq(1, mongosServerStatus.metrics.query.findAndModifyTargetedShardedCount);
-    assert.eq(1, mongosServerStatus.metrics.query.updateOneUnshardedCount);
-    assert.eq(1, mongosServerStatus.metrics.query.deleteOneUnshardedCount);
-    assert.eq(1, mongosServerStatus.metrics.query.findAndModifyUnshardedCount);
-    assert.eq(12, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
-    assert.eq(6, mongosServerStatus.metrics.query.deleteOneNonTargetedShardedCount);
-    assert.eq(4, mongosServerStatus.metrics.query.findAndModifyNonTargetedShardedCount);
-}
+// Verify all counter metrics were not updated after the error write commands.
+assert.eq(2, mongosServerStatus.metrics.query.updateOneTargetedShardedCount);
+assert.eq(3, mongosServerStatus.metrics.query.deleteOneTargetedShardedCount);
+assert.eq(1, mongosServerStatus.metrics.query.findAndModifyTargetedShardedCount);
+assert.eq(1, mongosServerStatus.metrics.query.updateOneUnshardedCount);
+assert.eq(1, mongosServerStatus.metrics.query.deleteOneUnshardedCount);
+assert.eq(1, mongosServerStatus.metrics.query.findAndModifyUnshardedCount);
+assert.eq(12, mongosServerStatus.metrics.query.updateOneNonTargetedShardedCount);
+assert.eq(6, mongosServerStatus.metrics.query.deleteOneNonTargetedShardedCount);
+assert.eq(4, mongosServerStatus.metrics.query.findAndModifyNonTargetedShardedCount);
 
 st.stop();

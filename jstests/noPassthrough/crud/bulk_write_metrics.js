@@ -225,7 +225,8 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         },
     );
 
-    // TODO SERVER-104122: Enable when 'WouldChangeOwningShard' writes are supported.
+    // TODO SERVER-114992: Not running in master because of tag but passes with flag off and fails
+    // with flag on.
     const uweEnabled = isUweEnabled(testDB);
     if (isMongos && !uweEnabled) {
         // Update modifying owning shard requires a transaction or retryable write, we do not want

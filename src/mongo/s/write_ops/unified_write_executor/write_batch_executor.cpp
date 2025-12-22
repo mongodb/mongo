@@ -820,7 +820,6 @@ ShardResponse ShardResponse::make(StatusWith<executor::RemoteCommandResponse> sw
 
     // If there was a local error, return a ShardResponse that reports this local error.
     if (!swResponse.isOK()) {
-        // TODO SERVER-104122 Support for 'WouldChangeOwningShard' writes.
         const Status& status = swResponse.getStatus();
 
         LOGV2_DEBUG(10896501,

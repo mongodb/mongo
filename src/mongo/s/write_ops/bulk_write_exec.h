@@ -75,6 +75,17 @@ public:
                        const std::vector<std::unique_ptr<NSTargeter>>& targeters,
                        bool updatedShardKey);
 
+    /**
+     * Set of methods to determine whether this 'BulkWriteExecStats' object should be ignored or
+     * not (that is, whether it should not be used to update targeting or query counter stats).
+     */
+    void markIgnore() {
+        _ignore = true;
+    }
+    bool getIgnore() const {
+        return _ignore;
+    }
+
 private:
     // Indexed by the namespace index.
     stdx::unordered_map<size_t, int> _numShardsOwningChunks;
@@ -83,6 +94,7 @@ private:
         size_t,
         stdx::unordered_map<BatchedCommandRequest::BatchType, stdx::unordered_set<ShardId>>>
         _targetedShardsPerNsAndBatchType;
+    bool _ignore = false;
 };
 
 /**
