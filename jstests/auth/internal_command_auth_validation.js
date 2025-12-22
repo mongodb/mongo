@@ -698,6 +698,8 @@ const internalCommandsMap = {
         testname: "_shardsvrDropDatabase",
         command: {
             _shardsvrDropDatabase: 1,
+            // This test relies on failing due to write concern not being majority since running this command on the admin database will hang.
+            writeConcern: {w: 1},
         },
     },
     _shardsvrDropDatabaseParticipant: {

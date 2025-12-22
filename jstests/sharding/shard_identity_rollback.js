@@ -44,8 +44,11 @@ let shardIdentityDoc = {
     clusterId: ObjectId(),
 };
 
+// Do this explicitly with w:1 so that we don't hang waiting for replication that will never happen.
 assert.commandWorked(
-    priConn.getDB("admin").system.version.update({_id: "shardIdentity"}, shardIdentityDoc, {upsert: true}),
+    priConn
+        .getDB("admin")
+        .system.version.update({_id: "shardIdentity"}, shardIdentityDoc, {upsert: true, writeConcern: {w: 1}}),
 );
 
 // Ensure sharding state on the primary was initialized
@@ -62,8 +65,13 @@ secondaries.forEach(function (secondary) {
     assert(!res.enabled, tojson(res));
 });
 
-// Ensure manually deleting the shardIdentity document is not allowed.
-assert.writeErrorWithCode(priConn.getDB("admin").system.version.remove({_id: "shardIdentity"}), 40070);
+// Ensure manually deleting the shardIdentity document is not allowed. We do this with w: 1 because
+// otherwise we would wait for majority write concern of the prior op which was the write of the
+// shard identity.
+assert.writeErrorWithCode(
+    priConn.getDB("admin").system.version.remove({_id: "shardIdentity"}, {writeConcern: {w: 1}}),
+    40070,
+);
 
 jsTest.log("shutting down primary");
 // Shut down the primary so a secondary gets elected that definitely won't have replicated the

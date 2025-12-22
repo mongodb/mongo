@@ -122,7 +122,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, TestReadConcernClientUnspecifiedNoDefaul
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, TestReadConcernClientUnspecifiedWithDefault) {
-    testReadConcernClientUnspecifiedWithDefault(true);
+    testReadConcernClientUnspecifiedWithDefault();
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, TestReadConcernClientSuppliedLevelNotAllowed) {
@@ -154,7 +154,7 @@ TEST_F(ServiceEntryPointRouterRoleTest, TestWriteConcernClientUnspecifiedNoDefau
 }
 
 TEST_F(ServiceEntryPointRouterRoleTest, TestWriteConcernClientUnspecifiedWithDefault) {
-    testWriteConcernClientUnspecifiedWithDefault(true);
+    testWriteConcernClientUnspecifiedWithDefault();
 }
 
 #ifdef MONGO_CONFIG_OTEL

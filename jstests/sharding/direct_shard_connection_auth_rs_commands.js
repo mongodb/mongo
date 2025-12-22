@@ -141,7 +141,8 @@ jsTest.log("Testing replSetAbortPrimaryCatchUp");
     });
     const stopReplProducerFailPoint1 = configureFailPoint(secondary1Conn, "stopReplProducer");
     stopReplProducerFailPoint1.wait();
-    runAsAdminUser(primary, {insert: "catch_up", documents: [{_id: 1}]}, "test");
+    // Since we have stopped replication on both secondaries, run this with w: 1
+    runAsAdminUser(primary, {insert: "catch_up", documents: [{_id: 1}], writeConcern: {w: 1}}, "test");
     // Step up the first secondary, it will enter catch up indefinitely
     assert.commandWorked(secondary1Conn.adminCommand({replSetStepUp: 1}));
 

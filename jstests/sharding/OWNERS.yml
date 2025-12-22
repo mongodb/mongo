@@ -142,3 +142,6 @@ filters:
   - "index_commands_shard_targeting.js":
     approvers:
       - 10gen/server-catalog-and-routing-ddl
+  - "shard_identity_rollback.js":
+    approvers:
+      - 10gen/server-catalog-and-routing

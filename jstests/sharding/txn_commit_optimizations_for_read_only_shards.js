@@ -284,7 +284,9 @@ const failureModes = {
             stopServerReplication(expectTwoPhaseCommit ? st.rs1.getSecondaries() : st.rs0.getSecondaries());
 
             // Do a write on rs0 through the router outside the transaction to ensure the
-            // transaction will choose a read time that has not been majority committed.
+            // transaction will choose a read time that has not been majority committed. We do this
+            // write with {w: 1} because we stopped replication on secondaries so anything else is
+            // unfulfillable.
             assert.commandWorked(st.s.getDB(dbName).getCollection("dummy").insert({dummy: 1}));
         },
         beforeCommit: noop,
@@ -329,7 +331,7 @@ const failureModes = {
                     // Any read shard failure should have triggered an implicit abort on all shards.
                     // Note the first shard already received commitTransaction but couldn't majority
                     // commit it, so it should have already committed the transaction.
-                    const dummyTxnCmd = addTxnFields({commitTransaction: 1}, lsid, txnNumber);
+                    const dummyTxnCmd = addTxnFields({commitTransaction: 1, writeConcern: {w: 1}}, lsid, txnNumber);
                     assert.commandWorked(st.rs0.getPrimary().adminCommand(dummyTxnCmd));
                     assert.commandFailedWithCode(
                         st.rs1.getPrimary().adminCommand(dummyTxnCmd),

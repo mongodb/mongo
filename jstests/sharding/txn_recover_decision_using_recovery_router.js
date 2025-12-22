@@ -332,8 +332,14 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "ShardAuthoritativeDbMetadat
 
     stopReplicationOnSecondaries(recoveryShardReplSetTest, false /* changeReplicaSetDefaultWCToLocal */);
 
-    // Do a write on the recovery node to bump the recovery node's system last OpTime.
-    recoveryShardReplSetTest.getPrimary().getDB("dummy").getCollection("dummy").insert({dummy: 1});
+    // Do a write on the recovery node to bump the recovery node's system last OpTime. We do this
+    // write with {w: 1} because we stopped replication on secondaries so anything else is
+    // unfulfillable.
+    recoveryShardReplSetTest
+        .getPrimary()
+        .getDB("dummy")
+        .getCollection("dummy")
+        .insert({dummy: 1}, {writeConcern: {w: 1}});
 
     // While the recovery shard primary cannot majority commit writes, commitTransaction returns
     // NoSuchTransaction with a writeConcern error.
@@ -363,8 +369,14 @@ if (!FeatureFlagUtil.isPresentAndEnabled(st.shard1, "ShardAuthoritativeDbMetadat
 
     stopReplicationOnSecondaries(recoveryShardReplSetTest, false /* changeReplicaSetDefaultWCToLocal */);
 
-    // Do a write on the recovery node to bump the recovery node's system last OpTime.
-    recoveryShardReplSetTest.getPrimary().getDB("dummy").getCollection("dummy").insert({dummy: 1});
+    // Do a write on the recovery node to bump the recovery node's system last OpTime. We do this
+    // write with {w: 1} because we stopped replication on secondaries so anything else is
+    // unfulfillable.
+    recoveryShardReplSetTest
+        .getPrimary()
+        .getDB("dummy")
+        .getCollection("dummy")
+        .insert({dummy: 1}, {writeConcern: {w: 1}});
 
     // While the recovery shard primary cannot majority commit writes, commitTransaction returns
     // ok with a writeConcern error.

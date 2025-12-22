@@ -239,6 +239,7 @@ mongo_cc_library(
     ],
     deps = [
         ":sharding_mongod_test_fixture",
+        "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db/global_catalog:sharding_catalog_client_impl",
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",

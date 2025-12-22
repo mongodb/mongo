@@ -1461,14 +1461,16 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
                                 "internalClient connection {}",
                                 redact(_execContext.getRequest().body.toString())),
                     readConcernArgs.isSpecified());
-        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
-                   serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-            if (!readConcernArgs.isSpecified()) {
-                // TODO: Disabled until after SERVER-44539, to avoid log spam.
-                // LOGV2(21954, "Missing readConcern on {command}", "Missing readConcern "
-                // "for command", "command"_attr = _invocation->definition()->getName());
-            }
         } else {
+            if ((serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+                 serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) &&
+                !readConcernArgs.isSpecified()) {
+                // TODO: Disabled until after SERVER-44539, to avoid log spam.
+                // LOGV2(21954,
+                //       "Missing readConcern for command",
+                //       "command"_attr = _invocation->definition()->getName());
+            }
+
             // A member in a regular replica set.  Since these servers receive client queries, in
             // this context empty RC (ie. readConcern: {}) means the same as if absent/unspecified,
             // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),

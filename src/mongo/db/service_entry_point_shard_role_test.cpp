@@ -240,7 +240,7 @@ TEST_F(ServiceEntryPointShardServerTest, TestReadConcernClientUnspecifiedNoDefau
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestReadConcernClientUnspecifiedWithDefault) {
-    testReadConcernClientUnspecifiedWithDefault(false);
+    testReadConcernClientUnspecifiedWithDefault();
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestReadConcernClientSuppliedLevelNotAllowed) {
@@ -275,7 +275,7 @@ TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedNoDefa
 
 TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedWithDefault) {
     _replCoordMock->setWriteConcernMajorityShouldJournal(false);
-    testWriteConcernClientUnspecifiedWithDefault(false);
+    testWriteConcernClientUnspecifiedWithDefault();
 }
 
 #ifdef MONGO_CONFIG_OTEL
@@ -364,7 +364,7 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestReadConcernClientUnspecifiedNoDefaul
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestReadConcernClientUnspecifiedWithDefault) {
-    testReadConcernClientUnspecifiedWithDefault(true);
+    testReadConcernClientUnspecifiedWithDefault();
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestReadConcernClientSuppliedLevelNotAllowed) {
@@ -399,7 +399,7 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedNoDefau
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedWithDefault) {
     _replCoordMock->setWriteConcernMajorityShouldJournal(false);
-    testWriteConcernClientUnspecifiedWithDefault(true);
+    testWriteConcernClientUnspecifiedWithDefault();
 }
 
 #ifdef MONGO_CONFIG_OTEL

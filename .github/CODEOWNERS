@@ -1648,6 +1648,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/remove_shard_*.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/**/reporting_compound_wildcard_index_prefixed_by_shard_key.js @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /jstests/sharding/**/index_commands_shard_targeting.js @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
+/jstests/sharding/**/shard_identity_rollback.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml
 /jstests/sharding/analyze_shard_key/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
