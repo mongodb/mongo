@@ -57,14 +57,15 @@ protected:
 
 class BulkCommandSizeEstimator final : public write_op_helpers::BatchCommandSizeEstimatorBase {
 public:
-    explicit BulkCommandSizeEstimator(OperationContext* opCtx, WriteCommandRef cmdRef);
+    explicit BulkCommandSizeEstimator(OperationContext* opCtx,
+                                      const BulkWriteCommandRequest& clientRequest);
 
     int getBaseSizeEstimate() const final;
     int getOpSizeEstimate(int opIdx, const ShardId& shardId) const final;
     void addOpToBatch(int opIdx, const ShardId& shardId) final;
 
 private:
-    const WriteCommandRef _cmdRef;
+    const BulkWriteCommandRequest& _clientRequest;
     const bool _isRetryableWriteOrInTransaction;
     const int _baseSizeEstimate;
 
@@ -73,6 +74,22 @@ private:
     // nsInfo indexes we have account for the size of. We only want to count each nsInfoIdx once
     // per child batch.
     absl::flat_hash_map<ShardId, absl::flat_hash_set<NamespaceString>> _accountedForNsInfos;
+};
+
+
+class BatchedCommandSizeEstimator final : public write_op_helpers::BatchCommandSizeEstimatorBase {
+public:
+    explicit BatchedCommandSizeEstimator(OperationContext* opCtx,
+                                         const BatchedCommandRequest& clientRequest);
+
+    int getBaseSizeEstimate() const final;
+    int getOpSizeEstimate(int opIdx, const ShardId& shardId) const final;
+    void addOpToBatch(int opIdx, const ShardId& shardId) final {}
+
+private:
+    const BatchedCommandRequest& _clientRequest;
+    const bool _isRetryableWriteOrInTransaction;
+    const int _baseSizeEstimate;
 };
 
 bool isRetryErrCode(int errCode);
@@ -132,7 +149,7 @@ bool shouldTargetAllShardsSVIgnored(bool inTransaction, bool isMulti);
  */
 bool isSafeToIgnoreErrorInPartiallyAppliedOp(const Status& status);
 
-int computeBaseSizeEstimate(OperationContext* opCtx, WriteCommandRef cmdRef);
+int computeBaseSizeEstimate(OperationContext* opCtx, const BulkWriteCommandRequest& client);
 
 BulkWriteDeleteOp toBulkWriteDelete(const write_ops::DeleteOpEntry& op);
 

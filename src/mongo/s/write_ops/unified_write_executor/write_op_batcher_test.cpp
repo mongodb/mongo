@@ -815,7 +815,8 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherSkipsDoneBatches) {
     ASSERT_TRUE(result5.batch.isEmptyBatch());
 }
 
-TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherSplitsBatchesWhenExceedsBSONMax) {
+TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
+       OrderedBatcherSplitsBulkCommandBatchesWhenExceedsBSONMax) {
     BulkWriteCommandRequest request;
     int kNumOps = 17;
     int kLetSize = 15 * 1024 * 1024;  // 15 MB.
@@ -841,6 +842,260 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherSplitsBatchesWhenEx
     request.setOps(ops);
     request.setDbName(DatabaseName::kAdmin);
     request.setNsInfo({NamespaceInfoEntry(nss0)});
+
+    ASSERT_GT(request.toBSON().objsize(), BSONObjMaxUserSize);
+
+    WriteOpProducer producer(request);
+
+    std::map<WriteOpId, StatusWith<Analysis>> opAnalysis;
+    for (auto i = 0; i < kNumOps; i++) {
+        opAnalysis.emplace(i, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries});
+    }
+    WriteOpAnalyzerMock analyzer({std::move(opAnalysis)});
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = OrderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // The batcher should split the batches to honor the max bson size even though they target the
+    // same namespace.
+    std::vector<WriteOpId> expectedOps;
+    std::vector<ShardEndpoint> expectedShardVersions;
+    std::vector<bool> expectedIsViewfulTimeseries;
+    for (int i = 0; i < kNumOpsInBatch1; i++) {
+        expectedOps.push_back(i);
+        expectedShardVersions.push_back(nss0Shard0);
+        expectedIsViewfulTimeseries.push_back(nss0IsViewfulTimeseries);
+    }
+    auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(result1.batch,
+                                      std::move(expectedOps),
+                                      std::move(expectedShardVersions),
+                                      std::move(expectedIsViewfulTimeseries));
+
+
+    std::vector<WriteOpId> expectedOps2;
+    std::vector<ShardEndpoint> expectedShardVersions2;
+    std::vector<bool> expectedIsViewfulTimeseries2;
+    for (int i = kNumOpsInBatch1; i < kNumOps; i++) {
+        expectedOps2.push_back(i);
+        expectedShardVersions2.push_back(nss0Shard0);
+        expectedIsViewfulTimeseries2.push_back(nss0IsViewfulTimeseries);
+    }
+    auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result2.batch.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(result2.batch,
+                                      std::move(expectedOps2),
+                                      std::move(expectedShardVersions2),
+                                      std::move(expectedIsViewfulTimeseries2));
+
+    auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result3.batch.isEmptyBatch());
+}
+
+TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
+       OrderedBatcherSplitsBatchedUpdateBatchesWhenExceedsBSONMax) {
+    int kNumOps = 17;
+    int kLetSize = 15 * 1024 * 1024;  // 15 MB.
+    int kOpSize = 100 * 1024;         // 0.1 MB.
+
+    // This is an approximate estimate but should work with the request overhead since we round
+    // down.
+    int kNumOpsInBatch1 = (BSONObjMaxUserSize - kLetSize) / kOpSize;
+    ASSERT_LT(kNumOpsInBatch1, kNumOps);
+
+    // Create a ~15 MB let.
+    auto giantLet = BSON("a" << std::string(kLetSize, 'a'));
+
+    // Create a ~.1 MB update document.
+    auto updateDoc = write_ops::UpdateOpEntry(BSON("x" << 1),
+                                              write_ops::UpdateModification::parseFromClassicUpdate(
+                                                  BSON("b" << std::string(kOpSize, 'b'))));
+    std::vector<write_ops::UpdateOpEntry> ops;
+    for (auto i = 0; i < kNumOps; i++) {
+        ops.push_back(updateDoc);
+    }
+
+    // Create the BatchedCommandRequested with updates.
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(nss0);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        updateOp.setLet(giantLet);
+        updateOp.setUpdates(ops);
+        return updateOp;
+    }());
+
+    ASSERT_GT(request.toBSON().objsize(), BSONObjMaxUserSize);
+
+    WriteOpProducer producer(request);
+
+    std::map<WriteOpId, StatusWith<Analysis>> opAnalysis;
+    for (auto i = 0; i < kNumOps; i++) {
+        opAnalysis.emplace(i, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries});
+    }
+    WriteOpAnalyzerMock analyzer({std::move(opAnalysis)});
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = OrderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // The batcher should split the batches to honor the max bson size even though they target the
+    // same namespace.
+    std::vector<WriteOpId> expectedOps;
+    std::vector<ShardEndpoint> expectedShardVersions;
+    std::vector<bool> expectedIsViewfulTimeseries;
+    for (int i = 0; i < kNumOpsInBatch1; i++) {
+        expectedOps.push_back(i);
+        expectedShardVersions.push_back(nss0Shard0);
+        expectedIsViewfulTimeseries.push_back(nss0IsViewfulTimeseries);
+    }
+    auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(result1.batch,
+                                      std::move(expectedOps),
+                                      std::move(expectedShardVersions),
+                                      std::move(expectedIsViewfulTimeseries));
+
+
+    std::vector<WriteOpId> expectedOps2;
+    std::vector<ShardEndpoint> expectedShardVersions2;
+    std::vector<bool> expectedIsViewfulTimeseries2;
+    for (int i = kNumOpsInBatch1; i < kNumOps; i++) {
+        expectedOps2.push_back(i);
+        expectedShardVersions2.push_back(nss0Shard0);
+        expectedIsViewfulTimeseries2.push_back(nss0IsViewfulTimeseries);
+    }
+    auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result2.batch.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(result2.batch,
+                                      std::move(expectedOps2),
+                                      std::move(expectedShardVersions2),
+                                      std::move(expectedIsViewfulTimeseries2));
+
+    auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result3.batch.isEmptyBatch());
+}
+
+TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
+       OrderedBatcherSplitsBatchedInsertBatchesWhenExceedsBSONMax) {
+    int kNumOps = 17;
+    int kCommentSize = 15 * 1024 * 1024;  // 15 MB.
+    int kOpSize = 100 * 1024;             // 0.1 MB.
+
+    // This is an approximate estimate but should work with the request overhead since we round
+    // down.
+    int kNumOpsInBatch1 = (BSONObjMaxUserSize - kCommentSize) / kOpSize;
+    ASSERT_LT(kNumOpsInBatch1, kNumOps);
+
+    // Create a ~15 MB comment.
+    auto giantComment = IDLAnyTypeOwned(BSON("key" << std::string(kCommentSize, 'b'))["key"]);
+
+    // Create a ~.1 MB document to insert.
+    auto insertDoc = BSON("a" << std::string(kOpSize, 'x'));
+    std::vector<BSONObj> ops;
+    for (auto i = 0; i < kNumOps; i++) {
+        ops.push_back(insertDoc);
+    }
+
+    // Create the BatchedCommandRequested with inserts.
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss0);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setComment(giantComment);
+        insertOp.setDocuments(ops);
+        return insertOp;
+    }());
+
+    ASSERT_GT(request.toBSON().objsize(), BSONObjMaxUserSize);
+
+    WriteOpProducer producer(request);
+
+    std::map<WriteOpId, StatusWith<Analysis>> opAnalysis;
+    for (auto i = 0; i < kNumOps; i++) {
+        opAnalysis.emplace(i, Analysis{kSingleShard, {nss0Shard0}, nss0IsViewfulTimeseries});
+    }
+    WriteOpAnalyzerMock analyzer({std::move(opAnalysis)});
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = OrderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // The batcher should split the batches to honor the max bson size even though they target the
+    // same namespace.
+    std::vector<WriteOpId> expectedOps;
+    std::vector<ShardEndpoint> expectedShardVersions;
+    std::vector<bool> expectedIsViewfulTimeseries;
+    for (int i = 0; i < kNumOpsInBatch1; i++) {
+        expectedOps.push_back(i);
+        expectedShardVersions.push_back(nss0Shard0);
+        expectedIsViewfulTimeseries.push_back(nss0IsViewfulTimeseries);
+    }
+    auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(result1.batch,
+                                      std::move(expectedOps),
+                                      std::move(expectedShardVersions),
+                                      std::move(expectedIsViewfulTimeseries));
+
+
+    std::vector<WriteOpId> expectedOps2;
+    std::vector<ShardEndpoint> expectedShardVersions2;
+    std::vector<bool> expectedIsViewfulTimeseries2;
+    for (int i = kNumOpsInBatch1; i < kNumOps; i++) {
+        expectedOps2.push_back(i);
+        expectedShardVersions2.push_back(nss0Shard0);
+        expectedIsViewfulTimeseries2.push_back(nss0IsViewfulTimeseries);
+    }
+    auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result2.batch.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(result2.batch,
+                                      std::move(expectedOps2),
+                                      std::move(expectedShardVersions2),
+                                      std::move(expectedIsViewfulTimeseries2));
+
+    auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result3.batch.isEmptyBatch());
+}
+
+TEST_F(OrderedUnifiedWriteExecutorBatcherTest,
+       OrderedBatcherSplitsBatchedDeleteBatchesWhenExceedsBSONMax) {
+    int kNumOps = 17;
+    int kCommentSize = 15 * 1024 * 1024;  // 15 MB.
+    int kOpSize = 100 * 1024;             // 0.1 MB.
+
+    // This is an approximate estimate but should work with the request overhead since we round
+    // down.
+    int kNumOpsInBatch1 = (BSONObjMaxUserSize - kCommentSize) / kOpSize;
+    ASSERT_LT(kNumOpsInBatch1, kNumOps);
+
+    // Create a ~15 MB comment.
+    auto giantComment = IDLAnyTypeOwned(BSON("key" << std::string(kCommentSize, 'b'))["key"]);
+
+    // Create a ~.1 MB delete document.
+    auto deleteDoc = write_ops::DeleteOpEntry(BSON("a" << std::string(kOpSize, 'x')), false);
+    std::vector<write_ops::DeleteOpEntry> ops;
+    for (auto i = 0; i < kNumOps; i++) {
+        ops.push_back(deleteDoc);
+    }
+
+    // Create the BatchedCommandRequested with deletes.
+    BatchedCommandRequest request([&] {
+        write_ops::DeleteCommandRequest deleteOp(nss0);
+        deleteOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        deleteOp.setComment(giantComment);
+        deleteOp.setDeletes(ops);
+        return deleteOp;
+    }());
 
     ASSERT_GT(request.toBSON().objsize(), BSONObjMaxUserSize);
 
@@ -1539,7 +1794,8 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherAttachesSampleI
     ASSERT_TRUE(result4.batch.isEmptyBatch());
 }
 
-TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherSplitsBatchesWhenExceedsBSONMax) {
+TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
+       UnorderedBatcherSplitsBulkCommandBatchesWhenExceedsBSONMax) {
     BulkWriteCommandRequest request;
     int kNumOps = 17;
     int kLetSize = 15 * 1024 * 1024;  // 15 MB.
@@ -1624,6 +1880,282 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherSplitsBatchesWh
     ASSERT_TRUE(result3.batch.isEmptyBatch());
 }
 
+TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
+       UnorderedBatcherSplitsBatchedUpdateBatchesWhenExceedsBSONMax) {
+    int kNumOps = 17;
+    int kCommentSize = 15 * 1024 * 1024;  // 15 MB.
+    int kOpSize = 200 * 1024;             // 0.2 MB.
+
+    // This is an approximate estimate but should work with the request overhead since we round
+    // down.
+    int kNumOpsInBatch1 = (BSONObjMaxUserSize - kCommentSize) / kOpSize;
+    ASSERT_LT(kNumOpsInBatch1, kNumOps);
+
+    // Create a ~15 MB comment.
+    auto giantComment = IDLAnyTypeOwned(BSON("key" << std::string(kCommentSize, 'b'))["key"]);
+
+    // Create a ~.2 MB update document. We have 17, 9 targeted to shard0 and 8 to shard1,
+    // expecting 8 to fit in one batch.
+    auto updateDoc = write_ops::UpdateOpEntry(BSON("x" << 1),
+                                              write_ops::UpdateModification::parseFromClassicUpdate(
+                                                  BSON("b" << std::string(kOpSize, 'b'))));
+    std::vector<write_ops::UpdateOpEntry> ops;
+    for (auto i = 0; i < kNumOps; i++) {
+        ops.push_back(updateDoc);
+    }
+
+    // Create the BatchedCommandRequested with updates.
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(nss0);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        updateOp.setComment(giantComment);
+        updateOp.setUpdates(ops);
+        return updateOp;
+    }());
+
+    ASSERT_GT(request.toBSON().objsize(), BSONObjMaxUserSize);
+
+    WriteOpProducer producer(request);
+
+    std::map<WriteOpId, StatusWith<Analysis>> opAnalysis;
+    for (auto i = 0; i < kNumOps; i++) {
+        auto shardAffected = i % 2 ? nss0Shard1 : nss0Shard0;
+        opAnalysis.emplace(i, Analysis{kSingleShard, {shardAffected}, nss0IsViewfulTimeseries});
+    }
+    WriteOpAnalyzerMock analyzer({std::move(opAnalysis)});
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = UnorderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // The batcher should split the ops to honor the max bson size.
+    std::vector<WriteOp> expectedShard0Ops;
+    std::vector<WriteOp> expectedShard1Ops;
+    for (int i = 0; i < 2 * kNumOpsInBatch1; i++) {
+        if (i % 2) {
+            expectedShard1Ops.push_back(WriteOp(request, i));
+        } else {
+            expectedShard0Ops.push_back(WriteOp(request, i));
+        }
+    }
+    auto shard0Request = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard0}}, nssIsViewfulTimeseries, std::move(expectedShard0Ops)};
+    auto shard1Request = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard1}}, nssIsViewfulTimeseries, std::move(expectedShard1Ops)};
+    SimpleWriteBatch expectedBatch1{{{shardId0, shard0Request}, {shardId1, shard1Request}}};
+
+    auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(result1.batch, expectedBatch1);
+
+    std::vector<WriteOp> expectedShard0Ops2;
+    std::vector<WriteOp> expectedShard1Ops2;
+    for (int i = 2 * kNumOpsInBatch1; i < kNumOps; i++) {
+        if (i % 2) {
+            expectedShard1Ops2.push_back(WriteOp(request, i));
+        } else {
+            expectedShard0Ops2.push_back(WriteOp(request, i));
+        }
+    }
+    auto shard0Request2 = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard0}}, nssIsViewfulTimeseries, std::move(expectedShard0Ops2)};
+    auto shard1Request2 = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard1}}, nssIsViewfulTimeseries, std::move(expectedShard1Ops2)};
+    SimpleWriteBatch expectedBatch2{{{shardId0, shard0Request2}, {shardId1, shard1Request2}}};
+    auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result2.batch.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(result2.batch, expectedBatch2);
+
+    auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result3.batch.isEmptyBatch());
+}
+
+TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
+       UnorderedBatcherSplitsBatchedInsertBatchesWhenExceedsBSONMax) {
+    int kNumOps = 17;
+    int kCommentSize = 15 * 1024 * 1024;  // 15 MB.
+    int kOpSize = 200 * 1024;             // 0.2 MB.
+
+    // This is an approximate estimate but should work with the request overhead since we round
+    // down.
+    int kNumOpsInBatch1 = (BSONObjMaxUserSize - kCommentSize) / kOpSize;
+    ASSERT_LT(kNumOpsInBatch1, kNumOps);
+
+    // Create a ~15 MB comment.
+    auto giantComment = IDLAnyTypeOwned(BSON("key" << std::string(kCommentSize, 'b'))["key"]);
+
+    // Create a ~.2 MB document to insert.
+    auto insertDoc = BSON("a" << std::string(kOpSize, 'x'));
+    std::vector<BSONObj> ops;
+    for (auto i = 0; i < kNumOps; i++) {
+        ops.push_back(insertDoc);
+    }
+
+    // Create an insert command request with the docs. We have 17, 9 targeted to shard0 and 8 to
+    // shard1, expecting 8 to fit in one batch.
+    BatchedCommandRequest request([&] {
+        write_ops::InsertCommandRequest insertOp(nss0);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setComment(giantComment);
+        insertOp.setDocuments(ops);
+        return insertOp;
+    }());
+
+    ASSERT_GT(request.toBSON().objsize(), BSONObjMaxUserSize);
+
+    WriteOpProducer producer(request);
+
+    std::map<WriteOpId, StatusWith<Analysis>> opAnalysis;
+    for (auto i = 0; i < kNumOps; i++) {
+        auto shardAffected = i % 2 ? nss0Shard1 : nss0Shard0;
+        opAnalysis.emplace(i, Analysis{kSingleShard, {shardAffected}, nss0IsViewfulTimeseries});
+    }
+    WriteOpAnalyzerMock analyzer({std::move(opAnalysis)});
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = UnorderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // The batcher should split the ops to honor the max bson size.
+    std::vector<WriteOp> expectedShard0Ops;
+    std::vector<WriteOp> expectedShard1Ops;
+    for (int i = 0; i < 2 * kNumOpsInBatch1; i++) {
+        if (i % 2) {
+            expectedShard1Ops.push_back(WriteOp(request, i));
+        } else {
+            expectedShard0Ops.push_back(WriteOp(request, i));
+        }
+    }
+    auto shard0Request = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard0}}, nssIsViewfulTimeseries, std::move(expectedShard0Ops)};
+    auto shard1Request = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard1}}, nssIsViewfulTimeseries, std::move(expectedShard1Ops)};
+    SimpleWriteBatch expectedBatch1{{{shardId0, shard0Request}, {shardId1, shard1Request}}};
+
+    auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(result1.batch, expectedBatch1);
+
+    std::vector<WriteOp> expectedShard0Ops2;
+    std::vector<WriteOp> expectedShard1Ops2;
+    for (int i = 2 * kNumOpsInBatch1; i < kNumOps; i++) {
+        if (i % 2) {
+            expectedShard1Ops2.push_back(WriteOp(request, i));
+        } else {
+            expectedShard0Ops2.push_back(WriteOp(request, i));
+        }
+    }
+    auto shard0Request2 = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard0}}, nssIsViewfulTimeseries, std::move(expectedShard0Ops2)};
+    auto shard1Request2 = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard1}}, nssIsViewfulTimeseries, std::move(expectedShard1Ops2)};
+    SimpleWriteBatch expectedBatch2{{{shardId0, shard0Request2}, {shardId1, shard1Request2}}};
+    auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result2.batch.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(result2.batch, expectedBatch2);
+
+    auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result3.batch.isEmptyBatch());
+}
+
+TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
+       UnorderedBatcherSplitsBatchedDeleteBatchesWhenExceedsBSONMax) {
+    int kNumOps = 17;
+    int kLetSize = 15 * 1024 * 1024;  // 15 MB.
+    int kOpSize = 200 * 1024;         // 0.2 MB.
+
+    // This is an approximate estimate but should work with the request overhead since we round
+    // down.
+    int kNumOpsInBatch1 = (BSONObjMaxUserSize - kLetSize) / kOpSize;
+    ASSERT_LT(kNumOpsInBatch1, kNumOps);
+
+    // Create a ~15 MB let.
+    auto giantLet = BSON("a" << std::string(kLetSize, 'a'));
+
+    // Create a ~.2 MB delete. We have 17, 9 targeted to shard0 and 8 to shard1, expecting 8 to fit
+    // in one batch.
+    auto deleteDoc = write_ops::DeleteOpEntry(BSON("b" << std::string(kOpSize, 'b')), false);
+
+    std::vector<write_ops::DeleteOpEntry> ops;
+    for (auto i = 0; i < kNumOps; i++) {
+        ops.push_back(deleteDoc);
+    }
+
+    // Create the BatchedCommandRequested with deletes.
+    BatchedCommandRequest request([&] {
+        write_ops::DeleteCommandRequest deleteOp(nss0);
+        deleteOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        deleteOp.setLet(giantLet);
+        deleteOp.setDeletes(ops);
+        return deleteOp;
+    }());
+
+    ASSERT_GT(request.toBSON().objsize(), BSONObjMaxUserSize);
+
+    WriteOpProducer producer(request);
+
+    std::map<WriteOpId, StatusWith<Analysis>> opAnalysis;
+    for (auto i = 0; i < kNumOps; i++) {
+        auto shardAffected = i % 2 ? nss0Shard1 : nss0Shard0;
+        opAnalysis.emplace(i, Analysis{kSingleShard, {shardAffected}, nss0IsViewfulTimeseries});
+    }
+    WriteOpAnalyzerMock analyzer({std::move(opAnalysis)});
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = UnorderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
+
+    // The batcher should split the ops to honor the max bson size.
+    std::vector<WriteOp> expectedShard0Ops;
+    std::vector<WriteOp> expectedShard1Ops;
+    for (int i = 0; i < 2 * kNumOpsInBatch1; i++) {
+        if (i % 2) {
+            expectedShard1Ops.push_back(WriteOp(request, i));
+        } else {
+            expectedShard0Ops.push_back(WriteOp(request, i));
+        }
+    }
+    auto shard0Request = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard0}}, nssIsViewfulTimeseries, std::move(expectedShard0Ops)};
+    auto shard1Request = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard1}}, nssIsViewfulTimeseries, std::move(expectedShard1Ops)};
+    SimpleWriteBatch expectedBatch1{{{shardId0, shard0Request}, {shardId1, shard1Request}}};
+
+    auto result1 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result1.batch.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(result1.batch, expectedBatch1);
+
+    std::vector<WriteOp> expectedShard0Ops2;
+    std::vector<WriteOp> expectedShard1Ops2;
+    for (int i = 2 * kNumOpsInBatch1; i < kNumOps; i++) {
+        if (i % 2) {
+            expectedShard1Ops2.push_back(WriteOp(request, i));
+        } else {
+            expectedShard0Ops2.push_back(WriteOp(request, i));
+        }
+    }
+    auto shard0Request2 = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard0}}, nssIsViewfulTimeseries, std::move(expectedShard0Ops2)};
+    auto shard1Request2 = SimpleWriteBatch::ShardRequest{
+        {{nss0, nss0Shard1}}, nssIsViewfulTimeseries, std::move(expectedShard1Ops2)};
+    SimpleWriteBatch expectedBatch2{{{shardId0, shard0Request2}, {shardId1, shard1Request2}}};
+    auto result2 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_FALSE(result2.batch.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(result2.batch, expectedBatch2);
+
+    auto result3 = batcher.getNextBatch(getOperationContext(), *routingCtx);
+    ASSERT_TRUE(result3.batch.isEmptyBatch());
+}
+
 class UnifiedWriteExecutorSizeEstimatorTest : public ServiceContextTest {
 public:
     UnifiedWriteExecutorSizeEstimatorTest() : _opCtx(makeOperationContext()) {}
@@ -1662,8 +2194,7 @@ TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BulkWriteCommandBaseSizeEstimate) 
     request.serialize(&builder);
     auto requestSize = builder.obj().objsize();
 
-    auto sizeEstimator =
-        write_op_helpers::BulkCommandSizeEstimator{getOperationContext(), WriteCommandRef{request}};
+    auto sizeEstimator = write_op_helpers::BulkCommandSizeEstimator{getOperationContext(), request};
 
     // Expect the estimated size to be larger and reasonably similar.
     const int diff = sizeEstimator.getBaseSizeEstimate() - requestSize;
@@ -1690,8 +2221,7 @@ TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BulkWriteCommandOpSizeEstimates) {
     BulkWriteCommandRequest request(ops, {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
     request.setDbName(DatabaseName::kAdmin);
 
-    auto sizeEstimator =
-        write_op_helpers::BulkCommandSizeEstimator{getOperationContext(), WriteCommandRef{request}};
+    auto sizeEstimator = write_op_helpers::BulkCommandSizeEstimator{getOperationContext(), request};
 
     int totalEstimate = sizeEstimator.getBaseSizeEstimate();
 
@@ -1733,31 +2263,21 @@ TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteInsertCommandBaseSizeE
             writeCommandBase.setBypassEmptyTsReplacement(true);
             return writeCommandBase;
         }());
+        insertOp.setDocuments({});
         return insertOp;
     }());
 
-    // Create a BulkWriteCommandRequest and add optional/variable fields to the request to match the
-    // BatchedCommandRequest.
-    BulkWriteCommandRequest bulkRequest;
-    bulkRequest.setDbName(DatabaseName::kAdmin);
-    bulkRequest.setBypassEmptyTsReplacement(true);
-
-    // We set NS Info and ops to empty arrays since we're checking the base size and these are added
-    // per op.
-    bulkRequest.setNsInfo({});
-    bulkRequest.setOps({});
-
     BSONObjBuilder builder;
-    bulkRequest.serialize(&builder);
+    batchedRequest.serialize(&builder);
     auto requestSize = builder.obj().objsize();
 
-    auto sizeEstimator = write_op_helpers::BulkCommandSizeEstimator{
-        getOperationContext(), WriteCommandRef{batchedRequest}};
+    auto sizeEstimator =
+        write_op_helpers::BatchedCommandSizeEstimator{getOperationContext(), batchedRequest};
 
     // Expect the estimated size to be larger and reasonably similar.
     const int diff = sizeEstimator.getBaseSizeEstimate() - requestSize;
     ASSERT_GT(diff, 0);
-    ASSERT_LT(diff, 50);
+    ASSERT_LT(diff, 25);
 }
 
 TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteDeleteCommandBaseSizeEstimate) {
@@ -1771,27 +2291,16 @@ TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteDeleteCommandBaseSizeE
             return writeCommandBase;
         }());
         deleteOp.setLet(let);
+        deleteOp.setDeletes({});
         return deleteOp;
     }());
 
-    // Create a BulkWriteCommandRequest and add optional/variable fields to the request to match the
-    // BatchedCommandRequest.
-    BulkWriteCommandRequest bulkRequest;
-    bulkRequest.setLet(let);
-    bulkRequest.setDbName(DatabaseName::kAdmin);
-    bulkRequest.setBypassEmptyTsReplacement(true);
-
-    // We set NS Info and ops to empty arrays since we're checking the base size and these are added
-    // per op.
-    bulkRequest.setNsInfo({});
-    bulkRequest.setOps({});
-
     BSONObjBuilder builder;
-    bulkRequest.serialize(&builder);
+    batchedRequest.serialize(&builder);
     auto requestSize = builder.obj().objsize();
 
-    auto sizeEstimator = write_op_helpers::BulkCommandSizeEstimator{
-        getOperationContext(), WriteCommandRef{batchedRequest}};
+    auto sizeEstimator =
+        write_op_helpers::BatchedCommandSizeEstimator{getOperationContext(), batchedRequest};
 
     // Expect the estimated size to be larger and reasonably similar.
     const int diff = sizeEstimator.getBaseSizeEstimate() - requestSize;
@@ -1810,43 +2319,31 @@ TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteUpdateCommandBaseSizeE
             return writeCommandBase;
         }());
         updateOp.setLet(let);
+        updateOp.setUpdates({});
         return updateOp;
     }());
 
-    // Create a BulkWriteCommandRequest and add optional/variable fields to the request to match the
-    // BatchedCommandRequest.
-    BulkWriteCommandRequest bulkRequest;
-    bulkRequest.setLet(let);
-    bulkRequest.setDbName(DatabaseName::kAdmin);
-    bulkRequest.setBypassEmptyTsReplacement(true);
-
-    // We set NS Info and ops to empty arrays since we're checking the base size and these are added
-    // per op.
-    bulkRequest.setNsInfo({});
-    bulkRequest.setOps({});
 
     BSONObjBuilder builder;
-    bulkRequest.serialize(&builder);
+    batchedRequest.serialize(&builder);
     auto requestSize = builder.obj().objsize();
 
-    auto sizeEstimator = write_op_helpers::BulkCommandSizeEstimator{
-        getOperationContext(), WriteCommandRef{batchedRequest}};
+    auto sizeEstimator =
+        write_op_helpers::BatchedCommandSizeEstimator{getOperationContext(), batchedRequest};
 
     // Expect the estimated size to be larger and reasonably similar.
     const int diff = sizeEstimator.getBaseSizeEstimate() - requestSize;
     ASSERT_GT(diff, 0);
-    ASSERT_LT(diff, 50);
+    ASSERT_LT(diff, 25);
 }
 
 TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteCommandOpSizeEstimate) {
     const int kNumDocs = 15;
     auto insertDoc = BSON("a" << std::string(200, 'x'));
     std::vector<BSONObj> docsToInsert;
-    std::vector<BulkWriteOpVariant> bulkWriteInsertOps;
     docsToInsert.reserve(kNumDocs);
     for (int i = 0; i < kNumDocs; i++) {
         docsToInsert.push_back(insertDoc);
-        bulkWriteInsertOps.push_back(BulkWriteInsertOp(0, insertDoc));
     }
 
     // Create the BatchedCommandRequested with inserts.
@@ -1861,43 +2358,23 @@ TEST_F(UnifiedWriteExecutorSizeEstimatorTest, BatchedWriteCommandOpSizeEstimate)
         return insertOp;
     }());
 
-    auto sizeEstimator = write_op_helpers::BulkCommandSizeEstimator{
-        getOperationContext(), WriteCommandRef{batchedRequest}};
+    auto sizeEstimator =
+        write_op_helpers::BatchedCommandSizeEstimator{getOperationContext(), batchedRequest};
 
     int totalEstimate = sizeEstimator.getBaseSizeEstimate();
 
-    // Get the estimate and add the op so we register the nss.
-    int firstNss0InsertSize = sizeEstimator.getOpSizeEstimate(0, shardId0);
-    sizeEstimator.addOpToBatch(0, shardId0);
-
-    int secondNss0InsertSize = sizeEstimator.getOpSizeEstimate(1, shardId0);
-    sizeEstimator.addOpToBatch(1, shardId0);
-
-    // The first insert should also account for adding the NSS but the second shouldn't as we've
-    // already accounted for it.
-    ASSERT_GT(firstNss0InsertSize, secondNss0InsertSize);
-
-    totalEstimate += firstNss0InsertSize;
-    totalEstimate += secondNss0InsertSize;
-
-    for (int i = 2; i < static_cast<int>(docsToInsert.size()); i++) {
+    for (int i = 0; i < static_cast<int>(docsToInsert.size()); i++) {
         totalEstimate += sizeEstimator.getOpSizeEstimate(i, shardId0);
         sizeEstimator.addOpToBatch(i, shardId0);
     }
 
-    // Create the same BulkWriteCommandRequest to compare the size after conversion.
-    BulkWriteCommandRequest bulkRequest(bulkWriteInsertOps, {NamespaceInfoEntry(nss0)});
     BSONObjBuilder builder;
-    bulkRequest.serialize(&builder);
+    batchedRequest.serialize(&builder);
     auto requestSize = builder.obj().objsize();
 
-    // Expect the estimated size to be larger and reasonably similar. Each op size estimate differs
-    // by about ~10 bytes (~150 bytes), we expect the base sizes to be within ~50 bytes and
-    // conservatively estimate an additional ~50 bytes per namespace in case we're dealing with
-    // timeseries.
     const int diff = totalEstimate - requestSize;
     ASSERT_GT(diff, 0);
-    ASSERT_LT(diff, 300);
+    ASSERT_LT(diff, 100);
 }
 
 

@@ -205,14 +205,6 @@ void trackErrors(const ShardEndpoint& endpoint,
         }
     }
 }
-
-int getEncryptionInformationSize(const BatchedCommandRequest& req) {
-    if (!req.getWriteCommandRequestBase().getEncryptionInformation()) {
-        return 0;
-    }
-    return req.getWriteCommandRequestBase().getEncryptionInformation().value().toBSON().objsize();
-}
-
 }  // namespace
 
 /**
@@ -465,42 +457,6 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
     return batchType ? *batchType : WriteType::Ordinary;
 }
 
-BatchedCommandSizeEstimator::BatchedCommandSizeEstimator(OperationContext* opCtx,
-                                                         const BatchedCommandRequest& clientRequest)
-    : _clientRequest(clientRequest),
-      _isRetryableWriteOrInTransaction(opCtx->getTxnNumber().has_value()),
-      _baseSizeEstimate(clientRequest.getBaseCommandSizeEstimate(opCtx)) {}
-
-int BatchedCommandSizeEstimator::getBaseSizeEstimate() const {
-    return _baseSizeEstimate;
-}
-
-int BatchedCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& shardId) const {
-    // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
-    // corresponding to the statements that got routed to each individual shard, so they
-    // need to be accounted in the potential request size so it does not exceed the max BSON
-    // size.
-    const int writeSizeBytes = BatchItemRef{&_clientRequest, opIdx}.estimateOpSizeInBytes() +
-        getEncryptionInformationSize(_clientRequest) +
-        write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
-        (_isRetryableWriteOrInTransaction
-             ? write_ops::kStmtIdSize + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
-             : 0);
-
-    // For unordered writes, the router must return an entry for each failed write. This
-    // constant is a pessimistic attempt to ensure that if a request to a shard hits
-    // "retargeting needed" error and has to return number of errors equivalent to the
-    // number of writes in the batch, the response size will not exceed the max BSON size.
-    //
-    // The constant of 272 is chosen as an approximation of the size of the BSON
-    // representation of the StaleConfigInfo (which contains the shard id) and the adjacent
-    // error message.
-    const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
-    const int errorResponsePotentialSizeBytes =
-        ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 272;
-    return std::max(writeSizeBytes, errorResponsePotentialSizeBytes);
-}
-
 BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest)
     : _opCtx(opCtx),
       _clientRequest(clientRequest),
@@ -519,7 +475,7 @@ StatusWith<WriteType> BatchWriteOp::targetBatch(const NSTargeter& targeter,
                                                 TargetedBatchMap* targetedBatches) {
     const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
 
-    BatchedCommandSizeEstimator sizeEstimator(_opCtx, _clientRequest);
+    write_op_helpers::BatchedCommandSizeEstimator sizeEstimator(_opCtx, _clientRequest);
 
     auto targetStatus = targetWriteOps(
         _opCtx,

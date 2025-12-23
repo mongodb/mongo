@@ -717,8 +717,7 @@ StatusWith<WriteType> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTa
                                           TargetedBatchMap& targetedBatches) {
     const auto ordered = _clientRequest.getOrdered();
 
-    auto cmdRef = WriteCommandRef{_clientRequest};
-    write_op_helpers::BulkCommandSizeEstimator sizeEstimator(_opCtx, cmdRef);
+    write_op_helpers::BulkCommandSizeEstimator sizeEstimator(_opCtx, _clientRequest);
 
     return targetWriteOps(
         _opCtx,

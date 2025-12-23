@@ -42,12 +42,31 @@ bool analysisTypeSupportsGrouping(AnalysisType type) {
     return type == kSingleShard || type == kMultiShard || type == kRetryableWriteWithId;
 }
 
+namespace {
+
+std::unique_ptr<write_op_helpers::BatchCommandSizeEstimatorBase> getSizeEstimator(
+    OperationContext* opCtx, const WriteCommandRef& cmdRef) {
+    if (cmdRef.isBatchWriteCommand()) {
+        return std::make_unique<write_op_helpers::BatchedCommandSizeEstimator>(
+            opCtx, cmdRef.getBatchedCommandRequest());
+    } else if (cmdRef.isBulkWriteCommand()) {
+        return std::make_unique<write_op_helpers::BulkCommandSizeEstimator>(
+            opCtx, cmdRef.getBulkWriteCommandRequest());
+    }
+
+    // TODO(SERVER-115502): Check if we hit this tassert for FAM commands, we may need to add a
+    // no-op size estimator.
+    tasserted(11576100, "Expected bulk or batched write command in a SimpleBatch");
+}
+}  // namespace
+
 template <bool Ordered>
 class SimpleBatchBuilderBase {
 public:
-    SimpleBatchBuilderBase(OperationContext* opCtx, WriteOpBatcher& batcher, WriteCommandRef cmdRef)
-        : _batcher(batcher),
-          _sizeEstimator(write_op_helpers::BulkCommandSizeEstimator(opCtx, cmdRef)) {}
+    SimpleBatchBuilderBase(OperationContext* opCtx,
+                           WriteOpBatcher& batcher,
+                           const WriteCommandRef& cmdRef)
+        : _batcher(batcher), _sizeEstimator(getSizeEstimator(opCtx, cmdRef)) {}
 
     /**
      * If ops were added to '_batch' but done() was not called, mark all the ops in '_batch' for
@@ -127,7 +146,7 @@ public:
                 continue;
             }
 
-            int estSizeBytesForWrite = _sizeEstimator.getOpSizeEstimate(opIdx, shard.shardName);
+            int estSizeBytesForWrite = _sizeEstimator->getOpSizeEstimate(opIdx, shard.shardName);
             tassert(10414701, "Expected a non-zero write operation size", estSizeBytesForWrite > 0);
 
             if (it->second.ops.size() >= write_ops::kMaxWriteBatchSize ||
@@ -163,7 +182,7 @@ public:
         for (const auto& shard : analysis.shardsAffected) {
             auto nss = writeOp.getNss();
             int estSizeBytesForWrite =
-                _sizeEstimator.getOpSizeEstimate(getWriteOpId(writeOp), shard.shardName);
+                _sizeEstimator->getOpSizeEstimate(getWriteOpId(writeOp), shard.shardName);
 
             auto it = _batch->requestByShardId.find(shard.shardName);
             if (it != _batch->requestByShardId.end()) {
@@ -196,7 +215,7 @@ public:
                         std::move(nssIsViewfulTimeseries),
                         std::vector<WriteOp>{writeOp},
                         std::map<WriteOpId, UUID>{},
-                        _sizeEstimator.getBaseSizeEstimate() + estSizeBytesForWrite});
+                        _sizeEstimator->getBaseSizeEstimate() + estSizeBytesForWrite});
             }
 
             const auto& targetedSampleId = analysis.targetedSampleId;
@@ -252,7 +271,7 @@ protected:
 
     WriteOpBatcher& _batcher;
     boost::optional<SimpleWriteBatch> _batch;
-    write_op_helpers::BulkCommandSizeEstimator _sizeEstimator;
+    std::unique_ptr<write_op_helpers::BatchCommandSizeEstimatorBase> _sizeEstimator;
 };
 
 class OrderedSimpleBatchBuilder : public SimpleBatchBuilderBase<true> {

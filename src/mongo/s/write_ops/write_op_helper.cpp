@@ -60,7 +60,7 @@ bool isSafeToIgnoreErrorInPartiallyAppliedOp(const Status& status) {
         !status.extraInfo<CollectionUUIDMismatchInfo>()->actualCollection();
 }
 
-int computeBaseSizeEstimate(OperationContext* opCtx, WriteCommandRef cmdRef) {
+int computeBaseSizeEstimate(OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest) {
     // For simplicity, we build a dummy bulk write command request that contains all the common
     // fields and serialize it to get the base command size. We only bother to copy over variable
     // size and/or optional fields, since the value of fields that are fixed-size and always present
@@ -74,7 +74,7 @@ int computeBaseSizeEstimate(OperationContext* opCtx, WriteCommandRef cmdRef) {
 
     // Bulk writes are executed against the admin database.
     request.setDbName(DatabaseName::kAdmin);
-    request.setLet(cmdRef.getLet());
+    request.setLet(clientRequest.getLet());
 
     // We'll account for the size to store each individual op as we add them, so just put an empty
     // vector as a placeholder for the array. This will ensure we properly count the size of the
@@ -87,11 +87,10 @@ int computeBaseSizeEstimate(OperationContext* opCtx, WriteCommandRef cmdRef) {
         request.setStmtIds({});
     }
 
-    request.setBypassEmptyTsReplacement(cmdRef.getBypassEmptyTsReplacement());
+    request.setBypassEmptyTsReplacement(clientRequest.getBypassEmptyTsReplacement());
 
-    if (cmdRef.isBulkWriteCommand()) {
-        request.setComment(cmdRef.getComment());
-    }
+
+    request.setComment(clientRequest.getComment());
 
     BSONObjBuilder builder;
     request.serialize(&builder);
@@ -101,22 +100,23 @@ int computeBaseSizeEstimate(OperationContext* opCtx, WriteCommandRef cmdRef) {
 
     return builder.obj().objsize();
 }
-BulkCommandSizeEstimator::BulkCommandSizeEstimator(OperationContext* opCtx, WriteCommandRef cmdRef)
-    : _cmdRef(std::move(cmdRef)),
+BulkCommandSizeEstimator::BulkCommandSizeEstimator(OperationContext* opCtx,
+                                                   const BulkWriteCommandRequest& clientRequest)
+    : _clientRequest(clientRequest),
       _isRetryableWriteOrInTransaction(opCtx->getTxnNumber().has_value()),
-      _baseSizeEstimate(computeBaseSizeEstimate(opCtx, _cmdRef)) {}
+      _baseSizeEstimate(computeBaseSizeEstimate(opCtx, _clientRequest)) {}
 
 int BulkCommandSizeEstimator::getBaseSizeEstimate() const {
     return _baseSizeEstimate;
 }
 
 int BulkCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& shardId) const {
-    const auto op = WriteOpRef{_cmdRef, opIdx};
+    const auto op = WriteOpRef{_clientRequest, opIdx};
 
     // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
     // corresponding to the statements that got routed to each individual shard, so they need to
     // be accounted in the potential request size so it does not exceed the max BSON size.
-    int writeSizeBytes = op.estimateOpSizeInBytesAsBulkOp() +
+    int writeSizeBytes = op.estimateOpSizeInBytes() +
         write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
         (_isRetryableWriteOrInTransaction
              ? write_ops::kStmtIdSize + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
@@ -166,8 +166,54 @@ void BulkCommandSizeEstimator::addOpToBatch(int opIdx, const ShardId& shardId) {
 
     // If we have not accounted for this one already then store the namespace so it doesn't get
     // counted again.
-    const auto op = WriteOpRef{_cmdRef, opIdx};
+    const auto op = WriteOpRef{_clientRequest, opIdx};
     iter->second.insert(op.getNss());
+}
+
+namespace {
+
+int getEncryptionInformationSize(const BatchedCommandRequest& req) {
+    if (!req.getWriteCommandRequestBase().getEncryptionInformation()) {
+        return 0;
+    }
+    return req.getWriteCommandRequestBase().getEncryptionInformation().value().toBSON().objsize();
+}
+}  // namespace
+
+BatchedCommandSizeEstimator::BatchedCommandSizeEstimator(OperationContext* opCtx,
+                                                         const BatchedCommandRequest& clientRequest)
+    : _clientRequest(clientRequest),
+      _isRetryableWriteOrInTransaction(opCtx->getTxnNumber().has_value()),
+      _baseSizeEstimate(clientRequest.getBaseCommandSizeEstimate(opCtx)) {}
+
+int BatchedCommandSizeEstimator::getBaseSizeEstimate() const {
+    return _baseSizeEstimate;
+}
+
+int BatchedCommandSizeEstimator::getOpSizeEstimate(int opIdx, const ShardId& shardId) const {
+    // If retryable writes are used, MongoS needs to send an additional array of stmtId(s)
+    // corresponding to the statements that got routed to each individual shard, so they
+    // need to be accounted in the potential request size so it does not exceed the max BSON
+    // size.
+    const int writeSizeBytes = BatchItemRef{&_clientRequest, opIdx}.estimateOpSizeInBytes() +
+        getEncryptionInformationSize(_clientRequest) +
+        write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
+        (_isRetryableWriteOrInTransaction
+             ? write_ops::kStmtIdSize + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
+             : 0);
+
+    // For unordered writes, the router must return an entry for each failed write. This
+    // constant is a pessimistic attempt to ensure that if a request to a shard hits
+    // "retargeting needed" error and has to return number of errors equivalent to the
+    // number of writes in the batch, the response size will not exceed the max BSON size.
+    //
+    // The constant of 272 is chosen as an approximation of the size of the BSON
+    // representation of the StaleConfigInfo (which contains the shard id) and the adjacent
+    // error message.
+    const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
+    const int errorResponsePotentialSizeBytes =
+        ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 272;
+    return std::max(writeSizeBytes, errorResponsePotentialSizeBytes);
 }
 
 BulkWriteUpdateOp toBulkWriteUpdate(const write_ops::UpdateOpEntry& op) {

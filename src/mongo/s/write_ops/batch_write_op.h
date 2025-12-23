@@ -308,22 +308,6 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
                                     boost::optional<std::string>* actualCollection,
                                     bool* hasContactedPrimaryShard);
 
-
-class BatchedCommandSizeEstimator final : public write_op_helpers::BatchCommandSizeEstimatorBase {
-public:
-    explicit BatchedCommandSizeEstimator(OperationContext* opCtx,
-                                         const BatchedCommandRequest& clientRequest);
-
-    int getBaseSizeEstimate() const final;
-    int getOpSizeEstimate(int opIdx, const ShardId& shardId) const final;
-    void addOpToBatch(int opIdx, const ShardId& shardId) final {}
-
-private:
-    const BatchedCommandRequest& _clientRequest;
-    const bool _isRetryableWriteOrInTransaction;
-    const int _baseSizeEstimate;
-};
-
 // Helper function to target ready writeOps. See BatchWriteOp::targetBatch for details.
 StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                                      std::vector<WriteOp>& writeOps,

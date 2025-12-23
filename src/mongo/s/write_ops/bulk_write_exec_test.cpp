@@ -1865,8 +1865,7 @@ TEST_F(BulkWriteOpTest, TestGetBaseChildBatchCommandSizeEstimate) {
 
     // Get a base size estimate.
     auto baseSizeEstimate =
-        write_op_helpers::BulkCommandSizeEstimator(_opCtx, WriteCommandRef{request})
-            .getBaseSizeEstimate();
+        write_op_helpers::BulkCommandSizeEstimator(_opCtx, request).getBaseSizeEstimate();
 
     BSONObjBuilder builder;
     request.serialize(&builder);

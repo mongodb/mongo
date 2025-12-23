@@ -424,6 +424,7 @@ int BatchedCommandRequest::getBaseCommandSizeEstimate(OperationContext* opCtx) c
     if (hasLegacyRuntimeConstants()) {
         request.setLegacyRuntimeConstants(*getLegacyRuntimeConstants());
     }
+    request.getGenericArguments().setComment(getGenericArguments().getComment());
 
     BSONObjBuilder builder;
     request.serialize(&builder);
