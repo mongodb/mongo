@@ -362,8 +362,19 @@ void insertDocumentsAtomically(OperationContext* opCtx,
 
     // For multiple inserts not part of a multi-document transaction, the inserts will be
     // batched into a single applyOps oplog entry.
-    if (!inTransaction && batchSize > 1 && !oplogDisabled) {
-        oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+    if ((!inTransaction && !oplogDisabled)) {
+        if (batchSize > 1) {
+            oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+        } else {
+            // TODO(SERVER-110289): Use utility function instead of checking fcvSnapshot.
+            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            const auto isPrimaryDrivenIndexBuild = fcvSnapshot.isVersionInitialized() &&
+                feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
+                    VersionContext::getDecoration(opCtx), fcvSnapshot);
+            if (isPrimaryDrivenIndexBuild) {
+                oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+            }
+        }
     }
 
     // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to

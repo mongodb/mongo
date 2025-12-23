@@ -2013,6 +2013,51 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
 
     if (batchedOps->isEmpty()) {
         return;
+    } else if (batchedOps->numOperations() == 1) {
+        MutableOplogEntry oplogEntry;
+        oplogEntry.setDurableReplOperation(batchedOps->getOperationsForOpObserver().front());
+
+        // TODO (SERVER-114338): Pull commonalities out of switch cases if possible.
+        switch (oplogEntry.getOpType()) {
+            case repl::OpTypeEnum::kInsert: {
+                if (!oplogEntry.getStatementIds().empty()) {
+                    repl::OplogLink oplogLink;
+                    _operationLogger->appendOplogEntryChainInfo(
+                        opCtx, &oplogEntry, &oplogLink, oplogEntry.getStatementIds());
+                }
+
+                auto opTime = logOperation(
+                    opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+
+                std::vector<StmtId> stmtIdsWritten;
+                stmtIdsWritten.insert(stmtIdsWritten.end(),
+                                      oplogEntry.getStatementIds().begin(),
+                                      oplogEntry.getStatementIds().end());
+
+                SessionTxnRecord sessionTxnRecord;
+                sessionTxnRecord.setLastWriteOpTime(opTime);
+                sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
+                onWriteOpCompleted(
+                    opCtx, std::move(stmtIdsWritten), sessionTxnRecord, oplogEntry.getNss());
+
+                return;
+            }
+            // // TODO (SERVER-114444): Handle single update ops
+            // case repl::OpTypeEnum::kUpdate: {
+            //     OpTimeBundle opTimes;
+            //     opTimes.writeOpTime = logOperation(
+            //         opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+            //     opTimes.wallClockTime = oplogEntry.getWallClockTime();
+            // }
+            // // TODO (SERVER-114445): Handle single delete ops
+            // case repl::OpTypeEnum::kDelete:
+            // // TODO (SERVER-114446): Handle single container insert
+            // case repl::OpTypeEnum::kContainerInsert:
+            // // TODO (SERVER-114447): Handle single container delete
+            // case repl::OpTypeEnum::kContainerDelete:
+            default:
+                break;
+        }
     }
 
     // Serialize batched statements to BSON and determine their assignment to "applyOps"
