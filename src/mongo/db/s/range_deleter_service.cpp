@@ -167,7 +167,9 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
                 _state = kUp;
                 LOGV2_INFO(11079600, "Range deleter service is now up", "term"_attr = term);
                 _readyRangeDeletionsProcessorPtr->beginProcessing();
-                ensureSet(lock, *_serviceUpPromise);
+                if (_serviceUpPromise.has_value()) {
+                    ensureSet(lock, *_serviceUpPromise);
+                }
             }
         })
         .getAsync([](auto) {});
