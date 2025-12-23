@@ -992,6 +992,12 @@ error_codes:
       name: StreamProcessorPrivateNetworkingError,
       categories: [StreamProcessorRetryableError],
     }
+  - {
+      code: 479,
+      name: IFRFlagRetry,
+      categories: [RetriableError],
+      extra: IFRFlagRetryInfo,
+    }
 
   # Error codes 4000-8999 are reserved.
 

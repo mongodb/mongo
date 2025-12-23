@@ -87,6 +87,7 @@ core.service:
     - src/mongo/db/dbdirectclient[._]*
     - src/mongo/dbtests/directclienttests.cpp
     - src/mongo/db/feature_flag*
+    - src/mongo/db/ifr_flag_retry_info*
     - src/mongo/db/error_labels*
     - src/mongo/db/server_feature_flags.idl
     - src/mongo/db/windows_options.idl

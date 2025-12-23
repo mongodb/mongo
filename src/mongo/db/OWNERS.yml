@@ -65,6 +65,9 @@ filters:
   - "generic_argument_util.*":
     approvers:
       - 10gen/server-programmability
+  - "ifr_flag_retry_info*":
+    approvers:
+      - 10gen/server-programmability
   - "index_names.*":
     approvers:
       - 10gen/query-execution-write-exec

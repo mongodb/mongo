@@ -1292,6 +1292,7 @@ mongo_cc_library(
         "feature_flag.cpp",
         "feature_flag_server_parameter.cpp",
         "generic_argument_util.cpp",
+        "ifr_flag_retry_info.cpp",
         "index_names.cpp",
         "keypattern.cpp",
         "mirror_maestro_feature_flags_gen",
@@ -1468,6 +1469,15 @@ mongo_cc_unit_test(
     }),
     deps = [
         ":throw_hook_impl",
+    ],
+)
+
+mongo_cc_unit_test(
+    name = "ifr_flag_retry_info_test",
+    srcs = ["ifr_flag_retry_info_test.cpp"],
+    tags = ["mongo_unittest_second_group"],
+    deps = [
+        ":server_base",
     ],
 )
 
