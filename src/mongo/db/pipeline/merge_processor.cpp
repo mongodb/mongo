@@ -79,7 +79,10 @@ BatchedCommandGenerator makeUpdateCommandGenerator() {
  * Converts 'batch' into a vector of UpdateOpEntries.
  */
 std::vector<write_ops::UpdateOpEntry> constructUpdateEntries(
-    MongoProcessInterface::BatchedObjects&& batch, UpsertType upsert, bool multi) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    MongoProcessInterface::BatchedObjects&& batch,
+    UpsertType upsert,
+    bool multi) {
     std::vector<write_ops::UpdateOpEntry> updateEntries;
     updateEntries.reserve(batch.size());
     for (auto&& obj : batch) {
@@ -91,6 +94,7 @@ std::vector<write_ops::UpdateOpEntry> constructUpdateEntries(
         entry.setUpsert(upsert != UpsertType::kNone);
         entry.setUpsertSupplied({{entry.getUpsert(), upsert == UpsertType::kInsertSuppliedDoc}});
         entry.setMulti(multi);
+        entry.setCollation(expCtx->getCollatorBSON());
 
         updateEntries.push_back(std::move(entry));
     }
@@ -110,7 +114,7 @@ MergeStrategy makeUpdateStrategy() {
               UpsertType upsert) {
         constexpr auto multi = false;
         auto updateCommand = bcr.extractUpdateRequest();
-        updateCommand->setUpdates(constructUpdateEntries(std::move(batch), upsert, multi));
+        updateCommand->setUpdates(constructUpdateEntries(expCtx, std::move(batch), upsert, multi));
         uassertStatusOK(expCtx->getMongoProcessInterface()->update(
             expCtx, ns, std::move(updateCommand), wc, upsert, multi, epoch));
     };
@@ -134,7 +138,7 @@ MergeStrategy makeStrictUpdateStrategy() {
         const int64_t batchSize = batch.size();
         constexpr auto multi = false;
         auto updateCommand = bcr.extractUpdateRequest();
-        updateCommand->setUpdates(constructUpdateEntries(std::move(batch), upsert, multi));
+        updateCommand->setUpdates(constructUpdateEntries(expCtx, std::move(batch), upsert, multi));
         auto updateResult = uassertStatusOK(expCtx->getMongoProcessInterface()->update(
             expCtx, ns, std::move(updateCommand), wc, upsert, multi, epoch));
         uassert(ErrorCodes::MergeStageNoMatchingDocument,
