@@ -52,6 +52,7 @@ class test_rollback_to_stable45(wttest.WiredTigerTestCase):
         os.mkdir('kv_home')
         os.symlink('../kv_home', 'follower/kv_home', target_is_directory=True)
 
+    @wttest.skip_for_hook("tiered", "Cannot run tiered storage in disagg mode")
     def test_rollback_to_stable45(self):
         uri = "table:rollback_to_stable45"
         ds = SimpleDataSet(self, uri, 500, key_format='S', value_format='S')

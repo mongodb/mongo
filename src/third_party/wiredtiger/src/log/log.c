@@ -464,7 +464,7 @@ __wt_log_written_reset(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     if (F_ISSET(&conn->log_mgr, WT_LOG_ENABLED))
-        conn->log_mgr.log->log_written = 0;
+        __wt_tsan_suppress_store_int64(&conn->log_mgr.log->log_written, 0);
 }
 
 /*
@@ -1920,7 +1920,7 @@ __wti_log_release(WT_SESSION_IMPL *session, WTI_LOGSLOT *slot, bool *freep)
      * shutdown before logging.
      */
     if (WT_CKPT_LOGSIZE(conn) && !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING)) {
-        log->log_written += (wt_off_t)release_bytes;
+        __wt_tsan_suppress_add_int64(&log->log_written, (wt_off_t)release_bytes);
         __wt_checkpoint_signal(session, log->log_written);
     }
 

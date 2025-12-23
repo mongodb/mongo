@@ -238,7 +238,22 @@ __wti_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
      * can know if statistics are enabled or not.
      */
     WT_RET(__wti_statlog_create(session, cfg));
-    WT_RET(__wti_tiered_storage_create(session));
+
+    /*
+     * FIXME-WT-14721: the disagg config check is a giant hack. Ideally, we'd have a single
+     * top-level disagg config item that can be checked, and set a variable elsewhere so we could
+     * gate this on a call like __wt_conn_is_disagg.
+     *
+     * As it stands, __wt_conn_is_disagg only works after we have metadata access, which depends on
+     * having run recovery, so the config hack is the simplest way to break that dependency.
+     *
+     * Note that tiered storage does not work in disagg mode. We need this check to ensure the
+     * tiered serer is not started when disagg is enabled.
+     */
+    WT_RET(__wt_config_gets(session, cfg, "disaggregated.page_log", &cval));
+    bool disagg = (cval.len != 0);
+
+    WT_RET(__wti_tiered_storage_create(session, disagg));
     WT_RET(__wt_logmgr_create(session));
 
     /* Initialize the page history tracker. */
@@ -248,16 +263,8 @@ __wti_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
      * Run recovery. NOTE: This call will start (and stop) eviction if recovery is required.
      * Recovery must run before the history store table is created (because recovery will update the
      * metadata, and set the maximum file id seen), and before eviction is started for real.
-     *
-     * FIXME-WT-14721: the disagg config check is a giant hack. Ideally, we'd have a single
-     * top-level disagg config item that can be checked, and set a variable elsewhere so we could
-     * gate this on a call like __wt_conn_is_disagg.
-     *
-     * As it stands, __wt_conn_is_disagg only works after we have metadata access, which depends on
-     * having run recovery, so the config hack is the simplest way to break that dependency.
      */
-    WT_RET(__wt_config_gets(session, cfg, "disaggregated.page_log", &cval));
-    WT_RET(__wt_txn_recover(session, cfg, cval.len != 0));
+    WT_RET(__wt_txn_recover(session, cfg, disagg));
 
     /*
      * If we're performing a live restore start the server. This is intentionally placed after

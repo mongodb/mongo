@@ -42,7 +42,7 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
     /* The checkpoint's snapshot includes the first dirty update on the page. */
     txn = session->txn;
     mod = ref->page->modify;
-    if (txn->snapshot_data.snap_max >= mod->first_dirty_txn)
+    if (txn->snapshot_data.snap_max >= __wt_tsan_suppress_load_uint64(&mod->first_dirty_txn))
         return (false);
 
     /*

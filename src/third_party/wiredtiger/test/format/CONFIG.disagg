@@ -26,3 +26,5 @@ ops.prepare=0
 quiet=0
 runs.in_memory=0
 transaction.timestamps=1
+tiered_storage.flush_frequency=0
+tiered_storage.storage_source=off

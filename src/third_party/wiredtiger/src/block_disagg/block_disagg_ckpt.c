@@ -153,6 +153,13 @@ __block_disagg_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session, bool fail
      * of the shared metadata table in the system-level metadata (similar to the turtle file).
      */
     if (strcmp(block_disagg->name, WT_DISAGG_METADATA_FILE) == 0) {
+        /*
+         * Gather any updated key encryption information so it can be written into the shared
+         * metadata table.
+         */
+        if (conn->key_provider != NULL)
+            WT_ERR(__wt_disagg_put_crypt_helper(session));
+
         /* Get the config we want to print to the metadata file */
         WT_ERR(__wt_config_getones(session, md_value, "checkpoint", &cval));
         checkpoint_timestamp = conn->disaggregated_storage.cur_checkpoint_timestamp;

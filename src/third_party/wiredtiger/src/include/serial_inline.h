@@ -87,7 +87,7 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_INSE
         if (old_ins != new_ins->next[i] || !__wt_atomic_cas_ptr(ins_stack[i], old_ins, new_ins))
             return (i == 0 ? WT_RESTART : 0);
         if (ins_head->tail[i] == NULL || ins_stack[i] == &ins_head->tail[i]->next[i])
-            ins_head->tail[i] = new_ins;
+            __wt_tsan_suppress_store_wt_insert_ptr(&ins_head->tail[i], new_ins);
     }
 
     return (0);
@@ -113,7 +113,8 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_
      * append.
      */
     if ((recno = WT_INSERT_RECNO(new_ins)) == WT_RECNO_OOB) {
-        recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
+        recno = btree->last_recno + 1;
+        __wt_tsan_suppress_store_uint64(&WT_INSERT_RECNO(new_ins), recno);
         WT_ASSERT(session,
           WT_SKIP_LAST(ins_head) == NULL || recno > WT_INSERT_RECNO(WT_SKIP_LAST(ins_head)));
         for (i = 0; i < skipdepth; i++)

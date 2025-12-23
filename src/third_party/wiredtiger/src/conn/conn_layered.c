@@ -247,6 +247,39 @@ __disagg_get_meta(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn, WT_I
 }
 
 /*
+ * __disagg_put_crypt_key --
+ *     Write encryption key data to disaggregated storage.
+ */
+static int
+__disagg_put_crypt_key(
+  WT_SESSION_IMPL *session, uint64_t page_id, const WT_ITEM *item, uint64_t *lsnp)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DISAGGREGATED_STORAGE *disagg;
+    WT_PAGE_LOG_PUT_ARGS put_args;
+
+    conn = S2C(session);
+    disagg = &conn->disaggregated_storage;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
+    if (conn->key_provider == NULL)
+        return (ENOTSUP);
+
+    WT_ASSERT_ALWAYS(session, page_id <= WT_DISAGG_KEY_PROVIDER_MAX_PAGE_ID,
+      "Multiple key provider pages is not currently supported");
+    WT_CLEAR(put_args);
+    put_args.backlink_lsn = disagg->last_key_provider_page_lsn[page_id];
+
+    WT_RET(disagg->page_log_key_provider->plh_put(
+      disagg->page_log_key_provider, &session->iface, page_id, 0, &put_args, item));
+    disagg->last_key_provider_page_lsn[page_id] = put_args.lsn;
+    if (lsnp != NULL)
+        *lsnp = put_args.lsn;
+    return (0);
+}
+
+/*
  * __disagg_put_meta --
  *     Write metadata to disaggregated storage.
  */
@@ -279,6 +312,59 @@ __disagg_put_meta(WT_SESSION_IMPL *session, uint64_t page_id, const WT_ITEM *ite
         *lsnp = put_args.lsn;
     __wt_atomic_add_uint64_v(&disagg->num_meta_put, 1);
     return (0);
+}
+
+/*
+ * __wt_disagg_put_crypt_helper --
+ *     If new encryption key data information is detected, update the metadata page log and callback
+ *     to the key provider upon completion.
+ */
+int
+__wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_CRYPT_KEYS crypt;
+    WT_DECL_ITEM(buf);
+    WT_DECL_RET;
+    WT_KEY_PROVIDER *key_provider;
+    uint64_t lsn;
+
+    conn = S2C(session);
+    key_provider = conn->key_provider;
+    WT_CLEAR(crypt.keys);
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
+    /* Check for a new encryption key data. If the size is 0, there is none so we can skip. */
+    WT_ERR(key_provider->get_key(key_provider, (WT_SESSION *)session, &crypt));
+    if (crypt.keys.size == 0)
+        goto done;
+
+    /* WiredTiger has the memory ownership of the encryption key buffer. */
+    WT_ERR(__wt_scr_alloc(session, crypt.keys.size, &buf));
+    crypt.keys.data = buf->data;
+
+    /* Call the function again to fetch the new encryption key data. */
+    WT_ERR(key_provider->get_key(key_provider, (WT_SESSION *)session, &crypt));
+    WT_ASSERT(session, crypt.keys.size != 0 && crypt.keys.data != NULL);
+
+    /* Write the encryption key data to disaggregated storage. */
+    ret = __disagg_put_crypt_key(session, WT_DISAGG_KEY_PROVIDER_MAIN_PAGE_ID, &crypt.keys, &lsn);
+
+    /* Callback to update key provider on the result of new encryption key data . */
+    if (ret == 0)
+        crypt.r.lsn = lsn;
+    else {
+        crypt.r.error = ret;
+        /* On error, remove references of crypt key before calling back. */
+        crypt.keys.data = NULL;
+        crypt.keys.size = 0;
+    }
+    WT_IGNORE_RET(key_provider->on_key_update(key_provider, (WT_SESSION *)session, &crypt));
+done:
+err:
+    __wt_scr_free(session, &buf);
+    return (ret);
 }
 
 /*

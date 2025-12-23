@@ -63,6 +63,7 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
     disagg_parameters = platform_api.getDisaggParameters()
     page_log_name = disagg_parameters.page_log
     page_log_config = disagg_parameters.config
+    key_provider = disagg_parameters.key_provider
 
     valid_page_log = False
     # Construct the configuration string based on the storage source.
@@ -94,10 +95,15 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
     if 'tiered_storage=' in conn_config:
         skip_test("cannot run disagg hook on a test that uses tiered_storage in the config string")
 
+    page_log_extension = WiredTigerTestCase.findExtension('page_log', page_log_name)
+    if len(page_log_extension) == 0:
+        raise RuntimeError(page_log_name + ' storage source extension not found')
 
-    extension_libs = WiredTigerTestCase.findExtension('page_log', page_log_name)
-    if len(extension_libs) == 0:
-        raise Exception(extension_name + ' storage source extension not found')
+    key_provider_extension = None
+    if (key_provider is not None):
+        key_provider_extension = WiredTigerTestCase.findExtension('test', "key_provider")
+        if len(key_provider_extension) == 0:
+            raise RuntimeError(key_provider_extension[0] + ' key provider extension not found')
 
     WiredTigerTestCase.verbose(None, 3, f'role={disagg_parameters.role}')
     disagg_config = ',verbose=[layered]' \
@@ -147,11 +153,17 @@ def wiredtiger_open_replace(orig_wiredtiger_open, homedir, conn_config):
             page_log_config = f"cache_size_mb=2048,{page_log_config}"
 
     if page_log_config == None:
-        ext_lib = '\"%s\"' % extension_libs[0]
+        ext_lib = f'\"{page_log_extension[0]}\"'
     else:
-        ext_lib = '\"%s\"=(config=\"%s\")' % (extension_libs[0], page_log_config)
+        ext_lib = f'\"{page_log_extension[0]}\"=(config=\"{page_log_config}\")'
 
-    disagg_config += ',' + ext_string + ',%s]' % ext_lib
+    disagg_config += f',{ext_string},{ext_lib}'
+    # Load the key provider extension. Configure low verbosity to eliminate test failures due to unexpected output and
+    # to always key expire such that we can perform a key rotation everytime a checkpoint is called.
+    if key_provider:
+        key_provider_extension_config =  f'\"{key_provider_extension[0]}\"=(early_load=true,config="verbose=-1,key_expires=0")'
+        disagg_config += f',{key_provider_extension_config}'
+    disagg_config += ']'
 
     config = conn_config + disagg_config
 
@@ -448,6 +460,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         #wttest.WiredTigerTestCase.tty('Disagg hook params={}'.format(params))
 
         self.disagg_config = ''
+        self.disagg_key_provider= None
         self.disagg_page_log = None
         self.disagg_role = 'leader'
         self.table_prefix = 'layered'
@@ -455,6 +468,8 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         for param_key, param_value in params:
             if param_key == 'config':
                 self.disagg_config = param_value
+            elif param_key == 'key_provider':
+                self.disagg_key_provider = param_value
             elif param_key == 'page_log':
                 self.disagg_page_log = param_value
             elif param_key == 'role':
@@ -500,6 +515,7 @@ class DisaggPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
         result.role = self.disagg_role
         result.page_log = self.disagg_page_log if self.disagg_page_log else WiredTigerTestCase.vars().page_log
         result.table_prefix = self.table_prefix
+        result.key_provider = self.disagg_key_provider
         return result
 
 # Every hook file must have a top level initialize function,

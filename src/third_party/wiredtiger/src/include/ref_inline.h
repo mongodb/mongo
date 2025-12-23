@@ -15,7 +15,7 @@
 static WT_INLINE bool
 __wt_ref_is_root(WT_REF *ref)
 {
-    return (ref->home == NULL);
+    return (__wt_tsan_suppress_load_wt_page_ptr_v(&ref->home) == NULL);
 }
 
 /*

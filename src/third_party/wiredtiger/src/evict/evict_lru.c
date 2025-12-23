@@ -3043,7 +3043,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
             WT_STAT_CONN_INCR(session, eviction_app_dirty_attempt);
         }
         WT_STAT_CONN_INCR(session, eviction_app_attempt);
-        ++S2C(session)->evict->app_evicts;
+        __wt_tsan_suppress_add_uint64(&S2C(session)->evict->app_evicts, 1);
         time_start = WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
     }
 
@@ -3195,7 +3195,7 @@ __wti_evict_app_assist_worker(
         } else if (ret == WT_NOTFOUND) {
             /* Allow the queue to re-populate before retrying. */
             __wt_cond_wait(session, conn->evict_threads.wait_cond, 10 * WT_THOUSAND, NULL);
-            evict->app_waits++;
+            __wt_tsan_suppress_add_uint64(&evict->app_waits, 1);
         } else if (ret != EBUSY)
             WT_ERR(ret);
 

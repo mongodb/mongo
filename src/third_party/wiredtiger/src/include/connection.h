@@ -203,11 +203,17 @@ struct __wt_disaggregated_storage {
     wt_shared wt_timestamp_t last_checkpoint_timestamp; /* The timestamp of the last checkpoint. */
 
     /*
-     * The LSN of the last metadata page written in the global metadata "table," which we use to
+     * The LSN of the last metadata page written in the global metadata "table" which we use to
      * track back links between the subsequent versions of the metadata pages. Protected by the
      * checkpoint lock.
      */
     uint64_t last_metadata_page_lsn[WT_DISAGG_METADATA_MAX_PAGE_ID + 1];
+
+    /*
+     * The LSN of the last encryption key page written in the global key provider "table". Any
+     * access to the table should be protected by the checkpoint lock.
+     */
+    uint64_t last_key_provider_page_lsn[WT_DISAGG_METADATA_MAX_PAGE_ID + 1];
 
     WT_NAMED_PAGE_LOG *npage_log;
     WT_PAGE_LOG_HANDLE *page_log_meta;         /* The page log for the metadata. */

@@ -1525,7 +1525,9 @@ __cursor_chain_needs_full_upd(WT_CURSOR_BTREE *cbt)
      * those two cases, we can't know which transaction the aborted entries belong to, so we can't
      * calculate a correct delta. (This is only a problem in read-uncommitted isolation.)
      */
-    if (upd != NULL && (upd->txnid == WT_TXN_ABORTED || upd->type == WT_UPDATE_TOMBSTONE))
+    if (upd != NULL &&
+      (__wt_tsan_suppress_load_uint64_v(&upd->txnid) == WT_TXN_ABORTED ||
+        upd->type == WT_UPDATE_TOMBSTONE))
         return (true);
 
     /*

@@ -1582,7 +1582,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                  * Switch reserved operations to abort to simplify obsolete update list truncation.
                  */
                 if (upd->type == WT_UPDATE_RESERVE) {
-                    upd->txnid = WT_TXN_ABORTED;
+                    __wt_tsan_suppress_store_uint64_v(&upd->txnid, WT_TXN_ABORTED);
                     break;
                 }
 
@@ -1791,7 +1791,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     update_durable_ts = false;
     prev_durable_timestamp = WT_TS_NONE;
     if (candidate_durable_timestamp != WT_TS_NONE) {
-        prev_durable_timestamp = txn_global->durable_timestamp;
+        prev_durable_timestamp = __wt_tsan_suppress_load_uint64(&txn_global->durable_timestamp);
         update_durable_ts = candidate_durable_timestamp > prev_durable_timestamp;
     }
 
@@ -1803,10 +1803,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         while (candidate_durable_timestamp > prev_durable_timestamp) {
             if (__wt_atomic_cas_uint64(&txn_global->durable_timestamp, prev_durable_timestamp,
                   candidate_durable_timestamp)) {
-                txn_global->has_durable_timestamp = true;
+                __wt_tsan_suppress_store_bool(&txn_global->has_durable_timestamp, true);
                 break;
             }
-            prev_durable_timestamp = txn_global->durable_timestamp;
+            prev_durable_timestamp = __wt_tsan_suppress_load_uint64(&txn_global->durable_timestamp);
         }
 
     /*
@@ -2095,7 +2095,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[], bool api_call)
                   op->btree->id == S2C(session)->cache->hs_fileid)
                     break;
                 WT_ASSERT(session, upd->txnid == txn->id || upd->txnid == WT_TXN_ABORTED);
-                upd->txnid = WT_TXN_ABORTED;
+                __wt_tsan_suppress_store_uint64_v(&upd->txnid, WT_TXN_ABORTED);
             } else {
                 /*
                  * If an operation has the key repeated flag set, skip resolving prepared updates as

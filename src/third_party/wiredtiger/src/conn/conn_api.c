@@ -2725,6 +2725,10 @@ __conn_set_key_provider(WT_CONNECTION *wt_conn, WT_KEY_PROVIDER *key_provider, c
     if (config != NULL)
         WT_ERR_MSG(session, EINVAL, "key provider configuration currently not supported.");
 
+    /* You can only enable the key provider system in disaggregated mode. */
+    if (__wt_conn_is_disagg(session))
+        WT_ERR_MSG(session, EINVAL, "key provider system is only supported in disaggregated mode");
+
     /*
      * You can only configure the key provider system with early-load set.
      */

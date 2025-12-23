@@ -222,7 +222,7 @@ struct __wt_btree {
     wt_shared uint64_t bytes_updates;       /* Bytes in updates. */
     wt_shared uint64_t bytes_delta_updates; /* Bytes of updates reconstructed from deltas */
 
-    uint64_t max_upd_txn; /* Transaction ID for the latest update on the btree. */
+    wt_shared uint64_t max_upd_txn; /* Transaction ID for the latest update on the btree. */
 
     /*
      * The maximum bytes allowed to be used for the table on disk. This is currently only used for

@@ -256,7 +256,7 @@ __live_restore_worker_run(WT_SESSION_IMPL *session, WT_THREAD *ctx)
          * again later.
          */
         __wt_spin_lock(session, &server->queue_lock);
-        remain = server->work_items_remaining;
+        remain = __wt_tsan_suppress_load_uint64(&server->work_items_remaining);
         threads = server->threads_working;
         TAILQ_INSERT_TAIL(&server->work_queue, work_item, q);
         __wt_spin_unlock(session, &server->queue_lock);

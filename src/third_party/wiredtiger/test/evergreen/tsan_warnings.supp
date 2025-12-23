@@ -91,3 +91,34 @@ race:__evict_force_check
 race:__wt_page_evict_clean
 race:__wt_evict_touch_page
 race:__wt_row_search
+
+# FIXME-WT-16311: Check warnings from the test/format implementation
+race:__wt_random
+race:operations
+race:timestamp_minimum_committed
+race:snap_op_init
+race:snap_track
+race:snap_verify_callback
+
+# Recently introduced issues.
+# FIXME-WT-16312: Check synchornization for __cell_unpack_window_cleanup_kv
+race:__cell_unpack_window_cleanup_kv
+# FIXME-WT-16310: Check synchornization around `oldest_timestamp` and `stable_timestamp`.
+race:__txn_check_if_stable_has_moved_ahead_commit_ts
+# FIXME-WT-16305: Synchornization around prepare_timestamp and upd_durable_ts
+race:__txn_apply_prepare_state_update
+
+# Warnings produced by column store related code
+race:__wt_col_modify
+race:__inmem_col_var
+race:__wt_col_search
+
+# Other warnings detected during test/format execution
+race:__wt_cell_type
+race:__posix_file_read
+race:__wt_cell_unpack_safe
+race:__cursor_var_next
+race:__cursor_var_prev
+race:__tombstone_update_alloc
+race:__wt_btcur_modify
+race:__wt_cursor_dhandle_decr_use

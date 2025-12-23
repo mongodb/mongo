@@ -350,7 +350,7 @@ struct __wt_ovfl_track {
  */
 struct __wt_page_modify {
     /* The first unwritten transaction ID (approximate). */
-    uint64_t first_dirty_txn;
+    wt_shared uint64_t first_dirty_txn;
 
     /* The transaction state last time eviction was attempted. */
     uint64_t last_evict_pass_gen;

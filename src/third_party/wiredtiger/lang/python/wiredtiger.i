@@ -1480,7 +1480,6 @@ int standalone_build();
 %ignore __wt_connection::add_data_source;
 %ignore __wt_connection::add_encryptor;
 %ignore __wt_connection::get_extension_api;
-%ignore __wt_connection::set_key_provider;
 %ignore __wt_session::log_printf;
 
 OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))

@@ -280,7 +280,7 @@ err:
         const char *cfg[] = {WT_CONFIG_BASE(session, WT_SESSION_checkpoint), NULL};
 
         /* Mark the connection modified to make sure a checkpoint happens even on an idle system. */
-        conn->modified = true;
+        __wt_tsan_suppress_store_bool(&conn->modified, true);
         WT_TRET(__wt_checkpoint_db(session, cfg, true));
     }
     /* Clear the flag on force stop after the completion of the checkpoint. */

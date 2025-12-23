@@ -194,7 +194,7 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
      * operation, or the handle is already open without any special flags. In particular, it must
      * fail if attempting to checkpoint a handle opened for a bulk load, even in the same session.
      */
-    if (dhandle->excl_session == session) {
+    if (__wt_tsan_suppress_load_wt_session_impl_ptr(&dhandle->excl_session) == session) {
         if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
           (!F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
             (btree != NULL && F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))))
@@ -347,7 +347,7 @@ __wt_session_release_dhandle_v2(WT_SESSION_IMPL *session, bool check_visibility)
 
     if (session == dhandle->excl_session) {
         if (--dhandle->excl_ref == 0)
-            dhandle->excl_session = NULL;
+            __wt_tsan_suppress_store_wt_session_impl_ptr(&dhandle->excl_session, NULL);
         else
             locked = false;
     }

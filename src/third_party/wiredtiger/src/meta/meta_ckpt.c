@@ -1511,7 +1511,7 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session, const char *name, size_t namelen
      * different values of the oldest timestamp.
      */
 
-    oldest_timestamp = txn_global->oldest_timestamp;
+    oldest_timestamp = __wt_tsan_suppress_load_uint64(&txn_global->oldest_timestamp);
     WT_ACQUIRE_BARRIER();
     __wt_timestamp_to_hex_string(
       WT_MIN(oldest_timestamp, txn_global->meta_ckpt_timestamp), hex_timestamp);

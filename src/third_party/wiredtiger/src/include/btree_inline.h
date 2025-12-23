@@ -1006,7 +1006,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
          * unnecessarily write a page in a checkpoint.
          */
         if (last_running != WT_TXN_NONE)
-            page->modify->first_dirty_txn = last_running;
+            __wt_tsan_suppress_store_uint64(&page->modify->first_dirty_txn, last_running);
     } else if (increase_dirty_size_first)
         __wt_cache_dirty_decr_size(session, page_memory_footprint, false);
 

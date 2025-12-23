@@ -600,7 +600,7 @@ read:
                 break;
             }
 
-            WT_ASSERT(session, ref->page != NULL);
+            WT_ASSERT(session, __wt_tsan_suppress_load_wt_page_ptr(&ref->page) != NULL);
             /*
              * If a page has grown too large, we'll try and forcibly evict it before making it
              * available to the caller. There are a variety of cases where that's not possible.
