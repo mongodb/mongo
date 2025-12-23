@@ -36,7 +36,6 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
         "//src/mongo/scripting:scripting_common",
         "//src/mongo/unittest",
-        "//src/mongo/unittest:unittest_main_core",
         "//src/mongo/util:periodic_runner_factory",
         "//src/mongo/util/options_parser:options_parser_init",
     ],

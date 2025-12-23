@@ -3360,17 +3360,12 @@ return std::move({varname});"""
 
         with self._condition(opt.condition):
             with self._block(section, ";"):
-                self._writer.write_line(
-                    ""
-                    + f".addOptionChaining({_encaps(opt.name)},"
-                    + f"                   {_encaps(opt.short_name)},"
-                    + f"                   moe::{opt.arg_vartype},"
-                    + f"                   {_get_expression(opt.description)},"
-                    + f"                   {_encaps_list(opt.deprecated_name)},"
-                    + f"                   {_encaps_list(opt.deprecated_short_name)},"
-                    + f"                   {usage})"
-                )
-                self._writer.write_line(f".setSources(moe::{opt.source})")
+                self._writer.write_line(f"""\
+.addOptionChaining({_encaps(opt.name)}, {_encaps(opt.short_name)}, moe::{opt.arg_vartype},
+    {_get_expression(opt.description)}, {_encaps_list(opt.deprecated_name)},
+    {_encaps_list(opt.deprecated_short_name)}, {usage})
+.setSources(moe::{opt.source})
+""")
                 if opt.hidden:
                     self._writer.write_line(".hidden()")
                 if opt.redact:

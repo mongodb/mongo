@@ -183,7 +183,7 @@ TEST(TypeBitsTest, AppendLotsOfZeroTypeBits) {
     ASSERT(!typeBits.isLongEncoding());
 }
 
-TEST_P(KeyStringBuilderTest, TooManyElementsInCompoundKey) {
+TEST_F(KeyStringBuilderTest, TooManyElementsInCompoundKey) {
     // Construct a KeyString with more than the limit of 32 elements in a compound index key. Encode
     // 33 kBoolTrue ('o') values.
     // Note that this KeyString encoding is legal, but it may not be legally stored in an index.
@@ -199,7 +199,7 @@ TEST_P(KeyStringBuilderTest, TooManyElementsInCompoundKey) {
     ASSERT_EQ(size, key_string::getKeySize(ks.getView(), ALL_ASCENDING, ks.version));
 }
 
-TEST_P(KeyStringBuilderTest, MaxElementsInCompoundKey) {
+TEST_F(KeyStringBuilderTest, MaxElementsInCompoundKey) {
     // Construct a KeyString with 32 elements in a compound index key followed by an end byte.
     // Encode 32 kBoolTrue ('o') values and an end byte, 0x4.
     const char* data = "oooooooooooooooooooooooooooooooo\x4";
@@ -214,7 +214,7 @@ TEST_P(KeyStringBuilderTest, MaxElementsInCompoundKey) {
     ASSERT_EQ(size, key_string::getKeySize(ks.getView(), ALL_ASCENDING, ks.version));
 }
 
-TEST_P(KeyStringBuilderTest, SizeOfIncompleteKey) {
+TEST_F(KeyStringBuilderTest, SizeOfIncompleteKey) {
     // The key portion of a keystring is terminated with kEnd, so missing that means the key size is
     // zero
     const char* data = "oooo\x4";
@@ -223,13 +223,13 @@ TEST_P(KeyStringBuilderTest, SizeOfIncompleteKey) {
     ASSERT_EQ(0, key_string::getKeySize({data, size - 1}, ALL_ASCENDING, key_string::Version::V1));
 }
 
-TEST_P(KeyStringBuilderTest, SizeWithTrailingDataInBuffer) {
+TEST_F(KeyStringBuilderTest, SizeWithTrailingDataInBuffer) {
     // Verify that we actually stop counting key bytes when we reach kEnd
     const char data[] = {'o', 'o', 4, 'a', 'b', 'c'};
     ASSERT_EQ(3, key_string::getKeySize(data, ALL_ASCENDING, key_string::Version::V1));
 }
 
-TEST_P(KeyStringBuilderTest, EmbeddedkEnd) {
+TEST_F(KeyStringBuilderTest, EmbeddedkEnd) {
     // Construct a KeyString which contains kEnd inside a string key and verify that getKeySize()
     // does not report that the size ends at that spot
     key_string::Builder ks(version, ALL_ASCENDING);
@@ -240,7 +240,7 @@ TEST_P(KeyStringBuilderTest, EmbeddedkEnd) {
     ASSERT_EQ(key_string::getKeySize(buffer, ALL_ASCENDING, version), buffer.size());
 }
 
-TEST_P(KeyStringBuilderTest, EmbeddedNullString) {
+TEST_F(KeyStringBuilderTest, EmbeddedNullString) {
     // Construct a KeyString where \x3c defines the type kStringLike then embedded with null
     // characters and followed by \x00.
     const char data[4] = {0x3c, 0, char(0xFF), 0};
@@ -251,7 +251,7 @@ TEST_P(KeyStringBuilderTest, EmbeddedNullString) {
                       BSON("" << StringData("\x00", 1)));
 };
 
-TEST_P(KeyStringBuilderTest, ExceededBSONDepth) {
+TEST_F(KeyStringBuilderTest, ExceededBSONDepth) {
     // Construct an illegal KeyString encoding with excessively nested BSON arrays '80' (P).
     const auto nestedArr = std::string(BSONDepth::getMaxAllowableDepth() + 1, 'P');
     ASSERT_THROWS_CODE(
@@ -277,7 +277,7 @@ TEST_P(KeyStringBuilderTest, ExceededBSONDepth) {
                        ErrorCodes::Overflow);
 }
 
-TEST_P(KeyStringBuilderTest, Simple1) {
+TEST_F(KeyStringBuilderTest, Simple1) {
     BSONObj a = BSON("" << 5);
     BSONObj b = BSON("" << 6);
 
@@ -287,11 +287,11 @@ TEST_P(KeyStringBuilderTest, Simple1) {
                      key_string::Builder(version, b, ALL_ASCENDING, RecordId(1)));
 }
 
-TEST_P(KeyStringBuilderTest, DeprecatedBinData) {
+TEST_F(KeyStringBuilderTest, DeprecatedBinData) {
     ROUNDTRIP(version, BSON("" << BSONBinData(nullptr, 0, ByteArrayDeprecated)));
 }
 
-TEST_P(KeyStringBuilderTest, ValidColumn) {
+TEST_F(KeyStringBuilderTest, ValidColumn) {
     BSONColumnBuilder cb;
     cb.append(BSON("a" << "deadbeef").getField("a"));
     cb.append(BSON("a" << 1).getField("a"));
@@ -303,7 +303,7 @@ TEST_P(KeyStringBuilderTest, ValidColumn) {
     ROUNDTRIP(version, objData);
 }
 
-TEST_P(KeyStringBuilderTest, InvalidColumn) {
+TEST_F(KeyStringBuilderTest, InvalidColumn) {
     const BSONObj objData = BSON("" << BSONBinData("foobar", 6, Column));
     const key_string::Builder builder(version, objData, ALL_ASCENDING);
 
@@ -313,7 +313,7 @@ TEST_P(KeyStringBuilderTest, InvalidColumn) {
         50833);
 }
 
-TEST_P(KeyStringBuilderTest, ActualBytesDouble) {
+TEST_F(KeyStringBuilderTest, ActualBytesDouble) {
     // just one test like this for utter sanity
 
     BSONObj a = BSON("" << 5.5);
@@ -355,7 +355,7 @@ TEST_P(KeyStringBuilderTest, ActualBytesDouble) {
     ASSERT_EQUALS(hexFlipped, ks.toString());
 }
 
-TEST_P(KeyStringBuilderTest, AllTypesSimple) {
+TEST_F(KeyStringBuilderTest, AllTypesSimple) {
     ROUNDTRIP(version, BSON("" << 5.5));
     ROUNDTRIP(version, BSON("" << "abc"));
     ROUNDTRIP(version, BSON("" << BSON("a" << 5)));
@@ -375,7 +375,7 @@ TEST_P(KeyStringBuilderTest, AllTypesSimple) {
     ROUNDTRIP(version, BSON("" << 1235123123123LL));
 }
 
-TEST_P(KeyStringBuilderTest, Array1) {
+TEST_F(KeyStringBuilderTest, Array1) {
     BSONObj emptyArray = BSON("" << BSONArray());
 
     ASSERT_EQUALS(BSONType::array, emptyArray.firstElement().type());
@@ -399,7 +399,7 @@ TEST_P(KeyStringBuilderTest, Array1) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, SubDoc1) {
+TEST_F(KeyStringBuilderTest, SubDoc1) {
     ROUNDTRIP(version, BSON("" << BSON("foo" << 2)));
     ROUNDTRIP(version,
               BSON("" << BSON("foo" << 2 << "bar"
@@ -407,7 +407,7 @@ TEST_P(KeyStringBuilderTest, SubDoc1) {
     ROUNDTRIP(version, BSON("" << BSON("foo" << BSON_ARRAY(2 << 4))));
 }
 
-TEST_P(KeyStringBuilderTest, SubDoc2) {
+TEST_F(KeyStringBuilderTest, SubDoc2) {
     BSONObj a = BSON("" << BSON("a" << "foo"));
     BSONObj b = BSON("" << BSON("b" << 5.5));
     BSONObj c = BSON("" << BSON("c" << BSON("x" << 5)));
@@ -421,23 +421,23 @@ TEST_P(KeyStringBuilderTest, SubDoc2) {
 }
 
 
-TEST_P(KeyStringBuilderTest, Compound1) {
+TEST_F(KeyStringBuilderTest, Compound1) {
     ROUNDTRIP(version, BSON("" << BSON("a" << 5) << "" << 1));
     ROUNDTRIP(version, BSON("" << BSON("" << 5) << "" << 1));
 }
 
-TEST_P(KeyStringBuilderTest, Undef1) {
+TEST_F(KeyStringBuilderTest, Undef1) {
     ROUNDTRIP(version, BSON("" << BSONUndefined));
 }
 
-TEST_P(KeyStringBuilderTest, NumberLong0) {
+TEST_F(KeyStringBuilderTest, NumberLong0) {
     double d = (1ll << 52) - 1;
     long long ll = static_cast<long long>(d);
     double d2 = static_cast<double>(ll);
     ASSERT_EQUALS(d, d2);
 }
 
-TEST_P(KeyStringBuilderTest, NumbersNearInt32Max) {
+TEST_F(KeyStringBuilderTest, NumbersNearInt32Max) {
     int64_t start = std::numeric_limits<int32_t>::max();
     for (int64_t i = -1000; i < 1000; i++) {
         long long toTest = start + i;
@@ -447,7 +447,7 @@ TEST_P(KeyStringBuilderTest, NumbersNearInt32Max) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, DecimalNumbers) {
+TEST_F(KeyStringBuilderTest, DecimalNumbers) {
     if (version == key_string::Version::V0) {
         LOGV2(22228, "not testing DecimalNumbers for KeyStringBuilder V0");
         return;
@@ -519,7 +519,7 @@ TEST_P(KeyStringBuilderTest, DecimalNumbers) {
     ROUNDTRIP(V1, BSON("" << BSONNULL << "" << BSON("a" << Decimal128::kPositiveInfinity)));
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringValue) {
+TEST_F(KeyStringBuilderTest, KeyStringValue) {
     // Test that KeyStringBuilder is releasable into a Value type that is comparable. Once
     // released, it is reusable once reset.
     key_string::HeapBuilder ks1(key_string::Version::V1, BSON("" << 1), ALL_ASCENDING);
@@ -541,7 +541,7 @@ TEST_P(KeyStringBuilderTest, KeyStringValue) {
     ASSERT_EQ(data2.compare(dataCopy), 0);
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringValueReleaseReusableTest) {
+TEST_F(KeyStringBuilderTest, KeyStringValueReleaseReusableTest) {
     // Test that KeyStringBuilder is reusable once reset.
     BSONObj doc1 = BSON("fieldA" << 1 << "fieldB" << 2);
     BSONObj doc2 = BSON("fieldA" << 2 << "fieldB" << 3);
@@ -560,7 +560,7 @@ TEST_P(KeyStringBuilderTest, KeyStringValueReleaseReusableTest) {
     COMPARE_KS_BSON(data2, bson2, ALL_ASCENDING);
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringGetValueCopyTest) {
+TEST_F(KeyStringBuilderTest, KeyStringGetValueCopyTest) {
     // Test that KeyStringGetValueCopyTest creates a copy.
     BSONObj doc = BSON("fieldA" << 1);
     key_string::HeapBuilder ks(key_string::Version::V1, ALL_ASCENDING);
@@ -575,7 +575,7 @@ TEST_P(KeyStringBuilderTest, KeyStringGetValueCopyTest) {
     COMPARE_KS_BSON(data2, BSON("" << 1), ALL_ASCENDING);
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringBuilderAppendBsonElement) {
+TEST_F(KeyStringBuilderTest, KeyStringBuilderAppendBsonElement) {
     // Test that appendBsonElement works.
     {
         BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
@@ -611,7 +611,7 @@ TEST_P(KeyStringBuilderTest, KeyStringBuilderAppendBsonElement) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringBuilderOrdering) {
+TEST_F(KeyStringBuilderTest, KeyStringBuilderOrdering) {
     // Test that ordering works.
     BSONObj doc = BSON("fieldA" << 1);
     key_string::HeapBuilder ks1(key_string::Version::V1, ALL_ASCENDING);
@@ -627,7 +627,7 @@ TEST_P(KeyStringBuilderTest, KeyStringBuilderOrdering) {
     ASSERT_FALSE(std::ranges::equal(data1.getView(), data2.getView()));
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringBuilderExclusiveBeforeDiscriminator) {
+TEST_F(KeyStringBuilderTest, KeyStringBuilderExclusiveBeforeDiscriminator) {
     // test that when passed in a Discriminator it gets added.
     BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
     key_string::HeapBuilder ks(
@@ -639,7 +639,7 @@ TEST_P(KeyStringBuilderTest, KeyStringBuilderExclusiveBeforeDiscriminator) {
     ASSERT_EQ(1, appendedDiscriminator);
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringBuilderExclusiveAfterDiscriminator) {
+TEST_F(KeyStringBuilderTest, KeyStringBuilderExclusiveAfterDiscriminator) {
     // test that when passed in a Discriminator it gets added.
     BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
     key_string::HeapBuilder ks(
@@ -651,7 +651,7 @@ TEST_P(KeyStringBuilderTest, KeyStringBuilderExclusiveAfterDiscriminator) {
     ASSERT_EQ(254, appendedDiscriminator);
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringBuilderInclusiveDiscriminator) {
+TEST_F(KeyStringBuilderTest, KeyStringBuilderInclusiveDiscriminator) {
     // test that when passed in a Discriminator it gets added.
     BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
     key_string::HeapBuilder ks(
@@ -663,7 +663,7 @@ TEST_P(KeyStringBuilderTest, KeyStringBuilderInclusiveDiscriminator) {
     ASSERT_EQ(4, appendedDiscriminator);
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringValueCompareWithoutDiscriminator1) {
+TEST_F(KeyStringBuilderTest, KeyStringValueCompareWithoutDiscriminator1) {
     BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
 
     key_string::HeapBuilder ks1(
@@ -681,7 +681,7 @@ TEST_P(KeyStringBuilderTest, KeyStringValueCompareWithoutDiscriminator1) {
     ASSERT_EQ(data1.compareWithoutDiscriminator(data2), 0);
 }
 
-TEST_P(KeyStringBuilderTest, KeyStringValueCompareWithoutDiscriminator2) {
+TEST_F(KeyStringBuilderTest, KeyStringValueCompareWithoutDiscriminator2) {
     BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
 
     key_string::HeapBuilder ks1(
@@ -699,7 +699,7 @@ TEST_P(KeyStringBuilderTest, KeyStringValueCompareWithoutDiscriminator2) {
     ASSERT(data1.compareWithoutDiscriminator(data2) > 0);
 }
 
-TEST_P(KeyStringBuilderTest, DoubleInvalidIntegerPartV0) {
+TEST_F(KeyStringBuilderTest, DoubleInvalidIntegerPartV0) {
     // Test that an illegally encoded double throws an error.
     const char data[8] = {
         // kNumericPositive7ByteInt
@@ -724,7 +724,7 @@ TEST_P(KeyStringBuilderTest, DoubleInvalidIntegerPartV0) {
                        31209);
 }
 
-TEST_P(KeyStringBuilderTest, InvalidInfinityDecimalV0) {
+TEST_F(KeyStringBuilderTest, InvalidInfinityDecimalV0) {
     // Encode a Decimal positive infinity in a V1 keystring.
     mongo::key_string::Builder ks(
         mongo::key_string::Version::V1, BSON("" << Decimal128::kPositiveInfinity), ALL_ASCENDING);
@@ -739,7 +739,7 @@ TEST_P(KeyStringBuilderTest, InvalidInfinityDecimalV0) {
         mongo::key_string::toBsonSafe(ks.getView(), ALL_ASCENDING, tb), AssertionException, 31231);
 }
 
-TEST_P(KeyStringBuilderTest, CannotEncodeDecimalInV0) {
+TEST_F(KeyStringBuilderTest, CannotEncodeDecimalInV0) {
     // Try encode a Decimal by passing it as a part of BSON
     ASSERT_THROWS_CODE(mongo::key_string::Builder(mongo::key_string::Version::V0,
                                                   BSON("d" << Decimal128::kPi),
@@ -754,7 +754,7 @@ TEST_P(KeyStringBuilderTest, CannotEncodeDecimalInV0) {
                        ErrorCodes::UnsupportedFormat);
 }
 
-TEST_P(KeyStringBuilderTest, ReasonableSize) {
+TEST_F(KeyStringBuilderTest, ReasonableSize) {
     // Tests that key_string::Builders do not use an excessive amount of memory for small key
     // generation. These upper bounds were the calculated sizes of each type at the time this
     // test was written.
@@ -798,7 +798,7 @@ TEST_P(KeyStringBuilderTest, ReasonableSize) {
     ASSERT_LTE(fragmentBuilder.memUsage(), 64);
 }
 
-TEST_P(KeyStringBuilderTest, DiscardIfNotReleased) {
+TEST_F(KeyStringBuilderTest, DiscardIfNotReleased) {
     SharedBufferFragmentBuilder fragmentBuilder(1024);
     {
         // Intentially not released, but the data should be discarded correctly.
@@ -812,7 +812,7 @@ TEST_P(KeyStringBuilderTest, DiscardIfNotReleased) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, LotsOfNumbers1) {
+TEST_F(KeyStringBuilderTest, LotsOfNumbers1) {
     for (int i = 0; i < 64; i++) {
         int64_t x = 1LL << i;
         ROUNDTRIP(version, BSON("" << static_cast<long long>(x)));
@@ -842,7 +842,7 @@ TEST_P(KeyStringBuilderTest, LotsOfNumbers1) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, LotsOfNumbers2) {
+TEST_F(KeyStringBuilderTest, LotsOfNumbers2) {
     for (double i = -1100; i < 1100; i++) {
         double x = pow(2, i);
         ROUNDTRIP(version, BSON("" << x));
@@ -853,7 +853,7 @@ TEST_P(KeyStringBuilderTest, LotsOfNumbers2) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, RecordIdOrder1) {
+TEST_F(KeyStringBuilderTest, RecordIdOrder1) {
     Ordering ordering = Ordering::make(BSON("a" << 1));
 
     key_string::Builder a(version, BSON("" << 5), ordering, RecordId::minLong());
@@ -868,7 +868,7 @@ TEST_P(KeyStringBuilderTest, RecordIdOrder1) {
     ASSERT_LESS_THAN(e, d);
 }
 
-TEST_P(KeyStringBuilderTest, RecordIdOrder2) {
+TEST_F(KeyStringBuilderTest, RecordIdOrder2) {
     Ordering ordering = Ordering::make(BSON("a" << -1 << "b" << -1));
 
     key_string::Builder a(version, BSON("" << 5 << "" << 6), ordering, RecordId::minLong());
@@ -884,7 +884,7 @@ TEST_P(KeyStringBuilderTest, RecordIdOrder2) {
     ASSERT_LESS_THAN(b, d);
 }
 
-TEST_P(KeyStringBuilderTest, RecordIdOrder2Double) {
+TEST_F(KeyStringBuilderTest, RecordIdOrder2Double) {
     Ordering ordering = Ordering::make(BSON("a" << -1 << "b" << -1));
 
     key_string::Builder a(version, BSON("" << 5.0 << "" << 6.0), ordering, RecordId::minLong());
@@ -896,7 +896,7 @@ TEST_P(KeyStringBuilderTest, RecordIdOrder2Double) {
     ASSERT_LESS_THAN(a, c);
 }
 
-TEST_P(KeyStringBuilderTest, Timestamp) {
+TEST_F(KeyStringBuilderTest, Timestamp) {
     BSONObj a = BSON("" << Timestamp(0, 0));
     BSONObj b = BSON("" << Timestamp(1234, 1));
     BSONObj c = BSON("" << Timestamp(1234, 2));
@@ -946,7 +946,7 @@ TEST_P(KeyStringBuilderTest, Timestamp) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, AllTypesRoundtrip) {
+TEST_F(KeyStringBuilderTest, AllTypesRoundtrip) {
     for (int i = 1; i <= stdx::to_underlying(BSONType::jsTypeMax); i++) {
         {
             BSONObjBuilder b;
@@ -963,7 +963,7 @@ TEST_P(KeyStringBuilderTest, AllTypesRoundtrip) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, SerializeDeserialize) {
+TEST_F(KeyStringBuilderTest, SerializeDeserialize) {
     BSONObj doc = BSON("a" << 1 << "b" << 2.0);
     // Round trip through serialize and deserialize
     {
@@ -1001,7 +1001,7 @@ TEST_P(KeyStringBuilderTest, SerializeDeserialize) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, RecordIdStr) {
+TEST_F(KeyStringBuilderTest, RecordIdStr) {
     const int kSize = 12;
     for (int i = 0; i < kSize; i++) {
         unsigned char buf[kSize];
@@ -1056,7 +1056,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStr) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, RecordIdStrBig1SizeSegment) {
+TEST_F(KeyStringBuilderTest, RecordIdStrBig1SizeSegment) {
     const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
     {
         const int size = 90;
@@ -1079,7 +1079,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBig1SizeSegment) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, RecordIdStrBig2SizeSegments) {
+TEST_F(KeyStringBuilderTest, RecordIdStrBig2SizeSegments) {
     const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
     {
         // Min 2-byte encoded string size is 128B: 1B CType + ridStr + string terminator
@@ -1112,7 +1112,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBig2SizeSegments) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, RecordIdStrBig3SizeSegments) {
+TEST_F(KeyStringBuilderTest, RecordIdStrBig3SizeSegments) {
     const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
     {
         // Min 3-byte encoded string size is 16384B: 1B CType + ridStr + string terminator
@@ -1136,7 +1136,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBig3SizeSegments) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, RecordIdStrBig4SizeSegments) {
+TEST_F(KeyStringBuilderTest, RecordIdStrBig4SizeSegments) {
     const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
     {
         // Min 4-byte encoded string size is 2097152B: 1B CType + ridStr + string terminator
@@ -1160,7 +1160,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBig4SizeSegments) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, RecordIdStrBigSizeWithoutRecordIdStr) {
+TEST_F(KeyStringBuilderTest, RecordIdStrBigSizeWithoutRecordIdStr) {
     const int pad = 3;  // kStringLike CType + StringData terminator + RecordId len
     const char str[] = "keyval";
     const int padStr = 3;  // kStringLike CType + string terminator + discriminator
@@ -1190,7 +1190,7 @@ TEST_P(KeyStringBuilderTest, RecordIdStrBigSizeWithoutRecordIdStr) {
 }
 
 
-TEST_P(KeyStringBuilderTest, NaNs) {
+TEST_F(KeyStringBuilderTest, NaNs) {
     // TODO use hex floats to force distinct NaNs
     const double nan1 = std::numeric_limits<double>::quiet_NaN();
     const double nan2 = std::numeric_limits<double>::signaling_NaN();
@@ -1234,7 +1234,7 @@ TEST_P(KeyStringBuilderTest, NaNs) {
     ASSERT(toBson(ks4d, ONE_DESCENDING)[""].Decimal().isNaN());
 }
 
-TEST_P(KeyStringBuilderTest, RecordIds) {
+TEST_F(KeyStringBuilderTest, RecordIds) {
     for (int i = 0; i < 63; i++) {
         const RecordId rid = RecordId(1ll << i);
 
@@ -1303,7 +1303,7 @@ TEST_P(KeyStringBuilderTest, RecordIds) {
     }
 }
 
-TEST_P(KeyStringBuilderTest, KeyWithLotsOfTypeBits) {
+TEST_F(KeyStringBuilderTest, KeyWithLotsOfTypeBits) {
     BSONObj obj;
     {
         BSONObjBuilder builder;
@@ -1320,7 +1320,7 @@ TEST_P(KeyStringBuilderTest, KeyWithLotsOfTypeBits) {
     ROUNDTRIP(version, obj);
 }
 
-TEST_P(KeyStringBuilderTest, KeysWithNBytesTypeBits) {
+TEST_F(KeyStringBuilderTest, KeysWithNBytesTypeBits) {
     checkKeyWithNByteOfTypeBits(version, 0, false);
     checkKeyWithNByteOfTypeBits(version, 1, false);
     checkKeyWithNByteOfTypeBits(version, 1, true);
@@ -1332,12 +1332,12 @@ TEST_P(KeyStringBuilderTest, KeysWithNBytesTypeBits) {
     checkKeyWithNByteOfTypeBits(version, 129, true);
 }
 
-TEST_P(KeyStringBuilderTest, VeryLargeString) {
+TEST_F(KeyStringBuilderTest, VeryLargeString) {
     BSONObj obj = BSON("" << std::string(123456, 'x'));
     ROUNDTRIP(version, obj);
 }
 
-TEST_P(KeyStringBuilderTest, ToBsonSafeShouldNotTerminate) {
+TEST_F(KeyStringBuilderTest, ToBsonSafeShouldNotTerminate) {
     key_string::TypeBits typeBits(key_string::Version::V1);
 
     const char invalidString[] = {
@@ -1363,7 +1363,7 @@ TEST_P(KeyStringBuilderTest, ToBsonSafeShouldNotTerminate) {
         key_string::toBsonSafe(invalidNumber, ALL_ASCENDING, typeBits), AssertionException, 50810);
 }
 
-TEST_P(KeyStringBuilderTest, InvalidDecimalExponent) {
+TEST_F(KeyStringBuilderTest, InvalidDecimalExponent) {
     const Decimal128 dec("1125899906842624.1");
     const key_string::Builder ks(key_string::Version::V1, BSON("" << dec), ALL_ASCENDING);
 
@@ -1377,7 +1377,7 @@ TEST_P(KeyStringBuilderTest, InvalidDecimalExponent) {
                        50814);
 }
 
-TEST_P(KeyStringBuilderTest, InvalidDecimalZero) {
+TEST_F(KeyStringBuilderTest, InvalidDecimalZero) {
     const key_string::Builder ks(
         key_string::Version::V1, BSON("" << Decimal128("-0")), ALL_ASCENDING);
 
@@ -1389,7 +1389,7 @@ TEST_P(KeyStringBuilderTest, InvalidDecimalZero) {
                        50846);
 }
 
-TEST_P(KeyStringBuilderTest, InvalidDecimalContinuation) {
+TEST_F(KeyStringBuilderTest, InvalidDecimalContinuation) {
     auto elem = Decimal128("1.797693134862315708145274237317043E308");
     const key_string::Builder ks(key_string::Version::V1, BSON("" << elem), ALL_ASCENDING);
 
@@ -1408,7 +1408,7 @@ TEST_P(KeyStringBuilderTest, InvalidDecimalContinuation) {
                        50850);
 }
 
-TEST_P(KeyStringBuilderTest, RandomizedInputsForToBsonSafe) {
+TEST_F(KeyStringBuilderTest, RandomizedInputsForToBsonSafe) {
     std::mt19937 gen(newSeed());
     std::uniform_int_distribution<unsigned int> randomNum(std::numeric_limits<unsigned int>::min(),
                                                           std::numeric_limits<unsigned int>::max());
@@ -1457,10 +1457,6 @@ TEST_P(KeyStringBuilderTest, RandomizedInputsForToBsonSafe) {
         }
     }
 }
-
-INSTANTIATE_TEST_SUITE_P(KeyStringBuilderTest,
-                         KeyStringBuilderTest,
-                         testing::Values(key_string::Version::V0, key_string::Version::V1));
 
 DEATH_TEST(KeyStringBuilderDeathTest,
            ToBsonPromotesAssertionsToTerminate,

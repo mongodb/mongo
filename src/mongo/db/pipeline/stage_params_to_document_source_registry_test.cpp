@@ -77,7 +77,7 @@ public:
  * Test that buildDocumentSource tasserts for stages that are not registered
  * in the StageParams to DocumentSource registry.
  */
-DEATH_TEST(StageParamsToDocumentSourceRegistryDeathTest, UnregisteredStageReturnsNone, "11434300") {
+DEATH_TEST(StageParamsToDocumentSourceRegistryTest, UnregisteredStageReturnsNone, "11434300") {
     BSONObj spec = BSON("$unregisteredTestStage" << BSONObj());
     auto liteParsed = UnregisteredTestLiteParsed(spec.firstElement());
     auto expCtx = make_intrusive<ExpressionContextForTest>();
@@ -132,7 +132,7 @@ REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(duplicateRegistrationTest,
  * This ensures that each stage can only have one registered mapping function,
  * preventing accidental overwrites or conflicting implementations.
  */
-DEATH_TEST(StageParamsToDocumentSourceRegistryDeathTest, DuplicateRegistrationFails, "11458700") {
+DEATH_TEST(StageParamsToDocumentSourceRegistryTest, DuplicateRegistrationFails, "11458700") {
     // Attempt to register a second mapping function for the same StageParams::Id.
     // This should trigger a tassert.
     registerStageParamsToDocumentSourceFn(DuplicateRegistrationTestStageParams::id, dummyMappingFn);
@@ -140,3 +140,4 @@ DEATH_TEST(StageParamsToDocumentSourceRegistryDeathTest, DuplicateRegistrationFa
 
 }  // namespace
 }  // namespace mongo
+

@@ -30,9 +30,6 @@
 #pragma once
 
 #include "mongo/stdx/thread.h"
-#include "mongo/util/modules.h"
-
-MONGO_MOD_PUBLIC;
 
 namespace mongo::unittest {
 

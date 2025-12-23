@@ -33,16 +33,14 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/modules.h"
 #include "mongo/util/scopeguard.h"
 
 #include <exception>
 #include <functional>
 #include <mutex>
 #include <utility>
-
-MONGO_MOD_PUBLIC;
 
 namespace mongo::unittest {
 
@@ -55,6 +53,7 @@ namespace mongo::unittest {
  * on this monitor while all other work happens in workers.
  */
 class ThreadAssertionMonitor {
+
 public:
     // Monitor will `wait()` on destruction, blocking until a `notifyDone()` call has occurred.
     ~ThreadAssertionMonitor() noexcept(false) {
@@ -83,9 +82,8 @@ public:
     void exec(F&& f) {
         try {
             std::invoke(std::forward<F>(f));
-        } catch (...) {
+        } catch (const unittest::TestAssertionFailureException&) {
             // Transport ASSERT failures to the monitor.
-            // Actually, just forward all exceptions to the monitor.
             bool notify = false;
             {
                 stdx::unique_lock lk(_mu);  // NOLINT

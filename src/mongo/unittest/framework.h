@@ -43,63 +43,147 @@
 // IWYU pragma: private, include "mongo/unittest/unittest.h"
 // IWYU pragma: friend "mongo/unittest/.*"
 
-#include <gmock/gmock.h>  // IWYU pragma: export
-#include <gtest/gtest.h>  // IWYU pragma: export
-
-// TODO(gtest) consider making this change (or something like it) in the gtest codebase.
-// We should enforce that all inclusions of gtest go through this header; if we
-// don't move this redefinition to the gtest codebase, we must enforce that.
-#undef GTEST_FATAL_FAILURE_
-
-/**
- * GTEST_FATAL_FAILURE_ is defined as a return statement. When gtest assertions are made to throw
- * exceptions rather than return, the result is that the return statement of this macro is never
- * reached, and this has various usability issues described in more detail here:
- * https://github.com/google/googletest/issues/4770. To work around this issue, we redefine
- * GTEST_FATAL_FAILURE_ without a return statement. In gtest, this macro would expand to 'return'.
- */
-#define GTEST_FATAL_FAILURE_RETURN_
-
-#define GTEST_FATAL_FAILURE_(message) \
-    GTEST_FATAL_FAILURE_RETURN_ GTEST_MESSAGE_(message, ::testing::TestPartResult::kFatalFailure)
-
-#include "mongo/platform/source_location.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/logv2/log_debug.h"
+#include "mongo/logv2/log_detail.h"
+#include "mongo/unittest/test_info.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/modules.h"
+#include "mongo/util/modules_incompletely_marked_header.h"
+#include "mongo/util/optional_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/synchronized_value.h"
 
+#include <cmath>
 #include <functional>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/optional.hpp>
+#include <fmt/format.h>
+
+/**
+ * Construct a single test, named `TEST_NAME` within the test Suite `SUITE_NAME`.
+ *
+ * Usage:
+ *
+ * TEST(MyModuleTests, TestThatFooFailsOnErrors) {
+ *     ASSERT_EQUALS(error_success, foo(invalidValue));
+ * }
+ */
+#define TEST(SUITE_NAME, TEST_NAME) \
+    UNIT_TEST_DETAIL_DEFINE_TEST_(SUITE_NAME, TEST_NAME, ::mongo::unittest::Test)
+
+/**
+ * Construct a single test named TEST_NAME that has access to a common class (a "fixture")
+ * named "FIXTURE_NAME". FIXTURE_NAME will be the name of the Suite in which the test appears.
+ *
+ * Usage:
+ *
+ * class FixtureClass : public mongo::unittest::Test {
+ * protected:
+ *   int myVar;
+ *   void setUp() { myVar = 10; }
+ * };
+ *
+ * TEST(FixtureClass, TestThatUsesFixture) {
+ *     ASSERT_EQUALS(10, myVar);
+ * }
+ */
+#define TEST_F(FIXTURE_NAME, TEST_NAME) \
+    UNIT_TEST_DETAIL_DEFINE_TEST_(FIXTURE_NAME, TEST_NAME, FIXTURE_NAME)
+
+#define UNIT_TEST_DETAIL_DEFINE_TEST_(SUITE_NAME, TEST_NAME, TEST_BASE) \
+    UNIT_TEST_DETAIL_DEFINE_TEST_PRIMITIVE_(                            \
+        SUITE_NAME, TEST_NAME, UNIT_TEST_DETAIL_TEST_TYPE_NAME(SUITE_NAME, TEST_NAME), TEST_BASE)
+
+#define UNIT_TEST_DETAIL_DEFINE_TEST_PRIMITIVE_(FIXTURE_NAME, TEST_NAME, TEST_TYPE, TEST_BASE) \
+    class TEST_TYPE : public TEST_BASE {                                                       \
+    private:                                                                                   \
+        void _doTest() override;                                                               \
+        static constexpr ::mongo::unittest::TestInfo _testInfo{                                \
+            #FIXTURE_NAME, #TEST_NAME, __FILE__, __LINE__, &typeid(TEST_BASE)};                \
+        static inline const RegistrationAgent<TEST_TYPE> _agent{&_testInfo};                   \
+    };                                                                                         \
+    void TEST_TYPE::_doTest()
+
+/**
+ * Macro to construct a type name for a test, from its `SUITE_NAME` and `TEST_NAME`.
+ * Do not use directly in test code.
+ */
+#define UNIT_TEST_DETAIL_TEST_TYPE_NAME(SUITE_NAME, TEST_NAME) \
+    UnitTest_SuiteName##SUITE_NAME##TestName##TEST_NAME
 
 namespace mongo::unittest {
 
+class Result;
+
 /**
- * Test fixture base class. Defined to translate old mongo-style setUp/tearDown methods to their
- * gtest counterparts, SetUp/TearDown.
+ * Representation of a collection of tests.
+ *
+ * One Suite is constructed for each SUITE_NAME when using the TEST macro.
+ *
+ * See `OldStyleSuiteSpecification` which adapts dbtests into this framework.
  */
-class MONGO_MOD_OPEN Test : public testing::Test {
+class Suite : public std::enable_shared_from_this<Suite> {
+private:
+    struct SuiteTest {
+        std::string name;
+        std::string fileName;
+        std::function<void()> fn;
+    };
+
+    struct ConstructorEnable {
+        explicit ConstructorEnable() = default;
+    };
+
 public:
-    virtual void setUp() {}
-    virtual void tearDown() {}
-    void SetUp() override {
-        setUp();
+    explicit Suite(ConstructorEnable, std::string name);
+    Suite(const Suite&) = delete;
+    Suite& operator=(const Suite&) = delete;
+
+    void add(std::string name, std::string fileName, std::function<void()> testFn);
+
+    std::unique_ptr<Result> run(const std::string& filter,
+                                const std::string& fileNameFilter,
+                                int runsPerTest);
+
+    static int run(const std::vector<std::string>& suites,
+                   const std::string& filter,
+                   const std::string& fileNameFilter,
+                   int runsPerTest);
+
+    /**
+     * Get a suite with the given name, creating and registering it if necessary.
+     * This is the only way to make a Suite object.
+     *
+     * Safe to call during static initialization.
+     */
+    static Suite& getSuite(StringData name);
+
+private:
+    /** Points to the string data of the _name field. */
+    StringData key() const {
+        return _name;
     }
-    void TearDown() override {
-        tearDown();
-    }
+
+    std::string _name;
+    std::vector<SuiteTest> _tests;
 };
 
 /**
  * Adaptor to set up a Suite from a dbtest-style suite.
  * Support for deprecated dbtest-style test suites. Tests are are added by overriding setupTests()
  * in a subclass of OldStyleSuiteSpecification, and defining an OldStyleSuiteInstance<T> object.
- * This approach is deprecated.
+ * This approach is
+ * deprecated.
  *
  * Example:
  *     class All : public OldStyleSuiteSpecification {
@@ -115,7 +199,12 @@ public:
  */
 class MONGO_MOD_OPEN OldStyleSuiteSpecification {
 public:
-    explicit OldStyleSuiteSpecification(std::string name) : _name(std::move(name)) {}
+    struct SuiteTest {
+        std::string name;
+        std::function<void()> fn;
+    };
+
+    OldStyleSuiteSpecification(std::string name) : _name(std::move(name)) {}
     virtual ~OldStyleSuiteSpecification() = default;
 
     // Note: setupTests() is run by a OldStyleSuiteInitializer at static initialization time.
@@ -126,61 +215,33 @@ public:
         return _name;
     }
 
+    const std::vector<SuiteTest>& tests() const {
+        return _tests;
+    }
+
     /**
      * Add an old-style test of type `T` to this Suite, saving any test constructor args
      * that would be needed at test run time.
      * The added test's name will be synthesized as the demangled typename of T.
      * At test run time, the test will be created and run with `T(args...).run()`.
      */
-    template <typename T>
-    void add(SourceLocation loc = MONGO_SOURCE_LOCATION()) {
-        _add<T>(loc);
+    template <typename T, typename... Args>
+    void add(Args&&... args) {
+        addNameCallback(nameForTestClass<T>(), [=] { T(args...).run(); });
     }
-    template <typename T>
-    void add(auto a0, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
-        _add<T>(loc, a0);
+
+    void addNameCallback(std::string name, std::function<void()> cb) {
+        _tests.push_back({std::move(name), std::move(cb)});
     }
+
     template <typename T>
-    void add(auto a0, auto a1, SourceLocation loc = MONGO_SOURCE_LOCATION()) {
-        _add<T>(loc, a0, a1);
+    static std::string nameForTestClass() {
+        return demangleName(typeid(T));
     }
 
 private:
-    /** A Gtest that runs an old style test as its `TestBody`. */
-    template <typename T>
-    class OldStyleTest : public Test {
-    public:
-        explicit OldStyleTest(auto... args) : _t(std::move(args)...) {}
-
-        void TestBody() override {
-            _t.run();
-        }
-
-    private:
-        T _t;
-    };
-
-    template <typename T, typename... As>
-    void _add(SourceLocation loc, As... args) {
-        // Gtest requires that a suite's tests all have the same base class,
-        // so they're all registered as `Test*`, since we have nothing more
-        // specific to use.
-        testing::RegisterTest(_name.c_str(),
-                              demangleName(typeid(T)).c_str(),
-                              nullptr,
-                              nullptr,
-                              loc.file_name(),
-                              loc.line(),
-                              [args...]() -> Test* {
-                                  if constexpr (std::is_base_of_v<Test, T>) {
-                                      return new T(args...);
-                                  } else {
-                                      return new OldStyleTest<T>(args...);
-                                  }
-                              });
-    }
-
     std::string _name;
+    std::vector<SuiteTest> _tests;
 };
 
 /**
@@ -192,31 +253,162 @@ template <typename T>
 struct OldStyleSuiteInitializer {
     template <typename... Args>
     explicit OldStyleSuiteInitializer(Args&&... args) {
-        T(std::forward<Args>(args)...).setupTests();
+        T t(std::forward<Args>(args)...);
+        init(t);
+    }
+
+    void init(OldStyleSuiteSpecification& suiteSpec) const {
+        suiteSpec.setupTests();
+        auto& suite = Suite::getSuite(suiteSpec.name());
+        for (auto&& t : suiteSpec.tests()) {
+            suite.add(t.name, "", t.fn);
+        }
     }
 };
 
-using TestAssertionFailureException = testing::AssertionException;
+/**
+ * UnitTest singleton class. Provides access to information about current execution state.
+ */
+class UnitTest {
+    UnitTest() = default;
+
+public:
+    static UnitTest* getInstance();
+
+    UnitTest(const UnitTest& other) = delete;
+    UnitTest& operator=(const UnitTest&) = delete;
+
+public:
+    /**
+     * Returns the currently running test, or `nullptr` if a test is not running.
+     */
+    const TestInfo* currentTestInfo() const;
+
+public:
+    /**
+     * Used to set/unset currently running test information.
+     */
+    class TestRunScope {
+    public:
+        explicit TestRunScope(const TestInfo* testInfo) {
+            UnitTest::getInstance()->setCurrentTestInfo(testInfo);
+        }
+
+        ~TestRunScope() {
+            UnitTest::getInstance()->setCurrentTestInfo(nullptr);
+        }
+    };
+
+private:
+    /**
+     * Sets the currently running tests. Internal: should only be used by unit test framework.
+     * testInfo - test info of the currently running test, or `nullptr` is a test is not running.
+     */
+    void setCurrentTestInfo(const TestInfo* testInfo);
+
+private:
+    const TestInfo* _currentTestInfo = nullptr;
+};
+
+/**
+ * Base type for unit test fixtures.  Also, the default fixture type used
+ * by the TEST() macro.
+ */
+class MONGO_MOD_OPEN Test {
+public:
+    Test();
+    virtual ~Test();
+    Test(const Test&) = delete;
+    Test& operator=(const Test&) = delete;
+
+    void run();
+
+    /**
+     * Called on the test object before running the test.
+     */
+    virtual void setUp() {}
+
+    /**
+     * Called on the test object after running the test.
+     */
+    virtual void tearDown() {}
+
+protected:
+    /**
+     * Adds a Test to a Suite, used by TEST/TEST_F macros.
+     */
+    template <typename T>
+    class RegistrationAgent {
+    public:
+        /**
+         * These TestInfo must point to data that outlives this RegistrationAgent.
+         * In the case of TEST/TEST_F, these are static variables.
+         */
+        explicit RegistrationAgent(const TestInfo* testInfo) : _testInfo{testInfo} {
+            Suite::getSuite(_testInfo->suiteName())
+                .add(
+                    std::string{_testInfo->testName()}, std::string{_testInfo->file()}, [testInfo] {
+                        UnitTest::TestRunScope trs(testInfo);
+                        T{}.run();
+                    });
+            _ensureSuiteHomogeneity(_testInfo);
+        }
+
+        StringData getSuiteName() const {
+            return _testInfo->suiteName();
+        }
+
+        StringData getTestName() const {
+            return _testInfo->testName();
+        }
+
+        StringData getFileName() const {
+            return _testInfo->file();
+        }
+
+    private:
+        const TestInfo* _testInfo;
+    };
+
+    /**
+     * This exception class is used to exercise the testing framework itself. If a test
+     * case throws it, the framework would not consider it an error.
+     */
+    class FixtureExceptionForTesting : public std::exception {};
+
+private:
+    static void _ensureSuiteHomogeneity(const TestInfo* testInfo);
+
+    /**
+     * The test itself.
+     */
+    virtual void _doTest() = 0;
+};
+
+/**
+ * Return a list of suite names.
+ */
+std::vector<std::string> getAllSuiteNames();
 
 /**
  * Returns the test info of the test currently executing.
  */
-inline const testing::TestInfo* getTestInfo() {
-    return testing::UnitTest::GetInstance()->current_test_info();
+inline const TestInfo* getTestInfo() {
+    return UnitTest::getInstance()->currentTestInfo();
 }
 
 /**
  * Returns the suite name of the test currently executing.
  */
 inline StringData getSuiteName() {
-    return getTestInfo()->test_suite_name();
+    return getTestInfo()->suiteName();
 }
 
 /**
  * Returns the name of the test currently executing.
  */
 inline StringData getTestName() {
-    return getTestInfo()->name();
+    return getTestInfo()->testName();
 }
 
 /** Invocation info (used e.g. by death test to exec). */
@@ -243,24 +435,3 @@ struct AutoUpdateConfig {
 AutoUpdateConfig& getAutoUpdateConfig();
 
 }  // namespace mongo::unittest
-
-/**
- * Defines a gtest-compatible printer for boost::optional in the boost namespace so that it's
- * discoverable where used.
- * TODO(gtest): We should consider putting this in gtest/internal/custom/gtest-printers.h.
- */
-namespace boost {
-template <typename T>
-void PrintTo(const boost::optional<T>& value, std::ostream* os) {
-    *os << '(';
-    if (!value) {
-        *os << "none";
-    } else {
-        *os << ::testing::PrintToString(*value);
-    }
-    *os << ')';
-}
-inline void PrintTo(decltype(boost::none), std::ostream* os) {
-    *os << "(none)";
-}
-}  // namespace boost

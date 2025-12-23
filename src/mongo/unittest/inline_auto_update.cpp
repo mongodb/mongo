@@ -28,7 +28,11 @@
  */
 
 
-#include "mongo/unittest/unittest.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/str_escape.h"
 
@@ -41,10 +45,6 @@
 #include <map>
 #include <memory>
 #include <utility>
-
-#include <boost/filesystem.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo::unittest {
 namespace {

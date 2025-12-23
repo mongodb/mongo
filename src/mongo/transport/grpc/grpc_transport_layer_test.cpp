@@ -280,8 +280,7 @@ TEST_F(GRPCTransportLayerTest, setupIngressWithoutTLSShouldFail) {
     ASSERT_EQ(ErrorCodes::InvalidOptions, tl->setup());
 }
 
-using GRPCTransportLayerTestDeathTest = GRPCTransportLayerTest;
-DEATH_TEST_F(GRPCTransportLayerTestDeathTest,
+DEATH_TEST_F(GRPCTransportLayerTest,
              setupWithPortConflictShouldFail,
              "Port collision, ports must be unique.") {
     serverGlobalParams.port = 20017;

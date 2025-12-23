@@ -172,7 +172,7 @@ public:
         return CardinalityEstimate(CardinalityType{estimate}, source);
     }
 
-    void TestBody() override {}
+    void _doTest() override {}
 
     OperationContext* getOperationContext() const {
         return operationContext();

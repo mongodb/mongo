@@ -61,12 +61,6 @@ void endProcessWithSignal(int signalNum);
 void setupSynchronousSignalHandlers();
 
 /**
- * Registers a user-defined callback to be invoked on any signal handler. Clobbers the
- * previously-registered callback.
- */
-void setSynchronousSignalHandlerCallback_forTest(std::function<void()> cb);
-
-/**
  * Report out of memory error with a stack trace and exit.
  *
  * Called when any of the following functions fails to allocate memory:

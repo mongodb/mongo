@@ -105,6 +105,10 @@ void TaskExecutorTest::joinExecutorThread() {
     _executor->join();
 }
 
+void TaskExecutorTest::_doTest() {
+    MONGO_UNREACHABLE;
+}
+
 void TaskExecutorTest::postExecutorThreadLaunch() {}
 
 }  // namespace executor

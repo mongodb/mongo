@@ -232,14 +232,14 @@ TEST(PlannerWildcardHelpersTest, Expand_CompoundWildcardIndex_NumericComponents)
     ASSERT_EQ(expectedMks, expandedIndexes.front().multikeyPaths);
 }
 
-DEATH_TEST(PlannerWildcardHelpersTestDeathTest, InvalidIndexExpansion, "11390001") {
+DEATH_TEST(PlannerWildcardHelpersTest, InvalidIndexExpansion, "11390001") {
     WildcardIndexEntryMock wildcardIndex{BSON("a" << 1 << "$**" << 1), BSON("_id" << 0), {}};
     std::set<std::string> fields{"a"};
     std::vector<IndexEntry> expandedIndexes{};
     expandWildcardIndexEntry(*wildcardIndex.indexEntry, fields, &expandedIndexes);
 }
 
-DEATH_TEST(PlannerWildcardHelpersTestDeathTest, AnotherInvalidIndexExpansion, "11390001") {
+DEATH_TEST(PlannerWildcardHelpersTest, AnotherInvalidIndexExpansion, "11390001") {
     WildcardIndexEntryMock wildcardIndex{BSON("$**" << 1 << "a" << 1), BSON("_id" << 0), {}};
     std::set<std::string> fields{"a"};
     std::vector<IndexEntry> expandedIndexes{};

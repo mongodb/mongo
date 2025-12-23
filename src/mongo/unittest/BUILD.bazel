@@ -18,6 +18,7 @@ mongo_cc_library(
         "golden_test.cpp",
         "inline_auto_update.cpp",
         "log_capture.cpp",
+        "matcher.cpp",
         "stringify.cpp",
         "temp_dir.cpp",
         "unittest.cpp",
@@ -28,58 +29,7 @@ mongo_cc_library(
         "//src/mongo/util:pcre_util",
         "//src/mongo/util:pcre_wrapper",
         "//src/mongo/util/options_parser",
-        "//src/third_party/googletest:gtest",
         "//src/third_party/yaml-cpp:yaml",
-    ],
-)
-
-mongo_cc_library(
-    name = "unittest_options",
-    srcs = [
-        "unittest_options.cpp",
-    ],
-    hdrs = [
-        "unittest_options.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
-    name = "unittest_main_core",
-    srcs = [
-        "enhanced_reporter.cpp",
-        "unittest_main_core.cpp",
-    ],
-    deps = [
-        ":unittest",
-        ":unittest_options",
-        "//src/mongo/db:wire_version",
-        "//src/mongo/db/commands:test_commands_enabled",
-        "//src/mongo/util:pcre_wrapper",
-        "//src/mongo/util:signal_handlers_base",
-        "//src/mongo/util/options_parser",
-        "//src/mongo/util/options_parser:options_parser_init",
-    ] + select({
-        "//bazel/config:non_system_allocator_enabled": [
-            "//src/mongo/util:tcmalloc_set_parameter",
-        ],
-        "//conditions:default": [],
-    }),
-)
-
-mongo_cc_library(
-    name = "signal_test_main",
-    srcs = [
-        "signal_test_main.cpp",
-    ],
-    target_compatible_with = select({
-        "@platforms//os:windows": ["@platforms//:incompatible"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        ":unittest_main_core",
     ],
 )
 
@@ -87,10 +37,19 @@ mongo_cc_library(
     name = "unittest_main",
     srcs = [
         "unittest_main.cpp",
+        ":unittest_options_gen",
     ],
     deps = [
-        ":unittest_main_core",
-    ],
+        ":unittest",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util/options_parser",
+    ] + select({
+        "//bazel/config:non_system_allocator_enabled": [
+            "//src/mongo/util:tcmalloc_set_parameter",
+        ],
+        "//conditions:default": [],
+    }),
     # TODO(before-merge): ?? AIB_COMPONENT="unittests",
 )
 
@@ -115,6 +74,11 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "unittest_options_gen",
+    src = "unittest_options.idl",
+)
+
+idl_generator(
     name = "integration_test_main_gen",
     src = "integration_test_main.idl",
 )
@@ -132,7 +96,6 @@ mongo_cc_library(
     ],
     deps = [
         "unittest",
-        "unittest_main_core",
         "//src/mongo/client:connection_string",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_options",
@@ -175,7 +138,9 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "unittest_test",
     srcs = [
+        "assert_that_test.cpp",
         "bson_test_util_test.cpp",
+        "fixture_test.cpp",
         "golden_test_test.cpp",
         "inline_auto_update_test.cpp",
         "log_capture_test.cpp",

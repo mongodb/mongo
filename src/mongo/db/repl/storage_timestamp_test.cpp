@@ -1806,7 +1806,7 @@ TEST_F(StorageTimestampTest, SetMinValidAppliedThrough) {
  */
 class KVDropDatabase : public StorageTimestampTest {
 private:
-    void TestBody() override {
+    void _doTest() override {
         // Not actually called.
     }
 
@@ -1928,7 +1928,12 @@ TEST(SimpleStorageTimestampTest, KVDropDatabasePrimary) {
  * entry is processed. Secondaries will look at the logical clock when completing the index
  * build. This is safe so long as completion is not racing with secondary oplog application.
  */
-class TimestampIndexBuilds : public StorageTimestampTest, public testing::WithParamInterface<bool> {
+class TimestampIndexBuilds : public StorageTimestampTest {
+private:
+    void _doTest() override {
+        // Not actually called.
+    }
+
 public:
     void run(bool simulatePrimary) {
         const bool simulateSecondary = !simulatePrimary;
@@ -2066,10 +2071,17 @@ public:
         }
     }
 };
-INSTANTIATE_TEST_SUITE_P(, TimestampIndexBuilds, testing::Values(false, true));
 
-TEST_P(TimestampIndexBuilds, Build) {
-    run(GetParam());
+TEST(SimpleStorageTimestampTest, TimestampIndexBuilds) {
+    {
+        TimestampIndexBuilds test;
+        test.run(false);
+    }
+    // Reconstruct the datafiles from scratch across tests.
+    {
+        TimestampIndexBuilds test;
+        test.run(true);
+    }
 }
 
 TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {

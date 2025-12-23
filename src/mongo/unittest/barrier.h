@@ -31,7 +31,6 @@
 
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -45,7 +44,7 @@ namespace unittest {
  * This counter is decremented every time a thread enters countDownAndWait() and blocks.
  * All threads are unblocked when the counter reaches zero and the counter is reset.
  */
-class MONGO_MOD_PUBLIC Barrier {
+class Barrier {
     Barrier(const Barrier&) = delete;
     Barrier& operator=(const Barrier&) = delete;
 

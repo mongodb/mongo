@@ -29,7 +29,5 @@ class CPPUnitTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         return core.programs.make_process(
-            self.logger,
-            [self.program_executable, "--enhancedReporter=false"],
-            **self.program_options,
+            self.logger, [self.program_executable], **self.program_options
         )

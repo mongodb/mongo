@@ -47,9 +47,6 @@
 namespace mongo {
 namespace test {
 
-const std::string& getGlobalSCSP();
-const std::string& getGlobalSWO();
-
 struct ExtraDataForServerParameter {
     std::string value = "start value";
     bool flag = true;

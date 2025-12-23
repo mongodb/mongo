@@ -83,6 +83,15 @@ bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
         return false;
     }
 
+    if (params.count("list")) {
+        std::vector<std::string> suiteNames = mongo::unittest::getAllSuiteNames();
+        for (std::vector<std::string>::const_iterator i = suiteNames.begin(); i != suiteNames.end();
+             ++i) {
+            std::cout << *i << std::endl;
+        }
+        return false;
+    }
+
     return true;
 }
 

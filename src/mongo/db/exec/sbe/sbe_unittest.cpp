@@ -40,15 +40,27 @@ namespace mongo::sbe {
 
 unittest::GoldenTestConfig goldenTestConfigSbe{"src/mongo/db/test_output/exec/sbe"};
 
-void GoldenSBETestFixture::setUp() {
-    gctx = std::make_unique<unittest::GoldenTestContext>(&goldenTestConfigSbe);
-    gctx->validateOnClose(false);
-    gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
-}
+void GoldenSBETestFixture::run() {
+    GoldenTestContext ctx(&goldenTestConfigSbe);
+    ctx.validateOnClose(false);
+    auto guard = ScopeGuard([&] { gctx = nullptr; });
+    gctx = &ctx;
+    gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
 
-void GoldenSBETestFixture::tearDown() {
-    gctx->verifyOutput();
-    gctx.reset();
+    if (_debug) {
+        try {
+            Test::run();
+        } catch (::mongo::unittest::TestAssertionFailureException&) {
+            std::cout << "== Golden test failed before output comparison. ==" << std::endl;
+            std::cout << "Output so far:" << std::endl << ctx.getOutputString() << std::endl;
+            std::cout.flush();
+            throw;
+        }
+    } else {
+        Test::run();
+    }
+
+    ctx.verifyOutput();
 }
 
 void GoldenSBETestFixture::printVariation(const std::string& name) {

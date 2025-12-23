@@ -33,13 +33,12 @@
 // IWYU pragma: friend "mongo/unittest/.*"
 
 #include "mongo/base/string_data.h"
-#include "mongo/util/modules.h"
 
 namespace mongo::unittest {
 /**
  * Represents data about a single unit test.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT TestInfo {
+class TestInfo {
 public:
     constexpr TestInfo(StringData suiteName,
                        StringData testName,

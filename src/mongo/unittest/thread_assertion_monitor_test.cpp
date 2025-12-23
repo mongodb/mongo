@@ -36,22 +36,12 @@
 
 #include <memory>
 #include <ostream>
-#include <string>
-#include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
 namespace mongo::unittest {
 namespace {
-
-struct FakeAssertionFailedExceptionForTest : std::exception {
-    explicit FakeAssertionFailedExceptionForTest(std::string what) : _what{std::move(what)} {}
-    const char* what() const noexcept override {
-        return _what.c_str();
-    }
-    std::string _what;
-};
 
 TEST(ThreadAssertionMonitor, Trivial) {
     ThreadAssertionMonitor monitor;
@@ -83,15 +73,12 @@ TEST(ThreadAssertionMonitor, WorkerExecOk) {
 
 TEST(ThreadAssertionMonitor, WorkerExecFail) {
     ThreadAssertionMonitor monitor;
-    monitor
-        .spawnController([&] {
-            monitor.spawn([&] { throw FakeAssertionFailedExceptionForTest{"Oops"}; }).join();
-        })
+    monitor.spawnController([&] { monitor.spawn([&] { ASSERT_EQ(1, 2) << "Oops"; }).join(); })
         .join();
     try {
         monitor.wait();
         FAIL("Expected monitor.wait() to throw");
-    } catch (const FakeAssertionFailedExceptionForTest& ex) {
+    } catch (const TestAssertionFailureException& ex) {
         ASSERT_STRING_SEARCH_REGEX(ex.what(), "Oops");
     }
     LOGV2_INFO(5182100, "monitor.wait finished");
@@ -107,11 +94,10 @@ TEST(ThreadAssertionMonitor, ThreadAssertionMonitoredTestPassing) {
 
 TEST(ThreadAssertionMonitor, ThreadAssertionMonitoredTestFailing) {
     try {
-        threadAssertionMonitoredTest([](auto& monitor) {
-            monitor.spawn([&] { throw FakeAssertionFailedExceptionForTest{"Oops"}; }).join();
-        });
+        threadAssertionMonitoredTest(
+            [](auto& monitor) { monitor.spawn([&] { ASSERT_EQ(1, 2) << "Oops"; }).join(); });
         FAIL("Expected threadAssertionMonitoredTest to throw");
-    } catch (const FakeAssertionFailedExceptionForTest& ex) {
+    } catch (const TestAssertionFailureException& ex) {
         ASSERT_STRING_SEARCH_REGEX(ex.what(), "Oops");
     }
 }

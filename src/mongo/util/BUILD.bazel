@@ -524,7 +524,7 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "signal_handlers_base",
+    name = "signal_handlers",
     srcs = [
         "signal_handlers.cpp",
     ],
@@ -537,19 +537,9 @@ mongo_cc_library(
         },
     ],
     deps = [
-        ":fail_point",
         "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
-    name = "signal_handlers",
-    srcs = [
-        "signal_handlers_mongod.cpp",
-    ],
-    deps = [
-        "signal_handlers_base",
         "//src/mongo/db:log_process_details",
+        "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
     ],
 )
@@ -819,18 +809,6 @@ mongo_cc_unit_test(
     ],
 )
 
-mongo_cc_library(
-    name = "fail_point",
-    srcs = [
-        "fail_point.cpp",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db:server_parameter",
-    ],
-)
-
 mongo_cc_unit_test(
     name = "util_test",
     srcs = [
@@ -952,7 +930,6 @@ mongo_cc_unit_test(
         "signal_handlers_asynchronous_test.cpp",
         "signal_handlers_synchronous_test.cpp",
     ],
-    provides_main = True,
     tags = ["mongo_unittest_first_group"],
     target_compatible_with = select({
         "@platforms//os:windows": ["@platforms//:incompatible"],
@@ -963,7 +940,6 @@ mongo_cc_unit_test(
         ":version_impl",
         "//src/mongo:base",
         "//src/mongo/db/shard_role:service_context_non_d",
-        "//src/mongo/unittest:signal_test_main",
     ],
 )
 
@@ -1203,15 +1179,11 @@ mongo_cc_unit_test(
     # EXPORT_SYMBOLS=[
     #     "mongo_stacktrace_test_detail_testFunctionWithLinkage",
     # ],
-    provides_main = True,
     tags = [
         "mongo_unittest_eighth_group",
         "server-programmability",
     ],
-    deps = [
-        "stacktrace_test_helpers",
-        "//src/mongo/unittest:signal_test_main",
-    ],
+    deps = ["stacktrace_test_helpers"],
 )
 
 mongo_cc_library(name = "packaged_task")

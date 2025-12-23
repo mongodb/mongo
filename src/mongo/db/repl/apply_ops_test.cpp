@@ -623,7 +623,8 @@ DEATH_TEST_F(ApplyOpsDeathTest, ApplyOpsRidOnNonRridCollection, "11454700") {
 
     auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
     BSONObjBuilder resultBuilder;
-    (void)applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder);
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
+        applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
 }
 
 DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateNoRidOnRridCollection, "11454701") {
@@ -642,7 +643,8 @@ DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateNoRidOnRridCollection, "11454701") {
 
     auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
     BSONObjBuilder resultBuilder;
-    (void)applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder);
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
+        applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
 }
 
 DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateRidOnNonRridCollection, "11454701") {
@@ -659,7 +661,8 @@ DEATH_TEST_F(ApplyOpsDeathTest, SteadyStateRidOnNonRridCollection, "11454701") {
 
     auto applyOpsCmdObj = BSON("applyOps" << BSON_ARRAY(insertOp));
     BSONObjBuilder resultBuilder;
-    (void)applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder);
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
+        applyOps(opCtx.get(), nss.dbName(), applyOpsCmdObj, mode, &resultBuilder));
 }
 
 }  // namespace

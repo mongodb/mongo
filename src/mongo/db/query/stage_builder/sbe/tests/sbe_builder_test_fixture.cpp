@@ -180,7 +180,7 @@ void GoldenSbeStageBuilderTestFixture::runTest(std::unique_ptr<QuerySolutionNode
     ASSERT_EQ(resultAccessors.size(), 1u);
 
     // Print the stage explain output and verify.
-    _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+    _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
     sbe::DebugPrintInfo debugPrintInfo{};
     auto explain = sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
     _gctx->outStream() << (localColl ? replaceUuid(explain, localColl->getCollection().uuid())
@@ -245,7 +245,7 @@ void GoldenSbeExprBuilderTestFixture::runTest(stage_builder::SbExpr sbExpr,
                                               StringData test) {
     auto sbeEExpr = sbExpr.lower(*_state);
     // Print the stage explain output and verify.
-    _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+    _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
     _gctx->outStream() << test << std::endl;
     _gctx->outStream() << sbe::DebugPrinter().print(sbeEExpr->debugPrint());
     _gctx->outStream() << std::endl;

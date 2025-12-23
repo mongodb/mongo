@@ -98,8 +98,8 @@ protected:
 };
 
 TEST_F(SBENumericTest, Compile) {
-    unittest::GoldenTestContext gctx(&goldenTestConfigSbe);
-    gctx.printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+    GoldenTestContext gctx(&goldenTestConfigSbe);
+    gctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
     auto& os = gctx.outStream();
 
     auto expr = test_detail::makeEFromNumber(

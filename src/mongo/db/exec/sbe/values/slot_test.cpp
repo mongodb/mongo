@@ -186,8 +186,6 @@ class BSONObjValueAccessorTest : public SlotTestBase<value::BSONObjValueAccessor
                                  public mongo::unittest::Test {
 public:
     void testGetOwnedBSONObj() {
-        using testing::Eq;
-        using testing::Ne;
         BSONObjBuilder bob;
         bob.append("a", 1);
         BSONObj obj = bob.obj();

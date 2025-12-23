@@ -649,7 +649,7 @@ public:
     void setUp() override {
         GoldenSbeStageBuilderTest::setUp();
         _gctx->validateOnClose(true);
-        _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+        _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
     }
 
     void tearDown() override {

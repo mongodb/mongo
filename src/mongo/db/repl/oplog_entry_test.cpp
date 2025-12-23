@@ -560,7 +560,8 @@ TEST_F(OplogEntryTest, OpTimeBaseNonStrictParsing) {
 
     // OpTimeBase should be successfully created from an OplogEntry, even though it has
     // extraneous fields.
-    (void)OpTimeBase::parse(oplogEntryExtraField, IDLParserContext("OpTimeBase"));
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
+        OpTimeBase::parse(oplogEntryExtraField, IDLParserContext("OpTimeBase")));
 
     // OplogEntryBase should still use strict parsing and throw an error when it has extraneous
     // fields.

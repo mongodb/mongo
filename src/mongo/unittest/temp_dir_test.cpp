@@ -30,7 +30,8 @@
 #include "mongo/unittest/temp_dir.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 #include <fstream>  // IWYU pragma: keep
 

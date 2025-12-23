@@ -35,11 +35,9 @@
 
 namespace MONGO_MOD_PRIVATE mongo {
 namespace key_string_test {
-class KeyStringBuilderTest : public testing::TestWithParam<key_string::Version> {
+class KeyStringBuilderTest : public unittest::Test {
 public:
-    void SetUp() override {
-        version = GetParam();
-    }
+    void run();
 
 protected:
     key_string::Version version;

@@ -32,7 +32,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/util/modules.h"
 #include "mongo/util/optional_util.h"
 
 #include <algorithm>

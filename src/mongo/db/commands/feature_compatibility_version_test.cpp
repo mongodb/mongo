@@ -63,8 +63,7 @@ protected:
     }
 };
 
-using FeatureCompatibilityVersionTestFixtureDeathTest = FeatureCompatibilityVersionTestFixture;
-DEATH_TEST_F(FeatureCompatibilityVersionTestFixtureDeathTest, NotInitialized, "invariant") {
+DEATH_TEST_F(FeatureCompatibilityVersionTestFixture, NotInitialized, "invariant") {
     FeatureCompatibilityVersion::fassertInitializedAfterStartup(operationContext());
 }
 

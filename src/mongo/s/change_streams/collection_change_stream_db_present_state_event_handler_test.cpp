@@ -228,7 +228,7 @@ TEST_F(
 }
 
 DEATH_TEST_REGEX_F(
-    CollectionDbPresentStateEventHandlerFixtureDeathTest,
+    CollectionDbPresentStateEventHandlerFixture,
     Given_NamespacePlacementChangedControlEventWithPlacementInFuture_When_HandleEventIsCalled_Then_Throws,
     "Tripwire assertion.*10917001") {
     Timestamp clusterTime(101, 0);

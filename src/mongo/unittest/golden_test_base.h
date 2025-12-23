@@ -31,7 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/util/modules.h"
+#include "mongo/unittest/test_info.h"
 
 #include <exception>
 #include <functional>
@@ -44,8 +44,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-
-MONGO_MOD_PUBLIC;
 
 namespace mongo::unittest {
 
@@ -143,7 +141,7 @@ private:
  * This reduces the size the side of diffs and reduces chances of conflicts. 3) Includes both input
  * and output. This helps with inspecting the changes, without need to pattern match across files.
  */
-class MONGO_MOD_OPEN GoldenTestContextBase {
+class GoldenTestContextBase {
 public:
     explicit GoldenTestContextBase(
         const GoldenTestConfig* config,

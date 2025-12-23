@@ -176,42 +176,42 @@ TEST(ExtensionStatusTest, extensionStatusInvokeCAndConvertStatusToException_Exte
         kErrorString);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetCode, "10930105") {
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsGetCode, "10930105") {
     StatusHandle status(new ExtensionGenericStatus());
     auto vtable = status->vtable();
     vtable.get_code = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsGetReason, "10930106") {
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsGetReason, "10930106") {
     StatusHandle status(new ExtensionGenericStatus());
     auto vtable = status->vtable();
     vtable.get_reason = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetCode, "11186306") {
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsSetCode, "11186306") {
     StatusHandle status(new ExtensionGenericStatus());
     auto vtable = status->vtable();
     vtable.set_code = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsSetReason, "11186309") {
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsSetReason, "11186309") {
     StatusHandle status(new ExtensionGenericStatus());
     auto vtable = status->vtable();
     vtable.set_reason = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, InvalidExtensionStatusVTableFailsClone, "11186310") {
+DEATH_TEST(ExtensionStatusTest, InvalidExtensionStatusVTableFailsClone, "11186310") {
     StatusHandle status(new ExtensionGenericStatus());
     auto vtable = status->vtable();
     vtable.clone = nullptr;
     StatusAPI::assertVTableConstraints(vtable);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, ExtensionStatusOKSetReasonFails, "11186303") {
+DEATH_TEST(ExtensionStatusTest, ExtensionStatusOKSetReasonFails, "11186303") {
     StatusHandle status(&ExtensionStatusOK::getInstance());
     status->setReason("");
 }
@@ -222,7 +222,7 @@ TEST(ExtensionStatusTest, ExtensionStatusOKSetCodeNoOp) {
     ASSERT_EQ(status->getCode(), 0);
 }
 
-DEATH_TEST(ExtensionStatusTestDeathTest, ExtensionStatusExceptionSetReasonFails, "11186304") {
+DEATH_TEST(ExtensionStatusTest, ExtensionStatusExceptionSetReasonFails, "11186304") {
     StatusHandle status(wrapCXXAndConvertExceptionToStatus(
         [&]() { uasserted(11186311, "Failed with uassert in $noOpExtension parse."); }));
     status->setReason("");

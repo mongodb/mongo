@@ -54,7 +54,6 @@
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/unittest/unittest_main_core.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/periodic_runner.h"
@@ -72,21 +71,12 @@
 namespace mongo {
 namespace dbtests {
 
-unittest::MainProgress initializeDbTests(std::vector<std::string> argVec) {
-    unittest::MainProgress progress(
-        {
-            .suppressGlobalInitializers = true,
-            .testSuites = frameworkGlobalParams.suites,
-            .runsPerTest = frameworkGlobalParams.runsPerTest,
-        },
-        std::move(argVec));
-    progress.initialize();
-    if (auto ec = progress.parseAndAcceptOptions())
-        std::quick_exit(static_cast<int>(*ec));
-    return progress;
-}
+int runDbTests(int argc, char** argv) {
+    if (frameworkGlobalParams.suites.empty()) {
+        LOGV2_ERROR(5733802, "The [suite] argument is required for dbtest and not specified here.");
+        return static_cast<int>(ExitCode::fail);
+    }
 
-int runDbTests(unittest::MainProgress& progress) {
     frameworkGlobalParams.perfHist = 1;
     frameworkGlobalParams.seed = time(nullptr);
     frameworkGlobalParams.runsPerTest = 1;
@@ -134,7 +124,10 @@ int runDbTests(unittest::MainProgress& progress) {
     DatabaseShardingStateFactory::set(serviceContext,
                                       std::make_unique<DatabaseShardingStateFactoryShard>());
 
-    int ret = progress.test();
+    int ret = unittest::Suite::run(frameworkGlobalParams.suites,
+                                   frameworkGlobalParams.filter,
+                                   "",
+                                   frameworkGlobalParams.runsPerTest);
 
     // So everything shuts down cleanly
     CollectionShardingStateFactory::clear(serviceContext);

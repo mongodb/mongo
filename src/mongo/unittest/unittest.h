@@ -44,6 +44,6 @@
 #pragma once
 
 #include "mongo/unittest/assert.h"       // IWYU pragma: export
+#include "mongo/unittest/assert_that.h"  // IWYU pragma: export
 #include "mongo/unittest/framework.h"    // IWYU pragma: export
 #include "mongo/unittest/log_capture.h"  // IWYU pragma: export
-#include "mongo/unittest/matcher.h"      // IWYU pragma: export

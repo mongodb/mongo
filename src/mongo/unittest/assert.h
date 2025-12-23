@@ -61,30 +61,35 @@
 #include <utility>
 #include <vector>
 
-#include <boost/exception/diagnostic_information.hpp>
 #include <fmt/format.h>
 
 /**
  * Fail unconditionally, reporting the given message.
  */
-#define FAIL(msg) GTEST_FAIL() << (msg)
+#define FAIL(MESSAGE) ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, MESSAGE).stream()
 
 /**
  * Fails unless "EXPRESSION" is true.
  */
+#define ASSERT_TRUE(EXPRESSION) \
+    if (EXPRESSION) {           \
+    } else                      \
+        FAIL("Expected: " #EXPRESSION)
+
 #define ASSERT(EXPRESSION) ASSERT_TRUE(EXPRESSION)
 
 /**
+ * Fails if "EXPRESSION" is true.
+ */
+#define ASSERT_FALSE(EXPRESSION) ASSERT(!(EXPRESSION))
+
+/**
  * Asserts that a Status code is OK.
- * TODO(gtest): Try expressing as `ASSERT_THAT(EXRESSION, IsOk())` which should accept Status and
- * StatusWith (and maybe ErrorCode).
  */
 #define ASSERT_OK(EXPRESSION) ASSERT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
 
 /**
  * Asserts that a status code is anything but OK.
- * TODO(gtest) Try expressing as `ASSERT_THAT(EXRESSION, Not(IsOk()))` which should accept Status
- * and StatusWith (and maybe ErrorCode).
  */
 #define ASSERT_NOT_OK(EXPRESSION) ASSERT_NOT_EQUALS(::mongo::Status::OK(), (EXPRESSION))
 
@@ -100,14 +105,31 @@
 #define ASSERT_LESS_THAN_OR_EQUALS(a, b) ASSERT_LTE(a, b)
 #define ASSERT_GREATER_THAN_OR_EQUALS(a, b) ASSERT_GTE(a, b)
 
-#define ASSERT_LTE(a, b) ASSERT_LE(a, b)
-#define ASSERT_GTE(a, b) ASSERT_GE(a, b)
+#define ASSERT_EQ(a, b) ASSERT_COMPARISON_(kEq, a, b)
+#define ASSERT_NE(a, b) ASSERT_COMPARISON_(kNe, a, b)
+#define ASSERT_LT(a, b) ASSERT_COMPARISON_(kLt, a, b)
+#define ASSERT_LTE(a, b) ASSERT_COMPARISON_(kLe, a, b)
+#define ASSERT_GT(a, b) ASSERT_COMPARISON_(kGt, a, b)
+#define ASSERT_GTE(a, b) ASSERT_COMPARISON_(kGe, a, b)
+
+/**
+ * Binary comparison utility macro. Do not use directly.
+ */
+#define ASSERT_COMPARISON_(OP, a, b) ASSERT_COMPARISON_STR_(OP, a, b, #a, #b)
+
+#define ASSERT_COMPARISON_STR_(OP, a, b, aExpr, bExpr)                                         \
+    if (auto ca =                                                                              \
+            ::mongo::unittest::ComparisonAssertion<::mongo::unittest::ComparisonOp::OP>::make( \
+                __FILE__, __LINE__, aExpr, bExpr, a, b);                                       \
+        !ca) {                                                                                 \
+    } else                                                                                     \
+        ca.failure().stream()
 
 /**
  * Approximate equality assertion. Useful for comparisons on limited precision floating point
  * values.
  */
-#define ASSERT_APPROX_EQUAL(a, b, ABSOLUTE_ERR) ASSERT_NEAR(a, b, ABSOLUTE_ERR)
+#define ASSERT_APPROX_EQUAL(a, b, ABSOLUTE_ERR) ASSERT_LTE(std::abs((a) - (b)), ABSOLUTE_ERR)
 
 /**
  * Verify that the evaluation of "EXPRESSION" throws an exception of type EXCEPTION_TYPE.
@@ -116,7 +138,8 @@
  * of a subtype of "EXCEPTION_TYPE", the test is considered a failure and further evaluation
  * halts.
  */
-#define ASSERT_THROWS(EXPRESSION, TYPE) ASSERT_THROW((void)(EXPRESSION), TYPE)
+#define ASSERT_THROWS(EXPRESSION, EXCEPTION_TYPE) \
+    ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, ([](const EXCEPTION_TYPE&) {}))
 
 /**
  * Verify that the evaluation of "EXPRESSION" does not throw any exceptions.
@@ -124,26 +147,33 @@
  * If "EXPRESSION" throws an exception the test is considered a failure and further evaluation
  * halts.
  */
-#define ASSERT_DOES_NOT_THROW(EXPRESSION) ASSERT_NO_THROW(EXPRESSION)
+#define ASSERT_DOES_NOT_THROW(EXPRESSION)                          \
+    try {                                                          \
+        EXPRESSION;                                                \
+    } catch (const AssertionException& e) {                        \
+        str::stream err;                                           \
+        err << "Threw an exception incorrectly: " << e.toString(); \
+        FAIL(err);                                                 \
+    }
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling what() on the thrown exception
  * does not return a string equal to EXPECTED_WHAT.
- * TODO(gtest) Consider using ASSERT_THROWS_WITH_CHECK(...) but with gtest output formatting.
  */
-#define ASSERT_THROWS_WHAT(EXPRESSION, EXCEPTION_TYPE, EXPECTED_WHAT) \
-    ASSERT_THAT([&] { (void)(EXPRESSION); },                          \
-                ::testing::Throws<EXCEPTION_TYPE>(                    \
-                    ::testing::Property(&EXCEPTION_TYPE::what, ::testing::StrEq(EXPECTED_WHAT))))
+#define ASSERT_THROWS_WHAT(EXPRESSION, EXCEPTION_TYPE, EXPECTED_WHAT)                     \
+    ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
+                                 ASSERT_EQ(::mongo::StringData(ex.what()),                \
+                                           ::mongo::StringData(EXPECTED_WHAT));           \
+                             }))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
  * does not return an error code equal to EXPECTED_CODE.
  */
-#define ASSERT_THROWS_CODE(EXPRESSION, EXCEPTION_TYPE, EXPECTED_CODE) \
-    ASSERT_THAT([&] { (void)(EXPRESSION); },                          \
-                ::testing::Throws<EXCEPTION_TYPE>(                    \
-                    ::testing::Property(&EXCEPTION_TYPE::code, EXPECTED_CODE)))
+#define ASSERT_THROWS_CODE(EXPRESSION, EXCEPTION_TYPE, EXPECTED_CODE)                     \
+    ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) { \
+                                 ASSERT_EQ(ex.toStatus().code(), EXPECTED_CODE);          \
+                             }))
 
 /**
  * Behaves like ASSERT_THROWS, above, but also fails if calling getCode() on the thrown exception
@@ -151,10 +181,11 @@
  * does not return a string equal to EXPECTED_WHAT.
  */
 #define ASSERT_THROWS_CODE_AND_WHAT(EXPRESSION, EXCEPTION_TYPE, EXPECTED_CODE, EXPECTED_WHAT) \
-    ASSERT_THAT([&] { (void)(EXPRESSION); },                                                  \
-                ::testing::Throws<EXCEPTION_TYPE>(::testing::AllOf(                           \
-                    ::testing::Property(&EXCEPTION_TYPE::code, EXPECTED_CODE),                \
-                    ::testing::Property(&EXCEPTION_TYPE::what, ::testing::StrEq(EXPECTED_WHAT)))))
+    ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, ([&](const EXCEPTION_TYPE& ex) {     \
+                                 ASSERT_EQ(ex.toStatus().code(), EXPECTED_CODE);              \
+                                 ASSERT_EQ(::mongo::StringData(ex.what()),                    \
+                                           ::mongo::StringData(EXPECTED_WHAT));               \
+                             }))
 
 
 /**
@@ -190,20 +221,32 @@
                   "Expression '" ExprString "' [with " AliasString "] shouldn't compile.");
 
 /**
+ * This internal helper is used to ignore warnings about unused results.  Some unit tests which test
+ * `ASSERT_THROWS` and its variations are used on functions which both throw and return `Status` or
+ * `StatusWith` objects.  Although such function designs are undesirable, they do exist, presently.
+ * Therefore this internal helper macro is used by `ASSERT_THROWS` and its variations to silence
+ * such warnings without forcing the caller to invoke `.ignore()` on the called function.
+ *
+ * NOTE: This macro should NOT be used inside regular unit test code to ignore unchecked `Status` or
+ * `StatusWith` instances -- if a `Status` or `StatusWith` result is to be ignored, please use the
+ * normal `.ignore()` code.  This macro exists only to make using `ASSERT_THROWS` less inconvenient
+ * on functions which both throw and return `Status` or `StatusWith`.
+ */
+#define UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(EXPRESSION) \
+    do {                                                              \
+        (void)(EXPRESSION);                                           \
+    } while (false)
+
+/**
  * Behaves like ASSERT_THROWS, above, but also calls CHECK(caughtException) which may contain
  * additional assertions.
  */
 #define ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, CHECK)                \
     if ([&] {                                                                      \
             try {                                                                  \
-                (void)(EXPRESSION);                                                \
+                UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(EXPRESSION);     \
                 return false;                                                      \
             } catch (const EXCEPTION_TYPE& ex) {                                   \
-                SCOPED_TRACE(                                                      \
-                    fmt::format("\n  expression: {}"                               \
-                                "\n  exception: {}",                               \
-                                #EXPRESSION,                                       \
-                                ::mongo::unittest::describeException(ex)));        \
                 CHECK(ex);                                                         \
                 return true;                                                       \
             }                                                                      \
@@ -215,27 +258,269 @@
         FAIL("Expected expression " #EXPRESSION " to throw " #EXCEPTION_TYPE       \
              " but it threw nothing.")
 
-#define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS) \
-    ASSERT_THAT(BIG_STRING, ::testing::HasSubstr(CONTAINS))
+#define ASSERT_STRING_CONTAINS(BIG_STRING, CONTAINS)                                           \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(CONTAINS));                \
+        std::get<0>(tup_).find(std::get<1>(tup_)) != std::string::npos) {                      \
+    } else                                                                                     \
+        FAIL(([&] {                                                                            \
+            const auto& [haystack, sub] = tup_;                                                \
+            return fmt::format(                                                                \
+                "Expected to find {} ({}) in {} ({})", #CONTAINS, sub, #BIG_STRING, haystack); \
+        }()))
 
-#define ASSERT_STRING_OMITS(BIG_STRING, CONTAINS) \
-    ASSERT_THAT(BIG_STRING, ::testing::Not(::testing::HasSubstr(CONTAINS)))
+#define ASSERT_STRING_OMITS(BIG_STRING, OMITS)                               \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), std::string(OMITS)); \
+        std::get<0>(tup_).find(std::get<1>(tup_)) == std::string::npos) {    \
+    } else                                                                   \
+        FAIL(([&] {                                                          \
+            const auto& [haystack, omits] = tup_;                            \
+            return fmt::format("Did not expect to find {} ({}) in {} ({})",  \
+                               #OMITS,                                       \
+                               omits,                                        \
+                               #BIG_STRING,                                  \
+                               haystack);                                    \
+        }()))
 
-/** TODO(gtest) Consider using a PCRE2 matcher to better match existing behavior. */
-#define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX) \
-    ASSERT_THAT(BIG_STRING, ::testing::ContainsRegex(REGEX))
+#define ASSERT_STRING_SEARCH_REGEX(BIG_STRING, REGEX)                                        \
+    if (auto tup_ = std::tuple(std::string(BIG_STRING), mongo::pcre::Regex(REGEX));          \
+        ::mongo::unittest::searchRegex(std::get<1>(tup_), std::get<0>(tup_))) {              \
+    } else                                                                                   \
+        FAIL(([&] {                                                                          \
+            const auto& [haystack, regex] = tup_;                                            \
+            std::string sub(REGEX);                                                          \
+            if (regex)                                                                       \
+                return fmt::format("Expected to find regular expression {} /{}/ in {} ({})", \
+                                   #REGEX,                                                   \
+                                   sub,                                                      \
+                                   #BIG_STRING,                                              \
+                                   haystack);                                                \
+            else                                                                             \
+                return fmt::format("Invalid regular expression: {} /{}/", #REGEX, sub);      \
+        }()))
 
 namespace mongo::unittest {
 
-template <typename Ex>
-std::string describeException(const Ex& ex) {
-    if constexpr (std::is_base_of_v<DBException, Ex>) {
-        return ex.toString();
-    } else if constexpr (std::is_base_of_v<boost::exception, Ex> ||
-                         std::is_base_of_v<std::exception, Ex>) {
-        return boost::diagnostic_information(ex, true);
+bool searchRegex(const pcre::Regex& pattern, const std::string& string);
+
+class Result;
+
+/**
+ * Exception thrown when a test assertion fails.
+ *
+ * Typically thrown by helpers in the TestAssertion class and its ilk, below.
+ *
+ * NOTE(schwerin): This intentionally does _not_ extend std::exception, so that code under
+ * test that (foolishly?) catches std::exception won't swallow test failures.  Doesn't
+ * protect you from code that foolishly catches ..., but you do what you can.
+ */
+class TestAssertionFailureException {
+public:
+    TestAssertionFailureException(std::string file, unsigned line, std::string message);
+
+    const std::string& getFile() const {
+        return _file;
     }
-}
+    unsigned getLine() const {
+        return _line;
+    }
+    const std::string& getMessage() const {
+        return _message;
+    }
+    void setMessage(const std::string& message) {
+        _message = message;
+    }
+
+    const std::string& what() const {
+        return getMessage();
+    }
+
+    std::string toString() const;
+
+    const std::string& getStacktrace() const {
+        return _stacktrace;
+    }
+
+private:
+    std::string _file;
+    unsigned _line;
+    std::string _message;
+    std::string _stacktrace;
+};
+
+class TestAssertionFailure {
+public:
+    TestAssertionFailure(const std::string& file, unsigned line, const std::string& message);
+    TestAssertionFailure(const TestAssertionFailure& other);
+    ~TestAssertionFailure() noexcept(false);
+
+    TestAssertionFailure& operator=(const TestAssertionFailure& other);
+
+    std::ostream& stream();
+
+private:
+    TestAssertionFailureException _exception;
+    std::ostringstream _stream;
+    bool _enabled;
+};
+
+enum class ComparisonOp { kEq, kNe, kLt, kLe, kGt, kGe };
+
+template <ComparisonOp op>
+class ComparisonAssertion {
+private:
+    static constexpr auto comparator() {
+        if constexpr (op == ComparisonOp::kEq) {
+            return std::equal_to<>{};
+        } else if constexpr (op == ComparisonOp::kNe) {
+            return std::not_equal_to<>{};
+        } else if constexpr (op == ComparisonOp::kLt) {
+            return std::less<>{};
+        } else if constexpr (op == ComparisonOp::kLe) {
+            return std::less_equal<>{};
+        } else if constexpr (op == ComparisonOp::kGt) {
+            return std::greater<>{};
+        } else if constexpr (op == ComparisonOp::kGe) {
+            return std::greater_equal<>{};
+        }
+    }
+
+    static constexpr StringData name() {
+        if constexpr (op == ComparisonOp::kEq) {
+            return "=="_sd;
+        } else if constexpr (op == ComparisonOp::kNe) {
+            return "!="_sd;
+        } else if constexpr (op == ComparisonOp::kLt) {
+            return "<"_sd;
+        } else if constexpr (op == ComparisonOp::kLe) {
+            return "<="_sd;
+        } else if constexpr (op == ComparisonOp::kGt) {
+            return ">"_sd;
+        } else if constexpr (op == ComparisonOp::kGe) {
+            return ">="_sd;
+        }
+    }
+
+    template <typename A, typename B>
+    MONGO_COMPILER_NOINLINE ComparisonAssertion(const char* theFile,
+                                                unsigned theLine,
+                                                StringData aExpression,
+                                                StringData bExpression,
+                                                const A& a,
+                                                const B& b) {
+        if (comparator()(a, b)) {
+            return;
+        }
+        _assertion =
+            std::make_unique<TestAssertionFailure>(theFile,
+                                                   theLine,
+                                                   fmt::format("Expected {1} {0} {2} ({3} {0} {4})",
+                                                               name(),
+                                                               aExpression,
+                                                               bExpression,
+                                                               stringify::invoke(a),
+                                                               stringify::invoke(b)));
+    }
+
+public:
+    // Use a single implementation (identical to the templated one) for all string-like types.
+    // This is particularly important to avoid making unique instantiations for each length of
+    // string literal.
+    static ComparisonAssertion make(const char* theFile,
+                                    unsigned theLine,
+                                    StringData aExpression,
+                                    StringData bExpression,
+                                    StringData a,
+                                    StringData b);
+
+    // Use a single implementation (identical to the templated one) for all pointer and array types.
+    // Note: this is selected instead of the StringData overload for char* and string literals
+    // because they are supposed to compare pointers, not contents.
+    static ComparisonAssertion make(const char* theFile,
+                                    unsigned theLine,
+                                    StringData aExpression,
+                                    StringData bExpression,
+                                    const void* a,
+                                    const void* b);
+
+    template <typename A, typename B>
+    requires(                                                                               //
+        !(std::is_convertible_v<A, StringData> && std::is_convertible_v<B, StringData>) &&  //
+        !(std::is_pointer_v<A> && std::is_pointer_v<B>) &&                                  //
+        !(std::is_array_v<A> && std::is_array_v<B>))                                        //
+    static ComparisonAssertion make(const char* theFile,
+                                    unsigned theLine,
+                                    StringData aExpression,
+                                    StringData bExpression,
+                                    const A& a,
+                                    const B& b) {
+        return ComparisonAssertion(theFile, theLine, aExpression, bExpression, a, b);
+    }
+
+    explicit operator bool() const {
+        return static_cast<bool>(_assertion);
+    }
+    TestAssertionFailure failure() {
+        return *_assertion;
+    }
+
+private:
+    std::unique_ptr<TestAssertionFailure> _assertion;
+};
+
+// Explicit instantiation of ComparisonAssertion ctor and factory, for "A OP B".
+#define TEMPLATE_COMPARISON_ASSERTION_CTOR_A_OP_B(EXTERN, OP, A, B)             \
+    EXTERN template ComparisonAssertion<ComparisonOp::OP>::ComparisonAssertion( \
+        const char*, unsigned, StringData, StringData, const A&, const B&);     \
+    EXTERN template ComparisonAssertion<ComparisonOp::OP>                       \
+    ComparisonAssertion<ComparisonOp::OP>::make(                                \
+        const char*, unsigned, StringData, StringData, const A&, const B&);
+
+// Explicit instantiation of ComparisonAssertion ctor and factory for a pair of types.
+#define TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(EXTERN, OP, A, B) \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_A_OP_B(EXTERN, OP, A, B)        \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_A_OP_B(EXTERN, OP, B, A)
+
+// Explicit instantiation of ComparisonAssertion ctor and factory for a single type.
+#define TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(EXTERN, OP, T) \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_A_OP_B(EXTERN, OP, T, T)
+
+// Call with `extern` to declace extern instantiations, and with no args to explicitly instantiate.
+#define INSTANTIATE_COMPARISON_ASSERTION_CTORS(...)                                             \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kEq>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kNe>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kGt>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kGe>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kLt>;                          \
+    __VA_ARGS__ template class ComparisonAssertion<ComparisonOp::kLe>;                          \
+                                                                                                \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, int)                         \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, long)                        \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, long long)                   \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, unsigned int)                \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, unsigned long)               \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, unsigned long long)          \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, bool)                        \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, double)                      \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, OID)                         \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, BSONType)                    \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, Timestamp)                   \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, Date_t)                      \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, Status)                      \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kEq, ErrorCodes::Error)           \
+                                                                                                \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, int, long)                   \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, int, long long)              \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, long, long long)             \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, unsigned int, unsigned long) \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, Status, ErrorCodes::Error)   \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_SYMMETRIC(__VA_ARGS__, kEq, ErrorCodes::Error, int)      \
+                                                                                                \
+    /* These are the only types that are often used with ASSERT_NE*/                            \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kNe, Status)                      \
+    TEMPLATE_COMPARISON_ASSERTION_CTOR_REFLEXIVE(__VA_ARGS__, kNe, unsigned long)
+
+// Declare that these definitions will be provided in unittest.cpp.
+INSTANTIATE_COMPARISON_ASSERTION_CTORS(extern);
 
 /**
  * Get the value out of a StatusWith<T>, or throw an exception if it is not OK.

@@ -626,9 +626,9 @@ DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
 // logging, we only surface the original tassert.
 DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  TassertAndTassertDuringLogging,
-                 "(?s)tasserting in test"
-                 ".*tasserting in mock printer"
-                 ".*ScopedDebugInfo failed.*9513401") {
+                 "(?s)tasserting in test.*BACKTRACE"
+                 ".*tasserting in mock printer.*BACKTRACE"
+                 ".*ScopedDebugInfo failed.*test.*9513401") {
     ScopedDebugInfo guardTasserts("test", PrinterMockTassert());
     tasserted(9513403, "tasserting in test");
 }
@@ -636,8 +636,8 @@ DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
 // Same as above, but with `uassert` instead of `tassert`.
 DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  TassertAndUassertDuringLogging,
-                 "(?s)tasserting in test"
-                 ".*ScopedDebugInfo failed.*9513402") {
+                 "(?s)tasserting in test.*BACKTRACE"
+                 ".*ScopedDebugInfo failed.*test.*9513402") {
     ScopedDebugInfo guardUasserts("test", PrinterMockUassert());
     tasserted(9513404, "tasserting in test");
 }
@@ -671,18 +671,14 @@ DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
 
 // Tests the functionality of the `signalHandlerUsesDiagnosticLogging` knob.
 // Note the regex here uses the negative lookahead operator `(?!)` in order to ensure that the
-// keyword is not found within the logs. The syntax here means: we want to match the start of
-// the string unless something after the start of the string contains the keyword.
+// string `hello` is not found within the logs. The syntax here means: we want to match the start of
+// the string unless something after the start of the string contains `hello`.
 DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  InvariantWhenSignalHandlerLoggingDisabled,
-                 "(?s)^(?!.*h"
-                 "ello)") {
+                 "(?s)^(?!.*hello)") {
     RAIIServerParameterControllerForTest knobController("signalHandlerUsesDiagnosticLogging",
                                                         false);
-    // The literal is split so it doesn't appear verbatim in stacktrace code snippet.
-    ScopedDebugInfo guard("test",
-                          "h"
-                          "ello");
+    ScopedDebugInfo guard("test", "hello");
     someRiskyBusiness();
 }
 
@@ -711,18 +707,14 @@ DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
 // Tests the functionality of the `signalHandlerUsesDiagnosticLogging` knob with a signal
 // raised.
 // Note the regex here uses the negative lookahead operator `(?!)` in order to ensure that the
-// keyword is not found within the logs. The syntax here means: we want to match the start of
-// the string unless something after the start of the string contains the keyword.
+// string `hello` is not found within the logs. The syntax here means: we want to match the start of
+// the string unless something after the start of the string contains `hello`.
 DEATH_TEST_REGEX(ScopedDebugInfoDeathTest,
                  SignalWhenSignalHandlerLoggingDisabled,
-                 "(?s)^(?!.*h"
-                 "ello)") {
+                 "(?s)^(?!.*hello)") {
     RAIIServerParameterControllerForTest knobController("signalHandlerUsesDiagnosticLogging",
                                                         false);
-    // The literal is split so it doesn't appear verbatim in stacktrace code snippet.
-    ScopedDebugInfo guard("test",
-                          "h"
-                          "ello");
+    ScopedDebugInfo guard("test", "hello");
     raise(SIGSEGV);
 }
 #endif

@@ -46,16 +46,44 @@ namespace {
 namespace m = unittest::match;
 
 /** Match that `x` converts to `true` and that `*x` matches `m`. */
-MATCHER_P(WhenDereferenced, m, "") {
-    if (!arg)
-        return false;
-    return ExplainMatchResult(m, *arg, result_listener);
-}
+template <typename M>
+class WhenDereferenced : public m::Matcher {
+public:
+    explicit WhenDereferenced(M&& m) : _m{std::move(m)} {}
+
+    std::string describe() const {
+        return fmt::format("WhenDereferenced({})", _m.describe());
+    }
+
+    template <typename X>
+    m::MatchResult match(const X& x) const {
+        if (!x)
+            return {false, "converts to a false bool value"};
+        return _m.match(*x);
+    }
+
+private:
+    M _m;
+};
 
 /** Match that `static_cast<bool>(x)` matches `m`. */
-MATCHER_P(WhenBool, m, "") {
-    return ExplainMatchResult(m, static_cast<bool>(arg), result_listener);
-}
+template <typename M>
+class WhenBool : public m::Matcher {
+public:
+    explicit WhenBool(M&& m) : _m{std::move(m)} {}
+
+    std::string describe() const {
+        return fmt::format("WhenBool({})", _m.describe());
+    }
+
+    template <typename X>
+    m::MatchResult match(const X& x) const {
+        return _m.match(static_cast<bool>(x));
+    }
+
+private:
+    M _m;
+};
 
 enum class SomeTimeSplitId : size_t {
     a,

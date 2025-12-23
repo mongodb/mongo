@@ -40,7 +40,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/modules.h"
 
 #include <barrier>  // NOLINT
 #include <memory>
@@ -52,7 +51,6 @@
 
 namespace mongo::unittest {
 
-namespace detail {
 /**
  * An RAII type that tracks the number of instructions and CPU cycles.
  */
@@ -229,12 +227,10 @@ private:
     BenchmarkBarrier _barrier;
 };
 
-}  // namespace detail
-
-class MONGO_MOD_OPEN BenchmarkWithProfiler : public detail::ThreadBenchmarkFixture {
+class BenchmarkWithProfiler : public ThreadBenchmarkFixture {
 public:
     void setUpSharedResources(benchmark::State& state) override {
-        detail::ThreadBenchmarkFixture::setUpSharedResources(state);
+        ThreadBenchmarkFixture::setUpSharedResources(state);
         auto& settings = logv2::LogManager::global().getGlobalSettings();
         for (size_t i = 0; i < logv2::LogComponent::kNumLogComponents; ++i) {
             settings.setMinimumLoggedSeverity(
@@ -245,7 +241,7 @@ public:
 
     template <typename BenchmarkFunc>
     void runBenchmarkWithProfiler(const BenchmarkFunc& benchmarkFunc, benchmark::State& state) {
-        detail::BenchmarkProfiler bp;
+        BenchmarkProfiler bp;
         for (auto _ : state) {
             benchmarkFunc();
         }

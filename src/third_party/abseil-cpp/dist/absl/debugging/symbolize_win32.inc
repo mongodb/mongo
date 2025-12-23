@@ -42,17 +42,7 @@ void InitializeSymbolizer(const char*) {
   if (process != nullptr) {
     return;
   }
-  HANDLE currentProcess = GetCurrentProcess();
-  if (!DuplicateHandle(currentProcess,
-                       currentProcess,
-                       currentProcess,
-                       &process,
-                       0,
-                       FALSE,
-                       DUPLICATE_SAME_ACCESS)) {
-    const unsigned long long error{GetLastError()};
-    ABSL_RAW_LOG(FATAL, "SymInitialize() failed: %llu", error);
-  }
+  process = GetCurrentProcess();
 
   // Symbols are not loaded until a reference is made requiring the
   // symbols be loaded. This is the fastest, most efficient way to use

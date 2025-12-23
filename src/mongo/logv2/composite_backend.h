@@ -43,7 +43,7 @@
 namespace mongo::logv2 {
 
 template <typename... Backend>
-class MONGO_MOD_NEEDS_REPLACEMENT CompositeBackend
+class CompositeBackend
     : public boost::log::sinks::basic_formatted_sink_backend<
           char,
           boost::log::sinks::combine_requirements<boost::log::sinks::concurrent_feeding,

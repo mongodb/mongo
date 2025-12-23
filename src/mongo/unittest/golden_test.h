@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/unittest/test_info.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/modules.h"
 
 #include <functional>
 #include <string>
@@ -45,7 +45,7 @@ namespace mongo::unittest {
 
 namespace fs = ::boost::filesystem;
 
-class MONGO_MOD_PUBLIC GoldenTestContext : public GoldenTestContextBase {
+class GoldenTestContext : public GoldenTestContextBase {
 public:
     /** Format of the test header*/
     enum HeaderFormat {
@@ -55,13 +55,14 @@ public:
 
     explicit GoldenTestContext(
         const GoldenTestConfig* config,
-        const testing::TestInfo* testInfo = testing::UnitTest::GetInstance()->current_test_info(),
+        const TestInfo* testInfo = UnitTest::getInstance()->currentTestInfo(),
         bool validateOnClose = true)
-        : GoldenTestContextBase(config,
-                                fs::path(sanitizeName(std::string{testInfo->test_suite_name()})) /
-                                    fs::path(sanitizeName(std::string{testInfo->name()}) + ".txt"),
-                                validateOnClose,
-                                [this](auto const&... args) { return onError(args...); }),
+        : GoldenTestContextBase(
+              config,
+              fs::path(sanitizeName(std::string{testInfo->suiteName()})) /
+                  fs::path(sanitizeName(std::string{testInfo->testName()}) + ".txt"),
+              validateOnClose,
+              [this](auto const&... args) { return onError(args...); }),
           _testInfo(testInfo) {}
 
     /**
@@ -78,7 +79,7 @@ protected:
                  const boost::optional<std::string>& expectedStr);
 
 private:
-    const testing::TestInfo* _testInfo;
+    const TestInfo* _testInfo;
 };
 
 }  // namespace mongo::unittest

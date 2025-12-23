@@ -29,12 +29,9 @@
 
 #pragma once
 
-#include "mongo/util/modules.h"
-
 #include <string>
 #include <utility>
 
-MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace unittest {

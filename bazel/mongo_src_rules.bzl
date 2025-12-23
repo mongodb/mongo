@@ -926,7 +926,6 @@ def mongo_cc_test(
             # We can remove this once we are on bazel 9 because it has removed the
             # logic that looks for this var always behaves as if it is set.
             "EXPERIMENTAL_SPLIT_XML_GENERATION": "1",
-            "GTEST_OUTPUT": "",
         } | select({
             "//bazel/config:dev_stacktrace_enabled": {
                 # Forcing bazel's test environment setup script to run from the
@@ -958,12 +957,12 @@ def mongo_cc_unit_test(
         additional_linker_inputs = [],
         features = [],
         exec_properties = {},
-        provides_main = False,
+        has_custom_mainline = False,
         **kwargs):
     mongo_cc_test(
         name = name,
         srcs = srcs,
-        deps = deps + ([] if provides_main else ["//src/mongo/unittest:unittest_main"]),
+        deps = deps + ([] if has_custom_mainline else ["//src/mongo/unittest:unittest_main"]),
         private_hdrs = private_hdrs,
         visibility = visibility,
         data = data,
@@ -1343,12 +1342,12 @@ def mongo_cc_benchmark(
         additional_linker_inputs = [],
         features = [],
         exec_properties = {},
-        provides_main = False,
+        has_custom_mainline = False,
         **kwargs):
     mongo_cc_test(
         name = name,
         srcs = srcs,
-        deps = deps + ([] if provides_main else ["//src/mongo/unittest:benchmark_main"]),
+        deps = deps + ([] if has_custom_mainline else ["//src/mongo/unittest:benchmark_main"]),
         private_hdrs = private_hdrs,
         visibility = visibility,
         data = data,
@@ -1384,12 +1383,12 @@ def mongo_cc_integration_test(
         additional_linker_inputs = [],
         features = [],
         exec_properties = {},
-        provides_main = False,
+        has_custom_mainline = False,
         **kwargs):
     mongo_cc_test(
         name = name,
         srcs = srcs,
-        deps = deps + ([] if provides_main else ["//src/mongo/unittest:integration_test_main"]),
+        deps = deps + ([] if has_custom_mainline else ["//src/mongo/unittest:integration_test_main"]),
         private_hdrs = private_hdrs,
         visibility = visibility,
         data = data,
@@ -1425,7 +1424,7 @@ def mongo_cc_fuzzer_test(
         additional_linker_inputs = [],
         features = [],
         exec_properties = {},
-        provides_main = False,
+        has_custom_mainline = False,
         **kwargs):
     mongo_cc_test(
         name = name,

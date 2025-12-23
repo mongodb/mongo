@@ -35,9 +35,11 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/log_process_details.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_util.h"
-#include "mongo/platform/process_id.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
@@ -84,9 +86,6 @@ MONGO_FAIL_POINT_DEFINE(enableSignalTesting);
  */
 
 namespace {
-
-std::function<void()> gSignalPostProcessingCb_forTest;
-std::function<void(LogRotationState*)> gLogRotationCb;
 
 #ifdef _WIN32
 void consoleTerminate(const char* controlCodeName) {
@@ -160,10 +159,6 @@ void eventProcessingThread() {
 
     setThreadName("eventTerminate");
 
-    if (gSignalPostProcessingCb_forTest) {
-        gSignalPostProcessingCb_forTest();
-    }
-
     LOGV2(23376, "shutdown event signaled, will terminate after current cmd ends");
     exitCleanly(ExitCode::clean);
 }
@@ -209,6 +204,12 @@ bool waitForSignal(const sigset_t& sigset, SignalWaitResult* result) {
 
 const int kSignalProcessingThreadExclusives[] = {SIGHUP, SIGINT, SIGTERM, SIGUSR1, SIGXCPU};
 
+struct LogRotationState {
+    static constexpr auto kNever = static_cast<time_t>(-1);
+    LogFileStatus logFileStatus;
+    time_t previous;
+};
+
 void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation) {
     int sig = waited.sig;
     LOGV2(23377, "Received signal", "signal"_attr = sig, "error"_attr = strsignal(sig));
@@ -233,8 +234,20 @@ void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation)
 
     if (sig == SIGUSR1) {
         // log rotate signal
-        if (gLogRotationCb) {
-            gLogRotationCb(rotation);
+        {
+            // Rate limit: 1 second per signal
+            auto now = time(nullptr);
+            if (rotation->previous != rotation->kNever && difftime(now, rotation->previous) <= 1.0)
+                return;
+            rotation->previous = now;
+        }
+
+        if (auto status = logv2::rotateLogs(serverGlobalParams.logRenameOnRotate, {}, {});
+            !status.isOK()) {
+            LOGV2_ERROR(4719800, "Log rotation failed", "error"_attr = status);
+        }
+        if (rotation->logFileStatus == LogFileStatus::kNeedToRotateLogFile) {
+            logProcessDetailsForLogRotate(getGlobalServiceContext());
         }
         return;
     }
@@ -249,10 +262,6 @@ void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation)
         return;
     }
 #endif
-
-    if (gSignalPostProcessingCb_forTest) {
-        gSignalPostProcessingCb_forTest();
-    }
 
     // interrupt/terminate signal
     LOGV2(23381, "will terminate after current cmd ends");
@@ -349,14 +358,6 @@ void signalTestingThread(Milliseconds period) {
 #endif  // __linux__
 #endif
 }  // namespace
-
-void setSignalPostProcessingCallback_forTest(std::function<void()> cb) {
-    gSignalPostProcessingCb_forTest = std::move(cb);
-}
-
-void setLogRotationCallback(std::function<void(LogRotationState*)> cb) {
-    gLogRotationCb = std::move(cb);
-}
 
 void setupSignalHandlers() {
     setupSynchronousSignalHandlers();

@@ -30,9 +30,10 @@
 #include "mongo/unittest/golden_test.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/unittest/test_info.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 #include <exception>
@@ -73,9 +74,44 @@ TEST(GoldenSelfTest2, SanityTest2) {
 
 // Verify that test path is correctly generated from TestInfo.
 TEST(GoldenSelfTest, GoldenTestContextGetPath) {
-    GoldenTestContext ctx(&goldenTestConfig);
-    ASSERT_EQ(ctx.getTestPath(),
-              fs::path("golden_self_test") / fs::path("golden_test_context_get_path.txt"));
+    // Verify that valid names result in expected path.
+    {
+        TestInfo testInfo("SuiteName"_sd, "TestName"_sd, __FILE__, __LINE__);
+        GoldenTestContext ctx(&goldenTestConfig, &testInfo, false);
+        ASSERT_EQ(ctx.getTestPath(), fs::path("suite_name") / fs::path("test_name.txt"));
+    }
+
+    {
+        TestInfo testInfo("SuiteName_-Abc"_sd, "_Test_Name_A-B"_sd, __FILE__, __LINE__);
+        GoldenTestContext ctx(&goldenTestConfig, &testInfo, false);
+        ASSERT_EQ(ctx.getTestPath(), fs::path("suite_name_-abc") / fs::path("_test_name_a-b.txt"));
+    }
+
+    // Verify that names with invalid characters fail with test asertion.
+    std::string badChars = "./\\*~`!@#$%^&*()";
+    for (char c : badChars) {
+        std::string badName = fmt::format("Bad{}Name", c);
+
+        {
+            TestInfo testInfo(badName, "TestName"_sd, __FILE__, __LINE__);
+            ASSERT_THROWS(
+                [&] {
+                    GoldenTestContext ctx(&goldenTestConfig, &testInfo, false);
+                    ctx.getTestPath();
+                }(),
+                AssertionException);
+        }
+
+        {
+            TestInfo testInfo("SuiteName"_sd, badName, __FILE__, __LINE__);
+            ASSERT_THROWS(
+                [&] {
+                    GoldenTestContext ctx(&goldenTestConfig, &testInfo, false);
+                    ctx.getTestPath();
+                }(),
+                AssertionException);
+        }
+    }
 }
 
 // Verify the basic output comparison works, when config is reused.

@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    void TestBody() override {}
+    void _doTest() override {}
 
     void setUp() final {
         CatalogTestFixture::setUp();

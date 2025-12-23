@@ -39,8 +39,7 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/unittest/unittest_main_core.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/environment.h"
@@ -95,24 +94,13 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
 }  // namespace
 
 int main(int argc, char** argv) {
-    unittest::MainProgress progress(
-        {
-            .suppressGlobalInitializers = true,
-            .testSuites = testSuites,
-            .testFilter = testFilter,
-            .fileNameFilter = fileNameFilter,
-        },
-        std::vector<std::string>(argv, argv + argc));
-    progress.initialize();
-    if (auto ec = progress.parseAndAcceptOptions())
-        std::quick_exit(static_cast<int>(*ec));
     setupSynchronousSignalHandlers();
     TestingProctor::instance().setEnabled(true);
-    runGlobalInitializersOrDie(progress.args());
+    runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
     setTestCommandsEnabled(true);
     auto serviceContextHolder = ServiceContext::make();
     setGlobalServiceContext(std::move(serviceContextHolder));
-    quickExit(progress.test());
+    quickExit(unittest::Suite::run(testSuites, testFilter, fileNameFilter, 1));
 }
 
 namespace {
@@ -125,11 +113,16 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
     // _could_ fork and here choses not to do so.
 }
 
+MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(IntegrationTestOptions)(InitializerContext*) {
+    uassertStatusOK(addBaseServerOptions(&moe::startupOptions));
+}
+
 MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
     auto& env = moe::startupOptionsParsed;
     auto& opts = moe::startupOptions;
 
     uassertStatusOK(env.validate());
+    uassertStatusOK(validateBaseOptions(env));
 
     if (env.count("help")) {
         std::cout << opts.helpString() << std::endl;
@@ -140,8 +133,15 @@ MONGO_STARTUP_OPTIONS_VALIDATE(IntegrationTestOptions)(InitializerContext*) {
 MONGO_STARTUP_OPTIONS_STORE(IntegrationTestOptions)(InitializerContext*) {
     auto& env = moe::startupOptionsParsed;
 
+    uassertStatusOK(canonicalizeBaseOptions(&env));
+    uassertStatusOK(storeBaseOptions(env));
+
     std::string connectionString = env["connectionString"].as<std::string>();
     useEgressGRPC = env["useEgressGRPC"].as<bool>();
+
+    env.get("filter", &testFilter).ignore();
+    env.get("fileNameFilter", &fileNameFilter).ignore();
+    env.get("suite", &testSuites).ignore();
 
     auto swConnectionString = ConnectionString::parse(connectionString);
     uassertStatusOK(swConnectionString);

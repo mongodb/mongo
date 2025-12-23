@@ -50,7 +50,7 @@ namespace mongo::logv2 {
  * This class is only expected to be used when the bazel flag `dev_stacktrace` is
  * enabled.
  */
-class MONGO_MOD_NEEDS_REPLACEMENT DevStacktraceFormatter {
+class DevStacktraceFormatter {
 public:
     DevStacktraceFormatter(const AtomicWord<int32_t>* maxAttributeSizeKB,
                            LogTimestampFormat timestampFormat)

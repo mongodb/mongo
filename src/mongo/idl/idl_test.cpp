@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/idl/idl_test.h"
+
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
@@ -57,7 +59,6 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options_gen.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/idl_test_defs.h"
 #include "mongo/idl/idl_test_types.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/idl/unittest_gen.h"
@@ -99,6 +100,11 @@ using namespace mongo::idl::test;
 using namespace mongo::idl::import;
 
 namespace mongo {
+
+void mongo::idl::test::checkValuesEqual(StructWithValidator* structToValidate) {
+    uassert(
+        6253512, "Values not equal", structToValidate->getFirst() == structToValidate->getSecond());
+}
 
 namespace {
 

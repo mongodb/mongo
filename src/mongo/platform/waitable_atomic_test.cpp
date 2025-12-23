@@ -310,7 +310,7 @@ TEST(AtomicWaitableTests, NotifyOneOnlyWakesOneThread) {
             LOGV2_ERROR(8179702,
                         "Test can fail spuriously, retrying",
                         "attemptsLeft"_attr = tries,
-                        "error"_attr = ex.what());
+                        "error"_attr = ex);
         }
     }
 }

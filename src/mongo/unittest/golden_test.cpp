@@ -49,8 +49,8 @@ namespace mongo::unittest {
 void GoldenTestContext::printTestHeader(HeaderFormat format) {
     switch (format) {
         case HeaderFormat::Text:
-            outStream() << "# Golden test output of " << _testInfo->test_suite_name() << "/"
-                        << _testInfo->name() << std::endl;
+            outStream() << "# Golden test output of " << _testInfo->suiteName() << "/"
+                        << _testInfo->testName() << std::endl;
     }
 }
 
@@ -89,7 +89,7 @@ void GoldenTestContext::onError(const std::string& message,
                     "reason"_attr = diffOutput.getStatus().reason());
     }
 
-    GTEST_FAIL_AT(_testInfo->file(), _testInfo->line()) << message;
+    throw TestAssertionFailureException(std::string{_testInfo->file()}, _testInfo->line(), message);
 }
 
 }  // namespace mongo::unittest

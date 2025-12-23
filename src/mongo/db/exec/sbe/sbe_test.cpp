@@ -491,8 +491,8 @@ TEST(SBEVM, CodeFragmentToStringSanity) {
 }
 
 TEST(SBEVM, CodeFragmentPrintStable) {
-    unittest::GoldenTestContext ctx(&goldenTestConfigSbe);
-    ctx.printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+    GoldenTestContext ctx(&goldenTestConfigSbe);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
 
     auto& os = ctx.outStream();
 

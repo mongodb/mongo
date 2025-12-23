@@ -1,7 +1,6 @@
 import json
 import time
 from glob import glob
-from pathlib import Path
 from typing import List
 
 import typer
@@ -49,7 +48,7 @@ def main(testlog_dir: str):
         else:
             status = "pass"
 
-        log_raw = Path(test_xml).with_suffix(".log").read_text()
+        log_raw = testsuite.find("system-out").text
 
         # Bazel gives just a duration, while Evergreen expects a start and end
         # time to calculate the duration. Evergreen itself does something similar

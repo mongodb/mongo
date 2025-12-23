@@ -94,7 +94,7 @@ public:
         ASSERT_EQ(resultSlots.size(), 1);
 
         // Print the stage explain output and verify.
-        _gctx->printTestHeader(unittest::GoldenTestContext::HeaderFormat::Text);
+        _gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
         sbe::DebugPrintInfo debugPrintInfo{};
         _gctx->outStream() << sbe::DebugPrinter().print(*stage.get(), debugPrintInfo);
         _gctx->outStream() << std::endl;

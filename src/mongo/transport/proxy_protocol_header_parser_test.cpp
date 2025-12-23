@@ -49,9 +49,23 @@ namespace {
 
 using namespace unittest::match;
 
-MATCHER_P2(ProxiedEndpointsAre, src, dst, "") {
-    return ExplainMatchResult(FieldsAre(src, dst), arg, result_listener);
-}
+template <typename MSrc, typename MDst>
+class ProxiedEndpointsAre : public Matcher {
+public:
+    explicit ProxiedEndpointsAre(MSrc&& s, MDst&& d) : _src(std::move(s)), _dst(std::move(d)) {}
+
+    std::string describe() const {
+        return fmt::format("ProxiedEndpointsAre({}, {})", _src.describe(), _dst.describe());
+    }
+
+    MatchResult match(const ProxiedEndpoints& e) const {
+        return StructuredBindingsAre<MSrc, MDst>(_src, _dst).match(e);
+    }
+
+private:
+    MSrc _src;
+    MDst _dst;
+};
 
 ParserResults parseAllPrefixes(StringData s) {
     boost::optional<ParserResults> results;

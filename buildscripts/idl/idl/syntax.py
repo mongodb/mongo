@@ -932,7 +932,6 @@ class ConfigOption(common.SourceLocation):
         self.requires = []  # type: List[str]
         self.hidden = False  # type: bool
         self.redact = False  # type: bool
-        self.ignoreIfDuplicate = False  # type: bool
         self.default = None  # type: Expression
         self.implicit = None  # type: Expression
         self.source = []  # type: List[str]

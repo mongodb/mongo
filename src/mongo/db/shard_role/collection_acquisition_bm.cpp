@@ -136,7 +136,7 @@ private:
         /** A `unittest::Test` fixture being overloaded as a benchmark harness. */
         class Test : public ServiceContextMongoDTest {
         public:
-            void TestBody() override {}
+            void _doTest() override {}
 
             void setUp() override {
                 ServiceContextMongoDTest::setUp();

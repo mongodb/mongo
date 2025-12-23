@@ -29,18 +29,11 @@
 
 #pragma once
 
-#include "mongo/unittest/unittest.h"
-#include "mongo/unittest/unittest_details.h"
-#include "mongo/util/errno_util.h"  // IWYU pragme: keep (Used in macro expansion)
-#include "mongo/util/modules.h"
-#include "mongo/util/testing_proctor.h"  // IWYU pragma: keep (Used in macro expansion)
+#include "mongo/unittest/framework.h"
 
 #include <functional>
 #include <memory>
 #include <string>
-
-// Same as GTEST_TEST_CLASS_NAME_ but that isn't public.
-#define DEATH_TEST_DETAIL_TEST_TYPE_NAME(SUITE_NAME, TEST_NAME) SUITE_NAME##_##TEST_NAME##_Test
 
 /**
  * Constructs a single death test named `TEST_NAME` within the test suite `SUITE_NAME`.
@@ -69,8 +62,6 @@
  * Constructs a single test named TEST_NAME that has access to a common fixture
  * named `FIXTURE_NAME`, which will be used as the Suite name.
  *
- * Fixture setUp, tearDown, ctor, and dtor run outside of any death checks.
- *
  * See description of DEATH_TEST for more details on death tests.
  */
 #define DEATH_TEST_F(FIXTURE_NAME, TEST_NAME, MATCH_EXPR) \
@@ -79,67 +70,55 @@
 #define DEATH_TEST_REGEX_F(FIXTURE_NAME, TEST_NAME, REGEX_EXPR) \
     DEATH_TEST_DEFINE_REGEX_(FIXTURE_NAME, TEST_NAME, REGEX_EXPR, FIXTURE_NAME)
 
-#define DEATH_TEST_DEFINE_(SUITE_NAME, TEST_NAME, MATCH_EXPR, TEST_BASE)                  \
-    DEATH_TEST_DEFINE_PRIMITIVE_(SUITE_NAME,                                              \
-                                 TEST_NAME,                                               \
-                                 MATCH_EXPR,                                              \
-                                 ::testing::HasSubstr,                                    \
-                                 DEATH_TEST_DETAIL_TEST_TYPE_NAME(SUITE_NAME, TEST_NAME), \
+#define DEATH_TEST_DEFINE_(SUITE_NAME, TEST_NAME, MATCH_EXPR, TEST_BASE)                 \
+    DEATH_TEST_DEFINE_PRIMITIVE_(SUITE_NAME,                                             \
+                                 TEST_NAME,                                              \
+                                 MATCH_EXPR,                                             \
+                                 false,                                                  \
+                                 UNIT_TEST_DETAIL_TEST_TYPE_NAME(SUITE_NAME, TEST_NAME), \
                                  TEST_BASE)
 
-#define DEATH_TEST_DEFINE_REGEX_(SUITE_NAME, TEST_NAME, REGEX_EXPR, TEST_BASE)            \
-    DEATH_TEST_DEFINE_PRIMITIVE_(SUITE_NAME,                                              \
-                                 TEST_NAME,                                               \
-                                 REGEX_EXPR,                                              \
-                                 ::mongo::unittest::match::MatchesPcreRegex,              \
-                                 DEATH_TEST_DETAIL_TEST_TYPE_NAME(SUITE_NAME, TEST_NAME), \
+#define DEATH_TEST_DEFINE_REGEX_(SUITE_NAME, TEST_NAME, REGEX_EXPR, TEST_BASE)           \
+    DEATH_TEST_DEFINE_PRIMITIVE_(SUITE_NAME,                                             \
+                                 TEST_NAME,                                              \
+                                 REGEX_EXPR,                                             \
+                                 true,                                                   \
+                                 UNIT_TEST_DETAIL_TEST_TYPE_NAME(SUITE_NAME, TEST_NAME), \
                                  TEST_BASE)
 
 
-#define DEATH_TEST_DEFINE_PRIMITIVE_(                                                       \
-    SUITE_NAME, TEST_NAME, MATCH_EXPR, MATCHER, TEST_TYPE, TEST_BASE)                       \
-    class TEST_TYPE : public TEST_BASE {                                                    \
-    public:                                                                                 \
-        static int getLine() {                                                              \
-            return __LINE__;                                                                \
-        }                                                                                   \
-                                                                                            \
-        static std::string getFile() {                                                      \
-            return __FILE__;                                                                \
-        }                                                                                   \
-                                                                                            \
-        void _executeDeathTest() {                                                          \
-            ASSERT_DEATH(_executeInChildForDeathTest(), MATCHER(MATCH_EXPR));               \
-        }                                                                                   \
-                                                                                            \
-    private:                                                                                \
-        void TestBody() override;                                                           \
-                                                                                            \
-        void _executeInChildForDeathTest() noexcept {                                       \
-            ::mongo::unittest::details::redirectStdoutToStderr();                           \
-            ::testing::UnitTest::GetInstance()->listeners().SuppressEventForwarding(false); \
-            SetUp();                                                                        \
-            TestBody();                                                                     \
-            TearDown();                                                                     \
-            ::mongo::TestingProctor::instance().exitAbruptlyIfDeferredErrors();             \
-        }                                                                                   \
-                                                                                            \
-        static inline auto _testInfo =                                                      \
-            testing::RegisterTest(#SUITE_NAME,                                              \
-                                  #TEST_NAME,                                               \
-                                  nullptr,                                                  \
-                                  nullptr,                                                  \
-                                  __FILE__,                                                 \
-                                  __LINE__,                                                 \
-                                  []() -> ::mongo::unittest::DeathTestBase* {               \
-                                      return new ::mongo::unittest::DeathTest<TEST_TYPE>(); \
-                                  });                                                       \
-    };                                                                                      \
-    void TEST_TYPE::TestBody()
+#define DEATH_TEST_DEFINE_PRIMITIVE_(                                                          \
+    SUITE_NAME, TEST_NAME, MATCH_EXPR, IS_REGEX, TEST_TYPE, TEST_BASE)                         \
+    class TEST_TYPE : public TEST_BASE {                                                       \
+    public:                                                                                    \
+        static std::string getPattern() {                                                      \
+            return MATCH_EXPR;                                                                 \
+        }                                                                                      \
+                                                                                               \
+        static bool isRegex() {                                                                \
+            return IS_REGEX;                                                                   \
+        }                                                                                      \
+                                                                                               \
+        static int getLine() {                                                                 \
+            return __LINE__;                                                                   \
+        }                                                                                      \
+                                                                                               \
+        static std::string getFile() {                                                         \
+            return __FILE__;                                                                   \
+        }                                                                                      \
+                                                                                               \
+    private:                                                                                   \
+        void _doTest() override;                                                               \
+        static inline const ::mongo::unittest::TestInfo _testInfo{                             \
+            #SUITE_NAME, #TEST_NAME, __FILE__, __LINE__, &typeid(TEST_BASE)};                  \
+        static inline const RegistrationAgent<::mongo::unittest::DeathTest<TEST_TYPE>> _agent{ \
+            &_testInfo};                                                                       \
+    };                                                                                         \
+    void TEST_TYPE::_doTest()
 
 namespace mongo::unittest {
 
-class MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS DeathTestBase : public Test {
+class DeathTestBase : public Test {
 public:
     /**
      * A test can use this to opt-out of exec behavior.
@@ -154,13 +133,17 @@ protected:
     DeathTestBase() = default;
 
 private:
+    struct Subprocess;
+
     // Forks, executes _doMakeTest() in the child process to create a Test, then runs that Test.
-    void TestBody() final;
+    void _doTest() final;
 
     // Customization points for derived DeathTest classes.
+    virtual std::unique_ptr<Test> _doMakeTest() = 0;
+    virtual std::string _doGetPattern() = 0;
+    virtual bool _isRegex() = 0;
     virtual int _getLine() = 0;
     virtual std::string _getFile() = 0;
-    virtual void _executeDeathTest() = 0;
 
     /**
      * All death tests will fork a subprocess.
@@ -170,13 +153,21 @@ private:
 };
 
 template <typename T>
-class MONGO_MOD_PUBLIC DeathTest : public DeathTestBase {
+class DeathTest : public DeathTestBase {
 public:
     template <typename... Args>
     explicit DeathTest(Args&&... args)
         : _makeTest([args...] { return std::make_unique<T>(args...); }) {}
 
 private:
+    std::string _doGetPattern() override {
+        return T::getPattern();
+    }
+
+    bool _isRegex() override {
+        return T::isRegex();
+    }
+
     int _getLine() override {
         return T::getLine();
     }
@@ -185,26 +176,11 @@ private:
         return T::getFile();
     }
 
-    void _executeDeathTest() override {
-        return _makeTest()->_executeDeathTest();
+    std::unique_ptr<Test> _doMakeTest() override {
+        return _makeTest();
     }
 
-    class DeathTestStyleFlagGuard {
-    public:
-        DeathTestStyleFlagGuard() {
-            GTEST_FLAG_SET(death_test_style, "threadsafe");
-        }
-
-        ~DeathTestStyleFlagGuard() {
-            GTEST_FLAG_SET(death_test_style, _saved);
-        }
-
-    private:
-        std::string _saved = GTEST_FLAG_GET(death_test_style);
-    };
-
-    DeathTestStyleFlagGuard _deathTestStyleFlagGuard;
-    std::function<std::unique_ptr<T>()> _makeTest;
+    std::function<std::unique_ptr<Test>()> _makeTest;
 };
 
 }  // namespace mongo::unittest

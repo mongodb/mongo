@@ -284,7 +284,7 @@ TEST(ChunkType, ParseFromNetworkRequest) {
                                 << onCurrentShardSince << ChunkHistoryBase::kShardFieldName
                                 << "shard0001")))));
 
-    ASSERT_EQ("shard0001"_sd, chunk.getShard());
+    ASSERT_EQ("shard0001", chunk.getShard());
     ASSERT_EQ(chunkVersion, chunk.getVersion());
 }
 

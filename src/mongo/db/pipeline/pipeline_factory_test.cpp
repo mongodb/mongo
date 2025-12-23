@@ -42,10 +42,7 @@ namespace {
 
 using MakePipelineBSONElementTest = AggregationContextFixture;
 
-using MakePipelineBSONElementTestDeathTest = MakePipelineBSONElementTest;
-DEATH_TEST_F(MakePipelineBSONElementTestDeathTest,
-             TassertFailsWhenBSONElementIsNotArray,
-             "11524600") {
+DEATH_TEST_F(MakePipelineBSONElementTest, TassertFailsWhenBSONElementIsNotArray, "11524600") {
     auto expCtx = getExpCtx();
     BSONObj cmdObj = BSON("pipeline" << 123);  // Not an array
     BSONElement pipelineElem = cmdObj["pipeline"];
