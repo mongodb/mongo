@@ -542,5 +542,34 @@ TEST(IDLFeatureFlag, IncrementalFeatureRolloutContext) {
                                       {"featureFlagReleasedForTest", true}};
     ASSERT_EQ(observedValues, expectedValues) << savedFlagsArray;
 }
+
+TEST(IDLFeatureFlag, IFRContextDisableFlagPreviouslyTrue) {
+    auto& releasedFeatureFlag = feature_flags::gFeatureFlagReleasedForTest;
+    releasedFeatureFlag.setForServerParameter(true);
+    IncrementalFeatureRolloutContext ifrContext;
+    ASSERT(ifrContext.getSavedFlagValue(releasedFeatureFlag));
+    ifrContext.disableFlag(releasedFeatureFlag);
+    ASSERT_FALSE(ifrContext.getSavedFlagValue(releasedFeatureFlag));
+    ASSERT(releasedFeatureFlag.checkEnabled());
+}
+
+TEST(IDLFeatureFlag, IFRContextDisableFlagPreviouslyUnknown) {
+    auto& developmentFeatureFlag = feature_flags::gFeatureFlagInDevelopmentForTest;
+    developmentFeatureFlag.setForServerParameter(false);
+    IncrementalFeatureRolloutContext ifrContext;
+    ifrContext.disableFlag(developmentFeatureFlag);
+    ASSERT_FALSE(ifrContext.getSavedFlagValue(developmentFeatureFlag));
+}
+
+TEST(IDLFeatureFlag, IFRContextDisableFlagPreviouslyFalse) {
+    auto& developmentFeatureFlag = feature_flags::gFeatureFlagInDevelopmentForTest;
+    developmentFeatureFlag.setForServerParameter(false);
+    IncrementalFeatureRolloutContext ifrContext;
+    developmentFeatureFlag.setForServerParameter(false);
+    ASSERT_FALSE(ifrContext.getSavedFlagValue(developmentFeatureFlag));
+    ifrContext.disableFlag(developmentFeatureFlag);
+    ASSERT_FALSE(ifrContext.getSavedFlagValue(developmentFeatureFlag));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -464,6 +464,13 @@ public:
      */
     void appendSavedFlagValues(BSONArrayBuilder& builder) const;
 
+    /**
+     * Disables the value of an IFR flag for the lifetime and scope of this context specifically.
+     * Primarily used for shard-router communication in the situation where we want to retry an
+     * aggregate command, with the value of a previously-enabled IFR flag disabled.
+     */
+    void disableFlag(IncrementalRolloutFeatureFlag& flag);
+
 private:
     absl::flat_hash_map<const IncrementalRolloutFeatureFlag*, bool> _savedFlagValues;
 };

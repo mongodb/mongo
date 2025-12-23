@@ -348,4 +348,8 @@ void IncrementalFeatureRolloutContext::appendSavedFlagValues(BSONArrayBuilder& b
         flagBuilder.appendBool("value", savedValue);
     }
 }
+
+void IncrementalFeatureRolloutContext::disableFlag(IncrementalRolloutFeatureFlag& flag) {
+    _savedFlagValues.insert_or_assign(&flag, false);
+}
 }  // namespace mongo
