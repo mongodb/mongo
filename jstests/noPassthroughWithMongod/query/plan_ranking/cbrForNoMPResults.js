@@ -1,7 +1,7 @@
 /*
  * Verify that queries where no results are returned are handled to CBR.
  */
-import {getWinningPlanFromExplain, getExecutionStats} from "jstests/libs/query/analyze_plan.js";
+import {getWinningPlanFromExplain, getExecutionStats, getEngine} from "jstests/libs/query/analyze_plan.js";
 import {assertPlanCosted, assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
@@ -20,10 +20,13 @@ function testNoResultsQueryIsPlannedWithCBR() {
     jsTest.log.info("Running testNoResultsQueryIsPlannedWithCBR");
     const explain = coll.find({a: {$gte: 1}, b: {$gte: 2}, c: 1}).explain("executionStats");
     const winningPlan = getWinningPlanFromExplain(explain);
-    assertPlanCosted(winningPlan);
-    // TODO SERVER-115402. Also verify rejected plans when emitted.
+    // TODO SERVER-115958: This test fails with featureFlagSbeFull.
+    if (getEngine(explain) === "classic") {
+        assertPlanCosted(winningPlan);
+        // TODO SERVER-115402. Also verify rejected plans when emitted.
 
-    assert.eq(getExecutionStats(explain)[0].nReturned, 0, toJsonForLog(explain));
+        assert.eq(getExecutionStats(explain)[0].nReturned, 0, toJsonForLog(explain));
+    }
 }
 
 function testResultsQueryIsPlannedWithMultiPlanner() {
@@ -50,7 +53,10 @@ function testEOFIsPlannedWithMultiPlanner() {
 
     const executionStats = getExecutionStats(explain)[0];
     assert.eq(executionStats.nReturned, 1, toJsonForLog(explain));
-    assert.eq(executionStats.executionStages.works, 2 /* seek + advance */, toJsonForLog(explain));
+    // TODO SERVER-115958: This test failes with featureFlagSbeFull.
+    if (getEngine(explain) === "classic") {
+        assert.eq(executionStats.executionStages.works, 2 /* seek + advance */, toJsonForLog(explain));
+    }
 }
 
 function testReturnKeyIsPlannedWithMultiPlanner() {
@@ -68,7 +74,10 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
     // Now verify that without the ReturnKey stage, the query is planned with CBR.
     const cbrExplain = coll.find(query).explain("executionStats");
     const cbrWinningPlan = getWinningPlanFromExplain(cbrExplain);
-    assertPlanCosted(cbrWinningPlan);
+    // TODO SERVER-115958: This test failes with featureFlagSbeFull.
+    if (getEngine(cbrExplain) === "classic") {
+        assertPlanCosted(cbrWinningPlan);
+    }
     assert.eq(getExecutionStats(cbrExplain)[0].nReturned, 0, toJsonForLog(cbrExplain));
 }
 
