@@ -370,7 +370,17 @@ public:
 
         _stats->incNumDocumentsFetched(1);
 
-        auto progress = continuation(collection, std::move(rid), std::move(obj), cursor.get());
+        // Reusing the cursor lowers write latency. For YCSB-style workloads, this causes the
+        // cache to run dirtier. This results in increased preemption of application threads to
+        // do eviction. With disaggregated storage, eviction has a higher cost (queued to go to
+        // storage layer services, WT must keep the page until page materialization). This results
+        // in higher variance for YCSB throughput, making it difficult to measure incremental
+        // performance improvements. For now, disable cursor reuse to unblock progress on
+        // disaggregated storage performance.
+        // TODO SERVER-115972 investigate re-enabling for attached storage.
+        cursor = nullptr;
+
+        auto progress = continuation(collection, std::move(rid), std::move(obj), nullptr);
 
         // Only advance the iterator if the continuation completely processed its item, as indicated
         // by its return value.
