@@ -35,8 +35,10 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/moving_average.h"
 
+#ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/context/context.h>
 #include <opentelemetry/metrics/meter.h>
+#endif
 
 namespace mongo::otel::metrics {
 
@@ -59,6 +61,7 @@ public:
     virtual void record(T value) = 0;
 };
 
+#ifdef MONGO_CONFIG_OTEL
 /**
  * Thin wrapper around OpenTelemetry Histogram for recording distributions of values.
  *
@@ -143,4 +146,15 @@ BSONObj HistogramImpl<T>::serializeToBson(const std::string& key) const {
     metrics.done();
     return builder.obj();
 }
+#else
+template <HistogramValueType T>
+class NoopHistogramImpl : public Histogram<T> {
+public:
+    void record(T value) override {}
+
+    BSONObj serializeToBson(const std::string& key) const override {
+        return BSONObj();
+    }
+};
+#endif
 }  // namespace mongo::otel::metrics
