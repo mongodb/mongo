@@ -1,5 +1,6 @@
 // Wrapper around the validate command that can be used to validate index key counts.
 import {Thread} from "jstests/libs/parallelTester.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
 export class CollectionValidator {
     validateCollections(db, obj) {
@@ -13,7 +14,8 @@ export class CollectionValidator {
 
         try {
             hostList.forEach(host => {
-                const thread = new Thread(validateCollectionsThread, validateCollectionsImpl, host);
+                const thread = new Thread(
+                    validateCollectionsThread, newMongoWithRetry, validateCollectionsImpl, host);
                 threads.push(thread);
                 thread.start();
             });
@@ -132,10 +134,10 @@ function validateCollectionsImpl(db, obj) {
 }
 
 // Run a separate thread to validate collections on each server in parallel.
-function validateCollectionsThread(validatorFunc, host) {
+function validateCollectionsThread(newMongoWithRetry, validatorFunc, host) {
     try {
         print('Running validate() on ' + host);
-        const conn = new Mongo(host);
+        const conn = newMongoWithRetry(host);
         conn.setSecondaryOk();
         jsTest.authenticate(conn);
 

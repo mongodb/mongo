@@ -1,6 +1,8 @@
 // Runner for checkPreImageCollection() that compares the pre-images collection on all replica set
 // nodes to ensure all nodes have compatible data without any holes.
 
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
+
 const startTime = Date.now();
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
 
@@ -22,7 +24,7 @@ if (db.getMongo().isMongos()) {
 
     // Run check on every shard.
     configDB.shards.find().forEach(shardEntry => {
-        let newConn = new Mongo(shardEntry.host);
+        let newConn = newMongoWithRetry(shardEntry.host);
         runCheckOnReplSet(newConn.getDB('test'));
     });
 } else {

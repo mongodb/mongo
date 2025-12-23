@@ -3,6 +3,7 @@
  * secondary node in a replica set.
  */
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
 const MIN_MS = 400;
 const MAX_MS = 1000;
@@ -87,7 +88,7 @@ try {
     const secondaries =
         (primary === undefined) ? topology.nodes : topology.nodes.filter(node => node !== primary);
     const randomSecondary = secondaries[Math.floor(Math.random() * secondaries.length)];
-    const randomSecondaryConn = new Mongo(randomSecondary);
+    const randomSecondaryConn = newMongoWithRetry(randomSecondary);
     res = lagLastApplied(randomSecondaryConn);
 } catch (e) {
     // If the ReplicaSetMonitor cannot find a primary because it has stepped down or
