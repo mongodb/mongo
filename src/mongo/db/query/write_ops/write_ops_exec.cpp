@@ -68,6 +68,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_shape/update_cmd_shape.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -1477,9 +1478,16 @@ void registerRequestForQueryStats(OperationContext* opCtx,
     // QueryShapeHash(QSH) will be recorded in CurOp, but it is not being used for anything else
     // downstream yet until we support updates in PQS. Using std::ignore to indicate that discarding
     // the returned QSH is intended.
-    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(opCtx, [&]() {
-        return shape_helpers::computeQueryShapeHash(expCtx, deferredShape, wholeOp.getNamespace());
-    });
+    std::ignore = CurOp::get(opCtx)->debug().ensureQueryShapeHash(
+        opCtx, [&]() -> boost::optional<query_shape::QueryShapeHash> {
+            // TODO(SERVER-102484): Provide fast path QueryShape and QueryShapeHash computation for
+            // Express queries.
+            if (!parsedUpdate.hasParsedFindCommand()) {
+                return boost::none;
+            }
+            return shape_helpers::computeQueryShapeHash(
+                expCtx, deferredShape, wholeOp.getNamespace());
+        });
 
 
     // Register query stats collection.
