@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -56,7 +57,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto groupSpec = fromjson("{$group: {_id: '$x', f: {$first: '$y'}, $willBeMerged: false}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, groupSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, groupSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
 
@@ -80,7 +82,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: true, x: {f: '$y'}}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, projectSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
 
@@ -106,7 +109,9 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta', "
         "bucketMaxSpanSeconds: 3600}}");
     auto groupSpec = fromjson("{$group: {_id: '$x', f: {$first: '$y'}, $willBeMerged: false}}");
-    auto pipeline = Pipeline::parse(makeVector(matchSpec, unpackSpec, groupSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(matchSpec, unpackSpec, groupSpec),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(3u, container.size());
 
@@ -131,7 +136,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto groupSpec = fromjson("{$group: {_id: '$x.y', f: {$first: '$a.b'}, $willBeMerged: false}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, groupSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, groupSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
 
@@ -155,7 +161,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: {a : true}}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, projectSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
 
@@ -180,7 +187,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto groupSpec = fromjson(
         "{$group: {_id: {$const: null}, count: { $sum: {$const: 1 }}, $willBeMerged: false}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, groupSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, groupSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
 
@@ -202,7 +210,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto sortSpec = fromjson("{$sort: {x: 1}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, sortSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, sortSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
 
@@ -225,7 +234,9 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto sortSpec = fromjson("{$sort: {x: 1}}");
     auto projectSpec = fromjson("{$project: {_id: false, x: false}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, sortSpec, projectSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpec, sortSpec, projectSpec),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(3u, container.size());
 
@@ -247,7 +258,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest, UsesViableInclusionPro
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: true, x: true}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, projectSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
 
@@ -268,7 +280,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest, UsesViableNonBoolInclu
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: 1, x: 1.0, y: 1.5}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, projectSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
 
@@ -290,7 +303,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest, UsesViableExclusionPro
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: false, x: false}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, projectSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(2u, container.size());
 
@@ -315,7 +329,9 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
     auto sortSpec = fromjson("{$sort: {y: 1}}");
     auto groupSpec = fromjson("{$group: {_id: '$y', f: {$first: '$z'}, $willBeMerged: false}}");
     auto pipeline =
-        Pipeline::parse(makeVector(unpackSpec, projectSpec, sortSpec, groupSpec), getExpCtx());
+        pipeline_factory::makePipeline(makeVector(unpackSpec, projectSpec, sortSpec, groupSpec),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(4u, container.size());
 

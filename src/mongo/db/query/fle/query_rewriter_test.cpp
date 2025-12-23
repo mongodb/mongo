@@ -42,6 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/encrypted_predicate_test_fixtures.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
@@ -1124,7 +1125,8 @@ public:
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::array);
         auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
         expCtx->setNamespaceString(nss);
-        return Pipeline::parse(rawPipeline, expCtx);
+        return pipeline_factory::makePipeline(
+            rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     }
 
     void assertExpectedPipeline(const Pipeline& rewrittenPipeline,

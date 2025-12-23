@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -160,7 +161,7 @@ TEST_F(ExpressionContextTest, DontInitializeUnreferencedVariables) {
     pipeline.push_back(BSON("$match" << BSON("a" << 1)));
     AggregateCommandRequest acr({} /*nss*/, pipeline);
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), acr).build();
-    Pipeline::parse(pipeline, expCtx);
+    pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
     expCtx->initializeReferencedSystemVariables();
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kNowId));
     ASSERT_FALSE(expCtx->variables.hasValue(Variables::kClusterTimeId));
@@ -176,8 +177,10 @@ TEST_F(ExpressionContextTest, ErrorsIfClusterTimeUsedInStandalone) {
     pipeline.push_back(BSON("$project" << BSON("a" << "$$CLUSTER_TIME")));
     AggregateCommandRequest acr({} /*nss*/, pipeline);
     auto expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), acr).build();
-    Pipeline::parse(pipeline, expCtx);
-    ASSERT_THROWS_CODE(expCtx->initializeReferencedSystemVariables(), AssertionException, 10071200);
+    ASSERT_THROWS_CODE(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        10071200);
 }
 
 TEST_F(ExpressionContextTest, CanBuildWithoutView) {

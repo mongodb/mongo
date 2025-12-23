@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -66,7 +67,7 @@ std::unique_ptr<Pipeline> makePipeline(boost::intrusive_ptr<mongo::ExpressionCon
     auto unpackSpecObj = BSON("$_internalUnpackBucket" << unpackSpecBuilder.obj());
 
     stages.insert(stages.begin(), unpackSpecObj);
-    return Pipeline::parse(stages, expCtx);
+    return pipeline_factory::makePipeline(stages, expCtx, pipeline_factory::kOptionsMinimal);
 }
 
 std::vector<BSONObj> makeAndOptimizePipeline(
@@ -308,7 +309,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxConstantGroupKey) {
         auto unpackSpecObj = fromjson(
             "{$_internalUnpackBucket: { exclude: [], timeField: 't', bucketMaxSpanSeconds: 3600}}");
         auto groupSpecObj = fromjson("{$group: {_id: 0, accmin: {$min: '$meta1.f1'}}}");
-        auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+        auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, groupSpecObj),
+                                                       getExpCtx(),
+                                                       pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*pipeline);
         auto serialized = pipeline->serializeToBson();
         ASSERT_EQ(1, serialized.size());
@@ -555,7 +558,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
         auto groupSpecObj = fromjson(
             "{$group: {_id: {g0: {$toUpper: [ '$x' ] }}, accmin: {$min: '$meta1.f1'}, "
             "$willBeMerged: false}}");
-        auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+        auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, groupSpecObj),
+                                                       getExpCtx(),
+                                                       pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*pipeline);
         auto serialized = pipeline->serializeToBson();
         ASSERT_EQ(2, serialized.size());
@@ -576,7 +581,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
         auto groupSpecObj = fromjson(
             "{$group: {_id: {g0: {$toUpper: [ '$$CURRENT.x' ] }}, accmin: {$min: '$meta1.f1'}}}");
 
-        auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+        auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, groupSpecObj),
+                                                       getExpCtx(),
+                                                       pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*pipeline);
         auto serialized = pipeline->serializeToBson();
 
@@ -603,7 +610,9 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataExpressionNegative
             "{$group: {_id: {g0: {$toUpper: [ '$$ROOT.x' ] }}, accmin: {$min: '$meta1.f1'}, "
             "$willBeMerged: false}}");
 
-        auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+        auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, groupSpecObj),
+                                                       getExpCtx(),
+                                                       pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*pipeline);
         auto serialized = pipeline->serializeToBson();
 

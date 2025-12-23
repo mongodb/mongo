@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -52,7 +53,8 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSort) {
         "bucketMaxSpanSeconds: 3600}}");
     auto sortSpecObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, sortSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -72,7 +74,8 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortNegative) {
         "bucketMaxSpanSeconds: 3600}}");
     auto sortSpecObj = fromjson("{$sort: {'meta1.a': 1, 'unrelated': -1}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, sortSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -95,8 +98,10 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortLimit) {
     auto sortSpecObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
     auto limitSpecObj = fromjson("{$limit: 2}");
 
-    auto pipeline = Pipeline::parse(
-        makeVector(unpackSpecObj, matchSpecObj, sortSpecObj, limitSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, matchSpecObj, sortSpecObj, limitSpecObj),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -130,9 +135,10 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortSkipLimit) {
     auto skipSpecObj = fromjson("{$skip: 1}");
     auto limitSpecObj = fromjson("{$limit: 2}");
 
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(unpackSpecObj, projectSpecObj, sortSpecObj, skipSpecObj, limitSpecObj),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -148,7 +154,8 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortSkipLimit) {
     ASSERT_BSONOBJ_EQ(fromjson("{$skip: 1}"), serialized[4]);
 
     // Optimize the optimized pipeline again. More rewrites will happen here.
-    auto optimizedPipeline = Pipeline::parse(serialized, getExpCtx());
+    auto optimizedPipeline =
+        pipeline_factory::makePipeline(serialized, getExpCtx(), pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*optimizedPipeline);
     auto optimizedSerialized = optimizedPipeline->serializeToBson();
     ASSERT_EQ(6, optimizedSerialized.size());
@@ -173,13 +180,14 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaLimitSortSkipLimit) {
     auto limitTwoSpecObj = fromjson("{$limit: 2}");
     auto limitFourSpecObj = fromjson("{$limit: 4}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj,
-                                               projectSpecObj,
-                                               limitFourSpecObj,
-                                               sortSpecObj,
-                                               skipSpecObj,
-                                               limitTwoSpecObj),
-                                    getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj,
+                                                              projectSpecObj,
+                                                              limitFourSpecObj,
+                                                              sortSpecObj,
+                                                              skipSpecObj,
+                                                              limitTwoSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();

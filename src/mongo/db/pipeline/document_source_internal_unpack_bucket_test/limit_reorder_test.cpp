@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -62,7 +63,8 @@ auto sortObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
 
 // Simple test to push limit down.
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForOnlyLimit) {
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, limitObj2), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, limitObj2), getExpCtx(), pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -81,7 +83,9 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForOnlyLimit) {
 // limit value ({$limit: 2} in this case) and pushed down.
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForMultipleLimits) {
     auto pipeline =
-        Pipeline::parse(makeVector(unpackSpecObj, limitObj10, limitObj2, limitObj5), getExpCtx());
+        pipeline_factory::makePipeline(makeVector(unpackSpecObj, limitObj10, limitObj2, limitObj5),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -96,7 +100,9 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForMultipleLimits) {
 
 // Test that the stages after $limit are also preserved.
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithMatch) {
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, limitObj2, matchObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, limitObj2, matchObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -113,7 +119,9 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithMatch) {
 
 // Test that limit is not pushed down if it comes after match.
 TEST_F(InternalUnpackBucketLimitReorderTest, NoOptimizeForMatchBeforeLimit) {
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, matchObj, limitObj2), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, matchObj, limitObj2),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -132,7 +140,9 @@ TEST_F(InternalUnpackBucketLimitReorderTest, NoOptimizeForMatchBeforeLimit) {
 // Test that the sort that was pushed up absorbs the limit, while preserving the original limit.
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSort) {
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, sortObj, limitObj2), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, sortObj, limitObj2),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -158,7 +168,9 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSort) {
 // Test for sort with multiple limits in increasing limit values.
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimitsIncreasing) {
     auto pipeline =
-        Pipeline::parse(makeVector(unpackSpecObj, sortObj, limitObj5, limitObj10), getExpCtx());
+        pipeline_factory::makePipeline(makeVector(unpackSpecObj, sortObj, limitObj5, limitObj10),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -182,7 +194,9 @@ TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimit
 // {$limit: 2} would eventually replace the {$limit: 10} after {$limit: 10} is pushed up.
 TEST_F(InternalUnpackBucketLimitReorderTest, OptimizeForLimitWithSortAndTwoLimitsDecreasing) {
     auto pipeline =
-        Pipeline::parse(makeVector(unpackSpecObj, sortObj, limitObj10, limitObj2), getExpCtx());
+        pipeline_factory::makePipeline(makeVector(unpackSpecObj, sortObj, limitObj10, limitObj2),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();

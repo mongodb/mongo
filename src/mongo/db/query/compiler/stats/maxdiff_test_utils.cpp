@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/unittest/temp_dir.h"
@@ -78,7 +79,8 @@ std::unique_ptr<mongo::Pipeline> parsePipeline(const std::vector<BSONObj>& rawPi
     static unittest::TempDir tempDir("ABTPipelineTest");
     ctx->setTempDir(tempDir.path());
 
-    return Pipeline::parse(request.getPipeline(), ctx);
+    return pipeline_factory::makePipeline(
+        request.getPipeline(), ctx, pipeline_factory::kOptionsMinimal);
 }
 
 std::unique_ptr<mongo::Pipeline> parsePipeline(const std::string& pipelineStr,

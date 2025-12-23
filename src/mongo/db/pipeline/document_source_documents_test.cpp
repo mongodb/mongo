@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -99,7 +100,8 @@ TEST_F(DocumentSourceDocumentsTest, ReturnsDesugaredStagesProperly) {
     })");
 
     // Obtain desugared stages using helper.
-    auto pipeline = Pipeline::parse(std::vector<BSONObj>({spec}), expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        std::vector<BSONObj>({spec}), expCtx, pipeline_factory::kOptionsMinimal);
     auto serializedPipeline = pipeline->serializeToBson();
     ASSERT_EQ(4, serializedPipeline.size());
     auto desugaredStages =
@@ -139,8 +141,10 @@ TEST_F(DocumentSourceDocumentsTest, ReturnsNoneIfNotDesugaredDocuments) {
     })");
     auto replaceRootStage = BSON("$replaceRoot" << BSON("newRoot" << "$fullDocument"));
 
-    auto pipeline = Pipeline::parse(
-        std::vector<BSONObj>({queueStage, projectStage, unwindStage, replaceRootStage}), expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        std::vector<BSONObj>({queueStage, projectStage, unwindStage, replaceRootStage}),
+        expCtx,
+        pipeline_factory::kOptionsMinimal);
     auto serializedPipeline = pipeline->serializeToBson();
     auto desugaredStages =
         DocumentSourceDocuments::extractDesugaredStagesFromPipeline(serializedPipeline);

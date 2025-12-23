@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 
@@ -107,7 +107,7 @@ protected:
     static std::vector<BSONObj> desugarAndSerialize(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& stageSpec) {
         std::vector<BSONObj> spec{stageSpec};
-        auto pipe = Pipeline::parse(spec, expCtx);
+        auto pipe = pipeline_factory::makePipeline(spec, expCtx, pipeline_factory::kOptionsMinimal);
         ASSERT_TRUE(pipe);
         Desugarer(pipe.get())();
         return pipe->serializeToBson();
@@ -168,7 +168,8 @@ TEST_F(LoadNativeVectorSearchTest, ExtensionRegistration) {
     ASSERT_EQ(std::string(extensionStage->getSourceName()), kNativeVectorSearchStageName);
 
     // Verify the stage can be used in a pipeline with other existing stages.
-    auto parsedPipeline = Pipeline::parse({stageSpec, BSON("$skip" << 1)}, expCtx);
+    auto parsedPipeline = pipeline_factory::makePipeline(
+        {stageSpec, BSON("$skip" << 1)}, expCtx, pipeline_factory::kOptionsMinimal);
     ASSERT(parsedPipeline);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 2U);
 

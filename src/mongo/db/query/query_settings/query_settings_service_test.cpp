@@ -37,6 +37,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -468,7 +469,8 @@ TEST_F(QuerySettingsServiceTest, QuerySettingsLookupForAgg) {
         "{aggregate: 'exampleColl', pipeline: [{$match: {_id: 0}}], cursor: {}, '$db': 'foo'}"_sd;
     auto aggCmdBSON = fromjson(aggCmdStr);
     auto aggCmd = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(aggCmdBSON));
-    auto pipeline = Pipeline::parse(aggCmd.getPipeline(), expCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        aggCmd.getPipeline(), expCtx(), pipeline_factory::kOptionsMinimal);
     stdx::unordered_set<NamespaceString> involvedNamespaces = {nss()};
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(

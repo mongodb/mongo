@@ -33,6 +33,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
@@ -89,7 +90,8 @@ protected:
         const std::vector<BSONObj>& originalPipeline = std::vector{
             BSON("$match" << BSON("a" << 1))}) {
         auto expCtx = make_intrusive<ExpressionContextForTest>();
-        auto pipeline = Pipeline::parse(originalPipeline, expCtx);
+        auto pipeline = pipeline_factory::makePipeline(
+            originalPipeline, expCtx, pipeline_factory::kOptionsMinimal);
         const size_t originalPipelineSize = pipeline->getSources().size();
 
         auto options = TimeseriesOptions{};
@@ -117,7 +119,8 @@ protected:
 };
 
 TEST_F(TimeseriesRewritesTest, EmptyPipelineRewriteTest) {
-    auto pipeline = Pipeline::parse(std::vector<BSONObj>{}, expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        std::vector<BSONObj>{}, expCtx, pipeline_factory::kOptionsMinimal);
     translateStagesHelper(*pipeline);
 
     const auto translatedSources = pipeline->getSources();
@@ -128,7 +131,8 @@ TEST_F(TimeseriesRewritesTest, EmptyPipelineRewriteTest) {
 }
 
 TEST_F(TimeseriesRewritesTest, InternalUnpackBucketRewriteTest) {
-    auto pipeline = Pipeline::parse(std::vector{BSON("$match" << BSON("a" << "1"))}, expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        std::vector{BSON("$match" << BSON("a" << "1"))}, expCtx, pipeline_factory::kOptionsMinimal);
     const size_t originalPipelineSize = pipeline->size();
 
     translateStagesHelper(*pipeline);
@@ -142,7 +146,8 @@ TEST_F(TimeseriesRewritesTest, InternalUnpackBucketRewriteTest) {
 TEST_F(TimeseriesRewritesTest, InsertIndexStatsConversionStage) {
     const auto indexStatsStage = BSON("$indexStats" << BSONObj());
     const auto originalSources = std::vector{indexStatsStage};
-    auto pipeline = Pipeline::parse(originalSources, expCtx);
+    auto pipeline =
+        pipeline_factory::makePipeline(originalSources, expCtx, pipeline_factory::kOptionsMinimal);
 
     translateStagesHelper(*pipeline);
     ASSERT(pipeline->isTranslated());
@@ -159,7 +164,8 @@ TEST_F(TimeseriesRewritesTest, InsertIndexStatsConversionStageWithMatch) {
     const auto indexStatsStage = BSON("$indexStats" << BSONObj());
     const auto matchStage = BSON("$match" << BSON("b" << 2));
     const auto originalSources = std::vector{indexStatsStage, matchStage};
-    auto pipeline = Pipeline::parse(originalSources, expCtx);
+    auto pipeline =
+        pipeline_factory::makePipeline(originalSources, expCtx, pipeline_factory::kOptionsMinimal);
 
     translateStagesHelper(*pipeline);
     ASSERT(pipeline->isTranslated());
@@ -189,7 +195,8 @@ TEST_F(TimeseriesRewritesTest, DontInsertUnpackStageWhenStagesDontExpectUserDocu
     for (const auto& initialSource : testCases) {
         const auto matchStage = BSON("$match" << BSON("b" << 2));
         const auto originalSources = std::vector{initialSource, matchStage};
-        auto pipeline = Pipeline::parse(originalSources, expCtx);
+        auto pipeline = pipeline_factory::makePipeline(
+            originalSources, expCtx, pipeline_factory::kOptionsMinimal);
 
         translateStagesHelper(*pipeline);
         ASSERT(pipeline->isTranslated());

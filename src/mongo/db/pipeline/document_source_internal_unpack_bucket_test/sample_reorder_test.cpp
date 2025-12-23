@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -54,7 +55,9 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SampleThenSimpleProject) {
     auto sampleSpec = fromjson("{$sample: {size: 500}}");
     auto projectSpec = fromjson("{$project: {_id: false, x: false, y: false}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, sampleSpec, projectSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpec, sampleSpec, projectSpec),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -74,7 +77,9 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SampleThenComputedProject) {
     auto projectSpec =
         fromjson("{$project: {_id: true, city: '$myMeta.address.city', temp: '$temp.celsius'}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, sampleSpec, projectSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpec, sampleSpec, projectSpec),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -96,7 +101,9 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SimpleProjectThenSample) {
     auto projectSpec = fromjson("{$project: {_id: true, x: true}}");
     auto sampleSpec = fromjson("{$sample: {size: 500}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec, sampleSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpec, projectSpec, sampleSpec),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();
@@ -118,7 +125,9 @@ TEST_F(InternalUnpackBucketSampleReorderTest, ComputedProjectThenSample) {
         fromjson("{$project: {_id: true, city: '$myMeta.address.city', temp: '$temp.celsius'}}");
     auto sampleSpec = fromjson("{$sample: {size: 500}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec, sampleSpec), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpec, projectSpec, sampleSpec),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     pipeline_optimization::optimizePipeline(*pipeline);
 
     auto serialized = pipeline->serializeToBson();

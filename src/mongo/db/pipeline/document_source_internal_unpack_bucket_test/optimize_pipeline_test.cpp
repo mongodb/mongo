@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
@@ -55,9 +56,10 @@ TEST_F(OptimizePipeline, MixedMatchPushedDown) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}, a: {$lte: 4}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -85,8 +87,10 @@ TEST_F(OptimizePipeline, MetaMatchPushedDown) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline =
-        Pipeline::parse(makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0}}}")), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0}}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -113,7 +117,8 @@ TEST_F(OptimizePipeline, MixedMatchOr) {
         "    {y: {$lt: 1}}"
         "  ]}"
         "]}}");
-    auto pipeline = Pipeline::parse(makeVector(unpack, match), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpack, match), getExpCtx(), pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -152,10 +157,11 @@ TEST_F(OptimizePipeline, MixedMatchOnlyMetaMatchPushedDown) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(unpack,
                    fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}, a: {$type: \"string\"}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -178,10 +184,12 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDown) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(makeVector(unpack,
-                                               fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}}}"),
-                                               fromjson("{$match: {a: {$lte: 4}}}")),
-                                    getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpack,
+                   fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}}}"),
+                   fromjson("{$match: {a: {$lte: 4}}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -208,11 +216,13 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDownWithSort) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(makeVector(unpack,
-                                               fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}}}"),
-                                               fromjson("{$sort: {a: 1}}"),
-                                               fromjson("{$match: {a: {$lte: 4}}}")),
-                                    getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpack,
+                   fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}}}"),
+                   fromjson("{$sort: {a: 1}}"),
+                   fromjson("{$match: {a: {$lte: 4}}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(4u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -236,12 +246,13 @@ TEST_F(OptimizePipeline, MultipleMatchesPushedDownWithSort) {
 }
 
 TEST_F(OptimizePipeline, MetaMatchThenCountPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$match: {myMeta: {$eq: 'abc'}}}"),
                    fromjson("{$count: 'foo'}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(4u, pipeline->size());  // $count is expanded into $group and $project.
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -263,10 +274,12 @@ TEST_F(OptimizePipeline, SortThenMetaMatchPushedDown) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(makeVector(unpack,
-                                               fromjson("{$sort: {myMeta: -1}}"),
-                                               fromjson("{$match: {myMeta: {$eq: 'abc'}}}")),
-                                    getExpCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(makeVector(unpack,
+                                                  fromjson("{$sort: {myMeta: -1}}"),
+                                                  fromjson("{$match: {myMeta: {$eq: 'abc'}}}")),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -283,11 +296,12 @@ TEST_F(OptimizePipeline, SortThenMixedMatchPushedDown) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline =
-        Pipeline::parse(makeVector(unpack,
-                                   fromjson("{$sort: {myMeta: -1}}"),
-                                   fromjson("{$match: {a: {$gte: 5}, myMeta: {$eq: 'abc'}}}")),
-                        getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpack,
+                   fromjson("{$sort: {myMeta: -1}}"),
+                   fromjson("{$match: {a: {$gte: 5}, myMeta: {$eq: 'abc'}}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -318,10 +332,12 @@ TEST_F(OptimizePipeline, MetaMatchThenSortPushedDown) {
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(makeVector(unpack,
-                                               fromjson("{$match: {myMeta: {$eq: 'abc'}}}"),
-                                               fromjson("{$sort: {myMeta: -1}}")),
-                                    getExpCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(makeVector(unpack,
+                                                  fromjson("{$match: {myMeta: {$eq: 'abc'}}}"),
+                                                  fromjson("{$sort: {myMeta: -1}}")),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -335,12 +351,13 @@ TEST_F(OptimizePipeline, MetaMatchThenSortPushedDown) {
 }
 
 TEST_F(OptimizePipeline, MetaMatchThenProjectPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$match: {myMeta: {$eq: 'abc'}}}"),
                    fromjson("{$project: {x: 0}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -355,12 +372,13 @@ TEST_F(OptimizePipeline, MetaMatchThenProjectPushedDown) {
 }
 
 TEST_F(OptimizePipeline, MixedMatchThenProjectPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$match: {myMeta: {$eq: 'abc'}, a: {$lte: 4}}}"),
                    fromjson("{$project: {x: 1}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -386,12 +404,13 @@ TEST_F(OptimizePipeline, MixedMatchThenProjectPushedDown) {
 
 
 TEST_F(OptimizePipeline, ProjectThenMetaMatchPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {x: 0}}"),
                    fromjson("{$match: {myMeta: {$eq: 'abc'}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -406,12 +425,13 @@ TEST_F(OptimizePipeline, ProjectThenMetaMatchPushedDown) {
 }
 
 TEST_F(OptimizePipeline, ProjectThenMixedMatchPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {a: 1, myMeta: 1, x: 1}}"),
                    fromjson("{$match: {myMeta: {$eq: 'abc'}, a: {$lte: 4}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -439,12 +459,13 @@ TEST_F(OptimizePipeline, ProjectThenMixedMatchPushedDown) {
 }
 
 TEST_F(OptimizePipeline, ProjectWithRenameThenMixedMatchPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: '$y', a: 1}}"),
                    fromjson("{$match: {myMeta: {$gte: 'abc'}, a: {$lte: 4}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -471,12 +492,13 @@ TEST_F(OptimizePipeline, ProjectWithRenameThenMixedMatchPushedDown) {
 }
 
 TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {y: '$myMeta'}}"),
                    fromjson("{$match: {y: {$gte: 'abc'}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -496,11 +518,12 @@ TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchPushedDown) {
 }
 
 TEST_F(OptimizePipeline, ComputedMetaProjectPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {a: {$sum: ['$myMeta.a', '$myMeta.b']}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -517,11 +540,12 @@ TEST_F(OptimizePipeline, ComputedMetaProjectPushedDown) {
 }
 
 TEST_F(OptimizePipeline, ComputedShadowingMetaProjectPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: {$sum: ['$myMeta.a', '$myMeta.b']}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -538,12 +562,13 @@ TEST_F(OptimizePipeline, ComputedShadowingMetaProjectPushedDown) {
 }
 
 TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchPushedDownWithoutReorder) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: {$sum: ['$myMeta.a', '$myMeta.b']}}}"),
                    fromjson("{$match: {myMeta: {$gte: 'abc'}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -562,12 +587,13 @@ TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchPushedDownWithoutReorder) {
 }
 
 TEST_F(OptimizePipeline, ComputedProjectThenMatchPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {y: {$sum: ['$myMeta.a', '$myMeta.b']}}}"),
                    fromjson("{$match: {y: {$gt: 'abc'}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -586,12 +612,13 @@ TEST_F(OptimizePipeline, ComputedProjectThenMatchPushedDown) {
 }
 
 TEST_F(OptimizePipeline, MetaSortThenProjectPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$sort: {myMeta: -1}}"),
                    fromjson("{$project: {myMeta: 1, x: 1}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -607,12 +634,13 @@ TEST_F(OptimizePipeline, MetaSortThenProjectPushedDown) {
 }
 
 TEST_F(OptimizePipeline, ProjectThenMetaSortPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: 1, x: 1}}"),
                    fromjson("{$sort: {myMeta: -1}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -628,12 +656,13 @@ TEST_F(OptimizePipeline, ProjectThenMetaSortPushedDown) {
 }
 
 TEST_F(OptimizePipeline, ComputedProjectThenSortPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: '$myMeta.a'}}"),
                    fromjson("{$sort: {myMeta: 1}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -653,12 +682,13 @@ TEST_F(OptimizePipeline, ComputedProjectThenSortPushedDown) {
 }
 
 TEST_F(OptimizePipeline, ExclusionProjectThenMatchPushDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time',"
                             "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {'myMeta.a': 0}}"),
                    fromjson("{$match: {'myMeta.b': {$lt: 10}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -674,12 +704,13 @@ TEST_F(OptimizePipeline, ExclusionProjectThenMatchPushDown) {
 }
 
 TEST_F(OptimizePipeline, ExclusionProjectThenProjectPushDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time',"
                             "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: 0}}"),
                    fromjson("{$project: {myMeta: 1, a: 1, _id: 0}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -696,12 +727,13 @@ TEST_F(OptimizePipeline, ExclusionProjectThenProjectPushDown) {
 }
 
 TEST_F(OptimizePipeline, ProjectThenExclusionProjectPushDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time',"
                             "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: 1, _id: 0}}"),
                    fromjson("{$project: {myMeta: 0}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -718,12 +750,13 @@ TEST_F(OptimizePipeline, ProjectThenExclusionProjectPushDown) {
 }
 
 TEST_F(OptimizePipeline, ComputedProjectThenProjectPushDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: '$myMeta.a'}}"),
                    fromjson("{$project: {myMeta: 0}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -742,12 +775,13 @@ TEST_F(OptimizePipeline, ComputedProjectThenProjectPushDown) {
 }
 
 TEST_F(OptimizePipeline, DoubleInclusionMetaProjectPushDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$project: {myMeta: 1, _id: 0}}"),
                    fromjson("{$project: {_id: 0, time: 1}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -766,8 +800,10 @@ TEST_F(OptimizePipeline, ExcludeMetaProjectPushDown) {
     auto unpackSpec = fromjson(
         "{$_internalUnpackBucket: { exclude: ['myMeta'], timeField: 'time', metaField: "
         "'myMeta', bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(
-        makeVector(unpackSpec, fromjson("{$project: {_id: 0, time: 1}}")), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpec, fromjson("{$project: {_id: 0, time: 1}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -780,11 +816,12 @@ TEST_F(OptimizePipeline, ExcludeMetaProjectPushDown) {
 }
 
 TEST_F(OptimizePipeline, AddFieldsOfShadowingMetaPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$addFields: {myMeta: '$myMeta.a'}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -800,11 +837,12 @@ TEST_F(OptimizePipeline, AddFieldsOfShadowingMetaPushedDown) {
 }
 
 TEST_F(OptimizePipeline, AddFieldsOfComputedMetaPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$addFields: {a: '$myMeta.a'}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -820,12 +858,13 @@ TEST_F(OptimizePipeline, AddFieldsOfComputedMetaPushedDown) {
 }
 
 TEST_F(OptimizePipeline, AddFieldsThenSortPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$addFields: {myMeta: '$myMeta.a'}}"),
                    fromjson("{$sort: {myMeta: 1}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -849,7 +888,9 @@ TEST_F(OptimizePipeline, PushDownAddFieldsAndInternalizeProjection) {
     auto projectSpecObj = fromjson("{$project: {_id: true, x: true, device: true}}");
 
     auto pipeline =
-        Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpec, projectSpecObj), getExpCtx());
+        pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpec, projectSpecObj),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
 
     pipeline_optimization::optimizePipeline(*pipeline);
 
@@ -871,7 +912,9 @@ TEST_F(OptimizePipeline, PushDownAddFieldsDoNotInternalizeProjection) {
     auto projectSpecObj = fromjson("{$project: {x: 1, device: 1, z : 1}}");
 
     auto pipeline =
-        Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpec, projectSpecObj), getExpCtx());
+        pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpec, projectSpecObj),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
 
     pipeline_optimization::optimizePipeline(*pipeline);
 
@@ -901,7 +944,9 @@ TEST_F(OptimizePipeline, InternalizeProjectAndPushdownAddFields) {
     auto addFieldsSpec = fromjson("{$addFields: {newMeta: '$myMeta.a'}}");
 
     auto pipeline =
-        Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec), getExpCtx());
+        pipeline_factory::makePipeline(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
 
     pipeline_optimization::optimizePipeline(*pipeline);
 
@@ -924,7 +969,9 @@ TEST_F(OptimizePipeline, InternalizeProjectAndPushdownAddFieldsWithShadowingMeta
     auto addFieldsSpec = fromjson("{$addFields: {myMeta: '$myMeta.a'}}");
 
     auto pipeline =
-        Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec), getExpCtx());
+        pipeline_factory::makePipeline(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
 
     pipeline_optimization::optimizePipeline(*pipeline);
 
@@ -949,7 +996,9 @@ TEST_F(OptimizePipeline, DoNotSwapAddFieldsIfDependencyIsExcluded) {
         auto addFieldsSpec = fromjson("{$addFields: {newMeta: '$myMeta'}}");
 
         auto pipeline =
-            Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec), getExpCtx());
+            pipeline_factory::makePipeline(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec),
+                                           getExpCtx(),
+                                           pipeline_factory::kOptionsMinimal);
 
         pipeline_optimization::optimizePipeline(*pipeline);
 
@@ -973,7 +1022,9 @@ TEST_F(OptimizePipeline, DoNotSwapAddFieldsIfDependencyIsExcluded) {
         auto addFieldsSpec = fromjson("{$addFields: {newMeta: '$excluded'}}");
 
         auto pipeline =
-            Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec), getExpCtx());
+            pipeline_factory::makePipeline(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec),
+                                           getExpCtx(),
+                                           pipeline_factory::kOptionsMinimal);
 
         pipeline_optimization::optimizePipeline(*pipeline);
 
@@ -993,10 +1044,12 @@ TEST_F(OptimizePipeline, PushdownSortAndAddFields) {
     auto unpackSpecObj = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj,
-                                               fromjson("{$addFields: {newMeta: '$myMeta.a'}}"),
-                                               fromjson("{$sort: {myMeta: -1}}")),
-                                    getExpCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(makeVector(unpackSpecObj,
+                                                  fromjson("{$addFields: {newMeta: '$myMeta.a'}}"),
+                                                  fromjson("{$sort: {myMeta: -1}}")),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
 
     pipeline_optimization::optimizePipeline(*pipeline);
     // We should push down both $sort and $addFields.
@@ -1014,11 +1067,12 @@ TEST_F(OptimizePipeline, PushdownMatchAndAddFields) {
     auto unpackSpecObj = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(unpackSpecObj,
                    fromjson("{$match: {'myMeta.a': {$eq: 'abc'}}}"),
                    fromjson("{$addFields: {newMeta: '$myMeta.b', z: {$add : ['$x', '$y']}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
 
     pipeline_optimization::optimizePipeline(*pipeline);
 
@@ -1036,12 +1090,13 @@ TEST_F(OptimizePipeline, PushdownMatchAndAddFields) {
 }
 
 TEST_F(OptimizePipeline, MatchWithGeoWithinOnMeasurementsPushedDownUsingInternalBucketGeoWithin) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
                             "'time', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$match: {loc: {$geoWithin: {$geometry: {type: \"Polygon\", "
                             "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 2U);
 
@@ -1067,12 +1122,13 @@ TEST_F(OptimizePipeline, MatchWithGeoWithinOnMeasurementsPushedDownUsingInternal
 }
 
 TEST_F(OptimizePipeline, MatchWithGeoWithinOnMetaFieldIsPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
                             "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$match: {'myMeta.loc': {$geoWithin: {$geometry: {type: \"Polygon\", "
                             "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 2U);
 
@@ -1093,12 +1149,13 @@ TEST_F(OptimizePipeline, MatchWithGeoWithinOnMetaFieldIsPushedDown) {
 
 TEST_F(OptimizePipeline,
        MatchWithGeoIntersectsOnMeasurementsPushedDownUsingInternalBucketGeoWithin) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
                             "'time', bucketMaxSpanSeconds: 3600}}"),
                    fromjson("{$match: {loc: {$geoIntersects: {$geometry: {type: \"Polygon\", "
                             "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 2U);
 
@@ -1123,13 +1180,14 @@ TEST_F(OptimizePipeline,
 }
 
 TEST_F(OptimizePipeline, MatchWithGeoIntersectsOnMetaFieldIsPushedDown) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(
             fromjson("{$_internalUnpackBucket: {exclude: [], timeField: "
                      "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
             fromjson("{$match: {'myMeta.loc': {$geoIntersects: {$geometry: {type: \"Polygon\", "
                      "coordinates: [ [ [ 0, 0 ], [ 3, 6 ], [ 6, 1 ], [ 0, 0 ] ] ]}}}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 2U);
 
@@ -1157,11 +1215,13 @@ TEST_F(OptimizePipeline, StreamingGroupIsEnabledWhenPossible) {
         "{$group: {_id: {hour: {$dateTrunc: {date: '$time', unit: 'hour'}}, symbol: "
         "'$myMeta.symbol'}"
         ", 'sum': {$sum: '$tradeAmount'}}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj,
-                                               fromjson("{$sort: {time: 1}}"),
-                                               fromjson("{$match: {'tradePrice': 100}}"),
-                                               groupSpecObj),
-                                    getExpCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(makeVector(unpackSpecObj,
+                                                  fromjson("{$sort: {time: 1}}"),
+                                                  fromjson("{$match: {'tradePrice': 100}}"),
+                                                  groupSpecObj),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 4U);
 
@@ -1185,12 +1245,13 @@ TEST_F(OptimizePipeline, StreamingGroupIsNotEnabledWhenTimeFieldIsModified) {
     auto groupSpecObj = fromjson(
         "{$group: {_id: {hour: '$time', symbol: '$myMeta.symbol'}, 'sum': {$sum: "
         "'$tradeAmount'}, $willBeMerged: false}}");
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(unpackSpecObj,
                    fromjson("{$addFields: {'time': {$dateTrunc: {date: '$time', unit: 'hour'}}}}"),
                    fromjson("{$sort: {time: 1}}"),
                    groupSpecObj),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 4U);
 
@@ -1202,13 +1263,14 @@ TEST_F(OptimizePipeline, StreamingGroupIsNotEnabledWhenTimeFieldIsModified) {
 }
 
 TEST_F(OptimizePipeline, ComputedMetaProjFieldsAreNotInInclusionProjection) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(
             fromjson(
                 "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                 "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['time', 'y']}}"),
             fromjson("{$project: {time: 1, x: 1}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -1226,12 +1288,13 @@ TEST_F(OptimizePipeline, ComputedMetaProjFieldsAreNotInInclusionProjection) {
 
 TEST_F(OptimizePipeline, ComputedMetaProjectFieldsAfterInclusionGetsAddedToIncludes) {
 
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: []}}"),
                    fromjson("{$project: {myMeta: 1}}"),
                    fromjson("{$addFields: {newMeta: {$toUpper : '$myMeta'}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -1250,13 +1313,14 @@ TEST_F(OptimizePipeline, ComputedMetaProjectFieldsAfterInclusionGetsAddedToInclu
 }
 
 TEST_F(OptimizePipeline, ShadowingMetaProjectFieldsAfterInclusionGetsAddedToIncludes) {
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: "
                             "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: []}}"),
                    fromjson("{$project: {myMeta: 1}}"),
                    // The new 'myMeta' shadows the original 'myMeta'.
                    fromjson("{$addFields: {myMeta: {$toUpper : '$myMeta'}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);

@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -50,9 +51,10 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeSplitsMatchAndMaps
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(
+    auto pipeline = pipeline_factory::makePipeline(
         makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}, a: {$lte: 4}}}")),
-        getExpCtx());
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -86,8 +88,10 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeMovesMetaMatchBefo
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline =
-        Pipeline::parse(makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0}}}")), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0}}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -104,10 +108,11 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
     auto unpack = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
         "bucketMaxSpanSeconds: 3600}}");
-    auto pipeline = Pipeline::parse(makeVector(unpack,
-                                               fromjson("{$project: {data: 1}}"),
-                                               fromjson("{$match: {myMeta: {$gte: 0}}}")),
-                                    getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(
+            unpack, fromjson("{$project: {data: 1}}"), fromjson("{$match: {myMeta: {$gte: 0}}}")),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(3u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);
@@ -135,7 +140,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
         "    {y: {$lt: 1}}"
         "  ]}"
         "]}}");
-    auto pipeline = Pipeline::parse(makeVector(unpack, match), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpack, match), getExpCtx(), pipeline_factory::kOptionsMinimal);
     ASSERT_EQ(2u, pipeline->size());
 
     pipeline_optimization::optimizePipeline(*pipeline);

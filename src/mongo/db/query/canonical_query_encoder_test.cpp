@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_test_util.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -77,7 +78,8 @@ std::vector<boost::intrusive_ptr<DocumentSource>> parsePipeline(
     const boost::intrusive_ptr<ExpressionContext> expCtx,
     const std::vector<BSONObj>& rawPipeline,
     bool shouldParameterize = false) {
-    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
 
     if (shouldParameterize) {
         pipeline->parameterize();

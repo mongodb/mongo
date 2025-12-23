@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/plan_cache/plan_cache_bm_fixture.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -55,7 +56,8 @@ public:
     static CanonicalQuery::QueryShapeString parseAndEncode(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const std::vector<BSONObj>& pipeline) {
-        std::unique_ptr<Pipeline> parsedPipeline = Pipeline::parse(pipeline, expCtx);
+        std::unique_ptr<Pipeline> parsedPipeline =
+            pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*parsedPipeline);
         parsedPipeline->parameterize();
 

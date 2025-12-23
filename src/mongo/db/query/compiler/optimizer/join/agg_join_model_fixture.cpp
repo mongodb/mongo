@@ -59,8 +59,11 @@ std::unique_ptr<Pipeline> AggJoinModelFixture::makePipeline(std::vector<BSONObj>
     }
     auto expCtx = getExpCtx();
     expCtx->addResolvedNamespaces(secondaryNamespaces);
-    auto pipeline = Pipeline::parse(bsonStages, expCtx);
-    pipeline_optimization::optimizePipeline(*pipeline);
+    auto pipeline =
+        pipeline_factory::makePipeline(bsonStages,
+                                       expCtx,
+                                       pipeline_factory::MakePipelineOptions{
+                                           .alreadyOptimized = false, .attachCursorSource = false});
 
     return pipeline;
 }

@@ -38,7 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/storage/storage_options.h"
@@ -71,9 +71,11 @@ TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithNonDottedFieldAndIdIsNotProject
     const int numSamplesPerChunk = 2;
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
 
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource =
         DocumentSourceMock::createForTest({"{_id: 10, a: 15}", "{_id: 3, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -95,9 +97,11 @@ TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithIdFieldIsProjectedSucceeds) {
     const int numSamplesPerChunk = 2;
     auto shardKeyPattern = ShardKeyPattern(BSON("_id" << 1));
 
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource =
         DocumentSourceMock::createForTest({"{_id: 10, a: 15}", "{_id: 3, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -120,9 +124,11 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithNonDottedHashedFieldSuc
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1 << "b"
                                                     << "hashed"));
 
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 1, b: 16, a: 15}", "{x: 2, b: 123, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -146,9 +152,11 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedFieldSucceeds) {
     const int numSamplesPerChunk = 2;
     auto shardKeyPattern = ShardKeyPattern(BSON("a.b" << 1 << "c" << 1));
 
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 10, a: {b: 20}, c: 1}", "{x: 3, a: {b: 10}, c: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -169,9 +177,11 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedHashedFieldSuccee
     auto shardKeyPattern = ShardKeyPattern(BSON("a.b" << 1 << "c" << 1 << "a.c"
                                                       << "hashed"));
 
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 10, a: {b: 20, c: 16}, c: 1}", "{x: 3, a: {b: 10, c: 123}, c: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -209,9 +219,11 @@ TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsSufficientSamples) {
         docs.emplace_back(Document(BSON("a" << a)));
     }
 
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(docs, expCtx());
     pipeline->addInitialSource(mockSource.get());
 
@@ -242,9 +254,11 @@ TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsInsufficientSamplesOneSplit
         docs.emplace_back(Document(BSON("a" << a)));
     }
 
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(docs, expCtx());
     pipeline->addInitialSource(mockSource.get());
 
@@ -266,9 +280,11 @@ TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsInsufficientSamplesMultiple
         docs.emplace_back(Document(BSON("a" << a)));
     }
 
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(docs, expCtx());
     pipeline->addInitialSource(mockSource.get());
 
@@ -286,9 +302,11 @@ TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithDottedPathAndIdIsNotProjectedSu
     const int numSamplesPerChunk = 2;
 
     auto shardKeyPattern = ShardKeyPattern(BSON("b" << 1));
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(
         {"{_id: {a: 15}, b: 10}", "{_id: {a: 5}, b:1}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -305,9 +323,11 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedPathAndIdIsProjec
     const int numSamplesPerChunk = 2;
 
     auto shardKeyPattern = ShardKeyPattern(BSON("_id.a" << 1 << "c" << 1));
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(
         {"{_id: {a: 15}, c: 10}", "{_id: {a: 5}, c: 1}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -325,9 +345,11 @@ TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceed
 
     auto shardKeyPattern = ShardKeyPattern(BSON("_id.a" << 1 << "b" << 1 << "_id.b"
                                                         << "hashed"));
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 10, _id: {a: 20, b: 16}, b: 1}", "{x: 3, _id: {a: 10, b: 123}, b: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -375,9 +397,11 @@ TEST_F(SamplingBasedSplitPolicyTest, SetNumSamplesPerChunkSucceedsOnOneChunk) {
 
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
     const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(
         {
             "{_id: 10, a: 15}",
@@ -412,9 +436,11 @@ TEST_F(SamplingBasedSplitPolicyTest, SetNumSamplesPerChunkSucceedsOnMultipleChun
 
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
     const NamespaceString ns = NamespaceString::createNamespaceString_forTest("foo", "bar");
-    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
-                                    expCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(SamplingBasedSplitPolicy::createRawPipeline(
+                                           shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                       expCtx(),
+                                       pipeline_factory::kOptionsMinimal);
     auto mockSource = DocumentSourceMock::createForTest(
         {
             "{_id: 10, a: 15}",

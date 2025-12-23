@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
@@ -60,7 +61,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
         "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {newMeta: {$toUpper : '$userMeta'}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -83,7 +86,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWithMetaPro
     auto addFieldsSpecObj =
         fromjson("{$addFields: {newMeta: {$concat: ['$myMeta.a', '$myMeta.b']}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -107,7 +112,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWith2MetaPr
     auto addFieldsSpecObj =
         fromjson("{$addFields: {device: '$myMeta.a', deviceType: '$myMeta.b'}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -131,7 +138,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, SplitAddFieldsWithMixedProje
     auto addFieldsSpecObj =
         fromjson("{$addFields: {device: '$myMeta.a', temp: {$add: ['$temperature', '$offset']}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -155,7 +164,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotSplitAddFieldsWithMetaP
         "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {temp: '$temperature', device: '$myMeta.a'}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -175,7 +186,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotOptimizeAddFieldsWithMi
     auto addFieldsSpecObj =
         fromjson("{$addFields: {newMeta: {$add: ['$myMeta.a', '$temperature']}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -193,7 +206,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotOptimizeAddFieldsWithMi
         "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {newMeta: '$myMeta'}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -213,7 +228,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
         "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {data: '$myMeta'}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -233,7 +250,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
         "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {data : {x: '$myMeta'}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(makeVector(unpackSpecObj, addFieldsSpecObj),
+                                                   getExpCtx(),
+                                                   pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -255,7 +274,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
         "bucketMaxSpanSeconds: 3600}}");
     auto projectSpecObj = fromjson("{$project: {_id : true, device: '$myMeta.a'}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, projectSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
 
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
@@ -281,7 +301,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto projectSpecObj =
         fromjson("{$project: {_id: true, x: true, 'y.z' : true, device: '$myMeta.a'}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, projectSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
 
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
@@ -308,7 +329,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotPushDownMixedProjection
     auto projectSpecObj = fromjson(
         "{$project: {_id: true, x: true, newMeta: {$add: ['$myMeta.a', '$temperature']}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, projectSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
 
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
@@ -329,7 +351,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto projectSpecObj =
         fromjson("{$project: {_id: true, x: true, meta: {$add: ['$myMeta.a', '$myMeta.b']}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, projectSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -348,7 +371,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotPushDownNestedProjectio
     auto projectSpecObj =
         fromjson("{$project: {_id: true, x: true, data: {z: {$add: ['$myMeta.a', '$myMeta.b']}}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, projectSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -379,7 +403,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
         "{$project: {_id: true, x: true, data: {z: {$add: [{$getField: 'myMeta'}, "
         "'$myMeta.b']}}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, projectSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -404,7 +429,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoPushDownNestedProjectionWi
     auto projectSpecObj =
         fromjson("{$project: {_id : true, device: {$getField: {input: '$myMeta', field:'a'}}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, projectSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -433,7 +459,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
         "{$project: {_id: true, x: true, data: {z: {$add: [{$getField: {input: '$other', "
         "field:'a'}},'$myMeta.b']}}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, projectSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =
@@ -456,7 +483,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
         "bucketMaxSpanSeconds: 3600}}");
     auto projectSpecObj = fromjson("{$project: {_id: true, x: true, data: '$$ROOT'}}");
 
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(unpackSpecObj, projectSpecObj), getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
     auto pushedDownAddFieldsStage =

@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 
@@ -69,7 +70,9 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewrite) {
     // $match followed by a $group should remove the $unpack stage.
     {
         auto pipeline =
-            Pipeline::parse(makeVector(unpackSpecObj, matchSpecObj, groupSpecObj), getExpCtx());
+            pipeline_factory::makePipeline(makeVector(unpackSpecObj, matchSpecObj, groupSpecObj),
+                                           getExpCtx(),
+                                           pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*pipeline);
 
         auto serialized = pipeline->serializeToBson();
@@ -86,7 +89,9 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewrite) {
     // $limit can be pushed up after a $match.
     {
         auto pipeline =
-            Pipeline::parse(makeVector(unpackSpecObj, matchSpecObj, limitSpecObj), getExpCtx());
+            pipeline_factory::makePipeline(makeVector(unpackSpecObj, matchSpecObj, limitSpecObj),
+                                           getExpCtx(),
+                                           pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*pipeline);
 
         auto serialized = pipeline->serializeToBson();
@@ -118,7 +123,9 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewriteNegat
     // the _eventFilter exists.
     {
         auto pipeline =
-            Pipeline::parse(makeVector(unpackSpecObj, matchSpecObj, groupSpecObj), getExpCtx());
+            pipeline_factory::makePipeline(makeVector(unpackSpecObj, matchSpecObj, groupSpecObj),
+                                           getExpCtx(),
+                                           pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*pipeline);
 
         auto serialized = pipeline->serializeToBson();
@@ -130,7 +137,9 @@ TEST_F(InternalUnpackBucketMatchFixedBucketTest, MatchWithGroupLimitRewriteNegat
     // The $limit stage cannot be pushed up after the $match, since the _eventFilter remains.
     {
         auto pipeline =
-            Pipeline::parse(makeVector(unpackSpecObj, matchSpecObj, limitSpecObj), getExpCtx());
+            pipeline_factory::makePipeline(makeVector(unpackSpecObj, matchSpecObj, limitSpecObj),
+                                           getExpCtx(),
+                                           pipeline_factory::kOptionsMinimal);
         pipeline_optimization::optimizePipeline(*pipeline);
 
         auto serialized = pipeline->serializeToBson();

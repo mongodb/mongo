@@ -44,7 +44,7 @@
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_documents.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -73,7 +73,8 @@ public:
         expCtx->setNamespaceString(_nss);
         expCtx->setInRouter(false);
 
-        return Pipeline::parse(rawPipeline, expCtx);
+        return pipeline_factory::makePipeline(
+            rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     }
 
     BSONObj createDummySpecFromStageName(std::string_view stageName) {

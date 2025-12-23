@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
@@ -70,7 +71,8 @@ protected:
             NamespaceString::createNamespaceString_forTest("test", "collection");
         auto command = AggregateCommandRequest{testNss, rawPipeline};
 
-        return Pipeline::parse(command.getPipeline(), getExpCtx());
+        return pipeline_factory::makePipeline(
+            command.getPipeline(), getExpCtx(), pipeline_factory::kOptionsMinimal);
     }
 
     auto parseExpression(std::string expressionString) {

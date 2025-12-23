@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
@@ -111,11 +112,13 @@ const auto expectedOptimizedUnpackBucketForMatchOnly = fromjson(R"(
 
 TEST_F(TopKSortOptimization, MatchOnlyAfterTopKSortPushedDownWithTopKSortOptimizationApplied) {
     // The $match stage is after the $sort stage.
-    auto pipeline = Pipeline::parse(makeVector(commonInitialUnpackSpecObj,
-                                               fromjson("{$sort: {time: 1}}"),
-                                               fromjson("{$match: {price: {$gte: 100}}}"),
-                                               firstLastGroupSpecObj),
-                                    getExpCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(makeVector(commonInitialUnpackSpecObj,
+                                                  fromjson("{$sort: {time: 1}}"),
+                                                  fromjson("{$match: {price: {$gte: 100}}}"),
+                                                  firstLastGroupSpecObj),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 4U);
 
@@ -138,11 +141,13 @@ TEST_F(TopKSortOptimization, MatchOnlyAfterTopKSortPushedDownWithTopKSortOptimiz
 
 TEST_F(TopKSortOptimization, MatchOnlyBeforeTopKSortPushedDownWithTopKSortOptimizationApplied) {
     // The $match stage is before the $sort stage.
-    auto pipeline = Pipeline::parse(makeVector(commonInitialUnpackSpecObj,
-                                               fromjson("{$match: {price: {$gte: 100}}}"),
-                                               fromjson("{$sort: {time: 1}}"),
-                                               firstLastGroupSpecObj),
-                                    getExpCtx());
+    auto pipeline =
+        pipeline_factory::makePipeline(makeVector(commonInitialUnpackSpecObj,
+                                                  fromjson("{$match: {price: {$gte: 100}}}"),
+                                                  fromjson("{$sort: {time: 1}}"),
+                                                  firstLastGroupSpecObj),
+                                       getExpCtx(),
+                                       pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 4U);
 
@@ -211,15 +216,16 @@ const auto expectedOptimizedMatch = fromjson(R"(
 
 TEST_F(TopKSortOptimization,
        Project_Match_Before_TopKSort_Optimized_WithTopKSortOptimizationApplied) {
-    auto pipeline =
-        Pipeline::parse(makeVector(commonInitialUnpackSpecObj,
-                                   fromjson("{$project: {tag: 1}}"),
-                                   // The $match should be pushed before the $_internalUnpackBucket.
-                                   fromjson("{$match: {'tag.symbol': {$in: ['abc', 'bcd']}}}"),
-                                   // And yet the $sort can be absorbed into the $group stage.
-                                   fromjson("{$sort: {s: 1}}"),
-                                   firstSumGroupSpecObj),
-                        getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(commonInitialUnpackSpecObj,
+                   fromjson("{$project: {tag: 1}}"),
+                   // The $match should be pushed before the $_internalUnpackBucket.
+                   fromjson("{$match: {'tag.symbol': {$in: ['abc', 'bcd']}}}"),
+                   // And yet the $sort can be absorbed into the $group stage.
+                   fromjson("{$sort: {s: 1}}"),
+                   firstSumGroupSpecObj),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 5U);
 
@@ -242,16 +248,17 @@ TEST_F(TopKSortOptimization,
 
 TEST_F(TopKSortOptimization,
        Match_Project_Before_TopKSort_Optimized_WithTopKSortOptimizationApplied) {
-    auto pipeline =
-        Pipeline::parse(makeVector(commonInitialUnpackSpecObj,
-                                   // The $match should be pushed before the $_internalUnpackBucket.
-                                   fromjson("{$match: {'tag.symbol': {$in: ['abc', 'bcd']}}}"),
-                                   // Renames 'tag.symbol' to 's'.
-                                   fromjson("{$project: {s: '$tag.symbol'}}"),
-                                   // And yet the $sort can be absorbed into the $group stage.
-                                   fromjson("{$sort: {s: 1}}"),
-                                   firstSumGroupSpecObj),
-                        getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(commonInitialUnpackSpecObj,
+                   // The $match should be pushed before the $_internalUnpackBucket.
+                   fromjson("{$match: {'tag.symbol': {$in: ['abc', 'bcd']}}}"),
+                   // Renames 'tag.symbol' to 's'.
+                   fromjson("{$project: {s: '$tag.symbol'}}"),
+                   // And yet the $sort can be absorbed into the $group stage.
+                   fromjson("{$sort: {s: 1}}"),
+                   firstSumGroupSpecObj),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 5U);
 
@@ -298,15 +305,16 @@ TEST_F(TopKSortOptimization,
 
 TEST_F(TopKSortOptimization,
        Project_TopKSort_Then_Match_Optimized_WithTopKSortOptimizationApplied) {
-    auto pipeline =
-        Pipeline::parse(makeVector(commonInitialUnpackSpecObj,
-                                   fromjson("{$project: {tag: 1}}"),
-                                   // And yet the $sort can be absorbed into the $group stage.
-                                   fromjson("{$sort: {'s': 1}}"),
-                                   // The $match should be pushed before the $_internalUnpackBucket.
-                                   fromjson("{$match: {'tag.symbol': {$in: ['abc', 'bcd']}}}"),
-                                   firstSumGroupSpecObj),
-                        getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(commonInitialUnpackSpecObj,
+                   fromjson("{$project: {tag: 1}}"),
+                   // And yet the $sort can be absorbed into the $group stage.
+                   fromjson("{$sort: {'s': 1}}"),
+                   // The $match should be pushed before the $_internalUnpackBucket.
+                   fromjson("{$match: {'tag.symbol': {$in: ['abc', 'bcd']}}}"),
+                   firstSumGroupSpecObj),
+        getExpCtx(),
+        pipeline_factory::kOptionsMinimal);
 
     ASSERT_EQ(pipeline->size(), 5U);
 

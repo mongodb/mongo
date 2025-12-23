@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -59,7 +60,8 @@ void assertExpectedLastpointOpt(const boost::intrusive_ptr<ExpressionContext> ex
         inputPipelineBson.emplace_back(fromjson(stageStr));
     }
 
-    auto pipeline = Pipeline::parse(inputPipelineBson, expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        inputPipelineBson, expCtx, pipeline_factory::kOptionsMinimal);
     auto& container = pipeline->getSources();
     ASSERT_EQ(container.size(), inputPipelineBson.size());
 

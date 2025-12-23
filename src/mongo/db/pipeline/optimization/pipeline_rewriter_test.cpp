@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
@@ -63,7 +64,8 @@ void runTest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
         for (auto&& stage : stages) {
             bsonStages.push_back(fromjson(stage));
         }
-        return Pipeline::parse(bsonStages, expCtx);
+        return pipeline_factory::makePipeline(
+            bsonStages, expCtx, pipeline_factory::kOptionsMinimal);
     };
 
     auto pipeline = makePipeline(input);

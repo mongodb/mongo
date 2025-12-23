@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -56,7 +57,8 @@ public:
         auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
         AggregateCommandRequest acr(kDefaultTestNss.nss());
         acr.setPipeline(rawPipeline);
-        auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+        auto pipeline =
+            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
 
         auto aggShape = std::make_unique<query_shape::AggCmdShape>(
             acr, kDefaultTestNss.nss(), pipeline->getInvolvedCollections(), *pipeline, expCtx);
@@ -83,7 +85,8 @@ TEST_F(AggKeyTest, SizeOfAggCmdComponents) {
 
     AggregateCommandRequest acr(kDefaultTestNss.nss());
     acr.setPipeline(rawPipeline);
-    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     auto namespaces = pipeline->getInvolvedCollections();
     auto aggComponents = std::make_unique<AggCmdComponents>(acr, namespaces, expCtx->getExplain());
 
@@ -115,7 +118,8 @@ TEST_F(AggKeyTest, EquivalentAggCmdComponentSizes) {
     acrAllValues.setBypassDocumentValidation(true);
     acrAllValues.setPassthroughToShard(PassthroughToShardOptions("shard1"));
 
-    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     auto namespaces = pipeline->getInvolvedCollections();
     auto aggComponentsAllValues =
         std::make_unique<AggCmdComponents>(acrAllValues, namespaces, expCtx->getExplain());
@@ -186,7 +190,8 @@ TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutComment) {
     AggregateCommandRequest acrWithComment(kDefaultTestNss.nss());
     acrWithComment.setPipeline(rawPipeline);
     expCtx->getOperationContext()->setComment(BSON("comment" << " foo"));
-    auto pipelineWithComment = Pipeline::parse(rawPipeline, expCtx);
+    auto pipelineWithComment =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     auto aggShape =
         std::make_unique<query_shape::AggCmdShape>(acrWithComment,
                                                    kDefaultTestNss.nss(),
@@ -217,7 +222,8 @@ TEST_F(AggKeyTest, SizeOfAggKeyWithAndWithoutReadConcern) {
     AggregateCommandRequest acrWithReadConcern(kDefaultTestNss.nss());
     acrWithReadConcern.setPipeline(rawPipeline);
     acrWithReadConcern.setReadConcern(repl::ReadConcernArgs::kLocal);
-    auto pipelineWithReadConcern = Pipeline::parse(rawPipeline, expCtx);
+    auto pipelineWithReadConcern =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     auto aggShape = std::make_unique<query_shape::AggCmdShape>(
         acrWithReadConcern,
         kDefaultTestNss.nss(),

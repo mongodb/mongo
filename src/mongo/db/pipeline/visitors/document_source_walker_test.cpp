@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/death_test.h"
@@ -74,8 +75,10 @@ TEST(DocumentSourceWalker, RegisterAndUseStages) {
                        DocumentSourceSingleDocumentTransformation>(&reg);
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    auto pipeline = Pipeline::parse(
-        makeVector(fromjson("{$match: {a: 1}}"), fromjson("{$project: {_id: 0}}")), expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(fromjson("{$match: {a: 1}}"), fromjson("{$project: {_id: 0}}")),
+        expCtx,
+        pipeline_factory::kOptionsMinimal);
 
     VisitorCtxImpl ctx;
     DocumentSourceWalker walker(reg, &ctx);
@@ -92,10 +95,11 @@ TEST(DocumentSourceWalker, WalkerMultipleDuplicateStages) {
                        DocumentSourceSingleDocumentTransformation>(&reg);
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    auto pipeline = Pipeline::parse(makeVector(fromjson("{$match: {a: 1}}"),
-                                               fromjson("{$project: {_id: 0}}"),
-                                               fromjson("{$project: {b: 2}}")),
-                                    expCtx);
+    auto pipeline = pipeline_factory::makePipeline(makeVector(fromjson("{$match: {a: 1}}"),
+                                                              fromjson("{$project: {_id: 0}}"),
+                                                              fromjson("{$project: {b: 2}}")),
+                                                   expCtx,
+                                                   pipeline_factory::kOptionsMinimal);
 
     VisitorCtxImpl ctx;
     DocumentSourceWalker walker(reg, &ctx);
@@ -115,8 +119,10 @@ TEST(DocumentSourceWalker, MultipleVisitorsRegistered) {
                        DocumentSourceSingleDocumentTransformation>(&reg);
 
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    auto pipeline = Pipeline::parse(
-        makeVector(fromjson("{$match: {a: 1}}"), fromjson("{$project: {_id: 0}}")), expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(fromjson("{$match: {a: 1}}"), fromjson("{$project: {_id: 0}}")),
+        expCtx,
+        pipeline_factory::kOptionsMinimal);
 
     VisitorCtxImpl ctx;
     DocumentSourceWalker walker(reg, &ctx);
@@ -131,8 +137,10 @@ DEATH_TEST_REGEX(DocumentSourceWalkerDeathTest, UnimplementedStage, "Tripwire as
     // Register match and not project.
     registerVisitFuncs<VisitorCtxImpl, DocumentSourceMatch>(&reg);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
-    auto pipeline = Pipeline::parse(
-        makeVector(fromjson("{$match: {a: 1}}"), fromjson("{$project: {_id: 0}}")), expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(fromjson("{$match: {a: 1}}"), fromjson("{$project: {_id: 0}}")),
+        expCtx,
+        pipeline_factory::kOptionsMinimal);
 
     VisitorCtxImpl ctx;
     DocumentSourceWalker walker(reg, &ctx);

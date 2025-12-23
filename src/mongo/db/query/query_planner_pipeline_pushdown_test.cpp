@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/query_planner.h"
@@ -73,7 +74,8 @@ protected:
      */
     std::unique_ptr<Pipeline> buildTestPipeline(const std::vector<BSONObj>& rawPipeline) {
         expCtx->addResolvedNamespaces({kSecondaryNamespace});
-        return Pipeline::parse(rawPipeline, expCtx);
+        return pipeline_factory::makePipeline(
+            rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
     }
 
     const NamespaceString kSecondaryNamespace =

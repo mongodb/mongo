@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -935,7 +936,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     auto outStage = fromjson(R"({$out: 'outColl'})");
     auto rawPipeline = {matchStage, unwindStage, groupStage, limitStage, outStage};
     acr.setPipeline(rawPipeline);
-    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
 
     auto shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
@@ -1311,7 +1313,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields
     auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
     AggregateCommandRequest acr(kDefaultTestNss.nss());
     acr.setPipeline({});
-    auto pipeline = Pipeline::parse({}, expCtx);
+    auto pipeline = pipeline_factory::makePipeline(
+        std::vector<BSONObj>{}, expCtx, pipeline_factory::kOptionsMinimal);
 
     auto shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
@@ -1364,7 +1367,8 @@ TEST_F(QueryStatsStoreTest,
     auto sortStage = fromjson("{$sort: {age: 1}}");
     auto rawPipeline = {unionWithStage, sortStage};
     acr.setPipeline(rawPipeline);
-    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+    auto pipeline =
+        pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
 
     auto shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);

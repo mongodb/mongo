@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/unittest/unittest.h"
 
@@ -81,7 +82,8 @@ protected:
         AggregateCommandRequest request(testNss, rawPipeline);
         getExpCtx()->setNamespaceString(testNss);
 
-        return Pipeline::parse(request.getPipeline(), getExpCtx());
+        return pipeline_factory::makePipeline(
+            request.getPipeline(), getExpCtx(), pipeline_factory::kOptionsMinimal);
     }
 
     template <typename T, typename... Args>
@@ -525,7 +527,8 @@ TEST_F(PipelineMetadataTreeTest, ZipWalksAPipelineAndTreeInTandemAndInOrder) {
 }
 
 TEST_F(PipelineMetadataTreeTest, MakeTreeWithEmptyPipeline) {
-    auto pipeline = Pipeline::parse({}, getExpCtx());
+    auto pipeline = pipeline_factory::makePipeline(
+        std::vector<BSONObj>{}, getExpCtx(), pipeline_factory::kOptionsMinimal);
     auto result = makeTree<std::string>({{getExpCtx()->getNamespaceString(), std::string("input")}},
                                         *pipeline,
                                         [](const auto&, const auto&, const DocumentSource& source) {

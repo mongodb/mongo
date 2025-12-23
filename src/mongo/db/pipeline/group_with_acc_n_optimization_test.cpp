@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 
@@ -45,7 +46,8 @@ namespace {
 class AccNforNis1OptimizationTest : public AggregationContextFixture {
 protected:
     void verify(const BSONObj& groupSpec, const std::vector<BSONObj>& expectedOptimizedPipeline) {
-        auto pipeline = Pipeline::parse(makeVector(groupSpec), getExpCtx());
+        auto pipeline = pipeline_factory::makePipeline(
+            makeVector(groupSpec), getExpCtx(), pipeline_factory::kOptionsMinimal);
 
         ASSERT_EQ(pipeline->size(), 1U);
 

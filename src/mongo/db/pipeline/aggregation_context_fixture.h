@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -248,8 +249,11 @@ public:
     void makePipelineOptimizeAssertNoRewrites(
         boost::intrusive_ptr<mongo::ExpressionContextForTest> expCtx,
         std::vector<BSONObj> expectedStages) {
-        auto optimizedPipeline = Pipeline::parse(expectedStages, expCtx);
-        pipeline_optimization::optimizePipeline(*optimizedPipeline);
+        auto optimizedPipeline = pipeline_factory::makePipeline(
+            expectedStages,
+            expCtx,
+            pipeline_factory::MakePipelineOptions{.alreadyOptimized = false,
+                                                  .attachCursorSource = false});
         auto optimizedSerialized = optimizedPipeline->serializeToBson();
 
         ASSERT_EQ(expectedStages.size(), optimizedSerialized.size());

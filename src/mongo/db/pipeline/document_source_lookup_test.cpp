@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
@@ -614,8 +615,10 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwind)
     auto lookupSpec = fromjson(
         "{$lookup: { from: 'coll', as: 'asField', pipeline: [{$match: {subfield: {$eq: 1}}}]}}");
     auto unwindSpec = fromjson("{$unwind: '$asField'}");
-    auto pipeline = Pipeline::parse(makeVector(lookupSpec, unwindSpec), expCtx);
-    pipeline_optimization::optimizePipeline(*pipeline);
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(lookupSpec, unwindSpec),
+        expCtx,
+        pipeline_factory::MakePipelineOptions{.attachCursorSource = false});
 
     auto sourceContainers = pipeline->getSources();
     ASSERT_EQ(sourceContainers.size(), 1);
@@ -682,8 +685,10 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwindA
     auto unwindSpec = fromjson("{$unwind: '$asField'}");
     auto matchSpec = fromjson("{$match: {'asField.subfield2': {$eq: 2}}}");
 
-    auto pipeline = Pipeline::parse(makeVector(lookupSpec, unwindSpec, matchSpec), expCtx);
-    pipeline_optimization::optimizePipeline(*pipeline);
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(lookupSpec, unwindSpec, matchSpec),
+        expCtx,
+        pipeline_factory::MakePipelineOptions{.attachCursorSource = false});
 
     auto sourceContainers = pipeline->getSources();
     ASSERT_EQ(sourceContainers.size(), 1);
@@ -754,9 +759,10 @@ TEST_F(DocumentSourceLookUpTest, ShouldBeAbleToReParseSerializedStageWithUnwindA
     auto matchSpec1 = fromjson("{$match: {'asField.subfield2': {$eq: 2}}}");
     auto matchSpec2 = fromjson("{$match: {'asField.subfield3': {$eq: 3}}}");
 
-    auto pipeline =
-        Pipeline::parse(makeVector(lookupSpec, unwindSpec, matchSpec1, matchSpec2), expCtx);
-    pipeline_optimization::optimizePipeline(*pipeline);
+    auto pipeline = pipeline_factory::makePipeline(
+        makeVector(lookupSpec, unwindSpec, matchSpec1, matchSpec2),
+        expCtx,
+        pipeline_factory::MakePipelineOptions{.attachCursorSource = false});
 
     auto sourceContainers = pipeline->getSources();
     ASSERT_EQ(sourceContainers.size(), 1);

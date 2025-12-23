@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -192,7 +193,8 @@ protected:
 
         auto [rawPipeline, expCtx] = _cloner->makeRawNaturalOrderPipeline(
             operationContext(), std::make_shared<MockMongoInterface>(configCacheChunksData));
-        _pipeline = Pipeline::parse(rawPipeline, expCtx);
+        _pipeline =
+            pipeline_factory::makePipeline(rawPipeline, expCtx, pipeline_factory::kOptionsMinimal);
 
         _pipeline->addInitialSource(
             DocumentSourceMock::createForTest(sourceCollectionData, _pipeline->getContext()));

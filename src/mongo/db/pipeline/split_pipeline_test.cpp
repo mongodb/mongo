@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/split_pipeline.h"
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 
 #include <deque>
 
@@ -61,7 +62,8 @@ public:
     };
     SplitPipeline testPipelineSplit(const std::vector<BSONObj>& inputPipeline,
                                     const ExpectedSplitPipeline& expectedSplitPipeline) {
-        auto pipeline = Pipeline::parse(inputPipeline, getExpCtx());
+        auto pipeline = pipeline_factory::makePipeline(
+            inputPipeline, getExpCtx(), pipeline_factory::kOptionsMinimal);
 
         auto actualSplitPipeline = SplitPipeline::split(std::move(pipeline));
 

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/query/query_shape/let_shape_component.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -78,7 +79,8 @@ public:
         auto aggRequest = makeAggregateCommandRequest(
             std::move(stagesJson), std::move(letJson), std::move(collationJson));
 
-        auto parsedPipeline = Pipeline::parse(aggRequest->getPipeline(), _expCtx);
+        auto parsedPipeline = pipeline_factory::makePipeline(
+            aggRequest->getPipeline(), _expCtx, pipeline_factory::kOptionsMinimal);
         return std::make_unique<AggCmdShape>(*aggRequest,
                                              kDefaultTestNss,
                                              stdx::unordered_set<NamespaceString>{kDefaultTestNss},
@@ -90,7 +92,8 @@ public:
         std::vector<StringData> stagesJson, OptionalBool allowDiskUse = {}) {
         auto aggRequest = makeAggregateCommandRequest(std::move(stagesJson));
 
-        auto parsedPipeline = Pipeline::parse(aggRequest->getPipeline(), _expCtx);
+        auto parsedPipeline = pipeline_factory::makePipeline(
+            aggRequest->getPipeline(), _expCtx, pipeline_factory::kOptionsMinimal);
         return std::make_unique<AggCmdShapeComponents>(
             *aggRequest,
             stdx::unordered_set<NamespaceString>{kDefaultTestNss},

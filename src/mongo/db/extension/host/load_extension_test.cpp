@@ -39,7 +39,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -209,7 +209,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
     // Verify the stage can be used in a pipeline with other existing stages.
     std::vector<BSONObj> pipeline = {BSON(kTestFooStageName << BSONObj()), BSON("$limit" << 1)};
 
-    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 2U);
 
@@ -261,7 +262,8 @@ TEST_F(LoadExtensionsTest, LoadMatchTopNDesugarExtensionSucceeds) {
     // Verify the stage can be used in a pipeline with other existing stages.
     std::vector<BSONObj> pipeline = {stageSpec, BSON("$skip" << 1)};
 
-    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
     ASSERT(parsedPipeline);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 2U);
 
@@ -337,7 +339,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionTwoStagesSucceeds) {
         test_util::makeEmptyExtensionConfig("libload_two_stages_mongo_extension.so")));
 
     std::vector<BSONObj> pipeline = {BSON("$foo" << BSONObj()), BSON("$bar" << BSONObj())};
-    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 2U);
 
@@ -358,7 +361,8 @@ TEST_F(LoadExtensionsTest, LoadHighestCompatibleVersionSucceeds) {
                                   "libload_highest_compatible_version_mongo_extension.so")));
 
     std::vector<BSONObj> pipeline = {BSON("$extensionV1" << BSONObj())};
-    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
 
@@ -370,9 +374,15 @@ TEST_F(LoadExtensionsTest, LoadHighestCompatibleVersionSucceeds) {
 
     // Assert that the other extension versions registered aren't available.
     pipeline = {BSON("$extensionV2" << BSONObj())};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 40324);
+    ASSERT_THROWS_CODE(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        40324);
     pipeline = {BSON("$extensionV3" << BSONObj())};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 40324);
+    ASSERT_THROWS_CODE(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        40324);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionBothOptionsSucceed) {
@@ -384,7 +394,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionBothOptionsSucceed) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load("test_options", config));
 
     std::vector<BSONObj> pipeline = {BSON("$optionA" << BSONObj())};
-    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
 
@@ -394,7 +405,10 @@ TEST_F(LoadExtensionsTest, LoadExtensionBothOptionsSucceed) {
 
     // Assert that $optionB is unavailable.
     pipeline = {BSON("$optionB" << BSONObj())};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 40324);
+    ASSERT_THROWS_CODE(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        40324);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionParseWithExtensionOptions) {
@@ -406,7 +420,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionParseWithExtensionOptions) {
     ASSERT_DOES_NOT_THROW(ExtensionLoader::load("parse_options", config));
 
     std::vector<BSONObj> pipeline = {BSON("$checkNum" << BSON("num" << 9))};
-    auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
 
@@ -416,7 +431,10 @@ TEST_F(LoadExtensionsTest, LoadExtensionParseWithExtensionOptions) {
 
     // Assert that parsing fails when the provided num is greater than the specified max of 10.
     pipeline = {BSON("$checkNum" << BSON("num" << 11))};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 10999106);
+    ASSERT_THROWS_CODE(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        10999106);
 }
 
 TEST_F(LoadExtensionsTest, LoadExtensionConfigErrors) {
@@ -444,8 +462,14 @@ TEST_F(LoadExtensionsTest, LoadStubParser) {
     // Verify that attempting to parse a pipeline with the $stub stage fails with the proper error
     // message.
     std::vector<BSONObj> pipeline = {BSON("$stub" << BSONObj()), BSON("$limit" << 1)};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 10918500);
-    ASSERT_THROWS_WHAT(Pipeline::parse(pipeline, expCtx), AssertionException, errorMsg);
+    ASSERT_THROWS_CODE(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        10918500);
+    ASSERT_THROWS_WHAT(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        errorMsg);
 }
 
 DEATH_TEST_F(LoadExtensionsTestDeathTest,
@@ -483,8 +507,14 @@ TEST_F(ExtensionErrorsTest, ExtensionUasserts) {
     std::vector<BSONObj> pipeline = {
         BSON("$assert" << BSON("errmsg" << "a new error" << "code" << 54321 << "assertionType"
                                         << "uassert"))};
-    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 54321);
-    ASSERT_THROWS_WHAT(Pipeline::parse(pipeline, expCtx), AssertionException, "a new error");
+    ASSERT_THROWS_CODE(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        54321);
+    ASSERT_THROWS_WHAT(
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal),
+        AssertionException,
+        "a new error");
 }
 
 using ExtensionErrorsTestDeathTest = ExtensionErrorsTest;
@@ -492,6 +522,7 @@ DEATH_TEST_REGEX_F(ExtensionErrorsTestDeathTest, ExtensionTasserts, "98765.*anot
     std::vector<BSONObj> pipeline = {
         BSON("$assert" << BSON("errmsg" << "another new error" << "code" << 98765 << "assertionType"
                                         << "tassert"))};
-    [[maybe_unused]] auto parsedPipeline = Pipeline::parse(pipeline, expCtx);
+    [[maybe_unused]] auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
 }
 }  // namespace mongo::extension::host
