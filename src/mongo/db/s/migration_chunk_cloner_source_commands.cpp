@@ -70,7 +70,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeRunningXferMods);
 
 /**
  * This file contains commands, which are specific to the legacy chunk cloner source.
@@ -273,9 +272,6 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-
-        hangBeforeRunningXferMods.pauseWhileSet();
-
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 

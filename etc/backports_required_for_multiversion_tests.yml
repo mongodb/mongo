@@ -91,8 +91,6 @@ last-continuous:
       ticket: SERVER-113145
     - test_file: jstests/aggregation/accumulators/accumulator_js_size_limits.js
       ticket: SERVER-112267
-    - test_file: jstests/sharding/move_chunk_abort.js
-      ticket: SERVER-101421
     - test_file: jstests/sharding/resharding_error_during_critical_section.js
       ticket: SERVER-114005
     - test_file: jstests/sharding/move_collection_stale_mongos.js
@@ -708,8 +706,6 @@ last-lts:
       ticket: SERVER-112267
     - test_file: jstests/concurrency/fsm_workloads/timeseries/timeseries_create_indexes.js
       ticket: SERVER-113887
-    - test_file: jstests/sharding/move_chunk_abort.js
-      ticket: SERVER-101421
     - test_file: jstests/sharding/resharding_error_during_critical_section.js
       ticket: SERVER-114005
     - test_file: jstests/sharding/move_collection_stale_mongos.js
