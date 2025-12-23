@@ -42,5 +42,7 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         return core.programs.generic_program(
-            self.logger, [self.program_executable], **self.program_options
+            self.logger,
+            [self.program_executable, "--enhancedReporter=false"],
+            **self.program_options,
         )

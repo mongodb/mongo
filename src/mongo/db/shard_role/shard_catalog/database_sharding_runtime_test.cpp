@@ -432,7 +432,9 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,
     }
 }
 
-DEATH_TEST_REGEX_F(DatabaseShardingRuntimeTestWithMockedLoader,
+using DatabaseShardingRuntimeTestWithMockedLoaderDeathTest =
+    DatabaseShardingRuntimeTestWithMockedLoader;
+DEATH_TEST_REGEX_F(DatabaseShardingRuntimeTestWithMockedLoaderDeathTest,
                    TestsShouldTassertIfPlacementConflictTimeIsNotPresentInTxns,
                    "Tripwire assertion.*9758701") {
     const auto installedDbVersion = DatabaseVersion(UUID::gen(), Timestamp(10, 0));

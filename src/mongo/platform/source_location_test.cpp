@@ -38,11 +38,13 @@ namespace {
 
 namespace m = unittest::match;
 
-TEST(SourceLocation, CorrectLineNumber) {
+class SourceLocationTest : public unittest::Test {};
+
+TEST_F(SourceLocationTest, CorrectLineNumber) {
     ASSERT_EQ(MONGO_SOURCE_LOCATION().line(), __LINE__);
 }
 
-TEST(SourceLocation, InlineVariable) {
+TEST_F(SourceLocationTest, InlineVariable) {
     SourceLocation a = MONGO_SOURCE_LOCATION();
     SourceLocation b = MONGO_SOURCE_LOCATION();
     SourceLocation c = MONGO_SOURCE_LOCATION();
@@ -54,13 +56,13 @@ constexpr SourceLocation functionLocation() {
     return MONGO_SOURCE_LOCATION();
 }
 
-TEST(SourceLocation, LocalFunction) {
+TEST_F(SourceLocationTest, LocalFunction) {
     auto f1 = functionLocation();
     auto f2 = functionLocation();
     ASSERT_EQ(f2.line(), f1.line());
 }
 
-TEST(SourceLocation, HeaderFunction) {
+TEST_F(SourceLocationTest, HeaderFunction) {
     auto h1 = makeHeaderSourceLocation_forTest();
     auto h2 = makeHeaderSourceLocation_forTest();
     ASSERT_EQ(h1.file_name(), h2.file_name());
@@ -71,7 +73,7 @@ TEST(SourceLocation, HeaderFunction) {
 constexpr auto gLoc = MONGO_SOURCE_LOCATION();
 constexpr auto gLocLine = __LINE__ - 1;
 
-TEST(SourceLocation, GlobalVariable) {
+TEST_F(SourceLocationTest, GlobalVariable) {
     ASSERT_EQ(gLoc.file_name(), MONGO_SOURCE_LOCATION().file_name());
     ASSERT_EQ(gLoc.line(), gLocLine);
 }
@@ -89,7 +91,7 @@ constexpr bool wrongLocation = true;
 constexpr bool wrongLocation = false;
 #endif
 
-TEST(SourceLocation, DefaultStructMember) {
+TEST_F(SourceLocationTest, DefaultStructMember) {
     struct Obj {
         Obj() = default;
         unsigned ctorLine = __LINE__ - 1;
@@ -106,7 +108,7 @@ SourceLocation someFunction(SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     return loc;
 }
 
-TEST(SourceLocation, FunctionReportsCaller) {
+TEST_F(SourceLocationTest, FunctionReportsCaller) {
     auto reported = someFunction().line();
     auto callSiteLine = __LINE__ - 1;
     // Some compilers incorrectly choose the function source line.
@@ -119,7 +121,7 @@ struct SomeClass {
     SourceLocation loc;
 };
 
-TEST(SourceLocation, ConstructorReportsCaller) {
+TEST_F(SourceLocationTest, ConstructorReportsCaller) {
     auto reported = SomeClass{}.loc.line();
     auto callSiteLine = __LINE__ - 1;
     // Some compilers incorrectly choose the ctor source line.
@@ -128,13 +130,13 @@ TEST(SourceLocation, ConstructorReportsCaller) {
 
 #define CALL_MONGO_SOURCE_LOCATION() MONGO_SOURCE_LOCATION()
 
-TEST(SourceLocation, Macro) {
+TEST_F(SourceLocationTest, Macro) {
     auto a = MONGO_SOURCE_LOCATION();
     auto b = CALL_MONGO_SOURCE_LOCATION();
     ASSERT_EQ(b.line(), a.line() + 1);
 }
 
-TEST(SourceLocation, Constexpr) {
+TEST_F(SourceLocationTest, Constexpr) {
     constexpr auto a = MONGO_SOURCE_LOCATION();
     [[maybe_unused]] constexpr std::tuple allConstexprs{functionLocation(),
                                                         makeHeaderSourceLocation_forTest(),
@@ -144,7 +146,7 @@ TEST(SourceLocation, Constexpr) {
                                                         a.function_name()};
 }
 
-TEST(SourceLocation, ToString) {
+TEST_F(SourceLocationTest, ToString) {
     auto synth = [](auto&&... args) {
         return SyntheticSourceLocation(args...);
     };
@@ -158,7 +160,7 @@ TEST(SourceLocation, ToString) {
     ASSERT_EQ(toString(synth("f.c", 12, "", 0)), "f.c:12");
 }
 
-TEST(SourceLocation, Formatting) {
+TEST_F(SourceLocationTest, Formatting) {
     auto loc = MONGO_SOURCE_LOCATION();
     auto s = toString(loc);
     {
@@ -169,7 +171,7 @@ TEST(SourceLocation, Formatting) {
     ASSERT_EQ(fmt::format("{}", loc), s);
 }
 
-TEST(SourceLocation, Logging) {
+TEST_F(SourceLocationTest, Logging) {
     auto loc = MONGO_SOURCE_LOCATION();
     auto s = toString(loc);
     unittest::LogCaptureGuard logs;

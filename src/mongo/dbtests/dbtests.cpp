@@ -152,11 +152,12 @@ CollectionAcquisition WriteContextForTests::getCollection(LockMode mode) const {
 }
 
 int dbtestsMain(int argc, char** argv) {
+    auto progress = initializeDbTests(std::vector<std::string>(argv, argv + argc));
     ::mongo::setTestCommandsEnabled(true);
     ::mongo::TestingProctor::instance().setEnabled(true);
     ::mongo::setupSynchronousSignalHandlers();
 
-    mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
+    runGlobalInitializersOrDie(progress.args());
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
     serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
     repl::ReplSettings replSettings;
@@ -204,7 +205,7 @@ int dbtestsMain(int argc, char** argv) {
 
     query_settings::QuerySettingsService::initializeForTest(service);
 
-    return mongo::dbtests::runDbTests(argc, argv);
+    return runDbTests(progress);
 }
 
 }  // namespace dbtests

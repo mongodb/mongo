@@ -106,7 +106,7 @@ void setX509PeerInfo(const std::shared_ptr<transport::Session>& session, SSLPeer
 
 class SASLX509Test : public mongo::unittest::Test {
 protected:
-    void setUp() final try {
+    void SetUp() override try {
         auto serviceContextHolder = ServiceContext::make();
         serviceContext = serviceContextHolder.get();
         setGlobalServiceContext(std::move(serviceContextHolder));
@@ -158,6 +158,7 @@ protected:
                                         "MockServer.test");
         saslClientSession->setParameter(NativeSaslClientSession::parameterServiceHostAndPort,
                                         "MockServer.test:27017");
+        LOGV2(82092, "X509 variant");
     } catch (const DBException& e) {
         ::mongo::StringBuilder sb;
         sb << "SASLX509Test Fixture Setup Failed: " << e.what();
@@ -187,12 +188,6 @@ protected:
 
         saslClientSession.reset();
         saslServerSession.reset();
-    }
-
-public:
-    void run() {
-        LOGV2(82092, "X509 variant");
-        Test::run();
     }
 
 protected:

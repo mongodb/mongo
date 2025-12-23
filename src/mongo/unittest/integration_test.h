@@ -30,6 +30,9 @@
 #pragma once
 
 #include "mongo/client/connection_string.h"
+#include "mongo/util/modules.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace unittest {

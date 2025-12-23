@@ -1271,6 +1271,17 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "server_parameter",
+    srcs = [
+        "server_parameter.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:logical_time",
+    ],
+)
+
 # The 'server_base' library must only contain basic, stateless, value types which are used throughout
 # all the server binaries. It must not depend on anything other than utilities that are outside of
 # the server codebase.
@@ -1286,7 +1297,6 @@ mongo_cc_library(
         "mirror_maestro_feature_flags_gen",
         "read_write_concern_provenance.cpp",
         "server_options.cpp",
-        "server_parameter.cpp",
         "shutdown_in_progress_quiesce_info.cpp",
         "tenant_id.cpp",
         "version_context.cpp",
@@ -1334,19 +1344,20 @@ mongo_cc_library(
         "//src/mongo/idl:generic_argument_gen",
         "//src/mongo/rpc/metadata:audit_metadata_gen",
         "//src/mongo/util:database_name_util.cpp",
-        "//src/mongo/util:fail_point.cpp",
         "//src/mongo/util:fail_point_server_parameter_gen",
         "//src/mongo/util:namespace_string_util.cpp",
     ],
     deps = [
         ":cluster_role",
         ":logical_time",
+        ":server_parameter",
         "//src/mongo:base",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db/repl:optime",
         "//src/mongo/idl:basic_types_serialization",
         "//src/mongo/idl:idl_parser",
         "//src/mongo/rpc:get_status_from_command_result",
+        "//src/mongo/util:fail_point",
         "//src/mongo/util:pcre_wrapper",
         "//src/mongo/util/net:hostandport_impl",
     ],

@@ -44,9 +44,6 @@
 
 namespace mongo::sbe {
 
-using namespace mongo::unittest;
-using namespace mongo::unittest::match;
-
 typedef std::pair<value::TypeTags, value::Value> TypedValue;
 typedef std::vector<TypedValue> TypedValues;
 
@@ -69,11 +66,14 @@ class GoldenSBETestFixture : public virtual SBETestFixture {
 public:
     GoldenSBETestFixture(bool debug = false) : _debug(debug), _variationCount(0) {}
 
-    void run();
+    void setUp() override;
+
+    void tearDown() override;
+
     void printVariation(const std::string& name = "");
 
 protected:
-    GoldenTestContext* gctx;
+    std::unique_ptr<unittest::GoldenTestContext> gctx;
 
 private:
     bool _debug;
@@ -81,66 +81,60 @@ private:
 };
 
 /** SBE Value Equal to. */
-class ValueEq : public mongo::unittest::match::Matcher {
+class ValueEqMatcher {
 public:
-    explicit ValueEq(TypedValue v) : _v{v} {}
-    explicit ValueEq(value::TagValueView v) : _v{v.tag, v.value} {}
+    explicit ValueEqMatcher(TypedValue v) : _v{v} {}
+    explicit ValueEqMatcher(value::TagValueView v) : _v{v.tag, v.value} {}
 
-    std::string describe() const {
-        std::stringstream ss;
-        ss << "ValueEq(" << _v << ")";
-        return ss.str();
+    void DescribeTo(std::ostream* os) const {
+        *os << "ValueEq(" << _v << ")";
     }
 
-    MatchResult match(const TypedValue x) const {
+    void DescribeNegationTo(std::ostream* os) const {
+        *os << "not ValueEq(" << _v << ")";
+    }
+
+    bool MatchAndExplain(const TypedValue& x, ::testing::MatchResultListener* listener) const {
         auto [tag, val] = sbe::value::compareValue(_v.first, _v.second, x.first, x.second);
-        return MatchResult{tag == sbe::value::TypeTags::NumberInt32 &&
-                           sbe::value::bitcastTo<int>(val) == 0};
+        return tag == sbe::value::TypeTags::NumberInt32 && sbe::value::bitcastTo<int>(val) == 0;
     }
 
-    MatchResult match(const value::TagValueView x) const {
-        return match(std::make_pair(x.tag, x.value));
+    bool MatchAndExplain(const value::TagValueView& x,
+                         ::testing::MatchResultListener* listener) const {
+        return MatchAndExplain(std::make_pair(x.tag, x.value), listener);
     }
 
 private:
     TypedValue _v;
 };
+
+inline auto ValueEq(TypedValue v) {
+    return ::testing::MakePolymorphicMatcher(ValueEqMatcher(v));
+}
+
+inline auto ValueEq(value::TagValueView v) {
+    return ::testing::MakePolymorphicMatcher(ValueEqMatcher(v));
+}
 
 /* Similar to ValueEq, but also value difference within certain limit for double and decimal */
-class ValueRoughEq : public mongo::unittest::match::Matcher {
-public:
-    explicit ValueRoughEq(TypedValue v, double limit) : _v{v}, _limit{limit} {}
-
-    std::string describe() const {
-        std::stringstream ss;
-        ss << "ValueEq(" << _v << ")";
-        return ss.str();
-    }
-
-    MatchResult match(const TypedValue& x) const {
-        auto [tag, val] = sbe::value::compareValue(_v.first, _v.second, x.first, x.second);
-        bool equal =
-            tag == sbe::value::TypeTags::NumberInt32 && sbe::value::bitcastTo<int>(val) == 0;
-        if (!equal) {
-            if (_v.first == sbe::value::TypeTags::NumberDouble &&
-                x.first == sbe::value::TypeTags::NumberDouble) {
-                auto diff = sbe::value::bitcastTo<double>(_v.second) -
-                    sbe::value::bitcastTo<double>(x.second);
-                equal = std::abs(diff) <= _limit;
-            } else if (_v.first == sbe::value::TypeTags::NumberDecimal &&
-                       x.first == sbe::value::TypeTags::NumberDecimal) {
-                auto diff = sbe::value::bitcastTo<Decimal128>(_v.second).subtract(
-                    sbe::value::bitcastTo<Decimal128>(x.second));
-                equal = diff.toAbs().toDouble() <= _limit;
-            }
+MATCHER_P2(ValueRoughEq, v, limit, "") {
+    auto [tag, val] = sbe::value::compareValue(v.first, v.second, arg.first, arg.second);
+    bool equal = tag == sbe::value::TypeTags::NumberInt32 && sbe::value::bitcastTo<int>(val) == 0;
+    if (!equal) {
+        if (v.first == sbe::value::TypeTags::NumberDouble &&
+            arg.first == sbe::value::TypeTags::NumberDouble) {
+            auto diff =
+                sbe::value::bitcastTo<double>(v.second) - sbe::value::bitcastTo<double>(arg.second);
+            equal = std::abs(diff) <= limit;
+        } else if (v.first == sbe::value::TypeTags::NumberDecimal &&
+                   arg.first == sbe::value::TypeTags::NumberDecimal) {
+            auto diff = sbe::value::bitcastTo<Decimal128>(v.second).subtract(
+                sbe::value::bitcastTo<Decimal128>(arg.second));
+            equal = diff.toAbs().toDouble() <= limit;
         }
-        return MatchResult{equal};
     }
-
-private:
-    TypedValue _v;
-    double _limit;
-};
+    return equal;
+}
 
 class ValueVectorGuard {
     ValueVectorGuard() = delete;

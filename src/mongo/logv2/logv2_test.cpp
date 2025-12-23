@@ -123,6 +123,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/enhanced_reporter.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -133,6 +134,7 @@
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/str_escape.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -298,26 +300,30 @@ private:
 class LogDuringInitShutdownTester {
 public:
     LogDuringInitShutdownTester() {
-        auto sink = LogCaptureBackend::create(std::make_unique<Listener>(&syncedLines), true);
-        applyDefaultFilterToSink(sink);
-        // We have to leave this sink installed as it is not allowed to install sinks during
-        // shutdown. Add a filter so it is only used during this test.
-        sink->set_filter([this](boost::log::attribute_value_set const& attrs) { return enabled; });
-        sink->set_formatter(PlainFormatter());
-        boost::log::core::get()->add_sink(sink);
-
-        ScopeGuard enabledGuard([this] { enabled = false; });
+        createSink();
+        ScopeGuard enabledGuard([this] { _enabled = false; });
         LOGV2(20001, "log during init");
-        ASSERT_EQUALS((**syncedLines).back(), "log during init");
+        ASSERT_EQUALS((**_syncedLines).back(), "log during init");
     }
     ~LogDuringInitShutdownTester() {
-        enabled = true;
+        _enabled = true;
+        createSink();
         LOGV2(4600800, "log during shutdown");
-        ASSERT_EQUALS((**syncedLines).back(), "log during shutdown");
+        ASSERT_EQUALS((**_syncedLines).back(), "log during shutdown");
     }
 
-    synchronized_value<std::vector<std::string>> syncedLines;
-    bool enabled = true;
+    void createSink() {
+        auto sink = LogCaptureBackend::create(std::make_unique<Listener>(&_syncedLines), true);
+        applyDefaultFilterToSink(sink);
+        // Add a filter so this sink is only used during this test.
+        sink->set_filter([this](boost::log::attribute_value_set const& attrs) { return _enabled; });
+        sink->set_formatter(PlainFormatter());
+        boost::log::core::get()->add_sink(sink);
+    }
+
+private:
+    synchronized_value<std::vector<std::string>> _syncedLines;
+    bool _enabled = true;
 };
 
 LogDuringInitShutdownTester logDuringInitAndShutdown;
@@ -357,12 +363,16 @@ public:
     LogV2Test() {
         LogDomainGlobal::ConfigurationOptions config;
         config.makeDisabled();
+        if (unittest::getGlobalEnhancedReporter())
+            unittest::getGlobalEnhancedReporter()->disable();
         ASSERT_OK(mgr().getGlobalDomainInternal().configure(config));
     }
 
     ~LogV2Test() override {
         for (auto&& sink : _attachedSinks)
             boost::log::core::get()->remove_sink(sink);
+        if (unittest::getGlobalEnhancedReporter())
+            unittest::getGlobalEnhancedReporter()->enable();
         ASSERT_OK(mgr().getGlobalDomainInternal().configure({}));
     }
 
@@ -2458,7 +2468,7 @@ TEST_F(LogV2Test, UserAssert) {
     ASSERT_THROWS_WITH_CHECK(
         LOGV2_OPTIONS(4652000, {UserAssertAfterLog(ErrorCodes::BadValue)}, "uasserting log"),
         DBException,
-        [&syncedLines](const DBException& ex) {
+        [&](const DBException& ex) {
             ASSERT_EQUALS(ex.code(), ErrorCodes::BadValue);
             ASSERT_EQUALS(ex.reason(), "uasserting log");
             ASSERT_EQUALS((**syncedLines).front(), ex.reason());
@@ -2470,7 +2480,7 @@ TEST_F(LogV2Test, UserAssert) {
                                            "uasserting log {name}",
                                            "name"_attr = 1),
                              DBException,
-                             [&syncedLines](const DBException& ex) {
+                             [&](const DBException& ex) {
                                  ASSERT_EQUALS(ex.code(), ErrorCodes::BadValue);
                                  ASSERT_EQUALS(ex.reason(), "uasserting log 1");
                                  ASSERT_EQUALS((**syncedLines).front(), ex.reason());
@@ -2479,7 +2489,7 @@ TEST_F(LogV2Test, UserAssert) {
 
     ASSERT_THROWS_WITH_CHECK(LOGV2_OPTIONS(4716000, {UserAssertAfterLog()}, "uasserting log"),
                              DBException,
-                             [&syncedLines](const DBException& ex) {
+                             [&](const DBException& ex) {
                                  ASSERT_EQUALS(ex.code(), 4716000);
                                  ASSERT_EQUALS(ex.reason(), "uasserting log");
                                  ASSERT_EQUALS((**syncedLines).front(), ex.reason());

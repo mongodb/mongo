@@ -33,6 +33,7 @@
 // IWYU pragma: friend "mongo/unittest/.*"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
@@ -46,7 +47,7 @@ namespace mongo::unittest {
  * Only one of these can be active at a time, as the logs
  * of all such guards are captured into a single static object.
  */
-class LogCaptureGuard {
+class MONGO_MOD_PUBLIC LogCaptureGuard {
 public:
     /** The object is automatically started. */
     LogCaptureGuard() : LogCaptureGuard{true} {}

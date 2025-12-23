@@ -99,22 +99,6 @@ Status parseMixed(const std::vector<std::string>& argv,
     return ex.toStatus();
 }
 
-MONGO_STARTUP_OPTIONS_PARSE(ConfigOption)(InitializerContext*) {
-    // Fake argv for default arg parsing.
-    const std::vector<std::string> argv = {
-        "mongo",
-        "--testConfigOpt2",
-        "true",
-        "--testConfigOpt8",
-        "8",
-        "--testConfigOpt12",
-        "command-line option",
-        "--testConfigOpt14",
-        "set14",
-    };
-    uassertStatusOK(parseArgv(argv, &moe::startupOptionsParsed));
-}
-
 template <typename T>
 void ASSERT_OPTION_SET(const moe::Environment& env, const moe::Key& name, const T& exp) {
     ASSERT_TRUE(env.count(name));

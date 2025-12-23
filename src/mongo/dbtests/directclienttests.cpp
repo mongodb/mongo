@@ -62,9 +62,15 @@ namespace DirectClientTests {
 
 const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
 
-class InsertMany {
+class Base {
 public:
-    virtual void run() {
+    virtual ~Base() = default;
+    virtual void run() = 0;
+};
+
+class InsertMany : public Base {
+public:
+    void run() override {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
@@ -88,9 +94,9 @@ public:
     }
 };
 
-class BadNSCmd {
+class BadNSCmd : public Base {
 public:
-    virtual void run() {
+    void run() override {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
@@ -104,9 +110,9 @@ public:
     }
 };
 
-class BadNSQuery {
+class BadNSQuery : public Base {
 public:
-    virtual void run() {
+    void run() override {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
@@ -119,9 +125,9 @@ public:
     }
 };
 
-class BadNSGetMore {
+class BadNSGetMore : public Base {
 public:
-    virtual void run() {
+    void run() override {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
@@ -133,9 +139,9 @@ public:
     }
 };
 
-class BadNSInsert {
+class BadNSInsert : public Base {
 public:
-    virtual void run() {
+    void run() override {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
@@ -146,9 +152,9 @@ public:
     }
 };
 
-class BadNSUpdate {
+class BadNSUpdate : public Base {
 public:
-    virtual void run() {
+    void run() override {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);
@@ -161,9 +167,9 @@ public:
     }
 };
 
-class BadNSRemove {
+class BadNSRemove : public Base {
 public:
-    virtual void run() {
+    void run() override {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient client(&opCtx);

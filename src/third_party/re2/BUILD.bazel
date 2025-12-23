@@ -74,10 +74,6 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-    target_compatible_with = select({
-        "@platforms//os:linux": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
     deps = [
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/container:flat_hash_map",

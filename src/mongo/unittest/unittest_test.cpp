@@ -43,6 +43,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/stringify.h"
+#include "mongo/unittest/unittest_main_core.h"
 #include "mongo/util/assert_util.h"
 
 #include <array>
@@ -72,21 +73,6 @@ namespace mus = mongo::unittest::stringify;
 bool containsPattern(const std::string& pattern, const std::string& value) {
     return value.find(pattern) != std::string::npos;
 }
-
-#define ASSERT_TEST_FAILS(TEST_STMT) \
-    ASSERT_THROWS(                   \
-        [&] {                        \
-            TEST_STMT;               \
-        }(),                         \
-        mongo::unittest::TestAssertionFailureException)
-
-#define ASSERT_TEST_FAILS_MATCH(TEST_STMT, PATTERN)     \
-    ASSERT_THROWS_WITH_CHECK(                           \
-        [&] {                                           \
-            TEST_STMT;                                  \
-        }(),                                            \
-        mongo::unittest::TestAssertionFailureException, \
-        ([&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.getMessage(), (PATTERN)); }))
 
 TEST(UnitTestSelfTest, DoNothing) {}
 
@@ -122,72 +108,6 @@ TEST(UnitTestSelfTest, TestSuccessfulNumericComparisons) {
     ASSERT_GREATER_THAN_OR_EQUALS(5, 1);
     ASSERT_GREATER_THAN_OR_EQUALS(5, 5);
     ASSERT_APPROX_EQUAL(5, 6, 1);
-}
-
-TEST(UnitTestSelfTest, TestNumericComparisonFailures) {
-    ASSERT_TEST_FAILS(ASSERT_EQUALS(10, 1LL));
-    ASSERT_TEST_FAILS(ASSERT_NOT_EQUALS(10, 10LL));
-    ASSERT_TEST_FAILS(ASSERT_LESS_THAN(10, 10LL));
-    ASSERT_TEST_FAILS(ASSERT_GREATER_THAN(10, 10LL));
-    ASSERT_TEST_FAILS(ASSERT_NOT_LESS_THAN(9, 10LL));
-    ASSERT_TEST_FAILS(ASSERT_NOT_GREATER_THAN(1, 0LL));
-    ASSERT_TEST_FAILS(ASSERT_APPROX_EQUAL(5.0, 6.1, 1));
-    if (std::numeric_limits<double>::has_quiet_NaN) {
-        ASSERT_TEST_FAILS(ASSERT_APPROX_EQUAL(5, std::numeric_limits<double>::quiet_NaN(), 1));
-    }
-    if (std::numeric_limits<double>::has_infinity) {
-        ASSERT_TEST_FAILS(ASSERT_APPROX_EQUAL(5, std::numeric_limits<double>::infinity(), 1));
-    }
-}
-
-TEST(UnitTestSelfTest, TestStringComparisons) {
-    ASSERT_EQUALS(std::string("hello"), "hello");
-    ASSERT_EQUALS("hello", std::string("hello"));
-
-    ASSERT_NOT_EQUALS(std::string("hello"), "good bye!");
-    ASSERT_NOT_EQUALS("hello", std::string("good bye!"));
-
-    ASSERT_TEST_FAILS(ASSERT_NOT_EQUALS(std::string("hello"), "hello"));
-    ASSERT_TEST_FAILS(ASSERT_NOT_EQUALS("hello", std::string("hello")));
-
-    ASSERT_TEST_FAILS(ASSERT_EQUALS(std::string("hello"), "good bye!"));
-    ASSERT_TEST_FAILS(ASSERT_EQUALS("hello", std::string("good bye!")));
-}
-
-TEST(UnitTestSelfTest, TestAssertStringContains) {
-    ASSERT_STRING_CONTAINS("abcdef", "bcd");
-    ASSERT_TEST_FAILS(ASSERT_STRING_CONTAINS("abcdef", "AAA"));
-    ASSERT_TEST_FAILS_MATCH(ASSERT_STRING_CONTAINS("abcdef", "AAA") << "XmsgX", "XmsgX");
-}
-
-TEST(UnitTestSelfTest, TestAssertStringOmits) {
-    ASSERT_STRING_OMITS("abcdef", "AAA");
-    ASSERT_TEST_FAILS(ASSERT_STRING_OMITS("abcdef", "bcd"));
-    ASSERT_TEST_FAILS_MATCH(ASSERT_STRING_OMITS("abcdef", "bcd") << "XmsgX", "XmsgX");
-}
-
-TEST(UnitTestSelfTest, TestAssertStringSearchRegex) {
-    ASSERT_STRING_SEARCH_REGEX("abcdef", "^abcdef$");
-    ASSERT_STRING_SEARCH_REGEX("abcdef", "cd");
-    ASSERT_STRING_SEARCH_REGEX("abcdef", ".*");
-    ASSERT_TEST_FAILS(ASSERT_STRING_SEARCH_REGEX("abcdef", "ce"));
-    ASSERT_TEST_FAILS(ASSERT_STRING_SEARCH_REGEX("abcdef", ".z."));
-    // A regex starting with ? is invalid and shouldn't match.
-    ASSERT_TEST_FAILS(ASSERT_STRING_SEARCH_REGEX("?", "?"));
-    ASSERT_TEST_FAILS(ASSERT_STRING_SEARCH_REGEX("abcdef", "?.*"));
-}
-
-TEST(UnitTestSelfTest, TestStreamingIntoFailures) {
-    ASSERT_TEST_FAILS_MATCH(ASSERT_TRUE(false) << "Told you so", "Told you so");
-    ASSERT_TEST_FAILS_MATCH(ASSERT(false) << "Told you so", "Told you so");
-    ASSERT_TEST_FAILS_MATCH(ASSERT_FALSE(true) << "Told you so", "Told you so");
-    ASSERT_TEST_FAILS_MATCH(ASSERT_EQUALS(1, 2) << "Told you so", "Told you so");
-    ASSERT_TEST_FAILS_MATCH(FAIL("Foo") << "Told you so", "Told you so");
-}
-
-TEST(UnitTestSelfTest, TestNoDoubleEvaluation) {
-    int i = 0;
-    ASSERT_TEST_FAILS_MATCH(ASSERT_EQ(0, ++i), "(0 == 1)");
 }
 
 TEST(UnitTestSelfTest, BSONObjComparisons) {
@@ -319,6 +239,14 @@ DEATH_TEST_REGEX(DeathTestSelfTestDeathTest, TestDeath, "Invariant failure.*fals
     invariant(false);
 }
 
+DEATH_TEST_REGEX(DeathTestSelfTestDeathTest,
+                 TestDeathFromException,
+                 "noexcept|An exception is active") {
+    // throw a non-exception type, just to make sure we catch everything
+    struct Dummy {};
+    throw Dummy{};
+}
+
 class DeathTestSelfTestFixture : public ::mongo::unittest::Test {
 public:
     void setUp() override {}
@@ -330,19 +258,6 @@ public:
 
 using DeathTestSelfTestFixtureDeathTest = DeathTestSelfTestFixture;
 DEATH_TEST_F(DeathTestSelfTestFixtureDeathTest, DieInTearDown, "Died in tear-down") {}
-
-TEST(UnitTestSelfTest, StackTraceForAssertion) {
-    bool threw = false;
-    std::string stacktrace;
-    try {
-        ASSERT_EQ(0, 1);
-    } catch (mongo::unittest::TestAssertionFailureException& ae) {
-        stacktrace = ae.getStacktrace();
-        threw = true;
-    }
-    ASSERT_TRUE(threw);
-    ASSERT_STRING_CONTAINS(stacktrace, "printStructuredStackTrace");
-}
 
 TEST(UnitTestSelfTest, ComparisonAssertionOverloadResolution) {
     using namespace mongo;
@@ -360,13 +275,23 @@ TEST(UnitTestSelfTest, ComparisonAssertionOverloadResolution) {
     ASSERT_EQ(x, "x"_sd);
 
     // Otherwise, compare pointers:
-    ASSERT_EQ(x, x);
-    ASSERT_EQ(xBuf, xBuf);
-    ASSERT_EQ(x, xBuf);
-    ASSERT_NE("x", xBuf);
-    ASSERT_NE("x", x);
-    ASSERT_NE(xBuf, "x");
-    ASSERT_NE(x, "x");
+    ASSERT_EQ(x, +x);
+    ASSERT_EQ(xBuf, +xBuf);
+    ASSERT_EQ(x, +xBuf);
+    ASSERT_NE("x", +xBuf);
+    ASSERT_NE("x", +x);
+    ASSERT_NE(+xBuf, "x");
+    ASSERT_NE(+x, "x");
+}
+
+TEST(UnitTestSelfTest, GtestFilter) {
+    using mongo::unittest::gtestFilterForSelection;
+    ASSERT_EQ(gtestFilterForSelection({}), "");
+    ASSERT_EQ(gtestFilterForSelection({{"A", "X", 0}}), "");
+    ASSERT_EQ(gtestFilterForSelection({{"A", "X", 1}}), "A.X");
+    ASSERT_EQ(gtestFilterForSelection({{"A", "X", 0}, {"A", "Y", 0}}), "");
+    ASSERT_EQ(gtestFilterForSelection({{"A", "X", 1}, {"A", "Y", 1}, {"A", "Z", 1}}),
+              "A.X:A.Y:A.Z");
 }
 
 ASSERT_DOES_NOT_COMPILE(DoesNotCompileCheckDeclval, typename Char = char, *std::declval<Char>());

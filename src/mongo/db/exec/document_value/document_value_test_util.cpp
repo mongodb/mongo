@@ -48,7 +48,10 @@ namespace unittest {
             std::ostringstream os;                                                   \
             os << "Expected [ " << aExpression << " " #OPERATOR " " << bExpression   \
                << " ] but found [ " << aValue << " " #OPERATOR " " << bValue << "]"; \
-            TestAssertionFailure(theFile, theLine, os.str()).stream();               \
+            GTEST_MESSAGE_AT_(theFile.c_str(),                                       \
+                              theLine,                                               \
+                              os.str().c_str(),                                      \
+                              ::testing::TestPartResult::kFatalFailure);             \
         }                                                                            \
     }
 

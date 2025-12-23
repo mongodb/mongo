@@ -33,9 +33,9 @@ filters:
   - "folly":
     approvers:
       - 10gen/server-workload-resilience
-  - "googletest_restricted_for_disagg_only":
+  - "googletest":
     approvers:
-      - 10gen/server-disagg-storage
+      - 10gen/server-programmability
   - "gperftools":
     approvers:
       - 10gen/server-workload-resilience

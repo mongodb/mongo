@@ -102,7 +102,8 @@ TEST(RangeDeletionRecoveryTracker, AddJobForCompletedTermDoesNothing) {
     ASSERT_EQ(tracker.getTrackedTermsCount(), 0);
 }
 
-DEATH_TEST(RangeDeletionRecoveryTracker,
+using RangeDeletionRecoveryTrackerDeathTest = RangeDeletionRecoveryTracker;
+DEATH_TEST(RangeDeletionRecoveryTrackerDeathTest,
            NotifyMoreJobsThanRegisteredAsserts,
            "Tripwire assertion") {
     RangeDeletionRecoveryTracker tracker;
@@ -137,7 +138,7 @@ TEST(RangeDeletionRecoveryTracker, EndTermAfterAllJobsComplete) {
     ASSERT_EQ(future.get(), RangeDeletionRecoveryTracker::Outcome::kComplete);
 }
 
-DEATH_TEST(RangeDeletionRecoveryTracker,
+DEATH_TEST(RangeDeletionRecoveryTrackerDeathTest,
            RegisterJobAfterRecoveryCompleteAsserts,
            "Tripwire assertion") {
     const auto term = 0;

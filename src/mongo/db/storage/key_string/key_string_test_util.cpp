@@ -53,22 +53,6 @@ unsigned newSeed() {
     return seed;
 }
 
-void KeyStringBuilderTest::run() {
-    try {
-        version = key_string::Version::V0;
-        unittest::Test::run();
-        version = key_string::Version::V1;
-        unittest::Test::run();
-    } catch (...) {
-        LOGV2(22226,
-              "exception while testing KeyStringBuilder version "
-              "{mongo_KeyString_keyStringVersionToString_version}",
-              "mongo_KeyString_keyStringVersionToString_version"_attr =
-                  key_string::keyStringVersionToString(version));
-        throw;
-    }
-}
-
 BSONObj toBson(const key_string::Builder& ks, Ordering ord) {
     return key_string::toBson(ks.getView(), ord, ks.getTypeBits());
 }

@@ -1594,7 +1594,8 @@ TEST_F(TransactionCoordinatorTest,
     executor::NetworkInterfaceMock::InNetworkGuard(network())->runReadyNetworkOperations();
 }
 
-DEATH_TEST_REGEX_F(TransactionCoordinatorTest,
+using TransactionCoordinatorTestDeathTest = TransactionCoordinatorTest;
+DEATH_TEST_REGEX_F(TransactionCoordinatorTestDeathTest,
                    CoordinatorTerminatedWithUnexpectedErrorAfterDurablyWritingDecision,
                    "Fatal assertion.*11353000") {
     // Create the coordinator.

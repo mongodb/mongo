@@ -29,15 +29,9 @@
 
 #pragma once
 
-/*
+#include "mongo/unittest/unittest_main_core.h"
 
-  simple portable regression system
- */
-
-#include <string>
-
-namespace mongo {
-namespace dbtests {
-int runDbTests(int argc, char** argv);
-}  // namespace dbtests
-}  // namespace mongo
+namespace mongo::dbtests {
+unittest::MainProgress initializeDbTests(std::vector<std::string> argVec);
+int runDbTests(unittest::MainProgress& progress);
+}  // namespace mongo::dbtests

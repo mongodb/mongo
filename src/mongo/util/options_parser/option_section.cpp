@@ -138,7 +138,8 @@ OptionDescription& OptionSection::addOptionChaining(
     const std::string& description,
     const std::vector<std::string>& deprecatedDottedNames,
     const std::vector<std::string>& deprecatedSingleNames,
-    OptionParserUsageType) {
+    OptionParserUsageType,
+    bool ignoreIfDuplicate) {
 
     OptionDescription option(
         dottedName, singleName, type, description, deprecatedDottedNames, deprecatedSingleNames);
@@ -172,8 +173,10 @@ OptionDescription& OptionSection::addOptionChaining(
                           << "deprecatedSingleName: " << singleName,
             !std::count(deprecatedSingleNames.begin(), deprecatedSingleNames.end(), singleName));
 
-    // Should not contain any already registered name.
-    uassertStatusOK(checkConflicts(_allDottedNames, _allSingleNames, option));
+    if (!ignoreIfDuplicate) {
+        // Should not contain any already registered name.
+        uassertStatusOK(checkConflicts(_allDottedNames, _allSingleNames, option));
+    }
 
     _allDottedNames.insert(option._dottedName);
     _allDottedNames.insert(option._deprecatedDottedNames.begin(),

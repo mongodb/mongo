@@ -88,7 +88,9 @@ private:
     std::unique_ptr<ChangeStreamReaderContextMock> _readerCtx;
 };
 
-DEATH_TEST_REGEX_F(DatabaseDbPresentStateEventHandlerFixture,
+using DatabaseDbPresentStateEventHandlerFixtureDeathTest =
+    DatabaseDbPresentStateEventHandlerFixture;
+DEATH_TEST_REGEX_F(DatabaseDbPresentStateEventHandlerFixtureDeathTest,
                    Given_DatabaseCreatedControlEvent_When_HandleEventIsCalled_Then_Throws,
                    "Tripwire assertion.*IllegalOperation") {
     handler().handleEvent(opCtx(), DatabaseCreatedControlEvent{}, ctx(), readerCtx());
@@ -118,7 +120,7 @@ TEST_F(
 }
 
 DEATH_TEST_REGEX_F(
-    DatabaseDbPresentStateEventHandlerFixture,
+    DatabaseDbPresentStateEventHandlerFixtureDeathTest,
     Given_MoveChunkControlEventWithNotAllChunksMigratedWithPlacementInFuture_When_HandleEventIsCalled_Then_Throws,
     "Tripwire assertion.*10917001") {
     Timestamp clusterTime(20, 1);
@@ -135,7 +137,7 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(
-    DatabaseDbPresentStateEventHandlerFixture,
+    DatabaseDbPresentStateEventHandlerFixtureDeathTest,
     Given_MoveChunkControlEventWithAllChunksMigratedWithPlacementInFuture_When_HandleEventIsCalled_Then_Throws,
     "Tripwire assertion.*10917001") {
     Timestamp clusterTime(20, 1);
@@ -250,7 +252,7 @@ TEST_F(
 }
 
 DEATH_TEST_REGEX_F(
-    DatabaseDbPresentStateEventHandlerFixture,
+    DatabaseDbPresentStateEventHandlerFixtureDeathTest,
     Given_MovePrimaryControlEventWithPlacementInFuture_When_HandleEventIsCalled_Then_Throws,
     "Tripwire assertion.*10917001") {
     Timestamp clusterTime(101, 0);
@@ -311,7 +313,7 @@ TEST_F(
 }
 
 DEATH_TEST_REGEX_F(
-    DatabaseDbPresentStateEventHandlerFixture,
+    DatabaseDbPresentStateEventHandlerFixtureDeathTest,
     Given_NamespacePlacementChangedControlEventWithPlacementInFuture_When_HandleEventIsCalled_Then_Throws,
     "Tripwire assertion.*10917001") {
     Timestamp clusterTime(101, 0);
@@ -346,7 +348,7 @@ TEST_F(
         ctx().lastSetEventHandler()));
 }
 
-DEATH_TEST_REGEX_F(DatabaseDbPresentStateEventHandlerFixture,
+DEATH_TEST_REGEX_F(DatabaseDbPresentStateEventHandlerFixtureDeathTest,
                    When_HandleEventInDegradedModeIsCalled_Then_AlwaysThrows,
                    "Tripwire assertion.*10917000") {
     handler().handleEventInDegradedMode(opCtx(), MovePrimaryControlEvent{}, ctx(), readerCtx());

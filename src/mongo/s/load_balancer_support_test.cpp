@@ -50,6 +50,10 @@ namespace {
 
 using namespace unittest::match;
 
+auto HasServiceId() {
+    return Truly([](auto&& arg) { return arg.hasElement("serviceId"); });
+}
+
 class LoadBalancerSupportTest : public ServiceContextTest {
 public:
     LoadBalancerSupportTest() = default;
@@ -61,19 +65,6 @@ public:
         load_balancer_support::handleHello(&*makeOperationContext(), &bob, lbOption);
         return bob.obj();
     }
-
-    struct HasServiceId : Matcher {
-        std::string describe() const {
-            return "HasServiceId";
-        }
-        MatchResult match(BSONObj obj) const {
-            bool ok = obj.hasElement("serviceId");
-            std::string msg;
-            if (!ok)
-                msg = tojson(obj);
-            return {ok, msg};
-        }
-    };
 
     FailPointEnableBlock simulateLoadBalancerConnection() const {
         return FailPointEnableBlock("loadBalancerSupportClientIsFromLoadBalancerPort");

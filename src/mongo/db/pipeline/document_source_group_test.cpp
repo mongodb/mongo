@@ -1116,7 +1116,7 @@ private:
 class ParseErrorBase : public Base {
 public:
     ~ParseErrorBase() override {}
-    void _doTest() final {
+    void TestBody() final {
         ASSERT_THROWS(createGroup(spec()), AssertionException);
     }
 
@@ -1127,7 +1127,7 @@ protected:
 class ExpressionBase : public Base {
 public:
     ~ExpressionBase() override {}
-    void _doTest() final {
+    void TestBody() final {
         createGroup(spec());
         auto mockStage = exec::agg::MockStage::createForTest(Document(doc()), ctx());
         groupStage()->setSource(mockStage.get());
@@ -1157,7 +1157,7 @@ class IdConstantBase : public ExpressionBase {
 /** $group spec is not an object. */
 class NonObject : public Base {
 public:
-    void _doTest() final {
+    void TestBody() final {
         BSONObj spec = BSON(getStageName() << "foo");
         BSONElement specElement = spec.firstElement();
         ASSERT_THROWS(createFromBson(specElement, ctx()), AssertionException);
@@ -1373,7 +1373,7 @@ public:
     CheckResultsBase(GroupStageType groupStageType = GroupStageType::Default)
         : Base(groupStageType) {}
     ~CheckResultsBase() override {}
-    void _doTest() override {
+    void TestBody() override {
         runSharded(false);
         runSharded(true);
     }
@@ -1582,7 +1582,7 @@ class UndefinedAccumulatorValue : public CheckResultsBase {
 /** Simulate merging sharded results in the router. */
 class RouterMerger : public CheckResultsBase {
 public:
-    void _doTest() final {
+    void TestBody() final {
         auto mockStage = exec::agg::MockStage::createForTest({"{_id:0,list:[1,2]}",
                                                               "{_id:1,list:[3,4]}",
                                                               "{_id:0,list:[10,20]}",
@@ -1609,7 +1609,7 @@ private:
 /** Dependant field paths. */
 class Dependencies : public Base {
 public:
-    void _doTest() final {
+    void TestBody() final {
         createGroup(fromjson("{_id:'$x',a:{$sum:'$y.z'},b:{$avg:{$add:['$u','$v']}}}"));
         DepsTracker dependencies;
         ASSERT_EQUALS(DepsTracker::State::EXHAUSTIVE_ALL, group()->getDependencies(&dependencies));
@@ -1644,11 +1644,11 @@ class StringConstantIdAndAccumulatorExpressions : public CheckResultsBase {
 /** An array constant passed to an accumulator. */
 class ArrayConstantAccumulatorExpression : public CheckResultsBase {
 public:
-    void _doTest() final {
+    void TestBody() final {
         // A parse exception is thrown when a raw array is provided to an accumulator.
         ASSERT_THROWS(createGroup(fromjson("{_id:1,a:{$push:[4,5,6]}}")), AssertionException);
         // Run standard base tests.
-        CheckResultsBase::_doTest();
+        CheckResultsBase::TestBody();
     }
     std::deque<DocumentSource::GetNextResult> inputData() override {
         return {Document()};
@@ -1691,7 +1691,7 @@ public:
     CheckResultsAndSpills(GroupStageType groupStageType, uint64_t expectedSpills)
         : CheckResultsBase(groupStageType), _expectedSpills(expectedSpills) {}
 
-    void _doTest() final {
+    void TestBody() final {
         for (int sharded = 0; sharded < 2; ++sharded) {
             runSharded(sharded);
             const auto* groupStats =

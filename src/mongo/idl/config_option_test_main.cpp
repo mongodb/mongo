@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,35 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/matcher.h"
-
-#include "mongo/util/pcre.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/unittest_main_core.h"
 
 #include <memory>
-#include <utility>
+#include <string>
+#include <vector>
 
-#include <fmt/format.h>
-
-namespace mongo::unittest::match {
-
-struct ContainsRegex::Impl {
-    explicit Impl(std::string pat) : re(std::move(pat)) {}
-    pcre::Regex re;
-};
-
-ContainsRegex::ContainsRegex(std::string pattern)
-    : _impl{std::make_shared<Impl>(std::move(pattern))} {}
-
-ContainsRegex::~ContainsRegex() = default;
-
-MatchResult ContainsRegex::match(StringData x) const {
-    if (_impl->re.matchView(x))
-        return {};
-    return MatchResult(false, "");
+int main(int argc, char** argv) {
+    mongo::unittest::MainProgress progress({}, std::vector<std::string>(argv, argv + argc));
+    progress.initialize();
+    if (GTEST_FLAG_GET(internal_run_death_test).empty()) {
+        auto& args = progress.args();
+        args.insert(args.end(),
+                    {
+                        "--testConfigOpt2",
+                        "true",
+                        "--testConfigOpt8",
+                        "8",
+                        "--testConfigOpt12",
+                        "command-line option",
+                        "--testConfigOpt14",
+                        "set14",
+                    });
+    }
+    return progress.test();
 }
-
-std::string ContainsRegex::describe() const {
-    return fmt::format(R"(ContainsRegex("{}"))", _impl->re.pattern());
-}
-
-}  // namespace mongo::unittest::match

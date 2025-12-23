@@ -66,6 +66,10 @@ requires std::is_integral_v<Int>
 class IntegerIntervalSet {
 public:
     class iterator;
+    using value_type = std::pair<Int, Int>;
+    using reference = value_type&;
+    using const_reference = const value_type&;
+    using difference_type = std::ptrdiff_t;
     using size_type = std::size_t;
 
     IntegerIntervalSet() = default;
@@ -290,8 +294,12 @@ public:
      */
     class iterator {
     public:
-        using value_type = std::pair<Int, Int>;
-        using difference_type = std::ptrdiff_t;
+        using difference_type = IntegerIntervalSet::difference_type;
+        using value_type = IntegerIntervalSet::value_type;
+        using reference = const value_type&;
+        using pointer = const value_type*;
+        using iterator_category = std::bidirectional_iterator_tag;
+
         iterator() = default;
 
         const std::pair<Int, Int>& operator*() const {
@@ -320,7 +328,7 @@ public:
             return *this;
         }
 
-        // This is the postfix operator-- (i.e. "--iter")
+        // This is the postfix operator-- (i.e. "iter--")
         iterator operator--(int) {
             auto oldIter = _iter;
             --(*this);

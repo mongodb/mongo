@@ -37,7 +37,6 @@
 
 namespace mongo {
 
-
 const Date_t kDate = Date_t::now();
 const std::vector<BSONObj> kField1Elements = {
     BSON("logLevel" << 2),

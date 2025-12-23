@@ -132,7 +132,7 @@ mongo_cc_unit_test(
     copts = [
         "-Isrc/mongo/embedded",
     ],
-    has_custom_mainline = True,
+    provides_main = True,
     tags = [
         "mongo_unittest_third_group",
         "stitch_support_test",
@@ -145,5 +145,6 @@ mongo_cc_unit_test(
         "stitch_support_duplicate",
         "//src/mongo/db/shard_role:service_context_non_d",
         "//src/mongo/unittest",
+        "//src/mongo/unittest:unittest_main_core",
     ],
 )

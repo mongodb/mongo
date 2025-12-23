@@ -75,8 +75,6 @@ namespace mongo {
 namespace {
 
 // Reusing the ConfigServerTestFixture for benchmarking.
-// _doTest has empty implementation to honor the abstract class, but it is not used in the benchmark
-// framework.
 class BenchmarkConfigServerTestFixture : public ConfigServerTestFixture {
 public:
     BenchmarkConfigServerTestFixture() : ConfigServerTestFixture() {
@@ -176,7 +174,7 @@ public:
     }
 
 private:
-    void _doTest() override {};
+    void TestBody() override {}
 
     std::vector<BSONObj> _generateConfigShardSampleData(int nShards) const {
         std::vector<BSONObj> configShardData;

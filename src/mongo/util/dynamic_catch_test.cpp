@@ -183,9 +183,7 @@ TEST_F(DynamicCatchTest, MultipleArgs) {
     ASSERT_EQ(fmt::format("[{}]", fmt::join(events, ",")), "[{here:oops},{andHere:oops}]");
 }
 
-DEATH_TEST_REGEX(DynamicCatchDeathDeathTest,
-                 FatalTestAssertFromStdxThread,
-                 "1 == 2.*from stdx::thread.*TestAssertionFailureException") {
+DEATH_TEST_REGEX(DynamicCatchDeathDeathTest, FatalTestAssertFromStdxThread, "from stdx::thread") {
     stdx::thread([] { ASSERT_EQ(1, 2) << "from stdx::thread"; }).join();
 }
 

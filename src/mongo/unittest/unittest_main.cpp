@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,121 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
-#include "mongo/base/status.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/unittest/log_test.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest_options_gen.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/exit_code.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
-#include "mongo/util/options_parser/value.h"
-#include "mongo/util/signal_handlers_synchronous.h"
-#include "mongo/util/testing_proctor.h"
+#include "mongo/unittest/unittest_main_core.h"
 
-#include <algorithm>
-#include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
-
-using ::mongo::Status;
-
-namespace moe = ::mongo::optionenvironment;
 
 int main(int argc, char** argv) {
     std::vector<std::string> argVec(argv, argv + argc);
-
-    ::mongo::clearSignalMask();
-    ::mongo::setupSynchronousSignalHandlers();
-
-    ::mongo::TestingProctor::instance().setEnabled(true);
-    ::mongo::setTestCommandsEnabled(true);
-    ::mongo::runGlobalInitializersOrDie(argVec);
-
-    moe::OptionSection options;
-
-    Status status = mongo::unittest::addUnitTestOptions(&options);
-    if (!status.isOK()) {
-        std::cerr << status;
-        return static_cast<int>(mongo::ExitCode::fail);
-    }
-
-    moe::OptionsParser parser;
-    moe::Environment environment;
-    Status ret = parser.run(options, argVec, &environment);
-    if (!ret.isOK()) {
-        std::cerr << options.helpString();
-        return static_cast<int>(::mongo::ExitCode::fail);
-    }
-
-    bool list = false;
-    moe::StringVector_t suites;
-    std::string filter;
-    int repeat = 1;
-    std::string verbose;
-    std::string fileNameFilter;
-    std::string internalRunDeathTest;
-    mongo::unittest::AutoUpdateConfig autoUpdateConfig;
-    autoUpdateConfig.executablePath =
-        boost::filesystem::canonical(boost::filesystem::path(argVec[0]));
-
-    // "list", "repeat", and "autoUpdateAsserts" will be assigned with default values, if
-    // not present.
-    invariant(environment.get("list", &list));
-    invariant(environment.get("repeat", &repeat));
-    invariant(environment.get("autoUpdateAsserts", &autoUpdateConfig.updateFailingAsserts));
-    invariant(environment.get("rewriteAllAutoAsserts", &autoUpdateConfig.revalidateAll));
-
-    // The default values of "suite" "filter" and "verbose" are empty.
-    environment.get("suite", &suites).ignore();
-    environment.get("filter", &filter).ignore();
-    environment.get("verbose", &verbose).ignore();
-    environment.get("fileNameFilter", &fileNameFilter).ignore();
-    environment.get("internalRunDeathTest", &internalRunDeathTest).ignore();
-
-    if (environment.count("tempPath")) {
-        ::mongo::unittest::TempDir::setTempPath(environment["tempPath"].as<std::string>());
-    }
-
-    mongo::unittest::getSpawnInfo() = {argVec, internalRunDeathTest, true};
-
-    if (autoUpdateConfig.revalidateAll && !autoUpdateConfig.updateFailingAsserts) {
-        std::cerr << "--rewriteAllAutoAsserts can only be set if --autoUpdateAsserts is also set."
-                  << std::endl;
-        return static_cast<int>(mongo::ExitCode::fail);
-    }
-    mongo::unittest::getAutoUpdateConfig() = autoUpdateConfig;
-
-    if (std::any_of(verbose.cbegin(), verbose.cend(), [](char ch) { return ch != 'v'; })) {
-        std::cerr << "The string for the --verbose option cannot contain characters other than 'v'"
-                  << std::endl;
-        std::cerr << options.helpString();
-        return static_cast<int>(mongo::ExitCode::fail);
-    }
-    mongo::unittest::setMinimumLoggedSeverity(mongo::logv2::LogSeverity::Debug(verbose.size()));
-
-    if (list) {
-        auto suiteNames = ::mongo::unittest::getAllSuiteNames();
-        for (const auto& name : suiteNames) {
-            std::cout << name << std::endl;
-        }
-        return static_cast<int>(mongo::ExitCode::clean);
-    }
-
-    auto result = ::mongo::unittest::Suite::run(suites, filter, fileNameFilter, repeat);
-
-    ret = ::mongo::runGlobalDeinitializers();
-    if (!ret.isOK()) {
-        std::cerr << "Global deinitilization failed: " << ret.reason() << std::endl;
-    }
-
-    ::mongo::TestingProctor::instance().exitAbruptlyIfDeferredErrors();
-
-    return result;
+    mongo::unittest::MainProgress progress({}, std::move(argVec));
+    progress.initialize();
+    return progress.test();
 }

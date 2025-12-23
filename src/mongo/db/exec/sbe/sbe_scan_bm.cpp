@@ -87,7 +87,7 @@ public:
         return colls;
     }
 
-    void _doTest() override {}
+    void TestBody() override {}
 
     const NamespaceString _nss =
         NamespaceString::createNamespaceString_forTest("testdb.sbe_scan_stage");

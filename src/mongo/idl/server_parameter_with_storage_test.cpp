@@ -51,10 +51,6 @@
 #include <fmt/format.h>
 
 namespace mongo {
-AtomicWord<int> test::gStdIntPreallocated;
-AtomicWord<int> test::gStdIntPreallocatedUpdateCount;
-size_t test::count;
-
 namespace {
 
 using SPT = ServerParameterType;

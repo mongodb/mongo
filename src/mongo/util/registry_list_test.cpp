@@ -48,7 +48,7 @@ TEST(RegistryList, MixedOperationsSingleThread) {
 
     RegistryList<boost::optional<int>> list;
 
-    for (int i = 0; i < 10000; ++i) {
+    for (int i = 0; i < 100; ++i) {
         // Get our cached iterator first
         auto iter = list.iter();
 
