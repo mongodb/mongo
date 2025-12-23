@@ -103,21 +103,6 @@ public:
         MatchExpressionParser::AllowedFeatures::kGeoNear;
 
     /**
-     * Parses a Pipeline from a vector of BSONObjs then invokes the optional 'validator' callback
-     * with a reference to the newly created Pipeline. If no validator callback is given, this
-     * method assumes that we're parsing a top-level pipeline. Throws an exception if it failed to
-     * parse or if any exception occurs in the validator. The returned pipeline is not optimized,
-     * but the caller may convert it to an optimized pipeline by calling optimizePipeline().
-     *
-     * It is illegal to create a pipeline using an ExpressionContext which contains a collation that
-     * will not be used during execution of the pipeline. Doing so may cause comparisons made during
-     * parse-time to return the wrong results.
-     */
-    static std::unique_ptr<Pipeline> parse(const std::vector<BSONObj>& rawPipeline,
-                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           PipelineValidatorCallback validator = nullptr);
-
-    /**
      * Like parse, but takes a LiteParsedPipeline instead of raw BSONObjs.
      * If 'isFacetPipeline' is true, skips top-level validators.
      */
@@ -466,17 +451,6 @@ public:
 private:
     Pipeline(const boost::intrusive_ptr<ExpressionContext>& pCtx);
     Pipeline(DocumentSourceContainer stages, const boost::intrusive_ptr<ExpressionContext>& pCtx);
-
-    /**
-     * Helper for public methods that parse pipelines from vectors of different types.
-     */
-    template <class T>
-    static std::unique_ptr<Pipeline> parseCommon(
-        const std::vector<T>& rawPipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        PipelineValidatorCallback validator,
-        bool isFacetPipeline,
-        std::function<DocumentSourceContainer(const T&)> getDocSourceFn);
 
     DocumentSourceContainer _sources;
 

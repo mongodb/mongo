@@ -181,7 +181,7 @@ mongo_cc_library(
         # the 'pipeline' -> 'query_settings_service' -> 'pipeline' cyclic
         # dependency. Generating the Debug Query Shape requires re-parsing the
         # query instance via `query_settings::createRepresentativeInfo()`
-        # which internally uses `Pipeline::parse()`.
+        # which internally uses `pipeline_factory::makePipeline()`.
         "//src/mongo/db/exec/agg:query_settings_stage.cpp",
         "//src/mongo/db/pipeline:document_source_query_settings.cpp",
         ":query_settings_cmds_gen",

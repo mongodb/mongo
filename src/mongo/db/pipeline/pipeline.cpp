@@ -198,13 +198,12 @@ std::unique_ptr<Pipeline> Pipeline::clone(
     return pipe;
 }
 
-template <class T>
-std::unique_ptr<Pipeline> Pipeline::parseCommon(
-    const std::vector<T>& rawPipeline,
+std::unique_ptr<Pipeline> Pipeline::parseFromLiteParsed(
+    const LiteParsedPipeline& liteParsedPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     PipelineValidatorCallback validator,
-    bool isFacetPipeline,
-    std::function<std::list<boost::intrusive_ptr<DocumentSource>>(const T&)> getDocSourceFn) {
+    bool isFacetPipeline) {
+    const auto& rawPipeline = liteParsedPipeline.getStages();
 
     // Before parsing the pipeline, make sure it's not so long that it will make us run out of
     // memory.
@@ -215,7 +214,7 @@ std::unique_ptr<Pipeline> Pipeline::parseCommon(
 
     DocumentSourceContainer stages;
     for (auto&& stageElem : rawPipeline) {
-        auto parsedSources = getDocSourceFn(stageElem);
+        auto parsedSources = DocumentSource::parseFromLiteParsed(expCtx, *stageElem);
         stages.insert(stages.end(), parsedSources.begin(), parsedSources.end());
     }
 
@@ -236,29 +235,6 @@ std::unique_ptr<Pipeline> Pipeline::parseCommon(
     pipeline->validateCommon(alreadyOptimized);
 
     return pipeline;
-}
-
-std::unique_ptr<Pipeline> Pipeline::parse(const std::vector<BSONObj>& rawPipeline,
-                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          PipelineValidatorCallback validator) {
-    return parseCommon<BSONObj>(rawPipeline, expCtx, validator, false, [&expCtx](BSONObj o) {
-        return DocumentSource::parse(expCtx, o);
-    });
-}
-
-std::unique_ptr<Pipeline> Pipeline::parseFromLiteParsed(
-    const LiteParsedPipeline& liteParsedPipeline,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    PipelineValidatorCallback validator,
-    bool isFacetPipeline) {
-    return parseCommon<std::unique_ptr<LiteParsedDocumentSource>>(
-        liteParsedPipeline.getStages(),
-        expCtx,
-        validator,
-        isFacetPipeline,
-        [&expCtx](const std::unique_ptr<LiteParsedDocumentSource>& lp) {
-            return DocumentSource::parseFromLiteParsed(expCtx, *lp);
-        });
 }
 
 std::unique_ptr<Pipeline> Pipeline::create(DocumentSourceContainer stages,
