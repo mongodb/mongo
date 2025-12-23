@@ -89,7 +89,17 @@ struct DataType {
                                     "trivially copyable. You may specialize the template to use it "
                                     "with other types.");
             if (ptr) {
+                /** Silence spurious GCC stringop-overflow false negatives. */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
+
                 std::memcpy(ptr, &t, sizeof(T));
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
             }
 
             if (advanced) {

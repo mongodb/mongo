@@ -78,7 +78,7 @@ StatusWith<std::size_t> ZlibMessageCompressor::decompressData(ConstDataRange inp
     }
 
     counterHitDecompress(input.length(), output.length());
-    return {output.length()};
+    return {length};
 }
 
 
