@@ -30,7 +30,11 @@
 #include "mongo/transport/session_manager_common.h"
 
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/transport/session_manager_common_mock.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 
 #include <cerrno>
@@ -66,6 +70,18 @@ TEST_F(SessionManagerCommonTest, VerifyMaxOpenSessionsBasedOnRlimit) {
     rlimitReturnCode = setrlimit(RLIMIT_NOFILE, &originalLimit);
     const auto savedErrno3 = errno;
     ASSERT_EQ(rlimitReturnCode, 0) << savedErrno3;
+}
+
+TEST_F(SessionManagerCommonTest, ConnectionsProcessedCounterWorks) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    MockSessionManagerCommon sm(getServiceContext());
+
+    TransportLayerMock tl;
+    auto session = MockSession::create(&tl);
+
+    sm.startSession(session);
+
+    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kConnectionsProcessed), 1);
 }
 
 }  // namespace

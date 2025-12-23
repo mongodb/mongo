@@ -40,6 +40,8 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metric_units.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -268,13 +270,20 @@ SessionManagerCommon::SessionManagerCommon(
     : _svcCtx(svcCtx),
       _maxOpenSessions(getSupportedMax()),
       _sessions(std::make_unique<Sessions>()),
-      _observers(std::move(observers)) {}
+      _observers(std::move(observers)) {
+    _connectionsProcessedCounter = otel::metrics::MetricsService::get(_svcCtx).createInt64Counter(
+        otel::metrics::MetricNames::kConnectionsProcessed,
+        "Total number of ingress connections processed (accepted or rejected)",
+        otel::metrics::MetricUnit::kConnections);
+}
 
 SessionManagerCommon::~SessionManagerCommon() = default;
 
 void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     invariant(session);
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
+
+    _connectionsProcessedCounter->add(1);
 
     serverGlobalParams.maxIncomingConnsOverride.refreshSnapshot(maxIncomingConnsOverride);
     // TODO (SERVER-113219) Check and modify this if needed.

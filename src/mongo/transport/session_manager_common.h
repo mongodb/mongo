@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/client.h"
+#include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/net/cidr.h"
@@ -102,6 +103,8 @@ protected:
 
     // External observer which may receive client connect/disconnect events.
     std::vector<std::shared_ptr<ClientTransportObserver>> _observers;
+
+    otel::metrics::Counter<int64_t>* _connectionsProcessedCounter;
 };
 
 /**
