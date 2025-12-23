@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <string>
@@ -51,7 +52,7 @@ namespace mongo {
  * Use ServerStatusSectionBuilder below to build your ServerStatusSection and register it with the
  * command. Make sure to perform the registration before the server can run commands.
  */
-class ServerStatusSection {
+class MONGO_MOD_OPEN ServerStatusSection {
 public:
     ServerStatusSection(std::string sectionName, ClusterRole role)
         : _sectionName(std::move(sectionName)), _role(role) {}
@@ -194,7 +195,7 @@ private:
  * all sections are registered before serverStatus can be run.
  */
 template <typename Section>
-class ServerStatusSectionBuilder {
+class MONGO_MOD_PUBLIC ServerStatusSectionBuilder {
 public:
     explicit ServerStatusSectionBuilder(std::string name) : _name(std::move(name)) {}
 
@@ -247,18 +248,21 @@ private:
 };
 
 
-class OpCounterServerStatusSection : public ServerStatusSection {
+class MONGO_MOD_PUBLIC OpCounterServerStatusSection : public ServerStatusSection {
 public:
     OpCounterServerStatusSection(const std::string& sectionName,
                                  ClusterRole role,
-                                 OpCounters* counters);
+                                 OpCounters* counters)
+        : ServerStatusSection(sectionName, role), _counters(counters) {}
 
     bool includeByDefault() const override {
         return true;
     }
 
     BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override;
+                            const BSONElement& configElement) const override {
+        return _counters->getObj();
+    }
 
 private:
     const OpCounters* _counters;
@@ -267,7 +271,7 @@ private:
 /**
  * Publishes an infrequently-changing BSON object as a server status section.
  */
-class BSONObjectStatusSection : public ServerStatusSection {
+class MONGO_MOD_PUBLIC BSONObjectStatusSection : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;
 

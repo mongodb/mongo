@@ -180,7 +180,6 @@ query:
     - src/mongo/db/commands/profile*
     - src/mongo/db/commands/sysprofile*
     - src/mongo/db/commands/query_cmd/
-    - src/mongo/db/commands/server_status*
     - src/mongo/db/commands/set_profiling_*
     - src/mongo/db/commands/shardsvr_resolve_view_command*
     - src/mongo/db/commands/top_command*
@@ -587,6 +586,7 @@ observability:
     jira: Networking & Observability
     fully_marked: true
   files:
+    - src/mongo/db/commands/server_status*
     - src/mongo/db/connection_health_metrics_parameter.idl
     - src/mongo/db/not_primary_error_tracker*
     - src/mongo/db/operation_cpu_timer*

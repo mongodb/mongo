@@ -36,6 +36,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/synchronized_value.h"
 
 #include <cstdint>
@@ -225,7 +226,7 @@ void appendMergedTrees(std::vector<const MetricTree*> trees,
                        const BSONObj& excludePaths = {});
 
 template <typename Policy>
-class CustomMetricBuilder {
+class MONGO_MOD_PUBLIC CustomMetricBuilder {
 public:
     using Metric = BasicServerStatusMetric<Policy>;
 
@@ -318,7 +319,7 @@ using ServerStatusMetricPolicySelectionT = typename ServerStatusMetricPolicySele
  *                         .setPredicate(someNullaryPredicate);
  */
 template <typename T>
-using MetricBuilder = CustomMetricBuilder<ServerStatusMetricPolicySelectionT<T>>;
+using MetricBuilder MONGO_MOD_PUBLIC = CustomMetricBuilder<ServerStatusMetricPolicySelectionT<T>>;
 
 /**
  * Leverage `synchronized_value<T>` to make a thread-safe `T` metric, for `T`

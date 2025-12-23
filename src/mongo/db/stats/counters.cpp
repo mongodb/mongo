@@ -341,16 +341,6 @@ void AuthCounter::append(BSONObjBuilder* b) {
     b->append("totalAuthenticationTimeMicros", totalAuthenticationTimeMicros);
 }
 
-OpCounterServerStatusSection::OpCounterServerStatusSection(const std::string& sectionName,
-                                                           ClusterRole role,
-                                                           OpCounters* counters)
-    : ServerStatusSection(sectionName, role), _counters(counters) {}
-
-BSONObj OpCounterServerStatusSection::generateSection(OperationContext* opCtx,
-                                                      const BSONElement& configElement) const {
-    return _counters->getObj();
-}
-
 OpCounters& serviceOpCounters(ClusterRole role) {
     static StaticImmortal<OpCounters> routerOpCounters;
     static StaticImmortal<OpCounters> shardOpCounters;
