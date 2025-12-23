@@ -262,6 +262,11 @@ public:
         runTests(false);
         ASSERT(boost::filesystem::is_empty(tempDir.path()));
 
+        // Persisting the sorter data is only supported when there is no limit.
+        if (adjustSortOptions(opts).limit) {
+            return;
+        }
+
         // Run the tests checking the Sorter ranges. This allows us to verify that
         // Sorter::persistDataForShutdown() correctly persists the Sorter data.
         runTests(true);

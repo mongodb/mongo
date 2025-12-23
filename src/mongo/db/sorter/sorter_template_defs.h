@@ -824,6 +824,20 @@ public:
         _paused = false;
     }
 
+    typename Sorter<Key, Value>::PersistedState persistDataForShutdown() override {
+        spill();
+        this->_file->keep();
+
+        std::vector<SorterRange> ranges;
+        ranges.reserve(this->_iters.size());
+        std::transform(this->_iters.begin(),
+                       this->_iters.end(),
+                       std::back_inserter(ranges),
+                       [](auto&& it) { return it->getRange(); });
+
+        return {this->_file->path().filename().string(), ranges};
+    }
+
 private:
     class STLComparator {
     public:
@@ -1294,20 +1308,6 @@ Sorter<Key, Value>::Sorter(const SortOptions& opts, std::string fileName)
     if (opts.useMemPool) {
         _memPool.emplace(sorter::makeMemPool());
     }
-}
-
-template <typename Key, typename Value>
-typename Sorter<Key, Value>::PersistedState Sorter<Key, Value>::persistDataForShutdown() {
-    spill();
-    this->_file->keep();
-
-    std::vector<SorterRange> ranges;
-    ranges.reserve(_iters.size());
-    std::transform(_iters.begin(), _iters.end(), std::back_inserter(ranges), [](auto&& it) {
-        return it->getRange();
-    });
-
-    return {_file->path().filename().string(), ranges};
 }
 
 //

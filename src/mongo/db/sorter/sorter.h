@@ -756,7 +756,9 @@ public:
      *
      * Only applicable to sorters with limit = 0.
      */
-    PersistedState persistDataForShutdown();
+    virtual PersistedState persistDataForShutdown() {
+        MONGO_UNREACHABLE;
+    };
 
     SharedBufferFragmentBuilder& memPool() {
         invariant(_memPool);
