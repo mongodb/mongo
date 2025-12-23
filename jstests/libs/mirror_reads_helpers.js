@@ -121,17 +121,19 @@ function waitForReadsToResolveOnTargetedNode(
             );
 
             // Verify that the reads mirrored to the secondaries have been resolved by the reading node.
-            return pending == 0 && scheduled == 0 && sent === resolved;
+            let allRequestsResolved = pending == 0 && scheduled == 0 && sent === resolved;
+
+            if (readsExpectedToFail) {
+                return allRequestsResolved;
+            } else {
+                // If we don't expect to fail from some fail point, then we expect most of our reads
+                // to succeed barring some transient errors.
+                return allRequestsResolved && succeeded + erroredDuringSend == sent;
+            }
         },
         "Did not resolve all requests within time limit",
         20000,
     );
-
-    if (!readsExpectedToFail) {
-        // If we don't expect to fail from some fail point, then we expect most of our reads
-        // to succeed barring some transient errors.
-        assert.eq(succeeded + erroredDuringSend, sent);
-    }
 }
 
 function getProcessedAsSecondaryTotal(rst, mirrorMode, db, initialStatsOnSecondaries, secondariesWithTag) {
