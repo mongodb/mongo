@@ -157,6 +157,18 @@ public:
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths) const final;
 
+    /**
+     * Applies the setMultikeyMetadata op:'c' oplog entry. Only used by replication.
+     *
+     * It can run during steady-state replication, or recovery (startup recovery, replication
+     * rollback, logical initial sync).
+     * It needs not check FeatureFlagReplicateMultikeynessInTransactions: if replicating this oplog
+     * entry, the feature flag is assumed to be enabled.
+     */
+    void setMultikeyForApplyOps(OperationContext* opCtx,
+                                const CollectionPtr& coll,
+                                const MultikeyPaths& multikeyPaths) const final;
+
     void forceSetMultikey(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           bool isMultikey,

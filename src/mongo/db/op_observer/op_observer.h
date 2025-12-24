@@ -236,6 +236,11 @@ public:
                                    bool fromMigrate,
                                    bool isTimeseries = false) = 0;
 
+    virtual void onSetMultikeyMetadata(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const std::string& idxName,
+                                       const BSONObj& multikeyPaths) = 0;
+
     /**
      * 'recordIds' is a vector of recordIds corresponding to the inserted documents.
      * The presence of a non-empty vector of recordIds indicates that the recordIds should

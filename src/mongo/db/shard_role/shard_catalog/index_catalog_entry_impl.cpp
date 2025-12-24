@@ -51,6 +51,8 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -84,6 +86,20 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
+
+namespace {
+
+mongo::BSONObj multikeyPathsToBSON(const mongo::BSONObj& keyPattern,
+                                   const mongo::MultikeyPaths& multikeyPaths) {
+    // Multikey paths can be empty. Examples: legacy index formats that do not support path-level
+    // multikeyness, FTS indices, or wildcard indices. The latter embeds multikey paths directly in
+    // the index table, and uses this code path only for setting the global "is multikey" catalog
+    // flag.
+    return multikeyPaths.empty() ? mongo::BSONObj()
+                                 : mongo::multikey_paths::serialize(keyPattern, multikeyPaths);
+}
+
+}  // namespace
 
 namespace mongo {
 
@@ -292,6 +308,21 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     }
 }
 
+void IndexCatalogEntryImpl::setMultikeyForApplyOps(OperationContext* opCtx,
+                                                   const CollectionPtr& coll,
+                                                   const MultikeyPaths& multikeyPaths) const {
+    invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(coll->ns(), MODE_IX));
+    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+
+    opCtx->getClient()->getServiceContext()->getOpObserver()->onSetMultikeyMetadata(
+        opCtx,
+        coll->ns(),
+        descriptor()->indexName(),
+        multikeyPathsToBSON(descriptor()->keyPattern(), multikeyPaths));
+
+    _catalogSetMultikey(opCtx, coll, multikeyPaths);
+}
+
 void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
                                              const CollectionPtr& coll,
                                              bool isMultikey,
@@ -328,6 +359,10 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
 
     TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
 
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
+    const bool replicateMultikeyness = gFeatureFlagReplicateMultikeynessInTransactions.isEnabled(
+        VersionContext::getDecoration(opCtx));
+
     // If the index is not visible within the side transaction, the index may have been created,
     // but not committed, in the parent transaction. Therefore, we abandon the side transaction
     // and set the multikey flag in the parent transaction.
@@ -347,13 +382,33 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
         // application.
         auto recoveryPrepareOpTime = txnParticipant.getPrepareOpTimeForRecovery();
         if (!recoveryPrepareOpTime.isNull()) {
+            if (replicateMultikeyness) {
+                // Start-up recovery and replication rollback never expect to hit this path.
+                // Recovery either has the relevant multikey metadata persisted in the stable
+                // checkpoint it's based off, or replays the setMultikeyMetadata oplog entry,
+                // so this replayed transaction does not ever need to make any multikey metadata
+                // write.
+                invariant(!InReplicationRecovery::isSet(opCtx->getServiceContext()));
+
+                // Because prepared transactions are never reconstructed during replication
+                // recovery, the invariant above means that we must be in logical initial sync.
+                // Logical initial sync is therefore the only path where a reconstructed transaction
+                // violates the timestamp consistency guarantees: the multikey metadata can be set
+                // in the context of the reconstructed prepared transaction, without replicating the
+                // setMultikeyMetadata oplog entry, therefore using a different timestamp than the
+                // rest of the replicas.
+            }
+
             // We might replay a prepared transaction behind the oldest timestamp during initial
-            // sync or behind the stable timestamp during rollback. During initial sync, we
-            // may not have a stable timestamp. Therefore, we need to round up
-            // the multi-key write timestamp to the max of the three so that we don't write
+            // sync (or behind the stable timestamp during rollback if
+            // FeatureFlagReplicateMultikeynessInTransactions is disabled).
+            //
+            // During initial sync, we may not have a stable timestamp. Therefore, we need to round
+            // up the multi-key write timestamp to the max of the three so that we don't write
             // behind the oldest/stable timestamp. This code path is only hit during initial
-            // sync/recovery when reconstructing prepared transactions, and so we don't expect
-            // the oldest/stable timestamp to advance concurrently.
+            // sync (and recovery if FeatureFlagReplicateMultikeynessInTransactions is enabled)
+            // when reconstructing prepared transactions, and so we don't expect the oldest/stable
+            // timestamp to advance concurrently.
             //
             // WiredTiger disallows committing at the stable timestamp to avoid confusion during
             // checkpoints, to overcome that we allow setting the timestamp slightly after the
@@ -372,15 +427,23 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
                  opCtx->getServiceContext()->getStorageEngine()->getStableTimestamp() + 1}));
             fassert(31164, status);
         } else {
-            // If there is no recovery prepare OpTime, then this node must be a primary. We
-            // write a noop oplog entry to get a properly ordered timestamp.
+            // If there is no recovery prepare OpTime, then this node must be a primary.
             invariant(opCtx->writesAreReplicated());
 
-            auto msg =
-                BSON("msg" << "Setting index to multikey"
-                           << "coll" << NamespaceStringUtil::serializeForCatalog(collection->ns())
-                           << "index" << _descriptor.indexName());
-            opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msg);
+            if (replicateMultikeyness) {
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onSetMultikeyMetadata(
+                    opCtx,
+                    collection->ns(),
+                    descriptor()->indexName(),
+                    multikeyPathsToBSON(descriptor()->keyPattern(), multikeyPaths));
+            } else {
+                // Write a noop oplog entry to get a properly ordered timestamp.
+                auto msg = BSON("msg" << "Setting index to multikey"
+                                      << "coll"
+                                      << NamespaceStringUtil::serializeForCatalog(collection->ns())
+                                      << "index" << _descriptor.indexName());
+                opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msg);
+            }
         }
 
         _catalogSetMultikey(opCtx, collection, multikeyPaths);
@@ -520,6 +583,12 @@ public:
         return _original->setMultikey(opCtx, coll, multikeyMetadataKeys, multikeyPaths);
     }
 
+    void setMultikeyForApplyOps(OperationContext* opCtx,
+                                const CollectionPtr& coll,
+                                const MultikeyPaths& multikeyPaths) const final {
+        return _original->setMultikeyForApplyOps(opCtx, coll, multikeyPaths);
+    }
+
     void forceSetMultikey(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           bool isMultikey,
@@ -642,6 +711,12 @@ public:
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths) const final {
         return _original->setMultikey(opCtx, coll, multikeyMetadataKeys, multikeyPaths);
+    }
+
+    void setMultikeyForApplyOps(OperationContext* opCtx,
+                                const CollectionPtr& coll,
+                                const MultikeyPaths& multikeyPaths) const final {
+        return _original->setMultikeyForApplyOps(opCtx, coll, multikeyPaths);
     }
 
     void forceSetMultikey(OperationContext* opCtx,

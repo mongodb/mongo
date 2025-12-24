@@ -102,6 +102,7 @@ enums:
             kDropDatabaseMetadata: "dropDatabaseMetadata"
             kTruncateRange: "truncateRange"
             kUpgradeDowngradeViewlessTimeseries: "upgradeDowngradeViewlessTimeseries"
+            kSetMultikeyMetadata: "setMultikeyMetadata"
 
 types:
     zeroOneManyStmtId:

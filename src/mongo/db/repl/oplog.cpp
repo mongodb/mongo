@@ -76,6 +76,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/set_multikey_metadata_oplog_entry_gen.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
@@ -1295,6 +1296,46 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
          return Status::OK();
      }}},
+    {"setMultikeyMetadata",
+     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
+          -> Status {
+          const auto& entry = *op;
+          const auto& cmd = entry.getObject();
+          const auto& ns = NamespaceStringUtil::deserialize(boost::none,
+                                                            cmd.firstElement().valueStringData(),
+                                                            SerializationContext::stateDefault());
+
+          const auto setMkEntry = SetMultikeyMetadataOplogEntry::parse(cmd);
+          const auto idxName = setMkEntry.getIdxName();
+          const auto paths = uassertStatusOK(multikey_paths::parse(setMkEntry.getPaths()));
+
+          writeConflictRetryWithLimit(opCtx, "applyOps_setMultikeyMetadata", ns, [&] {
+              const auto coll = acquireCollection(
+                  opCtx,
+                  CollectionAcquisitionRequest(ns,
+                                               PlacementConcern::kPretendUnsharded,
+                                               repl::ReadConcernArgs::get(opCtx),
+                                               AcquisitionPrerequisites::kWrite),
+                  MODE_IX);
+              uassert(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Failed to set multikey paths due to missing collection: "
+                                    << ns.toStringForErrorMsg(),
+                      coll.exists());
+
+              const auto idxEntry =
+                  coll.getCollectionPtr()->getIndexCatalog()->findIndexByName(opCtx, idxName);
+              uassert(ErrorCodes::IndexNotFound,
+                      str::stream()
+                          << "Failed to set multikey paths due to missing index: " << idxName,
+                      idxEntry);
+
+              WriteUnitOfWork wuow(opCtx);
+              idxEntry->setMultikeyForApplyOps(opCtx, coll.getCollectionPtr(), paths);
+              wuow.commit();
+          });
+          return Status::OK();
+      },
+      {ErrorCodes::NamespaceNotFound}}},
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write

@@ -82,6 +82,11 @@ public:
                            bool fromMigrate,
                            bool isTimeseries) override {}
 
+    void onSetMultikeyMetadata(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const std::string& idxName,
+                               const BSONObj& multikeyPaths) override {}
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,

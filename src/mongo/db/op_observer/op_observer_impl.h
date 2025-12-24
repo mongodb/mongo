@@ -111,6 +111,11 @@ public:
                            bool fromMigrate,
                            bool isTimeseries = false) final;
 
+    void onSetMultikeyMetadata(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const std::string& idxName,
+                               const BSONObj& multikeyPaths) final;
+
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator first,

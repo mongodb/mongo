@@ -136,6 +136,10 @@ public:
                              const KeyStringSet& multikeyMetadataKeys,
                              const MultikeyPaths& multikeyPaths) const = 0;
 
+    virtual void setMultikeyForApplyOps(OperationContext* opCtx,
+                                        const CollectionPtr& coll,
+                                        const MultikeyPaths& multikeyPaths) const = 0;
+
     /**
      * Sets the index to be multikey with the provided paths. This performs minimal validation of
      * the inputs and is intended to be used internally to "correct" multikey metadata that drifts

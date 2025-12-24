@@ -52,3 +52,6 @@ filters:
     approvers:
       - 10gen/server-fcv
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "set_multikey_metadata_oplog_entry.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog

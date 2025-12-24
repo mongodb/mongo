@@ -779,6 +779,26 @@ mongo_cc_library(
     ],
 )
 
+idl_generator(
+    name = "set_multikey_metadata_oplog_entry_gen",
+    src = "set_multikey_metadata_oplog_entry.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "set_multikey_metadata_oplog_entry_idl",
+    srcs = [
+        ":set_multikey_metadata_oplog_entry_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
 mongo_cc_library(
     name = "oplog",
     srcs = [
@@ -795,6 +815,7 @@ mongo_cc_library(
         ":repl_coordinator_interface",
         ":repl_server_parameters",
         ":repl_settings",
+        ":set_multikey_metadata_oplog_entry_idl",
         ":timestamp_block",
         ":truncate_range_oplog_entry_idl",
         "//src/mongo/db:change_stream_pre_images_collection_manager",
@@ -929,6 +950,7 @@ mongo_cc_library(
         ":oplog_entry",
         ":repl_coordinator_interface",
         ":repl_writer_thread_pool_server_parameters",
+        ":set_multikey_metadata_oplog_entry_idl",
         ":truncate_range_oplog_entry_idl",
         "//src/mongo/db:change_stream_pre_image_util",
         "//src/mongo/db:server_base",

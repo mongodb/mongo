@@ -510,7 +510,8 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
             case OplogEntry::CommandType::kAbortIndexBuild:
             case OplogEntry::CommandType::kCommitIndexBuild:
             case OplogEntry::CommandType::kCollMod:
-            case OplogEntry::CommandType::kTruncateRange: {
+            case OplogEntry::CommandType::kTruncateRange:
+            case OplogEntry::CommandType::kSetMultikeyMetadata: {
                 // For all other command types, we should be able to parse the collection name from
                 // the first command argument.
                 try {

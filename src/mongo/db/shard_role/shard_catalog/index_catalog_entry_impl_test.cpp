@@ -118,6 +118,12 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
+    void setMultikeyForApplyOps(OperationContext* opCtx,
+                                const CollectionPtr& coll,
+                                const MultikeyPaths& multikeyPaths) const override {
+        MONGO_UNREACHABLE;
+    }
+
     void forceSetMultikey(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           bool isMultikey,

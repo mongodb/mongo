@@ -53,6 +53,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/set_multikey_metadata_oplog_entry_gen.h"
 #include "mongo/db/repl/truncate_range_oplog_entry_gen.h"
 #include "mongo/db/router_role/sharding_write_router.h"
 #include "mongo/db/rss/replicated_storage_service.h"
@@ -557,6 +558,24 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
+    logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
+}
+
+void OpObserverImpl::onSetMultikeyMetadata(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const std::string& idxName,
+                                           const BSONObj& multikeyPaths) {
+    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
+        return;
+    }
+
+    SetMultikeyMetadataOplogEntry objectEntry(nss, idxName, multikeyPaths);
+
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setObject(objectEntry.toBSON());
+    oplogEntry.setNss(nss.getCommandNS());
+
     logOperation(opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 }
 

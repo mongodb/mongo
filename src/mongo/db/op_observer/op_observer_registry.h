@@ -197,6 +197,16 @@ public:
         }
     }
 
+    void onSetMultikeyMetadata(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const std::string& idxName,
+                               const BSONObj& multikeyPaths) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers) {
+            o->onSetMultikeyMetadata(opCtx, nss, idxName, multikeyPaths);
+        }
+    }
+
     void onInserts(OperationContext* const opCtx,
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,

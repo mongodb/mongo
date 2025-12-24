@@ -236,3 +236,10 @@ feature_flags:
         cpp_varname: gFeatureFlagOtelMetrics
         default: false
         fcv_gated: false
+    featureFlagReplicateMultikeynessInTransactions:
+        description: "Enable explicit replication of multikey metadata inside multi-document transactions"
+        cpp_varname: gFeatureFlagReplicateMultikeynessInTransactions
+        default: true
+        version: 8.3
+        fcv_gated: true
+        check_against_fcv: operation_fcv_only

@@ -129,6 +129,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/index_builds:commit_quorum_options",
         "//src/mongo/db/repl:repl_server_parameters",
+        "//src/mongo/db/repl:set_multikey_metadata_oplog_entry_idl",
         "//src/mongo/db/repl:truncate_range_oplog_entry_idl",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/shard_role/lock_manager:exception_util",
