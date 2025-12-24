@@ -1069,6 +1069,26 @@ TEST(BalancerPolicy, BalancerMostOverLoadShardHasMultipleZonesSkipZoneWithShardI
     ASSERT_BSONOBJ_EQ(cluster.second[getShardId(0)][3].getMin(), migrations[0].minKey);
 }
 
+TEST(BalancerPolicy, ZonesNotBelongingToTheMostOverloadedShardAreImbalanced) {
+    // shard0 is in zone `a` while shard1 and shard2 are in zone `b` that needs rebalancing
+    auto [cluster, cm] = generateCluster({{100, 100 * kDefaultMaxChunkSizeBytes, false, {"a"}},
+                                          {50, 50 * kDefaultMaxChunkSizeBytes, false, {"b"}},
+                                          {1, 1 * kDefaultMaxChunkSizeBytes, false, {"b"}}});
+
+    ZoneInfo zoneInfo;
+    ASSERT_OK(
+        zoneInfo.addRangeToZone(ZoneRange(kShardKeyPattern.globalMin(), BSON("x" << 100), "a")));
+    ASSERT_OK(zoneInfo.addRangeToZone(ZoneRange(BSON("x" << 100), BSON("x" << 200), "b")));
+
+    const auto distribution = makeDistStatus(cm, std::move(zoneInfo));
+
+    const auto [migrations, reason] = balanceChunks(cluster.first, distribution, false, false);
+    ASSERT_EQ(1U, migrations.size());
+
+    ASSERT_EQ(getShardId(1), migrations[0].from);
+    ASSERT_EQ(getShardId(2), migrations[0].to);
+}
+
 TEST(BalancerPolicy, BalancerFixesIncorrectZonesInOtherwiseBalancedClusterParallel) {
     // Chunks are balanced across shards, but there are wrong zones, which need to be fixed
     auto [cluster, cm] = generateCluster({{5, 3 * kDefaultMaxChunkSizeBytes, false, {"a"}},
