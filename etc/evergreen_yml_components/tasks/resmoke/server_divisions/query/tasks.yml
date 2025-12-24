@@ -2618,17 +2618,18 @@ tasks:
         vars:
           suite: query_golden_join_optimization
 
-  - <<: *task_template
-    name: query_join_optimization_passthrough_gen
-    tags: [
-        "assigned_to_jira_team_server_query_optimization",
-        "experimental",
-        "blocked_in_query_alias", # We explicitly specify this task in query alias
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_jobs_max: 5
+  # TODO SERVER-115982: Re-enable once join optimization passthrough tests are stable.
+  #- <<: *task_template
+  #  name: query_join_optimization_passthrough_gen
+  #  tags: [
+  #     "assigned_to_jira_team_server_query_optimization",
+  #      "experimental",
+  #      "blocked_in_query_alias", # We explicitly specify this task in query alias
+  #    ]
+  #  commands:
+  #    - func: "generate resmoke tasks"
+  #      vars:
+  #        resmoke_jobs_max: 5
 
   ################################################
   #           Query Integration tasks            #

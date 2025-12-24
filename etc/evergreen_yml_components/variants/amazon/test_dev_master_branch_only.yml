@@ -462,8 +462,9 @@ buildvariants:
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_golden_cbr_histogram
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
-      - name: query_join_optimization_passthrough_gen
-        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      # TODO SERVER-115982: Reenable!
+      # - name: query_join_optimization_passthrough_gen
+      #   cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
     name: amazon_linux2023_arm64_static-try-sbe-engine-query-patch-only
@@ -554,8 +555,9 @@ buildvariants:
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_golden_join_optimization
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
-      - name: query_join_optimization_passthrough_gen
-        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+      # TODO SERVER-115982: Reenable!
+      # - name: query_join_optimization_passthrough_gen
+      #   cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
     name: amazon_linux2023_arm64_static-unified-write-executor-query-patch-only
