@@ -42,9 +42,9 @@ for component in components_remove:
 endor_components_rename = [
     ["pkg:c/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
     ["pkg:generic/sourceware.org/git/valgrind", "pkg:generic/valgrind/valgrind"],
-    ["pkg:generic/zlib.net/zlib", "pkg:github/madler/zlib"],
-    ["pkg:generic/tartarus.org/libstemmer", "pkg:github/snowballstem/snowball"],
-    ["pkg:generic/intel.com/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
+    ["pkg:generic/zlib", "pkg:github/madler/zlib"],
+    ["pkg:generic/libstemmer", "pkg:github/snowballstem/snowball"],
+    ["pkg:generic/intel-dfp-math", "pkg:generic/intel/IntelRDFPMathLib"],
     ["pkg:c/git.openldap.org/openldap/openldap", "pkg:generic/openldap/openldap"],
     ["pkg:generic/github.com/", "pkg:github/"],
     ["pkg:c/github.com/", "pkg:github/"],

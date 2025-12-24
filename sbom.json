@@ -63,7 +63,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.697"
+          "version": "v1.7.742"
         }
       ]
     }
@@ -164,6 +164,10 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
+        },
+        {
+          "name": "internal:endor_labs_bom-ref",
+          "value": "pkg:generic/intel-dfp-math@2.0.1?package-id=378bc021cd4ac04e"
         }
       ],
       "evidence": {
@@ -254,6 +258,10 @@
         {
           "name": "emits_persisted_data",
           "value": "false"
+        },
+        {
+          "name": "internal:endor_labs_bom-ref",
+          "value": "pkg:generic/sourceware.org/git/valgrind@093bef43d69236287ccc748591c9560a71181b0a?package-id=28ec2eb9a0f1cc16"
         }
       ],
       "evidence": {
@@ -1838,6 +1846,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/scripts/zlib_get_sources.sh"
+        },
+        {
+          "name": "internal:endor_labs_bom-ref",
+          "value": "pkg:generic/zlib@1.3.1?package-id=c8022a0449368a5c"
         }
       ],
       "evidence": {
@@ -2393,6 +2405,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/libstemmer_c/scripts/import.sh"
+        },
+        {
+          "name": "internal:endor_labs_bom-ref",
+          "value": "pkg:generic/libstemmer@1.0.0?package-id=bf7f3ec34662591d"
         }
       ],
       "evidence": {
@@ -2643,7 +2659,7 @@
         "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
         "pkg:github/madler/zlib@1.3.1",
         "pkg:github/facebook/zstd@v1.5.5",
-        "pkg:github/open-telemetry/opentelemetry-cpp@v1.17.0",
+        "pkg:github/open-telemetry/opentelemetry-cpp@v1.24.0",
         "pkg:github/open-telemetry/opentelemetry-proto@1.3.2",
         "pkg:github/nlohmann/json@v3.11.3",
         "pkg:github/wiredtiger/wiredtiger@12.0.0",

@@ -374,6 +374,13 @@ def get_subfolders_dict(folder_path: str = ".") -> dict:
     return {key: 0 for key in subfolders}
 
 
+def add_component_property(component: dict, name: str, value: str) -> None:
+    """Add a key/value to to 'properties' in SBOM component"""
+    if "properties" not in component:
+        component["properties"] = []
+    component["properties"].append({"name": name, "value": value})
+
+
 def get_component_import_script_path(component: dict) -> str:
     """Extract the path to a third-party library import script as defined in component 'properties' as 'import_script_path'"""
     import_script_path = [
@@ -622,7 +629,7 @@ def main() -> None:
         removed = False
         for remove in endor_components_remove:
             if component["bom-ref"].startswith(remove):
-                logger.info("ENDOR SBOM PRE-PROCESS: removing " + component["bom-ref"])
+                logger.info("ENDOR SBOM PRE-PROCESS: removing %s", component["bom-ref"])
                 del endor_bom["components"][i]
                 removed = True
                 break
@@ -630,10 +637,27 @@ def main() -> None:
             for rename in endor_components_rename:
                 old = rename[0]
                 new = rename[1]
-                component["bom-ref"] = component["bom-ref"].replace(old, new)
-                component["purl"] = component["purl"].replace(old, new)
+                if component["bom-ref"].startswith(old):
+                    # property
+                    logger.info(
+                        "ENDOR SBOM PRE-PROCESS: replacing start of bom-ref '%s' with '%s'",
+                        component["bom-ref"],
+                        new,
+                    )
+                    add_component_property(
+                        component, "internal:endor_labs_bom-ref", component["bom-ref"]
+                    )
+                    component["bom-ref"] = component["bom-ref"].replace(old, new)
+                if component["purl"].startswith(old):
+                    logger.info(
+                        "ENDOR SBOM PRE-PROCESS: replacing start of purl '%s' with '%s'",
+                        component["purl"],
+                        new,
+                    )
+                    # add_component_property(component, "Endor Labs purl", component["purl"])
+                    component["purl"] = component["purl"].replace(old, new)
 
-    logger.info(f"Endor Labs SBOM pre-processed with {len(endor_bom['components'])} components")
+    logger.info("Endor Labs SBOM pre-processed with %s components", len(endor_bom["components"]))
 
     # endregion Pre-process Endor Labs SBOM
 
@@ -775,6 +799,8 @@ def main() -> None:
         if component_key in endor_components:
             # Pop component from dict so we are left with only unmatched components
             endor_component = endor_components.pop(component_key)
+            # Preserve Endor Labs component properties, if any
+            component["properties"].extend(endor_component.get("properties", []))
             versions["endor"] = endor_component.get("version")
             logger.debug(
                 f"VERSION ENDOR: {component_key}: Found version '{versions['endor']}' in Endor Labs results"
