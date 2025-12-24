@@ -132,6 +132,7 @@ MONGO_FAIL_POINT_DEFINE(failIndexBuildWithError);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildOnSetupBeforeTakingLocks);
 MONGO_FAIL_POINT_DEFINE(hangAbortIndexBuildByBuildUUIDAfterLocks);
 MONGO_FAIL_POINT_DEFINE(hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry);
 
 extern FailPoint skipWriteConflictRetries;
 
@@ -160,6 +161,14 @@ public:
                       processConstraintsViolatonTableOnCommit.loadRelaxed());
         phases.append("commit", commit.loadRelaxed());
         phases.append("lastCommittedMillis", lastCommittedMillis.loadRelaxed());
+        phases.append("lastTimeBetweenCommitOplogAndCommitMillis",
+                      lastTimeBetweenCommitOplogAndCommitMillis.loadRelaxed());
+        phases.append("lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery",
+                      lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery.loadRelaxed());
+        phases.append("lastTimeBetweenCommitOplogAndCommitMillisRestore",
+                      lastTimeBetweenCommitOplogAndCommitMillisRestore.loadRelaxed());
+        phases.append("lastTimeBetweenVoteAndCommitMillis",
+                      lastTimeBetweenVoteAndCommitMillis.loadRelaxed());
         phases.done();
 
         return indexBuilds.obj();
@@ -176,6 +185,18 @@ public:
     AtomicWord<int> commit{0};
     // The duration of the last committed index build.
     AtomicWord<int64_t> lastCommittedMillis{0};
+    // The duration between receiving the commitIndexBuild oplog entry and committing the index
+    // build for steady state replication for the last committed index build.
+    AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillis;
+    // The duration between receiving the commitIndexBuild oplog entry and committing the index
+    // build during startup recovery for the last committed index build.
+    AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery;
+    // The duration between receiving the commitIndexBuild oplog entry and committing the index
+    // build for the last index build, when restoring a node using magic restore or when restoring
+    // it from the oplog as a standalone node.
+    AtomicWord<int64_t> lastTimeBetweenCommitOplogAndCommitMillisRestore;
+    // The duration between voting to commit and committing the index build.
+    AtomicWord<int64_t> lastTimeBetweenVoteAndCommitMillis;
 };
 
 auto& indexBuildsSSS = *ServerStatusSectionBuilder<IndexBuildsSSS>("indexBuilds").forShard();
@@ -189,6 +210,12 @@ constexpr StringData kIndexesFieldName = "indexes"_sd;
 constexpr StringData kKeyFieldName = "key"_sd;
 constexpr StringData kUniqueFieldName = "unique"_sd;
 constexpr StringData kPrepareUniqueFieldName = "prepareUnique"_sd;
+constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillis =
+    "lastTimeBetweenCommitOplogAndCommitMillis"_sd;
+constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillisStartupRecovery =
+    "lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery"_sd;
+constexpr StringData kLastTimeBetweenCommitOplogAndCommitMillisRestore =
+    "lastTimeBetweenCommitOplogAndCommitMillisRestore"_sd;
 
 /**
  * Returns true if we should build the indexes an empty collection using the IndexCatalog and
@@ -537,6 +564,39 @@ void storeLastCommittedDuration(const ReplIndexBuildState& replState) {
     const auto elapsedTime = (now - metrics.startTime).count();
     indexBuildsSSS.lastCommittedMillis.store(elapsedTime);
 }
+
+/**
+ * Stores the time at which which we voted to commit an index build.
+ */
+void storeLastTimeBetweenVoteAndCommitMillis(const ReplIndexBuildState& replState) {
+    const auto metrics = replState.getIndexBuildMetrics();
+    if (metrics.voteCommitTime == Date_t::min()) {
+        // It's possible that this node skipped voting for commit quorum (e.g, this was a single
+        // phase index build, or the commit quorum was disabled). In this case, return early to
+        // avoid storing a nonsensical duration.
+        return;
+    }
+    const auto now = Date_t::now();
+    const auto elapsedTime = (now - metrics.voteCommitTime).count();
+    indexBuildsSSS.lastTimeBetweenVoteAndCommitMillis.store(elapsedTime);
+}
+
+/**
+ * Stores the duration between receiving the `commitIndexBuild` oplog entry and committing the index
+ * build, parameterized for the different scenarios that we could be applying the entry from.
+ */
+void storeLastTimeBetweenCommitOplogAndCommit(const ReplIndexBuildState& replState,
+                                              StringData metricName,
+                                              AtomicWord<int64_t>& metric) {
+    const auto metrics = replState.getIndexBuildMetrics();
+    const auto now = Date_t::now();
+    tassert(11436300,
+            str::stream() << "commitIndexOplogEntryTime was not set before setting " << metricName,
+            metrics.commitIndexOplogEntryTime != Date_t::min());
+    const auto elapsedTime = (now - metrics.commitIndexOplogEntryTime).count();
+    metric.store(elapsedTime);
+}
+
 }  // namespace
 
 const auto getIndexBuildsCoord =
@@ -1214,7 +1274,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
     auto swReplState = _getIndexBuild(buildUUID);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-
+    bool restartingPausedIndexInStandaloneOrRestore = false;
     // Index builds are not restarted in standalone mode. If the node is started with
     // recoverFromOplogAsStandalone or is in magic restore and when replaying the commitIndexBuild
     // oplog entry for a paused index, there is no active index build thread to commit.
@@ -1233,9 +1293,11 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
         // Get the builder.
         swReplState = _getIndexBuild(buildUUID);
+        restartingPausedIndexInStandaloneOrRestore = true;
     }
     auto replState = uassertStatusOK(swReplState);
-
+    replState->setReceivedCommitIndexBuildEntryTime(Date_t::now());
+    hangIndexBuildAfterReceivingCommitIndexBuildOplogEntry.pauseWhileSet(opCtx);
     // Retry until we are able to put the index build in the kApplyCommitOplogEntry state. None of
     // the conditions for retrying are common or expected to be long-lived, so we believe this to be
     // safe to poll at this frequency.
@@ -1251,6 +1313,22 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
           "buildUUID"_attr = buildUUID,
           "waitResult"_attr = waitStatus,
           "status"_attr = buildStatus);
+    if (restartingPausedIndexInStandaloneOrRestore) {
+        storeLastTimeBetweenCommitOplogAndCommit(
+            *replState,
+            kLastTimeBetweenCommitOplogAndCommitMillisRestore,
+            indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillisRestore);
+    } else if (InReplicationRecovery::isSet(opCtx->getServiceContext())) {
+        storeLastTimeBetweenCommitOplogAndCommit(
+            *replState,
+            kLastTimeBetweenCommitOplogAndCommitMillisStartupRecovery,
+            indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillisStartupRecovery);
+    } else {
+        storeLastTimeBetweenCommitOplogAndCommit(
+            *replState,
+            kLastTimeBetweenCommitOplogAndCommitMillis,
+            indexBuildsSSS.lastTimeBetweenCommitOplogAndCommitMillis);
+    }
 
     // Throws if there was an error building the index.
     fut.get();
@@ -3396,6 +3474,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
           "indexesBuilt"_attr = replState->indexNames,
           "numIndexesBefore"_attr = replState->stats.numIndexesBefore,
           "numIndexesAfter"_attr = replState->stats.numIndexesAfter);
+    storeLastTimeBetweenVoteAndCommitMillis(*replState);
     return CommitResult::kSuccess;
 }
 

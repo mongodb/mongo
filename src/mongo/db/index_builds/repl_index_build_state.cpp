@@ -729,6 +729,16 @@ IndexBuildMetrics ReplIndexBuildState::getIndexBuildMetrics() const {
     return _metrics;
 }
 
+void ReplIndexBuildState::setVotedToCommitTime(const Date_t& time) {
+    stdx::lock_guard lk(_mutex);
+    _metrics.voteCommitTime = time;
+}
+
+void ReplIndexBuildState::setReceivedCommitIndexBuildEntryTime(const Date_t& time) {
+    stdx::lock_guard lk(_mutex);
+    _metrics.commitIndexOplogEntryTime = time;
+}
+
 bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().isReplSet() && protocol == IndexBuildProtocol::kTwoPhase) {

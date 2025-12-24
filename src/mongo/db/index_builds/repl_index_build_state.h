@@ -301,6 +301,10 @@ private:
 struct IndexBuildMetrics {
     // The time at which the index build begins.
     Date_t startTime;
+    // The time at which we voted to commit the index build.
+    Date_t voteCommitTime = Date_t::min();
+    // The time at which we received a 'commitIndexBuild' oplog entry.
+    Date_t commitIndexOplogEntryTime = Date_t::min();
 };
 
 /**
@@ -540,6 +544,16 @@ public:
      * Returns the metrics for this index build.
      */
     IndexBuildMetrics getIndexBuildMetrics() const;
+
+    /**
+     * Stores the time at which which we voted to commit an index build.
+     */
+    void setVotedToCommitTime(const Date_t& time);
+
+    /**
+     * Stores the time at which we received the `commitIndexBuild` oplog entry.
+     */
+    void setReceivedCommitIndexBuildEntryTime(const Date_t& time);
 
     // Uniquely identifies this index build across replica set members.
     const UUID buildUUID;
