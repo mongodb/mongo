@@ -527,24 +527,15 @@ public:
         setGlobalFailPoint("addDestinedRecipient", BSON("mode" << "off"));
     }
 
-    void assertExpectedOplogEntries(NamespaceString nss,
-                                    bool usedApplyOpsToBatch,
-                                    int numOplogEntries) {
-        if (!usedApplyOpsToBatch) {
-            ASSERT_EQ(numOplogEntries,
-                      itcount(NamespaceString::kRsOplogNamespace,
-                              BSON("op" << "i"
-                                        << "ns" << nss.ns_forTest())));
-        } else {
-            ASSERT_EQ(0,
-                      itcount(NamespaceString::kRsOplogNamespace,
-                              BSON("op" << "i"
-                                        << "ns" << nss.ns_forTest())));
-            ASSERT_EQ(numOplogEntries,
-                      itcount(NamespaceString::kRsOplogNamespace,
-                              BSON("o.applyOps.op" << "i"
-                                                   << "o.applyOps.ns" << nss.ns_forTest())));
-        }
+    void assertUsedApplyOpsToBatchInsert(NamespaceString nss, int numApplyOpsOplogEntries) {
+        ASSERT_EQ(0,
+                  itcount(NamespaceString::kRsOplogNamespace,
+                          BSON("op" << "i"
+                                    << "ns" << nss.ns_forTest())));
+        ASSERT_EQ(numApplyOpsOplogEntries,
+                  itcount(NamespaceString::kRsOplogNamespace,
+                          BSON("o.applyOps.op" << "i"
+                                               << "o.applyOps.ns" << nss.ns_forTest())));
     }
 
     long long currentOpFetchedCount() const {
@@ -634,8 +625,7 @@ protected:
                           bool storeProgress,
                           boost::optional<int> initialAggregateBatchSize,
                           int expectedNumFetchedOplogEntries,
-                          int expectedNumApplyOpsOplogEntries,
-                          bool singleInsertExceedsBatchLimits = false) {
+                          int expectedNumApplyOpsOplogEntries) {
         const auto dataColl = acquireCollection(
             _opCtx,
             CollectionAcquisitionRequest{dataCollectionNss,
@@ -669,13 +659,7 @@ protected:
             << " Verify currentOp metrics";
         ASSERT_EQ(storeProgress ? expectedNumFetchedOplogEntries : 0, persistedFetchedCount(_opCtx))
             << " Verify persisted metrics";
-
-        // When singleInsertExceedsBatchLimits, more than one insert will not fit into an applyOps.
-        // Store progress writes an update to the progress doc that is batched in an applyOps with
-        // the insert(s).
-        bool usedApplyOpsToBatch = !singleInsertExceedsBatchLimits || storeProgress;
-        assertExpectedOplogEntries(
-            outputCollectionNss, usedApplyOpsToBatch, expectedNumApplyOpsOplogEntries);
+        assertUsedApplyOpsToBatchInsert(outputCollectionNss, expectedNumApplyOpsOplogEntries);
     }
 
     void assertAggregateReadPreference(const executor::RemoteCommandRequest& request,
@@ -858,8 +842,7 @@ TEST_F(ReshardingOplogFetcherTest,
                          storeProgress,
                          initialAggregateBatchSize,
                          numFetchedOplogEntries,
-                         numApplyOpsOplogEntries,
-                         true /*singleInsertExceedsBatchLimits=*/);
+                         numApplyOpsOplogEntries);
 
         resetResharding();
     }
@@ -923,7 +906,6 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
         MODE_IX);
 
     const int maxBatches = 1;
-    bool storeProgress = true;
     auto fetcherJob = launchAsync([&, this] {
         ThreadClient tc("RefetcherRunner", _svcCtx->getService(), Client::noSession());
 
@@ -934,7 +916,7 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       storeProgress);
+                                       true /* storeProgress */);
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
         fetcher.setMaxBatchesForTest(maxBatches);
@@ -951,11 +933,7 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
     ASSERT_EQ(2, persistedFetchedCount(_opCtx)) << " Verify persisted metrics";
     // Assert the lastSeen value has been bumped from the original `_fetchTimestamp`.
     ASSERT_GT(lastSeen.getTs(), _fetchTimestamp);
-    // Store progress writes an update to the progress doc that is batched in an applyOps with
-    // the insert(s).
-    assertExpectedOplogEntries(outputCollectionNss,
-                               storeProgress /* usedApplyOpsToBatch */,
-                               1 /* numApplyOpsOplogEntries */);
+    assertUsedApplyOpsToBatchInsert(outputCollectionNss, 1 /* numApplyOpsOplogEntries */);
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
@@ -974,7 +952,6 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
                                      AcquisitionPrerequisites::kWrite},
         MODE_IX);
 
-    bool storeProgress = true;
     auto fetcherJob = launchAsync([&, this] {
         ThreadClient tc("RefetcherRunner", _svcCtx->getService(), Client::noSession());
 
@@ -986,7 +963,7 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
                                        _donorShard,
                                        _destinationShard,
                                        outputCollectionNss,
-                                       storeProgress);
+                                       true /* storeProgress*/);
         fetcher.useReadConcernForTest(false);
 
         // Status has a private default constructor so we wrap it in a boost::optional to placate
@@ -1006,11 +983,7 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
     ASSERT_EQ(0, itcount(outputCollectionNss));
     ASSERT_EQ(ErrorCodes::OplogQueryMinTsMissing, fetcherStatus->code());
     ASSERT_EQ(0, currentOpFetchedCount()) << " Verify currentOp metrics";
-    // Store progress writes an update to the progress doc that is batched in an applyOps with
-    // the insert(s).
-    assertExpectedOplogEntries(outputCollectionNss,
-                               storeProgress /* usedApplyOpsToBatch */,
-                               0 /* numApplyOpsOplogEntries */);
+    assertUsedApplyOpsToBatchInsert(outputCollectionNss, 0 /* numApplyOpsOplogEntries */);
 }
 
 TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
@@ -1183,11 +1156,7 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         ASSERT_EQ(1, currentOpFetchedCount()) << " Verify currentOp metrics";
         ASSERT_EQ(storeProgress ? 1 : 0, persistedFetchedCount(_opCtx))
             << " Verify persisted metrics";
-        // Store progress writes an update to the progress doc that is batched in an applyOps with
-        // the insert(s).
-        assertExpectedOplogEntries(outputCollectionNss,
-                                   storeProgress /* usedApplyOpsToBatch */,
-                                   1 /* numApplyOpsOplogEntries */);
+        assertUsedApplyOpsToBatchInsert(outputCollectionNss, 1 /* numApplyOpsOplogEntries */);
 
         // Now, insert a document into a different collection that is not involved in resharding.
         auto writeToOtherCollectionTs = [&] {
@@ -1227,11 +1196,7 @@ TEST_F(ReshardingOplogFetcherTest, TestStartAtUpdatedWithProgressMarkOplogTs) {
         ASSERT_EQ(2, currentOpFetchedCount()) << " Verify currentOp metrics";
         ASSERT_EQ(storeProgress ? 2 : 0, persistedFetchedCount(_opCtx))
             << " Verify persisted metrics";
-        // Store progress writes an update to the progress doc that is batched in an applyOps with
-        // the insert(s).
-        assertExpectedOplogEntries(outputCollectionNss,
-                                   storeProgress /* usedApplyOpsToBatch */,
-                                   2 /* numApplyOpsOplogEntries */);
+        assertUsedApplyOpsToBatchInsert(outputCollectionNss, 2 /* numApplyOpsOplogEntries */);
 
         // The last document returned by ReshardingDonorOplogIterator::getNextBatch() would be
         // `writeToDataCollectionTs`, but ReshardingOplogFetcher would have inserted a doc with
@@ -2599,11 +2564,7 @@ protected:
         ASSERT_EQ(currentOpFetchedCount(), expected.lastFetchedCount);
         ASSERT_EQ(persistedFetchedCount(_opCtx),
                   expected.storedProgress ? expected.lastFetchedCount : 0);
-        // Store progress writes an update to the progress doc that is batched in an applyOps with
-        // the insert(s).
-        assertExpectedOplogEntries(outputNss,
-                                   expected.storedProgress /* usedApplyOpsToBatch */,
-                                   expected.lastFetchedCount);
+        assertUsedApplyOpsToBatchInsert(outputNss, expected.lastFetchedCount);
     }
 
     void assertNoOplogEntries(const NamespaceString& outputNss) {

@@ -8,7 +8,6 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
-import {isIxscan, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -35,7 +34,8 @@ IndexBuildTest.pauseIndexBuilds(primary);
 const awaitIndex = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 IndexBuildTest.waitForIndexBuildToStart(db, collName, "a_1");
 
-// Perform writes that are not allowed while the index build is in progress.
+// Perform writes while the index build is in progress.
+assert.commandFailedWithCode(coll.insert({a: 2}), ErrorCodes.ConflictingOperationInProgress);
 assert.commandFailedWithCode(coll.update({a: 1}, {a: -1}), ErrorCodes.ConflictingOperationInProgress);
 assert.commandFailedWithCode(coll.remove({a: 1}), ErrorCodes.ConflictingOperationInProgress);
 assert.commandFailedWithCode(
@@ -44,29 +44,19 @@ assert.commandFailedWithCode(
     }),
     ErrorCodes.ConflictingOperationInProgress,
 );
-
-// Bulk writes partially succeeds for writes that are allowed and errors for disallowed writes.
-const result = assert.throws(function () {
-    coll.bulkWrite([
-        {insertOne: {document: {a: 2}}},
-        {updateOne: {filter: {a: 1}, update: {$set: {a: -1}}}},
-        {deleteOne: {filter: {a: 1}}},
-    ]);
-});
-assert.commandFailedWithCode(result, ErrorCodes.ConflictingOperationInProgress);
-assert.eq(result.nInserted, 1);
-
-// Perform writes that are allowed while index is building.
-assert.commandWorked(coll.insert({a: 3}));
-
-// Verify write to the collection.
-assert.eq(coll.find({a: 3}).count(), 1);
+assert.commandFailedWithCode(
+    assert.throws(function () {
+        coll.bulkWrite([
+            {insertOne: {document: {a: 2}}},
+            {updateOne: {filter: {a: 1}, update: {$set: {a: -1}}}},
+            {deleteOne: {filter: {a: 1}}},
+        ]);
+    }),
+    ErrorCodes.ConflictingOperationInProgress,
+);
 
 // Allow the index build to complete.
 IndexBuildTest.resumeIndexBuilds(primary);
 awaitIndex();
-
-// Verify that query for successful concurrent writes uses the index.
-assert(isIxscan(db, getWinningPlanFromExplain(coll.find({a: 2}).explain())));
 
 rst.stopSet();

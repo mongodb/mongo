@@ -312,10 +312,6 @@ void SortedDataIndexAccessMethod::remove(OperationContext* opCtx,
                                          const InsertDeleteOptions& options,
                                          int64_t* numDeleted,
                                          CheckRecordId checkRecordId) {
-
-    // TODO SERVER-111867: Remove disallowing deletes during primary driven index build
-    uassertStatusOK(allowedToWriteIfIndexBuildInProgress(opCtx, entry));
-
     auto& containerPool = PreallocatedContainerPool::get(opCtx);
 
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
@@ -349,11 +345,6 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
                                            const InsertDeleteOptions& options,
                                            int64_t* numInserted,
                                            int64_t* numDeleted) {
-    // TODO SERVER-111867: Remove disallowing updates during primary driven index build.
-    if (auto status = allowedToWriteIfIndexBuildInProgress(opCtx, entry); !status.isOK()) {
-        return status;
-    }
-
     UpdateTicket updateTicket;
     prepareUpdate(opCtx, coll, entry, oldDoc, newDoc, loc, options, &updateTicket);
 
@@ -1703,6 +1694,11 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
     int64_t* keysInsertedOut) {
     Status status = Status::OK();
 
+    // TODO SERVER-111867: Remove disallowing writes during primary driven index build
+    if (status = allowedToWriteIfIndexBuildInProgress(opCtx, entry); !status.isOK()) {
+        return status;
+    }
+
     if (entry->sideWritesAllowed()) {
         // The side table interface accepts only records that meet the criteria for this partial
         // index.
@@ -1756,6 +1752,9 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     int64_t* const keysDeletedOut,
     InsertDeleteOptions options,  // copy!
     CheckRecordId checkRecordId) {
+
+    // TODO SERVER-111867: Remove disallowing writes during primary driven index build
+    uassertStatusOK(allowedToWriteIfIndexBuildInProgress(opCtx, entry));
 
     if (entry->sideWritesAllowed()) {
         // The side table interface accepts only records that meet the criteria for this partial
