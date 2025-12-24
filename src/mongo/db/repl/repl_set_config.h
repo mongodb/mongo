@@ -440,6 +440,14 @@ public:
     }
 
     /**
+     * Returns true if hidden nodes should be automatically promoted when all non-hidden 
+     * secondary nodes are unhealthy.
+     */
+     bool getAutoPromoteHidden() const {
+        return getSettings()->getAutoPromoteHidden();
+    }
+
+    /**
      * Returns whether all members of this replica set have hostname localhost.
      */
     bool isLocalHostAllowed() const;
