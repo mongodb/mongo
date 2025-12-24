@@ -34,6 +34,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/bulk_write_reply_info.h"
+#include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/write_command_ref.h"
 #include "mongo/util/modules.h"
 
@@ -53,6 +54,7 @@ using WriteCommandResponse = std::variant<BatchedCommandResponse,
  */
 WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
                                          WriteCommandRef cmdRef,
+                                         unified_write_executor::Stats& stats,
                                          BSONObj originalCommand = BSONObj(),
                                          boost::optional<OID> targetEpoch = boost::none);
 
@@ -61,6 +63,7 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
  */
 BatchedCommandResponse write(OperationContext* opCtx,
                              const BatchedCommandRequest& request,
+                             unified_write_executor::Stats& stats,
                              boost::optional<OID> targetEpoch = boost::none);
 
 /**
@@ -68,6 +71,7 @@ BatchedCommandResponse write(OperationContext* opCtx,
  */
 bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
                                               const BulkWriteCommandRequest& request,
+                                              unified_write_executor::Stats& stats,
                                               BSONObj originalCommand = BSONObj());
 
 /**

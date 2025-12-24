@@ -74,6 +74,7 @@
 #include "mongo/s/query/exec/router_stage_queued_data.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/unified_write_executor/stats.h"
 #include "mongo/s/write_ops/unified_write_executor/unified_write_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -254,8 +255,10 @@ public:
 
             bulk_write_exec::BulkWriteExecStats execStats;
             bulk_write_exec::BulkWriteReplyInfo replyInfo;
+            unified_write_executor::Stats uweStats;
             if (unified_write_executor::isEnabled(opCtx)) {
-                replyInfo = unified_write_executor::bulkWrite(opCtx, bulkRequest);
+                replyInfo = unified_write_executor::bulkWrite(opCtx, bulkRequest, uweStats);
+                execStats.markIgnore();
             } else {
                 // This is used only for the ScopedDebugInfo construction below.
                 stdx::unordered_map<NamespaceString, boost::optional<BSONObj>>
@@ -306,7 +309,11 @@ public:
                 handleWouldChangeOwningShardError(opCtx, bulkRequest, replyInfo, targeters);
             // TODO SERVER-83869 handle BulkWriteExecStats for batches of size > 1 containing
             // updates that modify a document’s owning shard.
-            execStats.updateMetrics(opCtx, targeters, updatedShardKey);
+            if (!execStats.getIgnore()) {
+                execStats.updateMetrics(opCtx, targeters, updatedShardKey);
+            } else {
+                uweStats.updateMetrics(opCtx, updatedShardKey);
+            }
 
             response = populateCursorReply(opCtx, bulkRequest, request.body, std::move(replyInfo));
 

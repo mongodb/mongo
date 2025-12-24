@@ -1,3 +1,5 @@
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
+
 /**
  * Helper function to check a BulkWrite cursorEntry.
  */
@@ -387,7 +389,9 @@ export class BulkWriteMetricChecker {
             targetedInsert *= retryCount;
         }
 
-        if (this.timeseries && !this.bulkWrite && updateShardField === "manyShards") {
+        // Note that in the case of the UWE, we do not double count retryable timeseries updates.
+        const uweEnabled = isUweEnabled(this.testDB);
+        if (this.timeseries && !this.bulkWrite && !uweEnabled && updateShardField === "manyShards") {
             targetedUpdate = targetedUpdate * 2;
         }
 

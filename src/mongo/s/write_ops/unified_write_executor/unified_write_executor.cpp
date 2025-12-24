@@ -69,6 +69,7 @@ bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
 
 WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
                                          WriteCommandRef cmdRef,
+                                         unified_write_executor::Stats& stats,
                                          BSONObj originalCommand,
                                          boost::optional<OID> targetEpoch) {
 
@@ -76,7 +77,6 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
 
     const bool isNonVerbose = isNonVerboseWriteCommand(opCtx, cmdRef);
 
-    Stats stats;
     WriteOpProducer producer(cmdRef);
     WriteOpAnalyzerImpl analyzer = WriteOpAnalyzerImpl(stats);
 
@@ -94,12 +94,12 @@ WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
     WriteBatchScheduler scheduler(cmdRef, *batcher, executor, processor, targetEpoch);
 
     scheduler.run(opCtx);
-    stats.updateMetrics(opCtx);
     return processor.generateClientResponse(opCtx);
 }
 
 BatchedCommandResponse write(OperationContext* opCtx,
                              const BatchedCommandRequest& request,
+                             unified_write_executor::Stats& stats,
                              boost::optional<OID> targetEpoch) {
     if (request.hasEncryptionInformation()) {
         BatchedCommandResponse response;
@@ -112,11 +112,12 @@ BatchedCommandResponse write(OperationContext* opCtx,
     }
 
     return std::get<BatchedCommandResponse>(
-        executeWriteCommand(opCtx, WriteCommandRef{request}, BSONObj(), targetEpoch));
+        executeWriteCommand(opCtx, WriteCommandRef{request}, stats, BSONObj(), targetEpoch));
 }
 
 bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
                                               const BulkWriteCommandRequest& request,
+                                              unified_write_executor::Stats& stats,
                                               BSONObj originalCommand) {
     if (request.getNsInfo()[0].getEncryptionInformation().has_value()) {
         auto [result, replyInfo] = attemptExecuteFLE(opCtx, request);
@@ -128,7 +129,7 @@ bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
     }
 
     return std::get<bulk_write_exec::BulkWriteReplyInfo>(
-        executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
+        executeWriteCommand(opCtx, WriteCommandRef{request}, stats, originalCommand));
 }
 
 // TODO(SERVER-115515) Clean up FAM code in UWE (here and across files in
@@ -157,8 +158,10 @@ FindAndModifyCommandResponse findAndModify(
             "Cannot specify runtime constants option to a mongos",
             request.getLegacyRuntimeConstants() == boost::none);
     request.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+
+    unified_write_executor::Stats stats;
     return std::get<FindAndModifyCommandResponse>(
-        executeWriteCommand(opCtx, WriteCommandRef{request}, originalCommand));
+        executeWriteCommand(opCtx, WriteCommandRef{request}, stats, originalCommand));
 }
 
 bool isEnabled(OperationContext* opCtx) {

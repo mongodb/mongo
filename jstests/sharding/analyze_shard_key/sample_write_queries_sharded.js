@@ -6,7 +6,6 @@
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
@@ -24,8 +23,6 @@ const st = new ShardingTest({
     },
     mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}},
 });
-
-const uweEnabled = isUweEnabled(st.s);
 
 const dbName = "testDb";
 const collName = "testColl";
@@ -154,10 +151,6 @@ const expectedSampledQueryDocs = [];
         }),
     );
 
-    // TODO SERVER-114992: failed to find sampled query.
-    if (uweEnabled) {
-        return;
-    }
     // This is a WouldChangeOwningShard update. It causes the document to move from shard0 to
     // shard1.
     const singleUpdateOp2 = {
@@ -297,10 +290,6 @@ const expectedSampledQueryDocs = [];
         mongosDB.runCommand({explain: {findAndModify: collName, query: {x: 501}, update: {$set: {y: 501}}}}),
     );
 
-    // TODO SERVER-114992: failed to find sampled query.
-    if (uweEnabled) {
-        return;
-    }
     // This is a WouldChangeOwningShard update. It causes the document to move from shard1 to
     // shard2.
     const originalCmdObj1 = {

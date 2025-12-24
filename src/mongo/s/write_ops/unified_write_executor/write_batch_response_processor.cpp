@@ -1228,6 +1228,11 @@ WriteBatchResponseProcessor::generateClientResponseForBulkWriteCommand(Operation
     auto finalResults = finalizeRepliesForOps(opCtx);
 
     for (auto& [id, item] : finalResults) {
+        // Check to see if we've recieved a WCOS error. If we have, then we should skip incrementing
+        // the relevant op counters as this will doulbe count our update. Instead, we will increment
+        // this as part of the WCOS handling in the command layer.
+        const bool isNotAWCOSError = !item || item->getStatus().isOK() ||
+            item->getStatus() != ErrorCodes::WouldChangeOwningShard || _cmdRef.getNumOps() > 1;
         if (!_isNonVerbose && (!errorsOnly || (item && !item->getStatus().isOK()))) {
             tassert(11182221, "Expected a BulkWriteReplyItem", item.has_value());
 
@@ -1238,10 +1243,9 @@ WriteBatchResponseProcessor::generateClientResponseForBulkWriteCommand(Operation
                                 item->getIdx(),
                                 id),
                     static_cast<WriteOpId>(item->getIdx()) == id);
-
             results.emplace_back(std::move(*item));
         }
-        _stats.incrementOpCounters(opCtx, _cmdRef.getOp(id));
+        _stats.incrementOpCounters(opCtx, _cmdRef.getOp(id), isNotAWCOSError);
     }
 
     bulk_write_exec::SummaryFields fields(

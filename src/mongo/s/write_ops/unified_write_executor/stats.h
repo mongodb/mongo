@@ -67,12 +67,22 @@ public:
     /**
      * Method to update CurOp and NumHostsTargetedMetrics.
      */
-    void updateMetrics(OperationContext* opCtx);
+    void updateMetrics(OperationContext* opCtx, bool updatedShardKey);
 
     /**
      * Helper to increment query counters for 'op'.
      */
-    void incrementOpCounters(OperationContext* opCtx, WriteCommandRef::OpRef op);
+    void incrementOpCounters(OperationContext* opCtx,
+                             WriteCommandRef::OpRef op,
+                             bool statusOkOrNotWCOS);
+
+    const stdx::unordered_map<size_t, TargetingStats>& getTargetingStatsMap() {
+        return _targetingStatsMap;
+    }
+
+    const stdx::unordered_set<ShardId>& getTargetedShards() {
+        return _targetedShards;
+    }
 
 private:
     stdx::unordered_map<size_t, TargetingStats> _targetingStatsMap;

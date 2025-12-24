@@ -6,7 +6,6 @@
 
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {BulkWriteMetricChecker} from "jstests/libs/bulk_write_utils.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -225,10 +224,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         },
     );
 
-    // TODO SERVER-114992: Not running in master because of tag but passes with flag off and fails
-    // with flag on.
-    const uweEnabled = isUweEnabled(testDB);
-    if (isMongos && !uweEnabled) {
+    if (isMongos) {
         // Update modifying owning shard requires a transaction or retryable write, we do not want
         // actual retries here.
         metricChecker.retryCount = 1;

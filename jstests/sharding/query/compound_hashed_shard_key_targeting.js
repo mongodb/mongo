@@ -16,7 +16,6 @@ import {
 import {assertStagesForExplainOfCommand} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
@@ -29,7 +28,6 @@ const sessionDB = session.getDatabase(kDbName);
 const coll = sessionDB["coll"];
 const shard0DB = st.shard0.getDB(kDbName);
 const shard1DB = st.shard1.getDB(kDbName);
-const uweEnabled = isUweEnabled(st.s);
 
 /**
  * Enables profiling on both shards so that we can verify the targeting behaviour.
@@ -174,11 +172,8 @@ res = assert.commandWorked(coll.update({a: 22, b: {subObj: "str_0"}, c: "update"
 assert.eq(res.nModified, 1, res);
 
 // Verify that the 'update' command gets targeted to 'shard1DB'.
-// TODO SERVER-114992: couldn't find matching bulkWrite.
-if (!uweEnabled) {
-    profilerHasAtLeastOneMatchingEntryOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": shardCmdName}});
-    profilerHasZeroMatchingEntriesOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": shardCmdName}});
-}
+profilerHasAtLeastOneMatchingEntryOrThrow({profileDB: shard1DB, filter: {ns: ns, "op": shardCmdName}});
+profilerHasZeroMatchingEntriesOrThrow({profileDB: shard0DB, filter: {ns: ns, "op": shardCmdName}});
 
 // Verify that the 'count' command gets targeted to 'shard0DB' after the update.
 assert.eq(coll.count(updateObj["$set"]), 1);

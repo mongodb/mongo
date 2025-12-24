@@ -59,21 +59,27 @@ void Stats::recordTargetingStats(const std::vector<ShardEndpoint>& targetedShard
     }
 }
 
-void Stats::updateMetrics(OperationContext* opCtx) {
+void Stats::updateMetrics(OperationContext* opCtx, bool updatedShardKey) {
     // Record the number of shards targeted by this write.
-    // TODO SERVER-114992 increment 'nShards' by 1 if we've targeted shards and updated the shard
-    // key.
     CurOp::get(opCtx)->debug().nShards = _targetedShards.size();
 
     for (const auto& [nsIdx, targetingStats] : _targetingStatsMap) {
         const bool isSharded = targetingStats.isSharded;
         const int nShardsOwningChunks = targetingStats.numShardsOwningChunks;
 
-        for (const auto& [writeType, shards] : targetingStats.targetedShardsByWriteType) {
-            const int perWriteNShards = shards.size();
+        if (nShardsOwningChunks == 0) {
+            continue;
+        }
 
-            // TODO SERVER-114992: add one to 'nShards' if updated shard key. This information is
-            // returned from WCOS handling, see batch_write_exec.cpp
+        for (const auto& [writeType, shards] : targetingStats.targetedShardsByWriteType) {
+            int perWriteNShards = shards.size();
+
+            // If we have no information on the shards targeted, ignore updatedShardKey,
+            // updateHostsTargetedMetrics will report this as TargetType::kManyShards.
+            if (perWriteNShards != 0 && updatedShardKey) {
+                perWriteNShards += 1;
+            }
+
             NumHostsTargetedMetrics::QueryType metricsWriteType;
             switch (writeType) {
                 case WriteType::kInsert:
@@ -95,12 +101,16 @@ void Stats::updateMetrics(OperationContext* opCtx) {
     }
 }
 
-void Stats::incrementOpCounters(OperationContext* opCtx, WriteCommandRef::OpRef op) {
+void Stats::incrementOpCounters(OperationContext* opCtx,
+                                WriteCommandRef::OpRef op,
+                                bool statusOkOrNotWCOS) {
     if (op.isInsertOp()) {
         serviceOpCounters(ClusterRole::RouterServer).gotInsert();
 
     } else if (op.isUpdateOp()) {
-        serviceOpCounters(ClusterRole::RouterServer).gotUpdate();
+        if (statusOkOrNotWCOS) {
+            serviceOpCounters(ClusterRole::RouterServer).gotUpdate();
+        }
 
         auto updateRef = op.getUpdateOp();
         // 'isMulti' is set to false as the metrics for multi updates were registered

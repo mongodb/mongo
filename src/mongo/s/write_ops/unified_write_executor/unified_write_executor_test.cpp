@@ -206,7 +206,8 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteBasic) {
         {NamespaceInfoEntry(nss1), NamespaceInfoEntry(nss2)});
 
     auto future = launchAsync([&]() {
-        auto replyInfo = bulkWrite(operationContext(), request);
+        Stats uweStats;
+        auto replyInfo = bulkWrite(operationContext(), request, uweStats);
         auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 2);
@@ -272,7 +273,8 @@ TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
 
 
     auto future = launchAsync([&]() {
-        auto resp = write(operationContext(), insertRequest);
+        Stats uweStats;
+        auto resp = write(operationContext(), insertRequest, uweStats);
         ASSERT(resp.getOk());
         ASSERT_FALSE(resp.isErrDetailsSet());
         ASSERT_EQ(resp.getN(), 2);
@@ -308,7 +310,8 @@ TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
     }());
 
     auto updateFuture = launchAsync([&]() {
-        auto resp = write(operationContext(), updateRequest);
+        Stats uweStats;
+        auto resp = write(operationContext(), updateRequest, uweStats);
         ASSERT(resp.getOk());
         ASSERT_FALSE(resp.isErrDetailsSet());
         ASSERT_EQ(resp.getN(), 1);
@@ -339,7 +342,8 @@ TEST_F(UnifiedWriteExecutorTest, BatchWriteBasic) {
     }());
 
     auto deleteFuture = launchAsync([&]() {
-        auto resp = write(operationContext(), deleteRequest);
+        Stats uweStats;
+        auto resp = write(operationContext(), deleteRequest, uweStats);
         ASSERT(resp.getOk());
         ASSERT_FALSE(resp.isErrDetailsSet());
         ASSERT_EQ(resp.getN(), 1);
@@ -361,7 +365,8 @@ TEST_F(UnifiedWriteExecutorTest, BulkWriteImplicitCollectionCreation) {
                                     {NamespaceInfoEntry(nss1)});
 
     auto future = launchAsync([&]() {
-        auto replyInfo = bulkWrite(operationContext(), request);
+        Stats uweStats;
+        auto replyInfo = bulkWrite(operationContext(), request, uweStats);
         auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 1);
@@ -432,7 +437,8 @@ TEST_F(UnifiedWriteExecutorTest, OrderedBulkWriteErrorsAndStops) {
     request.setOrdered(true);
 
     auto future = launchAsync([&]() {
-        auto replyInfo = bulkWrite(operationContext(), request);
+        Stats uweStats;
+        auto replyInfo = bulkWrite(operationContext(), request, uweStats);
         auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 1);
@@ -482,7 +488,8 @@ TEST_F(UnifiedWriteExecutorTest, UnorderedBulkWriteErrorsAndStops) {
 
 
     auto future = launchAsync([&]() {
-        auto replyInfo = bulkWrite(operationContext(), request);
+        Stats uweStats;
+        auto replyInfo = bulkWrite(operationContext(), request, uweStats);
         auto reply = populateCursorReply(operationContext(), request, request.toBSON(), replyInfo);
         auto replyItems = reply.getCursor().getFirstBatch();
         ASSERT_EQ(replyItems.size(), 2);

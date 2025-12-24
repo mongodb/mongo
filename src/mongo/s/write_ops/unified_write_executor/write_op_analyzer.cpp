@@ -139,6 +139,8 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                 !(tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId));
         // Note we do not translate viewful timeseries collection namespace here, it will be
         // translated within the transaction when we analyze the request again.
+        // Note also that we do not record any targeting stats here as we will do so when we analyze
+        // the request a second time.
         return Analysis{AnalysisType::kInternalTransaction,
                         std::move(tr.endpoints),
                         false /* isTimeseries */,

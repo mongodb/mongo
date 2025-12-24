@@ -9,7 +9,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // This command involves running commands outside a session.
 TestData.disableImplicitSessions = true;
@@ -39,16 +38,6 @@ const st = new ShardingTest({
     },
     mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}},
 });
-
-// TODO SERVER-114992: failed to find sampled query.
-let uweEnabled = false;
-st.forEachConnection((conn) => {
-    uweEnabled = uweEnabled || isUweEnabled(conn);
-});
-if (uweEnabled) {
-    st.stop();
-    quit();
-}
 
 const execCtxTypes = {
     kNoClientSession: 1,
