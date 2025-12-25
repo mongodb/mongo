@@ -781,6 +781,20 @@ Status parseInExpression(InMatchExpression* inExpression,
     });
 }
 
+// The top-level _id field name.
+constexpr StringData kIdFieldName = "_id"_sd;
+
+/**
+ * The set of BSON types that cannot be stored in the _id field.
+ * According to storage_validation.cpp (storageValidIdField), _id cannot be Array, RegEx,
+ * or Undefined.
+ */
+const std::set<BSONType> kInvalidTypesForIdField = {
+    BSONType::Array,
+    BSONType::RegEx,
+    BSONType::Undefined,
+};
+
 template <class T>
 StatusWithMatchExpression parseType(boost::optional<StringData> name,
                                     BSONElement elt,
@@ -793,6 +807,21 @@ StatusWithMatchExpression parseType(boost::optional<StringData> name,
     if (typeSet.getValue().isEmpty()) {
         return {Status(ErrorCodes::FailedToParse,
                        str::stream() << name << " must match at least one type")};
+    }
+
+    // Validate that _id field queries do not use types that are invalid for _id.
+    // The _id field cannot be Array, RegEx, or Undefined (per storage_validation.cpp).
+    if constexpr (std::is_same_v<T, TypeMatchExpression>) {
+        if (name && *name == kIdFieldName) {
+            for (const auto& type : typeSet.getValue().bsonTypes) {
+                if (kInvalidTypesForIdField.count(type) > 0) {
+                    return {Status(ErrorCodes::InvalidIdField,
+                                   str::stream()
+                                       << "The '_id' field cannot be queried by type "
+                                       << typeName(type))};
+                }
+            }
+        }
     }
 
     if constexpr (std::is_same_v<T, InternalSchemaTypeExpression> ||
