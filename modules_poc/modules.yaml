@@ -793,7 +793,6 @@ index_builds: # authoritative: @10gen/server-index-builds
     - src/mongo/db/index/index_access_method*
     - src/mongo/db/index_key_validate*
     - src/mongo/db/index_spec_validate*
-    - src/mongo/db/commands/create_indexes*
     - src/mongo/db/commands/set_index_commit_quorum*
     - src/mongo/db/commands/vote*index_build*
     - src/mongo/dbtests/indexupdatetests.cpp

@@ -4,3 +4,13 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
       - 10gen/server-catalog-and-routing-ddl
+  - "create_indexes*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+      - 10gen/server-catalog-and-routing-ddl
+      - 10gen/server-index-builds
+  - "drop_indexes*":
+    approvers:
+      - 10gen/server-catalog-and-routing-shard-catalog
+      - 10gen/server-catalog-and-routing-ddl
+      - 10gen/server-index-builds

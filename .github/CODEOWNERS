@@ -1943,7 +1943,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/**/buildinfo_common.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/connection_status.* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/commands/**/cpuload.* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/db/commands/**/create_indexes* @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/commands/**/db_command_test_fixture.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/fail_point_cmd.* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/commands/**/fsync* @10gen/server-storage-engine-integration @svc-auto-approve-bot
@@ -2841,6 +2840,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/shard_role/ddl/OWNERS.yml
 /src/mongo/db/shard_role/ddl/**/* @10gen/server-catalog-and-routing-ddl @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/src/mongo/db/shard_role/ddl/**/create_indexes* @10gen/server-catalog-and-routing-ddl @10gen/server-catalog-and-routing-shard-catalog @10gen/server-index-builds @svc-auto-approve-bot
+/src/mongo/db/shard_role/ddl/**/drop_indexes* @10gen/server-catalog-and-routing-ddl @10gen/server-catalog-and-routing-shard-catalog @10gen/server-index-builds @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/shard_role/lock_manager/OWNERS.yml
 /src/mongo/db/shard_role/lock_manager/**/* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot

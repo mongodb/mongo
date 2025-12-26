@@ -15,9 +15,6 @@ filters:
   - "cpuload.*":
     approvers:
       - 10gen/server-programmability
-  - "create_indexes*":
-    approvers:
-      - 10gen/server-index-builds
   - "db_command_test_fixture.*":
     approvers:
       - 10gen/server-programmability

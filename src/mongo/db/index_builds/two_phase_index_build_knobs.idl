@@ -40,6 +40,7 @@ server_parameters:
         default: true
         test_only: true
         redact: false
+        mod_visibility: needs_replacement
 
     maxNumActiveUserIndexBuilds:
         description: >
