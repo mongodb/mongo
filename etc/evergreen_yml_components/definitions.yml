@@ -1418,8 +1418,7 @@ functions:
       include:
         - "*"
 
-  "validate generate tasks config filesize":
-    &validate_generate_tasks_config_filesize
+  "validate generate tasks config": &validate_generate_tasks_config
     command: subprocess.exec
     display_name: "validate generate tasks config filesize"
     type: test
@@ -1427,8 +1426,11 @@ functions:
       binary: bash
       args:
         - "src/evergreen/run_python_script.sh"
-        - "buildscripts/validate_file_size.py"
+        - "buildscripts/validate_task_gen.py"
         - "generate_tasks_config.tgz"
+      env:
+        EVERGREEN_API_USER: ${evergreen_api_user}
+        EVERGREEN_API_KEY: ${evergreen_api_key}
 
   "upload generate tasks config": &upload_generate_tasks_config
     command: s3.put
@@ -1471,7 +1473,7 @@ functions:
     - *configure_evergreen_api_credentials
     - *generate_version_sh
     - *pack_generate_tasks_config
-    - *validate_generate_tasks_config_filesize
+    - *validate_generate_tasks_config
     - *upload_generate_tasks_config
     - *generate_resmoke_tasks_config
 
@@ -1480,7 +1482,7 @@ functions:
     - *configure_evergreen_api_credentials
     - *generate_version_sh
     - *pack_generate_tasks_config
-    - *validate_generate_tasks_config_filesize
+    - *validate_generate_tasks_config
 
   "generate version burn in":
     - *f_expansions_write
@@ -1493,7 +1495,7 @@ functions:
         args:
           - "./src/evergreen/generate_version_burn_in.sh"
     - *pack_generate_tasks_config
-    - *validate_generate_tasks_config_filesize
+    - *validate_generate_tasks_config
     - *upload_burn_in_generate_tasks_config
     - *generate_resmoke_tasks_config
 
