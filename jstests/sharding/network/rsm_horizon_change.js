@@ -1,6 +1,11 @@
 /*
  * Tests that split horizon reconfig results in unknown ServerDescription in
  * StreamableReplicaSetMonitor.
+ *
+ * @tags: [
+ *   # This test issues a replSetReconfig command, which must be routed to the primary.
+ *   does_not_support_stepdowns
+ * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
