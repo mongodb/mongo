@@ -5,6 +5,7 @@
  *
  * @tags: [
  *  requires_sharding,
+ *  does_not_support_stepdowns,
  * ]
  */
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
