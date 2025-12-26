@@ -4,6 +4,9 @@
 # enabled.
 info --config=local
 
+# temp workaround from https://github.com/bazelbuild/bazel/issues/28101#issuecomment-3692747741
+common --registry=https://raw.githubusercontent.com/bazelbuild/bazel-central-registry/main/
+
 # Don't use legacy toolchain resolution.
 common --incompatible_enable_cc_toolchain_resolution
 # https://github.com/bazelbuild/bazel/issues/8766
