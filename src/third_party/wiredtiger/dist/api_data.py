@@ -645,12 +645,12 @@ connection_runtime_config = [
                 maximum number of threads WiredTiger will start to help evict pages from cache. The
                 number of threads started will vary depending on the current eviction load. Each
                 eviction worker thread uses a session from the configured session_max''',
-                min=1, max=20), # !!! Must match WT_EVICT_MAX_WORKERS
+                min=1, max=64), # !!! Must match WT_EVICT_MAX_WORKERS
             Config('threads_min', '1', r'''
                 minimum number of threads WiredTiger will start to help evict pages from
                 cache. The number of threads currently running will vary depending on the
                 current eviction load''',
-                min=1, max=20),
+                min=1, max=64),
             Config('evict_sample_inmem', 'true', r'''
                 If no in-memory ref is found on the root page, attempt to locate a random
                 in-memory page by examining all entries on the root page.''',
