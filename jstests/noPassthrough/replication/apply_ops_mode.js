@@ -3,7 +3,7 @@
  * 'alwaysUpsert' defaults to false and 'oplogApplicationMode' defaults to 'ApplyOps'. We test
  * that these default values do not lead to command failure.
  * @tags: [
- *  # TODO SERVER-115578: Make this test compatible with replicated recordIds enabled.
+ *  # The test explicitly uses "InitialSync" mode that has a stronger constraint on replicated record ids.
  *  exclude_when_record_ids_replicated,
  * ]
  */
