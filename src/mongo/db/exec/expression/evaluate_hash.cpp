@@ -28,8 +28,10 @@
  */
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/util/md5.h"
 #include "mongo/util/text.h"
 
 #include <common/xxhash.h>
@@ -89,10 +91,21 @@ Value evaluate(const ExpressionHash& expr, const Document& root, Variables* vari
                          input.getBinData().length);
 
     switch (algorithm) {
-        case HashAlgorithm::md5:
-            uasserted(ErrorCodes::NotImplemented, "md5 not yet implemented");
-        case HashAlgorithm::sha256:
-            uasserted(ErrorCodes::NotImplemented, "sha256 not yet implemented");
+        case HashAlgorithm::md5: {
+            uassert(10754003,
+                    "The md5 algorithm for $hash is disabled while in FIPS mode",
+                    !sslGlobalParams.sslFIPSMode);
+
+            // MD5 is a deprecated hashing algorithm but supported for users migrating from hex_md5
+            // in $function and for compatibility with other databases.
+            md5digest digest;
+            md5_deprecated(inputBytes.data(), inputBytes.length(), digest);
+            return Value(BSONBinData(digest, sizeof(digest), BinDataGeneral));
+        }
+        case HashAlgorithm::sha256: {
+            SHA256Block hash = SHA256Block::computeHash({inputBytes});
+            return Value(BSONBinData(hash.data(), hash.size(), BinDataGeneral));
+        }
         case HashAlgorithm::xxh64: {
             // We use the canonical (big endian) form for a platform-independent representation.
             XXH64_hash_t hash = ZSTD_XXH64(inputBytes.data(), inputBytes.length(), 0);

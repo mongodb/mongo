@@ -36,7 +36,20 @@
 namespace mongo {
 namespace ExpressionHashTest {
 
-using ExpressionHashTest = AggregationContextFixture;
+class ExpressionHashTest : public AggregationContextFixture {
+protected:
+    void assertHashResult(StringData algorithm, const Document& input, std::string expectedBytes) {
+        auto expCtx = getExpCtx();
+        auto spec = fromjson(str::stream()
+                             << "{$hash: {input: '$path', algorithm: '" << algorithm << "'}}");
+        auto hashExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+        auto result = hashExp->evaluate(input, &expCtx->variables);
+
+        ASSERT_EQ(result.getType(), BSONType::binData);
+        ASSERT_VALUE_EQ(
+            result, Value(BSONBinData(expectedBytes.data(), expectedBytes.size(), BinDataGeneral)));
+    }
+};
 
 TEST_F(ExpressionHashTest, ParseAndSerialize) {
     auto expCtx = getExpCtx();
@@ -177,32 +190,43 @@ TEST_F(ExpressionHashTest, AlgorithmCaseSensitiveFails) {
 }
 
 TEST_F(ExpressionHashTest, HashWithXxh64WorksForString) {
-    auto expCtx = getExpCtx();
-    auto spec = fromjson("{$hash: {input: '$path', algorithm: 'xxh64'}}");
-    auto hashExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-
-    Document input{{"path", "Hello World"_sd}};
-    auto result = hashExp->evaluate(input, &expCtx->variables);
-
-    auto expectedBytes = base64::decode("YzTSBxkkW8I=");
-    ASSERT_EQ(result.getType(), BSONType::binData);
-    ASSERT_VALUE_EQ(result,
-                    Value(BSONBinData(expectedBytes.data(), expectedBytes.size(), BinDataGeneral)));
+    assertHashResult(
+        "xxh64"_sd, Document{{"path", "Hello World"_sd}}, base64::decode("YzTSBxkkW8I="));
 }
 
 TEST_F(ExpressionHashTest, HashWithXxh64WorksForBinaryData) {
-    auto expCtx = getExpCtx();
-    auto spec = fromjson("{$hash: {input: '$path', algorithm: 'xxh64'}}");
-    auto hashExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
-
     StringData helloWorld = "Hello World"_sd;
-    Document input{{"path", BSONBinData(helloWorld.data(), helloWorld.size(), BinDataGeneral)}};
-    auto result = hashExp->evaluate(input, &expCtx->variables);
+    assertHashResult(
+        "xxh64"_sd,
+        Document{{"path", BSONBinData(helloWorld.data(), helloWorld.size(), BinDataGeneral)}},
+        base64::decode("YzTSBxkkW8I="));
+}
 
-    auto expectedBytes = base64::decode("YzTSBxkkW8I=");
-    ASSERT_EQ(result.getType(), BSONType::binData);
-    ASSERT_VALUE_EQ(result,
-                    Value(BSONBinData(expectedBytes.data(), expectedBytes.size(), BinDataGeneral)));
+TEST_F(ExpressionHashTest, HashWithSha256WorksForString) {
+    assertHashResult("sha256"_sd,
+                     Document{{"path", "Hello World"_sd}},
+                     base64::decode("pZGm1Av0IEBKARczz7exkNYsZb8LzaMrV7J32a2fFG4="));
+}
+
+TEST_F(ExpressionHashTest, HashWithSha256WorksForBinaryData) {
+    StringData helloWorld = "Hello World"_sd;
+    assertHashResult(
+        "sha256"_sd,
+        Document{{"path", BSONBinData(helloWorld.data(), helloWorld.size(), BinDataGeneral)}},
+        base64::decode("pZGm1Av0IEBKARczz7exkNYsZb8LzaMrV7J32a2fFG4="));
+}
+
+TEST_F(ExpressionHashTest, HashWithMd5WorksForString) {
+    assertHashResult(
+        "md5"_sd, Document{{"path", "Hello World"_sd}}, base64::decode("sQqNsWTgdUEFt6mb5y4/5Q=="));
+}
+
+TEST_F(ExpressionHashTest, HashWithMd5WorksForBinaryData) {
+    StringData helloWorld = "Hello World"_sd;
+    assertHashResult(
+        "md5"_sd,
+        Document{{"path", BSONBinData(helloWorld.data(), helloWorld.size(), BinDataGeneral)}},
+        base64::decode("sQqNsWTgdUEFt6mb5y4/5Q=="));
 }
 
 }  // namespace ExpressionHashTest
