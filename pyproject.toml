@@ -138,6 +138,7 @@ cffi = "^2.0.0"
 [tool.poetry.group.platform.dependencies]
 pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }
 pywin32 = { version = ">=225", markers = "sys_platform == 'win32'" }
+python-msilib = { version = "^0.5.0", markers = "sys_platform == 'win32' and python_version >= '3.13'" }
 cryptography = "^44.0.2"
 
 [tool.poetry.group.testing.dependencies]

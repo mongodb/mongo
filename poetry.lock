@@ -3512,6 +3512,34 @@ files = [
 six = ">=1.5"
 
 [[package]]
+name = "python-msilib"
+version = "0.5.0"
+description = "Read and write Microsoft Installer files"
+optional = false
+python-versions = ">=3.13"
+groups = ["platform"]
+markers = "(platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\") and python_version >= \"3.13\" and sys_platform == \"win32\""
+files = [
+    {file = "python_msilib-0.5.0-cp313-cp313-win32.whl", hash = "sha256:240c9cebc402361e6fe32fb94020ce5a2674343122cb4dbd036fa59068d153c4"},
+    {file = "python_msilib-0.5.0-cp313-cp313-win_amd64.whl", hash = "sha256:cb1db6fa79cfff539a0f313c80f27760b3c452b8fb59878c4b1ce2959711541e"},
+    {file = "python_msilib-0.5.0-cp313-cp313-win_arm64.whl", hash = "sha256:3904771a9e31276da9d2de4e431e09b122a354b84b41746c6feaa14b91d2fd0d"},
+    {file = "python_msilib-0.5.0-cp313-cp313t-win32.whl", hash = "sha256:67ab7fe107b6dbed42e609d0731ae9863c8aaf58e6015995e42671a9d215fe86"},
+    {file = "python_msilib-0.5.0-cp313-cp313t-win_amd64.whl", hash = "sha256:dc3d895c1cb4f695344a7149909d460020d0e6f987d33ab40ea687d65dd1f2ad"},
+    {file = "python_msilib-0.5.0-cp313-cp313t-win_arm64.whl", hash = "sha256:cc62a3d0500c1d6d21bea347c55215ae16c81bc749134c47e466f284a46b56fe"},
+    {file = "python_msilib-0.5.0-cp314-cp314-win32.whl", hash = "sha256:e5023ab8da04a13769d1054e64415c02c198d442ce0f7cd9637204341d997379"},
+    {file = "python_msilib-0.5.0-cp314-cp314-win_amd64.whl", hash = "sha256:24cd942d097bafc97018698e1e66652143529eecaf8b8df55a624d580d81df7c"},
+    {file = "python_msilib-0.5.0-cp314-cp314-win_arm64.whl", hash = "sha256:f9da5045835d0de30b1087ff6fd6e0b6d076e248cd26405c0d399d8649ef9684"},
+    {file = "python_msilib-0.5.0-cp314-cp314t-win32.whl", hash = "sha256:821a164e72d77786d9e6d7cd28c060e6668665632a29f2c76abac85651f05f11"},
+    {file = "python_msilib-0.5.0-cp314-cp314t-win_amd64.whl", hash = "sha256:3fafe94d66f00bd3b26159b7ff43078421738288af5212744a1cb4a1cea52bc8"},
+    {file = "python_msilib-0.5.0-cp314-cp314t-win_arm64.whl", hash = "sha256:1c0b7a595dd457f7df5bd102c4c5abe5337ba0362aab2ece31bea29e6e7d9f2d"},
+    {file = "python_msilib-0.5.0.tar.gz", hash = "sha256:5d9d0c2af2cafbc50d484cce4cfab1cb8cfd65d705d7111d216bc525a059113b"},
+]
+
+[package.extras]
+dev = ["bump-my-version (==1.2.4)", "cibuildwheel (==3.3.0)", "pre-commit (==4.5.0)"]
+tests = ["coverage (==7.12.0)", "pytest (==9.0.2)"]
+
+[[package]]
 name = "python-utils"
 version = "3.9.1"
 description = "Python Utils is a module with some convenient utilities not included with the standard Python install"
@@ -5822,4 +5850,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "1dbae359442623c0de042611e96cc390d29c6b64091202e02e347f1c7a001e11"
+content-hash = "a6c93bc106ebcdcda189b2b4f307fee178b888aea15df83525eeeb255ba78300"
