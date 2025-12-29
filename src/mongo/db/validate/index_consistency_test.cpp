@@ -36,7 +36,10 @@
 #include "mongo/db/validate/collection_validation.h"
 #include "mongo/db/validate/validate_gen.h"
 #include "mongo/db/validate/validate_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -44,19 +47,18 @@ namespace {
 // Namespace String for the collection used in these tests.
 const auto kNss =
     NamespaceString::createNamespaceString_forTest("indexConsistencyDB.indexConsistencyColl");
+const auto kDefaultValidateOptions =
+    CollectionValidation::ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
+                                            CollectionValidation::RepairMode::kNone,
+                                            /*logDiagnostics=*/true};
 
 using IndexConsistencyTest = CatalogTestFixture;
 
 
 ValidateResults validate(OperationContext* opCtx) {
     ValidateResults validateResults;
-    ASSERT_OK(CollectionValidation::validate(
-        opCtx,
-        kNss,
-        CollectionValidation::ValidationOptions{CollectionValidation::ValidateMode::kForegroundFull,
-                                                CollectionValidation::RepairMode::kNone,
-                                                /*logDiagnostics=*/true},
-        &validateResults));
+    ASSERT_OK(
+        CollectionValidation::validate(opCtx, kNss, kDefaultValidateOptions, &validateResults));
     return validateResults;
 }
 
@@ -348,6 +350,55 @@ TEST_F(IndexConsistencyTest, MemoryLimitSharedBetweenMissingAndExtra) {
         // 1 bucket is always kept, so even with 0 memory we will at least find one inconsistency.
         ASSERT_GTE(sum_of_inconsistencies, 1);
     }
+}
+
+// Index key consistency is validated by rebuilding the key for a given document in a collection.
+// This test exercises the failure path by creating a hashed index which is incompatible with
+// array-type BSON data. This document will then be subject to key consistency checks that it will
+// fail.
+TEST_F(IndexConsistencyTest, FailedKeygen) {
+    auto opCtx = operationContext();
+    ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions()));
+
+    static constexpr auto secondaryIndexKey{"xHashed"_sd};
+
+    AutoGetCollection coll(opCtx, kNss, MODE_X);
+    CollectionWriter writer(opCtx, coll);
+    const auto indexSpec = BSON("v" << IndexDescriptor::IndexVersion::kV2 << "name"
+                                    << secondaryIndexKey << "key" << BSON("x" << "hashed"));
+    {
+        WriteUnitOfWork wuow(opCtx);
+        auto collWriter = writer.getWritableCollection(opCtx);
+        ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
+            opCtx, collWriter, indexSpec));
+
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, writer.get(), InsertStatement(BSON("_id" << 1 << "x" << "y")), nullptr));
+        wuow.commit();
+    }
+
+    CollectionValidation::ValidateState state(opCtx, kNss, kDefaultValidateOptions);
+
+    const auto unhashableDoc = std::invoke([] {
+        BSONArrayBuilder bab;
+        bab.append(1);
+        return BSON("x" << bab.arr());
+    });
+
+    const auto xHashedIndex = coll->getIndexCatalog()->findIndexByName(opCtx, secondaryIndexKey);
+
+    ValidateResults results;
+    KeyStringIndexConsistency ksic(opCtx, &state);
+    ksic.traverseRecord(opCtx, *coll, xHashedIndex, RecordId(1), unhashableDoc, &results);
+    const auto& errors = results.getErrors();
+    ASSERT_EQ(errors.size(), 1);
+    auto it = std::find_if(errors.begin(), errors.end(), [](StringData error) {
+        // Expect error relating to hashed indexes unsupported on array types
+        return error.contains("16766");
+    });
+    ASSERT_EQ(errors.begin(), it)
+        << "Expected to find error 16766 relating to hashed indexes unsupported on array types";
+    LOGV2(11475700, "Error associated with validation run", "validationError"_attr = *it);
 }
 
 }  // namespace mongo
