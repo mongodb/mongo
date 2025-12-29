@@ -55,7 +55,7 @@ boost::optional<Timestamp> AttachedPersistenceProvider::getSentinelDataTimestamp
     return boost::none;
 }
 
-std::string AttachedPersistenceProvider::getWiredTigerConfig(int) const {
+std::string AttachedPersistenceProvider::getWiredTigerConfig() const {
     return "";
 }
 

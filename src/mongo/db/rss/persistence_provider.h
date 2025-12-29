@@ -67,10 +67,9 @@ public:
 
     /**
      * Additional configuration that should be added to the WiredTiger config string for the
-     * 'wiredtiger_open' call. The 'flattenLeafPageDelta' is expected to be the corresponding
-     * WiredTigerConfig member value.
+     * 'wiredtiger_open' call.
      */
-    virtual std::string getWiredTigerConfig(int flattenLeafPageDelta) const = 0;
+    virtual std::string getWiredTigerConfig() const = 0;
 
     /**
      * Additional configuration that should be added to the WiredTiger config string for creating a

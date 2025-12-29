@@ -688,10 +688,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         }
     }
 
-    std::string config =
-        generateWTOpenConfigString(_wtConfig,
-                                   wtExtensions.getOpenExtensionsConfig(),
-                                   provider.getWiredTigerConfig(_wtConfig.flattenLeafPageDelta));
+    std::string config = generateWTOpenConfigString(
+        _wtConfig, wtExtensions.getOpenExtensionsConfig(), provider.getWiredTigerConfig());
     LOGV2(22315, "Opening WiredTiger", "config"_attr = config);
 
     auto startTime = Date_t::now();
@@ -3259,7 +3257,6 @@ WiredTigerKVEngineBase::WiredTigerConfig getWiredTigerConfigFromStartupOptions(
     wtConfig.evictionThreadsMin = gWiredTigerEvictionThreadsMin.load();
     wtConfig.providerSupportsUnstableCheckpoints = provider.supportsUnstableCheckpoints();
     wtConfig.safeToTakeDuplicateCheckpoints = !provider.shouldAvoidDuplicateCheckpoints();
-    wtConfig.flattenLeafPageDelta = wiredTigerGlobalOptions.flattenLeafPageDelta;
 
     wtConfig.extraOpenOptions = wiredTigerGlobalOptions.engineConfig;
     if (wtConfig.extraOpenOptions.find("session_max=") != std::string::npos) {

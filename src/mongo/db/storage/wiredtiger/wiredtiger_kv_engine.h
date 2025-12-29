@@ -228,8 +228,6 @@ public:
         bool providerSupportsUnstableCheckpoints{true};
         // Specifies whether it is safe to take duplicate checkpoints on the same stable timestamp.
         bool safeToTakeDuplicateCheckpoints{true};
-        // Specifies whether the value for the flatten_leaf_page_delta configuration parameter.
-        int flattenLeafPageDelta{1};
         // This specifies the value for the log.compressor configuration parameter.
         std::string logCompressor{"snappy"};
         // This specifies the value for the live_restore.path configuration parameter.
