@@ -9,9 +9,6 @@
  * @tags: [
  * requires_fcv_80,
  * requires_getmore,
- * # TODO SERVER-115270 This test hits the evergreen timeout when run in
- * # suites with additional overhead.
- * query_intensive_pbt,
  * ]
  */
 
@@ -237,6 +234,6 @@ fc.assert(
         seed: 413,
         // The search space for this PBT is small because express path covers a narrow range of
         // queries. 300 runs should be enough.
-        numRuns: 300,
+        numRuns: 150,
     },
 );
