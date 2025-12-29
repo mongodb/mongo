@@ -41,7 +41,7 @@ namespace mongo::otel::metrics {
 template <typename T>
 class MONGO_MOD_PUBLIC Counter : public Metric {
 public:
-    virtual ~Counter() = default;
+    ~Counter() override = default;
 
     // T must be nonnegative.
     virtual void add(T value) = 0;

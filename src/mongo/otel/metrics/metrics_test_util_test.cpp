@@ -44,7 +44,6 @@ TEST_F(OtelMetricsCapturerTest, ReadInt64ThrowsExceptionIfMetricNotFound) {
                        ErrorCodes::KeyNotFound);
 }
 
-// TODO SERVER-115164 or SERVER-114955 or SERVER-114954 Add some tests for if the name is correct
-// but the type is wrong.
+// TODO(SERVER-115964): Add some tests for if the name is correct but the type is wrong.
 
 }  // namespace mongo::otel::metrics

@@ -61,13 +61,35 @@ public:
      * Creates a counter with the provided parameters. The result is never null but will throw an
      * exception if the counter would collide with an existing metric (i.e., same name but different
      * type or other parameters).
+     *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
     Counter<int64_t>* createInt64Counter(MetricName name, std::string description, MetricUnit unit);
 
     // TODO SERVER-114954 Implement MetricsService::createUInt64Gauge
     // TODO SERVER-114955 Implement MetricsService::createDoubleGauge
-    // TODO SERVER-115164 Implement MetricsService::createHistogram method
+
+    /**
+     * Creates an int64_t histogram with the provided parameters. The result is never null but will
+     * throw an exception if the counter would collide with an existing metric (i.e., same name but
+     * different type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    Histogram<int64_t>* createInt64Histogram(MetricName name,
+                                             std::string description,
+                                             MetricUnit unit);
+
+    /**
+     * Creates a double histogram with the provided parameters. The result is never null but will
+     * throw an exception if the counter would collide with an existing metric (i.e., same name but
+     * different type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    Histogram<double>* createDoubleHistogram(MetricName name,
+                                             std::string description,
+                                             MetricUnit unit);
 
     /**
      * Serializes the created metrics to BSON for server status reporting.
@@ -83,6 +105,19 @@ private:
         auto operator<=>(const MetricIdentifier& other) const = default;
     };
 
+    /**
+     * Retrieves an existing metric if one with the same name, identifier, and type T exists.
+     *
+     * This helper handles cases where developers may attempt to "create" the same metric multiple
+     * times (e.g., when refactoring a class into multiple files with duplicated metric recording
+     * logic). If a matching metric exists, a pointer to it is returned. Otherwise, returns nullptr.
+     *
+     * If a metric with the same name and different identifier or type T exists, an exception is
+     * thrown.
+     */
+    template <typename T>
+    T* getDuplicateMetric(WithLock, const std::string& name, MetricIdentifier identifier);
+
     using OwnedMetric = std::variant<std::unique_ptr<Counter<int64_t>>,
                                      std::unique_ptr<Histogram<double>>,
                                      std::unique_ptr<Histogram<int64_t>>>;
@@ -92,7 +127,7 @@ private:
         OwnedMetric metric;
     };
 
-    // Guards `_observableInstruments` and `_metrics`
+    // Guards `_observableInstruments` and `_metrics`.
     mutable stdx::mutex _mutex;
 
     // Pointers to all observable instruments. These are not directly used, but must be kept alive
@@ -114,9 +149,17 @@ public:
 
     Counter<int64_t>* createInt64Counter(MetricName name, std::string description, MetricUnit unit);
 
+    Histogram<int64_t>* createInt64Histogram(MetricName name,
+                                             std::string description,
+                                             MetricUnit unit);
+
+    Histogram<double>* createDoubleHistogram(MetricName name,
+                                             std::string description,
+                                             MetricUnit unit);
+
 private:
     stdx::mutex _mutex;
-    std::vector<std::unique_ptr<Counter<int64_t>>> _counters;
+    std::vector<std::unique_ptr<Metric>> _metrics;
 };
 }  // namespace mongo::otel::metrics
 #endif

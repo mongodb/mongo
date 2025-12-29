@@ -55,24 +55,35 @@ void observableCounterCallback(opentelemetry::metrics::ObserverResult observer_r
 }
 }  // namespace
 
+template <typename T>
+T* MetricsService::getDuplicateMetric(WithLock,
+                                      const std::string& name,
+                                      MetricIdentifier identifier) {
+    if (auto it = _metrics.find(name); it != _metrics.end()) {
+        massert(ErrorCodes::ObjectAlreadyExists,
+                fmt::format("Tried to create a metric with the name: {} but different definition "
+                            "already exists.",
+                            name),
+                it->second.identifier == identifier);
+        massert(ErrorCodes::ObjectAlreadyExists,
+                "Tried to create a new metric, but a metric with a different type parameter "
+                "already exists.",
+                std::holds_alternative<std::unique_ptr<T>>(it->second.metric));
+
+        return std::get<std::unique_ptr<T>>(it->second.metric).get();
+    }
+    return nullptr;
+}
+
 Counter<int64_t>* MetricsService::createInt64Counter(MetricName name,
                                                      std::string description,
                                                      MetricUnit unit) {
     std::string nameStr{name.getName()};
     MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
-    if (auto it = _metrics.find(nameStr); it != _metrics.end()) {
-        massert(ErrorCodes::ObjectAlreadyExists,
-                fmt::format("Tried to create a metric with the name: {} but different definition "
-                            "already exists.",
-                            nameStr),
-                it->second.identifier == identifier);
-        massert(ErrorCodes::ObjectAlreadyExists,
-                "Tried to create an int64_t counter, but a metric with a different type parameter"
-                "already exists.",
-                std::holds_alternative<std::unique_ptr<Counter<int64_t>>>(it->second.metric));
-
-        return std::get<std::unique_ptr<Counter<int64_t>>>(it->second.metric).get();
+    auto duplicate = getDuplicateMetric<Counter<int64_t>>(lock, nameStr, identifier);
+    if (duplicate) {
+        return duplicate;
     }
 
     // Make the raw counter.
@@ -97,6 +108,54 @@ Counter<int64_t>* MetricsService::createInt64Counter(MetricName name,
     return counter_ptr;
 }
 
+Histogram<double>* MetricsService::createDoubleHistogram(MetricName name,
+                                                         std::string description,
+                                                         MetricUnit unit) {
+    std::string nameStr(name.getName());
+    MetricIdentifier identifier{.description = description, .unit = unit};
+    stdx::lock_guard lock(_mutex);
+    auto duplicate = getDuplicateMetric<Histogram<double>>(lock, nameStr, identifier);
+    if (duplicate) {
+        return duplicate;
+    }
+
+    auto histogram =
+        std::make_unique<HistogramImpl<double>>(opentelemetry::metrics::Provider::GetMeterProvider()
+                                                    ->GetMeter(std::string{kMeterName})
+                                                    .get(),
+                                                nameStr,
+                                                description,
+                                                std::string(toString(unit)));
+    Histogram<double>* const histogram_ptr = histogram.get();
+    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
+
+    return histogram_ptr;
+}
+
+Histogram<int64_t>* MetricsService::createInt64Histogram(MetricName name,
+                                                         std::string description,
+                                                         MetricUnit unit) {
+    std::string nameStr(name.getName());
+    MetricIdentifier identifier{.description = description, .unit = unit};
+    stdx::lock_guard lock(_mutex);
+    auto duplicate = getDuplicateMetric<Histogram<int64_t>>(lock, nameStr, identifier);
+    if (duplicate) {
+        return duplicate;
+    }
+
+    auto histogram = std::make_unique<HistogramImpl<int64_t>>(
+        opentelemetry::metrics::Provider::GetMeterProvider()
+            ->GetMeter(std::string{kMeterName})
+            .get(),
+        nameStr,
+        description,
+        std::string(toString(unit)));
+    Histogram<int64_t>* const histogram_ptr = histogram.get();
+    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
+
+    return histogram_ptr;
+}
+
 BSONObj MetricsService::serializeMetrics() const {
     BSONObjBuilder builder;
     stdx::lock_guard lock(_mutex);
@@ -116,15 +175,35 @@ Counter<int64_t>* MetricsService::createInt64Counter(MetricName name,
                                                      std::string description,
                                                      MetricUnit unit) {
     stdx::lock_guard lock(_mutex);
-    _counters.push_back(std::make_unique<CounterImpl<int64_t>>(
+    _metrics.push_back(std::make_unique<CounterImpl<int64_t>>(
         std::string(name.getName()), std::move(description), std::string(toString(unit))));
-    return _counters.back().get();
+    auto ptr = dynamic_cast<Counter<int64_t>*>(_metrics.back().get());
+    invariant(ptr);
+    return ptr;
+}
+
+Histogram<int64_t>* MetricsService::createInt64Histogram(MetricName name,
+                                                         std::string description,
+                                                         MetricUnit unit) {
+    stdx::lock_guard lock(_mutex);
+    _metrics.push_back(std::make_unique<NoopHistogramImpl<int64_t>>());
+    auto ptr = dynamic_cast<Histogram<int64_t>*>(_metrics.back().get());
+    invariant(ptr);
+    return ptr;
+}
+
+Histogram<double>* MetricsService::createDoubleHistogram(MetricName name,
+                                                         std::string description,
+                                                         MetricUnit unit) {
+    stdx::lock_guard lock(_mutex);
+    _metrics.push_back(std::make_unique<NoopHistogramImpl<double>>());
+    auto ptr = dynamic_cast<Histogram<double>*>(_metrics.back().get());
+    invariant(ptr);
+    return ptr;
 }
 #endif
 
 MetricsService& MetricsService::get(ServiceContext* serviceContext) {
     return getMetricsService(serviceContext);
 }
-
 }  // namespace mongo::otel::metrics
-

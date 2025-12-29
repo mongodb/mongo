@@ -41,7 +41,6 @@
 namespace mongo::otel::metrics {
 namespace {
 
-
 class MetricsServiceTest : public ServiceContextTest {};
 
 // Assert that when a valid MeterProvider in place, we create a working Meter implementation with
@@ -74,11 +73,27 @@ TEST_F(MetricsServiceTest, ServiceContextInitBeforeMeterProvider) {
 }
 
 TEST_F(MetricsServiceTest, SerializeMetrics) {
-    // TODO(SERVER-115756): Create counter and histogram metrics, record metrics, and check
-    // serialization output.
     auto& metricsService = MetricsService::get(getServiceContext());
-    metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    ASSERT_BSONOBJ_EQ(metricsService.serializeMetrics(), BSON("otelMetrics" << Document()));
+    auto int64Histogram = metricsService.createInt64Histogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    auto doubleHistogram = metricsService.createDoubleHistogram(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds);
+    auto counter =
+        metricsService.createInt64Counter(MetricNames::kTest3, "description", MetricUnit::kSeconds);
+    int64Histogram->record(10);
+    doubleHistogram->record(20);
+    counter->add(1);
+
+    auto expectedInt64HistogramBson =
+        BSON("test_only.metric1_seconds" << BSON("average" << 10.0 << "count" << 1));
+    auto expectedDoubleHistogramBson =
+        BSON("test_only.metric2_seconds" << BSON("average" << 20.0 << "count" << 1));
+    // TODO(SERVER-115756): Update expected value.
+    auto expectedCounterBson = Document();
+    ASSERT_BSONOBJ_EQ(metricsService.serializeMetrics(),
+                      BSON("otelMetrics" << expectedInt64HistogramBson << "otelMetrics"
+                                         << expectedDoubleHistogramBson << "otelMetrics"
+                                         << expectedCounterBson));
 }
 
 using CreateInt64CounterTest = MetricsServiceTest;
@@ -105,9 +120,6 @@ TEST_F(CreateInt64CounterTest, ExceptionWhenSameNameButDifferentParameters) {
         ErrorCodes::ObjectAlreadyExists);
 }
 
-// TODO SERVER-115164 or SERVER-114955 or SERVER-114954 add a test that verifies that creating
-// duplicate metrics with different types fails.
-
 TEST_F(CreateInt64CounterTest, RecordsValues) {
     OtelMetricsCapturer metricsCapturer;
     auto& metricsService = MetricsService::get(getServiceContext());
@@ -129,5 +141,55 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
     ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 20);
 }
 
+using CreateHistogramTest = MetricsServiceTest;
+
+// TODO(SERVER-115964): Add RecordsValue test for histogram.
+
+TEST_F(CreateHistogramTest, SameHistogramReturnedOnSameCreate) {
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Histogram<int64_t>* histogram_1 = metricsService.createInt64Histogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    Histogram<int64_t>* histogram_2 = metricsService.createInt64Histogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_EQ(histogram_1, histogram_2);
+
+    Histogram<double>* histogram_3 = metricsService.createDoubleHistogram(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds);
+    Histogram<double>* histogram_4 = metricsService.createDoubleHistogram(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds);
+    ASSERT_EQ(histogram_3, histogram_4);
+}
+
+TEST_F(CreateHistogramTest, ExceptionWhenSameNameButDifferentParameters) {
+    auto& metricsService = MetricsService::get(getServiceContext());
+    metricsService.createInt64Histogram(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_THROWS_CODE(metricsService.createInt64Histogram(
+                           MetricNames::kTest1, "different_description", MetricUnit::kSeconds),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(
+        metricsService.createInt64Histogram(MetricNames::kTest1, "description", MetricUnit::kBytes),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
+
+    metricsService.createDoubleHistogram(MetricNames::kTest2, "description", MetricUnit::kSeconds);
+    ASSERT_THROWS_CODE(metricsService.createDoubleHistogram(
+                           MetricNames::kTest2, "different_description", MetricUnit::kSeconds),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(metricsService.createDoubleHistogram(
+                           MetricNames::kTest2, "description", MetricUnit::kBytes),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+}
+
+TEST_F(CreateHistogramTest, ExceptionWhenSameNameButDifferentType) {
+    auto& metricsService = MetricsService::get(getServiceContext());
+    metricsService.createInt64Histogram(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_THROWS_CODE(metricsService.createDoubleHistogram(
+                           MetricNames::kTest1, "description", MetricUnit::kSeconds),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+}
 }  // namespace
 }  // namespace mongo::otel::metrics

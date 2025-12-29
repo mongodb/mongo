@@ -69,6 +69,7 @@ public:
     // Test-only
     static constexpr MetricName kTest1 = {"test_only.metric1"};
     static constexpr MetricName kTest2 = {"test_only.metric2"};
+    static constexpr MetricName kTest3 = {"test_only.metric3"};
 };
 
 }  // namespace mongo::otel::metrics

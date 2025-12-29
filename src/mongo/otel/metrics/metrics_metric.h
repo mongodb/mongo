@@ -38,6 +38,8 @@ namespace mongo::otel::metrics {
  */
 class Metric {
 public:
+    virtual ~Metric() = default;
+
     /**
      * Serializes the derived class to BSON.
      *

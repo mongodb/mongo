@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/moving_average.h"
@@ -51,7 +52,7 @@ concept HistogramValueType = std::same_as<T, int64_t> || std::same_as<T, double>
 template <HistogramValueType T>
 class MONGO_MOD_PUBLIC Histogram : public Metric {
 public:
-    virtual ~Histogram() = default;
+    ~Histogram() override = default;
 
     /**
      * Records a value.
@@ -72,7 +73,7 @@ public:
  * impact latency/throughput.
  */
 template <HistogramValueType T>
-class HistogramImpl : public Histogram<T> {
+class HistogramImpl final : public Histogram<T> {
 public:
     /**
      * Creates a new Histogram instance.
@@ -146,9 +147,10 @@ BSONObj HistogramImpl<T>::serializeToBson(const std::string& key) const {
     metrics.done();
     return builder.obj();
 }
+
 #else
 template <HistogramValueType T>
-class NoopHistogramImpl : public Histogram<T> {
+class NoopHistogramImpl final : public Histogram<T> {
 public:
     void record(T value) override {}
 
