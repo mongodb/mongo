@@ -109,5 +109,13 @@ TEST(Int64CounterImplTest, ConcurrentAdds) {
     ASSERT_EQ(counter.value(), kNumThreads * kIncrementsPerThread);
 }
 
-// TODO(SERVER-115756): Test serialization of counter.
+TEST(Int64CounterImplTest, Serialization) {
+    CounterImpl<int64_t> counter("name", "description", "unit");
+    const std::string key = "a";
+    ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 0));
+    counter.add(0);
+    ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 0));
+    counter.add(10);
+    ASSERT_BSONOBJ_EQ(counter.serializeToBson(key), BSON(key << 10));
+}
 }  // namespace mongo::otel::metrics

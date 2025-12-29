@@ -84,16 +84,16 @@ TEST_F(MetricsServiceTest, SerializeMetrics) {
     doubleHistogram->record(20);
     counter->add(1);
 
-    auto expectedInt64HistogramBson =
-        BSON("test_only.metric1_seconds" << BSON("average" << 10.0 << "count" << 1));
-    auto expectedDoubleHistogramBson =
-        BSON("test_only.metric2_seconds" << BSON("average" << 20.0 << "count" << 1));
-    // TODO(SERVER-115756): Update expected value.
-    auto expectedCounterBson = Document();
-    ASSERT_BSONOBJ_EQ(metricsService.serializeMetrics(),
-                      BSON("otelMetrics" << expectedInt64HistogramBson << "otelMetrics"
-                                         << expectedDoubleHistogramBson << "otelMetrics"
-                                         << expectedCounterBson));
+    BSONObjBuilder expectedBson;
+    BSONObjBuilder expectedOtelMetrics(expectedBson.subobjStart("otelMetrics"));
+    expectedOtelMetrics.append("test_only.metric1_seconds",
+                               BSON("average" << 10.0 << "count" << 1));
+    expectedOtelMetrics.append("test_only.metric2_seconds",
+                               BSON("average" << 20.0 << "count" << 1));
+    expectedOtelMetrics.append("test_only.metric3_seconds", 1);
+    expectedOtelMetrics.doneFast();
+
+    ASSERT_BSONOBJ_EQ(metricsService.serializeMetrics(), expectedBson.obj());
 }
 
 using CreateInt64CounterTest = MetricsServiceTest;

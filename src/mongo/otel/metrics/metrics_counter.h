@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
@@ -104,7 +105,6 @@ void CounterImpl<T>::add(T value) {
 
 template <typename T>
 BSONObj CounterImpl<T>::serializeToBson(const std::string& key) const {
-    // TODO(SERVER-115756): Implement.
-    return {};
+    return BSON(key << _value.loadRelaxed());
 }
 }  // namespace mongo::otel::metrics

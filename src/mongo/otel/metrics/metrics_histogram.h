@@ -144,7 +144,7 @@ BSONObj HistogramImpl<T>::serializeToBson(const std::string& key) const {
     BSONObjBuilder metrics{builder.subobjStart(key)};
     metrics.append("average", _avg.get().value_or(0.0));
     metrics.append("count", _count.load());
-    metrics.done();
+    metrics.doneFast();
     return builder.obj();
 }
 
@@ -155,7 +155,7 @@ public:
     void record(T value) override {}
 
     BSONObj serializeToBson(const std::string& key) const override {
-        return BSONObj();
+        return BSON(key << BSONObj());
     }
 };
 #endif

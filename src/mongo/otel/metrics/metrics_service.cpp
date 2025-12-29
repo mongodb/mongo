@@ -30,6 +30,8 @@
 
 #include "mongo/otel/metrics/metrics_service.h"
 
+#include "mongo/util/assert_util.h"
+
 #include <fmt/format.h>
 
 namespace mongo::otel::metrics {
@@ -158,16 +160,22 @@ Histogram<int64_t>* MetricsService::createInt64Histogram(MetricName name,
 
 BSONObj MetricsService::serializeMetrics() const {
     BSONObjBuilder builder;
+    BSONObjBuilder otelMetrics(builder.subobjStart("otelMetrics"));
     stdx::lock_guard lock(_mutex);
     for (const auto& [name, identifierAndMetric] : _metrics) {
         std::visit(
             [&](const auto& metric) {
-                builder.append("otelMetrics",
-                               metric->serializeToBson(fmt::format(
-                                   "{}_{}", name, toString(identifierAndMetric.identifier.unit))));
+                const auto key =
+                    fmt::format("{}_{}", name, toString(identifierAndMetric.identifier.unit));
+                const auto obj = metric->serializeToBson(key);
+                massert(ErrorCodes::KeyNotFound,
+                        fmt::format("Provided key {} not found in serialized BSONObj", key),
+                        !obj.getField(key).eoo());
+                otelMetrics.append(obj.getField(key));
             },
             identifierAndMetric.metric);
     }
+    otelMetrics.doneFast();
     return builder.obj();
 }
 #else
