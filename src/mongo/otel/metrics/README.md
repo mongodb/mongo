@@ -22,7 +22,11 @@ void initializeMetrics(ServiceContext* svcCtx) {
 
 ### MetricName Registry
 
-All metric names must be registered in the `MetricNames` class. This central registry ensures the N&O team has full ownership over new OTel metrics in the server for centralized collaboration with downstream OTel consumers. OTel metrics are stored in time-series DBs by the SRE team, and a sudden increase in metrics will result in operational costs ballooning for the SRE team, which is why N&O owns this registry.
+All metric names must be registered in the [`MetricNames`](metric_names.h) class. This central
+registry ensures the N&O team has full ownership over new OTel metrics in the server for centralized
+collaboration with downstream OTel consumers. OTel metrics are stored in time-series DBs by the SRE
+team, and a sudden increase in metrics will result in operational costs ballooning for the SRE team,
+which is why N&O owns this registry.
 
 When adding a new metric, add a `static constexpr MetricName` entry to the `MetricNames` class in `metric_names.h`, grouped under your team name:
 
@@ -46,7 +50,8 @@ Follow [OpenTelemetry naming conventions](https://opentelemetry.io/docs/specs/se
 
 ### Available Units
 
-The `MetricUnit` enum provides standard units. Please add any additional units to the enum as they are needed.
+The [`MetricUnit`](metric_unit.h) enum provides standard units. Please add any additional units to
+the enum as they are needed.
 
 ## Metric Types
 
