@@ -148,6 +148,13 @@ bool validateTag(StringData uniqueTag);
 bool isValidIdent(StringData ident);
 
 /**
+ * Returns the directory component of the ident, which is the prefix before the last '/'.
+ * Returns an empty string when the ident has no directory component.
+ * Supplying an ill-formed ident will trigger a uassert.
+ */
+StringData getDirectory(StringData ident);
+
+/**
  * When idents are generated with 'directoryPerDB', the name of the database is encoded within the
  * ident. Idents must be capable of conversion into valid filesystem path components to guarantee
  * correct mapping from the server to the file that holds the storage engine table.

@@ -283,6 +283,33 @@ TEST_F(IdentGenerationTest, ValidCollectionIdents) {
     ASSERT_TRUE(ident::isValidIdent(ident::kSizeStorer));
 }
 
+TEST_F(IdentGenerationTest, IdentDirectoryForCollectionIdents) {
+    const auto identDefault = ident::generateNewCollectionIdent(
+        kTestDB, false /* directoryPerDB */, false /* directoryForIndexes */);
+
+    ASSERT_EQ(ident::getDirectory(identDefault), ""_sd);
+
+    const auto identDirectoryPerDB = ident::generateNewCollectionIdent(
+        kTestDB, true /* directoryPerDB */, false /* directoryForIndexes */);
+    const auto dbComponent = ident::createDBNamePathComponent(kTestDB);
+    ASSERT_EQ(ident::getDirectory(identDirectoryPerDB), StringData{dbComponent});
+
+    const auto identDirectoryForIndexes = ident::generateNewCollectionIdent(
+        kTestDB, false /* directoryPerDB */, true /* directoryForIndexes */);
+    ASSERT_EQ(ident::getDirectory(identDirectoryForIndexes), "collection"_sd);
+
+    const auto identDirectoryPerDBAndIndexes = ident::generateNewCollectionIdent(
+        kTestDB, true /* directoryPerDB */, true /* directoryForIndexes */);
+    const auto dbComponentWithCollection = dbComponent + "/collection";
+    ASSERT_EQ(ident::getDirectory(identDirectoryPerDBAndIndexes),
+              StringData{dbComponentWithCollection});
+}
+
+TEST_F(IdentGenerationTest, IdentDirectoryForSpecialIdents) {
+    ASSERT_EQ(ident::getDirectory(ident::kMdbCatalog), ""_sd);
+    ASSERT_EQ(ident::getDirectory(ident::kSizeStorer), ""_sd);
+}
+
 TEST_F(IdentGenerationTest, InvalidIdents) {
     // empty ident
     ASSERT_FALSE(ident::isValidIdent(""));
@@ -311,6 +338,14 @@ TEST_F(IdentGenerationTest, InvalidIdents) {
     ASSERT_FALSE(ident::isValidIdent("db/index/:a"));
     // dbname containing characters that should have been escaped
     ASSERT_FALSE(ident::isValidIdent("db[name]/index/a"));
+}
+
+TEST_F(IdentGenerationTest, IdentDirectoryRejectsInvalidIdents) {
+    ASSERT_FALSE(ident::isValidIdent(""));
+    ASSERT_THROWS_CODE(ident::getDirectory(""), DBException, 11558900);
+
+    ASSERT_FALSE(ident::isValidIdent("db/index\\collection-0"));
+    ASSERT_THROWS_CODE(ident::getDirectory("index\\collection-0"), DBException, 11558900);
 }
 
 TEST_F(IdentGenerationTest, ValidInternalIndexBuildIdent) {
