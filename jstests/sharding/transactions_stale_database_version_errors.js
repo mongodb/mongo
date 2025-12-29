@@ -21,16 +21,9 @@ const st = new ShardingTest({
     },
 });
 
-// TODO (SERVER-101777): This test makes a lot of assumptions about database versions stored in
-// shards that are not the primary shard. This test shuld be re-written thinking about that shards
-// are database authoritative and don't need to refresh anymore.
-const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB("admin"),
-    "ShardAuthoritativeDbMetadataDDL",
-);
-if (isAuthoritativeShardEnabled) {
-    st.stop();
-    quit();
+// Helper function to check if authoritative database shards feature is enabled.
+function isAuthoritativeShardsEnabled() {
+    return FeatureFlagUtil.isPresentAndEnabled(st.s.getDB("admin"), "ShardAuthoritativeDbMetadataCRUD");
 }
 
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
@@ -112,35 +105,41 @@ assert.commandWorked(session.commitTransaction_forTesting());
 //
 // The final StaleDbVersion error should be returned if the router exhausts its retries.
 //
-assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
-assert.commandWorked(st.s.adminCommand({movePrimary: otherDbName, to: st.shard1.shardName}));
+// Note: This test case relies on the skipDatabaseVersionMetadataRefresh failpoint to prevent
+// metadata refresh. With authoritative shards, the metadata is populated by DDL during movePrimary,
+// not via refresh, so this test case is skipped when authoritative shards are enabled.
+//
+if (!isAuthoritativeShardsEnabled()) {
+    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: otherDbName, to: st.shard1.shardName}));
 
-// Disable database metadata refreshes on the stale shard so it will indefinitely return a stale
-// version error.
-assert.commandWorked(
-    st.rs0.getPrimary().adminCommand({configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "alwaysOn"}),
-);
+    // Disable database metadata refreshes on the stale shard so it will indefinitely return a stale
+    // version error.
+    assert.commandWorked(
+        st.rs0.getPrimary().adminCommand({configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "alwaysOn"}),
+    );
 
-session.startTransaction();
+    session.startTransaction();
 
-// Target Shard1, to verify the transaction on it is implicitly aborted later.
-assert.commandWorked(sessionOtherDB.runCommand({find: otherCollName}));
+    // Target Shard1, to verify the transaction on it is implicitly aborted later.
+    assert.commandWorked(sessionOtherDB.runCommand({find: otherCollName}));
 
-// Target the first database which is on Shard0. The shard is stale and won't refresh its
-// metadata, so mongos should exhaust its retries and implicitly abort the transaction.
-res = assert.commandFailedWithCode(
-    sessionDB.runCommand({distinct: collName, key: "_id", query: {_id: 0}}),
-    ErrorCodes.StaleDbVersion,
-);
-assert.eq(res.errorLabels, ["TransientTransactionError"]);
+    // Target the first database which is on Shard0. The shard is stale and won't refresh its
+    // metadata, so mongos should exhaust its retries and implicitly abort the transaction.
+    res = assert.commandFailedWithCode(
+        sessionDB.runCommand({distinct: collName, key: "_id", query: {_id: 0}}),
+        ErrorCodes.StaleDbVersion,
+    );
+    assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
-// Verify all shards aborted the transaction.
-assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
-assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
+    // Verify all shards aborted the transaction.
+    assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
+    assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-assert.commandWorked(
-    st.rs0.getPrimary().adminCommand({configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "off"}),
-);
+    assert.commandWorked(
+        st.rs0.getPrimary().adminCommand({configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "off"}),
+    );
+}
 
 disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
