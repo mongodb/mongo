@@ -364,6 +364,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /docs/owners/** @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/poetry_execution.md @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/server_parameters.md @10gen/server-programmability @svc-auto-approve-bot
+/docs/**/unit_test.md @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./docs/antithesis/OWNERS.yml
 /docs/antithesis/ @10gen/devprod-correctness @svc-auto-approve-bot
@@ -3322,7 +3323,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/croaring @10gen/query-execution @svc-auto-approve-bot
 /src/third_party/**/fmt @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/folly @10gen/server-workload-resilience @svc-auto-approve-bot
-/src/third_party/**/googletest_restricted_for_disagg_only @10gen/server-disagg-storage @svc-auto-approve-bot
+/src/third_party/**/googletest @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/gperftools @10gen/server-workload-resilience @svc-auto-approve-bot
 /src/third_party/**/grpc @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/icu4c* @10gen/query-execution @svc-auto-approve-bot

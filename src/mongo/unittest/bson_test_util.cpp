@@ -33,7 +33,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -54,7 +54,7 @@ namespace unittest {
             std::ostringstream os;                                                   \
             os << "Expected [ " << aExpression << " " #OPERATOR " " << bExpression   \
                << " ] but found [ " << aValue << " " #OPERATOR " " << bValue << "]"; \
-            TestAssertionFailure(theFile, theLine, os.str()).stream();               \
+            GTEST_FAIL_AT(theFile.c_str(), theLine) << os.str();                     \
         }                                                                            \
     }
 

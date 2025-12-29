@@ -54,9 +54,6 @@
 
 namespace mongo {
 
-using namespace mongo::unittest;
-using namespace mongo::unittest::match;
-
 /**
  * SbeStageBuilderTestFixture is a unittest fixture that can be used to facilitate testing the
  * translation of a QuerySolution tree to an sbe PlanStage tree.
@@ -143,7 +140,7 @@ extern unittest::GoldenTestConfig goldenTestConfigSbe;
 class GoldenSbeStageBuilderTestFixture : public SbeStageBuilderTestFixture {
 public:
     GoldenSbeStageBuilderTestFixture()
-        : _gctx(std::make_unique<GoldenTestContext>(&goldenTestConfigSbe)) {
+        : _gctx(std::make_unique<unittest::GoldenTestContext>(&goldenTestConfigSbe)) {
         _gctx->validateOnClose(false);
     }
 
@@ -157,7 +154,7 @@ protected:
                  const mongo::BSONArray& expectedValue,
                  BuildPlanStageParam param = {});
 
-    std::unique_ptr<GoldenTestContext> _gctx;
+    std::unique_ptr<unittest::GoldenTestContext> _gctx;
     bool _collInitialized = false;
 };
 

@@ -39,6 +39,8 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/unittest/unittest_main_core.h"
+#include "mongo/unittest/unittest_options.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
@@ -650,23 +652,22 @@ TEST_F(StitchSupportTest, TestUpsertProducesProperStatus) {
 // Note that we don't use the main() defined for most other unit tests so that we can avoid double
 // calling runGlobalInitializers(), which is called both from the regular unit test main() and from
 // the Stitch Support Library intializer function that gets tested here.
-int main(const int argc, const char* const* const argv) {
-    // See comment by the same code block in mongo_embedded_test.cpp
-    auto ret = mongo::runGlobalInitializers(std::vector<std::string>{argv, argv + argc});
-    if (!ret.isOK()) {
-        std::cerr << "Global initilization failed";
+int main(int argc, char** argv) {
+    mongo::unittest::MainProgress progress({.suppressGlobalInitializers = true},
+                                           std::vector<std::string>(argv, argv + argc));
+    progress.initialize();
+    if (auto ec = progress.parseAndAcceptOptions())
+        return static_cast<int>(*ec);
+
+    if (auto ret = mongo::runGlobalInitializers(progress.args()); !ret.isOK()) {
+        std::cerr << "Global initilization failed" << ret.toString();
         return static_cast<int>(mongo::ExitCode::fail);
     }
 
-    ret = mongo::runGlobalDeinitializers();
-    if (!ret.isOK()) {
-        std::cerr << "Global deinitilization failed";
+    if (auto ret = mongo::runGlobalDeinitializers(); !ret.isOK()) {
+        std::cerr << "Global deinitilization failed" << ret.toString();
         return static_cast<int>(mongo::ExitCode::fail);
     }
 
-    const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", "", 1);
-
-    // This is the standard exit path for Mongo processes. See the mongo::quickExit() declaration
-    // for more information.
-    mongo::quickExit(result);
+    return progress.test();
 }

@@ -276,6 +276,7 @@ DEATH_TEST_F(RecoveryUnitTestHarnessDeathTest, AbortMustBeInUnitOfWork, "invaria
 
 DEATH_TEST_F(RecoveryUnitTestHarnessDeathTest, CannotHaveUnfinishedUnitOfWorkOnExit, "invariant") {
     ru->beginUnitOfWork(opCtx->readOnly());
+    opCtx.reset();
 }
 
 DEATH_TEST_F(RecoveryUnitTestHarnessDeathTest, PrepareMustBeInUnitOfWork, "invariant") {

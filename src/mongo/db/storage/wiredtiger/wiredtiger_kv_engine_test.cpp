@@ -167,7 +167,16 @@ private:
 class WiredTigerKVEngineTest : public ServiceContextTest {
 public:
     WiredTigerKVEngineTest(bool repair = false, bool preciseCheckpoints = false)
-        : _helper(getServiceContext(), repair, preciseCheckpoints) {}
+        : _repair(repair), _preciseCheckpoints(preciseCheckpoints) {}
+
+    void setUp() override {
+        _helper = std::make_unique<WiredTigerKVHarnessHelper>(
+            getServiceContext(), _repair, _preciseCheckpoints);
+    }
+
+    void tearDown() override {
+        _helper.reset();
+    }
 
 protected:
     using ClientAndCtx =
@@ -176,7 +185,7 @@ protected:
     ServiceContext::UniqueOperationContext _makeOperationContext() {
         auto opCtx = makeOperationContext();
         shard_role_details::setRecoveryUnit(opCtx.get(),
-                                            _helper.getEngine()->newRecoveryUnit(),
+                                            _helper->getEngine()->newRecoveryUnit(),
                                             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return opCtx;
     }
@@ -185,14 +194,16 @@ protected:
         auto* sc = getServiceContext();
         auto client = sc->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        _helper.getEngine()->newRecoveryUnit();
+        _helper->getEngine()->newRecoveryUnit();
         shard_role_details::setRecoveryUnit(opCtx.get(),
-                                            _helper.getEngine()->newRecoveryUnit(),
+                                            _helper->getEngine()->newRecoveryUnit(),
                                             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 
-    WiredTigerKVHarnessHelper _helper;
+    bool _repair;
+    bool _preciseCheckpoints;
+    std::unique_ptr<WiredTigerKVHarnessHelper> _helper;
 };
 
 class WiredTigerKVEngineRepairTest : public WiredTigerKVEngineTest {
@@ -209,8 +220,8 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
     ASSERT_OK(
-        _helper.getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
-    auto rs = _helper.getWiredTigerKVEngine()->getRecordStore(
+        _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+    auto rs = _helper->getWiredTigerKVEngine()->getRecordStore(
         opCtxPtr.get(), nss, ident, options, UUID::gen());
     ASSERT(rs);
 
@@ -230,7 +241,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     }
 
     const boost::optional<boost::filesystem::path> dataFilePath =
-        _helper.getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
+        _helper->getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
     ASSERT(dataFilePath);
 
     ASSERT(boost::filesystem::exists(*dataFilePath));
@@ -240,12 +251,12 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 
 #ifdef _WIN32
     auto status =
-        _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
+        _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
     ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
 #else
 
     // Dropping a collection might fail if we haven't checkpointed the data.
-    _helper.getWiredTigerKVEngine()->checkpoint();
+    _helper->getWiredTigerKVEngine()->checkpoint();
 
     // Move the data file out of the way so the ident can be dropped. This not permitted on Windows
     // because the file cannot be moved while it is open. The implementation for orphan recovery is
@@ -254,7 +265,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     boost::filesystem::rename(*dataFilePath, tmpFile, err);
     ASSERT(!err) << err.message();
 
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
+    ASSERT_OK(_helper->getWiredTigerKVEngine()->dropIdent(
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // The data file is moved back in place so that it becomes an "orphan" of the storage
@@ -263,7 +274,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
     ASSERT(!err) << err.message();
 
     auto status =
-        _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
+        _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
     ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code());
 #endif
 }
@@ -277,11 +288,11 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
     ASSERT_OK(
-        _helper.getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
 
     UUID uuid = UUID::gen();
     auto rs =
-        _helper.getWiredTigerKVEngine()->getRecordStore(opCtxPtr.get(), nss, ident, options, uuid);
+        _helper->getWiredTigerKVEngine()->getRecordStore(opCtxPtr.get(), nss, ident, options, uuid);
     ASSERT(rs);
 
     RecordId loc;
@@ -300,20 +311,20 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     }
 
     const boost::optional<boost::filesystem::path> dataFilePath =
-        _helper.getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
+        _helper->getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
     ASSERT(dataFilePath);
 
     ASSERT(boost::filesystem::exists(*dataFilePath));
 
     // Dropping a collection might fail if we haven't checkpointed the data
-    _helper.getWiredTigerKVEngine()->checkpoint();
+    _helper->getWiredTigerKVEngine()->checkpoint();
 
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
+    ASSERT_OK(_helper->getWiredTigerKVEngine()->dropIdent(
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
 #ifdef _WIN32
     auto status =
-        _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
+        _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
     ASSERT_EQ(ErrorCodes::CommandNotSupported, status.code());
 #else
     // The ident may not get immediately dropped, so ensure it is completely gone.
@@ -332,13 +343,14 @@ TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     // This should recreate an empty data file successfully and move the old one to a name that ends
     // in ".corrupt".
     auto status =
-        _helper.getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
+        _helper->getWiredTigerKVEngine()->recoverOrphanedIdent(provider, ru, nss, ident, options);
     ASSERT_EQ(ErrorCodes::DataModifiedByRepair, status.code()) << status.reason();
 
     boost::filesystem::path corruptFile = (dataFilePath->string() + ".corrupt");
     ASSERT(boost::filesystem::exists(corruptFile));
 
-    rs = _helper.getWiredTigerKVEngine()->getRecordStore(opCtxPtr.get(), nss, ident, options, uuid);
+    rs =
+        _helper->getWiredTigerKVEngine()->getRecordStore(opCtxPtr.get(), nss, ident, options, uuid);
     RecordData data;
     ASSERT_FALSE(rs->findRecord(
         opCtxPtr.get(), *shard_role_details::getRecoveryUnit(opCtxPtr.get()), loc, &data));
@@ -366,7 +378,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     // The initial data timestamp has to be set to take stable checkpoints. The first stable
     // timestamp greater than this will also trigger a checkpoint. The following loop of the
     // CheckpointThread will observe the new `syncdelay` value.
-    _helper.getWiredTigerKVEngine()->setInitialDataTimestamp(Timestamp(1, 1));
+    _helper->getWiredTigerKVEngine()->setInitialDataTimestamp(Timestamp(1, 1));
 
     // Simulate the callback that queries config.transactions for the oldest active transaction.
     boost::optional<Timestamp> oldestActiveTxnTimestamp;
@@ -380,7 +392,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
         return ResultType(oldestActiveTxnTimestamp);
     };
 
-    _helper.getWiredTigerKVEngine()->setOldestActiveTransactionTimestampCallback(callback);
+    _helper->getWiredTigerKVEngine()->setOldestActiveTransactionTimestampCallback(callback);
 
     // A method that will poll the WiredTigerKVEngine until it sees the amount of oplog necessary
     // for crash recovery exceeds the input.
@@ -388,7 +400,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
         // If the current oplog needed for rollback does not exceed the requested pinned out, we
         // cannot expect the CheckpointThread to eventually publish a sufficient crash recovery
         // value.
-        auto needed = _helper.getWiredTigerKVEngine()->getOplogNeededForRollback();
+        auto needed = _helper->getWiredTigerKVEngine()->getOplogNeededForRollback();
         if (needed.isOK()) {
             ASSERT_TRUE(needed.getValue() >= newPinned);
         }
@@ -396,9 +408,9 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
         // Do 100 iterations that sleep for 100 milliseconds between polls. This will wait for up
         // to 10 seconds to observe an asynchronous update that iterates once per second.
         for (auto iterations = 0; iterations < 100; ++iterations) {
-            if (_helper.getWiredTigerKVEngine()->getPinnedOplog() >= newPinned) {
+            if (_helper->getWiredTigerKVEngine()->getPinnedOplog() >= newPinned) {
                 ASSERT_TRUE(
-                    _helper.getWiredTigerKVEngine()->getOplogNeededForCrashRecovery().value() >=
+                    _helper->getWiredTigerKVEngine()->getOplogNeededForCrashRecovery().value() >=
                     newPinned);
                 return;
             }
@@ -410,34 +422,34 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
               "Expected the pinned oplog to advance.",
               "expectedValue"_attr = newPinned,
               "publishedValue"_attr =
-                  _helper.getWiredTigerKVEngine()->getOplogNeededForCrashRecovery());
+                  _helper->getWiredTigerKVEngine()->getOplogNeededForCrashRecovery());
         FAIL("");
     };
 
     oldestActiveTxnTimestamp = boost::none;
-    _helper.getWiredTigerKVEngine()->setStableTimestamp(Timestamp(10, 1), false);
+    _helper->getWiredTigerKVEngine()->setStableTimestamp(Timestamp(10, 1), false);
     assertPinnedMovesSoon(Timestamp(10, 1));
 
     oldestActiveTxnTimestamp = Timestamp(15, 1);
-    _helper.getWiredTigerKVEngine()->setStableTimestamp(Timestamp(20, 1), false);
+    _helper->getWiredTigerKVEngine()->setStableTimestamp(Timestamp(20, 1), false);
     assertPinnedMovesSoon(Timestamp(15, 1));
 
     oldestActiveTxnTimestamp = Timestamp(19, 1);
-    _helper.getWiredTigerKVEngine()->setStableTimestamp(Timestamp(30, 1), false);
+    _helper->getWiredTigerKVEngine()->setStableTimestamp(Timestamp(30, 1), false);
     assertPinnedMovesSoon(Timestamp(19, 1));
 
     oldestActiveTxnTimestamp = boost::none;
-    _helper.getWiredTigerKVEngine()->setStableTimestamp(Timestamp(30, 1), false);
+    _helper->getWiredTigerKVEngine()->setStableTimestamp(Timestamp(30, 1), false);
     assertPinnedMovesSoon(Timestamp(30, 1));
 
     callbackShouldFail.store(true);
-    ASSERT_NOT_OK(_helper.getWiredTigerKVEngine()->getOplogNeededForRollback());
-    _helper.getWiredTigerKVEngine()->setStableTimestamp(Timestamp(40, 1), false);
+    ASSERT_NOT_OK(_helper->getWiredTigerKVEngine()->getOplogNeededForRollback());
+    _helper->getWiredTigerKVEngine()->setStableTimestamp(Timestamp(40, 1), false);
     // Await a new checkpoint. Oplog needed for rollback does not advance.
     sleepmillis(1100);
-    ASSERT_EQ(_helper.getWiredTigerKVEngine()->getOplogNeededForCrashRecovery().value(),
+    ASSERT_EQ(_helper->getWiredTigerKVEngine()->getOplogNeededForCrashRecovery().value(),
               Timestamp(30, 1));
-    _helper.getWiredTigerKVEngine()->setStableTimestamp(Timestamp(30, 1), false);
+    _helper->getWiredTigerKVEngine()->setStableTimestamp(Timestamp(30, 1), false);
     callbackShouldFail.store(false);
     assertPinnedMovesSoon(Timestamp(40, 1));
 }
@@ -451,7 +463,7 @@ TEST_F(WiredTigerKVEngineTest, CreateRecordStoreFailsWithExistingIdent) {
     auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
     ASSERT_OK(
-        _helper.getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
 
     // A new record store must always have its own storage table uniquely identified by the ident.
     // Otherwise, multiple record stores could point to the same storage resource and lead to data
@@ -461,7 +473,7 @@ TEST_F(WiredTigerKVEngineTest, CreateRecordStoreFailsWithExistingIdent) {
     // use.
 
     const auto status =
-        _helper.getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options);
+        _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.code(), ErrorCodes::ObjectAlreadyExists);
 }
@@ -481,27 +493,27 @@ TEST_F(WiredTigerKVEngineTest, IdentDrop) {
     auto& provider = rss::ReplicatedStorageService::get(opCtxPtr.get()).getPersistenceProvider();
     auto& ru = *shard_role_details::getRecoveryUnit(opCtxPtr.get());
     ASSERT_OK(
-        _helper.getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
 
     const boost::optional<boost::filesystem::path> dataFilePath =
-        _helper.getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
+        _helper->getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
     ASSERT(dataFilePath);
     ASSERT(boost::filesystem::exists(*dataFilePath));
 
-    _helper.getWiredTigerKVEngine()->dropIdentForImport(
+    _helper->getWiredTigerKVEngine()->dropIdentForImport(
         *opCtxPtr.get(), *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident);
     ASSERT(boost::filesystem::exists(*dataFilePath));
 
     // Because the underlying file was not removed, it will be renamed out of the way by WiredTiger
     // when creating a new table with the same ident.
     ASSERT_OK(
-        _helper.getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
+        _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options));
 
     const boost::filesystem::path renamedFilePath = dataFilePath->generic_string() + ".1";
     ASSERT(boost::filesystem::exists(*dataFilePath));
     ASSERT(boost::filesystem::exists(renamedFilePath));
 
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->dropIdent(
+    ASSERT_OK(_helper->getWiredTigerKVEngine()->dropIdent(
         *shard_role_details::getRecoveryUnit(opCtxPtr.get()), ident, /*identHasSizeInfo=*/true));
 
     // WiredTiger drops files asynchronously.
@@ -520,36 +532,36 @@ TEST_F(WiredTigerKVEngineTest, TestBasicPinOldestTimestamp) {
     const Timestamp initTs = Timestamp(1, 0);
 
     // Initialize the oldest timestamp.
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs, false);
-    ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs, false);
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Assert that advancing the oldest timestamp still succeeds.
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs + 1, false);
-    ASSERT_EQ(initTs + 1, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs + 1, false);
+    ASSERT_EQ(initTs + 1, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Error if there's a request to pin the oldest timestamp earlier than what it is already set
     // as. This error case is not exercised in this test.
     const bool roundUpIfTooOld = false;
     // Pin the oldest timestamp to "3".
-    auto pinnedTs = unittest::assertGet(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
+    auto pinnedTs = unittest::assertGet(_helper->getWiredTigerKVEngine()->pinOldestTimestamp(
         *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "A", initTs + 3, roundUpIfTooOld));
     // Assert that the pinning method returns the same timestamp as was requested.
     ASSERT_EQ(initTs + 3, pinnedTs);
     // Assert that pinning the oldest timestamp does not advance it.
-    ASSERT_EQ(initTs + 1, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    ASSERT_EQ(initTs + 1, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Attempt to advance the oldest timestamp to "5".
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
     // Observe the oldest timestamp was pinned at the requested "3".
-    ASSERT_EQ(initTs + 3, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    ASSERT_EQ(initTs + 3, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Unpin the oldest timestamp. Assert that unpinning does not advance the oldest timestamp.
-    _helper.getWiredTigerKVEngine()->unpinOldestTimestamp("A");
-    ASSERT_EQ(initTs + 3, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    _helper->getWiredTigerKVEngine()->unpinOldestTimestamp("A");
+    ASSERT_EQ(initTs + 3, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Now advancing the oldest timestamp to "5" succeeds.
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
-    ASSERT_EQ(initTs + 5, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
+    ASSERT_EQ(initTs + 5, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 }
 
 /**
@@ -560,37 +572,37 @@ TEST_F(WiredTigerKVEngineTest, TestMultiPinOldestTimestamp) {
     auto opCtxRaii = _makeOperationContext();
     const Timestamp initTs = Timestamp(1, 0);
 
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs, false);
-    ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs, false);
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Error if there's a request to pin the oldest timestamp earlier than what it is already set
     // as. This error case is not exercised in this test.
     const bool roundUpIfTooOld = false;
     // Have "A" pin the timestamp to "1".
-    auto pinnedTs = unittest::assertGet(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
+    auto pinnedTs = unittest::assertGet(_helper->getWiredTigerKVEngine()->pinOldestTimestamp(
         *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "A", initTs + 1, roundUpIfTooOld));
     ASSERT_EQ(initTs + 1, pinnedTs);
-    ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Have "B" pin the timestamp to "2".
-    pinnedTs = unittest::assertGet(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
+    pinnedTs = unittest::assertGet(_helper->getWiredTigerKVEngine()->pinOldestTimestamp(
         *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "B", initTs + 2, roundUpIfTooOld));
     ASSERT_EQ(initTs + 2, pinnedTs);
-    ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Advancing the oldest timestamp to "5" will only succeed in advancing it to "1".
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
-    ASSERT_EQ(initTs + 1, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
+    ASSERT_EQ(initTs + 1, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // After unpinning "A" at "1", advancing the oldest timestamp will be pinned to "2".
-    _helper.getWiredTigerKVEngine()->unpinOldestTimestamp("A");
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
-    ASSERT_EQ(initTs + 2, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    _helper->getWiredTigerKVEngine()->unpinOldestTimestamp("A");
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
+    ASSERT_EQ(initTs + 2, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Unpinning "B" at "2" allows the oldest timestamp to advance freely.
-    _helper.getWiredTigerKVEngine()->unpinOldestTimestamp("B");
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
-    ASSERT_EQ(initTs + 5, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    _helper->getWiredTigerKVEngine()->unpinOldestTimestamp("B");
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs + 5, false);
+    ASSERT_EQ(initTs + 5, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 }
 
 /**
@@ -601,8 +613,8 @@ TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
     auto opCtxRaii = _makeOperationContext();
     const Timestamp initTs = Timestamp(10, 0);
 
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs, false);
-    ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs, false);
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     const bool roundUpIfTooOld = true;
     // The false value means using this variable will cause the method to fail on error.
@@ -610,15 +622,15 @@ TEST_F(WiredTigerKVEngineTest, TestPinOldestTimestampErrors) {
 
     // When rounding on error, the pin will succeed, but the return value will be the current oldest
     // timestamp instead of the requested value.
-    auto pinnedTs = unittest::assertGet(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
+    auto pinnedTs = unittest::assertGet(_helper->getWiredTigerKVEngine()->pinOldestTimestamp(
         *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "A", initTs - 1, roundUpIfTooOld));
     ASSERT_EQ(initTs, pinnedTs);
-    ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 
     // Using "fail on error" will result in a not-OK return value.
-    ASSERT_NOT_OK(_helper.getWiredTigerKVEngine()->pinOldestTimestamp(
+    ASSERT_NOT_OK(_helper->getWiredTigerKVEngine()->pinOldestTimestamp(
         *shard_role_details::getRecoveryUnit(opCtxRaii.get()), "B", initTs - 1, failOnError));
-    ASSERT_EQ(initTs, _helper.getWiredTigerKVEngine()->getOldestTimestamp());
+    ASSERT_EQ(initTs, _helper->getWiredTigerKVEngine()->getOldestTimestamp());
 }
 
 /**
@@ -630,26 +642,26 @@ TEST_F(WiredTigerKVEngineTest, TestOldestStableTimestampEndOfStartupRecovery) {
     auto& ru = *shard_role_details::getRecoveryUnit(opCtxRaii.get());
 
     // oldest and stable are both null.
-    ASSERT_DOES_NOT_THROW(_helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru));
+    ASSERT_DOES_NOT_THROW(_helper->getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru));
 
     // oldest is null, stable is not null.
     const Timestamp initTs = Timestamp(10, 0);
-    _helper.getWiredTigerKVEngine()->setStableTimestamp(initTs, true);
-    ASSERT_DOES_NOT_THROW(_helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru));
+    _helper->getWiredTigerKVEngine()->setStableTimestamp(initTs, true);
+    ASSERT_DOES_NOT_THROW(_helper->getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru));
 
     // oldest and stable equal.
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs, true);
-    ASSERT_DOES_NOT_THROW(_helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru));
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs, true);
+    ASSERT_DOES_NOT_THROW(_helper->getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru));
 
     // stable > oldest.
     Timestamp laterTs = Timestamp(15, 0);
-    _helper.getWiredTigerKVEngine()->setStableTimestamp(laterTs, true);
-    ASSERT_DOES_NOT_THROW(_helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru));
+    _helper->getWiredTigerKVEngine()->setStableTimestamp(laterTs, true);
+    ASSERT_DOES_NOT_THROW(_helper->getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru));
 
     // oldest > stable.
     laterTs = Timestamp(20, 0);
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(laterTs, true);
-    ASSERT_THROWS_CODE(_helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru),
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(laterTs, true);
+    ASSERT_THROWS_CODE(_helper->getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(ru),
                        AssertionException,
                        8470600);
 }
@@ -663,8 +675,8 @@ TEST_F(WiredTigerKVEngineTest, TestOldestStableTimestampEndOfStartupRecoveryStab
 
     // oldest is not null, stable is null.
     const Timestamp initTs = Timestamp(10, 0);
-    _helper.getWiredTigerKVEngine()->setOldestTimestamp(initTs, true);
-    ASSERT_DOES_NOT_THROW(_helper.getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(
+    _helper->getWiredTigerKVEngine()->setOldestTimestamp(initTs, true);
+    ASSERT_DOES_NOT_THROW(_helper->getWiredTigerKVEngine()->notifyReplStartupRecoveryComplete(
         *shard_role_details::getRecoveryUnit(opCtxRaii.get())));
 }
 
@@ -777,11 +789,11 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
             logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Log()};
         ASSERT_EQ(logv2::LogSeverity::Log(),
                   unittest::getMinimumLogSeverity(logv2::LogComponent::kWiredTigerCheckpoint));
-        ASSERT_OK(_helper.getWiredTigerKVEngine()->reconfigureLogging());
+        ASSERT_OK(_helper->getWiredTigerKVEngine()->reconfigureLogging());
         // Perform a checkpoint. The goal here is create some activity in WiredTiger in order
         // to generate verbose messages (we don't really care about the checkpoint itself).
         unittest::LogCaptureGuard logs;
-        _helper.getWiredTigerKVEngine()->checkpoint();
+        _helper->getWiredTigerKVEngine()->checkpoint();
         logs.stop();
         // In this initial case, we don't expect to capture any debug checkpoint messages. The
         // base severity for the checkpoint component should be at Log().
@@ -800,13 +812,13 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
         // Set the WiredTiger Checkpoint LOGV2 component severity to the Debug(2) level.
         auto severityGuard = unittest::MinimumLoggedSeverityGuard{
             logv2::LogComponent::kWiredTigerCheckpoint, logv2::LogSeverity::Debug(2)};
-        ASSERT_OK(_helper.getWiredTigerKVEngine()->reconfigureLogging());
+        ASSERT_OK(_helper->getWiredTigerKVEngine()->reconfigureLogging());
         ASSERT_EQ(logv2::LogSeverity::Debug(2),
                   unittest::getMinimumLogSeverity(logv2::LogComponent::kWiredTigerCheckpoint));
 
         // Perform another checkpoint.
         unittest::LogCaptureGuard logs;
-        _helper.getWiredTigerKVEngine()->checkpoint();
+        _helper->getWiredTigerKVEngine()->checkpoint();
         logs.stop();
 
         // This time we expect to detect WiredTiger checkpoint Debug() messages.
@@ -824,8 +836,8 @@ TEST_F(WiredTigerKVEngineTest, TestReconfigureLog) {
 
 TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
     auto opCtxPtr = _makeOperationContext();
-    _helper.getWiredTigerKVEngine()->setInitialDataTimestamp(Timestamp(1, 1));
-    _helper.getWiredTigerKVEngine()->setStableTimestamp(Timestamp(1, 1), false);
+    _helper->getWiredTigerKVEngine()->setInitialDataTimestamp(Timestamp(1, 1));
+    _helper->getWiredTigerKVEngine()->setStableTimestamp(Timestamp(1, 1), false);
 
     // Get a session. This will open a transaction.
     WiredTigerSession* session =
@@ -836,7 +848,7 @@ TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
     // WT will return EBUSY due to the open transaction.
     FailPointEnableBlock failPoint("WTRollbackToStableReturnOnEBUSY");
     ASSERT_EQ(ErrorCodes::ObjectIsBusy,
-              _helper.getWiredTigerKVEngine()
+              _helper->getWiredTigerKVEngine()
                   ->recoverToStableTimestamp(*opCtxPtr.get())
                   .getStatus()
                   .code());
@@ -846,7 +858,7 @@ TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
         ->abandonSnapshot();
 
     // WT will no longer return EBUSY.
-    ASSERT_OK(_helper.getWiredTigerKVEngine()->recoverToStableTimestamp(*opCtxPtr.get()));
+    ASSERT_OK(_helper->getWiredTigerKVEngine()->recoverToStableTimestamp(*opCtxPtr.get()));
 }
 
 std::unique_ptr<KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
@@ -858,14 +870,14 @@ MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdown) {
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerSingleActivityBeforeShutdownRAII) {
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     {
         auto permit = engine->tryGetStatsCollectionPermit();
@@ -880,7 +892,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerSingleActivityBeforeShutdownRAII) {
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerMultipleActivitiesBeforeShutdownRAII) {
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     {
         auto permit1 = engine->tryGetStatsCollectionPermit();
@@ -902,7 +914,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerMultipleActivitiesBeforeShutdownRAII) 
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivity) {
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     engine->cleanShutdown(kMemLeakAllowed);
     ASSERT(!engine->tryGetStatsCollectionPermit());
@@ -911,7 +923,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivity) {
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII) {
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     {
         auto permit = engine->tryGetStatsCollectionPermit();
@@ -932,7 +944,7 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII
 }
 
 TEST_F(WiredTigerKVEngineTest, TestRestartUsesNewConn) {
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
 
     {
@@ -941,8 +953,8 @@ TEST_F(WiredTigerKVEngineTest, TestRestartUsesNewConn) {
         ASSERT_EQ(engine->getConn(), permit->conn());
     }
 
-    _helper.restartEngine();
-    engine = _helper.getWiredTigerKVEngine();
+    _helper->restartEngine();
+    engine = _helper->getWiredTigerKVEngine();
 
     auto permit = engine->tryGetStatsCollectionPermit();
     ASSERT(permit);
@@ -950,7 +962,7 @@ TEST_F(WiredTigerKVEngineTest, TestRestartUsesNewConn) {
 }
 
 TEST_F(WiredTigerKVEngineTest, TestGetBackupCheckpointTimestampWithoutOpenBackupCursor) {
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     ASSERT_EQ(Timestamp::min(), engine->getBackupCheckpointTimestamp());
 }
 
@@ -977,18 +989,18 @@ protected:
             rss::ReplicatedStorageService::get(getGlobalServiceContext()).getPersistenceProvider();
         auto& ru = *shard_role_details::getRecoveryUnit(_opCtx.get());
         Status stat =
-            _helper.getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options);
+            _helper->getWiredTigerKVEngine()->createRecordStore(provider, ru, nss, ident, options);
         if (!stat.isOK()) {
             return stat;
         }
         boost::optional<boost::filesystem::path> path =
-            _helper.getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
+            _helper->getWiredTigerKVEngine()->getDataFilePathForIdent(ident);
         ASSERT_TRUE(path.has_value());
         return *path;
     }
 
     Status removeIdent(StringData ident) {
-        return _helper.getWiredTigerKVEngine()->dropIdent(
+        return _helper->getWiredTigerKVEngine()->dropIdent(
             *shard_role_details::getRecoveryUnit(_opCtx.get()), ident, /*identHasSizeInfo=*/true);
     }
 
@@ -1061,9 +1073,9 @@ TEST_F(WiredTigerKVEngineTest, CheckSessionCacheMax) {
 
     RAIIServerParameterControllerForTest sessionCacheMax{"wiredTigerSessionCacheMaxPercentage", 20};
     RAIIServerParameterControllerForTest sessionMax{"wiredTigerSessionMax", 150};
-    _helper.restartEngine();
+    _helper->restartEngine();
 
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     auto& connection = engine->getConnection();
 
     // Check that the configured session cache max is derived correctly.
@@ -1116,7 +1128,7 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     ASSERT_EQ(ru.getPreparedId().value(), preparedId);
 
     // Create a checkpoint that includes the prepared transaction.
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     engine->setInitialDataTimestamp(Timestamp(1, 0));
     engine->setStableTimestamp(prepareTimestamp, /*force=*/false);
     engine->checkpoint();
@@ -1130,8 +1142,8 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     opCtxPtr.reset();
 
     // Simulate startup recovery by restarting the storage engine.
-    _helper.restartEngine();
-    engine = _helper.getWiredTigerKVEngine();
+    _helper->restartEngine();
+    engine = _helper->getWiredTigerKVEngine();
     auto opCtxPtr2 = _makeOperationContext();
 
     // Verify that we see the prepared transaction on startup recovery and reclaim it.
@@ -1181,7 +1193,7 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     ASSERT_EQ(ru2.getPreparedId().value(), preparedId2);
 
     // Create a checkpoint that includes both prepared transactions.
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     engine->setInitialDataTimestamp(Timestamp(1, 0));
     engine->setStableTimestamp(prepareTimestamp2, /*force=*/false);
     engine->checkpoint();
@@ -1199,8 +1211,8 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     clientAndCtx2.first.reset();
 
     // Simulate startup recovery by restarting the storage engine.
-    _helper.restartEngine();
-    engine = _helper.getWiredTigerKVEngine();
+    _helper->restartEngine();
+    engine = _helper->getWiredTigerKVEngine();
     auto opCtxPtr = _makeOperationContext();
 
     // Verify that we see both prepared transactions on startup recovery.
@@ -1248,7 +1260,7 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     ru.abortUnitOfWork();
 
     // Create a checkpoint that includes the aborted transaction.
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     engine->setInitialDataTimestamp(Timestamp(1, 0));
     engine->setStableTimestamp(Timestamp(5, 0), /*force=*/false);
     engine->checkpoint();
@@ -1257,8 +1269,8 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     opCtxPtr.reset();
 
     // Simulate startup recovery by restarting the storage engine.
-    _helper.restartEngine();
-    engine = _helper.getWiredTigerKVEngine();
+    _helper->restartEngine();
+    engine = _helper->getWiredTigerKVEngine();
     auto opCtxPtr2 = _makeOperationContext();
 
     // Verify that we do not see any prepared transactions on startup recovery.
@@ -1284,7 +1296,7 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     ru.abortUnitOfWork();
 
     // Create a checkpoint that includes the prepared transaction but not the abort.
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     engine->setInitialDataTimestamp(Timestamp(1, 0));
     engine->setStableTimestamp(Timestamp(5, 0), /*force=*/false);
     engine->checkpoint();
@@ -1293,8 +1305,8 @@ TEST_F(WiredTigerKVEngineTestWithPreciseCheckpoints,
     opCtxPtr.reset();
 
     // Simulate startup recovery by restarting the storage engine.
-    _helper.restartEngine();
-    engine = _helper.getWiredTigerKVEngine();
+    _helper->restartEngine();
+    engine = _helper->getWiredTigerKVEngine();
     auto opCtxPtr2 = _makeOperationContext();
     auto& ru2 = *checked_cast<WiredTigerRecoveryUnit*>(
         shard_role_details::getRecoveryUnit(opCtxPtr2.get()));
@@ -1332,7 +1344,7 @@ DEATH_TEST_F(WiredTigerKVEngineTestWithPreciseCheckpointsDeathTest,
     ASSERT_EQ(ru.getPreparedId().value(), preparedId);
 
     // Create a checkpoint that includes the prepared transaction.
-    auto* engine = _helper.getWiredTigerKVEngine();
+    auto* engine = _helper->getWiredTigerKVEngine();
     engine->setInitialDataTimestamp(Timestamp(1, 0));
     engine->setStableTimestamp(prepareTimestamp, /*force=*/false);
     engine->checkpoint();
@@ -1347,8 +1359,8 @@ DEATH_TEST_F(WiredTigerKVEngineTestWithPreciseCheckpointsDeathTest,
     opCtxPtr.reset();
 
     // Simulate startup recovery by restarting the storage engine.
-    _helper.restartEngine();
-    engine = _helper.getWiredTigerKVEngine();
+    _helper->restartEngine();
+    engine = _helper->getWiredTigerKVEngine();
     auto opCtxPtr2 = _makeOperationContext();
 
     // Verify that we see the prepared transaction on startup recovery.

@@ -191,7 +191,9 @@ TEST_F(LiteParsedDocumentSourceParseTest, CanRegisterBothPrimaryAndFallback) {
     registerPrimaryParser();
 }
 
-DEATH_TEST_F(LiteParsedDocumentSourceParseTest, MustRegisterPrimaryAfterFallback, "11395100") {
+using LiteParsedDocumentSourceParseDeathTest = LiteParsedDocumentSourceParseTest;
+
+DEATH_TEST_F(LiteParsedDocumentSourceParseDeathTest, MustRegisterPrimaryAfterFallback, "11395100") {
     _stageName = "$mustRegisterPrimaryAfterFallback";
 
     IncrementalRolloutFeatureFlag mockFlag("testFlag"_sd, RolloutPhase::inDevelopment, false);
@@ -199,7 +201,7 @@ DEATH_TEST_F(LiteParsedDocumentSourceParseTest, MustRegisterPrimaryAfterFallback
     registerFallbackParser(&mockFlag);
 }
 
-DEATH_TEST_F(LiteParsedDocumentSourceParseTest, CannotOverridePrimaryParser, "11534800") {
+DEATH_TEST_F(LiteParsedDocumentSourceParseDeathTest, CannotOverridePrimaryParser, "11534800") {
     _stageName = "$cannotOverridePrimaryParser";
 
     // Register the primary parser first.
@@ -251,7 +253,7 @@ TEST_F(LiteParsedDocumentSourceParseTest, FirstFallbackParserTakesPrecedenceWith
 }
 
 // TODO SERVER-114028 Remove the following test when fallback parsing supports all feature flags.
-DEATH_TEST_F(LiteParsedDocumentSourceParseTest, IFRFlagIsRequired, "11395101") {
+DEATH_TEST_F(LiteParsedDocumentSourceParseDeathTest, IFRFlagIsRequired, "11395101") {
     _stageName = "$IFRFlagIsRequired";
 
     BinaryCompatibleFeatureFlag mockFlag(false);
@@ -371,4 +373,3 @@ TEST(ViewPolicy, CanSpecifyDisallowViewPolicyCustomValues) {
 }
 
 }  // namespace mongo
-

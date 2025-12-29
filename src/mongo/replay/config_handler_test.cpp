@@ -35,6 +35,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/filesystem.hpp>
+
 namespace mongo {
 
 class ConfigHandlerTest : public unittest::Test {

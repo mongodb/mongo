@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,12 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/unittest/unittest_main_core.h"
 
-// IWYU pragma: private, include "mongo/unittest/unittest.h"
-// IWYU pragma: friend "mongo/unittest/.*"
-
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/matcher.h"
-#include "mongo/unittest/matcher_core.h"
-
-#include <tuple>
-
-/**
- * unittest-style ASSERT that an `expr` successfully matches a `matcher`.
- *
- * Like most other ASSERT macros, can accept further information via a trailing
- * stream `<<` operation.
- *
- * Example (assumed to be enclosed in namespace mongo):
- *
- *    ASSERT_THAT(std::sqrt(4.0), unittest::match::Eq(2.0));
- *
- *    namespace m = unittest::match;
- *    ASSERT_THAT(std::sqrt(4.0), m::Eq(2.0)) << "std::sqrt must be reasonable";
- *
- *    // Combine several matchers on the same value into nice one-liners.
- *    using namespace unittest::match;
- *    ASSERT_THAT(getGreeting(),
- *                AllOf(ContainsRegex("^Hello, "),
- *                      Not(ContainsRegex("bye"))));
- *
- * See https://google.github.io/googletest/reference/matchers.html for inspiration.
- */
-#define ASSERT_THAT(expr, matcher)                                                             \
-    if (auto args_ = ::mongo::unittest::match::detail::MatchAssertion{expr, matcher, #expr}) { \
-    } else                                                                                     \
-        FAIL(args_.failMsg())
+int main(int argc, char** argv) {
+    std::vector<std::string> argVec(argv, argv + argc);
+    mongo::unittest::MainProgress progress({.startSignalProcessingThread = false},
+                                           std::move(argVec));
+    progress.initialize();
+    return progress.test();
+}

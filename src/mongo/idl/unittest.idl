@@ -32,7 +32,7 @@ global:
     cpp_namespace: "mongo::idl::test"
     cpp_includes:
         - "mongo/idl/idl_test_types.h"
-        - "mongo/idl/idl_test.h"
+        - "mongo/idl/idl_test_defs.h"
 
 imports:
     - "mongo/db/basic_types.idl"

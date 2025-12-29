@@ -20,6 +20,12 @@
 			"*.idl": "yaml",
 		},
 		"files.insertFinalNewline": true,
+		"files.watcherInclude": [
+			"bazel-bin"
+		],
+		"files.watcherExclude": {
+			"bazel-bin/**/*.runfiles/**": true
+		},
 		"js/ts.implicitProjectConfig.target": "ES2020",
 		"python.autoComplete.extraPaths": [
 			"/opt/mongodbtoolchain/v5/share/gcc-14.2.0/python"
@@ -65,6 +71,34 @@
 			],
 		},
 		"C_Cpp.intelliSenseEngine": "disabled",
+		"typescript.inlayHints.enumMemberValues.enabled": true,
+		"testMate.cpp.test.advancedExecutables": [
+			{
+				"pattern": "bazel-bin/src/mongo/**/*test*_with_debug",
+				"exclude": "files.watcherExclude",
+				// "parallelizationLimit": 1, // Needed for unittest_test :(
+				"cwd": "${workspaceFolder}",
+				"runTask": {
+					"before": [ "_buildForTestMate" ],
+				},
+				"gtest": {
+					"prependTestRunningArgs": [
+						// TODO(gtest): Enable fancy output when we add support for it,
+						// if it's not on by default.
+					],
+					"testGrouping": {
+						"groupByLabel": { // Binary name w/o "_with_debug"
+							"label": "${filename`(.*)_with_debug`$1`}",
+							"groupBySource": {
+								"groupByTags": { // Suite
+									"groupByTestName": true
+								}
+							}
+						}
+					}
+				}
+			},
+		],
 	},
 	"extensions": {
 		"recommendations": [
@@ -82,7 +116,8 @@
 			"bazelbuild.vscode-bazel",
 			"rioj7.command-variable",
 			"augustocdias.tasks-shell-input",
-			"ms-vscode.cpptools"
+			"ms-vscode.cpptools",
+			"matepek.vscode-catch2-test-adapter",
 		]
 	},
 	"tasks": {
@@ -120,6 +155,31 @@
 				"group": {
 					"kind": "test",
 					"isDefault": true
+				}
+			},
+			{
+				"label": "Build current file's test (config=dbg)",
+				"type": "bazel",
+				"command": "build",
+				"targets": [
+					"+${fileBasenameNoExtension}"
+				],
+				"options": [
+					"--config=dbg"
+				],
+				"group": "build",
+			},
+			{
+				"label": "_buildForTestMate",
+				"type": "shell",
+				"command": "bazel build --config=dbg $(echo ${absPathConcatWithSpace} | sed -Ee 's;[^ ]*(src/mongo/[^ ]*)_with_debug;\\1;g')",
+				"presentation": {
+					"echo": true,
+					"reveal": "silent",
+					"focus": false,
+					"panel": "shared",
+					"showReuseMessage": true,
+					"clear": true
 				}
 			},
 		]

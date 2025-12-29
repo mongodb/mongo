@@ -204,7 +204,7 @@ public:
         query_settings::QuerySettingsService::initializeForTest(_opCtx.getServiceContext());
     }
 
-    ~Base() {
+    virtual ~Base() {
         auto* const sc = _opCtx.getServiceContext();
         try {
             deleteAll(ns());
@@ -436,7 +436,7 @@ namespace Idempotence {
 
 class Base : public ReplTests::Base {
 public:
-    virtual ~Base() {}
+    virtual ~Base() = default;
     void run() {
         reset();
         doIt();

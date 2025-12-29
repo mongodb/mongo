@@ -343,7 +343,7 @@ StackTrace getTrace() {
     stacktrace_test::executeUnderCallstack<N>(
         [&] { trace = stack_trace_detail::getStructuredStackTrace(); });
     ASSERT_TRUE(trace.has_value());
-    ASSERT_EQ(trace->getError(), {});
+    ASSERT_EQ(trace->getError(), std::string{});
     return *trace;
 }
 
@@ -572,8 +572,8 @@ public:
 TEST_F(JsonTest, Hex) {
     ASSERT_EQ(StringData(Hex(static_cast<void*>(0))), "0");
     ASSERT_EQ(StringData(Hex(0xffff)), "FFFF");
-    ASSERT_EQ(Hex(0xfff0), "FFF0");
-    ASSERT_EQ(Hex(0x8000'0000'0000'0000), "8000000000000000");
+    ASSERT_EQ(StringData(Hex(0xfff0)), "FFF0");
+    ASSERT_EQ(StringData(Hex(0x8000'0000'0000'0000)), "8000000000000000");
     ASSERT_EQ(Hex::fromHex("FFFF"), 0xffff);
     ASSERT_EQ(Hex::fromHex("0"), 0);
     ASSERT_EQ(Hex::fromHex("FFFFFFFFFFFFFFFF"), 0xffff'ffff'ffff'ffff);

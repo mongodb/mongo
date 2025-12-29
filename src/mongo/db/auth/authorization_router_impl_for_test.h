@@ -39,6 +39,10 @@ namespace mongo {
 // functions have been called.
 class AuthorizationRouterImplForTest : public AuthorizationRouterImpl {
 public:
+    struct Counts {
+        uint64_t byName, byTenant, wholeCache;
+    };
+
     using AuthorizationRouterImpl::AuthorizationRouterImpl;
 
     void invalidateUserByName(const UserName& user) override {
@@ -62,10 +66,8 @@ public:
         _wholeCacheCount.store(0);
     }
 
-    void assertCounts(uint64_t whole, uint64_t name, uint64_t tenant) {
-        ASSERT_EQ(whole, _wholeCacheCount.load());
-        ASSERT_EQ(name, _byNameCount.load());
-        ASSERT_EQ(tenant, _byTenantCount.load());
+    Counts counts() const {
+        return {_byNameCount.load(), _byTenantCount.load(), _wholeCacheCount.load()};
     }
 
 private:

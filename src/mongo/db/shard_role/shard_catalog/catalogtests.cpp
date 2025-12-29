@@ -106,16 +106,9 @@ public:
     }
 };
 
-}  // namespace
-
 class AllCatalogTests : public unittest::OldStyleSuiteSpecification {
 public:
     AllCatalogTests() : unittest::OldStyleSuiteSpecification("CatalogTests") {}
-
-    template <typename T>
-    void add() {
-        addNameCallback(nameForTestClass<T>(), [] { T().run(); });
-    }
 
     void setupTests() override {
         add<ConcurrentCreateCollectionTest>();
@@ -124,4 +117,5 @@ public:
 
 unittest::OldStyleSuiteInitializer<AllCatalogTests> allCatalogTests;
 
+}  // namespace
 }  // namespace mongo

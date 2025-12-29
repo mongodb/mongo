@@ -77,7 +77,7 @@ void FailingOplogWriter::waitForScheduledWrites(OperationContext* opCtx) {};
  * Tests for the parent class behavior for OplogWriter.
  * Uses a default ThreadPoolExecutor.
  */
-class OplogWriterTest : public ServiceContextMongoDTest {};
+class OplogWriterTest : public executor::ThreadPoolExecutorTest {};
 
 
 /**
@@ -95,11 +95,7 @@ using OplogWriterTestDeathTest = OplogWriterTest;
 DEATH_TEST_F(OplogWriterTestDeathTest,
              ThrowingInRunLoopLogsUsefulError,
              "OplogWriter threw a DBException") {
-    executor::ThreadPoolMock::Options threadPoolMockOptions;
-
-    executor::ThreadPoolExecutorTest executorFixture{threadPoolMockOptions};
-    executorFixture.setUp();
-    auto& executor = executorFixture.getExecutor();
+    auto& executor = getExecutor();
     executor.startup();
 
     OplogWriter::Options options(false /* skipWritesToOplogColl */);

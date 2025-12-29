@@ -537,7 +537,8 @@ TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflic
     }
 }
 
-DEATH_TEST_REGEX_F(CollectionShardingRuntimeTest,
+using CollectionShardingRuntimeTestDeathTest = CollectionShardingRuntimeTest;
+DEATH_TEST_REGEX_F(CollectionShardingRuntimeTestDeathTest,
                    TestsShouldTassertIfPlacementConflictTimeIsNotPresentInTxns,
                    "Tripwire assertion.*10206300") {
     CollectionShardingRuntime csr(getServiceContext(), kTestNss);

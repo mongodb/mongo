@@ -127,13 +127,6 @@ std::string posInfoToString(const std::vector<int32_t>& posInfo) {
 
 class BsonBlockDecodingTest : public mongo::unittest::Test {
 public:
-    void run() {
-        auto base = static_cast<mongo::unittest::Test*>(this);
-
-        // Run the tests using the block-based BSON implementation for extracting paths.
-        base->run();
-    }
-
     // Given an object that matches what we might see in the data field of a bucket, produce the
     // corresonding vector of objects.
     std::vector<BSONObj> columnsToObjs(BSONObj bsonColumns) {

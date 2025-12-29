@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 filegroup(
     name = "sanity_test",
     srcs = [
+        "golden_test_context_get_path.txt",
         "sanity_test.txt",
     ],
 )

@@ -450,6 +450,7 @@ mongo_cc_library(
         "//src/mongo/db:query_matcher",
         "//src/mongo/db:service_context",
         "//src/mongo/db/update:update_driver",
+        "//src/mongo/unittest",
     ],
 )
 

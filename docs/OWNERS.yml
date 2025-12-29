@@ -39,3 +39,6 @@ filters:
   - "server_parameters.md":
     approvers:
       - 10gen/server-programmability
+  - "unit_test.md":
+    approvers:
+      - 10gen/server-programmability

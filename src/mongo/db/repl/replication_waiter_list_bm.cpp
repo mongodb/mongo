@@ -221,7 +221,7 @@ public:
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
     }
 
-    void _doTest() final {}
+    void TestBody() override {}
 };
 
 namespace {

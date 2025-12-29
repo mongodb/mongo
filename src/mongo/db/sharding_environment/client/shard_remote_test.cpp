@@ -404,7 +404,8 @@ TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigShuttingDown) {
     ASSERT_EQ(1UL, configTargeter()->getAndClearMarkedDownHosts().size());
 }
 
-TEST_F(ShardRemoteTest, FindOnConfigRespectsDefaultConfigCommandTimeout) {
+TEST_F(ShardRemoteTest, FindOnConfigFromShardRespectsDefaultConfigCommandTimeout) {
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
     // Set the timeout for config commands to 1 second.
     auto timeoutMs = 1000;
     RAIIServerParameterControllerForTest configCommandTimeout{"defaultConfigCommandTimeoutMS",

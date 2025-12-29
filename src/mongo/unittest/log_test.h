@@ -33,6 +33,7 @@
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional/optional.hpp>
 
@@ -83,7 +84,7 @@ using log_test_detail::setMinimumLoggedSeverity;
  * when this guard object dies. There can be no severity mapping for a LogComponent, so
  * the logged severity 'state' is read and written as a boost::optional.
  */
-class MinimumLoggedSeverityGuard {
+class MONGO_MOD_PUBLIC MinimumLoggedSeverityGuard {
 public:
     /** Just save and restore: do not change the severity at ctor time. */
     explicit MinimumLoggedSeverityGuard(logv2::LogComponent component)

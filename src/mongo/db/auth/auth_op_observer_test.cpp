@@ -150,6 +150,13 @@ public:
                                                                << "test")));
     }
 
+    void assertCounts(uint64_t whole, uint64_t name, uint64_t tenant) {
+        auto counts = mockRouter->counts();
+        ASSERT_EQ(counts.wholeCache, whole);
+        ASSERT_EQ(counts.byName, name);
+        ASSERT_EQ(counts.byTenant, tenant);
+    }
+
     void doInsert(const NamespaceString& nss,
                   const std::vector<BSONObj> insertDocs,
                   bool shouldInvalidateCache) {
@@ -172,14 +179,14 @@ public:
                              /*recordIds*/ {},
                              /*fromMigrate=*/std::vector<bool>(stmts.size(), false),
                              /*defaultFromMigrate=*/false);
-        mockRouter->assertCounts(0, 0, 0);
+        assertCounts(0, 0, 0);
         wuow.commit();
 
         // The cache should only invalidate after the WUOW commits if shouldInvalidateCache is true.
         if (shouldInvalidateCache) {
-            mockRouter->assertCounts(0, 1, 0);
+            assertCounts(0, 1, 0);
         } else {
-            mockRouter->assertCounts(0, 0, 0);
+            assertCounts(0, 0, 0);
         }
     }
 
@@ -203,13 +210,13 @@ public:
         OplogUpdateEntryArgs entryArgs(&updateArgs, *autoColl);
         opObserver.onUpdate(opCtx.get(), entryArgs);
 
-        mockRouter->assertCounts(0, 0, 0);
+        assertCounts(0, 0, 0);
         wuow.commit();
 
         if (shouldInvalidateCache) {
-            mockRouter->assertCounts(0, 1, 0);
+            assertCounts(0, 1, 0);
         } else {
-            mockRouter->assertCounts(0, 0, 0);
+            assertCounts(0, 0, 0);
         }
     }
 
@@ -225,13 +232,13 @@ public:
 
         const auto& deleteDocumentKey = getDocumentKey(*coll, deleteDoc);
         opObserver.onDelete(opCtx.get(), *coll, {}, deleteDoc, deleteDocumentKey, args);
-        mockRouter->assertCounts(0, 0, 0);
+        assertCounts(0, 0, 0);
         wuow.commit();
 
         if (shouldInvalidateCache) {
-            mockRouter->assertCounts(0, 1, 0);
+            assertCounts(0, 1, 0);
         } else {
-            mockRouter->assertCounts(0, 0, 0);
+            assertCounts(0, 0, 0);
         }
     }
 
@@ -242,13 +249,13 @@ public:
 
         WriteUnitOfWork wuow(opCtx.get());
         opObserver.onDropDatabase(opCtx.get(), dbname, false /*fromMigrate*/);
-        mockRouter->assertCounts(0, 0, 0);
+        assertCounts(0, 0, 0);
         wuow.commit();
 
         if (shouldInvalidateCache) {
-            mockRouter->assertCounts(1, 0, 0);
+            assertCounts(1, 0, 0);
         } else {
-            mockRouter->assertCounts(0, 0, 0);
+            assertCounts(0, 0, 0);
         }
     }
 

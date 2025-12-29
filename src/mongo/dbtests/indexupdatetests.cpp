@@ -70,10 +70,8 @@
 #include <fmt/format.h>
 
 namespace mongo {
-namespace IndexUpdateTests {
 namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
-}  // namespace
 
 static const char* const _ns = "unittests.indexupdate";
 static const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(_ns);
@@ -678,19 +676,14 @@ class IndexUpdateTests : public unittest::OldStyleSuiteSpecification {
 public:
     IndexUpdateTests() : OldStyleSuiteSpecification("indexupdate") {}
 
-    template <typename T>
-    void addIf() {
-        addNameCallback(nameForTestClass<T>(), [] { T().run(); });
-    }
-
     void setupTests() override {
         // These tests check that index creation ignores the unique constraint when told to.
         // The mobile storage engine does not support duplicate keys in unique indexes so these
         // tests are disabled.
-        addIf<InsertBuildIgnoreUnique<true>>();
-        addIf<InsertBuildIgnoreUnique<false>>();
-        addIf<InsertBuildEnforceUnique<true>>();
-        addIf<InsertBuildEnforceUnique<false>>();
+        add<InsertBuildIgnoreUnique<true>>();
+        add<InsertBuildIgnoreUnique<false>>();
+        add<InsertBuildEnforceUnique<true>>();
+        add<InsertBuildEnforceUnique<false>>();
 
         add<InsertBuildIndexInterrupt>();
         add<InsertBuildIdIndexInterrupt>();
@@ -717,5 +710,5 @@ public:
 
 unittest::OldStyleSuiteInitializer<IndexUpdateTests> indexUpdateTests;
 
-}  // namespace IndexUpdateTests
+}  // namespace
 }  // namespace mongo

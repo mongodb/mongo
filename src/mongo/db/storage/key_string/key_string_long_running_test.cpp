@@ -36,7 +36,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 namespace mongo::key_string_test {
 
-TEST_F(KeyStringBuilderTest, CommonIntPerf) {
+TEST_P(KeyStringBuilderTest, CommonIntPerf) {
     // Exponential distribution, so skewed towards smaller integers.
     std::mt19937 gen(newSeed());
     std::exponential_distribution<double> expReal(1e-3);
@@ -48,7 +48,7 @@ TEST_F(KeyStringBuilderTest, CommonIntPerf) {
     perfTest(version, numbers);
 }
 
-TEST_F(KeyStringBuilderTest, UniformInt64Perf) {
+TEST_P(KeyStringBuilderTest, UniformInt64Perf) {
     std::vector<BSONObj> numbers;
     std::mt19937 gen(newSeed());
     std::uniform_int_distribution<long long> uniformInt64(std::numeric_limits<long long>::min(),
@@ -60,7 +60,7 @@ TEST_F(KeyStringBuilderTest, UniformInt64Perf) {
     perfTest(version, numbers);
 }
 
-TEST_F(KeyStringBuilderTest, CommonDoublePerf) {
+TEST_P(KeyStringBuilderTest, CommonDoublePerf) {
     std::mt19937 gen(newSeed());
     std::exponential_distribution<double> expReal(1e-3);
 
@@ -71,7 +71,7 @@ TEST_F(KeyStringBuilderTest, CommonDoublePerf) {
     perfTest(version, numbers);
 }
 
-TEST_F(KeyStringBuilderTest, UniformDoublePerf) {
+TEST_P(KeyStringBuilderTest, UniformDoublePerf) {
     std::vector<BSONObj> numbers;
     std::mt19937 gen(newSeed());
     std::uniform_int_distribution<long long> uniformInt64(std::numeric_limits<long long>::min(),
@@ -87,7 +87,7 @@ TEST_F(KeyStringBuilderTest, UniformDoublePerf) {
     perfTest(version, numbers);
 }
 
-TEST_F(KeyStringBuilderTest, CommonDecimalPerf) {
+TEST_P(KeyStringBuilderTest, CommonDecimalPerf) {
     std::mt19937 gen(newSeed());
     std::exponential_distribution<double> expReal(1e-3);
 
@@ -104,7 +104,7 @@ TEST_F(KeyStringBuilderTest, CommonDecimalPerf) {
     perfTest(version, numbers);
 }
 
-TEST_F(KeyStringBuilderTest, UniformDecimalPerf) {
+TEST_P(KeyStringBuilderTest, UniformDecimalPerf) {
     std::mt19937 gen(newSeed());
     std::uniform_int_distribution<long long> uniformInt64(std::numeric_limits<long long>::min(),
                                                           std::numeric_limits<long long>::max());
@@ -123,7 +123,7 @@ TEST_F(KeyStringBuilderTest, UniformDecimalPerf) {
     perfTest(version, numbers);
 }
 
-TEST_F(KeyStringBuilderTest, DecimalFromUniformDoublePerf) {
+TEST_P(KeyStringBuilderTest, DecimalFromUniformDoublePerf) {
     std::vector<BSONObj> numbers;
     std::mt19937 gen(newSeed());
     std::uniform_int_distribution<long long> uniformInt64(std::numeric_limits<long long>::min(),
@@ -150,7 +150,7 @@ TEST_F(KeyStringBuilderTest, DecimalFromUniformDoublePerf) {
     perfTest(version, numbers);
 }
 
-TEST_F(KeyStringBuilderTest, AllPermCompare) {
+TEST_P(KeyStringBuilderTest, AllPermCompare) {
     std::vector<BSONObj> elements = getInterestingElements(version);
 
     for (size_t i = 0; i < elements.size(); i++) {
@@ -165,7 +165,7 @@ TEST_F(KeyStringBuilderTest, AllPermCompare) {
     testPermutation(version, elements, orderings, false);
 }
 
-TEST_F(KeyStringBuilderTest, AllPerm2Compare) {
+TEST_P(KeyStringBuilderTest, AllPerm2Compare) {
     std::vector<BSONObj> baseElements = getInterestingElements(version);
     auto seed = newSeed();
 
@@ -207,7 +207,7 @@ TEST_F(KeyStringBuilderTest, AllPerm2Compare) {
     testPermutation(version, elements, orderings, false);
 }
 
-TEST_F(KeyStringBuilderTest, LotsOfNumbers3) {
+TEST_P(KeyStringBuilderTest, LotsOfNumbers3) {
     std::vector<stdx::future<void>> futures;
 
     for (double k = 0; k < 8; k++) {
@@ -251,7 +251,7 @@ TEST_F(KeyStringBuilderTest, LotsOfNumbers3) {
     }
 }
 
-TEST_F(KeyStringBuilderTest, NumberOrderLots) {
+TEST_P(KeyStringBuilderTest, NumberOrderLots) {
     std::vector<BSONObj> numbers;
     {
         numbers.push_back(BSON("" << 0));
@@ -330,4 +330,8 @@ TEST_F(KeyStringBuilderTest, NumberOrderLots) {
         }
     }
 }
+
+INSTANTIATE_TEST_SUITE_P(KeyStringBuilderLongRunningTest,
+                         KeyStringBuilderTest,
+                         testing::Values(key_string::Version::V0, key_string::Version::V1));
 }  // namespace mongo::key_string_test

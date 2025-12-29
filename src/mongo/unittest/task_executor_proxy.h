@@ -39,8 +39,11 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+
+MONGO_MOD_PUBLIC;
 
 namespace mongo {
 namespace unittest {
@@ -55,7 +58,7 @@ namespace unittest {
  * - appendConnectionStats()
  * - dropConnections()
  */
-class TaskExecutorProxy : public executor::TaskExecutor {
+class MONGO_MOD_OPEN TaskExecutorProxy : public executor::TaskExecutor {
 public:
     /**
      * Does not own target executor.

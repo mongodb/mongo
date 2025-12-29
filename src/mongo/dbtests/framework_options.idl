@@ -49,19 +49,6 @@ configs:
     debug:
         description: "Run tests with verbose output"
         arg_vartype: Switch
-    list:
-        description: "List available test suites"
-        arg_vartype: Switch
-        single_name: l
-    filter:
-        description: "String substring filter on test name"
-        arg_vartype: String
-        single_name: f
-        cpp_varname: "frameworkGlobalParams.filter"
-    verbose:
-        description: Verbose
-        arg_vartype: Switch
-        single_name: v
     seed:
         description: "Random number seed"
         arg_vartype: UnsignedLongLong

@@ -197,7 +197,7 @@ struct SCRAMStepsResult {
     }
 };
 
-class SCRAMFixture : public mongo::unittest::Test {
+class SCRAMFixture : public mongo::unittest::Test, public testing::WithParamInterface<bool> {
 protected:
     const SCRAMStepsResult goalState =
         SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 4), Status::OK());
@@ -211,7 +211,7 @@ protected:
     std::unique_ptr<ServerMechanismBase> saslServerSession;
     std::unique_ptr<NativeSaslClientSession> saslClientSession;
 
-    void setUp() final {
+    void SetUp() override {
         auto serviceContextHolder = ServiceContext::make();
         serviceContext = serviceContextHolder.get();
         setGlobalServiceContext(std::move(serviceContextHolder));
@@ -238,6 +238,14 @@ protected:
         authzBackend = reinterpret_cast<auth::AuthorizationBackendMock*>(
             auth::AuthorizationBackendInterface::get(serviceContext->getService()));
 
+        if (_digestPassword()) {
+            LOGV2(20252, "SCRAM-SHA-1 variant");
+            saslServerSession = std::make_unique<SaslSCRAMSHA1ServerMechanism>("test");
+        } else {
+            LOGV2(20253, "SCRAM-SHA-256 variant");
+            saslServerSession = std::make_unique<SaslSCRAMSHA256ServerMechanism>("test");
+        }
+
         saslClientSession = std::make_unique<NativeSaslClientSession>();
         saslClientSession->setParameter(NativeSaslClientSession::parameterMechanism,
                                         saslServerSession->mechanismName());
@@ -248,7 +256,7 @@ protected:
                                         "MockServer.test:27017");
     }
 
-    void tearDown() final {
+    void TearDown() override {
         opCtx.reset();
         client.reset();
         setGlobalServiceContext(nullptr);
@@ -259,7 +267,7 @@ protected:
     }
 
     std::string createPasswordDigest(StringData username, StringData password) {
-        if (_digestPassword) {
+        if (_digestPassword()) {
             return mongo::createPasswordDigest(username, password);
         } else {
             return std::string{password};
@@ -301,24 +309,14 @@ protected:
         return result;
     }
 
-
-    bool _digestPassword;
-
-public:
-    void run() {
-        LOGV2(20252, "SCRAM-SHA-1 variant");
-        saslServerSession = std::make_unique<SaslSCRAMSHA1ServerMechanism>("test");
-        _digestPassword = true;
-        Test::run();
-
-        LOGV2(20253, "SCRAM-SHA-256 variant");
-        saslServerSession = std::make_unique<SaslSCRAMSHA256ServerMechanism>("test");
-        _digestPassword = false;
-        Test::run();
+    bool _digestPassword() const {
+        return GetParam();
     }
 };
 
-TEST_F(SCRAMFixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
+INSTANTIATE_TEST_SUITE_P(, SCRAMFixture, testing::Values(false, true));
+
+TEST_P(SCRAMFixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
@@ -340,7 +338,7 @@ TEST_F(SCRAMFixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
         runSteps(mutator));
 }
 
-TEST_F(SCRAMFixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
+TEST_P(SCRAMFixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
@@ -362,7 +360,7 @@ TEST_F(SCRAMFixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
         runSteps(mutator));
 }
 
-TEST_F(SCRAMFixture, testClientStep2GivesBadProof) {
+TEST_P(SCRAMFixture, testClientStep2GivesBadProof) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
@@ -387,7 +385,7 @@ TEST_F(SCRAMFixture, testClientStep2GivesBadProof) {
               runSteps(mutator));
 }
 
-TEST_F(SCRAMFixture, testServerStep2GivesBadVerifier) {
+TEST_P(SCRAMFixture, testServerStep2GivesBadVerifier) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
@@ -420,7 +418,7 @@ TEST_F(SCRAMFixture, testServerStep2GivesBadVerifier) {
 }
 
 
-TEST_F(SCRAMFixture, testSCRAM) {
+TEST_P(SCRAMFixture, testSCRAM) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
@@ -433,7 +431,7 @@ TEST_F(SCRAMFixture, testSCRAM) {
     ASSERT_EQ(goalState, runSteps());
 }
 
-TEST_F(SCRAMFixture, testSCRAMWithChannelBindingSupportedByClient) {
+TEST_P(SCRAMFixture, testSCRAMWithChannelBindingSupportedByClient) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
@@ -451,7 +449,7 @@ TEST_F(SCRAMFixture, testSCRAMWithChannelBindingSupportedByClient) {
     ASSERT_EQ(goalState, runSteps(mutator));
 }
 
-TEST_F(SCRAMFixture, testSCRAMWithChannelBindingRequiredByClient) {
+TEST_P(SCRAMFixture, testSCRAMWithChannelBindingRequiredByClient) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
@@ -472,7 +470,7 @@ TEST_F(SCRAMFixture, testSCRAMWithChannelBindingRequiredByClient) {
         runSteps(mutator));
 }
 
-TEST_F(SCRAMFixture, testSCRAMWithInvalidChannelBinding) {
+TEST_P(SCRAMFixture, testSCRAMWithInvalidChannelBinding) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
@@ -493,7 +491,7 @@ TEST_F(SCRAMFixture, testSCRAMWithInvalidChannelBinding) {
               runSteps(mutator));
 }
 
-TEST_F(SCRAMFixture, testNULLInPassword) {
+TEST_P(SCRAMFixture, testNULLInPassword) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "saj\0ack"), BSONObj()));
 
@@ -507,7 +505,7 @@ TEST_F(SCRAMFixture, testNULLInPassword) {
 }
 
 
-TEST_F(SCRAMFixture, testCommasInUsernameAndPassword) {
+TEST_P(SCRAMFixture, testCommasInUsernameAndPassword) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("s,a,jack", "s,a,jack"), BSONObj()));
 
@@ -520,7 +518,7 @@ TEST_F(SCRAMFixture, testCommasInUsernameAndPassword) {
     ASSERT_EQ(goalState, runSteps());
 }
 
-TEST_F(SCRAMFixture, testIncorrectUser) {
+TEST_P(SCRAMFixture, testIncorrectUser) {
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
                                     createPasswordDigest("sajack", "sajack"));
@@ -533,7 +531,7 @@ TEST_F(SCRAMFixture, testIncorrectUser) {
               runSteps());
 }
 
-TEST_F(SCRAMFixture, testIncorrectPassword) {
+TEST_P(SCRAMFixture, testIncorrectPassword) {
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
@@ -549,7 +547,7 @@ TEST_F(SCRAMFixture, testIncorrectPassword) {
               runSteps());
 }
 
-TEST_F(SCRAMFixture, testOptionalClientExtensions) {
+TEST_P(SCRAMFixture, testOptionalClientExtensions) {
     // Verify server ignores unknown/optional extensions sent by client.
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
@@ -573,7 +571,7 @@ TEST_F(SCRAMFixture, testOptionalClientExtensions) {
               runSteps(mutator));
 }
 
-TEST_F(SCRAMFixture, testOptionalServerExtensions) {
+TEST_P(SCRAMFixture, testOptionalServerExtensions) {
     // Verify client errors on unknown/optional extensions sent by server.
     ASSERT_OK(authzBackend->insertUserDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
@@ -660,11 +658,11 @@ void runTestClientConversationUsesCacheTest(SaslClientSession* saslClientSession
     assertCacheStats(cache, 5, 4, 2);
 }
 
-TEST_F(SCRAMFixture, testClientConversationUsesCacheSHA1) {
+TEST_P(SCRAMFixture, testClientConversationUsesCacheSHA1) {
     runTestClientConversationUsesCacheTest<SHA1Block>(saslClientSession.get());
 }
 
-TEST_F(SCRAMFixture, testClientConversationUsesCacheSHA256) {
+TEST_P(SCRAMFixture, testClientConversationUsesCacheSHA256) {
     runTestClientConversationUsesCacheTest<SHA256Block>(saslClientSession.get());
 }
 

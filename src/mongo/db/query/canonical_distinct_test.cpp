@@ -279,7 +279,7 @@ TEST_F(CanonicalDistinctTest, CopyMaintainsDistinctProperties) {
     originalDistinct->setSortRequirement(SortPattern(BSON("x" << 1), expCtx));
 
     const auto& copyDistinct = CanonicalDistinct(*originalDistinct);
-    ASSERT_NE(&originalDistinct, &copyDistinct);
+    ASSERT_NE(originalDistinct, &copyDistinct);
 
     ASSERT_EQ(originalDistinct->getKey(), copyDistinct.getKey());
     ASSERT_EQ(originalDistinct->isMirrored(), copyDistinct.isMirrored());

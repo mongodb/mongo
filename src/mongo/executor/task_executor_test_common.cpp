@@ -125,14 +125,14 @@ public:
             : CommonTaskExecutorTestFixture(std::move(makeExecutor)) {}        \
                                                                                \
     private:                                                                   \
-        void _doTest() override;                                               \
+        void TestBody() override;                                              \
         static const CetRegistrationAgent _agent;                              \
     };                                                                         \
     const CetRegistrationAgent CET_##TEST_NAME::_agent(                        \
         #TEST_NAME, [](ExecutorFactory makeExecutor) {                         \
             return std::make_unique<CET_##TEST_NAME>(std::move(makeExecutor)); \
         });                                                                    \
-    void CET_##TEST_NAME::_doTest()
+    void CET_##TEST_NAME::TestBody()
 
 auto makeSetStatusClosure(Status* target) {
     return [target](const TaskExecutor::CallbackArgs& cbData) {
@@ -1142,11 +1142,11 @@ COMMON_EXECUTOR_TEST(ScheduleRemoteCommandAfterNetworkInterfaceShutdown) {
 }  // namespace
 
 void addTestsForExecutor(const std::string& suiteName, ExecutorFactory makeExecutor) {
-    auto& suite = unittest::Suite::getSuite(suiteName);
-    for (const auto& testCase : executorTestCaseRegistry()) {
-        suite.add(str::stream() << suiteName << "::" << testCase.first,
-                  __FILE__,
-                  [testCase, makeExecutor] { testCase.second(makeExecutor)->run(); });
+    for (auto&& [name, func] : executorTestCaseRegistry()) {
+        testing::RegisterTest(
+            suiteName.c_str(), name.c_str(), nullptr, nullptr, __FILE__, __LINE__, [=] {
+                return func(makeExecutor).release();
+            });
     }
 }
 

@@ -1216,6 +1216,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=mongo_unittest,-final_target,-intermediate_debug,-incompatible_with_bazel_remote_test
             --build_tag_filters=mongo_unittest,-incompatible_with_bazel_remote_test
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: unit_tests_remote_exec_incompatible
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1243,6 +1245,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=incompatible_with_bazel_remote_test,-intermediate_debug,-final_target
             --build_tag_filters=incompatible_with_bazel_remote_test
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: unit_test_group1
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1270,6 +1274,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=mongo_unittest_first_group,-intermediate_debug,-final_target
             --build_tag_filters=mongo_unittest_first_group
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: unit_test_group2
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1297,6 +1303,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=mongo_unittest_second_group,-intermediate_debug,-tracing_test,-final_target
             --build_tag_filters=mongo_unittest_second_group
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: unit_test_group3
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1324,6 +1332,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=mongo_unittest_third_group,-intermediate_debug,-final_target
             --build_tag_filters=mongo_unittest_third_group
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: unit_test_group4
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1351,6 +1361,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=mongo_unittest_fourth_group,-intermediate_debug,-final_target
             --build_tag_filters=mongo_unittest_fourth_group
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: unit_test_group5
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1378,6 +1390,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=mongo_unittest_fifth_group,-intermediate_debug,-final_target
             --build_tag_filters=mongo_unittest_fifth_group
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: unit_test_group6
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1405,6 +1419,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=mongo_unittest_sixth_group,-intermediate_debug,-final_target
             --build_tag_filters=mongo_unittest_sixth_group
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: unit_test_group7
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1432,6 +1448,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=mongo_unittest_seventh_group,-intermediate_debug,-final_target
             --build_tag_filters=mongo_unittest_seventh_group
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: unit_test_group8
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
@@ -1459,6 +1477,8 @@ tasks:
             --separate_debug=False
             --test_tag_filters=mongo_unittest_eighth_group,-intermediate_debug,-final_target
             --build_tag_filters=mongo_unittest_eighth_group
+            --keep_going
+            --test_arg=--showEachTest
 
   - name: monitor_build_status
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

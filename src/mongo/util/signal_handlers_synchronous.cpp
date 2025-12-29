@@ -77,6 +77,8 @@ Atomic<bool> shouldLogScopedDebugInfoInSignalHandlers{true};
 
 namespace {
 
+std::function<void()> gSynchronousSignalHandlerCb;
+
 #if defined(_WIN32)
 const char* strsignal(int signalNum) {
     // should only see SIGABRT on windows
@@ -266,6 +268,9 @@ void myInvalidParameterHandler(const wchar_t* expression,
                                const wchar_t* file,
                                unsigned int line,
                                uintptr_t pReserved) {
+    if (gSynchronousSignalHandlerCb) {
+        gSynchronousSignalHandlerCb();
+    }
 
     logNoRecursion(fmt::format(
         "Invalid parameter detected in function {} in {} at line {} with expression '{}'\n",
@@ -278,6 +283,9 @@ void myInvalidParameterHandler(const wchar_t* expression,
 }
 
 void myPureCallHandler() {
+    if (gSynchronousSignalHandlerCb) {
+        gSynchronousSignalHandlerCb();
+    }
     logNoRecursion("Pure call handler invoked. Immediate exit due to invalid pure call\n");
     abruptQuit(SIGABRT);
 }
@@ -285,6 +293,9 @@ void myPureCallHandler() {
 #else
 
 extern "C" void abruptQuitAction(int signalNum, siginfo_t*, void*) {
+    if (gSynchronousSignalHandlerCb) {
+        gSynchronousSignalHandlerCb();
+    }
     abruptQuit(signalNum);
 };
 
@@ -305,6 +316,10 @@ extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void
     [[maybe_unused]] auto ucontext = static_cast<const ucontext_t*>(ucontext_erased);
 
     MallocFreeOStreamGuard lk(signalNum);
+
+    if (gSynchronousSignalHandlerCb) {
+        gSynchronousSignalHandlerCb();
+    }
 
     const char* action = (signalNum == SIGSEGV || signalNum == SIGBUS) ? "access" : "operation";
     mallocFreeOStream << "Invalid " << action << " at address: " << siginfo->si_addr;
@@ -426,6 +441,10 @@ void setupSynchronousSignalHandlers() {
     setupStackTraceSignalAction(stackTraceSignal());
 #endif
 #endif
+}
+
+void setSynchronousSignalHandlerCallback_forTest(std::function<void()> cb) {
+    gSynchronousSignalHandlerCb = cb;
 }
 
 void reportOutOfMemoryErrorAndExit() {

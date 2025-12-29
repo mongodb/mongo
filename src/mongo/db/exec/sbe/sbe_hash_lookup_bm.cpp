@@ -31,6 +31,7 @@
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/unittest/test_info.h"
+#include "mongo/unittest/unittest.h"
 
 #include <benchmark/benchmark.h>
 
@@ -41,10 +42,18 @@ public:
     void runVariation(const RunVariationParams& params) override {
         return;
     }
-    void _doTest() override {
+    void TestBody() override {
         return;
     }
 };
+
+class DummyBenchmarkTestFixture : public ::testing::Test {
+public:
+    void TestBody() override {}
+};
+
+// Register a dummy test for GoldenTestContext initialization. This test is never run.
+TEST_F(DummyBenchmarkTestFixture, DummyBenchmarkTest) {}
 
 class HashLookupBenchmarkFixture : public benchmark::Fixture {
 public:
@@ -139,14 +148,15 @@ public:
 
         sharedTest.tearDown();
     }  // runVariation
-    void _doTest() {
+    void TestBody() {
         return;
     }
     unittest::GoldenTestContext getGoldenTestContext() {
-        TestInfo testInfo(
-            "HashLookupBenchmarkFixture", "runVariation", "sbe_hash_lookup_bm.cpp", __LINE__);
+        // GoldenTestContext not used in this benchmark, create a dummy GoldenTestContext.
+        static const ::testing::TestInfo* dummyTestInfo =
+            ::testing::UnitTest::GetInstance()->GetTestSuite(0)->GetTestInfo(0);
         return unittest::GoldenTestContext(
-            &goldenTestConfigSbe, &testInfo, false /* validateOnClose */);
+            &goldenTestConfigSbe, dummyTestInfo, false /* validateOnClose */);
     }
 };
 

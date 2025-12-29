@@ -1249,8 +1249,8 @@ DEATH_TEST_F(OplogApplierImplTestDeathTest, ApplyOpsRidOnNonRridCollectionGroupe
     std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
     OplogEntryOrGroupedInserts groupedInserts(ops.begin(), ops.end());
 
-    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(_applyOplogEntryOrGroupedInsertsWrapper(
-        _opCtx.get(), groupedInserts, OplogApplication::Mode::kApplyOpsCmd));
+    (void)_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), groupedInserts, OplogApplication::Mode::kApplyOpsCmd);
 }
 
 DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateRidOnNonRridCollectionGrouped, "11454703") {
@@ -1273,8 +1273,8 @@ DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateRidOnNonRridCollectionGro
     std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
     OplogEntryOrGroupedInserts groupedInserts(ops.begin(), ops.end());
 
-    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(_applyOplogEntryOrGroupedInsertsWrapper(
-        _opCtx.get(), groupedInserts, OplogApplication::Mode::kSecondary));
+    (void)_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), groupedInserts, OplogApplication::Mode::kSecondary);
 }
 
 DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateNoRidOnRridCollectionGrouped, "11454703") {
@@ -1299,8 +1299,8 @@ DEATH_TEST_F(OplogApplierImplTestDeathTest, SteadyStateNoRidOnRridCollectionGrou
     std::vector<ApplierOperation> ops = {ApplierOperation{&op1}, ApplierOperation{&op2}};
     OplogEntryOrGroupedInserts groupedInserts(ops.begin(), ops.end());
 
-    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(_applyOplogEntryOrGroupedInsertsWrapper(
-        _opCtx.get(), groupedInserts, OplogApplication::Mode::kSecondary));
+    (void)_applyOplogEntryOrGroupedInsertsWrapper(
+        _opCtx.get(), groupedInserts, OplogApplication::Mode::kSecondary);
 }
 
 bool _testOplogEntryIsForCappedCollection(OperationContext* opCtx,

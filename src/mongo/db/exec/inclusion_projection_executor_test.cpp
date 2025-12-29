@@ -66,37 +66,20 @@ BSONObj wrapInLiteral(const T& arg) {
     return BSON("$literal" << arg);
 }
 
-/**
- * This test fixture run the test twice, one when the fast-path projection mode is allowed, another
- * one when it's not.
- *
- * The 'AllowFallBackToDefault' parameter should be set to 'true', if the executor is allowed to
- * fall back to the default inclusion projection implementation if the fast-path projection cannot
- * be used for a specific test. If set to 'false', a tassert will be triggered if fast-path
- * projection was expected to be chosen, but the default one has been picked instead.
- */
-template <bool AllowFallBackToDefault>
-class BaseInclusionProjectionExecutionTest : public mongo::unittest::Test {
+enum AllowFallBackToDefault : bool {};
+enum AllowFastPath : bool {};
+
+class BaseInclusionProjectionExecutionTest : public mongo::unittest::Test,
+                                             public testing::WithParamInterface<AllowFastPath> {
 public:
-    void run() {
-        auto base = static_cast<mongo::unittest::Test*>(this);
-        try {
-            if (_runFastPath) {
-                _allowFastPath = true;
-                base->run();
-            }
-            if (_runDefault) {
-                _allowFastPath = false;
-                base->run();
-            }
-        } catch (...) {
-            LOGV2(20587,
-                  "Exception while testing",
-                  "allowFastPath"_attr = _allowFastPath,
-                  "allowFallBackToDefault"_attr = AllowFallBackToDefault);
-            throw;
-        }
-    }
+    /**
+     * The 'allowFallBackToDefault' parameter should be set to 'true', if the executor is allowed to
+     * fall back to the default inclusion projection implementation if the fast-path projection
+     * cannot be used for a specific test. If set to 'false', a tassert will be triggered if
+     * fast-path projection was expected to be chosen, but the default one has been picked instead.
+     */
+    explicit BaseInclusionProjectionExecutionTest(AllowFallBackToDefault allowFallBackToDefault)
+        : _allowFallBackToDefault{allowFallBackToDefault}, _allowFastPath{GetParam()} {}
 
 protected:
     auto createProjectionExecutor(const BSONObj& projSpec,
@@ -130,7 +113,7 @@ protected:
         if (_allowFastPath) {
             uassert(51752,
                     "Fast-path projection mode or fall back to default expected",
-                    fastPathRootNode || AllowFallBackToDefault);
+                    fastPathRootNode || _allowFallBackToDefault);
         } else {
             uassert(51753, "Default projection mode expected", !fastPathRootNode);
         }
@@ -173,21 +156,34 @@ protected:
             projSpec, matchSpec, ProjectionPolicies::findProjectionPolicies());
     }
 
+    AllowFallBackToDefault _allowFallBackToDefault;
     // True, if the projection executor is allowed to use the fast-path inclusion projection
     // implementation.
-    bool _allowFastPath{true};
-    // Run the test using fast-path projection mode.
-    bool _runFastPath{true};
-    // Run the test using default projection mode.
-    bool _runDefault{true};
+    AllowFastPath _allowFastPath;
 };
 
-using InclusionProjectionExecutionTestWithFallBackToDefault =
-    BaseInclusionProjectionExecutionTest<true>;
-using InclusionProjectionExecutionTestWithoutFallBackToDefault =
-    BaseInclusionProjectionExecutionTest<false>;
+class InclusionProjectionExecutionTestWithFallBackToDefault
+    : public BaseInclusionProjectionExecutionTest {
+public:
+    InclusionProjectionExecutionTestWithFallBackToDefault()
+        : BaseInclusionProjectionExecutionTest{AllowFallBackToDefault{true}} {}
+};
+INSTANTIATE_TEST_SUITE_P(,
+                         InclusionProjectionExecutionTestWithFallBackToDefault,
+                         testing::Values(AllowFastPath{true}, AllowFastPath{false}));
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+class InclusionProjectionExecutionTestWithoutFallBackToDefault
+    : public BaseInclusionProjectionExecutionTest {
+public:
+    InclusionProjectionExecutionTestWithoutFallBackToDefault()
+        : BaseInclusionProjectionExecutionTest{AllowFallBackToDefault{false}} {}
+};
+
+INSTANTIATE_TEST_SUITE_P(,
+                         InclusionProjectionExecutionTestWithoutFallBackToDefault,
+                         testing::Values(AllowFastPath{true}, AllowFastPath{false}));
+
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldAddIncludedFieldsToDependencies) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("_id" << false << "a" << true << "x.y" << true));
@@ -201,7 +197,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_EQ(deps.fields.count("x.y"), 1UL);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldAddIdToDependenciesIfNotSpecified) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << true));
 
@@ -213,7 +209,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_EQ(deps.fields.count("a"), 1UL);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddDependenciesOfComputedFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << "$a"
                                                                          << "x"
@@ -228,7 +224,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_EQ(deps.fields.count("z"), 1UL);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddPathToDependenciesForNestedComputedFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a.b.c" << BSON("$add" << BSON_ARRAY(1 << 2))));
@@ -242,7 +238,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_EQ(deps.fields.count("a.b"), 1UL);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldNotAddTopLevelDependencyWithExpressionOnTopLevelPath) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("a" << BSON("$add" << BSON_ARRAY(1 << 2))));
@@ -254,7 +250,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_EQ(deps.fields.count("_id"), 1UL);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddPathToDependenciesForNestedComputedFieldsUsingVariableReferences) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("x.y" << "$z"));
 
@@ -270,7 +266,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_EQ(deps.fields.count("x"), 1UL);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldSerializeToEquivalentProjection) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         fromjson("{a: {$add: ['$a', 2]}, b: {d: 3}, 'x.y': {$literal: 4}}"));
@@ -293,7 +289,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldSerializeExplicitExclusionOfId) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("_id" << false << "a" << true));
@@ -314,7 +310,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldSerializeWithTopLevelID) {
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldSerializeWithTopLevelID) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << 1 << "b" << 1));
     auto serialization = inclusion->serializeTransformation();
     ASSERT_VALUE_EQ(serialization["a"], Value(true));
@@ -351,7 +347,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldSerialize
     ASSERT_VALUE_EQ(serialization["_id"], Value(true));
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldOptimizeTopLevelExpressions) {
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldOptimizeTopLevelExpressions) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("a" << BSON("$add" << BSON_ARRAY(1 << 2))));
 
@@ -372,7 +368,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldOptimizeTopL
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldOptimizeNestedExpressions) {
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldOptimizeNestedExpressions) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a.b" << BSON("$add" << BSON_ARRAY(1 << 2))));
 
@@ -394,7 +390,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldOptimizeNest
                            .verbosity = ExplainOptions::Verbosity::kExecAllPlans}));
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldReportThatAllExceptIncludedFieldsAreModified) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << wrapInLiteral("computedVal") << "b.c" << wrapInLiteral("computedVal") << "d"
@@ -412,7 +408,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_EQ(modifiedPaths.paths.size(), 3UL);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldReportThatAllExceptIncludedFieldsAreModifiedWithIdExclusion) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("_id" << false << "a" << wrapInLiteral("computedVal") << "b.c"
@@ -436,7 +432,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 // Top-level only.
 //
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldIncludeTopLevelField) {
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldIncludeTopLevelField) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << true));
 
     // More than one field in document.
@@ -460,7 +456,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldIncludeTo
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldAddComputedTopLevelField) {
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldAddComputedTopLevelField) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("newField" << wrapInLiteral("computedVal")));
     auto result = inclusion->applyTransformation(Document{});
@@ -473,7 +469,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldAddComputedT
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldApplyBothInclusionsAndComputedFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << true << "newField" << wrapInLiteral("computedVal")));
@@ -482,7 +478,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldIncludeFieldsInOrderOfInputDoc) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("first" << true << "second" << true << "third" << true));
@@ -491,7 +487,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, inputDoc);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldApplyComputedFieldsInOrderSpecified) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON(
         "firstComputed" << wrapInLiteral("FIRST") << "secondComputed" << wrapInLiteral("SECOND")));
@@ -501,7 +497,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldImplicitlyIncludeId) {
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldImplicitlyIncludeId) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << true));
     auto result = inclusion->applyTransformation(Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}});
     auto expectedResult = Document{{"_id", "ID"_sd}, {"a", 1}};
@@ -513,7 +509,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldImplicitl
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldImplicitlyIncludeIdWithComputedFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("newField" << wrapInLiteral("computedVal")));
@@ -522,7 +518,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldIncludeIdIfExplicitlyIncluded) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << true << "_id" << true << "b" << true));
@@ -532,7 +528,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldExcludeIdIfExplicitlyExcluded) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("a" << true << "_id" << false));
@@ -541,7 +537,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldReplaceIdWithComputedId) {
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldReplaceIdWithComputedId) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("_id" << wrapInLiteral("newId")));
     auto result = inclusion->applyTransformation(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
@@ -553,7 +549,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldReplaceIdWit
 // Projections with nested fields.
 //
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldIncludeSimpleDottedFieldFromSubDoc) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a.b" << true));
 
@@ -578,7 +574,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldNotCreateSubDocIfDottedIncludedFieldDoesNotExist) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("sub.target" << true));
 
@@ -593,7 +589,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldApplyDottedInclusionToEachElementInArray) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a.b" << true));
 
@@ -611,7 +607,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddComputedDottedFieldToSubDocument) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("sub.target" << wrapInLiteral("computedVal")));
@@ -633,7 +629,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldCreateSubDocIfDottedComputedFieldDoesntExist) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("sub.target" << wrapInLiteral("computedVal")));
@@ -648,7 +644,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldCreateNestedSubDocumentsAllTheWayToComputedField) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("a.b.c.d" << wrapInLiteral("computedVal")));
@@ -664,7 +660,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddComputedDottedFieldToEachElementInArray) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("a.b" << wrapInLiteral("COMPUTED")));
@@ -687,7 +683,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldApplyInclusionsAndAdditionsToEachElementInArray) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a.inc" << true << "a.comp" << wrapInLiteral("COMPUTED")));
@@ -715,7 +711,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldAddOrIncludeSubFieldsOfId) {
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldAddOrIncludeSubFieldsOfId) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("_id.X" << true << "_id.Z" << wrapInLiteral("NEW")));
     auto result = inclusion->applyTransformation(Document{{"_id", Document{{"X", 1}, {"Y", 2}}}});
@@ -723,7 +719,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldAddOrInclude
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAllowMixedNestedAndDottedFields) {
     // Include all of "a.b", "a.c", "a.d", and "a.e".
     // Add new computed fields "a.W", "a.X", "a.Y", and "a.Z".
@@ -747,7 +743,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldApplyNestedComputedFieldsInOrderSpecified) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << wrapInLiteral("FIRST") << "b.c" << wrapInLiteral("SECOND")));
@@ -756,7 +752,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldApplyComputedFieldsAfterAllInclusions) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("b.c" << wrapInLiteral("NEW") << "a" << true));
@@ -776,7 +772,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ComputedFieldReplacingExistingShouldAppearAfterInclusions) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("b" << wrapInLiteral("NEW") << "a" << true));
@@ -792,7 +788,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
 // Metadata inclusion.
 //
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldAlwaysKeepMetadataFromOriginalDoc) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << true));
 
@@ -808,7 +804,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedDoc.freeze());
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        MetaDependenciesFalseWhenNotIncluded) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1}"));
 
@@ -832,7 +828,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddSingleMetaExpressionDependency) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, b: {$meta: 'geoNearPoint'}}"));
@@ -859,7 +855,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ShouldAddMetaExpressionsToDependencies) {
     // Used to set 'score' metadata.
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
@@ -899,7 +895,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kScore]);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMetaExpressions) {
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMetaExpressions) {
     // Used to set 'score' metadata.
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRankFusionFull", true);
     auto inclusion =
@@ -946,7 +942,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ShouldEvaluateMeta
 // _id inclusion policy.
 //
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldIncludeIdByDefault) {
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldIncludeIdByDefault) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << true));
 
     auto result = inclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}});
@@ -955,7 +951,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldIncludeId
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldIncludeIdWithIncludePolicy) {
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldIncludeIdWithIncludePolicy) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << true));
 
     auto result = inclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}});
@@ -964,7 +960,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldIncludeId
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldExcludeIdWithExcludePolicy) {
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldExcludeIdWithExcludePolicy) {
     auto inclusion = makeInclusionProjectionWithDefaultIdExclusion(BSON("a" << true));
 
     auto result = inclusion->applyTransformation(Document{{"_id", 2}, {"a", 3}});
@@ -973,7 +969,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, ShouldExcludeId
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldOverrideIncludePolicyWithExplicitExcludeIdSpec) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("_id" << false << "a" << true));
@@ -984,7 +980,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldOverrideExcludePolicyWithExplicitIncludeIdSpec) {
     auto inclusion =
         makeInclusionProjectionWithDefaultIdExclusion(BSON("_id" << true << "a" << true));
@@ -995,7 +991,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldAllowInclusionOfIdSubfieldWithDefaultIncludePolicy) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("_id.id1" << true << "a" << true));
@@ -1007,7 +1003,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldAllowInclusionOfIdSubfieldWithDefaultExcludePolicy) {
     auto inclusion =
         makeInclusionProjectionWithDefaultIdExclusion(BSON("_id.id1" << true << "a" << true));
@@ -1023,7 +1019,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
 // Nested array recursion.
 //
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldRecurseNestedArraysByDefault) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a.b" << true));
 
@@ -1037,7 +1033,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldNotRecurseNestedArraysForNoRecursePolicy) {
     auto inclusion = makeInclusionProjectionWithNoArrayRecursion(BSON("a.b" << true));
 
@@ -1051,7 +1047,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefault,
        ShouldRetainNestedArraysIfNoRecursionNeeded) {
     auto inclusion = makeInclusionProjectionWithNoArrayRecursion(BSON("a" << true));
 
@@ -1066,7 +1062,7 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ComputedFieldIsAddedToNestedArrayElementsForRecursePolicy) {
     auto inclusion =
         makeInclusionProjectionWithDefaultPolicies(BSON("a.b" << wrapInLiteral("COMPUTED")));
@@ -1089,7 +1085,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ComputedFieldShouldReplaceNestedArrayForNoRecursePolicy) {
     auto inclusion =
         makeInclusionProjectionWithNoArrayRecursion(BSON("a.b" << wrapInLiteral("COMPUTED")));
@@ -1116,7 +1112,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ExtractComputedProjections) {
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ExtractComputedProjections) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("computedMeta1" << BSON("$toUpper" << "$myMeta.x") << "computed2"
                              << BSON("$add" << BSON_ARRAY(1 << "$c")) << "computedMeta3"
@@ -1140,7 +1136,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ExtractComputedPro
     ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation());
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ExtractComputedProjectionInProjectShouldNotHideDependentFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << "$myMeta"
                                                                          << "b"
@@ -1158,7 +1154,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation());
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ExtractComputedProjectionInProjectShouldNotIncludeId) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << BSON("$sum" << BSON_ARRAY("$myMeta" << "$_id"))));
@@ -1175,7 +1171,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation());
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ExtractComputedProjectionInProjectShouldNotHideDependentSubFields) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << "$myMeta"
                                                                          << "b"
@@ -1193,7 +1189,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation());
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault,
        ExtractComputedProjectionInProjectShouldNotHideDependentSubFieldsWithDottedSibling) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << "$myMeta"
                                                                          << "c.b"
@@ -1211,7 +1207,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation());
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ApplyProjectionAfterSplit) {
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, ApplyProjectionAfterSplit) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << true << "computedMeta1" << BSON("$toUpper" << "$myMeta.x") << "computed2"
                  << BSON("$add" << BSON_ARRAY(1 << "$c")) << "c" << true << "computedMeta3"
@@ -1231,7 +1227,7 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ApplyProjectionAft
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, DoNotExtractReservedNames) {
+TEST_P(InclusionProjectionExecutionTestWithFallBackToDefault, DoNotExtractReservedNames) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << true << "data" << BSON("$toUpper" << "$myMeta.x") << "newMeta"
                  << "$myMeta"));
@@ -1250,71 +1246,67 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, DoNotExtractReserv
         "{_id: true, a: true, data: {\"$toUpper\" : [\"$myMeta.x\"]}, newMeta: \"$newMeta\"}"));
     ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation());
 }
-}  // namespace
 
-// The tests in this block are for the fast-path projection only, as the default projection mode
-// would always succeed, so we'll set the _runDefault flag to false to skip applying the projection
-// in default mode.
-namespace fast_path_projection_only_tests {
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+class InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly
+    : public InclusionProjectionExecutionTestWithoutFallBackToDefault {};
+INSTANTIATE_TEST_SUITE_P(,
+                         InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly,
+                         testing::Values(AllowFastPath{true}));
+
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly,
        CannotUseFastPathWithFindPositional) {
-    _runDefault = false;
     ASSERT_THROWS_CODE(
         makeInclusionProjectionWithFindPolicies(fromjson("{a: 1, 'b.$': 1}"), fromjson("{b: 1}")),
         AssertionException,
         51752);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, CannotUseFastPathWithFindSlice) {
-    _runDefault = false;
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly,
+       CannotUseFastPathWithFindSlice) {
     ASSERT_THROWS_CODE(
         makeInclusionProjectionWithFindPolicies(fromjson("{a: 1, b: {$slice: 2}}"), {}),
         AssertionException,
         51752);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly,
        CannotUseFastPathWithFindElemMatch) {
-    _runDefault = false;
     ASSERT_THROWS_CODE(
         makeInclusionProjectionWithFindPolicies(fromjson("{a: 1, b: {$elemMatch: {c: 1}}}"), {}),
         AssertionException,
         51752);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly,
        CannotUseFastPathWithRegularExpression) {
-    _runDefault = false;
     ASSERT_THROWS_CODE(
         makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, b: {$add: ['$c', 1]}}")),
         AssertionException,
         51752);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly,
        CannotUseFastPathWithMetadataExpression) {
-    _runDefault = false;
     ASSERT_THROWS_CODE(
         makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, b: {$meta: 'randVal'}}")),
         AssertionException,
         51752);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault, CannotUseFastPathWithLiteral) {
-    _runDefault = false;
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly,
+       CannotUseFastPathWithLiteral) {
     ASSERT_THROWS_CODE(
         makeInclusionProjectionWithDefaultPolicies(BSON("a" << 1 << "b" << wrapInLiteral("abc"))),
         AssertionException,
         51752);
 }
 
-TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
+TEST_P(InclusionProjectionExecutionTestWithoutFallBackToDefaultFastPathOnly,
        CannotUseFastPathWithFieldPathExpression) {
-    _runDefault = false;
     ASSERT_THROWS_CODE(makeInclusionProjectionWithDefaultPolicies(fromjson("{a: 1, b: '$c'}")),
                        AssertionException,
                        51752);
 }
 
-}  // namespace fast_path_projection_only_tests
+}  // namespace
 }  // namespace mongo::projection_executor
