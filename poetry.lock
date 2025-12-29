@@ -997,19 +997,20 @@ typing-extensions = ">=3.10.0"
 
 [[package]]
 name = "evergreen-py"
-version = "3.11.1"
+version = "3.13.0"
 description = "Python client for the Evergreen API"
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["testing"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
-    {file = "evergreen_py-3.11.1-py3-none-any.whl", hash = "sha256:057ac41cffc6d6ca6f84ea1bd0365da15a869e0fe4b36f87cefa4516a34b1e16"},
-    {file = "evergreen_py-3.11.1.tar.gz", hash = "sha256:6e334a94dfdca3151185dc43c646bb1acd0f7984fd05a35cdf5dc0a7defe7b8c"},
+    {file = "evergreen_py-3.13.0-py3-none-any.whl", hash = "sha256:7728ce5bdbf27066879c4b59f9617197c76fa97d08bed9eb3cd67a2b2fd26bd8"},
+    {file = "evergreen_py-3.13.0.tar.gz", hash = "sha256:cde2802af94eb5245d9670643fccf9dea777a33bf1cceb5b4cfd57c1bc72054e"},
 ]
 
 [package.dependencies]
-Click = ">=7"
+Click = ">=8,<9"
+packaging = ">=25.0,<26.0"
 pydantic = ">=1"
 python-dateutil = ">=2"
 PyYAML = ">=5"
@@ -2785,15 +2786,15 @@ attrs = ">=19.2.0"
 
 [[package]]
 name = "packaging"
-version = "24.2"
+version = "25.0"
 description = "Core utilities for Python packages"
 optional = false
 python-versions = ">=3.8"
 groups = ["compile", "export", "idl", "powercycle-incompatible", "testing"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
-    {file = "packaging-24.2-py3-none-any.whl", hash = "sha256:09abb1bccd265c01f4a3aa3f7a7db064b36514d2cba19a2f694fe6150451a759"},
-    {file = "packaging-24.2.tar.gz", hash = "sha256:c228a6dc5e932d346bc5739379109d49e8853dd8223571c7c5b55260edc0b97f"},
+    {file = "packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"},
+    {file = "packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f"},
 ]
 
 [[package]]
@@ -5821,4 +5822,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "ce16f89834e31b7c80615a3452f715a901d22879a73942a64b3b8241d6214dc1"
+content-hash = "3196e8f5e6d6cd76a9acc53bf6bef940624599665734ea7a22d25ab731a4d85f"
