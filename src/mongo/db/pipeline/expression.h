@@ -6141,6 +6141,9 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(HashAlgorithm, HASH_ALGORITHM);
 
 class ExpressionHash final : public Expression {
 public:
+    static constexpr StringData kInput = "input"_sd;
+    static constexpr StringData kAlgorithm = "algorithm"_sd;
+
     explicit ExpressionHash(ExpressionContext* expCtx,
                             boost::intrusive_ptr<Expression> input,
                             boost::intrusive_ptr<Expression> algorithm);
@@ -6171,10 +6174,7 @@ public:
     const Expression& getAlgorithm() const;
 
 private:
-    static constexpr StringData _kInput = "input"_sd;
     static constexpr size_t _kInputIdx = 0;
-
-    static constexpr StringData _kAlgorithm = "algorithm"_sd;
     static constexpr size_t _kAlgorithmIdx = 1;
 };
 

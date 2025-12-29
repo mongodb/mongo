@@ -1,16 +1,19 @@
 /**
- * Test the $hash expression for generating hashes of string or binary inputs.
+ * Test the $hash/$hexHash expressions for generating hashes of string or binary inputs.
  *
  * @tags: [
  *   requires_fcv_83
  * ]
  */
-import {beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {describe, it} from "jstests/libs/mochalite.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const collName = jsTestName();
 const coll = db[collName];
+
+assertDropCollection(db, collName);
+assert.commandWorked(coll.insert({_id: 0}));
 
 const successTests = [
     // Normal strings
@@ -129,11 +132,6 @@ const failureTests = [
 ];
 
 describe("$hash", () => {
-    beforeEach(() => {
-        assertDropCollection(db, collName);
-        assert.commandWorked(coll.insert({_id: 0}));
-    });
-
     describe("succeeds", () => {
         for (const {expressionInput, expectedHash} of successTests) {
             it(`for ${tojson(expressionInput)}`, () => {
@@ -147,6 +145,26 @@ describe("$hash", () => {
         for (const {expressionInput, expectedCode} of failureTests) {
             it(`for ${tojson(expressionInput)}`, () => {
                 assertErrorCode(coll, [{$project: {hash: {$hash: expressionInput}}}], expectedCode);
+            });
+        }
+    });
+});
+
+describe("$hexHash", () => {
+    describe("succeeds", () => {
+        for (const {expressionInput, expectedHash} of successTests) {
+            it(`for ${tojson(expressionInput)}`, () => {
+                const actualHex = coll.aggregate([{$project: {hash: {$hexHash: expressionInput}}}]).toArray()[0].hash;
+                const expectedHex = expectedHash?.hex().toUpperCase() ?? null;
+                assert.eq(actualHex, expectedHex);
+            });
+        }
+    });
+
+    describe("fails", () => {
+        for (const {expressionInput, expectedCode} of failureTests) {
+            it(`for ${tojson(expressionInput)}`, () => {
+                assertErrorCode(coll, [{$project: {hash: {$hexHash: expressionInput}}}], expectedCode);
             });
         }
     });
