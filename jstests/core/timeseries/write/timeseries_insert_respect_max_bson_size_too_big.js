@@ -8,6 +8,7 @@
  * @tags: [
  *   requires_timeseries,
  *   multiversion_incompatible,
+ *   does_not_support_stepdowns,
  * ]
  */
 
