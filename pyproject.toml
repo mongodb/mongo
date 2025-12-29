@@ -103,7 +103,7 @@ twisted = "^24.3.0"
 ldaptor = "19.0.0"
 
 [tool.poetry.group.idl.dependencies]
-unittest-xml-reporting = "3.0.4" # Pinned because newer versions require lxml which fails to install
+unittest-xml-reporting = "3.2.0"
 packaging = "^24.0"
 
 [tool.poetry.group.jira-client.dependencies]

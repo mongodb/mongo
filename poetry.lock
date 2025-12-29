@@ -1994,7 +1994,7 @@ version = "5.3.1"
 description = "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API."
 optional = false
 python-versions = ">=3.6"
-groups = ["main", "testing"]
+groups = ["main", "idl", "testing"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
     {file = "lxml-5.3.1-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:a4058f16cee694577f7e4dd410263cd0ef75644b43802a689c2b3c2a7e69453b"},
@@ -5374,16 +5374,19 @@ test = ["coverage", "pytest", "pytest-cov"]
 
 [[package]]
 name = "unittest-xml-reporting"
-version = "3.0.4"
+version = "3.2.0"
 description = "unittest-based test runner with Ant/JUnit like XML reporting."
 optional = false
-python-versions = ">=3.5"
+python-versions = ">=3.7"
 groups = ["idl"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
 files = [
-    {file = "unittest-xml-reporting-3.0.4.tar.gz", hash = "sha256:984cebba69e889401bfe3adb9088ca376b3a1f923f0590d005126c1bffd1a695"},
-    {file = "unittest_xml_reporting-3.0.4-py2.py3-none-any.whl", hash = "sha256:7bf515ea8cb244255a25100cd29db611a73f8d3d0aaf672ed3266307e14cc1ca"},
+    {file = "unittest-xml-reporting-3.2.0.tar.gz", hash = "sha256:edd8d3170b40c3a81b8cf910f46c6a304ae2847ec01036d02e9c0f9b85762d28"},
+    {file = "unittest_xml_reporting-3.2.0-py2.py3-none-any.whl", hash = "sha256:f3d7402e5b3ac72a5ee3149278339db1a8f932ee405f48bcb9c681372f2717d5"},
 ]
+
+[package.dependencies]
+lxml = "*"
 
 [[package]]
 name = "uritemplate"
@@ -5818,4 +5821,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "498c3d0b7159a6a3260cc5a7afa740b72eff690808c674427a4a6b65ae8f6f14"
+content-hash = "ce16f89834e31b7c80615a3452f715a901d22879a73942a64b3b8241d6214dc1"
