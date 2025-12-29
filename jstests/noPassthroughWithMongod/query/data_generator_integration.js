@@ -3,6 +3,12 @@
  * the data generator Python script located at src/mongo/db/query/benchmark/data_generator
  *
  * See src/mongo/db/query/benchmark/data_generator/README.md for more information.
+ *
+ * @tags: [
+ *   # This depends on numpy which isn't currently supported on these platforms.
+ *   incompatible_ppc,
+ *   incompatible_s390x,
+ * ]
  */
 
 import {DataGenerator} from "jstests/libs/query/data_generator.js";

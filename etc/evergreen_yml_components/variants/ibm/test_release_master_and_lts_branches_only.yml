@@ -40,6 +40,7 @@ buildvariants:
       compile_variant: enterprise-rhel-81-ppc64le
       timeout_secs: 3600 # 1 hour idle timeout
       exec_timeout_secs: 21600 # 6 hours exec timeout
+      test_flags: --excludeWithAnyTags=incompatible_ppc
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
@@ -111,6 +112,7 @@ buildvariants:
       compile_variant: enterprise-rhel-9-ppc64le
       timeout_secs: 3600 # 1 hour idle timeout
       exec_timeout_secs: 21600 # 6 hours exec timeout
+      test_flags: --excludeWithAnyTags=incompatible_ppc
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
@@ -160,7 +162,7 @@ buildvariants:
         archive-mongocryptd-stripped
         archive-mongocryptd-debug
       release_buid: true
-      test_flags: --excludeWithAnyTags=incompatible_with_s390x
+      test_flags: --excludeWithAnyTags=incompatible_s390x
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel83
         --compiler_type=gcc
@@ -229,7 +231,7 @@ buildvariants:
         archive-mongocryptd-stripped
         archive-mongocryptd-debug
       release_buid: true
-      test_flags: --excludeWithAnyTags=incompatible_with_s390x
+      test_flags: --excludeWithAnyTags=incompatible_s390x
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel9
         --compiler_type=gcc
