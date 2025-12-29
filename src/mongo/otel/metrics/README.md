@@ -46,7 +46,7 @@ Follow [OpenTelemetry naming conventions](https://opentelemetry.io/docs/specs/se
 
 ### Available Units
 
-The [`MetricUnit` enum](https://github.com/mongodb/mongo/blob/a013280e0e5dc374f78adbc4cb68b4d190c1d9ed/src/mongo/otel/metrics/metric_units.h#L37) provides standard units. Please add any additional units to the enum as they are needed.
+The `MetricUnit` enum provides standard units. Please add any additional units to the enum as they are needed.
 
 ## Metric Types
 

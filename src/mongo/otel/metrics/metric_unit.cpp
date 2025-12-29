@@ -26,17 +26,39 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/otel/metrics/metric_units.h"
 
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/otel/metrics/metric_unit.h"
+
+#include "mongo/logv2/log.h"
 
 namespace mongo::otel::metrics {
-TEST(ToStringTest, Works) {
-    ASSERT_EQ(toString(MetricUnit::kSeconds), "seconds");
-}
 
-DEATH_TEST(ToStringDeathTest, DiesOnBadUnit, "11494600") {
-    toString(static_cast<MetricUnit>(-1));
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+StringData toString(MetricUnit unit) {
+    switch (unit) {
+        // Time
+        case MetricUnit::kMicroseconds:
+            return "microseconds";
+        case MetricUnit::kMilliseconds:
+            return "milliseconds";
+        case MetricUnit::kSeconds:
+            return "seconds";
+
+        // Space
+        case MetricUnit::kBytes:
+            return "bytes";
+
+        // Database
+        case MetricUnit::kOperations:
+            return "operations";
+        case MetricUnit::kQueries:
+            return "queries";
+
+        // Networking
+        case MetricUnit::kConnections:
+            return "connections";
+    }
+    LOGV2_FATAL(11494600, "Unknown MetricUnit value", "value"_attr = static_cast<int>(unit));
 }
 }  // namespace mongo::otel::metrics

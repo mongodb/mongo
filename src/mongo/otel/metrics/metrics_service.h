@@ -33,7 +33,7 @@
 #include "mongo/config.h"
 #include "mongo/db/service_context.h"
 #include "mongo/otel/metrics/metric_names.h"
-#include "mongo/otel/metrics/metric_units.h"
+#include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/util/modules.h"

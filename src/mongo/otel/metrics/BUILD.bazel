@@ -65,7 +65,7 @@ mongo_cc_library(
         "metrics_service.cpp",
     ],
     deps = [
-        ":metric_units",
+        ":metric_unit",
         "//src/mongo/db:server_base",
     ] + select(
         {
@@ -102,16 +102,16 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_library(
-    name = "metric_units",
-    srcs = ["metric_units.cpp"],
+    name = "metric_unit",
+    srcs = ["metric_unit.cpp"],
     deps = ["//src/mongo:base"],
 )
 
 mongo_cc_unit_test(
-    name = "metric_units_test",
-    srcs = ["metric_units_test.cpp"],
-    tags = ["mongo_unittest_second_group"],
-    deps = [":metric_units"],
+    name = "metric_unit_test",
+    srcs = ["metric_unit_test.cpp"],
+    tags = ["mongo_unittest_first_group"],
+    deps = [":metric_unit"],
 )
 
 mongo_cc_unit_test(
@@ -138,7 +138,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_sixth_group"],
     target_compatible_with = OTEL_TARGET_COMPATIBLE_WITH,
     deps = [
-        ":metric_units",
+        ":metric_unit",
         "//src/third_party/opentelemetry-cpp/api",
     ],
 )
