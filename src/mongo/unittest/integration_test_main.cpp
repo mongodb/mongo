@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
         std::vector<std::string>(argv, argv + argc));
     progress.initialize();
     if (auto ec = progress.parseAndAcceptOptions())
-        std::quick_exit(static_cast<int>(*ec));
+        quickExit(static_cast<int>(*ec));
     setupSynchronousSignalHandlers();
     TestingProctor::instance().setEnabled(true);
     runGlobalInitializersOrDie(progress.args());

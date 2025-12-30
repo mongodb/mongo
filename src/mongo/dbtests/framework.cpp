@@ -59,6 +59,7 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
+#include "mongo/util/quick_exit.h"
 
 #include <cstdlib>
 #include <ctime>
@@ -82,7 +83,7 @@ unittest::MainProgress initializeDbTests(std::vector<std::string> argVec) {
         std::move(argVec));
     progress.initialize();
     if (auto ec = progress.parseAndAcceptOptions())
-        std::quick_exit(static_cast<int>(*ec));
+        quickExit(static_cast<int>(*ec));
     return progress;
 }
 
