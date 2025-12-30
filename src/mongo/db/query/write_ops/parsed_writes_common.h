@@ -133,12 +133,14 @@ StatusWith<std::unique_ptr<ParsedFindCommand>> parseWriteQueryToParsedFindComman
     if (auto& letParams = request.getLet()) {
         findCommand->setLet(*letParams);
     }
-    ParsedFindCommandParams params{.findCommand = std::move(findCommand),
-                                   .extensionsCallback = extensionsCallback,
-                                   .allowedFeatures = allowedMatcherFeatures,
-                                   .projectionPolicies =
-                                       ProjectionPolicies::findProjectionPolicies()};
-    return parsed_find_command::parse(expCtx, std::move(params));
+
+    return parsed_find_command::parse(
+        expCtx,
+        ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                .extensionsCallback = extensionsCallback,
+                                .allowedFeatures = allowedMatcherFeatures,
+                                .projectionPolicies =
+                                    ProjectionPolicies::findProjectionPolicies()});
 }
 
 /**
