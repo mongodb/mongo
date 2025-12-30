@@ -1497,7 +1497,7 @@ public:
                 Value{obj["str"]};
             }(),
             DBException,
-            16493);
+            ErrorCodes::BSONObjectTooLarge);
     }
 };
 
