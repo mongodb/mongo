@@ -64,8 +64,8 @@ TOOLCHAIN_MAP_V5 = {
     },
     "rhel9_s390x": {
         "platform_name": "rhel90-zseries",
-        "sha": "74a370c5e9b1027411c611985cf350437b27781a2caf7634b3cac4d4a2c306a1",
-        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-rhel90-zseries-868b3c714c67f4f245623d2f772d0fac95d936a2.tar.gz",
+        "sha": "60db7b6a8cb351aebe36665722e4624ea282429e7d1c1e704bde96006159cd77",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_toolchain-rhel90-zseries-d0c2e5e88069c3eb0f7bcd61bd317e288a3c917a.tar.gz",
     },
     "rhel9_x86_64": {
         "platform_name": "rhel90",
