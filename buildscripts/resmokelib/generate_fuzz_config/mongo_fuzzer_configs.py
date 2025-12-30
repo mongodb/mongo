@@ -357,6 +357,7 @@ def generate_mongod_parameters(rng):
         param: val
         for param, val in config_fuzzer_params["mongod"].items()
         if "startup" in val.get("fuzz_at", [])
+        and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
     }
 
     # Parameter sets with different behaviors.
@@ -417,6 +418,7 @@ def generate_mongod_extra_configs(rng):
     return {
         key: generate_normal_mongo_parameters(rng, value)
         for key, value in config_fuzzer_extra_configs["mongod"].items()
+        if not (value.get("enterprise_only", False) and "enterprise" not in config.MODULES)
     }
 
 
@@ -431,6 +433,7 @@ def generate_mongos_parameters(rng):
         param: val
         for param, val in config_fuzzer_params["mongos"].items()
         if "startup" in val.get("fuzz_at", [])
+        and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
     }
 
     return {key: generate_normal_mongo_parameters(rng, value) for key, value in params.items()}

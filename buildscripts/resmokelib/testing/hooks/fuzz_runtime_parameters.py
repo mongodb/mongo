@@ -103,6 +103,7 @@ class FuzzRuntimeParameters(interface.Hook):
         for cluster in self._fixture.get_testable_clusters():
             self._add_fixture(cluster)
 
+        from buildscripts.resmokelib import config
         from buildscripts.resmokelib.generate_fuzz_config.config_fuzzer_limits import (
             config_fuzzer_params,
         )
@@ -112,17 +113,21 @@ class FuzzRuntimeParameters(interface.Hook):
             param: val
             for param, val in config_fuzzer_params["mongod"].items()
             if "runtime" in val.get("fuzz_at", [])
+            and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
         }
         runtime_mongos_params = {
             param: val
             for param, val in config_fuzzer_params["mongos"].items()
             if "runtime" in val.get("fuzz_at", [])
+            and not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
         }
 
         # Get cluster parameters
-        cluster_params = dict(config_fuzzer_params["cluster"].items())
-
-        from buildscripts.resmokelib import config
+        cluster_params = {
+            param: val
+            for param, val in config_fuzzer_params["cluster"].items()
+            if not (val.get("enterprise_only", False) and "enterprise" not in config.MODULES)
+        }
 
         # Flow control-related parameters should only be fuzzed when enableFlowControl is set to True at startup.
         enableFlowControl = re.search(r"enableFlowControl:\s+(\w+)", config.MONGOD_SET_PARAMETERS)
@@ -132,7 +137,7 @@ class FuzzRuntimeParameters(interface.Hook):
             }
 
         auditingEnabled = config.MONGOD_EXTRA_CONFIG.get("auditRuntimeConfiguration", "off") == "on"
-        if not auditingEnabled:
+        if "auditConfig" in cluster_params and not auditingEnabled:
             # auditConfig requires auditing to be enabled, so we should not fuzz it if auditing is disabled.
             del cluster_params["auditConfig"]
 

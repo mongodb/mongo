@@ -744,6 +744,7 @@ config_fuzzer_params = {
             },
             "period": 10,
             "fuzz_at": ["cluster"],
+            "enterprise_only": True,
         },
     },
 }
@@ -752,13 +753,13 @@ config_fuzzer_extra_configs = {
     "mongod": {
         "directoryperdb": {"choices": [True, False]},
         "wiredTigerDirectoryForIndexes": {"choices": [True, False]},
-        "auditDestination": {"default": "console"},
-        "auditRuntimeConfiguration": {"choices": ["on", "off"]},
-        "auditSchema": {"choices": ["mongo", "OCSF"]},
+        "auditDestination": {"default": "console", "enterprise_only": True},
+        "auditRuntimeConfiguration": {"choices": ["on", "off"], "enterprise_only": True},
+        "auditSchema": {"choices": ["mongo", "OCSF"], "enterprise_only": True},
     },
     "mongos": {
-        "auditDestination": {"default": "console"},
-        "auditRuntimeConfiguration": {"choices": ["on", "off"]},
-        "auditSchema": {"choices": ["mongo", "OCSF"]},
+        "auditDestination": {"default": "console", "enterprise_only": True},
+        "auditRuntimeConfiguration": {"choices": ["on", "off"], "enterprise_only": True},
+        "auditSchema": {"choices": ["mongo", "OCSF"], "enterprise_only": True},
     },
 }
