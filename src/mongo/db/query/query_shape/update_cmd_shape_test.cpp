@@ -744,6 +744,7 @@ TEST_F(UpdateCmdShapeTest, PushModifierUpdateShape) {
                             $sort: { score: 1, name: -1 }
                         }
                     },
+                    $push: { quizzesDollarPrefix: { $each: [ { id: 7, $score: 8 } ], $sort: {"$score": 1 } } },
                     $push: {}
                 },
                 multi: false, 
@@ -759,6 +760,7 @@ TEST_F(UpdateCmdShapeTest, PushModifierUpdateShape) {
             u: {
                 $push: { 
                     quizzes: { $each: [ { "?": "?" } ], $sort: { score: 1, name: -1 } }, 
+                    quizzesDollarPrefix: { $each: [ { "?": "?" } ], $sort: { "$score": 1 } },
                     scoresSinglePush: { $each: [ 1 ] }, 
                     scoresToSlice: { $each: [ 1 ], $slice: 1 }, 
                     scoresWithPostion: { $each: [ 1 ], $position: 1 }, 
@@ -779,6 +781,7 @@ TEST_F(UpdateCmdShapeTest, PushModifierUpdateShape) {
             u: {
                 $push: { 
                     quizzes: { $each: "?array<?object>", $sort: { score: 1, name: -1 } }, 
+                    quizzesDollarPrefix: { $each: "?array<?object>", $sort: { "$score": 1 } },
                     scoresSinglePush: { $each: "?array<?number>" }, 
                     scoresToSlice: { $each: "?array<?number>", $slice: "?number" }, 
                     scoresWithPostion: { $each: "?array<?number>", $position: "?number" }, 
@@ -799,6 +802,7 @@ TEST_F(UpdateCmdShapeTest, PushModifierUpdateShape) {
             u: {
                 $push: { 
                     "HASH<quizzes>": { $each: "?array<?object>", $sort: { "HASH<score>": 1, "HASH<name>": -1 } }, 
+                    "HASH<quizzesDollarPrefix>": { $each: "?array<?object>", $sort: { "HASH<$score>": 1 } },
                     "HASH<scoresSinglePush>": { $each: "?array<?number>" }, 
                     "HASH<scoresToSlice>": { $each: "?array<?number>", $slice: "?number" }, 
                     "HASH<scoresWithPostion>": { $each: "?array<?number>", $position: "?number" }, 

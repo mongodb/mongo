@@ -216,7 +216,8 @@ BSONObj PushNode::operatorValue(const SerializationOptions& opts) const {
                     while (i.more()) {
                         BSONElement e = i.next();
                         const auto name = e.fieldNameStringData();
-                        sortBuilder.append(opts.serializeFieldPath(name), e.number());
+                        // note: name is allowed to be $-prefixed so may fail FieldPath validation
+                        sortBuilder.append(opts.serializeFieldPathFromString(name), e.number());
                     }
                 }
             }

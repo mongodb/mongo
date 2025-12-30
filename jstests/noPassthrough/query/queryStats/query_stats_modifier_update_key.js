@@ -192,6 +192,73 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
                 keyFields: updateKeyFieldsRequired,
             });
         });
+
+        it("should validate modifier update on dollar-prefixed fields", function () {
+            // Similar query to modifierUpdateCommandObjComplex but with a $ prefix on every field name where one should be supported
+            const modifierUpdateCommandObjComplexDollarPrefix = {
+                update: collName,
+                updates: [
+                    {
+                        q: {v: {$gt: 5}},
+                        u: {
+                            $set: {
+                                "$item": "ABC123",
+                                "$info.publisher": "2222",
+                                "info.$publisher2": "3333",
+                                "$tags": ["software"],
+                                "ratings.1": {by: "xyz", "$rating": 3},
+                                "ratings.$2": {by: "uvw", rating: 4},
+                            },
+                            $unset: {"$tagsToRemove": 1},
+                            $rename: {"$oldName": "newName"},
+                            $setOnInsert: {"$newInsert": true},
+                            $currentDate: {"$lastModified": {$type: "timestamp"}},
+                            $bit: {"$expdata": {and: NumberInt(10)}},
+                            $min: {"$minPrice": 5},
+                            $max: {"$maxPrice": 500},
+                            $mul: {"$quantity": 2},
+                            $addToSet: {
+                                "$scores": {
+                                    $each: [50, 60, 70],
+                                },
+                            },
+                            $push: {
+                                "$scoresSingleAdd": 89,
+                                "$tests": {$each: [40, 60], $sort: 1},
+                                "$scoresWithPostion": {$each: [50, 60, 70], $position: 0},
+                                "$scoresToSlice": {$each: [80, 78, 86], $slice: -5},
+                                "$quizzes": {
+                                    $each: [
+                                        {id: 3, "$score": 8},
+                                        {id: 4, "$score": 7},
+                                        {id: 5, "$score": 6},
+                                    ],
+                                    $sort: {"$score": 1},
+                                },
+                            },
+                            $pop: {"$tagsToPop": -1},
+                            $pull: {
+                                "$instock": {$elemMatch: {qty: {$gt: 10, $lte: 20}}},
+                                "$pulledObjects": {testField: 6},
+                                "$arrayToPullFrom": 6,
+                                "$results": {answers: {$elemMatch: {q: 2, a: {$gte: 8}}}}, // note: $answers isn't expected to work here
+                                "$resultsWithoutPredicate": {q: 2, a: 8},
+                                "where.to.$begin": {"$regex": "^thestart", "$options": ""},
+                            },
+                            $pullAll: {"$colorsToRemove": ["red", "blue"]},
+                        },
+                    },
+                ],
+            };
+
+            runCommandAndValidateQueryStats({
+                coll: coll,
+                commandName: "update",
+                commandObj: modifierUpdateCommandObjComplexDollarPrefix,
+                shapeFields: queryShapeUpdateFieldsRequired,
+                keyFields: updateKeyFieldsRequired,
+            });
+        });
     });
 }
 
