@@ -367,26 +367,18 @@ void ServiceEntryPointTestFixture::testReadConcernClientUnspecifiedNoDefault() {
     ASSERT_EQ(countTextFormatLogLinesContaining("Applying default readConcern on command"), 1);
 }
 
-void ServiceEntryPointTestFixture::testReadConcernClientUnspecifiedWithDefault(
-    bool expectClusterDefault) {
-    // When the read concern is not specified:
-    //   * In the router and replica set cases, a cluster-wide default read concern applies
-    //   * In the shard server case, an implicit default applies.
+void ServiceEntryPointTestFixture::testReadConcernClientUnspecifiedWithDefault() {
+    // When the read concern is not specified, a cluster-wide default read concern applies
     const auto cmdBSON = BSON(TestCmdSucceedsDefaultRCPermitted::kCommandName << 1);
     auto opCtx = makeOperationContext();
     setDefaultReadConcern(opCtx.get(), repl::ReadConcernArgs::kAvailable);
     auto dbResponse = runCommandTestWithResponse(cmdBSON, opCtx.get());
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx.get());
 
-    if (expectClusterDefault) {
-        ASSERT_EQ(readConcernArgs.getLevel(), repl::ReadConcernArgs::kAvailable.getLevel());
-        ASSERT_EQ(readConcernArgs.getProvenance(),
-                  ReadWriteConcernProvenance(ReadWriteConcernProvenanceSourceEnum::customDefault));
-        ASSERT_EQ(countTextFormatLogLinesContaining("Applying default readConcern on command"), 1);
-    } else {
-        ASSERT(readConcernArgs.isImplicitDefault());
-        ASSERT_EQ(countTextFormatLogLinesContaining("Applying default readConcern on command"), 0);
-    }
+    ASSERT_EQ(readConcernArgs.getLevel(), repl::ReadConcernArgs::kAvailable.getLevel());
+    ASSERT_EQ(readConcernArgs.getProvenance(),
+              ReadWriteConcernProvenance(ReadWriteConcernProvenanceSourceEnum::customDefault));
+    ASSERT_EQ(countTextFormatLogLinesContaining("Applying default readConcern on command"), 1);
 }
 
 void ServiceEntryPointTestFixture::testReadConcernClientSuppliedLevelNotAllowed(
@@ -515,20 +507,13 @@ void ServiceEntryPointTestFixture::testWriteConcernClientUnspecifiedNoDefault() 
     runWriteConcernTestExpectImplicitDefault(opCtx.get());
 }
 
-void ServiceEntryPointTestFixture::testWriteConcernClientUnspecifiedWithDefault(
-    bool expectClusterDefault) {
-    // When the write concern is not specified:
-    //   * In the router and replica set cases, a cluster-wide default write concern applies
-    //   * In the shard server case, an implicit default applies.
+void ServiceEntryPointTestFixture::testWriteConcernClientUnspecifiedWithDefault() {
+    // When the write concern is not specified, a cluster-wide default write concern applies
     auto opCtx = makeOperationContext();
     auto defaultWCObj = BSON("w" << "majority"
                                  << "wtimeout" << 500);
     setDefaultWriteConcern(opCtx.get(), defaultWCObj);
-    if (expectClusterDefault) {
-        runWriteConcernTestExpectClusterDefault(opCtx.get());
-    } else {
-        runWriteConcernTestExpectImplicitDefault(opCtx.get());
-    }
+    runWriteConcernTestExpectClusterDefault(opCtx.get());
 }
 
 void ServiceEntryPointTestFixture::runWriteConcernTestExpectImplicitDefault(

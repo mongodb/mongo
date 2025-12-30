@@ -70,3 +70,6 @@ filters:
   - "startup_with_all_configs_down.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "shard_identity_rollback.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
