@@ -82,7 +82,8 @@ constexpr std::size_t kDefaultNumberOfStripes = 32;
  */
 void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
                                 WriteBatch& batch,
-                                Bucket& bucket) {
+                                Bucket& bucket,
+                                const StringDataComparator* comparator) {
     invariant(batch.commitRights.load());
     batch.numPreviouslyCommittedMeasurements = bucket.numCommittedMeasurements;
 
@@ -105,8 +106,7 @@ void prepareWriteBatchForCommit(TrackingContexts& trackingContexts,
     }
 
     for (const auto& doc : batch.measurements) {
-        bucket.minmax.update(
-            doc, bucket.key.metadata.getMetaField(), bucket.key.metadata.getComparator());
+        bucket.minmax.update(doc, bucket.key.metadata.getMetaField(), comparator);
     }
 
     const bool isUpdate = batch.numPreviouslyCommittedMeasurements > 0;
@@ -303,7 +303,8 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                          nss,
                                          insertContext,
                                          internal::AllowBucketCreation::kNo,
-                                         time);
+                                         time,
+                                         comparator);
     // If there are no open buckets for our measurement that we can use, we return a
     // reopeningContext to try reopening a closed bucket from disk.
     if (!bucket) {
@@ -326,7 +327,8 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                             internal::AllowBucketCreation::kNo,
                                             insertContext,
                                             *bucket,
-                                            time);
+                                            time,
+                                            comparator);
     // If our insert was successful, return a SuccessfulInsertion with our
     // WriteBatch.
     if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
@@ -353,7 +355,8 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                                internal::AllowBucketCreation::kNo,
                                                insertContext,
                                                *alternate,
-                                               time);
+                                               time,
+                                               comparator);
             if (auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
                 return SuccessfulInsertion{std::move(*batch),
                                            std::move(insertContext.closedBuckets)};
@@ -454,7 +457,8 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                                     internal::AllowBucketCreation::kYes,
                                                     insertContext,
                                                     bucket,
-                                                    time);
+                                                    time,
+                                                    comparator);
             auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
             invariant(batch);
             return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
@@ -475,7 +479,8 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                nss,
                                insertContext,
                                internal::AllowBucketCreation::kYes,
-                               time);
+                               time,
+                               comparator);
     invariant(bucket);
 
     auto insertionResult = insertIntoBucket(opCtx,
@@ -487,7 +492,8 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                             internal::AllowBucketCreation::kYes,
                                             insertContext,
                                             *bucket,
-                                            time);
+                                            time,
+                                            comparator);
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
     return SuccessfulInsertion{std::move(*batch), std::move(insertContext.closedBuckets)};
@@ -511,7 +517,8 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                nss,
                                insertContext,
                                internal::AllowBucketCreation::kYes,
-                               time);
+                               time,
+                               comparator);
     invariant(bucket);
 
     auto insertionResult = insertIntoBucket(opCtx,
@@ -523,7 +530,8 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                             internal::AllowBucketCreation::kYes,
                                             insertContext,
                                             *bucket,
-                                            time);
+                                            time,
+                                            comparator);
 
     auto* batch = get_if<std::shared_ptr<WriteBatch>>(&insertionResult);
     invariant(batch);
@@ -540,7 +548,8 @@ void waitToInsert(InsertWaiter* waiter) {
 
 Status prepareCommit(BucketCatalog& catalog,
                      const NamespaceString& nss,
-                     std::shared_ptr<WriteBatch> batch) {
+                     std::shared_ptr<WriteBatch> batch,
+                     const StringDataComparator* comparator) {
     auto getBatchStatus = [&] {
         return batch->promise.getFuture().getNoThrow().getStatus();
     };
@@ -578,7 +587,7 @@ Status prepareCommit(BucketCatalog& catalog,
         return getBatchStatus();
     }
 
-    prepareWriteBatchForCommit(catalog.trackingContexts, *batch, *bucket);
+    prepareWriteBatchForCommit(catalog.trackingContexts, *batch, *bucket, comparator);
 
     return Status::OK();
 }
@@ -788,7 +797,6 @@ BucketId extractBucketId(BucketCatalog& bucketCatalog,
                         BucketMetadata{getTrackingContext(bucketCatalog.trackingContexts,
                                                           TrackingScope::kOpenBucketsByKey),
                                        metadata,
-                                       comparator,
                                        options.getMetaField()}};
     return {collectionUUID, bucketOID, key.signature()};
 }
@@ -800,9 +808,8 @@ BucketKey::Signature getKeySignature(const TimeseriesOptions& options,
     TrackingContext trackingContext;
     auto metaField = options.getMetaField();
     const BSONElement metadata = metaField ? metadataObj[metaField.value()] : BSONElement();
-    const BucketKey key{
-        collectionUUID,
-        BucketMetadata{trackingContext, metadata, comparator, options.getMetaField()}};
+    const BucketKey key{collectionUUID,
+                        BucketMetadata{trackingContext, metadata, options.getMetaField()}};
     return key.signature();
 }
 
