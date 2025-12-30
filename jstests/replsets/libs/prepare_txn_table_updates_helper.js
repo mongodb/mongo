@@ -19,9 +19,7 @@ export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort) {
         const isMultiversion =
             Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
         if (isMultiversion) {
-            delete primaryTxnEntry.prepareTimestamp;
             delete primaryTxnEntry.affectedNamespaces;
-            delete secondaryTxnEntry.prepareTimestamp;
             delete secondaryTxnEntry.affectedNamespaces;
         }
 
@@ -31,7 +29,6 @@ export function checkPrepareTxnTableUpdate(primary, secondary, commitOrAbort) {
 
         if (FeatureFlagUtil.isPresentAndEnabled(primary, "PreparedTransactionsPreciseCheckpoints") && !isMultiversion) {
             assert.eq(primaryTxnEntry["affectedNamespaces"], expectedAffectedNamespaces);
-            assert.eq(primaryTxnEntry["prepareTimestamp"], preparedTs);
         }
     };
 

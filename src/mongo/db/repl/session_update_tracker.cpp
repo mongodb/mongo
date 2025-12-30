@@ -329,7 +329,6 @@ boost::optional<OplogEntry> SessionUpdateTracker::_createTransactionTableUpdateF
                     if (affectedNamespaces) {
                         MongoDSessionCatalog::addCanonicalizedNamespacesToTxnEntry(
                             *affectedNamespaces, newTxnRecord);
-                        newTxnRecord.setPrepareTimestamp(entry.getOpTime().getTimestamp());
                     }
                     if (entry.getPrevWriteOpTimeInTransaction()->isNull()) {
                         // The prepare oplog entry is the first operation of the transaction.

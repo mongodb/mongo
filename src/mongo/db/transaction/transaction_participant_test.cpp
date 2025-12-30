@@ -7979,10 +7979,6 @@ TEST_F(TxnParticipantTest, CanAddPreciseCheckpointFieldsForRecovery) {
     SessionTxnRecord sessionTxnRecord;
     txnParticipant.addPreparedTransactionPreciseCheckpointRecoveryFields(sessionTxnRecord);
 
-    ASSERT_EQ(sessionTxnRecord.getPrepareTimestamp(), timestamp);
-    ASSERT_EQ(sessionTxnRecord.getPrepareTimestamp(),
-              txnParticipant.getPrepareOpTime().getTimestamp());
-
     auto addedAffectedNamespaces = sessionTxnRecord.getAffectedNamespaces();
     ASSERT(addedAffectedNamespaces);
     std::sort(addedAffectedNamespaces->begin(), addedAffectedNamespaces->end());
@@ -8012,10 +8008,6 @@ TEST_F(TxnParticipantTest, CanAddPreciseCheckpointFieldsForRecoveryNoNamespaces)
 
     SessionTxnRecord sessionTxnRecord;
     txnParticipant.addPreparedTransactionPreciseCheckpointRecoveryFields(sessionTxnRecord);
-
-    ASSERT_EQ(sessionTxnRecord.getPrepareTimestamp(), timestamp);
-    ASSERT_EQ(sessionTxnRecord.getPrepareTimestamp(),
-              txnParticipant.getPrepareOpTime().getTimestamp());
 
     auto addedAffectedNamespaces = sessionTxnRecord.getAffectedNamespaces();
     ASSERT(addedAffectedNamespaces);

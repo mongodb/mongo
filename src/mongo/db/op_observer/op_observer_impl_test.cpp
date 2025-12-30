@@ -1924,10 +1924,7 @@ protected:
         }
 
         if (prepareTs) {
-            ASSERT(txnRecord.getPrepareTimestamp());
-            ASSERT_EQ(*txnRecord.getPrepareTimestamp(), *prepareTs);
-        } else {
-            ASSERT(!txnRecord.getPrepareTimestamp());
+            ASSERT_EQ(txnRecord.getLastWriteOpTime().getTimestamp(), *prepareTs);
         }
 
         if (numAffectedNamespaces) {

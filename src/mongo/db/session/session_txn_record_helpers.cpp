@@ -33,9 +33,6 @@ namespace mongo {
 
 SessionTxnRecordForPrepareRecovery::SessionTxnRecordForPrepareRecovery(SessionTxnRecord&& txnRecord)
     : SessionTxnRecord(std::move(txnRecord)) {
-    uassert(11372903,
-            "Can't reclaim a prepared transaction without a prepare timestamp",
-            SessionTxnRecord::getPrepareTimestamp());
     uassert(11372904,
             "Can't reclaim a prepared transaction without affected namespaces",
             SessionTxnRecord::getAffectedNamespaces());
@@ -48,7 +45,7 @@ SessionTxnRecordForPrepareRecovery::SessionTxnRecordForPrepareRecovery(SessionTx
 }
 
 Timestamp SessionTxnRecordForPrepareRecovery::getPrepareTimestamp() const {
-    return *SessionTxnRecord::getPrepareTimestamp();
+    return SessionTxnRecord::getLastWriteOpTime().getTimestamp();
 }
 
 const std::vector<NamespaceString>& SessionTxnRecordForPrepareRecovery::getAffectedNamespaces()

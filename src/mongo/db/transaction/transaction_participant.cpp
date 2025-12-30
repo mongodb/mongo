@@ -3940,10 +3940,6 @@ void TransactionParticipant::Participant::addPreparedTransactionPreciseCheckpoin
     SessionTxnRecord& sessionTxnRecord) const {
     MongoDSessionCatalog::addCanonicalizedNamespacesToTxnEntry(affectedNamespaces(),
                                                                sessionTxnRecord);
-
-    auto prepareOpTime = getPrepareOpTime();
-    invariant(!prepareOpTime.isNull());
-    sessionTxnRecord.setPrepareTimestamp(prepareOpTime.getTimestamp());
 }
 
 void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(

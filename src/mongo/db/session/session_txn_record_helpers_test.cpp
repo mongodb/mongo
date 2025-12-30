@@ -39,20 +39,6 @@ namespace {
 
 TEST(SessionTxnRecordForPrepareRecoveryTest, ValidatesNecessaryFields) {
     {
-        // Create a session txn record without a prepare timestamp.
-        SessionTxnRecord txnRecord;
-        txnRecord.setState(DurableTxnStateEnum::kPrepared);
-        txnRecord.setSessionId(makeLogicalSessionIdForTest());
-        txnRecord.setTxnNum(11);
-        txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(1, 0), 0));
-        txnRecord.setLastWriteDate(Date_t::now());
-        txnRecord.setAffectedNamespaces({{}});
-
-        ASSERT_THROWS_CODE(
-            SessionTxnRecordForPrepareRecovery(std::move(txnRecord)), AssertionException, 11372903);
-    }
-
-    {
         // Create a session txn record without affectedNamespaces.
         SessionTxnRecord txnRecord;
         txnRecord.setState(DurableTxnStateEnum::kPrepared);
@@ -60,7 +46,6 @@ TEST(SessionTxnRecordForPrepareRecoveryTest, ValidatesNecessaryFields) {
         txnRecord.setTxnNum(11);
         txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(1, 0), 0));
         txnRecord.setLastWriteDate(Date_t::now());
-        txnRecord.setPrepareTimestamp(Timestamp(1, 0));
 
         ASSERT_THROWS_CODE(
             SessionTxnRecordForPrepareRecovery(std::move(txnRecord)), AssertionException, 11372904);
@@ -73,7 +58,6 @@ TEST(SessionTxnRecordForPrepareRecoveryTest, ValidatesNecessaryFields) {
         txnRecord.setTxnNum(11);
         txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(1, 0), 0));
         txnRecord.setLastWriteDate(Date_t::now());
-        txnRecord.setPrepareTimestamp(Timestamp(1, 0));
         txnRecord.setAffectedNamespaces({{}});
 
         ASSERT_THROWS_CODE(
@@ -88,12 +72,25 @@ TEST(SessionTxnRecordForPrepareRecoveryTest, ValidatesNecessaryFields) {
         txnRecord.setTxnNum(11);
         txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(1, 0), 0));
         txnRecord.setLastWriteDate(Date_t::now());
-        txnRecord.setPrepareTimestamp(Timestamp(1, 0));
         txnRecord.setAffectedNamespaces({{}});
 
         ASSERT_THROWS_CODE(
             SessionTxnRecordForPrepareRecovery(std::move(txnRecord)), AssertionException, 11372906);
     }
+}
+
+TEST(SessionTxnRecordForPrepareRecoveryTest, PrepareTimestampEqualsLastWriteOpTimestamp) {
+    SessionTxnRecord txnRecord;
+    txnRecord.setState(DurableTxnStateEnum::kPrepared);
+    txnRecord.setSessionId(makeLogicalSessionIdForTest());
+    txnRecord.setTxnNum(11);
+    txnRecord.setLastWriteOpTime(repl::OpTime(Timestamp(1, 0), 0));
+    txnRecord.setLastWriteDate(Date_t::now());
+    txnRecord.setAffectedNamespaces({{}});
+
+    SessionTxnRecordForPrepareRecovery txnRecordForRecovery(std::move(txnRecord));
+    ASSERT_EQ(txnRecordForRecovery.getPrepareTimestamp(),
+              txnRecord.getLastWriteOpTime().getTimestamp());
 }
 
 }  // namespace

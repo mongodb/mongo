@@ -52,14 +52,12 @@ function doTest(commitOrAbort) {
     const isMultiversion =
         Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet) || Boolean(TestData.multiversionBinVersion);
     if (isMultiversion) {
-        delete txnEntry.prepareTimestamp;
         delete txnEntry.affectedNamespaces;
     }
 
     assert.soonNoExcept(() => {
         const secondaryTxnEntry = secondary.getDB("config").transactions.findOne();
         if (isMultiversion) {
-            delete secondaryTxnEntry.prepareTimestamp;
             delete secondaryTxnEntry.affectedNamespaces;
         }
         assert.eq(secondaryTxnEntry, txnEntry, tojson(secondaryTxnEntry));
