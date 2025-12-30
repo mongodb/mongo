@@ -99,6 +99,12 @@
 				}
 			},
 		],
+		"clangd.arguments": [
+			"-j=4",
+			"--background-index-priority=low",
+			"--pch-storage=disk",
+			"--malloc-trim",
+		],
 	},
 	"extensions": {
 		"recommendations": [
