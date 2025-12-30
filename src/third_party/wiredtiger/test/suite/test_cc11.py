@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import time
+import time, wttest
 from helper_disagg import DisaggConfigMixin, disagg_test_class, gen_disagg_storages
 from test_cc01 import test_cc_base
 from wiredtiger import stat
@@ -41,6 +41,7 @@ class test_cc11(DisaggConfigMixin, test_cc_base):
 
     conn_config = 'cache_size=10MB,page_delta=(delta_pct=100),disaggregated=(role="follower"),checkpoint_cleanup=[wait=1,file_wait_ms=0],'
 
+    @wttest.skip_for_hook("tiered", "Cannot run tiered storage in disagg mode")
     def test_cc11(self):
         # Create a table.
         create_params = 'key_format=i,value_format=S'

@@ -108,6 +108,38 @@ def unpack_int(b: bytes) -> tuple[int, bytes]:
         sz = get_bits(marker, 4)
         return (POS_2BYTE_MAX + 1 + get_int(b[1:], sz), b[sz+1:])
 
+def unpack_4b_array(data: bytes, count: int) -> list[int]:
+    """
+    Decode a byte sequence into an array of small unsigned integers.
+    """
+    result = []
+    n = 0
+    shift = 0
+
+    def decode_chunk(chunk: int) -> bool:
+        """Process the next chunk and return the value."""
+        nonlocal n, shift
+        val = chunk & 0b0111  # Get the last 3 bits
+        if shift:
+            val = (val + 1) << shift
+        n += val  # Use "+" rather than "|", since we can carry bits from "+1"
+        shift += 3
+        return bool(chunk & 0b1000)
+
+    for byte in data:
+        for chunk in (byte & 0b1111, byte >> 4):
+            if not decode_chunk(chunk):
+                result.append(n)
+                if (count := count - 1) <= 0:
+                    return result
+                n, shift = 0, 0
+
+    if n or shift:
+        raise ValueError("Incomplete data: not enough bits to decode the last integer")
+    if count > 0:
+        raise ValueError(f"Too many integers requested: not enough data to decode all integers ({count} left)")
+
+    return result
 
 def decode_esc_hex(s: str) -> bytes:
     '''
@@ -287,3 +319,7 @@ def binary_to_pretty_string(b, per_line=16, line_prefix='  ', start_with_line_pr
             result += '   '
     result += '  ' + printable
     return result
+
+# Show an integer as decimal and hex
+def d_and_h(n):
+    return f'{n} (0x{n:x})'

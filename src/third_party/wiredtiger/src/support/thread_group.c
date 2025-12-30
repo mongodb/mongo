@@ -282,7 +282,7 @@ __wt_thread_group_create(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, const
 
     __wt_verbose(session, WT_VERB_THREAD_GROUP, "Creating thread group: %s", name);
 
-    WT_RET(__wt_rwlock_init(session, &group->lock));
+    WT_ERR(__wt_rwlock_init(session, &group->lock));
     WT_ERR(__wt_cond_alloc(session, "thread group cond", &group->wait_cond));
     cond_alloced = true;
 

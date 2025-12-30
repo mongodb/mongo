@@ -152,11 +152,11 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool search_operation)
         return (false);
 
     /*
-     * XXX No fast-path searches at read-committed isolation. Underlying transactional functions
-     * called by the fast and slow path search code handle transaction IDs differently, resulting in
-     * different search results at read-committed isolation. This makes no difference for the update
-     * functions, but in the case of a search, we will see different results based on the cursor's
-     * initial location. See WT-5134 for the details.
+     * FIXME-WT-5147 No fast-path searches at read-committed isolation. Underlying transactional
+     * functions called by the fast and slow path search code handle transaction IDs differently,
+     * resulting in different search results at read-committed isolation. This makes no difference
+     * for the update functions, but in the case of a search, we will see different results based on
+     * the cursor's initial location.
      */
     if (search_operation && session->txn->isolation == WT_ISO_READ_COMMITTED)
         return (false);

@@ -32,7 +32,7 @@
 # see "wt dump" for that.  But this is standalone (doesn't require linkage with any WT
 # libraries), and may be useful as 1) a learning tool 2) quick way to hack/extend dumping.
 
-import codecs, io, os, re, sys, traceback, pprint
+import codecs, io, os, re, sys, traceback, pprint, json
 from py_common import binary_data, btree_format
 from dataclasses import dataclass
 import typing
@@ -260,7 +260,7 @@ def raw_bytes(b):
         val, s = binary_data.unpack_int(s)
         if result != '':
             result += ' '
-        result += f'<packed {d_and_h(val)}>'
+        result += f'<packed {binary_data.d_and_h(val)}>'
     if len(s) == 0:
         return result
 
@@ -274,10 +274,6 @@ def raw_bytes(b):
 
     # The earlier steps failed, so it must be binary data
     return binary_to_pretty_string(b, start_with_line_prefix=False)
-
-# Show an integer as decimal and hex
-def d_and_h(n):
-    return f'{n} (0x{n:x})'
 
 def dumpraw(p, b, pos):
     savepos = b.tell()
@@ -507,12 +503,6 @@ def block_decode(p, b, nbytes, opts):
 
     # Skip the rest if we don't want to display the data
     skip_data = opts.skip_data
-    if opts.disagg and blockhead.flags & btree_format.BlockDisaggFlags.WT_BLOCK_DISAGG_COMPRESSED:
-        p.rint(f'? the block is compressed, skipping payload')
-        skip_data = True
-    if opts.disagg and blockhead.flags & btree_format.BlockDisaggFlags.WT_BLOCK_DISAGG_ENCRYPTED:
-        p.rint(f'? the block is encrypted, skipping payload')
-        skip_data = True
 
     if skip_data:
         b.seek(disk_pos + disk_size)
@@ -597,7 +587,7 @@ def block_decode(p, b, nbytes, opts):
         p.rint_v(binary_to_pretty_string(payload_data))
     elif pagehead.type == btree_format.PageType.WT_PAGE_ROW_INT or \
         pagehead.type == btree_format.PageType.WT_PAGE_ROW_LEAF:
-        row_decode(p, b_page, pagehead, blockhead, pagestats, opts)
+        row_decode(p, b_page, pagehead, pagestats, opts)
     elif pagehead.type == btree_format.PageType.WT_PAGE_OVFL:
         # Use b_page.read() so that we can also print the raw bytes in the split mode
         p.rint_v(raw_bytes(b_page.read(len(payload_data))))
@@ -607,8 +597,8 @@ def block_decode(p, b, nbytes, opts):
 
     outfile_stats_end(opts, pagehead, blockhead, pagestats)
 
-# Hacking this up so we count timestamps and txns
-def row_decode(p, b, pagehead, blockhead, pagestats, opts):
+# Decode the contents of a cell 
+def row_decode(p, b, pagehead, pagestats, opts):
     for cellnum in range(0, pagehead.entries):
         cellpos = b.tell()
         if cellpos >= pagehead.mem_size:
@@ -618,59 +608,38 @@ def row_decode(p, b, pagehead, blockhead, pagestats, opts):
 
         try:
             cell = btree_format.Cell.parse(b, True)
-
-            desc_str = f'desc: 0x{cell.descriptor:x} '
-            if cell.extra_descriptor != 0:
-                p.rint_v(desc_str + f'extra: 0x{cell.extra_descriptor:x}')
-                desc_str = ''
+            
+            p.rint_v(cell.descriptor_string())
+            if cell.has_timestamps():
                 process_timestamps(p, cell, pagestats)
-            if cell.run_length is not None:
-                p.rint_v(desc_str + f'runlength/addr: {d_and_h(cell.run_length)}')
-                desc_str = ''
-
-            s = '?'
-            if cell.is_address:
-                s = 'addr (leaf no-overflow) '
-            elif cell.is_key:
-                s = 'key '
-            elif cell.is_value:
-                s = 'val '
-            elif cell.is_unsupported:
-                p.rint(desc_str + ', celltype = {} ({}) not implemented' \
-                       .format(cell.cell_type.value, cell.cell_type.name))
-                desc_str = ''
-            else:
-                raise ValueError('Unexpected cell type')
-
-            if cell.is_overflow:
-                s = 'overflow ' + s
-            if cell.is_short:
-                s = 'short ' + s
-            if cell.prefix is not None:
-                s += 'prefix={}'.format(hex(cell.prefix))
-            if not cell.is_unsupported:
-                s += '{} bytes'.format(len(cell.data))
 
             if cell.is_key:
                 pagestats.num_keys += 1
                 pagestats.keys_sz += len(cell.data)
+            
+            # If the cell cannot be decoded as a valid type, dump the raw bytes and raise an error.
+            if not cell.is_valid_type():
+                dumpraw(p, b, cellpos)
+                raise ValueError('Unexpected cell type')
 
+            p.rint_v(cell.type_string())
+            
+            # Print the contents of the cell.
             try:
-                if s != '?':
-                    if (cell.is_value and opts.bson and have_bson):
-                        if (bson.is_valid(cell.data)):
-                            p.rint_v("cell is valid BSON")
-                            decoded_data = bson.BSON(cell.data).decode()
-                            p.rint_v(pprint.pformat(decoded_data, indent=2))
-                        else:
-                            p.rint_v("cannot decode cell as BSON")
-                            p.rint_v(f'{desc_str}{s}:')
-                            p.rint_v(raw_bytes(cell.data))
-                    else:
-                        p.rint_v(f'{desc_str}{s}:')
-                        p.rint_v(raw_bytes(cell.data))
+                # Attempt the decode the cell as BSON.
+                if (cell.is_value and opts.bson and have_bson):
+                    decoded_data = bson.BSON(cell.data).decode()
+                    p.rint_v(pprint.pformat(decoded_data, indent=2))
+                # If the cell is an address and we're in disagg mode, print the cell as a DisaggAddr
+                # type.
+                elif cell.is_address and opts.disagg:
+                    addr = btree_format.DisaggAddr.parse(cell.data)
+                    p.rint(json.dumps(addr.__dict__))
                 else:
-                    dumpraw(p, b, cellpos)
+                    p.rint_v(raw_bytes(cell.data))
+            except bson.InvalidBSON as e:
+                p.rint_v(f"cannot decode cell as BSON: {e}")
+                p.rint_v(raw_bytes(cell.data))
             except (IndexError, ValueError):
                 # FIXME-WT-13000 theres a bug in raw_bytes
                 pass
@@ -678,7 +647,7 @@ def row_decode(p, b, pagehead, blockhead, pagestats, opts):
         finally:
             p.end_cell()
 
-def extlist_decode(p, b, pagehead, blockhead, pagestats):
+def extlist_decode(p, b, pagehead):
     WT_BLOCK_EXTLIST_MAGIC = 71002       # from block.h
     # Written by block_ext.c
     okay = True
@@ -792,7 +761,7 @@ def wtdecode_file_object(b, opts, nbytes):
     outfile_header(opts)
 
     while (nbytes == 0 or startblock < nbytes) and (opts.pages == 0 or pagecount < opts.pages):
-        d_h = d_and_h(startblock)
+        d_h = binary_data.d_and_h(startblock)
         outfile_stats_start(opts, d_h)
         print('Decode at ' + d_h)
         b.seek(startblock)
@@ -805,7 +774,7 @@ def wtdecode_file_object(b, opts, nbytes):
             p.rint('ERROR: ' + str(e))
             exit(1)
         except Exception:
-            p.rint(f'ERROR decoding block at {d_and_h(startblock)}')
+            p.rint(f'ERROR decoding block at {binary_data.d_and_h(startblock)}')
             if opts.debug:
                 traceback.print_exception(*sys.exc_info())
         pos = b.tell()

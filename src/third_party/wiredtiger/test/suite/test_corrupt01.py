@@ -35,7 +35,7 @@ import wiredtiger
 # test_corrupt01.py
 # Test the verbose log messages in the event of a corrupted block. We should expect to see a dump
 # of the block bytes along with a dump of each checkpoints extent lists.
-# FIXME-WT-14867: Enable this test once disaggregated storage supports Verify.
+# FIXME-WT-15064: This test is disabled until we have a way to implement corruption tests for DisAgg.
 @wttest.skip_for_hook("disagg", "Verify is not supported with disaggregated storage (yet)")
 class test_corrupt01(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_corrupt01'

@@ -316,7 +316,7 @@ __evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     /*
      * Cache a history store cursor to avoid deadlock: if an eviction thread marks a file busy and
      * then opens a different file (in this case, the HS file), it can deadlock with a thread
-     * waiting for the first file to drain from the eviction queue. See WT-5946 for details.
+     * waiting for the first file to drain from the eviction queue.
      */
     WT_ERR(__wt_curhs_cache(session));
     if (__wt_atomic_load_bool_relaxed(&conn->evict_server_running) &&
@@ -1207,9 +1207,9 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 /*
  * Atomically decrement the evict-disabled count, without acquiring the eviction walk-lock. We can't
  * acquire that lock here because there's a potential deadlock. When acquiring exclusive eviction
- * access, we acquire the eviction walk-lock and then the eviction's pass-intr lock. The current
- * eviction implementation can hold the pass-intr lock and call into this function (see WT-3303 for
- * the details), which might deadlock with another thread trying to get exclusive eviction access.
+ * access, we acquire the eviction walk-lock and then the eviction's pass-intr lock. The eviction
+ * server can hold the pass-intr lock and call into this function, which might deadlock with another
+ * thread trying to get exclusive eviction access.
  */
 #if defined(HAVE_DIAGNOSTIC)
     {

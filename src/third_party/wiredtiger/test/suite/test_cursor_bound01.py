@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger
+import wiredtiger, wttest
 from helper_disagg import DisaggConfigMixin, gen_disagg_storages
 from wtscenario import make_scenarios
 from wtbound import bound_base
@@ -65,6 +65,7 @@ class test_cursor_bound01(bound_base, DisaggConfigMixin):
     def conn_extensions(self, extlist):
         DisaggConfigMixin.conn_extensions(self, extlist)
 
+    @wttest.skip_for_hook("tiered", "Cannot run tiered storage in disagg mode")
     def test_bound_api(self):
         if (self.key_format == 'r' and self.uri == 'layered:'):
             return

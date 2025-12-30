@@ -610,8 +610,8 @@ __recovery_set_checkpoint_snapshot(WT_SESSION_IMPL *session)
     /*
      * WiredTiger versions 10.0.1 onward have a valid checkpoint snapshot on-disk. There was a bug
      * in some versions of WiredTiger that are tagged with the 10.0.0 release, which saved the wrong
-     * checkpoint snapshot (see WT-8395), so we ignore the snapshot when it was created with one of
-     * those versions. Versions of WiredTiger prior to 10.0.0 never saved a checkpoint snapshot.
+     * checkpoint snapshot, so we ignore the snapshot when it was created with one of those
+     * versions. Versions of WiredTiger prior to 10.0.0 never saved a checkpoint snapshot.
      * Additionally the turtle file doesn't always exist (for example, backup doesn't include the
      * turtle file), so there isn't always a WiredTiger version available. If there is no version
      * available, assume that the snapshot is valid, otherwise restoring from a backup won't work.

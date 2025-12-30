@@ -423,7 +423,7 @@ __reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, u
     rec = WT_CLOCKDIFF_MS(rec_finish, rec_start);
 
     /*
-     * Sanity check timings (WT_DAY is in seconds, and we have milliseconds). FIXME WT-12192
+     * Sanity check timings (WT_DAY is in seconds, and we have milliseconds). FIXME-WT-12192
      * rec_hs_wrapup and rec_img_build should also have an assertion here.
      */
     WT_ASSERT(session, rec < WT_DAY * WT_THOUSAND);

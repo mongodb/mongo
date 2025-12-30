@@ -53,6 +53,8 @@ This provides an API similar to the C API, with the following modifications:
 %feature("autodoc", "0");
 
 %pythoncode %{
+import os
+import errno
 from packing import pack, unpack
 ## @endcond
 %}
@@ -113,26 +115,27 @@ from packing import pack, unpack
 	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
 	    SWIGTYPE_p___wt_connection, 0);
 }
+
+/*
+ * For Sessions and Cursors created in Python, each of WT_SESSION_IMPL
+ * and WT_CURSOR have a lang_private field that stores a pointer to the
+ * associated Python object.  {session,cursor}CloseHandler()
+ * functions reach into the associated Python object, set the 'this'
+ * attribute to None, and clear the lang_private field.
+ */
 %typemap(argout) WT_SESSION ** {
 	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
 	    SWIGTYPE_p___wt_session, 0);
 	if (*$1 != NULL) {
-		PY_CALLBACK *pcb;
-
-		if (__wt_calloc_def((WT_SESSION_IMPL *)(*$1), 1, &pcb) != 0)
-			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
-		else {
-			Py_XINCREF($result);
-			pcb->pyobj = $result;
-			((WT_SESSION_IMPL *)(*$1))->lang_private = pcb;
-		}
+		Py_XINCREF($result);
+		((WT_SESSION_IMPL *)(*$1))->lang_private = $result;
 	}
 }
+
 %typemap(argout) WT_CURSOR ** {
 	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
 	    SWIGTYPE_p___wt_cursor, 0);
 	if (*$1 != NULL) {
-		PY_CALLBACK *pcb;
 		uint64_t json, version_cursor;
 
 		json = (*$1)->flags & WT_CURSTD_DUMP_JSON;
@@ -150,13 +153,8 @@ from packing import pack, unpack
 		PyObject_SetAttrString($result, "value_format",
 		    PyString_InternFromString((*$1)->value_format));
 
-		if (__wt_calloc_def((WT_SESSION_IMPL *)(*$1)->session, 1, &pcb) != 0)
-			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
-		else {
-			Py_XINCREF($result);
-			pcb->pyobj = $result;
-			(*$1)->lang_private = pcb;
-		}
+		Py_XINCREF($result);
+		(*$1)->lang_private = $result;
 	}
 }
 
@@ -466,10 +464,13 @@ __wt_get_verbose_categories(const WT_NAME_FLAG **catp, size_t *countp);
 
 		@copydoc class::method'''
 		try:
-			self._freecb()
-			return $action(self, *args)
-		finally:
+			ret = $action(self, *args)
 			self.this = None
+			return ret
+		except _wiredtiger.WiredTigerError as err:
+			if str(err) != os.strerror(errno.EBUSY):
+				self.this = None
+			raise
 %}
 %enddef
 DESTRUCTOR(__wt_connection, close)
@@ -531,23 +532,11 @@ DESTRUCTOR(__wt_file_system, fs_terminate)
 #define WT_SESSION_CLOSED		WT_SESSION
 #define WT_CONNECTION_CLOSED		WT_CONNECTION
 
-/*
- * For Connections, Sessions and Cursors created in Python, each of
- * WT_CONNECTION_IMPL, WT_SESSION_IMPL and WT_CURSOR have a
- * lang_private field that store a pointer to a PY_CALLBACK, alloced
- * during the various open calls.  {conn,session,cursor}CloseHandler()
- * functions reach into the associated Python object, set the 'this'
- * asttribute to None, and free the PY_CALLBACK.
- */
-typedef struct {
-	PyObject *pyobj;	/* the python Session/Cursor object */
-} PY_CALLBACK;
-
 static PyObject *wtError;
 static PyObject *wtRollbackError;
 
-static int sessionFreeHandler(WT_SESSION *session_arg);
-static int cursorFreeHandler(WT_CURSOR *cursor_arg);
+static int sessionClearHandler(WT_SESSION *session);
+static int cursorClearHandler(WT_CURSOR *cursor);
 static int unpackBytesOrString(PyObject *obj, void **data, size_t *size);
 
 #define WT_GETATTR(var, parent, name)					\
@@ -1061,8 +1050,8 @@ typedef int int_void;
 		return ((ret != 0) ? ret : (cmp < 0) ? -1 : (cmp == 0) ? 0 : 1);
 	}
 
-	int _freecb() {
-		return (cursorFreeHandler($self));
+	int _clear() {
+		return (cursorClearHandler($self));
 	}
 
 	/*
@@ -1208,16 +1197,16 @@ typedef int int_void;
 
 %extend __wt_session {
 	int _log_printf(const char *msg) {
-		return self->log_printf(self, "%s", msg);
+		return self->log_printf($self, "%s", msg);
 	}
 
-	int _freecb() {
-		return (sessionFreeHandler(self));
+	int _clear() {
+		return (sessionClearHandler($self));
 	}
 };
 
 %extend __wt_connection {
-	int _freecb() {
+	int _clear() {
 		return (0);
 	}
 };
@@ -1690,7 +1679,8 @@ writeToPythonStream(const char *streamname, const char *message)
 	(void)PyObject_CallObject(flush_method, arglist2);
 	ret = 0;
 
-err:	Py_XDECREF(arglist2);
+err:
+	Py_XDECREF(arglist2);
 	Py_XDECREF(arglist);
 	Py_XDECREF(flush_method);
 	Py_XDECREF(write_method);
@@ -1723,22 +1713,20 @@ pythonMessageCallback(WT_EVENT_HANDLER *handler, WT_SESSION *session,
  * equivalent to 'pyobj.this = None' in Python.
  */
 static int
-pythonClose(PY_CALLBACK *pcb)
+pythonClose(PyObject *pyobj)
 {
-	int ret;
-
 	/*
 	 * Ensure the global interpreter lock is held - so that Python
 	 * doesn't shut down threads while we use them.
 	 */
 	SWIG_PYTHON_THREAD_BEGIN_BLOCK;
 
-	ret = 0;
-	if (PyObject_SetAttrString(pcb->pyobj, "this", Py_None) == -1) {
+	int ret = 0;
+	if (PyObject_SetAttrString(pyobj, "this", Py_None) == -1) {
 		SWIG_Error(SWIG_RuntimeError, "WT SetAttr failed");
 		ret = EINVAL;  /* any non-zero value will do. */
 	}
-	Py_XDECREF(pcb->pyobj);
+	Py_XDECREF(pyobj);
 
 	SWIG_PYTHON_THREAD_END_BLOCK;
 
@@ -1749,17 +1737,12 @@ pythonClose(PY_CALLBACK *pcb)
 static int
 sessionCloseHandler(WT_SESSION *session_arg)
 {
-	int ret;
-	PY_CALLBACK *pcb;
-	WT_SESSION_IMPL *session;
-
-	ret = 0;
-	session = (WT_SESSION_IMPL *)session_arg;
-	pcb = (PY_CALLBACK *)session->lang_private;
+	WT_SESSION_IMPL *session = (WT_SESSION_IMPL *)session_arg;
+	PyObject *pyobj = (PyObject *)session->lang_private;
 	session->lang_private = NULL;
-	if (pcb != NULL)
-		ret = pythonClose(pcb);
-	__wt_free(session, pcb);
+	int ret = 0;
+	if (pyobj != NULL)
+		ret = pythonClose(pyobj);
 
 	return (ret);
 }
@@ -1768,42 +1751,30 @@ sessionCloseHandler(WT_SESSION *session_arg)
 static int
 cursorCloseHandler(WT_CURSOR *cursor)
 {
-	int ret;
-	PY_CALLBACK *pcb;
-
-	ret = 0;
-	pcb = (PY_CALLBACK *)cursor->lang_private;
+	PyObject *pyobj = (PyObject *)cursor->lang_private;
 	cursor->lang_private = NULL;
-	if (pcb != NULL)
-		ret = pythonClose(pcb);
-	__wt_free(CUR2S(cursor), pcb);
+	int ret = 0;
+	if (pyobj != NULL)
+		ret = pythonClose(pyobj);
 
 	return (ret);
 }
 
 /* Session specific close handler. */
 static int
-sessionFreeHandler(WT_SESSION *session_arg)
+sessionClearHandler(WT_SESSION *session)
 {
-	PY_CALLBACK *pcb;
-	WT_SESSION_IMPL *session;
+	((WT_SESSION_IMPL *)session)->lang_private = NULL;
 
-	session = (WT_SESSION_IMPL *)session_arg;
-	pcb = (PY_CALLBACK *)session->lang_private;
-	session->lang_private = NULL;
-	__wt_free(session, pcb);
 	return (0);
 }
 
 /* Cursor specific close handler. */
 static int
-cursorFreeHandler(WT_CURSOR *cursor)
+cursorClearHandler(WT_CURSOR *cursor)
 {
-	PY_CALLBACK *pcb;
-
-	pcb = (PY_CALLBACK *)cursor->lang_private;
 	cursor->lang_private = NULL;
-	__wt_free(CUR2S(cursor), pcb);
+
 	return (0);
 }
 

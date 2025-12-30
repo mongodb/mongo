@@ -143,8 +143,9 @@
         if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL))                \
             __wt_op_timer_stop(s);                                                         \
         /*                                                                                 \
-         * We should not leave any history store cursor open when return from an api call. \
-         * However, we cannot do a stricter check before WT-7247 is resolved.              \
+         * FIXME-WT-7247 Ideally we would not leave any history store cursors open when we \
+         * return from an api call. But we cannot do a stricter check due to the way we    \
+         * nest calls to the API macros.                                                   \
          */                                                                                \
         WT_ASSERT(s, (s)->api_call_counter > 1 || (s)->hs_cursor_counter <= 3);            \
         /*                                                                                 \

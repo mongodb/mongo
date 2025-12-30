@@ -759,7 +759,8 @@ connection_runtime_config = [
                 type='boolean', undoc=True),
             Config('legacy_page_visit_strategy', 'false', r'''
                 Use legacy page visit strategy for eviction. Using this option is highly discouraged
-                as it will re-introduce the bug described in WT-9121.''',
+                as it will re-introduce a bug where eviction can fail to find older cache
+                content.''',
                 type='boolean'),
             Config('app_eviction_min_cache_fill_ratio', '0', r'''
                 This setting establishes a minimum cache fill ratio that must be met before

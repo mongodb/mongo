@@ -52,7 +52,10 @@ existing example in the source code and copy it.
 
   * Describe intended functionality
   * Not reference variable names where possible
-  * Not reference JIRA ticket numbers nor pull request numbers
+  * Not reference closed ticket numbers in Jira
+  * Not reference pull request numbers
+  * Use a keyword of the form ``FIXME-WT-12345`` when describing a deficiency or opportunity
+    for improvement that has an open WiredTiger Jira ticket
   * Be fully formed sentences
   * Use C-style with ``/* ... */`` and not C++ style double-slash comments
   * Single-line comments should place the delimiters on the same line as the text
