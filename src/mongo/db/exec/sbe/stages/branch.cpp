@@ -210,8 +210,9 @@ const SpecificStats* BranchStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-void BranchStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                               DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> BranchStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
     ret.emplace_back("{`");
     DebugPrinter::addBlocks(ret, _filter->debugPrint());
     ret.emplace_back("`}");
@@ -254,6 +255,7 @@ void BranchStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     }
 
     DebugPrinter::addBlocks(ret, _children[1]->debugPrint(debugPrintInfo));
+    return ret;
 }
 
 size_t BranchStage::estimateCompileTimeSize() const {

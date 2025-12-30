@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
@@ -49,11 +48,7 @@ class PlanStage;
  * stage printing functions.
  */
 struct DebugPrintInfo {
-    const bool printBytecode = false;
-    uint32_t callDepth = 0;
-    // Some aggregation pipeline stages manifest as more than one SBE stage. Provide a 50% buffer
-    // before capping the printing depth.
-    const uint32_t maxCallDepth = 3 * internalPipelineLengthLimit.loadRelaxed() / 2;
+    bool printBytecode = false;
 };
 
 class DebugPrinter {
@@ -132,7 +127,7 @@ public:
                    std::make_move_iterator(blocks.begin()),
                    std::make_move_iterator(blocks.end()));
     }
-    std::string print(const PlanStage& s, DebugPrintInfo& debugPrintInfo);
+    std::string print(const PlanStage& s, const DebugPrintInfo& debugPrintInfo);
     std::string print(const std::vector<Block>& blocks);
 
 private:

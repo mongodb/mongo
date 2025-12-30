@@ -226,8 +226,10 @@ const SpecificStats* HashJoinStage::getSpecificStats() const {
     return nullptr;
 }
 
-void HashJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                 DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> HashJoinStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
+
     if (_collatorSlot) {
         DebugPrinter::addIdentifier(ret, *_collatorSlot);
     }
@@ -286,6 +288,8 @@ void HashJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
+
+    return ret;
 }
 
 size_t HashJoinStage::estimateCompileTimeSize() const {

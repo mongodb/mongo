@@ -131,8 +131,10 @@ const SpecificStats* ProjectStage::getSpecificStats() const {
     return nullptr;
 }
 
-void ProjectStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> ProjectStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
+
     ret.emplace_back("[`");
     bool first = true;
     for (auto&& [slot, expr] : _projects) {
@@ -160,6 +162,7 @@ void ProjectStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     }
 
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
+    return ret;
 }
 
 size_t ProjectStage::estimateCompileTimeSize() const {

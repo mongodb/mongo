@@ -249,8 +249,10 @@ const SpecificStats* LoopJoinStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-void LoopJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                 DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> LoopJoinStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
+
     switch (_joinType) {
         case JoinType::Inner:
             ret.emplace_back(DebugPrinter::Block("inner"));
@@ -307,6 +309,8 @@ void LoopJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     if (debugPrintInfo.printBytecode) {
         PlanStage::debugPrintBytecode(ret, _predicateCode, "PREDICATE_CODE" /*title*/);
     }
+
+    return ret;
 }
 
 size_t LoopJoinStage::estimateCompileTimeSize() const {

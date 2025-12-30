@@ -740,8 +740,10 @@ void WindowStage::close() {
     _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
 }
 
-void WindowStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                               DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> WindowStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
+
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _currSlots.size(); ++idx) {
         if (idx) {
@@ -866,6 +868,8 @@ void WindowStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     }
 
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
+
+    return ret;
 }
 
 std::unique_ptr<PlanStageStats> WindowStage::getStats(bool includeDebugInfo) const {

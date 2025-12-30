@@ -148,8 +148,9 @@ const SpecificStats* AggProjectStage::getSpecificStats() const {
     return nullptr;
 }
 
-void AggProjectStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                   DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> AggProjectStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
 
     ret.emplace_back("[`");
     bool first = true;
@@ -190,6 +191,7 @@ void AggProjectStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     }
 
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
+    return ret;
 }
 
 size_t AggProjectStage::estimateCompileTimeSize() const {

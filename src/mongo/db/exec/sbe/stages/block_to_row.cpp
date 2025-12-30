@@ -261,8 +261,10 @@ const SpecificStats* BlockToRowStage::getSpecificStats() const {
     return nullptr;
 }
 
-void BlockToRowStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                   DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> BlockToRowStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
+
     ret.emplace_back(DebugPrinter::Block("blocks[`"));
     for (size_t i = 0; i < _blockSlotIds.size(); ++i) {
         if (i) {
@@ -285,6 +287,8 @@ void BlockToRowStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
+
+    return ret;
 }
 
 size_t BlockToRowStage::estimateCompileTimeSize() const {

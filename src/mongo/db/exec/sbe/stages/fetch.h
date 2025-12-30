@@ -127,8 +127,8 @@ public:
     void close() override;
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const override;
     const SpecificStats* getSpecificStats() const override;
-    void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                      DebugPrintInfo& debugPrintInfo) const final;
+    std::vector<DebugPrinter::Block> debugPrint(
+        const DebugPrintInfo& debugPrintInfo) const override;
     size_t estimateCompileTimeSize() const override;
 
 protected:

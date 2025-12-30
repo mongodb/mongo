@@ -56,9 +56,6 @@ public:
 
     size_t estimateCompileTimeSize() const final;
 
-    void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                      DebugPrintInfo& debugPrintInfo) const final {}
-
 protected:
     void doAttachCollectionAcquisition(const MultipleCollectionAccessor& mca) override {
         return;

@@ -357,8 +357,10 @@ const SpecificStats* MergeJoinStage::getSpecificStats() const {
     return nullptr;
 }
 
-void MergeJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                  DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> MergeJoinStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
+
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
 
     ret.emplace_back(DebugPrinter::Block("[`"));
@@ -423,6 +425,8 @@ void MergeJoinStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
+
+    return ret;
 }
 
 size_t MergeJoinStage::estimateCompileTimeSize() const {

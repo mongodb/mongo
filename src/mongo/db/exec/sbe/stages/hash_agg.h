@@ -123,8 +123,7 @@ public:
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     HashAggStats* getHashAggStats();
-    void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                      DebugPrintInfo& debugPrintInfo) const final;
+    std::vector<DebugPrinter::Block> debugPrint(const DebugPrintInfo& debugPrintInfo) const final;
     size_t estimateCompileTimeSize() const final;
 
 protected:

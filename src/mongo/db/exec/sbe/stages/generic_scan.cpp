@@ -143,10 +143,12 @@ std::unique_ptr<PlanStageStats> GenericScanStage::getStats(bool includeDebugInfo
     return ret;
 }
 
-void GenericScanStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                    DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> GenericScanStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint(debugPrintInfo);
     ret.emplace_back("generic");
     debugPrintShared(ret);
+    return ret;
 }
 }  // namespace sbe
 }  // namespace mongo

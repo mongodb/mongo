@@ -78,8 +78,7 @@ public:
         _cursor.reset();
     }
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
-    void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                      DebugPrintInfo& debugPrintInfo) const final;
+    std::vector<DebugPrinter::Block> debugPrint(const DebugPrintInfo& debugPrintInfo) const final;
 
 private:
     inline void scanResetState(bool reOpen) {

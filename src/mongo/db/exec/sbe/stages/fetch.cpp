@@ -313,8 +313,9 @@ const SpecificStats* FetchStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-void FetchStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                              DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> FetchStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
     DebugPrinter::addIdentifier(ret, _state->seekSlot);
     ret.emplace_back("=");
     DebugPrinter::addKeyword(ret, "seek");
@@ -377,6 +378,7 @@ void FetchStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
+    return ret;
 }
 
 size_t FetchStage::estimateCompileTimeSize() const {

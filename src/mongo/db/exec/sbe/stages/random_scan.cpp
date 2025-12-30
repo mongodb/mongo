@@ -130,10 +130,13 @@ std::unique_ptr<PlanStageStats> RandomScanStage::getStats(bool includeDebugInfo)
     return ret;
 }
 
-void RandomScanStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                   DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> RandomScanStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint(debugPrintInfo);
     DebugPrinter::addKeyword(ret, "random");
     debugPrintShared(ret);
+
+    return ret;
 }
 }  // namespace sbe
 }  // namespace mongo

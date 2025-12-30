@@ -123,7 +123,7 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
     return ret;
 }
 
-std::string DebugPrinter::print(const PlanStage& s, DebugPrintInfo& debugPrintInfo) {
+std::string DebugPrinter::print(const PlanStage& s, const DebugPrintInfo& debugPrintInfo) {
     return print(s.debugPrint(debugPrintInfo));
 }
 }  // namespace sbe

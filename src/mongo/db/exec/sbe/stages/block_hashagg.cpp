@@ -1026,8 +1026,10 @@ void BlockHashAggStage::close() {
     _memoryTracker.value().set(0);
 }
 
-void BlockHashAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                     DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> BlockHashAggStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
+
     ret.emplace_back(DebugPrinter::Block("bitset ="));
     DebugPrinter::addIdentifier(ret, _blockBitsetInSlotId);
 
@@ -1118,6 +1120,8 @@ void BlockHashAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
+
+    return ret;
 }
 
 size_t BlockHashAggStage::estimateCompileTimeSize() const {

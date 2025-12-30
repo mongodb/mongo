@@ -170,8 +170,10 @@ const SpecificStats* UniqueStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-void UniqueStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                               DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> UniqueStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
+
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _keySlots.size(); idx++) {
         if (idx) {
@@ -183,6 +185,8 @@ void UniqueStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
+
+    return ret;
 }
 
 size_t UniqueStage::estimateCompileTimeSize() const {
@@ -326,11 +330,15 @@ const SpecificStats* UniqueRoaringStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-void UniqueRoaringStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
-                                      DebugPrintInfo& debugPrintInfo) const {
+std::vector<DebugPrinter::Block> UniqueRoaringStage::debugPrint(
+    const DebugPrintInfo& debugPrintInfo) const {
+    auto ret = PlanStage::debugPrint(debugPrintInfo);
+
     DebugPrinter::addIdentifier(ret, _keySlot);
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
+
+    return ret;
 }
 
 size_t UniqueRoaringStage::estimateCompileTimeSize() const {
