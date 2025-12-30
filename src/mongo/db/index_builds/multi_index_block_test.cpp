@@ -42,9 +42,14 @@
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/exceptions.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -70,9 +75,19 @@ protected:
         return _indexer.get();
     }
 
+    // On teardown, asserts that the temporary tables for all given idents exist and that these
+    // temporary tables can be dropped if expected.
+    void validateTempTableIdentsOnTeardown(const std::vector<std::string>& idents,
+                                           bool droppable = false) {
+        _tempTableIdentsToValidate = idents;
+        _tempTableIdentsDroppable = droppable;
+    }
+
 private:
     NamespaceString _nss;
     std::unique_ptr<MultiIndexBlock> _indexer;
+    std::vector<std::string> _tempTableIdentsToValidate;
+    bool _tempTableIdentsDroppable;
 };
 
 void MultiIndexBlockTest::setUp() {
@@ -94,7 +109,81 @@ void MultiIndexBlockTest::setUp() {
 void MultiIndexBlockTest::tearDown() {
     _indexer = {};
 
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    for (const auto& ident : _tempTableIdentsToValidate) {
+        if (!storageEngine->getEngine()->hasIdent(
+                *shard_role_details::getRecoveryUnit(operationContext()), ident)) {
+            FAIL(std::string(str::stream() << "Expected storage engine to have ident: " << ident));
+        };
+
+        if (_tempTableIdentsDroppable) {
+            ASSERT_OK(storageEngine->immediatelyCompletePendingDrop(operationContext(), ident));
+            if (storageEngine->getEngine()->hasIdent(
+                    *shard_role_details::getRecoveryUnit(operationContext()), ident)) {
+                FAIL(std::string(str::stream()
+                                 << "Expected storage engine to have dropped ident: " << ident));
+            }
+        };
+    }
+
     CatalogTestFixture::tearDown();
+}
+
+// Check if there is a resumable index build temporary table with a persisted resume state that
+// corresponds to the given index build UUID. If one matches, the ident is returned; if there are
+// multiple matches or persisted states in the temporary table, this will assert.
+boost::optional<std::string> findPersistedResumeState(
+    OperationContext* opCtx,
+    const UUID& buildUUID,
+    boost::optional<IndexBuildPhaseEnum> phase = boost::none,
+    boost::optional<UUID> collectionUUID = boost::none) {
+    boost::optional<std::string> foundResumeIdent;
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const auto idents =
+        storageEngine->getEngine()->getAllIdents(*shard_role_details::getRecoveryUnit(opCtx));
+
+    for (auto it = idents.begin(); it != idents.end(); ++it) {
+        if (!ident::isInternalIdent(*it, kResumableIndexIdentStem)) {
+            continue;
+        }
+
+        std::unique_ptr<RecordStore> rs = storageEngine->getEngine()->getTemporaryRecordStore(
+            *shard_role_details::getRecoveryUnit(opCtx), *it, KeyFormat::Long);
+        auto cursor = rs->getCursor(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+        auto record = cursor->next();
+        if (!record) {
+            continue;
+        }
+
+        auto doc = record->data.toBson();
+        ResumeIndexInfo resumeInfo;
+        try {
+            resumeInfo = ResumeIndexInfo::parse(doc, IDLParserContext("ResumeIndexInfo"));
+        } catch (const DBException&) {
+            continue;
+        }
+
+        if (resumeInfo.getBuildUUID() != buildUUID) {
+            continue;
+        }
+
+        if (phase) {
+            ASSERT_EQUALS(*phase, resumeInfo.getPhase());
+        }
+
+        if (collectionUUID) {
+            ASSERT_EQUALS(*collectionUUID, resumeInfo.getCollectionUUID());
+        }
+
+        // Should not discover >1 recovery ident with a resumeInfo containing the same buildUUID, or
+        // multiple documents in the recovery ident.
+        ASSERT_FALSE(foundResumeIdent);
+        ASSERT_FALSE(cursor->next());
+
+        foundResumeIdent = *it;
+    }
+
+    return foundResumeIdent;
 }
 
 TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
@@ -198,6 +287,125 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
         /*restoreCursorAfterWrite*/ []() {}));
     auto isResumable = false;
     indexer->abortWithoutCleanup(operationContext(), coll.get(), isResumable);
+}
+
+TEST_F(MultiIndexBlockTest, PersistResumeStateOnAbortWithoutCleanup) {
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setTwoPhaseBuildUUID(buildUUID);
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo1 =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       std::string{"index-1"});
+    indexBuildInfo1.setInternalIdents(*storageEngine,
+                                      VersionContext::getDecoration(operationContext()));
+
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   {indexBuildInfo1},
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   MultiIndexBlock::InitMode::SteadyState,
+                                                   boost::none,
+                                                   /*generateTableWrites=*/true));
+    ASSERT_EQUALS(1U, specs.size());
+
+    auto isResumable = true;
+    indexer->abortWithoutCleanup(operationContext(), coll.get(), isResumable);
+    auto resumeIndexIdent = findPersistedResumeState(
+        operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, autoColl->uuid());
+    ASSERT_TRUE(resumeIndexIdent);
+
+    validateTempTableIdentsOnTeardown({*indexBuildInfo1.sideWritesIdent, *resumeIndexIdent});
+}
+
+TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndCommit) {
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setTwoPhaseBuildUUID(buildUUID);
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo1 =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       std::string{"index-1"});
+    indexBuildInfo1.setInternalIdents(*storageEngine,
+                                      VersionContext::getDecoration(operationContext()));
+
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   {indexBuildInfo1},
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   MultiIndexBlock::InitMode::SteadyState,
+                                                   boost::none,
+                                                   /*generateTableWrites=*/true));
+    ASSERT_EQUALS(1U, specs.size());
+
+    auto isResumable = true;
+    indexer->persistResumeState(operationContext(), coll.get(), isResumable);
+    auto resumeIndexIdent = findPersistedResumeState(
+        operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, autoColl->uuid());
+    ASSERT_TRUE(resumeIndexIdent);
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(indexer->commit(operationContext(),
+                                  coll.getWritableCollection(operationContext()),
+                                  MultiIndexBlock::kNoopOnCreateEachFn,
+                                  MultiIndexBlock::kNoopOnCommitFn));
+        wuow.commit();
+    }
+
+    validateTempTableIdentsOnTeardown({*indexBuildInfo1.sideWritesIdent, *resumeIndexIdent},
+                                      /*droppable=*/true);
+}
+
+TEST_F(MultiIndexBlockTest, PersistResumeStateOnRequestAndOnAbort) {
+    auto indexer = getIndexer();
+    const auto buildUUID = UUID::gen();
+    indexer->setTwoPhaseBuildUUID(buildUUID);
+
+    AutoGetCollection autoColl(operationContext(), getNSS(), MODE_X);
+    CollectionWriter coll(operationContext(), autoColl);
+
+    auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
+    auto indexBuildInfo1 =
+        IndexBuildInfo(BSON("key" << BSON("a" << 1) << "name"
+                                  << "a_1"
+                                  << "v" << static_cast<int>(IndexConfig::kLatestIndexVersion)),
+                       std::string{"index-1"});
+    indexBuildInfo1.setInternalIdents(*storageEngine,
+                                      VersionContext::getDecoration(operationContext()));
+
+    auto specs = unittest::assertGet(indexer->init(operationContext(),
+                                                   coll,
+                                                   {indexBuildInfo1},
+                                                   MultiIndexBlock::kNoopOnInitFn,
+                                                   MultiIndexBlock::InitMode::SteadyState,
+                                                   boost::none,
+                                                   /*generateTableWrites=*/true));
+    ASSERT_EQUALS(1U, specs.size());
+
+    auto isResumable = true;
+    indexer->persistResumeState(operationContext(), coll.get(), isResumable);
+    auto resumeIndexIdent = findPersistedResumeState(
+        operationContext(), buildUUID, IndexBuildPhaseEnum::kInitialized, autoColl->uuid());
+    ASSERT_TRUE(resumeIndexIdent);
+
+    indexer->abortWithoutCleanup(operationContext(), coll.get(), isResumable);
+    resumeIndexIdent = findPersistedResumeState(operationContext(), buildUUID);
+    ASSERT_TRUE(resumeIndexIdent);
+
+    validateTempTableIdentsOnTeardown({*indexBuildInfo1.sideWritesIdent, *resumeIndexIdent});
 }
 
 TEST_F(MultiIndexBlockTest, InitWriteConflictException) {

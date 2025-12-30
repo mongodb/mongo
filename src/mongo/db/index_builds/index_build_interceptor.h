@@ -89,7 +89,8 @@ public:
     }
 
     /**
-     * Keeps the temporary side writes and duplicate key constraint violations tables.
+     * Keeps the temporary side writes, duplicate key constraint violations, and skipped records
+     * tables.
      */
     void keepTemporaryTables();
 

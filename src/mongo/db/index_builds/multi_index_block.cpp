@@ -1291,6 +1291,26 @@ void MultiIndexBlock::appendBuildInfo(BSONObjBuilder* builder) const {
     builder->append("phaseStr", IndexBuildPhase_serializer(_phase));
 }
 
+void MultiIndexBlock::persistResumeState(OperationContext* opCtx,
+                                         const CollectionPtr& collection,
+                                         bool isResumable) {
+    if (!isResumable || _method != IndexBuildMethodEnum::kHybrid) {
+        return;
+    }
+
+    invariant(!_buildIsCleanedUp);
+    invariant(_buildUUID);
+
+    if (!_resumeStateTempRecordStore) {
+        _resumeStateTempRecordStore =
+            opCtx->getServiceContext()
+                ->getStorageEngine()
+                ->makeTemporaryRecordStoreForResumableIndexBuild(opCtx, KeyFormat::Long);
+    }
+
+    _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore.get());
+}
+
 void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                                           const CollectionPtr& collection,
                                           bool isResumable) {
@@ -1310,8 +1330,18 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
 
     if (isResumable && _method == IndexBuildMethodEnum::kHybrid) {
         invariant(_buildUUID);
-        _writeStateToDisk(opCtx, collection);
 
+        if (!_resumeStateTempRecordStore) {
+            _resumeStateTempRecordStore =
+                opCtx->getServiceContext()
+                    ->getStorageEngine()
+                    ->makeTemporaryRecordStoreForResumableIndexBuild(opCtx, KeyFormat::Long);
+        }
+
+        _writeStateToDisk(opCtx, collection, _resumeStateTempRecordStore.get());
+
+        // Ensure all temporary tables are kept around after destruction.
+        _resumeStateTempRecordStore->keep();
         for (auto& index : _indexes) {
             index.block->keepTemporaryTables();
         }
@@ -1321,28 +1351,42 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
 }
 
 void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
-                                        const CollectionPtr& collection) const {
+                                        const CollectionPtr& collection,
+                                        TemporaryRecordStore* tempRS) const {
     auto obj = _constructStateObject(opCtx, collection);
-    auto rs = opCtx->getServiceContext()
-                  ->getStorageEngine()
-                  ->makeTemporaryRecordStoreForResumableIndexBuild(opCtx, KeyFormat::Long);
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto status = rs->rs()->insertRecord(opCtx,
-                                         *shard_role_details::getRecoveryUnit(opCtx),
-                                         obj.objdata(),
-                                         obj.objsize(),
-                                         Timestamp());
-    if (!status.isOK()) {
+    auto truncateStatus =
+        tempRS->rs()->truncate(opCtx, *shard_role_details::getRecoveryUnit(opCtx));
+    if (!truncateStatus.isOK()) {
+        LOGV2_ERROR(11231501,
+                    "Index build: failed to truncate temporary record store for resumable state",
+                    "buildUUID"_attr = _buildUUID,
+                    "collectionUUID"_attr = _collectionUUID,
+                    logAttrs(collection->ns()),
+                    "details"_attr = obj,
+                    "error"_attr = truncateStatus);
+        dassert(truncateStatus,
+                str::stream() << "Failed to write resumable index build state to disk. UUID: "
+                              << _buildUUID);
+        return;
+    }
+
+    auto insertStatus = tempRS->rs()->insertRecord(opCtx,
+                                                   *shard_role_details::getRecoveryUnit(opCtx),
+                                                   obj.objdata(),
+                                                   obj.objsize(),
+                                                   Timestamp());
+    if (!insertStatus.isOK()) {
         LOGV2_ERROR(4841501,
                     "Index build: failed to write resumable state to disk",
                     "buildUUID"_attr = _buildUUID,
                     "collectionUUID"_attr = _collectionUUID,
                     logAttrs(collection->ns()),
                     "details"_attr = obj,
-                    "error"_attr = status.getStatus());
-        dassert(status,
+                    "error"_attr = insertStatus.getStatus());
+        dassert(insertStatus,
                 str::stream() << "Failed to write resumable index build state to disk. UUID: "
                               << _buildUUID);
         return;
@@ -1356,8 +1400,6 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
           "collectionUUID"_attr = _collectionUUID,
           logAttrs(collection->ns()),
           "details"_attr = obj);
-
-    rs->keep();
 }
 
 BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
