@@ -280,6 +280,8 @@ buildvariants:
         --linkstatic=False
         --remote_execution_priority=2
         --build_atlas=True
+        --dtlto=False
+        --pgo_profile_use=False
       clang_tidy_toolchain: v5
       compile_variant: *commit-queue
       resmoke_tests_tag_filter: ci-development-critical-single-variant
