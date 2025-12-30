@@ -68,20 +68,21 @@ public:
         : _options{std::move(options)}, _argVec{std::move(argVec)} {}
 
     /**
-     * Parses and removes flags relevant to test framework.
-     * Call this at the top of main and then call `parseAndAcceptOptions` later.
-     */
-    void initialize();
-
-    /**
      * The `uto` options are validated and take effect within this function.
      * The `argVec` should have already been parsed to produce `uto`. It isn't used
      * except for possible user-friendly messaging.
      * Returns an exit code if the program should immediately end.
+     * This is done as part of `testMain`, but is provided for standalone reuse.
      */
     boost::optional<ExitCode> parseAndAcceptOptions();
 
-    /** Call `initialize` and `parseAndAcceptOptions` before calling this. */
+    /**
+     * Parses and removes flags relevant to test framework.
+     * Call this at the top of main and then call `testMain` later.
+     */
+    void initialize();
+
+    /** Call `initializeMain` before calling this. */
     int test();
 
     std::vector<std::string>& args() {
