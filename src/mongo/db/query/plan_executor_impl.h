@@ -331,7 +331,8 @@ private:
     // oplog, nullptr otherwise.
     OplogWaitConfig* _oplogWaitConfig{nullptr};
 
-    // Function used to wait for oplog visibility in between snapshot abandonment and
+    // Function used to wait for oplog visibility in between snapshot abandonment and restoring the
+    // snapshot.
     std::function<void()> _afterSnapshotAbandonFn{nullptr};
 };
 
