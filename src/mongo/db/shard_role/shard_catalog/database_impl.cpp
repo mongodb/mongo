@@ -154,6 +154,64 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
     }
 }
 
+// Given the 'nss', the 'collectionOptions' of a collection, and whether or not the collection is
+// newly created, computes whether the collection should be created with
+// 'recordIdsReplicated':true'.
+bool shouldSetRecordIdsReplicated(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const CollectionOptions& collectionOptions,
+                                  bool isOriginalCollectionCreation) {
+    // The recordId is the '_id' for clustered collections - thus explicit recordId replication is
+    // unnecessary. Additionally, replicated recordIds only apply to explicitly replicated
+    // collections, since implicitly replicated collections don't guarantee CRUD ops are persisted
+    // through the oplog with the relevant 'rid' field.
+    if (bool collTypeSupportsExplicitlyReplicatedRecordIds = !collectionOptions.clusteredIndex &&
+            nss.isReplicated() && !nss.isImplicitlyReplicated();
+        !collTypeSupportsExplicitlyReplicatedRecordIds) {
+        return false;
+    }
+
+    const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    if (provider.shouldUseReplicatedRecordIds()) {
+        // The provider enforces all compatible collections must be created with replicated
+        // recordIds.
+        tassert(10985561,
+                str::stream() << "Replicated record IDs must be enabled with " << provider.name(),
+                gFeatureFlagRecordIdsReplicated.isEnabledUseLatestFCVWhenUninitialized(
+                    VersionContext::getDecoration(opCtx),
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+        LOGV2_DEBUG(10985560,
+                    2,
+                    "Collection will use recordIdsReplicated:true",
+                    "provider"_attr = provider.name(),
+                    "oldValue"_attr = collectionOptions.recordIdsReplicated,
+                    logAttrs(nss));
+        return true;
+    }
+
+    // Do not use replicated record id if not explicitly enabled.
+    if (!overrideRecordIdsReplicatedDefault.shouldFail()) {
+        return false;
+    }
+
+    // To prevent issues with upgrade/downgrade when FCV is uninitialized, only enforce replicated
+    // recordIds when the feature flag is already enabled on the last LTS release.
+    bool replicatedRidsFeatureIsEnabled =
+        gFeatureFlagRecordIdsReplicated.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    // TODO (SERVER-115758): Determine whether internal collections can set 'recordIdsReplicated'.
+    if (isOriginalCollectionCreation && !nss.isOnInternalDb() && replicatedRidsFeatureIsEnabled) {
+        LOGV2_DEBUG(8700501,
+                    0,
+                    "Collection will use recordIdsReplicated:true.",
+                    "oldValue"_attr = collectionOptions.recordIdsReplicated,
+                    logAttrs(nss));
+        return true;
+    }
+    return false;
+}
+
 RecordId acquireCatalogId(
     OperationContext* opCtx,
     const boost::optional<CreateCollCatalogIdentifier>& createCollCatalogIdentifier,
@@ -718,7 +776,7 @@ Collection* DatabaseImpl::_createCollection(
         (!coordinator->getSettings().isReplSet()) || coordinator->canAcceptWritesFor(opCtx, nss);
 
     CollectionOptions optionsWithUUID = options;
-    bool generatedUUID = false;
+    bool isGeneratedUUID = false;
     if (!optionsWithUUID.uuid) {
         if (!canAcceptWrites) {
             LOGV2_ERROR_OPTIONS(20329,
@@ -727,7 +785,7 @@ Collection* DatabaseImpl::_createCollection(
                                 logAttrs(nss));
         } else {
             optionsWithUUID.uuid.emplace(UUID::gen());
-            generatedUUID = true;
+            isGeneratedUUID = true;
         }
     }
 
@@ -746,52 +804,9 @@ Collection* DatabaseImpl::_createCollection(
         createOplogSlot = repl::getNextOpTime(opCtx);
     }
 
-    // If we generated a UUID for the collection, then it MUST be the case
-    // that we are creating the collection for the first time - i.e. the collection
-    // isn't being copied over / migrated as in initial sync or a chunk migration.
-    //
-    // Therefore, since we are sure that we are creating the collection for the first
-    // time, set recordIdsReplicated:true on all non-internal collections. We don't set
-    // recordIdsReplicated:true on internal collections because many of these collections
-    // are partially implicitly replicated (for example, on config.image_collection inserts
-    // are implicitly replicated while deletes are not) and this makes it hard to ensure
-    // that they have the same recordIds.
-    //
-    // Additionally, we do not set the recordIdsReplicated:true option on timeseries and
-    // clustered collections because in those cases the recordId is the _id, or on capped
-    // collections which utilizes a separate mechanism for ensuring uniform recordIds.
-    const bool collectionTypeSupportsReplicatedRecordIds =
-        !optionsWithUUID.timeseries && !optionsWithUUID.clusteredIndex && !optionsWithUUID.capped;
-    const auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
-    if (generatedUUID && !nss.isOnInternalDb() && collectionTypeSupportsReplicatedRecordIds &&
-        gFeatureFlagRecordIdsReplicated.isEnabledUseLastLTSFCVWhenUninitialized(
-            VersionContext::getDecoration(opCtx),
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-        overrideRecordIdsReplicatedDefault.shouldFail()) {
-        LOGV2_DEBUG(8700501,
-                    0,
-                    "Collection will use recordIdsReplicated:true.",
-                    "oldValue"_attr = optionsWithUUID.recordIdsReplicated);
-        optionsWithUUID.recordIdsReplicated = true;
-    } else if (provider.shouldUseReplicatedRecordIds() && nss.isReplicated() &&
-               !nss.isImplicitlyReplicated() && collectionTypeSupportsReplicatedRecordIds) {
-        tassert(10985561,
-                str::stream() << "Replicated record IDs must be enabled with " << provider.name(),
-                gFeatureFlagRecordIdsReplicated.isEnabledUseLatestFCVWhenUninitialized(
-                    VersionContext::getDecoration(opCtx),
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-        LOGV2_DEBUG(10985560,
-                    2,
-                    "Collection will use recordIdsReplicated:true",
-                    "provider"_attr = provider.name(),
-                    "oldValue"_attr = optionsWithUUID.recordIdsReplicated);
+    if (shouldSetRecordIdsReplicated(opCtx, nss, optionsWithUUID, isGeneratedUUID)) {
         optionsWithUUID.recordIdsReplicated = true;
     }
-
-    uassert(ErrorCodes::CommandNotSupported,
-            fmt::format("Capped collection '{}' can't use recordIdsReplicated:true",
-                        nss.toStringForErrorMsg()),
-            !(optionsWithUUID.recordIdsReplicated && optionsWithUUID.capped));
 
     hangAndFailAfterCreateCollectionReservesOpTime.executeIf(
         [&](const BSONObj&) {
@@ -814,7 +829,7 @@ Collection* DatabaseImpl::_createCollection(
                 debugLevel,
                 "createCollection",
                 logAttrs(nss),
-                "uuidDisposition"_attr = (generatedUUID ? "generated" : "provided"),
+                "uuidDisposition"_attr = (isGeneratedUUID ? "generated" : "provided"),
                 "uuid"_attr = optionsWithUUID.uuid.value(),
                 "options"_attr = options);
 

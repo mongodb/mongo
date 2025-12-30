@@ -175,7 +175,9 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             if (collection->isChangeStreamPreAndPostImagesEnabled()) {
                 args.changeStreamPreAndPostImagesEnabledForCollection = true;
             }
-
+            if (collection->areRecordIdsReplicated()) {
+                args.replicatedRecordId = record->id;
+            }
             // Reserves an optime for the deletion and sets the timestamp for future writes.
             opObserver->onDelete(opCtx, collection, kUninitializedStmtId, doc, documentKey, args);
         }

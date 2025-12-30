@@ -201,3 +201,6 @@ filters:
   - "*rate_limited.yml":
     approvers:
       - 10gen/server-workload-resilience
+  - "secondary_reads_passthrough_with_replica_set_endpoint.yml":
+    approvers:
+      - 10gen/server-cluster-scalability

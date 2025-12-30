@@ -106,7 +106,7 @@ suites:
     - jstests/core/diagnostics/datasize/datasize2.js
     - jstests/core/diagnostics/datasize/datasize_validation.js
     - jstests/core/replicate_record_ids/collmod_removes_replicate_record_ids.js
-    - jstests/core/replicate_record_ids/disallow_capped.js
+    - jstests/core/replicate_record_ids/allow_capped.js
     - jstests/core/replicate_record_ids/replicate_record_ids_collection_creation.js
   no_passthrough:
     # server-collection-write-path

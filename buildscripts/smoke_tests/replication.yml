@@ -72,7 +72,7 @@ suites:
     # failed 53.0/13023 times, success p90 => 1.660s, score => 31.919
     - jstests/core/timeseries/query/timeseries_ixscan_clusteredidxscan_union.js
     # failed 10.0/10821 times, success p90 => 0.399s, score => 25.077
-    - jstests/core/replicate_record_ids/disallow_capped.js
+    - jstests/core/replicate_record_ids/allow_capped.js
     # failed 19.0/13032 times, success p90 => 0.766s, score => 24.791
     - jstests/core/shell/shelltypes.js
     # failed 22.0/13021 times, success p90 => 0.902s, score => 24.393
