@@ -34,5 +34,7 @@ int main(int argc, char** argv) {
     mongo::unittest::MainProgress progress({.startSignalProcessingThread = false},
                                            std::move(argVec));
     progress.initialize();
+    if (auto ec = progress.parseAndAcceptOptions())
+        return static_cast<int>(*ec);
     return progress.test();
 }

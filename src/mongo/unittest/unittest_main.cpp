@@ -37,5 +37,7 @@ int main(int argc, char** argv) {
     std::vector<std::string> argVec(argv, argv + argc);
     mongo::unittest::MainProgress progress({}, std::move(argVec));
     progress.initialize();
+    if (auto ec = progress.parseAndAcceptOptions())
+        return static_cast<int>(*ec);
     return progress.test();
 }

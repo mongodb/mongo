@@ -51,5 +51,7 @@ int main(int argc, char** argv) {
                         "set14",
                     });
     }
+    if (auto ec = progress.parseAndAcceptOptions())
+        return static_cast<int>(*ec);
     return progress.test();
 }

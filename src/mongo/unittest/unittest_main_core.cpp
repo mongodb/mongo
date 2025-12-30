@@ -230,8 +230,9 @@ void initializeDeathTestChild() {
 
 void installEnhancedReporter(EnhancedReporter::Options options) {
     auto& listeners = testing::UnitTest::GetInstance()->listeners();
-    std::unique_ptr<testing::TestEventListener> originalPrinter{
-        listeners.Release(listeners.default_result_printer())};
+    auto* defaultListener = listeners.default_result_printer();
+    invariant(defaultListener, "GoogleTest default listener already removed.");
+    std::unique_ptr<testing::TestEventListener> originalPrinter{listeners.Release(defaultListener)};
     auto enhanced =
         std::make_unique<EnhancedReporter>(std::move(originalPrinter), std::move(options));
     gEnhancedReporter = enhanced.get();
@@ -360,7 +361,7 @@ boost::optional<ExitCode> MainProgress::parseAndAcceptOptions() {
         getAutoUpdateConfig() = std::move(auc);
     }
 
-    if (uto.enhancedReporter.value_or(false)) {
+    if (uto.enhancedReporter.value_or(true)) {
         if (!isDeathTestChild()) {
             EnhancedReporter::Options ero;
             ero.showEachTest = uto.showEachTest.value_or(ero.showEachTest);
@@ -378,9 +379,6 @@ int MainProgress::test() {
         TestingProctor::instance().setEnabled(true);
     }
     setTestCommandsEnabled(true);
-
-    if (auto ec = parseAndAcceptOptions())
-        return static_cast<int>(*ec);
 
     if (!_options.suppressGlobalInitializers) {
         runGlobalInitializersOrDie(_argVec);
