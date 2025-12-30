@@ -779,11 +779,20 @@ public:
      */
     virtual void close() = 0;
 
-    virtual std::vector<DebugPrinter::Block> debugPrint(
-        const DebugPrintInfo& debugPrintInfo) const {
+    virtual void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                              DebugPrintInfo& debugPrintInfo) const = 0;
+
+    std::vector<DebugPrinter::Block> debugPrint(DebugPrintInfo& debugPrintInfo) const {
+        ScopeGuard guard([&] { debugPrintInfo.callDepth--; });
+        if (++debugPrintInfo.callDepth > debugPrintInfo.maxCallDepth) {
+            return {DebugPrinter::Block("warning: exceeded depth limit")};
+        }
         auto stats = getCommonStats();
         std::string str = str::stream() << '[' << stats->nodeId << "] " << stats->stageType;
-        return {DebugPrinter::Block(str)};
+
+        std::vector<DebugPrinter::Block> ret{DebugPrinter::Block(str)};
+        doDebugPrint(ret, debugPrintInfo);
+        return ret;
     }
 
     static void debugPrintBytecode(std::vector<DebugPrinter::Block>& blocks,

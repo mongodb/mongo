@@ -553,10 +553,8 @@ void HashAggStage::close() {
     _specificStats.peakTrackedMemBytes = _memoryTracker.value().peakTrackedMemoryBytes();
 }
 
-std::vector<DebugPrinter::Block> HashAggStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void HashAggStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                DebugPrintInfo& debugPrintInfo) const {
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _gbs.size(); ++idx) {
         if (idx) {
@@ -640,8 +638,6 @@ std::vector<DebugPrinter::Block> HashAggStage::debugPrint(
     }
 
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
-
-    return ret;
 }
 
 size_t HashAggStage::estimateCompileTimeSize() const {

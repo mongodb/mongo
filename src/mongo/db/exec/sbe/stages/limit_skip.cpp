@@ -139,9 +139,8 @@ const SpecificStats* LimitSkipStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-std::vector<DebugPrinter::Block> LimitSkipStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
+void LimitSkipStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                  DebugPrintInfo& debugPrintInfo) const {
     if (_limitExpr) {
         DebugPrinter::addBlocks(ret, _limitExpr->debugPrint());
     } else {
@@ -159,8 +158,6 @@ std::vector<DebugPrinter::Block> LimitSkipStage::debugPrint(
     }
 
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
-
-    return ret;
 }
 
 size_t LimitSkipStage::estimateCompileTimeSize() const {

@@ -142,9 +142,8 @@ const SpecificStats* SortStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-std::vector<DebugPrinter::Block> SortStage::debugPrint(const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void SortStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                             DebugPrintInfo& debugPrintInfo) const {
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _obs.size(); ++idx) {
         if (idx) {
@@ -181,8 +180,6 @@ std::vector<DebugPrinter::Block> SortStage::debugPrint(const DebugPrintInfo& deb
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
-
-    return ret;
 }
 
 size_t SortStage::estimateCompileTimeSize() const {

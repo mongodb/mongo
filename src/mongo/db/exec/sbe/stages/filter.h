@@ -176,9 +176,8 @@ public:
         return &_specificStats;
     }
 
-    std::vector<DebugPrinter::Block> debugPrint(const DebugPrintInfo& debugPrintInfo) const final {
-        auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+    void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                      DebugPrintInfo& debugPrintInfo) const final {
         ret.emplace_back("{`");
         DebugPrinter::addBlocks(ret, _filter->debugPrint());
         ret.emplace_back("`}");
@@ -190,8 +189,6 @@ public:
         }
 
         DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
-
-        return ret;
     }
 
     size_t estimateCompileTimeSize() const final {

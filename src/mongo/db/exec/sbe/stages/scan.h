@@ -366,7 +366,8 @@ public:
     void prepare(CompileCtx& ctx) final;
     void close() final;
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
-    std::vector<DebugPrinter::Block> debugPrint(const DebugPrintInfo& debugPrintInfo) const final;
+    void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                      DebugPrintInfo& debugPrintInfo) const final;
 
 private:
     inline RecordCursor* getActiveCursor() const {
