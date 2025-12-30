@@ -949,6 +949,7 @@ MongoRunner.runMongod = function (opts) {
     mongod.port = parseInt(connectPort);
     if (mongod.commandLine.maintenancePort > 0) {
         mongod.maintenancePort = mongod.commandLine.maintenancePort;
+        mongod.maintenanceHost = mongod.hostNoPort + ":" + mongod.maintenancePort;
     }
     mongod.runId = runId || ObjectId();
     mongod.dbpath = fullOptions.dbpath;
@@ -996,6 +997,7 @@ MongoRunner.runMongos = function (opts) {
     mongos.port = parseInt(connectPort);
     if (mongos.commandLine.maintenancePort > 0) {
         mongos.maintenancePort = mongos.commandLine.maintenancePort;
+        mongos.maintenanceHost = MongoRunner.getMongosName(mongos.maintenancePort, useHostName);
     }
     mongos.runId = runId || ObjectId();
     mongos.savedOptions = MongoRunner.savedOptions[mongos.runId];

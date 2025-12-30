@@ -11,97 +11,27 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
+import {MaxConnsOverrideHelpers} from "jstests/noPassthrough/libs/max_conns_override_helpers.js";
 
 const kConfiguredMaxConns = 5;
 const kConfiguredReadyAdminThreads = 3;
-
-// Get serverStatus to check that we have the right number of threads in the right places
-function getStats(conn) {
-    return assert.commandWorked(conn.adminCommand({serverStatus: 1}));
-}
-
-function verifyStats(conn, {exemptCount, normalCount}) {
-    const totalCount = exemptCount + normalCount;
-
-    // Verify that we have updated serverStatus.
-    assert.soon(
-        () => {
-            const serverStatus = getStats(conn);
-            const executors = serverStatus.network.serviceExecutors;
-
-            const currentCount = serverStatus.connections.current;
-            if (currentCount != totalCount) {
-                print(`Not yet at the expected count of connections: ${currentCount} != ${totalCount}`);
-                return false;
-            }
-
-            const readyAdminThreads = executors.reserved.threadsRunning - executors.reserved.clientsRunning;
-            if (readyAdminThreads < kConfiguredReadyAdminThreads) {
-                print("Not enough admin threads yet: " + `${readyAdminThreads} < ${kConfiguredReadyAdminThreads}`);
-                return false;
-            }
-
-            const threadedCount = serverStatus.connections.threaded;
-            const threadedExecutorCount = executors.passthrough.clientsInTotal + executors.reserved.clientsInTotal;
-            if (threadedCount != threadedExecutorCount) {
-                print("Not enough running threaded clients yet: " + `${threadedCount} != ${threadedExecutorCount}`);
-                return false;
-            }
-
-            return true;
-        },
-        "Failed to verify initial conditions",
-        10000,
-    );
-
-    const serverStatus = getStats(conn);
-    const connectionsStatus = serverStatus.connections;
-    const reservedExecutorStatus = serverStatus.network.serviceExecutors.reserved;
-    const executorStatus = serverStatus.network.serviceExecutors.passthrough;
-
-    // Log these serverStatus sections so we can debug this easily.
-    const filteredSections = {
-        connections: connectionsStatus,
-        network: {serviceExecutors: {passthrough: executorStatus, reserved: reservedExecutorStatus}},
-    };
-    print(`serverStatus: ${tojson(filteredSections)}`);
-
-    if (totalCount > kConfiguredMaxConns) {
-        // If we're over maxConns, there are no available connections.
-        assert.lte(connectionsStatus["available"], -1);
-    } else {
-        assert.eq(connectionsStatus["available"], kConfiguredMaxConns - totalCount);
-    }
-
-    // All connections on an exempt CIDR should be marked as limitExempt.
-    assert.eq(connectionsStatus["limitExempt"], exemptCount);
-
-    // The normal serviceExecutor should only be running at most maxConns number of threads.
-    assert.lte(executorStatus["threadsRunning"], kConfiguredMaxConns);
-
-    // Clients on the normal executor own their thread and cannot wait asynchronously.
-    assert.eq(executorStatus["clientsRunning"], executorStatus["clientsInTotal"]);
-    assert.lte(executorStatus["clientsRunning"], executorStatus["threadsRunning"]);
-    assert.eq(executorStatus["clientsWaitingForData"], 0);
-
-    // Clients on the reserved executor run on a thread and cannot wait asynchronously.
-    assert.eq(reservedExecutorStatus["clientsRunning"], reservedExecutorStatus["clientsInTotal"]);
-    assert.lte(reservedExecutorStatus["clientsRunning"], reservedExecutorStatus["threadsRunning"]);
-    assert.eq(reservedExecutorStatus["clientsWaitingForData"], 0);
-}
 
 // Can't run the proxy on Windows.
 // If we're on POSIX, then determine doing the proxy test based on checking FF enable.
 // (deferred until first run without proxy)
 let featureFlagMongodProxyProtocolSupportEnabled = _isWindows() ? false : undefined;
 
-function runTest(useProxy, useMongos) {
-    jsTest.log(`runTest(useProxy: ${tojson(useProxy)}, useMongos: ${tojson(useMongos)})`);
+function runTest(useProxy, useMongos, useAdminThreads) {
+    jsTest.log(
+        `runTest(useProxy: ${tojson(useProxy)}, useMongos: ${tojson(useMongos)}, useAdminThreads: ${tojson(useAdminThreads)})`,
+    );
 
     // Use the external ip to avoid our exempt CIDR.
     const ip = get_ipaddr();
     const opts = {
-        config: "jstests/noPassthrough/libs/max_conns_override_config.yaml",
+        config: useAdminThreads
+            ? "jstests/noPassthrough/libs/max_conns_override_config.yaml"
+            : "jstests/noPassthrough/libs/max_conns_override_config_no_admin_threads.yaml",
         port: allocatePort(),
     };
 
@@ -159,80 +89,31 @@ function runTest(useProxy, useMongos) {
         }
     })();
 
-    try {
-        if (featureFlagMongodProxyProtocolSupportEnabled === undefined) {
-            // Test for featureFlag while in normal mode,
-            // so that we know if we can run with proxy mode later.
-            featureFlagMongodProxyProtocolSupportEnabled = FeatureFlagUtil.isEnabled(
-                conn,
-                "MongodProxyProtocolSupport",
-            );
-        }
-
-        let adminConns = [];
-        let normalConns = [];
-
-        // We start with one exempt control socket.
-        let exemptCount = 1;
-        let normalCount = 0;
-
-        // Do an initial verification.
-        verifyStats(conn, {exemptCount: exemptCount, normalCount: normalCount});
-
-        for (let i = 0; i < 2 * kConfiguredMaxConns; i++) {
-            // Make some connections using the exempt CIDR and some using the normal CIDR.
-            let isExempt = i % 2 == 0;
-            try {
-                if (isExempt) {
-                    adminConns.push(new Mongo(host.admin));
-                    ++exemptCount;
-                } else {
-                    normalConns.push(new Mongo(host.normal));
-                    ++normalCount;
-                }
-            } catch (e) {
-                jsTest.log("Threw exception: " + tojson(e));
-
-                // If we couldn't connect, that means we've exceeded maxConns
-                // and we're using the normal CIDR.
-                assert(!isExempt);
-                assert(i >= kConfiguredMaxConns);
-            }
-
-            verifyStats(conn, {exemptCount: exemptCount, normalCount: normalCount});
-        }
-
-        // Some common sense assertions around what was admitted.
-        assert.eq(exemptCount, kConfiguredMaxConns + 1);
-        assert.lte(normalCount, kConfiguredMaxConns);
-
-        // Destroy all admin connections and verify assumptions.
-        while (adminConns.length) {
-            adminConns.pop().close();
-            --exemptCount;
-
-            verifyStats(conn, {exemptCount: exemptCount, normalCount: normalCount});
-        }
-
-        // Destroy all normal connections and verify assumptions.
-        while (normalConns.length) {
-            normalConns.pop().close();
-            --normalCount;
-
-            verifyStats(conn, {exemptCount: exemptCount, normalCount: normalCount});
-        }
-    } finally {
-        shutdown();
-        Object.values(proxyServer).forEach((p) => p.stop());
+    if (featureFlagMongodProxyProtocolSupportEnabled === undefined) {
+        // Test for featureFlag while in normal mode,
+        // so that we know if we can run with proxy mode later.
+        featureFlagMongodProxyProtocolSupportEnabled = FeatureFlagUtil.isEnabled(conn, "MongodProxyProtocolSupport");
     }
+
+    MaxConnsOverrideHelpers.runTest(
+        conn,
+        host,
+        proxyServer,
+        false /* useMaintenance */,
+        useAdminThreads ? kConfiguredReadyAdminThreads : 0,
+        kConfiguredMaxConns,
+        shutdown,
+    );
 }
 
 function runTestSet(useProxy) {
-    runTest(useProxy, false /* mongos */);
-    runTest(useProxy, true /* mongos */);
+    runTest(useProxy, false /* mongos */, true /* useAdminThreads */);
+    runTest(useProxy, true /* mongos */, true /* useAdminThreads */);
+    runTest(useProxy, false /* mongos */, false /* useAdminThreads */);
+    runTest(useProxy, true /* mongos */, false /* useAdminThreads */);
 }
 
-// Ordering of false->true requied for identifying if we have ff enabled.
+// Ordering of false->true required for identifying if we have ff enabled.
 runTestSet(false);
 if (featureFlagMongodProxyProtocolSupportEnabled) {
     runTestSet(true);

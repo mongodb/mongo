@@ -1,0 +1,4 @@
+# Used in the max_conns_override.js test to set the maxIncomingConnsOverride settings
+net:
+  maxIncomingConnectionsOverride: ["127.0.0.1"]
+  maxIncomingConnections: 5

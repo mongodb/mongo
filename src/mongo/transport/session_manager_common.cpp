@@ -286,7 +286,6 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     _connectionsProcessedCounter->add(1);
 
     serverGlobalParams.maxIncomingConnsOverride.refreshSnapshot(maxIncomingConnsOverride);
-    // TODO (SERVER-113219) Check and modify this if needed.
     const bool isPrivilegedSession = session->isConnectedToMaintenancePort() ||
         (maxIncomingConnsOverride && session->isExemptedByCIDRList(*maxIncomingConnsOverride));
     const bool verbose = !quiet();

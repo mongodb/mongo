@@ -18,3 +18,9 @@ filters:
   - "*extension*":
     approvers:
       - 10gen/query-integration-extensions-api
+  - "max_conns*.yaml":
+    approvers:
+      - 10gen/server-networking-and-observability
+  - "max_conns_override_helpers.js":
+    approvers:
+      - 10gen/server-networking-and-observability

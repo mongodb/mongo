@@ -9,7 +9,12 @@ ShardingTest.prototype.checkShardFilteringMetadata = function () {
 
     // Use a new connection so we don't have to worry about existing users logged in to the
     // connection.
-    let mongosConn = new Mongo(this.s.host);
+    let mongosConn;
+    if (this.s.maintenancePort > 0) {
+        mongosConn = new Mongo(this.s.maintenanceHost);
+    } else {
+        mongosConn = new Mongo(this.s.host);
+    }
     mongosConn.fullOptions = Object.merge(this.s.fullOptions, {});
 
     const keyFile = this.keyFile;

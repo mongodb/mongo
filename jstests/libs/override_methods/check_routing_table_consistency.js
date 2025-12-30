@@ -7,7 +7,12 @@ ShardingTest.prototype.checkRoutingTableConsistency = function () {
         return;
     }
 
-    const mongos = new Mongo(this.s.host);
+    let mongos;
+    if (this.s.maintenancePort > 0) {
+        mongos = new Mongo(this.s.maintenanceHost);
+    } else {
+        mongos = new Mongo(this.s.host);
+    }
     mongos.fullOptions = this.s.fullOptions || {};
     mongos.setReadPref("primaryPreferred");
 

@@ -1297,6 +1297,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/libs/**/net.* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/noPassthrough/libs/**/write_concern* @10gen/server-rw-concerns @svc-auto-approve-bot
 /jstests/noPassthrough/libs/**/*extension* @10gen/query-integration-extensions-api @svc-auto-approve-bot
+/jstests/noPassthrough/libs/**/max_conns*.yaml @10gen/server-networking-and-observability @svc-auto-approve-bot
+/jstests/noPassthrough/libs/**/max_conns_override_helpers.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/libs/index_builds/OWNERS.yml
 /jstests/noPassthrough/libs/index_builds/**/* @10gen/server-index-builds @svc-auto-approve-bot

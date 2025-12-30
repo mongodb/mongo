@@ -1,0 +1,4 @@
+# Used in the max_conns_override.js test to set the maxIncomingConnsOverride settings
+net:
+  reservedAdminThreads: 3
+  maxIncomingConnections: 5
