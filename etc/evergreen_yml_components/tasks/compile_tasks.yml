@@ -1437,6 +1437,12 @@ task_groups:
       - compile_all_but_not_unittests
 
   - <<: *compile_task_group_template
+    name: run_unit_tests_no_rbe_incompatible_TG
+    max_hosts: 1
+    tasks:
+      - unit_tests
+
+  - <<: *compile_task_group_template
     name: run_unit_tests_TG
     max_hosts: 1
     tasks:

@@ -293,7 +293,7 @@ buildvariants:
       - name: compile_all_but_not_unittests_TG
         distros:
           - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
-      - name: run_unit_tests_TG
+      - name: run_unit_tests_no_rbe_incompatible_TG
         distros:
           - amazon2023-arm64-latest-m8g-12xlarge-commitqueue
       - name: compile_test_parallel_dbtest_stream_TG
