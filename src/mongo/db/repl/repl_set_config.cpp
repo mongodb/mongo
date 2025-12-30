@@ -336,6 +336,19 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                                   << MemberConfig::kHostFieldName
                                   << " == " << memberI.getHostAndPort().toString());
             }
+            if (memberI.getHostAndPortMaintenance() == memberJ.getHostAndPortMaintenance()) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                                  << "Found two member configurations with same "
+                                  << MemberConfig::kMaintenancePortFieldName
+                                  << " field and same hostname, " << kMembersFieldName << "." << i
+                                  << "." << MemberConfig::kMaintenancePortFieldName
+                                  << " == " << kMembersFieldName << "." << j << "."
+                                  << MemberConfig::kMaintenancePortFieldName << " == "
+                                  << memberI.getMaintenancePort() << " and " << kMembersFieldName
+                                  << "." << i << ".hostname == " << kMembersFieldName << "." << j
+                                  << ".hostname == " << memberI.getHostAndPort().host());
+            }
         }
     }
 
