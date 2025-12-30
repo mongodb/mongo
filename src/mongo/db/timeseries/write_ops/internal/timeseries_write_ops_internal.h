@@ -52,9 +52,6 @@ struct ContinuableRetryableErrorWithAbortBatch {
 struct ContinuableRetryableErrorWithAbortBatchAbandonSnapshot {
     Status error;
 };
-struct NonContinuableError {
-    Status error;
-};
 struct NonContinuableErrorWithAbortBatch {
     Status error;
 };
@@ -65,7 +62,6 @@ using Result = std::variant<Success,
                             ContinuableRetryableError,
                             ContinuableRetryableErrorWithAbortBatch,
                             ContinuableRetryableErrorWithAbortBatchAbandonSnapshot,
-                            NonContinuableError,
                             NonContinuableErrorWithAbortBatch>;
 
 }  // namespace commit_result
