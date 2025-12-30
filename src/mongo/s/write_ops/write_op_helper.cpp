@@ -43,14 +43,18 @@ bool isRetryErrCode(int errCode) {
         errCode == ErrorCodes::CannotImplicitlyCreateCollection;
 }
 
+bool isOnlyTargetDataOwningShardsForMultiWritesEnabled() {
+    auto* clusterParam =
+        ServerParameterSet::getClusterParameterSet()
+            ->get<ClusterParameterWithStorage<OnlyTargetDataOwningShardsForMultiWritesParam>>(
+                "onlyTargetDataOwningShardsForMultiWrites");
+    return clusterParam->getValue(boost::none).getEnabled();
+}
+
 bool shouldTargetAllShardsSVIgnored(bool inTransaction, bool isMulti) {
     // Fetch the 'onlyTargetDataOwningShardsForMultiWrites' cluster param.
     if (isMulti && !inTransaction) {
-        auto* clusterParam =
-            ServerParameterSet::getClusterParameterSet()
-                ->get<ClusterParameterWithStorage<OnlyTargetDataOwningShardsForMultiWritesParam>>(
-                    "onlyTargetDataOwningShardsForMultiWrites");
-        return !clusterParam->getValue(boost::none).getEnabled();
+        return !isOnlyTargetDataOwningShardsForMultiWritesEnabled();
     }
     return false;
 }

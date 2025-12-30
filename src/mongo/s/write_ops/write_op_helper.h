@@ -133,6 +133,11 @@ ItemType getFirstNonRetryableError(const std::vector<ItemType>& items, GetCodeFn
 }
 
 /**
+ * Fetch and return the value of the "onlyTargetDataOwningShardsForMultiWrites" cluster param.
+ */
+bool isOnlyTargetDataOwningShardsForMultiWritesEnabled();
+
+/**
  * Returns whether an operation should target all shards with ShardVersion::IGNORED(). This is
  * true for multi: true writes where 'onlyTargetDataOwningShardsForMultiWrites' is false and we are
  * not in a transaction.

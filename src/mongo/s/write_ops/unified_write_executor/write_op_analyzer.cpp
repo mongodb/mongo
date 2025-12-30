@@ -114,6 +114,33 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         opCtx, targeter.getNS(), op.getOpType(), tr.endpoints);
 
     if (tr.isNonTargetedRetryableWriteWithId) {
+        // For a retryable write without shard key with id operation, there is a special case where
+        // we will target all shards instead  of the initial set of endpoints returned by the
+        // targeter. This is the case when we are:
+        // - Performing an update or delete.
+        // - Not in a transaction.
+        // - Already targeting multiple endpoints.
+        // - We are not in a multi: true write OR 'onlyTargetDataOwningShardsForMultiWrites' is
+        // disabled.
+        // TODO SERVER-101167: For WithoutShardKeyWithId write ops, we should only target the shards
+        // that are needed (instead of targeting all shards).
+        const bool targetAllShards = [&]() {
+            const bool isUpdateOrDelete = (isUpdate || isDelete);
+            if (isUpdateOrDelete && !inTxn && tr.endpoints.size() > 1) {
+                if (op.getMulti()) {
+                    return !write_op_helpers::isOnlyTargetDataOwningShardsForMultiWritesEnabled();
+                }
+                return true;
+            }
+            return false;
+        }();
+
+        if (targetAllShards) {
+            tr.endpoints = targeter.targetAllShards(opCtx);
+            // Regenerate the targetedSampleId since we changed the endpoints to target all shards.
+            targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
+                opCtx, targeter.getNS(), op.getOpType(), tr.endpoints);
+        }
         recordTargetingStats(opCtx, targeter, tr, op);
         return Analysis{AnalysisType::kRetryableWriteWithId,
                         std::move(tr.endpoints),
