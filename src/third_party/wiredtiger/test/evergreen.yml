@@ -220,11 +220,10 @@ functions:
         # the case of patch builds, it is possible that the developer has a branch name that doesn't
         # adhere to naming rules, therefore derive the base branch name from git.
         branch=$(git branch --contains | grep -e "mongodb" -e "develop" -e "evg-pr-test-")
+        mongo_repo=https://github.com/mongodb/mongo
         if [[ $branch =~ "mongodb-" ]]; then
-          mongo_repo=https://github.com/mongodb/mongo
           mongo_branch=v$(echo $branch | cut -d'-' -f 2)
         else
-          mongo_repo=https://github.com/mongodb/mongo
           mongo_branch=master
         fi
         popd
@@ -250,6 +249,11 @@ functions:
         virtualenv -p python3 venv
         source venv/bin/activate
         buildscripts/poetry_sync.sh
+
+        # Without this variable the bazel execution might be stalled for many hours.
+        # This is because evergreen is using a go Cmd.Wait and waiting for some file descriptors
+        # to be clean up. This setting helps to avoid using the extra file descriptors.
+        export MONGO_WRAPPER_OUTPUT_ALL=1
 
         # The bazel cache uses a substantial (>30GB) amount of data which causes our evergreen hosts
         # to run out of disk space. By default it's saved into ~/.cache, but we want it saved into
