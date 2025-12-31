@@ -1011,4 +1011,15 @@ void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceConte
  */
 logv2::LogService toLogService(Service* service);
 
+/**
+ * Attach `cb` to `serviceContext` to be run after its transport layer is initialized.
+ */
+void addSetUpPostTransportLayerTask(ServiceContext* serviceContext, std::function<void()> cb);
+
+/**
+ * Runs the callbacks previously attached to `serviceContext` by calls to
+ * `addSetUpPostTransportLayerTask`. Each is destroyed immediately after it is executed.
+ */
+void setUpPostTransportLayer(ServiceContext* serviceContext);
+
 }  // namespace mongo

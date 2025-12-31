@@ -58,6 +58,7 @@
 #include <exception>
 #include <list>
 #include <memory>
+#include <queue>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -569,6 +570,26 @@ void ServiceContext::ServiceContextDeleter::operator()(ServiceContext* sc) const
 void Service::ServiceDeleter::operator()(Service* service) const {
     onDestroy(service, ConstructorActionRegisterer::registeredConstructorActions());
     delete service;
+}
+
+namespace {
+auto setUpPostTransportLayerTasks =
+    ServiceContext::declareDecoration<std::queue<std::function<void()>>>();
+}  // namespace
+
+void addSetUpPostTransportLayerTask(ServiceContext* serviceContext, std::function<void()> cb) {
+    auto& tasks = (*serviceContext)[setUpPostTransportLayerTasks];
+    tasks.push(std::move(cb));
+}
+
+void setUpPostTransportLayer(ServiceContext* serviceContext) {
+    auto& tasks = (*serviceContext)[setUpPostTransportLayerTasks];
+    try {
+        for (; !tasks.empty(); tasks.pop())
+            tasks.front()();
+    } catch (const DBException& ex) {
+        iasserted(ex.toStatus().withContext("setUpPostTransportLayer"));
+    }
 }
 
 }  // namespace mongo

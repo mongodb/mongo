@@ -582,6 +582,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         ec != ExitCode::clean)
         return ec;
 
+    {
+        SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                       TimedSectionId::setUpPostTransportLayer,
+                                       &startupTimeElapsedBuilder);
+        setUpPostTransportLayer(serviceContext);
+    }
+
     auto& rss = rss::ReplicatedStorageService::get(serviceContext);
     auto& serviceLifecycle = rss.getServiceLifecycle();
     serviceLifecycle.initializeFlowControl(serviceContext);
