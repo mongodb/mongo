@@ -6,6 +6,7 @@ import re
 import threading
 import warnings
 from collections import deque
+from contextlib import nullcontext
 from enum import Enum
 
 import requests
@@ -138,9 +139,12 @@ class BufferedHandler(logging.Handler):
     # We override createLock(), acquire(), and release() to be no-ops since emit(), flush(), and
     # close() serialize accesses to 'self.__emit_buffer' in a more granular way via
     # 'self.__emit_lock'.
+    # However, in Python 3.13+, the Handler.handle() method directly accesses self.lock using
+    # 'with self.lock:', so we need to create a context manager. We use nullcontext() which is
+    # a no-op context manager, maintaining the intended behavior while satisfying Python 3.13.
     def createLock(self):
         """Create lock."""
-        pass
+        self.lock = nullcontext()
 
     def acquire(self):
         """Acquire."""
