@@ -542,8 +542,8 @@ void ShardServerCatalogCacheLoaderImpl::shutDown() {
 
 SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::getChunksSince(
     const NamespaceString& nss, ChunkVersion version) {
-    // If the collecction is never registered on the sharding catalog there is no need to refresh.
-    // Further, attempting to refesh config.collections or config.chunks would trigger recursive
+    // If the collection is never registered on the sharding catalog there is no need to refresh.
+    // Further, attempting to refresh config.collections or config.chunks would trigger recursive
     // refreshes, and, if this is running on a config server secondary, the refresh would not
     // succeed if the primary is unavailable, unnecessarily reducing availability.
     if (nss.isNamespaceAlwaysUntracked()) {
