@@ -81,7 +81,7 @@ public:
                         opCtx->getWriteConcern()),
                     Shard::RetryPolicy::kIdempotent);
 
-            uassertStatusOK(cmdResponseWithStatus.getValue().commandStatus);
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponseWithStatus));
         }
 
 
