@@ -228,6 +228,7 @@ void ErrorLabelBuilder::build(BSONArrayBuilder& labels) const {
                 labels << ErrorLabel::kNoWritesPerformed;
             }
         } else if (isOperationIdempotent()) {
+            // TODO SERVER-108898: apply the NoWritesPerformed error label here too, if appropriate.
             labels << ErrorLabel::kRetryableError;
         }
     }

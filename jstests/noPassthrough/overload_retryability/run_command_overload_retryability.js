@@ -40,7 +40,7 @@ function enableFailCommand(conn, command, times) {
                 errorCode: ErrorCodes.IngressRequestRateLimitExceeded,
                 failCommands: commands,
                 failInternalCommands: true,
-                errorLabels: ["SystemOverloadedError", "RetryableError"],
+                errorLabels: ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"],
             },
         }),
     );

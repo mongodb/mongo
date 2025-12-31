@@ -1798,6 +1798,7 @@ void ExecCommandDatabase::_initiateCommand() {
             BSONArrayBuilder arrayBuilder;
             arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
             arrayBuilder.append(ErrorLabel::kRetryableError);
+            arrayBuilder.append(ErrorLabel::kNoWritesPerformed);
             auto& errorLabels = errorLabelsOverride(opCtx);
             invariant(!errorLabels);
             errorLabels.emplace(arrayBuilder.arr());

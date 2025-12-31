@@ -755,6 +755,9 @@ DbResponse makeDbResponseErrorForRateLimiting(const Message& message, const Stat
             BSONArrayBuilder arrayBuilder(commandBodyBob.subarrayStart(kErrorLabelsFieldName));
             arrayBuilder.append(ErrorLabel::kSystemOverloadedError);
             arrayBuilder.append(ErrorLabel::kRetryableError);
+            // It can't be determined whether the request being rejected is a write or not without
+            // deserializing it, so we just always append the NoWritesPerformed label.
+            arrayBuilder.append(ErrorLabel::kNoWritesPerformed);
         }
     }
 

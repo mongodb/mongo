@@ -19,6 +19,8 @@ import {
     runTestStandalone,
 } from "jstests/noPassthrough/admission/libs/ingress_request_rate_limiter_helper.js";
 
+const kExpectedErrorLabels = ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"];
+
 /**
  * Runs the set parameter commands with some arbitrary value to ensure invalid values are rejected.
  */
@@ -118,7 +120,7 @@ function testRateLimiterMetrics(conn, exemptConn) {
     for (let i = 0; i < requestAmount; ++i) {
         const assertContainsExpectedErrorLabels = (res) => {
             assert(res.hasOwnProperty("errorLabels"), res);
-            assert.sameMembers(["SystemOverloadedError", "RetryableError"], res.errorLabels);
+            assert.sameMembers(kExpectedErrorLabels, res.errorLabels);
         };
 
         const collName = `${jsTest.name()}_coll`;
@@ -283,7 +285,7 @@ function runTestCompressed() {
     const compressionArgs = ["--networkMessageCompressors", kCompressor];
     const shell = startParallelShell(
         funWithArgs(
-            (host, params, exemptAppName, requestAmount) => {
+            (host, params, exemptAppName, requestAmount, expectedLabels) => {
                 const exemptConn = new Mongo(`mongodb://${host}/?appName=${exemptAppName}`);
                 exemptConn.getDB("admin").auth("admin", "pwd");
                 assert.commandWorked(exemptConn.adminCommand({setParameter: 1, ...JSON.parse(params)}));
@@ -293,7 +295,7 @@ function runTestCompressed() {
                 for (let i = 0; i < requestAmount; ++i) {
                     const assertContainSystemOverloadedErrorLabel = (res) => {
                         assert(res.hasOwnProperty("errorLabels"), res);
-                        assert.sameMembers(["SystemOverloadedError", "RetryableError"], res.errorLabels);
+                        assert.sameMembers(expectedLabels, res.errorLabels);
                     };
 
                     const collName = `${jsTest.name()}_coll`;
@@ -311,6 +313,7 @@ function runTestCompressed() {
             JSON.stringify(kParams),
             kRateLimiterExemptAppName,
             requestAmount,
+            kExpectedErrorLabels,
         ),
         mongod.port,
         false,
