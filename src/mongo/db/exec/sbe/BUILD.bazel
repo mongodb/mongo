@@ -335,6 +335,10 @@ mongo_cc_unit_test(
         "//src/mongo/db/exec/sbe/values:value_test.cpp",
         "//src/mongo/db/exec/sbe/vm:code_fragment_test.cpp",
     ],
+    copts = select({
+        "@platforms//cpu:ppc": ["-Wno-uninitialized"],
+        "//conditions:default": [],
+    }),
     data = [
         "//src/mongo/db/test_output/exec/sbe:test_data",
     ],
