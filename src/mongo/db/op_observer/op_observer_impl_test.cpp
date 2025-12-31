@@ -3466,7 +3466,7 @@ protected:
 };
 
 // Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction replicates its writes
-// as a single applyOps. Tests WUOWs batching a range of 1 to 5 deletes (inclusive).
+// as a single applyOps. Tests WUOWs batching a range of 2 to 5 deletes (inclusive).
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     const auto nDocsToDelete = 5;
     const BSONObj docsToDelete[nDocsToDelete] = {
@@ -3483,8 +3483,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     reset(opCtx, _nss);
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
-    // Run the test with WUOW's grouping 1 to 5 deletions.
-    for (size_t docsToBeBatched = 1; docsToBeBatched <= nDocsToDelete; docsToBeBatched++) {
+    // Run the test with WUOW's grouping 2 to 5 deletions.
+    for (size_t docsToBeBatched = 2; docsToBeBatched <= nDocsToDelete; docsToBeBatched++) {
 
         // Start a WUOW with groupOplogEntries=kGroupForTransaction. Verify that initialises the
         // BatchedWriteContext.
@@ -3504,9 +3504,9 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
 
         wuow.commit();
 
-        // Retrieve the oplog entries. We expect 'docsToBeBatched' oplog entries because of
+        // Retrieve the oplog entries. We expect 'docsToBeBatched' - 1 oplog entries because of
         // previous iteration of this loop that exercised previous batch sizes.
-        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, docsToBeBatched);
+        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, docsToBeBatched - 1);
         // Entries in ascending timestamp order, so fetch the last one at the back of the
         // vector.
         auto lastOplogEntry = oplogs.back();
@@ -4022,7 +4022,7 @@ TEST_F(BatchedWriteOutputsTest, RuntimeLimitsAffectApplyOpsBatchingWithFeatureFl
 }
 
 // Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForPossiblyRetryableOperations
-// replicates its writes as a single applyOps. Tests WUOWs batching a range of 1 to 5 inserts
+// replicates its writes as a single applyOps. Tests WUOWs batching a range of 2 to 5 inserts
 // (inclusive).
 TEST_F(BatchedWriteOutputsTest, TestVectoredInsertApplyOpsGrouping) {
     const BSONObj docsToInsert[] = {
@@ -4040,8 +4040,8 @@ TEST_F(BatchedWriteOutputsTest, TestVectoredInsertApplyOpsGrouping) {
     reset(opCtx, _nss);
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
-    // Run the test with WUOW's grouping 1 to 5 inserts.
-    for (size_t docsToBeBatched = 1; docsToBeBatched <= nDocsToInsert; docsToBeBatched++) {
+    // Run the test with WUOW's grouping 2 to 5 inserts.
+    for (size_t docsToBeBatched = 2; docsToBeBatched <= nDocsToInsert; docsToBeBatched++) {
         // Start a WUOW with groupOplogEntries=kGroupForPossiblyRetryableOperation.
         // Verify that initialises the BatchedWriteContext.
         auto& bwc = BatchedWriteContext::get(opCtx);
@@ -4066,9 +4066,9 @@ TEST_F(BatchedWriteOutputsTest, TestVectoredInsertApplyOpsGrouping) {
             /*defaultFromMigrate=*/false);
         wuow.commit();
 
-        // Retrieve the oplog entries. We expect 'docsToBeBatched' oplog entries because of
-        // previous iteration of this loop that exercised previous batch sizes.
-        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, docsToBeBatched);
+        // Retrieve the oplog entries. We expect 'docsToBeBatched' - 1 oplog entries because of
+        // previous iterations of this loop that exercised previous batch sizes.
+        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, docsToBeBatched - 1);
         // Entries in ascending timestamp order, so fetch the last one at the back of the
         // vector.
         auto lastOplogEntry = oplogs.back();
@@ -4498,6 +4498,56 @@ TEST_F(BatchedWriteOutputsTest, TestNonRetryableVectoredInsertMultiApplyOpsGroup
         ASSERT(innerEntry.getStatementIds().empty());
         ASSERT_BSONOBJ_EQ(innerEntry.getObject(), docsToInsert1[opIdx]);
     }
+}
+
+TEST_F(BatchedWriteOutputsTest, TestSingleInsertIsNotInApplyOps) {
+    auto testGroupedSingleOperationIsNotBatched = [&](StmtId stmtId) {
+        // Setup and clear any state.
+        auto opCtxRaii = cc().makeOperationContext();
+        OperationContext* opCtx = opCtxRaii.get();
+        reset(opCtx, nss);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+        std::vector<InsertStatement> inserts;
+        inserts.emplace_back(stmtId, BSON("_id" << 0 << "a" << 10));
+
+        // Do an insert without grouping to get the expected oplog entry.
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        WriteUnitOfWork wuow(opCtx);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts.begin(),
+            inserts.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow.commit();
+
+        // Insert same document but grouped.
+        WriteUnitOfWork wuowGrouped(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts.begin(),
+            inserts.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuowGrouped.commit();
+
+        // Retrieve the oplog entries. Implicitly asserts that there are three oplog entries: one
+        // implicit changestream collection creation and two insert oplog entries.
+        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 2);
+        auto oplogEntry = oplogs[0].removeFields({"ts", "wall"});
+        auto oplogEntry1 = oplogs[1].removeFields({"ts", "wall"});
+        // Check that both oplog entries other than the timestamp and wall clock time are identical.
+        ASSERT_BSONOBJ_EQ(oplogEntry, oplogEntry1);
+    };
+
+    testGroupedSingleOperationIsNotBatched(kUninitializedStmtId);
+    // TODO SERVER-114338: Update test to check single retryable insert oplog entries
+    // testGroupedSingleOperationIsNotBatched(StmtId(0));
 }
 
 class OnDeleteOutputsTest : public OpObserverTest {

@@ -13,6 +13,8 @@
  *  transitioning_replicaset_incompatible,
  *  # The test uses a failpoint that is only available on mongod.
  *  assumes_against_mongod_not_mongos,
+ *  # TODO (SERVER-115947): Re-enable this test on primary driven index builds
+ *  primary_driven_index_builds_incompatible
  * ]
  */
 
