@@ -21,8 +21,16 @@ const primary = rst.getPrimary();
 const db = primary.getDB(dbName);
 
 const forceCheckpoint = () => {
+    rst.awaitLastStableRecoveryTimestamp(); // wait for stable to advance
     assert.commandWorked(db.adminCommand({fsync: 1}));
 };
+
+// Set write concern such that we ensure the stable timestamp advances to include our most recent
+// writes before we take a checkpoint. This is to avoid running into a possible race since fsync
+// checkpoints at the stable timestamp without necessarily advancing that timestamp to include the
+// latest committed writes. As a result, it is possible that the stable timestamp lags behind the
+// wall clock time and our writes are not included in the checkpoint.
+assert.commandWorked(rst.getPrimary().adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, j: true}}));
 
 assert.commandWorked(db.createCollection(collName));
 const coll = db.getCollection(collName);
