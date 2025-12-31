@@ -30,5 +30,9 @@ py_library(
             "gitpython",
             group = "evergreen",
         ),
+        dependency(
+            "packaging",
+            group = "testing",
+        ),
     ],
 )

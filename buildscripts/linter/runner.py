@@ -8,7 +8,7 @@ import subprocess
 import sys
 import threading
 
-import pkg_resources
+from packaging.version import parse as parse_version
 
 from . import base
 
@@ -35,7 +35,7 @@ def _check_version(linter, cmd_path, args):
             )
 
         pattern = r"\b(?:(%s) )?(?P<version>\S+)\b" % (linter.cmd_name)
-        required_version = pkg_resources.parse_version(linter.required_version)
+        required_version = parse_version(linter.required_version)
 
         match = re.search(pattern, decoded_output)
         if match:
@@ -43,7 +43,7 @@ def _check_version(linter, cmd_path, args):
         else:
             found_version = "0.0"
 
-        if pkg_resources.parse_version(found_version) < required_version:
+        if parse_version(found_version) < required_version:
             logging.info(
                 "Linter %s has wrong version for '%s'. Expected >= '%s',"
                 "Standard Output:\n'%s'\nStandard Error:\n%s",
