@@ -1370,7 +1370,7 @@ function isAuthoritativeShardsEnabled(conn) {
     return FeatureFlagUtil.isPresentAndEnabled(conn, "ShardAuthoritativeDbMetadataCRUD");
 }
 
-const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemovedSinceLastLTS) => {
+const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemovedSinceLastLTS, isMongodTest) => {
     const listCommandsRes = connection.adminCommand({listCommands: 1});
     assert.commandWorked(listCommandsRes);
     print("--------------------------------------------");
@@ -1418,6 +1418,34 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
         }
     })();
 
+    // Set of commands that are supported on all shards (used only for mongod tests).
+    const commandsSupportedOnAllMongod = (() => {
+        if (!isMongodTest) {
+            return new Set();
+        }
+
+        const shards = [st.shard0, st.shard1];
+
+        // Initialize the intersection with the first shard's commands
+        const firstRes = shards[0].getDB("admin").runCommand({listCommands: 1});
+        assert.commandWorked(firstRes);
+        const validCommands = new Set(Object.keys(firstRes.commands));
+
+        // Filter against remaining shards
+        for (let i = 1; i < shards.length; i++) {
+            const res = shards[i].getDB("admin").runCommand({listCommands: 1});
+            assert.commandWorked(res);
+
+            for (const cmd of validCommands) {
+                if (!res.commands.hasOwnProperty(cmd)) {
+                    validCommands.delete(cmd);
+                }
+            }
+        }
+
+        return validCommands;
+    })();
+
     (() => {
         // Test that commands that send databaseVersion are subjected to the databaseVersion
         // check when the primary shard for the database has moved and the database no longer
@@ -1434,6 +1462,15 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
             const testCase = testCases[command];
             if (testCase.skip || (isMultiversion && testCase.skipMultiversion)) {
                 print("skipping " + command + ": " + testCase.skip);
+                continue;
+            }
+
+            if (isMultiversion && isMongodTest && !commandsSupportedOnAllMongod.has(command)) {
+                assert(
+                    commandsAddedToMongodSinceLastLTS.includes(command),
+                    "did not expect " + command + " to not be supported on all shards",
+                );
+                print("skipping " + command + ": not supported on all shards");
                 continue;
             }
 
@@ -1481,6 +1518,15 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
                 continue;
             }
 
+            if (isMultiversion && isMongodTest && !commandsSupportedOnAllMongod.has(command)) {
+                assert(
+                    commandsAddedToMongodSinceLastLTS.includes(command),
+                    "did not expect " + command + " to not be supported on all shards",
+                );
+                print("skipping " + command + ": not supported on all shards");
+                continue;
+            }
+
             for (const test of toArray(testCase.run)) {
                 testCommandAfterMovePrimary(test, connection, st, dbName, collName);
             }
@@ -1504,6 +1550,15 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
                 continue;
             }
 
+            if (isMultiversion && isMongodTest && !commandsSupportedOnAllMongod.has(command)) {
+                assert(
+                    commandsAddedToMongodSinceLastLTS.includes(command),
+                    "did not expect " + command + " to not be supported on all shards",
+                );
+                print("skipping " + command + ": not supported on all shards");
+                continue;
+            }
+
             for (const test of toArray(testCase.run)) {
                 testCommandAfterDropRecreateDatabase(test, connection, st);
             }
@@ -1516,12 +1571,19 @@ const doTest = (connection, testCases, commandsAddedSinceLastLTS, commandsRemove
     })();
 };
 
-doTest(st.s, allTestCases.mongos, commandsAddedToMongosSinceLastLTS, commandsRemovedFromMongosSinceLastLTS);
+doTest(
+    st.s,
+    allTestCases.mongos,
+    commandsAddedToMongosSinceLastLTS,
+    commandsRemovedFromMongosSinceLastLTS,
+    false /* isMongodTest */,
+);
 doTest(
     st.rs0.getPrimary(),
     allTestCases.mongod,
     commandsAddedToMongodSinceLastLTS,
     commandsRemovedFromMongodSinceLastLTS,
+    true /* isMongodTest */,
 );
 
 st.stop();
