@@ -272,10 +272,8 @@ const SpecificStats* HashLookupStage::getSpecificStats() const {
     return _hashTable.getHashLookupStats();
 }
 
-std::vector<DebugPrinter::Block> HashLookupStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void HashLookupStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                   DebugPrintInfo& debugPrintInfo) const {
     ret.emplace_back(DebugPrinter::Block("[`"));
     auto& [slot, expr] = _innerAgg;
     DebugPrinter::addIdentifier(ret, slot);
@@ -308,9 +306,7 @@ std::vector<DebugPrinter::Block> HashLookupStage::debugPrint(
     if (debugPrintInfo.printBytecode) {
         PlanStage::debugPrintBytecode(ret, _aggCode, "AGGREGATE" /*title*/);
     }
-
-    return ret;
-}  // HashLookupStage::debugPrint
+}  // HashLookupStage::doDebugPrint
 
 size_t HashLookupStage::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);

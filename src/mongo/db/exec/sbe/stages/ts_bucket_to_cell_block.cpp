@@ -176,10 +176,8 @@ const SpecificStats* TsBucketToCellBlockStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-std::vector<DebugPrinter::Block> TsBucketToCellBlockStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void TsBucketToCellBlockStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                            DebugPrintInfo& debugPrintInfo) const {
     DebugPrinter::addIdentifier(ret, _bucketSlotId);
 
     ret.emplace_back(DebugPrinter::Block("pathReqs[`"));
@@ -204,8 +202,6 @@ std::vector<DebugPrinter::Block> TsBucketToCellBlockStage::debugPrint(
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
-
-    return ret;
 }
 
 size_t TsBucketToCellBlockStage::estimateCompileTimeSize() const {

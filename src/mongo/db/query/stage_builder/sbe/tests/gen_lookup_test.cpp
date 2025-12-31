@@ -138,8 +138,9 @@ public:
             buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
 
         if (enableDebugOutput) {
+            DebugPrintInfo debugPrintInfo{};
             std::cout << std::endl
-                      << DebugPrinter{true}.print(stage->debugPrint(DebugPrintInfo())) << std::endl;
+                      << DebugPrinter{true}.print(stage->debugPrint(debugPrintInfo)) << std::endl;
         }
 
         // Prepare the SBE tree for execution.
@@ -1206,8 +1207,9 @@ protected:
         ASSERT_EQ(resultSlots.size(), 1);
 
         if (enableDebugOutput) {
+            DebugPrintInfo debugPrintInfo{};
             std::cout << std::endl
-                      << DebugPrinter{true}.print(rootStage->debugPrint(DebugPrintInfo()))
+                      << DebugPrinter{true}.print(rootStage->debugPrint(debugPrintInfo))
                       << std::endl;
         }
 

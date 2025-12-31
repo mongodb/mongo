@@ -675,8 +675,8 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
     return ret;
 }
 
-std::vector<DebugPrinter::Block> ScanStage::debugPrint(const DebugPrintInfo& debugPrintInfo) const {
-    std::vector<DebugPrinter::Block> ret = PlanStage::debugPrint(debugPrintInfo);
+void ScanStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                             DebugPrintInfo& debugPrintInfo) const {
     bool first = true;
     if (_minRecordIdSlot) {
         DebugPrinter::addIdentifier(ret, _minRecordIdSlot.value());
@@ -694,7 +694,6 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint(const DebugPrintInfo& deb
     }
     debugPrintShared(ret);
     ret.emplace_back(_state->forward ? "forward" : "reverse");
-    return ret;
 }
 
 const SpecificStats* ScanStageBase::getSpecificStats() const {

@@ -246,10 +246,8 @@ const SpecificStats* HashLookupUnwindStage::getSpecificStats() const {
     return _hashTable.getHashLookupStats();
 }
 
-std::vector<DebugPrinter::Block> HashLookupUnwindStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void HashLookupUnwindStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                         DebugPrintInfo& debugPrintInfo) const {
     DebugPrinter::addIdentifier(ret, _lookupStageOutputSlot);
 
     if (_collatorSlot) {
@@ -273,8 +271,6 @@ std::vector<DebugPrinter::Block> HashLookupUnwindStage::debugPrint(
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
 
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
-
-    return ret;
 }
 
 size_t HashLookupUnwindStage::estimateCompileTimeSize() const {

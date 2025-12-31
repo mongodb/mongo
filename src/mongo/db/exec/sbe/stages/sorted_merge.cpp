@@ -199,10 +199,8 @@ const SpecificStats* SortedMergeStage::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> SortedMergeStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void SortedMergeStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                    DebugPrintInfo& debugPrintInfo) const {
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _outputVals.size(); idx++) {
         if (idx) {
@@ -252,8 +250,6 @@ std::vector<DebugPrinter::Block> SortedMergeStage::debugPrint(
     }
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
     ret.emplace_back(DebugPrinter::Block("`]"));
-
-    return ret;
 }
 
 size_t SortedMergeStage::estimateCompileTimeSize() const {

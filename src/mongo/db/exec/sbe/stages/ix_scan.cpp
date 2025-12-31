@@ -619,10 +619,8 @@ std::unique_ptr<PlanStageStats> SimpleIndexScanStage::getStats(bool includeDebug
     return stats;
 }
 
-std::vector<DebugPrinter::Block> SimpleIndexScanStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void SimpleIndexScanStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                        DebugPrintInfo& debugPrintInfo) const {
     if (_seekKeyLow) {
         DebugPrinter::addKeyword(ret, "seekKeyLow");
         ret.emplace_back("=");
@@ -641,8 +639,6 @@ std::vector<DebugPrinter::Block> SimpleIndexScanStage::debugPrint(
         PlanStage::debugPrintBytecode(ret, _seekKeyLowCode, "SEEK_KEY_LOW" /*title*/);
         PlanStage::debugPrintBytecode(ret, _seekKeyHighCode, "SEEK_KEY_HIGH" /*title*/);
     }
-
-    return ret;
 }
 
 size_t SimpleIndexScanStage::estimateCompileTimeSize() const {
@@ -736,9 +732,8 @@ void GenericIndexScanStage::open(bool reOpen) {
     }
 }
 
-std::vector<DebugPrinter::Block> GenericIndexScanStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
+void GenericIndexScanStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                         DebugPrintInfo& debugPrintInfo) const {
     DebugPrinter::addBlocks(ret, _params.indexBounds->debugPrint());
     IndexScanStageBase::debugPrintImpl(ret);
 
@@ -746,7 +741,6 @@ std::vector<DebugPrinter::Block> GenericIndexScanStage::debugPrint(
         DebugPrinter::addNewLine(ret);
         PlanStage::debugPrintBytecode(ret, _indexBoundsCode, "INDEX_BOUNDS" /*title*/);
     }
-    return ret;
 }
 
 size_t GenericIndexScanStage::estimateCompileTimeSize() const {

@@ -272,8 +272,8 @@ public:
     void prepare(CompileCtx& ctx) override;
     void open(bool reOpen) override;
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const override;
-    std::vector<DebugPrinter::Block> debugPrint(
-        const DebugPrintInfo& debugPrintInfo) const override;
+    void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                      DebugPrintInfo& debugPrintInfo) const final;
     size_t estimateCompileTimeSize() const override;
 
 protected:
@@ -385,8 +385,8 @@ public:
     void prepare(CompileCtx& ctx) override;
     void open(bool reOpen) override;
 
-    std::vector<DebugPrinter::Block> debugPrint(
-        const DebugPrintInfo& debugPrintInfo) const override;
+    void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                      DebugPrintInfo& debugPrintInfo) const final;
     size_t estimateCompileTimeSize() const override;
 
 protected:

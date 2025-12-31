@@ -386,7 +386,7 @@ server_parameters:
     #
 
     internalPipelineLengthLimit:
-        description: "The maximum length allowed for an an aggregation pipeline."
+        description: "The maximum length allowed for an aggregation pipeline."
         set_at: [startup, runtime]
         cpp_varname: "internalPipelineLengthLimit"
         cpp_vartype: AtomicWord<int>
@@ -397,7 +397,7 @@ server_parameters:
         redact: false
 
     internalMaxSubPipelineViewDepth:
-        description: "The maximum length allowed for an an aggregation sub-pipeline view."
+        description: "The maximum length allowed for an aggregation sub-pipeline view."
         set_at: [startup, runtime]
         cpp_varname: "internalMaxSubPipelineViewDepth"
         cpp_vartype: AtomicWord<long long>

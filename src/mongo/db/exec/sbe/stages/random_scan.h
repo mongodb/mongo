@@ -103,7 +103,8 @@ public:
         prepareShared(ctx);
     }
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
-    std::vector<DebugPrinter::Block> debugPrint(const DebugPrintInfo& debugPrintInfo) const final;
+    void doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                      DebugPrintInfo& debugPrintInfo) const final;
 
 private:
     void scanResetState(bool reOpen) {

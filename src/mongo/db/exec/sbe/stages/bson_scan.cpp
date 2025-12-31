@@ -162,7 +162,6 @@ std::unique_ptr<PlanStageStats> BSONScanStage::getStats(bool includeDebugInfo) c
         bob.append("outputSlots", _scanFieldSlots.begin(), _scanFieldSlots.end());
         ret->debugInfo = bob.obj();
     }
-
     return ret;
 }
 
@@ -170,10 +169,8 @@ const SpecificStats* BSONScanStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-std::vector<DebugPrinter::Block> BSONScanStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void BSONScanStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                 DebugPrintInfo& debugPrintInfo) const {
     if (_recordSlot) {
         DebugPrinter::addIdentifier(ret, _recordSlot.value());
     }
@@ -189,8 +186,6 @@ std::vector<DebugPrinter::Block> BSONScanStage::debugPrint(
         DebugPrinter::addIdentifier(ret, _scanFieldNames[idx]);
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
-
-    return ret;
 }
 
 size_t BSONScanStage::estimateCompileTimeSize() const {

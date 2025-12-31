@@ -548,10 +548,8 @@ const SpecificStats* MakeObjStageBase<O>::getSpecificStats() const {
 }
 
 template <typename O>
-std::vector<DebugPrinter::Block> MakeObjStageBase<O>::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void MakeObjStageBase<O>::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                       DebugPrintInfo& debugPrintInfo) const {
     DebugPrinter::addIdentifier(ret, _objSlot);
 
     if (_rootSlot) {
@@ -591,8 +589,6 @@ std::vector<DebugPrinter::Block> MakeObjStageBase<O>::debugPrint(
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint(debugPrintInfo));
-
-    return ret;
 }
 
 template <typename O>

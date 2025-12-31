@@ -500,10 +500,8 @@ const SpecificStats* SearchCursorStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-std::vector<DebugPrinter::Block> SearchCursorStage::debugPrint(
-    const DebugPrintInfo& debugPrintInfo) const {
-    auto ret = PlanStage::debugPrint(debugPrintInfo);
-
+void SearchCursorStage::doDebugPrint(std::vector<DebugPrinter::Block>& ret,
+                                     DebugPrintInfo& debugPrintInfo) const {
     addDebugOptionalSlotIdentifier(ret, _idSlot, "id");
     addDebugOptionalSlotIdentifier(ret, _resultSlot, "result");
 
@@ -516,8 +514,6 @@ std::vector<DebugPrinter::Block> SearchCursorStage::debugPrint(
     addDebugOptionalSlotIdentifier(ret, _limitSlot, "limit");
     addDebugOptionalSlotIdentifier(ret, _sortKeySlot, "sortKey");
     addDebugOptionalSlotIdentifier(ret, _collatorSlot, "collator");
-
-    return ret;
 }
 
 size_t SearchCursorStage::estimateCompileTimeSize() const {
