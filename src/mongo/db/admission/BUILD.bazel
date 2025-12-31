@@ -21,18 +21,34 @@ filegroup(
 )
 
 mongo_cc_library(
+    name = "ingress_request_rate_limiter",
+    srcs = [
+        "ingress_request_rate_limiter.cpp",
+    ],
+    deps = [
+        ":ingress_request_rate_limiter_idl",
+        ":rate_limiter",
+        "//src/mongo:base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth",
+        "//src/mongo/transport:cidr_range_list_parameter",
+    ],
+)
+
+mongo_cc_library(
     name = "ingress_admission_control",
     srcs = [
         "//src/mongo/db/admission:ingress_admission_controller.cpp",
     ],
     deps = [
+        ":ingress_admission_context",
+        ":ingress_admission_control_idl",
+        ":rate_limiter",
         "//src/mongo:base",
-        "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
-        "//src/mongo/db/admission:ingress_admission_context",
-        "//src/mongo/db/admission:ingress_admission_control_idl",
         "//src/mongo/util/concurrency:ticketholder",
     ],
 )
@@ -117,6 +133,7 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db/admission:ingress_admission_control",
+        "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/admission:ticketholder_manager",
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/transport:transport_layer_common",
@@ -160,6 +177,11 @@ mongo_idl_library(
 mongo_idl_library(
     name = "ingress_admission_control_idl",
     src = "ingress_admission_control.idl",
+)
+
+mongo_idl_library(
+    name = "ingress_request_rate_limiter_idl",
+    src = "ingress_request_rate_limiter.idl",
 )
 
 mongo_idl_library(

@@ -123,6 +123,10 @@ bool ErrorLabelBuilder::isNonResumableChangeStreamError() const {
     return _code && ErrorCodes::isNonResumableChangeStreamError(_code.value());
 }
 
+bool ErrorLabelBuilder::isSystemOverloadedError() const {
+    return _code && mongo::isSystemOverloadedError(_code.value());
+}
+
 bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     // Determine whether this operation is a candidate for the ResumableChangeStreamError label.
     const bool mayNeedResumableChangeStreamErrorLabel =
@@ -296,4 +300,7 @@ bool isTransientTransactionError(ErrorCodes::Error code,
     return isTransient;
 }
 
+bool isSystemOverloadedError(ErrorCodes::Error code) {
+    return ErrorCodes::isSystemOverloadedError(code);
+}
 }  // namespace mongo

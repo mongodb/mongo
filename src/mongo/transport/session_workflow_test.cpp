@@ -53,6 +53,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/baton.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
@@ -71,6 +72,10 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/asio/asio_session_manager.h"
+#include "mongo/transport/message_compressor_base.h"
+#include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/message_compressor_registry.h"
+#include "mongo/transport/message_compressor_snappy.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session_manager_common.h"
@@ -431,7 +436,7 @@ private:
         auto sm =
             std::make_unique<MockSessionManagerCommon>(svcCtx, std::make_unique<SWTObserver>(this));
         _sessionManager = sm.get();
-        return std::move(sm);
+        return sm;
     }
 
     void _initTransportLayer(ServiceContext* svcCtx) {
@@ -601,7 +606,7 @@ private:
     std::unique_ptr<SessionManager> _initSessionManager(ServiceContext* svcCtx) override {
         auto sm = std::make_unique<AsioSessionManager>(svcCtx, std::make_unique<SWTObserver>(this));
         _sessionManager = sm.get();
-        return std::move(sm);
+        return sm;
     }
 
     RAIIServerParameterControllerForTest featureEnabled{
@@ -709,6 +714,136 @@ TEST_F(ConnectionEstablishmentQueueingTest, BypassQueueingEstablishment) {
     ASSERT_EQ(getConnectionStats()["establishmentRateLimit"]["exempted"].numberLong(), 1);
 
     joinSessions();
+}
+
+class IngressRequestRateLimiterTest : public SessionWorkflowTest {
+public:
+    struct IngressRequestRateLimiterStats {
+        std::int32_t rejectedAdmissions;
+        std::int32_t successfulAdmissions;
+        std::int32_t exemptedAdmissions;
+        std::int32_t attemptedAdmissions;
+        double totalAvailableTokens;
+    };
+
+    void setUp() override {
+        SessionWorkflowTest::setUp();
+        auto& registry = MessageCompressorRegistry::get();
+        const auto& compressorNames = registry.getCompressorNames();
+
+        if (std::ranges::find(compressorNames, "snappy") == compressorNames.end()) {
+            registry.setSupportedCompressors({"snappy"});
+            registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+            uassertStatusOK(registry.finalizeSupportedCompressors());
+        }
+
+        _requestLimiterEnabled.emplace("ingressRequestRateLimiterEnabled", true);
+    }
+
+    auto enableRateOverrideBehaviorWithSpecifiedBurstSize(double burstSize) -> void {
+        _overrideFailpoint.emplace("ingressRequestRateLimiterFractionalRateOverride",
+                                   BSON("rate" << kVerySlowRate));
+        _requestLimiterBurstCapacitySecs.emplace(
+            "ingressRequestAdmissionBurstCapacitySecs",
+            _convertBurstSizeToBurstCapacitySecs(kVerySlowRate, burstSize));
+    }
+
+    auto getRateLimiterStats() -> IngressRequestRateLimiterStats {
+        const auto sc = getServiceContext();
+        BSONObjBuilder bob;
+        IngressRequestRateLimiter::get(sc).appendStats(&bob);
+        auto stats = bob.obj();
+        LOGV2(10638801, "Request rate limiter stats", "stats"_attr = stats);
+        return IngressRequestRateLimiterStats{
+            .rejectedAdmissions = stats["rejectedAdmissions"].numberInt(),
+            .successfulAdmissions = stats["successfulAdmissions"].numberInt(),
+            .exemptedAdmissions = stats["exemptedAdmissions"].numberInt(),
+            .attemptedAdmissions = stats["attemptedAdmissions"].numberInt(),
+            .totalAvailableTokens = stats["totalAvailableTokens"].numberDouble(),
+        };
+    }
+
+    auto compressMessage(Message message) -> Message {
+        MessageCompressorManager compressorManager{};
+        const auto cid = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+        return uassertStatusOK(compressorManager.compressMessage(message, &cid));
+    }
+
+private:
+    double _convertBurstSizeToBurstCapacitySecs(double refreshRate, double burstSize) {
+        // Rounding needed to ensure that the conversion back to burstSize won't be incorrect due
+        // to imprecisions in floating point division.
+        return std::round(burstSize / refreshRate);
+    }
+
+    static constexpr double kVerySlowRate = 5e-6;
+
+    RAIIServerParameterControllerForTest _featureEnabled{"featureFlagIngressRateLimiting", true};
+
+    unittest::MinimumLoggedSeverityGuard _logSeverityGuard{logv2::LogComponent::kDefault,
+                                                           logv2::LogSeverity::Debug(4)};
+
+    boost::optional<FailPointEnableBlock> _overrideFailpoint;
+    boost::optional<RAIIServerParameterControllerForTest> _requestLimiterEnabled;
+    boost::optional<RAIIServerParameterControllerForTest> _requestLimiterBurstCapacitySecs;
+    boost::optional<RAIIServerParameterControllerForTest> _requestAdmissionRatePerSec;
+};
+
+TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponse) {
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
+
+    startSession();
+    auto msg = makeOpMsg();
+    setMoreToCome(msg);
+    expect<Event::sessionSourceMessage>(msg);
+    expect<Event::sepHandleRequest>(makeResponse(Message{}));
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+
+    initializeNewSession();
+    startSession();
+    expect<Event::sessionSourceMessage>(msg);
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+
+    joinSessions();
+
+    const auto stats = getRateLimiterStats();
+
+    ASSERT_EQ(stats.rejectedAdmissions, 1);
+    ASSERT_EQ(stats.successfulAdmissions, 1);
+    ASSERT_EQ(stats.exemptedAdmissions, 0);
+    ASSERT_EQ(stats.attemptedAdmissions, 2);
+    ASSERT_LT(stats.totalAvailableTokens, 1);
+}
+
+TEST_F(IngressRequestRateLimiterTest, FireAndForgetResponseCompressed) {
+    enableRateOverrideBehaviorWithSpecifiedBurstSize(1.0);
+
+    startSession();
+    auto msg = makeOpMsg();
+    setMoreToCome(msg);
+    msg = compressMessage(msg);
+    expect<Event::sessionSourceMessage>(msg);
+    expect<Event::sepHandleRequest>(makeResponse(Message{}));
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+
+    initializeNewSession();
+    startSession();
+    expect<Event::sessionSourceMessage>(msg);
+    expect<Event::sessionSourceMessage>(kClosedSessionError);
+    expect<Event::sepEndSession>();
+
+    joinSessions();
+
+    const auto stats = getRateLimiterStats();
+
+    ASSERT_EQ(stats.rejectedAdmissions, 1);
+    ASSERT_EQ(stats.successfulAdmissions, 1);
+    ASSERT_EQ(stats.exemptedAdmissions, 0);
+    ASSERT_EQ(stats.attemptedAdmissions, 2);
+    ASSERT_LT(stats.totalAvailableTokens, 1);
 }
 
 class StepRunnerSessionWorkflowTest : public SessionWorkflowTest {

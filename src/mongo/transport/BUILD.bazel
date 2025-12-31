@@ -31,6 +31,7 @@ mongo_cc_library(
     ],
     deps = [
         "transport_options_idl",
+        ":cidr_range_list_parameter",
         "//src/mongo:base",
         "//src/mongo/db:connection_health_metrics_parameter_idl",
         "//src/mongo/db:service_context",
@@ -52,6 +53,18 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/transport:transport_layer_common",
         "//src/mongo/util:clock_sources",
+    ],
+)
+
+mongo_cc_library(
+    name = "cidr_range_list_parameter",
+    srcs = [
+        "cidr_range_list_parameter.cpp",
+    ],
+    deps = [
+        "cidr_range_list_parameter_idl",
+        "//src/mongo:base",
+        "//src/mongo/util/net:network",
     ],
 )
 
@@ -114,10 +127,12 @@ mongo_cc_library(
         "//src/mongo/transport:session_workflow.cpp",
     ],
     deps = [
+        "//src/mongo/db:error_labels",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db:traffic_recorder",
+        "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/stats:counters",
         "//src/mongo/rpc:client_metadata",
@@ -146,6 +161,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/rpc:message",
         "//src/mongo/util/options_parser",
         "//src/third_party/snappy",
         "//src/third_party/zlib",
@@ -195,6 +211,17 @@ mongo_cc_benchmark(
         "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer_manager",
         "//src/mongo/transport:transport_layer_mock",
+    ],
+)
+
+mongo_idl_library(
+    name = "cidr_range_list_parameter_idl",
+    src = "cidr_range_list_parameter.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
+    deps = [
+        "//src/mongo/db:basic_types_idl",
     ],
 )
 

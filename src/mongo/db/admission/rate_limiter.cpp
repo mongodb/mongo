@@ -46,6 +46,11 @@ Milliseconds doubleToMillis(double t) {
     return duration_cast<Milliseconds>(
         duration_cast<std::chrono::milliseconds>(std::chrono::duration<double, std::ratio<1>>(t)));
 }
+
+double calculateBurstSize(double refreshRate, double burstCapacitySecs) {
+    return refreshRate * burstCapacitySecs;
+}
+
 }  // namespace
 
 struct RateLimiter::RateLimiterPrivate {
@@ -77,12 +82,10 @@ struct RateLimiter::RateLimiterPrivate {
         int64_t expected = queued.load();
         do {
             if (expected >= maxDepth) {
-                return Status(ErrorCodes::TemporarilyUnavailable,
-                              fmt::format("RateLimiter queue depth has exceeded the maxQueueDepth. "
-                                          "numWaiters={}; maxQueueDepth={}; rateLimiterName={}",
-                                          expected,
-                                          maxDepth,
-                                          name));
+                return Status(kRejectedErrorCode,
+                              fmt::format("Rate limiter '{}' maximum queue depth ({}) exceeded",
+                                          name,
+                                          maxDepth));
             }
         } while (!queued.compareAndSwap(&expected, expected + 1));
 
@@ -91,14 +94,16 @@ struct RateLimiter::RateLimiterPrivate {
 };
 
 RateLimiter::RateLimiter(double refreshRatePerSec,
-                         double burstSize,
+                         double burstCapacitySecs,
                          int64_t maxQueueDepth,
                          std::string name) {
     uassert(ErrorCodes::InvalidOptions,
-            fmt::format("burstSize cannot be less than 1.0. burstSize={}; rateLimiterName={}",
-                        burstSize,
+            fmt::format("burstCapacitySecs cannot be less than or equal to 0.0. "
+                        "burstCapacitySecs={}; rateLimiterName={}",
+                        burstCapacitySecs,
                         name),
-            burstSize >= 1.0);
+            burstCapacitySecs > 0.0);
+    auto burstSize = calculateBurstSize(refreshRatePerSec, burstCapacitySecs);
     _impl = std::make_unique<RateLimiterPrivate>(
         refreshRatePerSec, burstSize, maxQueueDepth, std::move(name));
 }
@@ -166,16 +171,31 @@ Status RateLimiter::acquireToken(OperationContext* opCtx) {
     return Status::OK();
 }
 
+Status RateLimiter::tryAcquireToken() {
+    _impl->stats.attemptedAdmissions.incrementRelaxed();
+
+    if (!_impl->tokenBucket.consume(1.0)) {
+        _impl->stats.rejectedAdmissions.incrementRelaxed();
+        return Status{kRejectedErrorCode,
+                      fmt::format("Rate limiter '{}' rate exceeded", _impl->name)};
+    }
+
+    _impl->stats.successfulAdmissions.incrementRelaxed();
+    return Status::OK();
+}
+
 void RateLimiter::recordExemption() {
     _impl->stats.exemptedAdmissions.incrementRelaxed();
 }
 
-void RateLimiter::updateRateParameters(double refreshRatePerSec, double burstSize) {
+void RateLimiter::updateRateParameters(double refreshRatePerSec, double burstCapacitySecs) {
     uassert(ErrorCodes::InvalidOptions,
-            fmt::format("burstSize cannot be less than 1.0. burstSize={}; rateLimiterName={}",
-                        burstSize,
+            fmt::format("burstCapacitySecs cannot be less than or equal to 0.0. "
+                        "burstCapacitySecs={}; rateLimiterName={}",
+                        burstCapacitySecs,
                         _impl->name),
-            burstSize >= 1.0);
+            burstCapacitySecs > 0.0);
+    auto burstSize = calculateBurstSize(refreshRatePerSec, burstCapacitySecs);
     auto lk = _impl->rwMutex.writeLock();
     _impl->tokenBucket.reset(refreshRatePerSec, burstSize);
 }

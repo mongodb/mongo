@@ -44,6 +44,8 @@ error_categories:
     - TenantMigrationError
     - TenantMigrationConflictError
     - CursorInvalidatedError
+    # This category contains all errors due to the system being under pressure
+    - SystemOverloadedError
 
 error_codes:
     - {code: 0,name: OK}
@@ -573,6 +575,8 @@ error_codes:
     - {code: 428, name: DbCheckAttemptOnClusteredCollectionIdIndex}
     - {code: 429, name: DbCheckInconsistentHash}
     - {code: 430, name: IndexKeyOrderViolation}
+
+    - {code: 449, name: RateLimitExceeded, categories: [SystemOverloadedError]}
 
     # Error codes 4000-8999 are reserved.
 

@@ -58,17 +58,21 @@ enum class Protocol : std::uint64_t {
     kOpMsg = 1 << 1,
 };
 
-inline Protocol protocolForMessage(const Message& message) {
-    switch (message.operation()) {
+inline Protocol protocolForOperation(NetworkOp operation) {
+    switch (operation) {
         case mongo::dbMsg:
             return Protocol::kOpMsg;
         case mongo::dbQuery:
             return Protocol::kOpQuery;
         default:
-            uasserted(ErrorCodes::UnsupportedFormat,
-                      fmt::format("Received a reply message with unexpected opcode: {}",
-                                  message.operation()));
+            uasserted(
+                ErrorCodes::UnsupportedFormat,
+                fmt::format("Received a reply message with unexpected opcode: {}", operation));
     }
+}
+
+inline Protocol protocolForMessage(const Message& message) {
+    return protocolForOperation(message.operation());
 }
 
 }  // namespace rpc

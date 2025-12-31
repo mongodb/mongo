@@ -86,10 +86,16 @@ public:
         MovingAverage averageTimeQueuedMicros{0.2};
     };
 
+    /**
+     * The error code used when the rate limter denies a request to acquire a token (e.g. because
+     * the max queue depth is exceeded).
+     */
+    constexpr static ErrorCodes::Error kRejectedErrorCode = ErrorCodes::RateLimitExceeded;
+
     RateLimiter(double refreshRatePerSec,
-                double burstSize,
+                double burstCapacitySecs,
                 int64_t maxQueueDepth,
-                std::string name = "");
+                std::string name);
 
     ~RateLimiter();
 
@@ -100,6 +106,12 @@ public:
     Status acquireToken(OperationContext*);
 
     /**
+     * Attempts to acquire a token without queuing. Returns an error status if the rate limit
+     * and the burst size is exceeded.
+     */
+    Status tryAcquireToken();
+
+    /**
      * Updates metrics for admission granted without having called acquireToken.
      * Use this function in place of acquireToken when admission must be granted immediately.
      * Admission granted in this way does not consume any tokens.
@@ -108,15 +120,16 @@ public:
 
     /**
      * refreshRate is the number of tokens issued per second when rate-limiting has kicked in.
-     * Tokens will be issued smoothly, rather than all at once every 1 second. The burstSize is the
-     * maximum number of tokens that will be issued before rate-limiting kicks in (ie, the maximum
-     * number of tokens that can accumulate in the bucket).
+     * Tokens will be issued smoothly, rather than all at once every 1 second. The
+     * burstCapacitySecs is the number of seconds worth of unutilized rate limit that can be
+     * stored away before rate-limiting kicks in.
      */
-    void updateRateParameters(double refreshRatePerSec, double burstSize);
+    void updateRateParameters(double refreshRatePerSec, double burstCapacitySecs);
 
     /**
      * The maximum number of requests enqueued waiting for a token. Token requests that come in and
-     * will queue past the maxQueueDepth will be rejected with a TemporarilyUnavailable error.
+     * will queue past the maxQueueDepth will be rejected with a RateLimiter::kRejectedErrorCode
+     * error.
      */
     void setMaxQueueDepth(int64_t maxQueueDepth);
 

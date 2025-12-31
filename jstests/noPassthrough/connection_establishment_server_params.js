@@ -111,32 +111,3 @@ ingressConnectionEstablishmentMaxQueueDepth =
         .ingressConnectionEstablishmentMaxQueueDepth;
 assert.eq(ingressConnectionEstablishmentMaxQueueDepth, stringSetValue);
 MongoRunner.stopMongod(mongo);
-
-// Make sure that increasing the burstSize results in increasing the available tokens in the bucket
-const marginOfError = 5;  // +/- 5 tokens just in case there is rounding errors/clock skew
-const refreshRate = 10000;
-const initialBurstCapacitySecs = 0.5;
-mongo = MongoRunner.runMongod({
-    setParameter: {
-        ingressConnectionEstablishmentRatePerSec: refreshRate,
-        ingressConnectionEstablishmentBurstCapacitySecs: initialBurstCapacitySecs,
-    }
-});
-let initialTokens =
-    mongo.adminCommand({serverStatus: 1}).queues.ingressSessionEstablishment.totalAvailableTokens;
-const targetTokens = refreshRate * initialBurstCapacitySecs;
-assert.between(targetTokens - marginOfError, initialTokens, targetTokens + marginOfError);
-
-const newBurstCapacitySecs = 2;
-const newTargetTokens = refreshRate * newBurstCapacitySecs;
-assert.commandWorked(mongo.adminCommand(
-    {setParameter: 1, ingressConnectionEstablishmentBurstCapacitySecs: newBurstCapacitySecs}));
-assert.soon(() => {
-    const newTokens = mongo.adminCommand({serverStatus: 1})
-                          .queues.ingressSessionEstablishment.totalAvailableTokens;
-    jsTestLog("New tokens: " + newTokens);
-    return newTargetTokens - marginOfError <= newTokens &&
-        newTokens <= newTargetTokens + marginOfError;
-});
-
-MongoRunner.stopMongod(mongo);

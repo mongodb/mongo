@@ -38,7 +38,6 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_endian.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -47,6 +46,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/op_compressed.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/session.h"
@@ -59,34 +59,6 @@
 
 namespace mongo {
 namespace {
-
-// TODO(JBR): This should be changed so it 's closer to the MSGHEADER View/ConstView classes
-// than this little struct.
-struct CompressionHeader {
-    int32_t originalOpCode;
-    int32_t uncompressedSize;
-    uint8_t compressorId;
-
-    void serialize(DataRangeCursor* cursor) {
-        cursor->writeAndAdvance<LittleEndian<int32_t>>(originalOpCode);
-        cursor->writeAndAdvance<LittleEndian<int32_t>>(uncompressedSize);
-        cursor->writeAndAdvance<LittleEndian<uint8_t>>(compressorId);
-    }
-
-    CompressionHeader(int32_t _opcode, int32_t _size, uint8_t _id)
-        : originalOpCode{_opcode}, uncompressedSize{_size}, compressorId{_id} {}
-
-    CompressionHeader(ConstDataRangeCursor* cursor) {
-        originalOpCode = cursor->readAndAdvance<LittleEndian<std::int32_t>>();
-        uncompressedSize = cursor->readAndAdvance<LittleEndian<std::int32_t>>();
-        compressorId = cursor->readAndAdvance<LittleEndian<uint8_t>>();
-    }
-
-    static size_t size() {
-        return sizeof(originalOpCode) + sizeof(uncompressedSize) + sizeof(compressorId);
-    }
-};
-
 const transport::Session::Decoration<MessageCompressorManager> getForSession =
     transport::Session::declareDecoration<MessageCompressorManager>();
 }  // namespace

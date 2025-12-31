@@ -49,6 +49,7 @@ static constexpr StringData kRetryableWrite = "RetryableWriteError"_sd;
 static constexpr StringData kNonResumableChangeStream = "NonResumableChangeStreamError"_sd;
 static constexpr StringData kResumableChangeStream = "ResumableChangeStreamError"_sd;
 static constexpr StringData kNoWritesPerformed = "NoWritesPerformed"_sd;
+static constexpr StringData kSystemOverloadedError = "SystemOverloadedError"_sd;
 }  // namespace ErrorLabel
 
 class ErrorLabelBuilder {
@@ -81,6 +82,7 @@ public:
     bool isResumableChangeStreamError() const;
     bool isNonResumableChangeStreamError() const;
     bool isErrorWithNoWritesPerformed() const;
+    bool isSystemOverloadedError() const;
 
 private:
     bool _isCommitOrAbort() const;
@@ -117,4 +119,8 @@ bool isTransientTransactionError(ErrorCodes::Error code,
                                  bool hasWriteConcernError,
                                  bool isCommitOrAbort);
 
+/**
+ * Whether the error is caused by the system being overloaded.
+ */
+bool isSystemOverloadedError(ErrorCodes::Error code);
 }  // namespace mongo

@@ -49,6 +49,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_servers.cpp",
     ],
     deps = [
+        "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/stats:counters",
         "//src/mongo/transport:message_compressor",

@@ -35,8 +35,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/admission/ingress_request_rate_limiter.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/atomic_word.h"
@@ -69,6 +71,12 @@ public:
         networkCounter.append(b);
         appendMessageCompressionStats(&b);
 
+
+        // (Ignore FCV check): This feature flag is not FCV-gated.
+        if (gFeatureFlagIngressRateLimiting.isEnabledAndIgnoreFCVUnsafe()) {
+            appendIngressRequestRateLimiterStats(&b, opCtx->getServiceContext());
+        }
+
         auto svcCtx = opCtx->getServiceContext();
 
         {
@@ -80,6 +88,14 @@ public:
             tl->appendStatsForServerStatus(&b);
 
         return b.obj();
+    }
+
+    void appendIngressRequestRateLimiterStats(BSONObjBuilder* b, ServiceContext* service) const {
+        auto ingressRequestRateLimiterBuilder =
+            BSONObjBuilder{b->subobjStart("ingressRequestRateLimiter")};
+        const auto& ingressRequestRateLimeter = IngressRequestRateLimiter::get(service);
+        ingressRequestRateLimeter.appendStats(&ingressRequestRateLimiterBuilder);
+        ingressRequestRateLimiterBuilder.done();
     }
 };
 auto& network = *ServerStatusSectionBuilder<Network>("network");
