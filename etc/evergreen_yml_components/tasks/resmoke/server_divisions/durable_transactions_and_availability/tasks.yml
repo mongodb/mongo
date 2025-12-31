@@ -989,8 +989,7 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           suite: backup_restore
-          resmoke_args: src/mongo/db/modules/*/jstests/hot_backups/**/*.js
-          use_2xlarge_distro: "true"
+          resmoke_jobs_max: 1
 
   - <<: *task_template
     name: queryableWT
