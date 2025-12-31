@@ -1208,12 +1208,8 @@ void _onContainerInsert(OperationContext* opCtx,
         txnParticipant && !oplogDisabled && txnParticipant.transactionIsOpen();
     auto inBatchedWrite = BatchedWriteContext::get(opCtx).writesAreBatched();
 
-    uassert(10942700,
-            "Cannot insert into a container in a multi-document transaction",
-            !inMultiDocumentTransaction);
-
-    if (inBatchedWrite) {
-        BatchedWriteContext::BatchedOperation op;
+    auto makeOp = [&] {
+        repl::ReplOperation op;
         op.setOpType(repl::OpTypeEnum::kContainerInsert);
         op.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
         op.setTid(ns.tenantId());
@@ -1221,7 +1217,16 @@ void _onContainerInsert(OperationContext* opCtx,
         op.setUuid(collUUID);
         op.setContainer(ident);
         op.setObject(buildContainerOpObject(key, value));
-        BatchedWriteContext::get(opCtx).addBatchedOperation(opCtx, op);
+        return op;
+    };
+
+    if (inBatchedWrite) {
+        BatchedWriteContext::get(opCtx).addBatchedOperation(opCtx, makeOp());
+        return;
+    }
+
+    if (inMultiDocumentTransaction) {
+        txnParticipant.addTransactionOperation(opCtx, makeOp());
         return;
     }
 
@@ -1274,12 +1279,8 @@ void _onContainerDelete(OperationContext* opCtx,
         txnParticipant && !oplogDisabled && txnParticipant.transactionIsOpen();
     auto inBatchedWrite = BatchedWriteContext::get(opCtx).writesAreBatched();
 
-    uassert(10942702,
-            "Cannot delete from a container in a multi-document transaction",
-            !inMultiDocumentTransaction);
-
-    if (inBatchedWrite) {
-        BatchedWriteContext::BatchedOperation op;
+    auto makeOp = [&] {
+        repl::ReplOperation op;
         op.setOpType(repl::OpTypeEnum::kContainerDelete);
         op.setVersionContextIfHasOperationFCV(VersionContext::getDecoration(opCtx));
         op.setTid(ns.tenantId());
@@ -1287,7 +1288,16 @@ void _onContainerDelete(OperationContext* opCtx,
         op.setUuid(collUUID);
         op.setContainer(ident);
         op.setObject(buildContainerOpObject(key));
-        BatchedWriteContext::get(opCtx).addBatchedOperation(opCtx, op);
+        return op;
+    };
+
+    if (inBatchedWrite) {
+        BatchedWriteContext::get(opCtx).addBatchedOperation(opCtx, makeOp());
+        return;
+    }
+
+    if (inMultiDocumentTransaction) {
+        txnParticipant.addTransactionOperation(opCtx, makeOp());
         return;
     }
 
