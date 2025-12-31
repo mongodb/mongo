@@ -1,6 +1,8 @@
 /**
  * Tests that the extension $vectorSearch stage has overridden the server implementation
- * when loaded.
+ * when loaded with featureFlagVectorSearchExtension enabled.
+ *
+ * vector_search_ifr_toggle.js extensivley tests the toggling behavior between extension and legacy $vectorSearch.
  *
  * @tags: [featureFlagExtensionsAPI]
  */
@@ -18,6 +20,7 @@ const extensionNames = generateExtensionConfigs("libvector_search_extension.so")
 
 const options = {
     loadExtensions: extensionNames[0],
+    setParameter: {featureFlagVectorSearchExtension: true},
 };
 
 function runVectorSearchOverrideTest(conn, shardingTest = null) {
