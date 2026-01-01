@@ -112,11 +112,10 @@ public:
             scoped_cursor &rnd_cursor = rnd_cursors[coll.id];
 
             /* Get the file statistics so we know how much to truncate. */
-            int64_t entries, bytes_avail_reuse, file_size;
-            metrics_monitor::get_stat(stat_cursor, WT_STAT_DSRC_BTREE_ENTRIES, &entries);
-            metrics_monitor::get_stat(
-              stat_cursor, WT_STAT_DSRC_BLOCK_REUSE_BYTES, &bytes_avail_reuse);
-            metrics_monitor::get_stat(stat_cursor, WT_STAT_DSRC_BLOCK_SIZE, &file_size);
+            int64_t entries = metrics_monitor::get_stat(stat_cursor, WT_STAT_DSRC_BTREE_ENTRIES);
+            int64_t bytes_avail_reuse =
+              metrics_monitor::get_stat(stat_cursor, WT_STAT_DSRC_BLOCK_REUSE_BYTES);
+            int64_t file_size = metrics_monitor::get_stat(stat_cursor, WT_STAT_DSRC_BLOCK_SIZE);
 
             /* Don't truncate if we already have enough free space for compact to do work. */
             const int64_t pct_free_space_threshold = 10;
@@ -326,32 +325,29 @@ public:
         scoped_session session = connection_manager::instance().create_session();
 
         /* Check the background compact statistics. */
-        int64_t bytes_recovered, bytes_rewritten_ema, bytes_written, files_tracked, skipped,
-          success;
         scoped_cursor conn_stat_cursor = session.open_scoped_cursor(STATISTICS_URI);
-
-        metrics_monitor::get_stat(
-          conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_BYTES_RECOVERED, &bytes_recovered);
+        int64_t bytes_recovered = metrics_monitor::get_stat(
+          conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_BYTES_RECOVERED);
         testutil_assert(bytes_recovered > 0);
 
-        metrics_monitor::get_stat(
-          conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_EMA, &bytes_rewritten_ema);
+        int64_t bytes_rewritten_ema =
+          metrics_monitor::get_stat(conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_EMA);
         testutil_assert(bytes_rewritten_ema > 0);
 
-        metrics_monitor::get_stat(
-          conn_stat_cursor, WT_STAT_CONN_BLOCK_BYTE_WRITE_COMPACT, &bytes_written);
+        int64_t bytes_written =
+          metrics_monitor::get_stat(conn_stat_cursor, WT_STAT_CONN_BLOCK_BYTE_WRITE_COMPACT);
         testutil_assert(bytes_written > 0);
 
-        metrics_monitor::get_stat(
-          conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_FILES_TRACKED, &files_tracked);
+        int64_t files_tracked = metrics_monitor::get_stat(
+          conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_FILES_TRACKED);
         testutil_assert(files_tracked > 0);
 
-        metrics_monitor::get_stat(
-          conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_SKIPPED, &skipped);
+        int64_t skipped =
+          metrics_monitor::get_stat(conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_SKIPPED);
         testutil_assert(skipped > 0);
 
-        metrics_monitor::get_stat(
-          conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_SUCCESS, &success);
+        int64_t success =
+          metrics_monitor::get_stat(conn_stat_cursor, WT_STAT_CONN_BACKGROUND_COMPACT_SUCCESS);
         testutil_assert(success > 0);
 
         logger::log_msg(LOG_INFO, "Validation successful.");

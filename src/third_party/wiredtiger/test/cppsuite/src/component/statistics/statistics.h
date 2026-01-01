@@ -29,6 +29,7 @@
 #pragma once
 
 #include <string>
+#include <type_traits>
 
 #include "src/main/configuration.h"
 #include "src/storage/scoped_cursor.h"
@@ -44,8 +45,8 @@ public:
     /* Check that the statistics are within bounds. */
     virtual void check(scoped_cursor &cursor);
 
-    /* Retrieve the value associated to the stat in a string format. */
-    virtual std::string get_value_str(scoped_cursor &cursor);
+    /* Retrieve the value and return it. */
+    virtual int64_t get_value(scoped_cursor &cursor);
 
     /* Getters. */
     int get_field() const;

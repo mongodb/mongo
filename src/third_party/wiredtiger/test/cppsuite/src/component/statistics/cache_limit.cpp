@@ -45,7 +45,7 @@ cache_limit::cache_limit(configuration &config, const std::string &name)
 void
 cache_limit::check(scoped_cursor &cursor)
 {
-    double use_percent = get_cache_value(cursor);
+    int64_t use_percent = get_value(cursor);
     if (use_percent > max) {
         const std::string error_string =
           "metrics_monitor: Cache usage exceeded during test! Limit: " + std::to_string(max) +
@@ -55,27 +55,17 @@ cache_limit::check(scoped_cursor &cursor)
         logger::log_msg(LOG_TRACE, name + " usage: " + std::to_string(use_percent));
 }
 
-std::string
-cache_limit::get_value_str(scoped_cursor &cursor)
-{
-    return std::to_string(get_cache_value(cursor));
-}
-
-double
-cache_limit::get_cache_value(scoped_cursor &cursor)
+int64_t
+cache_limit::get_value(scoped_cursor &cursor)
 {
     int64_t cache_bytes_image, cache_bytes_other, cache_bytes_max;
-    double use_percent;
     /* Three statistics are required to compute cache use percentage. */
-    metrics_monitor::get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_IMAGE, &cache_bytes_image);
-    metrics_monitor::get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_OTHER, &cache_bytes_other);
-    metrics_monitor::get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_MAX, &cache_bytes_max);
-    /*
-     * Assert that we never exceed our configured limit for cache usage. Add 0.0 to avoid floating
-     * point conversion errors.
-     */
+    cache_bytes_image = metrics_monitor::get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_IMAGE);
+    cache_bytes_other = metrics_monitor::get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_OTHER);
+    cache_bytes_max = metrics_monitor::get_stat(cursor, WT_STAT_CONN_CACHE_BYTES_MAX);
+    testutil_assert((cache_bytes_image + cache_bytes_other) * 100 < INT64_MAX);
+    /* Assert that we never exceed our configured limit for cache usage. */
     testutil_assert(cache_bytes_max > 0);
-    use_percent = ((cache_bytes_image + cache_bytes_other + 0.0) / cache_bytes_max) * 100;
-    return use_percent;
+    return (cache_bytes_image + cache_bytes_other) * 100 / cache_bytes_max;
 }
 } // namespace test_harness

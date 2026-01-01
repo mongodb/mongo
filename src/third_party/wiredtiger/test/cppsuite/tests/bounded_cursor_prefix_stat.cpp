@@ -233,11 +233,9 @@ public:
         configuration *workload_config, *read_config;
         std::vector<thread_worker *> workers;
         std::atomic<int64_t> z_key_searches;
-        int64_t entries_stat, expected_entries, prefix_stat, prev_entries_stat, prev_prefix_stat;
+        int64_t expected_entries;
         int num_threads;
 
-        prev_entries_stat = 0;
-        prev_prefix_stat = 0;
         num_threads = _config->get_int("search_near_threads");
         tc->stat_cursor = tc->session.open_scoped_cursor(STATISTICS_URI);
         workload_config = _config->get_subconfig(WORKLOAD_MANAGER);
@@ -257,10 +255,10 @@ public:
          */
         expected_entries = keys_per_prefix * pow(ALPHABET.size(), PREFIX_KEY_LEN - srchkey_len) * 2;
         while (tc->running()) {
-            metrics_monitor::get_stat(
-              tc->stat_cursor, WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100, &prev_entries_stat);
-            metrics_monitor::get_stat(
-              tc->stat_cursor, WT_STAT_CONN_CURSOR_BOUNDS_NEXT_EARLY_EXIT, &prev_prefix_stat);
+            int64_t prev_entries_stat =
+              metrics_monitor::get_stat(tc->stat_cursor, WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100);
+            int64_t prev_prefix_stat = metrics_monitor::get_stat(
+              tc->stat_cursor, WT_STAT_CONN_CURSOR_BOUNDS_NEXT_EARLY_EXIT);
 
             thread_manager tm;
             for (uint64_t i = 0; i < num_threads; ++i) {
@@ -282,10 +280,10 @@ public:
             }
             workers.clear();
 
-            metrics_monitor::get_stat(
-              tc->stat_cursor, WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100, &entries_stat);
-            metrics_monitor::get_stat(
-              tc->stat_cursor, WT_STAT_CONN_CURSOR_BOUNDS_NEXT_EARLY_EXIT, &prefix_stat);
+            int64_t entries_stat =
+              metrics_monitor::get_stat(tc->stat_cursor, WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100);
+            int64_t prefix_stat = metrics_monitor::get_stat(
+              tc->stat_cursor, WT_STAT_CONN_CURSOR_BOUNDS_NEXT_EARLY_EXIT);
             logger::log_msg(LOG_TRACE,
               "Read thread skipped entries: " + std::to_string(entries_stat - prev_entries_stat) +
                 " search near early exit: " +

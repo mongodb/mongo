@@ -502,6 +502,8 @@ struct __wt_connection_stats {
     int64_t block_byte_write_syscall;
     int64_t block_map_read;
     int64_t block_byte_map_read;
+    int64_t block_reusable_over_50;
+    int64_t block_reusable_over_90;
     int64_t block_byte_write_intl_delta_lt20;
     int64_t block_byte_write_intl_delta_lt40;
     int64_t block_byte_write_intl_delta_lt60;

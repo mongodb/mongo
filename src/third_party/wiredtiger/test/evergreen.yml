@@ -838,6 +838,35 @@ functions:
     - *cppsuite_s3_put
     - *cppsuite_remove_dir
 
+  "disagg failover perf test":
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger/cmake_build/test/cppsuite"
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          ${PREPARE_TEST_ENV}
+          ./test_disagg_failover_perf ${test_args|}
+    - *dump_stacktraces
+    - *upload_stacktraces
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - ./wiredtiger/test/evergreen/perf_submission.sh
+        env:
+          perf_file_path: ./wiredtiger/cmake_build/test/cppsuite/test_disagg_failover_perf.json
+        include_expansions_in_env:
+          - requester
+          - revision_order_id
+          - project_id
+          - version_id
+          - build_variant
+          - task_name
+          - task_id
+          - execution
+
   "wt2853_perf test":
     command: shell.exec
     params:
@@ -2250,6 +2279,30 @@ tasks:
         vars:
           test_config_filename: configs/api_timing_benchmarks_default.txt
           test_name: api_timing_benchmarks
+
+  - name: cppsuite-disagg-failover-perf-append
+    depends_on:
+      - name: compile
+    tags: ["cppsuite-perf-test-arm"]
+    commands:
+      - func: "fetch artifacts"
+      - func: "disagg failover perf test"
+        vars:
+          # Ingest 3.2GB of data into 10 1GB tables using append operations, keys are 10 bytes and
+          # values 1014 bytes. Cache size is 32GB.
+          test_args: "-c 10 -k 1000000 -i 3200 -S append -g 32 -s 10 -v 1014 -V 1"
+
+  - name: cppsuite-disagg-failover-perf-updates
+    depends_on:
+      - name: compile
+    tags: ["cppsuite-perf-test-arm"]
+    commands:
+      - func: "fetch artifacts"
+      - func: "disagg failover perf test"
+        vars:
+          # Ingest 3.2GB of data into 10 1GB tables using update operations, keys are 10 bytes and
+          # values 1014 bytes. Cache size is 32GB.
+          test_args: "-c 10 -k 1000000 -i 3200 -S updates -g 32 -s 10 -v 1014 -V 1"
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks

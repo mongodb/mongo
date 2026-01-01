@@ -50,8 +50,7 @@ instruction_counter::instruction_counter(const std::string &id, const std::strin
 void
 instruction_counter::append_stats()
 {
-    metrics_writer::instance().add_stat("{\"name\":\"" + _id +
-      "_instructions\",\"value\":" + std::to_string(_instruction_count) + "}");
+    metrics_writer::instance().add_stat(_id + "_instructions", _instruction_count);
 }
 
 instruction_counter::~instruction_counter()

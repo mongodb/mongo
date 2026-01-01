@@ -39,6 +39,8 @@
 #include "src/main/database.h"
 #include "src/main/database_operation.h"
 #include "src/main/crud.h"
+#include "src/component/metrics_monitor.h"
+#include "src/component/metrics_writer.h"
 
 extern "C" {
 #include "wiredtiger.h"
@@ -590,6 +592,16 @@ main(int argc, char *argv[])
     /* Sleep for 10 seconds, hopefully this will help with FTDC files. */
     logger::log_msg(LOG_INFO, "Sleeping 10 seconds to allow FTDC files to flush.");
     std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    /* Retrieve any useful statistics. */
+    logger::log_msg(LOG_INFO, "Retrieving statistics.");
+    scoped_session stat_session = connection_manager::instance().create_session();
+    scoped_cursor stat_cursor = stat_session.open_scoped_cursor("statistics:");
+    int64_t step_up_time = metrics_monitor::get_stat(stat_cursor, WT_STAT_CONN_DISAGG_STEP_UP_TIME);
+    /* Add the statistics to metrics_writer and output to JSON file. */
+    metrics_writer::instance().add_stat("disagg_step_up_time", step_up_time);
+    metrics_writer::instance().output_perf_file(progname);
+    logger::log_msg(LOG_INFO, "Statistics written to " + progname + ".json");
 
     /* Cleanup. */
     delete database_model;

@@ -60,14 +60,16 @@ get_stat_field(const std::string &name)
     testutil_die(EINVAL, "get_stat_field: Stat \"%s\" is unrecognized", name.c_str());
 }
 
-void
-metrics_monitor::get_stat(scoped_cursor &cursor, int stat_field, int64_t *valuep)
+int64_t
+metrics_monitor::get_stat(scoped_cursor &cursor, int stat_field)
 {
     const char *desc, *pvalue;
     cursor->set_key(cursor.get(), stat_field);
     testutil_check(cursor->search(cursor.get()));
-    testutil_check(cursor->get_value(cursor.get(), &desc, &pvalue, valuep));
+    int64_t value = 0;
+    testutil_check(cursor->get_value(cursor.get(), &desc, &pvalue, &value));
     testutil_check(cursor->reset(cursor.get()));
+    return value;
 }
 
 metrics_monitor::metrics_monitor(
@@ -124,18 +126,15 @@ metrics_monitor::finish()
         const std::string stat_name = stat->get_name();
 
         /* Append stats to the statistics writer if it needs to be saved. */
-        if (stat->get_save()) {
-            auto stat_str =
-              "{\"name\":\"" + stat_name + "\",\"value\":" + stat->get_value_str(_cursor) + "}";
-            metrics_writer::instance().add_stat(stat_str);
-        }
+        if (stat->get_save())
+            metrics_writer::instance().add_stat(stat_name, stat->get_value(_cursor));
 
         if (!stat->get_postrun())
             continue;
 
         int64_t stat_max = stat->get_max();
         int64_t stat_min = stat->get_min();
-        int64_t stat_value = std::stoi(stat->get_value_str(_cursor));
+        int64_t stat_value = stat->get_value(_cursor);
 
         if (stat_value < stat_min || stat_value > stat_max) {
             const std::string error_string = "metrics_monitor: Post-run stat \"" + stat_name +

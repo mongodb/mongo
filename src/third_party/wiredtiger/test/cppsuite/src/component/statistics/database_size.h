@@ -43,7 +43,7 @@ public:
 
     /* Don't need the stat cursor for these. */
     void check(scoped_cursor &) override final;
-    std::string get_value_str(scoped_cursor &) override final;
+    int64_t get_value(scoped_cursor &) override final;
 
 private:
     size_t get_db_size() const;

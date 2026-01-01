@@ -32,6 +32,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <type_traits>
 
 namespace test_harness {
 /* Singleton class that can write statistics to a file. */
@@ -44,7 +45,17 @@ public:
     metrics_writer(metrics_writer const &) = delete;
     metrics_writer &operator=(metrics_writer const &) = delete;
 
-    void add_stat(const std::string &stat_string);
+    template <typename T>
+    void
+    add_stat(const std::string &name, T value)
+    {
+        static_assert(
+          std::is_arithmetic<T>::value, "T must be an arithmetic type for std::to_string");
+        std::lock_guard<std::mutex> lg(_stat_mutex);
+        std::string stat_string =
+          "{\"name\":\"" + name + "\",\"value\":" + std::to_string(value) + "}";
+        _stats.emplace_back(std::move(stat_string));
+    }
     void output_perf_file(const std::string &test_name);
 
 private:

@@ -30,13 +30,6 @@
 
 namespace test_harness {
 void
-metrics_writer::add_stat(const std::string &stat_string)
-{
-    std::lock_guard<std::mutex> lg(_stat_mutex);
-    _stats.push_back(stat_string);
-}
-
-void
 metrics_writer::output_perf_file(const std::string &test_name)
 {
     std::ofstream perf_file(test_name + ".json");

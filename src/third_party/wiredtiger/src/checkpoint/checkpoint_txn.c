@@ -13,6 +13,7 @@ static int __checkpoint_lock_dirty_tree(WT_SESSION_IMPL *, bool, bool, bool, con
 static int __checkpoint_mark_skip(WT_SESSION_IMPL *, WT_CKPT *, bool);
 static int __checkpoint_presync(WT_SESSION_IMPL *, const char *[]);
 static int __checkpoint_tree_helper(WT_SESSION_IMPL *, const char *[]);
+static int __checkpoint_block_reusable_stats(WT_SESSION_IMPL *, const char *[]);
 static void __checkpoint_prepare_progress(WT_SESSION_IMPL *session, bool final);
 static void __checkpoint_progress(WT_SESSION_IMPL *, bool);
 static void __checkpoint_progress_clear(WT_SESSION_IMPL *);
@@ -697,7 +698,7 @@ __checkpoint_timer_stats_set(WTI_CKPT_TIMER *timer, uint64_t msec)
  * __checkpoint_stats --
  *     Update checkpoint timer stats.
  */
-static void
+static int
 __checkpoint_stats(WT_SESSION_IMPL *session)
 {
     struct timespec stop;
@@ -722,6 +723,16 @@ __checkpoint_stats(WT_SESSION_IMPL *session)
     /* Compute timer statistics for the checkpoint prepare. */
     msec = WT_TIMEDIFF_MS(conn->ckpt.prepare.timer_end, conn->ckpt.prepare.timer_start);
     __checkpoint_timer_stats_set(&conn->ckpt.prepare, msec);
+
+    /*
+     * Walk the list of open handles, updating the connection level count of files with available
+     * space above 50 and 90 percent respectively. Skip when using disagg, as available file space
+     * does not apply.
+     */
+    if (!__wt_conn_is_disagg(session))
+        WT_RET(__wt_conn_btree_apply(session, NULL, __checkpoint_block_reusable_stats, NULL, NULL));
+
+    return (0);
 }
 
 /*
@@ -1119,6 +1130,36 @@ __checkpoint_clear_time(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __checkpoint_block_reusable_stats --
+ *     Update block reusable ratio stats.
+ */
+int
+__checkpoint_block_reusable_stats(WT_SESSION_IMPL *session, const char *cfg[])
+{
+    WT_BM *bm;
+    WT_BTREE *btree;
+
+    WT_UNUSED(cfg);
+
+    btree = S2BT(session);
+
+    if ((bm = btree->bm) == NULL)
+        return (0);
+
+    /* Only check file size over 100MB. */
+    if (bm->block->size < 100 * WT_MILLION)
+        return (0);
+
+    /* Update btree reusable after each checkpoint. */
+    int64_t reusable_percentage = (int64_t)bm->block->live.avail.bytes * 100 / bm->block->size;
+    if (reusable_percentage >= 50)
+        WT_STAT_CONN_INCR(session, block_reusable_over_50);
+    if (reusable_percentage >= 90)
+        WT_STAT_CONN_INCR(session, block_reusable_over_90);
+    return (0);
+}
+
+/*
  * __checkpoint_db_internal --
  *     Checkpoint a database or a list of objects in the database.
  */
@@ -1202,6 +1243,10 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     __wt_atomic_store_uint64_relaxed(&conn->rec_maximum_milliseconds, 0);
     __wt_atomic_store_uint64_relaxed(&conn->page_delta.max_internal_delta_count, 0);
     __wt_atomic_store_uint64_relaxed(&conn->page_delta.max_leaf_delta_count, 0);
+
+    /* Reset reusable file count to 0. */
+    WT_STAT_CONN_SET(session, block_reusable_over_50, 0);
+    WT_STAT_CONN_SET(session, block_reusable_over_90, 0);
 
     /* Initialize the verbose tracking timer */
     __wt_epoch(session, &conn->ckpt.ckpt_api.timer_start);
@@ -1563,7 +1608,7 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
      */
     __wt_atomic_store_uint64_v_relaxed(&txn_global->checkpoint_txn_shared.pinned_id, WT_TXN_NONE);
 
-    __checkpoint_stats(session);
+    WT_ERR(__checkpoint_stats(session));
 
     /*
      * If timestamps defined the checkpoint's content, set the saved last checkpoint timestamp,

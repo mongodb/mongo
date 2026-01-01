@@ -46,7 +46,7 @@ namespace test_harness {
  */
 class metrics_monitor : public component {
 public:
-    static void get_stat(scoped_cursor &, int, int64_t *);
+    static int64_t get_stat(scoped_cursor &, int);
 
 public:
     metrics_monitor(const std::string &test_name, configuration *config, database &database);

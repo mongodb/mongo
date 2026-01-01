@@ -44,8 +44,7 @@ statistics::statistics(configuration &config, const std::string &stat_name, int 
 void
 statistics::check(scoped_cursor &cursor)
 {
-    int64_t stat_value;
-    metrics_monitor::get_stat(cursor, field, &stat_value);
+    int64_t stat_value = metrics_monitor::get_stat(cursor, field);
     if (stat_value < min || stat_value > max) {
         const std::string error_string = "metrics_monitor: Post-run stat \"" + name +
           "\" was outside of the specified limits. Min=" + std::to_string(min) +
@@ -55,12 +54,10 @@ statistics::check(scoped_cursor &cursor)
         logger::log_msg(LOG_TRACE, name + " usage: " + std::to_string(stat_value));
 }
 
-std::string
-statistics::get_value_str(scoped_cursor &cursor)
+int64_t
+statistics::get_value(scoped_cursor &cursor)
 {
-    int64_t stat_value;
-    metrics_monitor::get_stat(cursor, field, &stat_value);
-    return std::to_string(stat_value);
+    return metrics_monitor::get_stat(cursor, field);
 }
 
 int

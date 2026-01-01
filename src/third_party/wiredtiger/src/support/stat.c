@@ -1841,6 +1841,8 @@ static const char *const __stats_connection_desc[] = {
   "block-manager: bytes written via system call API",
   "block-manager: mapped blocks read",
   "block-manager: mapped bytes read",
+  "block-manager: number of files checkpointed with reusable space over 50 percent",
+  "block-manager: number of files checkpointed with reusable space over 90 percent",
   "block-manager: number of internal page deltas written that were between 0-20 percent the size "
   "of the full image",
   "block-manager: number of internal page deltas written that were between 20-40 percent the size "
@@ -2895,6 +2897,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_byte_write_syscall = 0;
     stats->block_map_read = 0;
     stats->block_byte_map_read = 0;
+    stats->block_reusable_over_50 = 0;
+    stats->block_reusable_over_90 = 0;
     stats->block_byte_write_intl_delta_lt20 = 0;
     stats->block_byte_write_intl_delta_lt40 = 0;
     stats->block_byte_write_intl_delta_lt60 = 0;
@@ -3889,6 +3893,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_byte_write_syscall += WT_STAT_CONN_READ(from, block_byte_write_syscall);
     to->block_map_read += WT_STAT_CONN_READ(from, block_map_read);
     to->block_byte_map_read += WT_STAT_CONN_READ(from, block_byte_map_read);
+    to->block_reusable_over_50 += WT_STAT_CONN_READ(from, block_reusable_over_50);
+    to->block_reusable_over_90 += WT_STAT_CONN_READ(from, block_reusable_over_90);
     to->block_byte_write_intl_delta_lt20 +=
       WT_STAT_CONN_READ(from, block_byte_write_intl_delta_lt20);
     to->block_byte_write_intl_delta_lt40 +=

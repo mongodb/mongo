@@ -45,8 +45,7 @@ execution_timer::append_stats()
 {
     std::sort(_time_recordings.begin(), _time_recordings.end());
     auto percentile = _time_recordings[std::floor(_time_recordings.size() * 0.9)];
-    metrics_writer::instance().add_stat("{\"name\":\"" + _id +
-      "_nanoseconds_90th_percentile\",\"value\":" + std::to_string(percentile) + "}");
+    metrics_writer::instance().add_stat(_id + "_nanoseconds_90th_percentile", percentile);
 }
 
 execution_timer::~execution_timer()

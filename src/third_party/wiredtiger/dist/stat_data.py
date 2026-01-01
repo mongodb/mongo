@@ -293,6 +293,8 @@ conn_stats = [
     BlockStat('block_read', 'blocks read'),
     BlockStat('block_remap_file_resize', 'number of times the file was remapped because it changed size via fallocate or truncate'),
     BlockStat('block_remap_file_write', 'number of times the region was remapped via write'),
+    BlockStat('block_reusable_over_50', 'number of files checkpointed with reusable space over 50 percent'),
+    BlockStat('block_reusable_over_90', 'number of files checkpointed with reusable space over 90 percent'),
     BlockStat('block_write', 'blocks written'),
 
     ##########################################
