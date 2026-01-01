@@ -5,7 +5,7 @@ Note: this doc is being continuously updated while changes are being made to the
 # Features
 
 The MongoDB unit test framework is a thin layer built atop GoogleTest, so most GoogleTest features
-(see [Google Test documentation](google_test_docs)) are available for use aside from anything
+(see [Google Test documentation][google_test_docs]) are available for use aside from anything
 listed out in [Banned Features](#banned-features). The unit testing framework also includes
 enhanced reporting of test output (see
 [Enhanced Reporting of Test Output](#enhanced-reporting-of-test-output)).
@@ -16,7 +16,7 @@ enhanced reporting of test output (see
 
 Parameterized tests are a GoogleTest feature that allows the same test logic to be run with
 different values or types (see GoogleTest docs on
-[Value-Parameterized Tests](value_parameterized_tests) and [Typed Tests](typed_tests)).
+[Value-Parameterized Tests][value_parameterized_tests] and [Typed Tests][typed_tests]).
 
 ```cpp
 class TestFixture :
@@ -70,11 +70,11 @@ These command line flags may be used to configure the Enhanced Reporter:
 The MongoDB unit testing framework uses `DEATH_TEST` (with `DEATH_TEST_F`, `DEATH_TEST_REGEX`,
 and `DEATH_TEST_REGEX_F` variants) to test code that is expected to cause the process to
 terminate. This should replace all uses of the `ASSERT_DEATH` macro from GoogleTest (see
-[unittest/death_test.h](death_test_h) for more details).
+[unittest/death_test.h][death_test_h] for more details).
 
 Similar to GoogleTest, `DEATH_TEST` test suite names should be suffixed with `DeathTest`. For
 instance, for a death test intending to be associated with `SuiteName` should use
-`SuiteNameDeathTest` (see GoogleTest's [Death Test naming](death_test_naming)).
+`SuiteNameDeathTest` (see GoogleTest's [Death Test naming][death_test_naming]).
 
 ```cpp
 TEST(SuiteName, TestName) {
