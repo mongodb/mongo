@@ -60,6 +60,10 @@ static void swapPredicateSides(JoinEdge::PredicateList& predicates) {
 }
 }  // namespace
 
+std::string nodeSetToString(const NodeSet& set, size_t numNodesToPrint) {
+    return set.to_string().substr(kHardMaxNodesInJoin - numNodesToPrint, numNodesToPrint);
+}
+
 BSONObj JoinNode::toBSON() const {
     BSONObjBuilder result{};
     result.append("collectionName", redactTenant(collectionName));

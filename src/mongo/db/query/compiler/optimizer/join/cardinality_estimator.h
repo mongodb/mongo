@@ -45,6 +45,7 @@ public:
     JoinCardinalityEstimator(const JoinReorderingContext& ctx,
                              EdgeSelectivities edgeSelectivities,
                              NodeCardinalities nodeCardinalities);
+    virtual ~JoinCardinalityEstimator() {};
 
     static JoinCardinalityEstimator make(const JoinReorderingContext& ctx,
                                          const cost_based_ranker::EstimateMap& estimates,
@@ -70,7 +71,8 @@ public:
      * edge selectivities, base table cardinalities, and single-table predicate selectivities to
      * produce an estimate. Populates `_subsetCardinalities` with the result.
      */
-    cost_based_ranker::CardinalityEstimate getOrEstimateSubsetCardinality(const NodeSet& nodes);
+    virtual cost_based_ranker::CardinalityEstimate getOrEstimateSubsetCardinality(
+        const NodeSet& nodes);
 
 private:
     const JoinReorderingContext& _ctx;

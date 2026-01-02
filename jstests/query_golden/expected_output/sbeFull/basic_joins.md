@@ -118,7 +118,7 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [b = b]
+NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
@@ -428,7 +428,7 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [b = b]
+NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
@@ -779,7 +779,7 @@ rightEmbeddingField: "y"
   |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
-  HASH_JOIN_EMBEDDING [a = a]
+  NESTED_LOOP_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
   rightEmbeddingField: "x"
   |  |
@@ -801,7 +801,7 @@ HASH_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "y"
 rightEmbeddingField: "none"
   |  |
-  |  HASH_JOIN_EMBEDDING [a = a]
+  |  NESTED_LOOP_JOIN_EMBEDDING [a = a]
   |  leftEmbeddingField: "none"
   |  rightEmbeddingField: "x"
   |  |  |
@@ -831,7 +831,7 @@ rightEmbeddingField: "y"
   |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
-  HASH_JOIN_EMBEDDING [a = a]
+  NESTED_LOOP_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
   rightEmbeddingField: "x"
   |  |
@@ -1168,7 +1168,7 @@ rightEmbeddingField: "y"
   |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
-  HASH_JOIN_EMBEDDING [a = a]
+  NESTED_LOOP_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
   rightEmbeddingField: "x"
   |  |
@@ -1187,7 +1187,7 @@ HASH_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "y"
 rightEmbeddingField: "none"
   |  |
-  |  HASH_JOIN_EMBEDDING [a = a]
+  |  NESTED_LOOP_JOIN_EMBEDDING [a = a]
   |  leftEmbeddingField: "none"
   |  rightEmbeddingField: "x"
   |  |  |
@@ -1214,7 +1214,7 @@ rightEmbeddingField: "y"
   |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
-  HASH_JOIN_EMBEDDING [a = a]
+  NESTED_LOOP_JOIN_EMBEDDING [a = a]
   leftEmbeddingField: "none"
   rightEmbeddingField: "x"
   |  |
@@ -2628,28 +2628,28 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [c = x.c]
-leftEmbeddingField: "z"
-rightEmbeddingField: "none"
+NESTED_LOOP_JOIN_EMBEDDING [x.c = c]
+leftEmbeddingField: "none"
+rightEmbeddingField: "z"
   |  |
-  |  HASH_JOIN_EMBEDDING [b = b]
-  |  leftEmbeddingField: "none"
-  |  rightEmbeddingField: "y"
-  |  |  |
-  |  |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  |  direction: "forward"
-  |  |
-  |  HASH_JOIN_EMBEDDING [a = a]
-  |  leftEmbeddingField: "none"
-  |  rightEmbeddingField: "x"
-  |  |  |
-  |  |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  |  direction: "forward"
-  |  |
-  |  COLLSCAN [test.basic_joins_md]
+  |  COLLSCAN [test.basic_joins_md_foreign3]
   |  direction: "forward"
   |
-  COLLSCAN [test.basic_joins_md_foreign3]
+  NESTED_LOOP_JOIN_EMBEDDING [b = b]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign2]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
   direction: "forward"
 ```
 ### With random order, seed 44, nested loop joins
@@ -2993,28 +2993,28 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [d = w.y.d]
-leftEmbeddingField: "k.y.z"
-rightEmbeddingField: "none"
+NESTED_LOOP_JOIN_EMBEDDING [w.y.d = d]
+leftEmbeddingField: "none"
+rightEmbeddingField: "k.y.z"
   |  |
-  |  HASH_JOIN_EMBEDDING [x.c = c]
-  |  leftEmbeddingField: "none"
-  |  rightEmbeddingField: "w.y"
-  |  |  |
-  |  |  COLLSCAN [test.basic_joins_md_foreign3]
-  |  |  direction: "forward"
-  |  |
-  |  HASH_JOIN_EMBEDDING [a = a]
-  |  leftEmbeddingField: "none"
-  |  rightEmbeddingField: "x"
-  |  |  |
-  |  |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  |  direction: "forward"
-  |  |
-  |  COLLSCAN [test.basic_joins_md]
+  |  COLLSCAN [test.basic_joins_md_foreign2]
   |  direction: "forward"
   |
-  COLLSCAN [test.basic_joins_md_foreign2]
+  HASH_JOIN_EMBEDDING [x.c = c]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "w.y"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign3]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [a = a]
+  leftEmbeddingField: "none"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.basic_joins_md_foreign1]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.basic_joins_md]
   direction: "forward"
 ```
 ### With random order, seed 44, nested loop joins
@@ -3330,7 +3330,7 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [b = b]
+NESTED_LOOP_JOIN_EMBEDDING [b = b]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |

@@ -1,4 +1,5 @@
 LEFT DEEP, 3 Nodes
+HJ order pruning enabled: 0
 Level 0:
 001, 010, 100
 Level 1:
@@ -48,6 +49,7 @@ Output plans (best plan 0):
     [010][test.nss1] COLLSCAN
 
 RIGHT DEEP, 3 Nodes
+HJ order pruning enabled: 0
 Level 0:
 001, 010, 100
 Level 1:

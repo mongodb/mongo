@@ -648,6 +648,14 @@ server_parameters:
             gte: 0
         redact: false
 
+    internalEnableJoinEnumerationHJOrderPruning:
+        description: "Whether or not to prune un-promising HJ orders during join plan enumeration"
+        set_at: [startup, runtime]
+        cpp_varname: "internalEnableJoinEnumerationHJOrderPruning"
+        cpp_vartype: AtomicWord<bool>
+        default: true
+        redact: false
+
     #
     # Query execution
     #
