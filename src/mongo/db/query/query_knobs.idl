@@ -1857,6 +1857,27 @@ server_parameters:
         cpp_vartype: bool
         default: false
         redact: false
+
+    internalQueryMergeMinInsertAttempts:
+        description: >-
+            When $merge stage is using a insert with backup strategy, a minimal number of insert
+            attempts before it can switch to update permamently.
+        set_at: [startup, runtime]
+        cpp_varname: internalQueryMergeMinInsertAttempts
+        cpp_vartype: AtomicWord<long long>
+        default: 1000
+        redact: false
+
+    internalQueryMergeMaxInsertErrorRate:
+        description: >-
+            When $merge stage is using a insert with backup strategy, a max allowed insert error
+            rate. If insert error rate is higher, than the stage will use update without trying
+            insert first.
+        set_at: [startup, runtime]
+        cpp_varname: internalQueryMergeMaxInsertErrorRate
+        cpp_vartype: AtomicWord<double>
+        default: 0.7
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

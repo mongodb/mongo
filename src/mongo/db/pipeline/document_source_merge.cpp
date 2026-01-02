@@ -89,7 +89,10 @@ const auto kDefaultPipelineLet = BSON("new" << "$$ROOT");
  * Checks if a pair of whenMatched/whenNotMatched merge modes is supported.
  */
 bool isSupportedMergeMode(WhenMatched whenMatched, WhenNotMatched whenNotMatched) {
-    return getMergeStrategyDescriptors().count({whenMatched, whenNotMatched}) > 0;
+    // AllowInsertWithUpdateBackupStrategies doesn't affect the set of supported modes, so we can
+    // pass any value.
+    return getMergeStrategyDescriptors(MergeProcessor::AllowInsertWithUpdateBackupStrategies{false})
+               .count({whenMatched, whenNotMatched}) > 0;
 }
 
 /**
@@ -209,8 +212,12 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
 PrivilegeVector DocumentSourceMerge::LiteParsed::requiredPrivileges(
     bool isMongos, bool bypassDocumentValidation) const {
     tassert(11282974, "Missing foreignNss", _foreignNss);
-    auto actions =
-        ActionSet{getMergeStrategyDescriptors().at({_whenMatched, _whenNotMatched}).actions};
+    // AllowInsertWithUpdateBackupStrategies doesn't affect required priviledges, so we can pass any
+    // value.
+    auto actions = ActionSet{
+        getMergeStrategyDescriptors(MergeProcessor::AllowInsertWithUpdateBackupStrategies{false})
+            .at({_whenMatched, _whenNotMatched})
+            .actions};
     if (bypassDocumentValidation) {
         actions.addAction(ActionType::bypassDocumentValidation);
     }
@@ -218,15 +225,17 @@ PrivilegeVector DocumentSourceMerge::LiteParsed::requiredPrivileges(
     return {{ResourcePattern::forExactNamespace(*_foreignNss), actions}};
 }
 
-DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
-                                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         WhenMatched whenMatched,
-                                         WhenNotMatched whenNotMatched,
-                                         boost::optional<BSONObj> letVariables,
-                                         boost::optional<std::vector<BSONObj>> pipeline,
-                                         std::set<FieldPath> mergeOnFields,
-                                         boost::optional<ChunkVersion> collectionPlacementVersion,
-                                         bool allowMergeOnNullishValues)
+DocumentSourceMerge::DocumentSourceMerge(
+    NamespaceString outputNs,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    WhenMatched whenMatched,
+    WhenNotMatched whenNotMatched,
+    boost::optional<BSONObj> letVariables,
+    boost::optional<std::vector<BSONObj>> pipeline,
+    std::set<FieldPath> mergeOnFields,
+    boost::optional<ChunkVersion> collectionPlacementVersion,
+    bool allowMergeOnNullishValues,
+    MergeProcessor::AllowInsertWithUpdateBackupStrategies allowInsertWithUpdateBackupStrategies)
     : DocumentSourceWriter(kStageName.data(), std::move(outputNs), expCtx),
       _mergeOnFields(std::make_shared<std::set<FieldPath>>(std::move(mergeOnFields))),
       _mergeOnFieldsIncludesId(_mergeOnFields->count("_id") == 1),
@@ -236,7 +245,9 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
                                                        std::move(letVariables),
                                                        std::move(pipeline),
                                                        std::move(collectionPlacementVersion),
-                                                       allowMergeOnNullishValues)) {};
+                                                       allowMergeOnNullishValues,
+                                                       allowInsertWithUpdateBackupStrategies)) {};
+
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
     NamespaceString outputNs,
@@ -248,6 +259,31 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
     std::set<FieldPath> mergeOnFields,
     boost::optional<ChunkVersion> collectionPlacementVersion,
     bool allowMergeOnNullishValues) {
+    return DocumentSourceMerge::create(
+        std::move(outputNs),
+        expCtx,
+        whenMatched,
+        whenNotMatched,
+        std::move(letVariables),
+        std::move(pipeline),
+        std::move(mergeOnFields),
+        std::move(collectionPlacementVersion),
+        allowMergeOnNullishValues,
+        MergeProcessor::AllowInsertWithUpdateBackupStrategies{
+            feature_flags::gFeatureFlagMergeStageInsertWithUpdateBackup.isEnabled()});
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
+    NamespaceString outputNs,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    WhenMatched whenMatched,
+    WhenNotMatched whenNotMatched,
+    boost::optional<BSONObj> letVariables,
+    boost::optional<std::vector<BSONObj>> pipeline,
+    std::set<FieldPath> mergeOnFields,
+    boost::optional<ChunkVersion> collectionPlacementVersion,
+    bool allowMergeOnNullishValues,
+    MergeProcessor::AllowInsertWithUpdateBackupStrategies allowInsertWithUpdateBackupStrategies) {
     uassert(51189,
             fmt::format("Combination of {} modes 'whenMatched: {}' and 'whenNotMatched: {}' "
                         "is not supported",
@@ -306,7 +342,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
                                    std::move(pipeline),
                                    std::move(mergeOnFields),
                                    std::move(collectionPlacementVersion),
-                                   allowMergeOnNullishValues);
+                                   allowMergeOnNullishValues,
+                                   allowInsertWithUpdateBackupStrategies);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(

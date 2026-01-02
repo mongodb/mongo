@@ -103,25 +103,21 @@ MongoProcessInterface::InsertResult ReplicaSetNodeProcessInterface::insert(
 
     auto statusWithReply = _executeCommandOnPrimaryRaw(opCtx, ns, batchInsertCommand.toBSON());
     if (!statusWithReply.isOK()) {
-        return {statusWithReply.getStatus()};
+        return {write_ops::WriteError{0, statusWithReply.getStatus()}};
     }
 
     BatchedCommandResponse response;
     std::string errMsg;
     InsertResult result;
     if (!response.parseBSON(statusWithReply.getValue(), &errMsg)) {
-        result.emplace_back(ErrorCodes::FailedToParse, errMsg);
+        result.emplace_back(0, Status{ErrorCodes::FailedToParse, errMsg});
     } else if (!response.getOk()) {
-        result.push_back(response.getTopLevelStatus());
+        result.emplace_back(0, response.getTopLevelStatus());
     } else if (response.isErrDetailsSet()) {
         result.reserve(response.getErrDetails().size());
-        for (const auto& error : response.getErrDetails()) {
-            result.push_back(error.getStatus());
-        }
+        result.assign(response.getErrDetails().begin(), response.getErrDetails().end());
     } else if (response.isWriteConcernErrorSet()) {
-        result.push_back(response.getWriteConcernError()->toStatus());
-    } else {
-        result.push_back(Status::OK());
+        result.emplace_back(0, response.getWriteConcernError()->toStatus());
     }
     return result;
 }

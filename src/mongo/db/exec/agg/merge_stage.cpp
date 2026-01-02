@@ -68,10 +68,14 @@ std::pair<MergeStage::BatchObject, int> MergeStage::makeBatchObject(Document doc
     return {std::move(batchObject), size};
 }
 
+bool MergeStage::shouldFlush(size_t currentBatchSize) const {
+    return _mergeProcessor->shouldFlush(currentBatchSize);
+}
+
 void MergeStage::flush(BatchedCommandRequest bcr, BatchedObjects batch) {
     try {
         DocumentSourceWriteBlock writeBlock(pExpCtx->getOperationContext());
-        _mergeProcessor->flush(_outputNs, std::move(bcr), std::move(batch));
+        _mergeProcessor->flush(_outputNs, *_mergeOnFields, std::move(bcr), std::move(batch));
     } catch (const ExceptionFor<ErrorCodes::ImmutableField>& ex) {
         uassertStatusOKWithContext(ex.toStatus(),
                                    "$merge failed to update the matching document, did you "

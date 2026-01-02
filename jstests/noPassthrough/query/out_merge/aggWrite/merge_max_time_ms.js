@@ -6,9 +6,10 @@
  * ]
  */
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
-import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {getCurOpFilterForFailPoint, waitForCurOpByFilter} from "jstests/libs/curop_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const kDBName = "test";
 const kSourceCollName = "merge_max_time_ms_source";
@@ -32,7 +33,7 @@ function insertDocs(coll) {
 function forceAggregationToHangAndCheckMaxTimeMsExpires(
     whenMatched,
     whenNotMatched,
-    failPointName,
+    failPointNames,
     conn,
     failPointConn,
     maxTimeMsConn,
@@ -45,20 +46,16 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
     // Enable a failPoint so that the write will hang. 'shouldCheckForInterrupt' is set to true
     // so that maxTimeMS expiration can occur while the $merge operation's thread is hanging on
     // this failpoiint.
-    const failpointCommand = {
-        configureFailPoint: failPointName,
-        mode: "alwaysOn",
-        data: {nss: kDBName + "." + kDestCollName, shouldCheckForInterrupt: true},
-    };
-
-    assert.commandWorked(failPointConn.getDB("admin").runCommand(failpointCommand));
+    const failPoints = failPointNames.map((failPointName) =>
+        configureFailPoint(failPointConn, failPointName, {
+            nss: kDBName + "." + kDestCollName,
+            shouldCheckForInterrupt: true,
+        }),
+    );
 
     // Make sure we don't run out of time on either of the involved nodes before the failpoint is
     // hit.
-    assert.commandWorked(conn.getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}));
-    assert.commandWorked(
-        maxTimeMsConn.getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "alwaysOn"}),
-    );
+    const maxTimeFailPoints = [conn, maxTimeMsConn].map((conn) => configureFailPoint(conn, "maxTimeNeverTimeOut"));
 
     // Build the parallel shell function.
     let shellStr = `const testDB = db.getSiblingDB('${kDBName}');`;
@@ -83,11 +80,10 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
     shellStr += `(${runAggregate.toString()})();`;
     const awaitShell = startParallelShell(shellStr, conn.port);
 
-    waitForCurOpByFailPointNoNS(failPointConn.getDB("admin"), failPointName, {}, {allUsers: true});
+    const curOpFilter = {$or: failPointNames.map((fp) => getCurOpFilterForFailPoint(fp))};
+    waitForCurOpByFilter(failPointConn.getDB("admin"), curOpFilter, {allUsers: true});
 
-    assert.commandWorked(
-        maxTimeMsConn.getDB("admin").runCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}),
-    );
+    maxTimeFailPoints.forEach((fp) => fp.off());
 
     // The aggregation running in the parallel shell will hang on the failpoint, burning
     // its time. Wait until the maxTimeMS has definitely expired.
@@ -95,7 +91,7 @@ function forceAggregationToHangAndCheckMaxTimeMsExpires(
 
     // Now drop the failpoint, allowing the aggregation to proceed. It should hit an
     // interrupt check and terminate immediately.
-    assert.commandWorked(failPointConn.getDB("admin").runCommand({configureFailPoint: failPointName, mode: "off"}));
+    failPoints.forEach((fp) => fp.off());
 
     // Wait for the parallel shell to finish.
     assert.eq(awaitShell(), 0);
@@ -133,14 +129,14 @@ function runUnshardedTest(whenMatched, whenNotMatched, conn, primaryConn, maxTim
 
     assert.commandWorked(destColl.remove({}));
 
-    // Force the aggregation to hang while the batch is being written. The failpoint changes
-    // depending on the mode. If 'whenMatched' is set to "fail" then the implementation will end
-    // up issuing insert commands instead of updates.
-    const kFailPointName = whenMatched === "fail" ? "hangDuringBatchInsert" : "hangDuringBatchUpdate";
+    // Force the aggregation to hang while the batch is being written. Depending on mode, $merge
+    // can perform inserts or updates. To make the test resiliant to $merge mode changing, we hang
+    // on both possible code paths.
+    const kFailPointNames = ["hangDuringBatchInsert", "hangDuringBatchUpdate"];
     forceAggregationToHangAndCheckMaxTimeMsExpires(
         whenMatched,
         whenNotMatched,
-        kFailPointName,
+        kFailPointNames,
         conn,
         primaryConn,
         maxTimeMsConn,
@@ -152,7 +148,7 @@ function runUnshardedTest(whenMatched, whenNotMatched, conn, primaryConn, maxTim
     forceAggregationToHangAndCheckMaxTimeMsExpires(
         whenMatched,
         whenNotMatched,
-        "hangWhileBuildingDocumentSourceMergeBatch",
+        ["hangWhileBuildingDocumentSourceMergeBatch"],
         conn,
         conn,
         conn,

@@ -141,7 +141,7 @@ protected:
                 bufferedBytes += objSize;
                 if (!batch.empty() &&
                     (bufferedBytes > maxBatchSizeBytes ||
-                     batch.size() >= write_ops::kMaxWriteBatchSize)) {
+                     batch.size() >= write_ops::kMaxWriteBatchSize || shouldFlush(batch.size()))) {
                     flush(std::move(batchWrite), std::move(batch));
                     batch.clear();
                     batchWrite = makeBatchedWriteRequest();
@@ -217,6 +217,10 @@ protected:
      * object size.
      */
     virtual std::pair<B, int> makeBatchObject(Document doc) const = 0;
+
+    virtual bool shouldFlush(size_t currentBatchSize) const {
+        return false;
+    }
 
     /**
      * A subclass may override this method to enable a fail point right after a next input element

@@ -56,10 +56,12 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
             .itcount(),
     );
     assert.eq(whenNotMatchedMode === "discard" ? 0 : 2, outColl.find().itcount());
-    if (whenMatchedMode === "fail") {
-        assert.eq(1, primary.system.profile.find({"op": "insert", "command.comment": commentStr}).itcount());
+    const insertCount = primary.system.profile.find({"op": "insert", "command.comment": commentStr}).itcount();
+    const updateCount = primary.system.profile.find({"op": "update", "command.comment": commentStr}).itcount();
+    if (insertCount !== 0) {
+        assert.eq(1, insertCount);
     } else {
-        assert.eq(2, primary.system.profile.find({"op": "update", "command.comment": commentStr}).itcount());
+        assert.eq(2, updateCount);
     }
     outColl.drop();
 });

@@ -32,6 +32,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/pipeline/writer_util.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -49,6 +51,8 @@ using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
 using BatchTransform = MergeStrategyDescriptor::BatchTransform;
 using UpdateModification = write_ops::UpdateModification;
 using UpsertType = MongoProcessInterface::UpsertType;
+
+enum AllowDuplicateKeyErrorsFromMergeIndex : bool {};
 
 BatchedCommandGenerator makeInsertCommandGenerator() {
     return [](const auto& expCtx, const auto& ns) -> BatchedCommandRequest {
@@ -107,11 +111,13 @@ std::vector<write_ops::UpdateOpEntry> constructUpdateEntries(
 MergeStrategy makeUpdateStrategy() {
     return [](const auto& expCtx,
               const auto& ns,
+              const auto& mergeOnFields,
               const auto& wc,
               auto epoch,
               auto&& batch,
               auto&& bcr,
-              UpsertType upsert) {
+              UpsertType upsert,
+              InsertStrategyStatistics& _) {
         constexpr auto multi = false;
         auto updateCommand = bcr.extractUpdateRequest();
         updateCommand->setUpdates(constructUpdateEntries(expCtx, std::move(batch), upsert, multi));
@@ -130,11 +136,13 @@ MergeStrategy makeUpdateStrategy() {
 MergeStrategy makeStrictUpdateStrategy() {
     return [](const auto& expCtx,
               const auto& ns,
+              const auto& mergeOnFields,
               const auto& wc,
               auto epoch,
               auto&& batch,
               auto&& bcr,
-              UpsertType upsert) {
+              UpsertType upsert,
+              InsertStrategyStatistics& _) {
         const int64_t batchSize = batch.size();
         constexpr auto multi = false;
         auto updateCommand = bcr.extractUpdateRequest();
@@ -148,17 +156,78 @@ MergeStrategy makeStrictUpdateStrategy() {
     };
 }
 
+bool collatorsMatch(const ExpressionContext* expCtx, const BSONObj& indexCollator) {
+    if (CollatorInterface::isSimpleCollator(expCtx->getCollator())) {
+        return indexCollator.isEmpty() || indexCollator.woCompare(CollationSpec::kSimpleSpec) == 0;
+    } else {
+        auto indexCollatorInterface = uassertStatusOK(
+            CollatorFactoryInterface::get(expCtx->getOperationContext()->getServiceContext())
+                ->makeFromBSON(indexCollator));
+        return CollatorInterface::collatorsMatch(expCtx->getCollator(),
+                                                 indexCollatorInterface.get());
+    }
+}
+
+bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
+                               const std::set<FieldPath>& uniqueKeyPaths) {
+    size_t nFieldsMatched = 0;
+    for (auto&& elem : keyPattern) {
+        if (!elem.isNumber()) {
+            return false;
+        }
+        if (uniqueKeyPaths.find(elem.fieldNameStringData()) == uniqueKeyPaths.end()) {
+            return false;
+        }
+        ++nFieldsMatched;
+    }
+    return nFieldsMatched == uniqueKeyPaths.size();
+}
+
+bool ignoreDuplicateKeyError(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                             const std::set<FieldPath>& mergeOnFields,
+                             const DuplicateKeyErrorInfo& errorInfo) {
+    if (!collatorsMatch(expCtx.get(), errorInfo.getCollation())) {
+        return false;
+    }
+    const auto& keyPattern = errorInfo.getKeyPattern();
+    if (keyPatternNamesExactPaths(keyPattern, mergeOnFields)) {
+        return true;
+    }
+    if (keyPattern.nFields() == 1 && keyPattern.firstElementFieldNameStringData() == "_id" &&
+        mergeOnFields.contains("_id")) {
+        return true;
+    }
+    return false;
+}
+
+template <AllowDuplicateKeyErrorsFromMergeIndex allowDuplicateKeyErrorsFromMergeIndex>
+inline bool canIgnoreInsertStatus(const Status& status,
+                                  const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                  const std::set<FieldPath>& mergeOnFields) {
+    if constexpr (!allowDuplicateKeyErrorsFromMergeIndex) {
+        return false;
+    } else {
+        if (status.code() == ErrorCodes::DuplicateKey) {
+            const auto& extraInfo = *status.template extraInfo<DuplicateKeyErrorInfo>();
+            return ignoreDuplicateKeyError(expCtx, mergeOnFields, extraInfo);
+        }
+        return false;
+    }
+}
+
 /**
  * Creates a merge strategy which uses insert semantics to perform a merge operation.
  */
 MergeStrategy makeInsertStrategy() {
-    return [](const auto& expCtx,
-              const auto& ns,
+    return [](const boost::intrusive_ptr<ExpressionContext>& expCtx,
+              const NamespaceString& ns,
+              const std::set<FieldPath>& mergeOnFields,
               const auto& wc,
               auto epoch,
               auto&& batch,
               auto&& bcr,
-              UpsertType upsertType) {
+              UpsertType upsertType,
+              InsertStrategyStatistics& _) {
         std::vector<BSONObj> objectsToInsert(batch.size());
         // The batch stores replacement style updates, but for this "insert" style of $merge we'd
         // like to just insert the new document without attempting any sort of replacement.
@@ -167,10 +236,126 @@ MergeStrategy makeInsertStrategy() {
         });
         auto insertCommand = bcr.extractInsertRequest();
         insertCommand->setDocuments(std::move(objectsToInsert));
-        for (const auto& insertStatus : expCtx->getMongoProcessInterface()->insert(
-                 expCtx, ns, std::move(insertCommand), wc, epoch)) {
-            uassertStatusOK(insertStatus);
+        auto insertResult = expCtx->getMongoProcessInterface()->insert(
+            expCtx, ns, std::move(insertCommand), wc, epoch);
+        for (const write_ops::WriteError& writeError : insertResult) {
+            uassertStatusOK(writeError.getStatus());
         }
+    };
+}
+
+bool shouldAttemptInsert(const InsertStrategyStatistics& insertStats) {
+    return insertStats.insertDocAttempts <
+        static_cast<size_t>(internalQueryMergeMinInsertAttempts.loadRelaxed()) ||
+        static_cast<double>(insertStats.insertErrors) / insertStats.insertDocAttempts <=
+        internalQueryMergeMaxInsertErrorRate.loadRelaxed();
+}
+
+void runBackupStrategy(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       const NamespaceString& ns,
+                       const std::set<FieldPath>& mergeOnFields,
+                       const auto& wc,
+                       auto epoch,
+                       MongoProcessInterface::BatchedObjects&& batch,
+                       BatchedCommandRequest&& bcr,
+                       UpsertType upsertType,
+                       const MergeStrategy& backupStrategy,
+                       const BatchTransform& backupTransform,
+                       InsertStrategyStatistics& insertStats) {
+    if (batch.empty()) {
+        return;
+    }
+
+    if (backupTransform) {
+        for (auto& batchObject : batch) {
+            backupTransform(batchObject);
+        }
+    }
+    backupStrategy(expCtx,
+                   ns,
+                   mergeOnFields,
+                   wc,
+                   epoch,
+                   std::move(batch),
+                   std::move(bcr),
+                   upsertType,
+                   insertStats);
+}
+
+template <AllowDuplicateKeyErrorsFromMergeIndex allowDuplicateKeyErrorsFromMergeIndex>
+MergeStrategy makeInsertStrategyWithBackup(BatchTransform backupTransform,
+                                           UpsertType backupUpsertType) {
+    return [backupTransform = std::move(backupTransform),
+            backupUpsertType = backupUpsertType,
+            backupStrategy = makeUpdateStrategy(),
+            backupCommandGenerator =
+                makeUpdateCommandGenerator()](const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              const NamespaceString& ns,
+                                              const std::set<FieldPath>& mergeOnFields,
+                                              const auto& wc,
+                                              auto epoch,
+                                              MongoProcessInterface::BatchedObjects&& batch,
+                                              auto&& bcr,
+                                              UpsertType upsertType,
+                                              InsertStrategyStatistics& insertStats) {
+        if (!shouldAttemptInsert(insertStats)) {
+            return runBackupStrategy(expCtx,
+                                     ns,
+                                     mergeOnFields,
+                                     wc,
+                                     epoch,
+                                     std::move(batch),
+                                     backupCommandGenerator(expCtx, ns),
+                                     backupUpsertType,
+                                     backupStrategy,
+                                     backupTransform,
+                                     insertStats);
+        }
+
+        std::vector<BSONObj> objectsToInsert(batch.size());
+        // The batch stores replacement style updates, but for this "insert" style of $merge we'd
+        // like to just insert the new document without attempting any sort of replacement.
+        std::transform(batch.begin(), batch.end(), objectsToInsert.begin(), [](const auto& obj) {
+            return get<UpdateModification>(obj).getUpdateReplacement();
+        });
+        auto insertCommand = bcr.extractInsertRequest();
+        insertCommand->setDocuments(std::move(objectsToInsert));
+
+        auto insertResult = expCtx->getMongoProcessInterface()->insert(
+            expCtx, ns, std::move(insertCommand), wc, epoch);
+        insertStats.insertDocAttempts += batch.size();
+        insertStats.insertErrors += insertResult.size();
+        if (insertResult.empty()) {
+            return;
+        }
+
+        MongoProcessInterface::BatchedObjects updateBatch;
+        updateBatch.reserve(insertResult.size());
+        for (const write_ops::WriteError& writeError : insertResult) {
+            if (writeError.getStatus().isOK() ||
+                canIgnoreInsertStatus<allowDuplicateKeyErrorsFromMergeIndex>(
+                    writeError.getStatus(), expCtx, mergeOnFields)) {
+                continue;
+            }
+            // DuplicateKey error might mean that matching document exists, so we retry the
+            // operation with update strategy instead. Any other error should be propagated.
+            if (writeError.getStatus().code() != ErrorCodes::DuplicateKey) {
+                uassertStatusOK(writeError.getStatus());
+            }
+            updateBatch.push_back(std::move(batch[writeError.getIndex()]));
+        }
+
+        runBackupStrategy(expCtx,
+                          ns,
+                          mergeOnFields,
+                          wc,
+                          epoch,
+                          std::move(updateBatch),
+                          backupCommandGenerator(expCtx, ns),
+                          backupUpsertType,
+                          backupStrategy,
+                          backupTransform,
+                          insertStats);
     };
 }
 
@@ -185,6 +370,13 @@ BatchTransform makeUpdateTransform(const std::string& updateOp) {
     };
 }
 
+template <typename BaseContainer, typename ExtendedContainer>
+BaseContainer extendContainer(BaseContainer baseContainer, ExtendedContainer extendedContainer) {
+    baseContainer.insert(std::make_move_iterator(extendedContainer.begin()),
+                         std::make_move_iterator(extendedContainer.end()));
+    return baseContainer;
+}
+
 }  // namespace
 
 /**
@@ -195,23 +387,18 @@ BatchTransform makeUpdateTransform(const std::string& updateOp) {
  * from this map based on the requested merge modes, and then passed to the $merge stage
  * constructor.
  */
-const MergeStrategyDescriptorsMap& getMergeStrategyDescriptors() {
+const MergeStrategyDescriptorsMap& getMergeStrategyDescriptors(
+    MergeProcessor::AllowInsertWithUpdateBackupStrategies allowInsertWithUpdateBackupStrategies) {
     // Rather than defining this map as a global object, we'll wrap the static map into a function
     // to prevent static initialization order fiasco which may happen since ActionType instances
     // are also defined as global objects and there is no way to tell the linker which objects must
     // be initialized first. By wrapping the map into a function we can guarantee that it won't be
     // initialized until the first use, which is when the program already started and all global
     // variables had been initialized.
-    static const auto mergeStrategyDescriptors =
-        MergeStrategyDescriptorsMap{// whenMatched: replace, whenNotMatched: insert
-                                    {MergeStrategyDescriptor::kReplaceInsertMode,
-                                     {MergeStrategyDescriptor::kReplaceInsertMode,
-                                      {ActionType::insert, ActionType::update},
-                                      makeUpdateStrategy(),
-                                      {},
-                                      UpsertType::kGenerateNewDoc,
-                                      makeUpdateCommandGenerator()}},
-                                    // whenMatched: replace, whenNotMatched: fail
+
+    // This map contains merge strategy descriptors that don't depend on the feature flag
+    static const auto kBaseMergeStrategyDescriptors =
+        MergeStrategyDescriptorsMap{// whenMatched: replace, whenNotMatched: fail
                                     {MergeStrategyDescriptor::kReplaceFailMode,
                                      {MergeStrategyDescriptor::kReplaceFailMode,
                                       {ActionType::update},
@@ -226,14 +413,6 @@ const MergeStrategyDescriptorsMap& getMergeStrategyDescriptors() {
                                       makeUpdateStrategy(),
                                       {},
                                       UpsertType::kNone,
-                                      makeUpdateCommandGenerator()}},
-                                    // whenMatched: merge, whenNotMatched: insert
-                                    {MergeStrategyDescriptor::kMergeInsertMode,
-                                     {MergeStrategyDescriptor::kMergeInsertMode,
-                                      {ActionType::insert, ActionType::update},
-                                      makeUpdateStrategy(),
-                                      makeUpdateTransform("$set"),
-                                      UpsertType::kGenerateNewDoc,
                                       makeUpdateCommandGenerator()}},
                                     // whenMatched: merge, whenNotMatched: fail
                                     {MergeStrategyDescriptor::kMergeFailMode,
@@ -250,14 +429,6 @@ const MergeStrategyDescriptorsMap& getMergeStrategyDescriptors() {
                                       makeUpdateStrategy(),
                                       makeUpdateTransform("$set"),
                                       UpsertType::kNone,
-                                      makeUpdateCommandGenerator()}},
-                                    // whenMatched: keepExisting, whenNotMatched: insert
-                                    {MergeStrategyDescriptor::kKeepExistingInsertMode,
-                                     {MergeStrategyDescriptor::kKeepExistingInsertMode,
-                                      {ActionType::insert, ActionType::update},
-                                      makeUpdateStrategy(),
-                                      makeUpdateTransform("$setOnInsert"),
-                                      UpsertType::kGenerateNewDoc,
                                       makeUpdateCommandGenerator()}},
                                     // whenMatched: [pipeline], whenNotMatched: insert
                                     {MergeStrategyDescriptor::kPipelineInsertMode,
@@ -291,19 +462,89 @@ const MergeStrategyDescriptorsMap& getMergeStrategyDescriptors() {
                                       {},
                                       UpsertType::kNone,
                                       makeInsertCommandGenerator()}}};
-    return mergeStrategyDescriptors;
+
+    static const auto kMergeStrategyDescriptorsWithoutBackup = extendContainer(
+        kBaseMergeStrategyDescriptors,
+        MergeStrategyDescriptorsMap{// whenMatched: replace, whenNotMatched: insert
+                                    {MergeStrategyDescriptor::kReplaceInsertMode,
+                                     {MergeStrategyDescriptor::kReplaceInsertMode,
+                                      {ActionType::insert, ActionType::update},
+                                      makeUpdateStrategy(),
+                                      {},
+                                      UpsertType::kGenerateNewDoc,
+                                      makeUpdateCommandGenerator()}},
+                                    // whenMatched: merge, whenNotMatched: insert
+                                    {MergeStrategyDescriptor::kMergeInsertMode,
+                                     {MergeStrategyDescriptor::kMergeInsertMode,
+                                      {ActionType::insert, ActionType::update},
+                                      makeUpdateStrategy(),
+                                      makeUpdateTransform("$set"),
+                                      UpsertType::kGenerateNewDoc,
+                                      makeUpdateCommandGenerator()}},
+                                    // whenMatched: keepExisting, whenNotMatched: insert
+                                    {MergeStrategyDescriptor::kKeepExistingInsertMode,
+                                     {MergeStrategyDescriptor::kKeepExistingInsertMode,
+                                      {ActionType::insert, ActionType::update},
+                                      makeUpdateStrategy(),
+                                      makeUpdateTransform("$setOnInsert"),
+                                      UpsertType::kGenerateNewDoc,
+                                      makeUpdateCommandGenerator()}}});
+
+    static const auto kMergeStrategyDescriptorsWithBackup = extendContainer(
+        kBaseMergeStrategyDescriptors,
+        MergeStrategyDescriptorsMap{
+            // whenMatched: replace, whenNotMatched: insert with backup
+            {MergeStrategyDescriptor::kReplaceInsertMode,
+             {MergeStrategyDescriptor::kReplaceInsertMode,
+              {ActionType::insert, ActionType::update},
+              makeInsertStrategyWithBackup<AllowDuplicateKeyErrorsFromMergeIndex{false}>(
+                  {}, UpsertType::kGenerateNewDoc),
+              {},
+              UpsertType::kNone,
+              makeInsertCommandGenerator(),
+              /*.isInsertWithUpdateBackupStrategy=*/true}},
+            // whenMatched: merge, whenNotMatched: insert  with backup
+            {MergeStrategyDescriptor::kMergeInsertMode,
+             {MergeStrategyDescriptor::kMergeInsertMode,
+              {ActionType::insert, ActionType::update},
+              makeInsertStrategyWithBackup<AllowDuplicateKeyErrorsFromMergeIndex{false}>(
+                  makeUpdateTransform("$set"), UpsertType::kGenerateNewDoc),
+              {},
+              UpsertType::kNone,
+              makeInsertCommandGenerator(),
+              /*.isInsertWithUpdateBackupStrategy=*/true}},
+            // whenMatched: keepExisting, whenNotMatched: insert with backup
+            {MergeStrategyDescriptor::kKeepExistingInsertMode,
+             {MergeStrategyDescriptor::kKeepExistingInsertMode,
+              {ActionType::insert, ActionType::update},
+              makeInsertStrategyWithBackup<AllowDuplicateKeyErrorsFromMergeIndex{true}>(
+                  makeUpdateTransform("$setOnInsert"), UpsertType::kGenerateNewDoc),
+              {},
+              UpsertType::kNone,
+              makeInsertCommandGenerator(),
+              /*.isInsertWithUpdateBackupStrategy=*/true}},
+        });
+
+    if (allowInsertWithUpdateBackupStrategies) {
+        return kMergeStrategyDescriptorsWithBackup;
+    } else {
+        return kMergeStrategyDescriptorsWithoutBackup;
+    }
 }
 
-MergeProcessor::MergeProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                               MergeStrategyDescriptor::WhenMatched whenMatched,
-                               MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
-                               boost::optional<BSONObj> letVariables,
-                               boost::optional<std::vector<BSONObj>> pipeline,
-                               boost::optional<ChunkVersion> collectionPlacementVersion,
-                               bool allowMergeOnNullishValues)
+MergeProcessor::MergeProcessor(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    MergeStrategyDescriptor::WhenMatched whenMatched,
+    MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
+    boost::optional<BSONObj> letVariables,
+    boost::optional<std::vector<BSONObj>> pipeline,
+    boost::optional<ChunkVersion> collectionPlacementVersion,
+    bool allowMergeOnNullishValues,
+    AllowInsertWithUpdateBackupStrategies allowInsertWithUpdateBackupStrategies)
     : _expCtx(expCtx),
       _writeConcern(expCtx->getOperationContext()->getWriteConcern()),
-      _descriptor(getMergeStrategyDescriptors().at({whenMatched, whenNotMatched})),
+      _descriptor(getMergeStrategyDescriptors(allowInsertWithUpdateBackupStrategies)
+                      .at({whenMatched, whenNotMatched})),
       _pipeline(std::move(pipeline)),
       _collectionPlacementVersion(collectionPlacementVersion),
       _allowMergeOnNullishValues(allowMergeOnNullishValues) {
@@ -349,18 +590,21 @@ MongoProcessInterface::BatchObject MergeProcessor::makeBatchObject(
 }
 
 void MergeProcessor::flush(const NamespaceString& outputNs,
+                           const std::set<FieldPath>& mergeOnFields,
                            BatchedCommandRequest bcr,
-                           MongoProcessInterface::BatchedObjects batch) const {
+                           MongoProcessInterface::BatchedObjects batch) {
     auto targetEpoch = _collectionPlacementVersion
         ? boost::optional<OID>(_collectionPlacementVersion->epoch())
         : boost::none;
     _descriptor.strategy(_expCtx,
                          outputNs,
+                         mergeOnFields,
                          _writeConcern,
                          targetEpoch,
                          std::move(batch),
                          std::move(bcr),
-                         _descriptor.upsertType);
+                         _descriptor.upsertType,
+                         _insertStats);
 }
 
 BSONObj MergeProcessor::_extractMergeOnFieldsFromDoc(
@@ -393,5 +637,10 @@ BSONObj MergeProcessor::_extractMergeOnFieldsFromDoc(
     return result.freeze().toBson();
 }
 
+bool MergeProcessor::shouldFlush(size_t currentBatchSize) {
+    return _descriptor.isInsertWithUpdateBackupStrategy &&
+        _insertStats.insertDocAttempts < _insertStats.minInsertAttempts &&
+        _insertStats.insertDocAttempts + currentBatchSize >= _insertStats.minInsertAttempts;
+}
 
 }  // namespace mongo

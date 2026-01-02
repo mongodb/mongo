@@ -135,19 +135,66 @@ const pipeline = [mergeStage];
         return;
     }
 
-    dropWithoutImplicitRecreate(source.getName());
-    assert.commandWorked(source.insert({_id: 4, a: 1}));
-    assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
-    const error = assert.throws(() => source.aggregate(pipeline));
-    assert.commandFailedWithCode(error, ErrorCodes.DuplicateKey);
-    assertArrayEq({
-        actual: target.find().toArray(),
-        expected: [
-            {_id: 1, a: 1, b: "a"},
-            {_id: 2, a: 2, b: "b"},
-        ],
-    });
-    assert.commandWorked(target.dropIndex({a: 1}));
+    {
+        dropWithoutImplicitRecreate(source.getName());
+        assert.commandWorked(source.insert({_id: 4, a: 1}));
+        assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
+        const error = assert.throws(() => source.aggregate(pipeline));
+        assert.commandFailedWithCode(error, ErrorCodes.DuplicateKey);
+        assertArrayEq({
+            actual: target.find().toArray(),
+            expected: [
+                {_id: 1, a: 1, b: "a"},
+                {_id: 2, a: 2, b: "b"},
+            ],
+        });
+        assert.commandWorked(target.dropIndex({a: 1}));
+    }
+
+    {
+        dropWithoutImplicitRecreate(source.getName());
+        dropWithoutImplicitRecreate(target.getName());
+
+        const document = {_id: 0, a: 1, b: 2};
+        assert.commandWorked(source.insert(document));
+        assert.commandWorked(target.insert(document));
+
+        assert.commandWorked(target.createIndex({a: 1}, {unique: true}));
+        assert.commandWorked(target.createIndex({b: 1}, {unique: true}));
+
+        const mergeOnAStage = {
+            $merge: {
+                into: target.getName(),
+                on: "a",
+                whenMatched: "keepExisting",
+                whenNotMatched: "insert",
+            },
+        };
+
+        const mergeOnBStage = {
+            $merge: {
+                into: target.getName(),
+                on: "b",
+                whenMatched: "keepExisting",
+                whenNotMatched: "insert",
+            },
+        };
+
+        const assertMerge = function (mergeStage) {
+            assert.doesNotThrow(() => source.aggregate([mergeStage]).itcount());
+            assertArrayEq({
+                actual: target.find().toArray(),
+                expected: [document],
+            });
+        };
+
+        assertMerge(mergeStage);
+        assertMerge(mergeOnAStage);
+        assertMerge(mergeOnBStage);
+
+        assert.commandWorked(target.dropIndex({a: 1}));
+        assert.commandWorked(target.dropIndex({b: 1}));
+    }
 })();
 
 // Test $merge fails if it cannot find an index to verify that the 'on' fields will be unique.

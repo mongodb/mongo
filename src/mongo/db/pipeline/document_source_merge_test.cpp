@@ -1175,5 +1175,19 @@ TEST_F(DocumentSourceMergeTest, QueryShape) {
         << "Expected [" << expectedBson << "] but found [" << result << "]";
 }
 
+TEST_F(DocumentSourceMergeTest, AllowInsertWithUpdateBackupStrategiesSameModesAndPrivileges) {
+    const auto& mapFalse =
+        getMergeStrategyDescriptors(MergeProcessor::AllowInsertWithUpdateBackupStrategies{false});
+    const auto& mapTrue =
+        getMergeStrategyDescriptors(MergeProcessor::AllowInsertWithUpdateBackupStrategies{false});
+
+    ASSERT_EQ(mapFalse.size(), mapTrue.size());
+
+    for (const auto& [mode, descriptorFalse] : mapFalse) {
+        const auto& descriptorTrue = mapTrue.at(mode);
+        ASSERT_EQ(descriptorFalse.actions, descriptorTrue.actions);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

@@ -237,12 +237,12 @@ public:
     virtual void updateClientOperationTime(OperationContext* opCtx) const = 0;
 
     /**
-     * Executes 'insertCommand' against 'ns'. Returns a vector of statuses. Will contain at least
-     * one error status if insert failed to not swallow any errors. If 'targetEpoch' is set, throws
-     * ErrorCodes::StaleEpoch if the targeted collection does not have the same epoch or the epoch
-     * changes during the course of the insert.
+     * Executes 'insertCommand' against 'ns'. Returns an empty vector on success and a vector of
+     * write erros on failure. If 'targetEpoch' is set, throws ErrorCodes::StaleEpoch if the
+     * targeted collection does not have the same epoch or the epoch changes during the course of
+     * the insert.
      */
-    using InsertResult = absl::InlinedVector<Status, 4>;
+    using InsertResult = std::vector<write_ops::WriteError>;
 
     virtual InsertResult insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 const NamespaceString& ns,

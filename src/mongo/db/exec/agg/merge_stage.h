@@ -84,6 +84,8 @@ public:
     BatchedCommandRequest makeBatchedWriteRequest() const override;
     std::pair<BatchObject, int> makeBatchObject(Document doc) const override;
 
+    bool shouldFlush(size_t batchSize) const final;
+
 private:
     void flush(BatchedCommandRequest bcr, BatchedObjects batch) override;
     void waitWhileFailPointEnabled() override;

@@ -207,13 +207,12 @@ MongoProcessInterface::InsertResult NonShardServerProcessInterface::insert(
         write_ops_exec::performInserts(expCtx->getOperationContext(), *insertCommand);
 
     InsertResult results;
-    for (const auto& writeResult : writeResults.results) {
-        if (writeResult.getStatus() != Status::OK()) {
-            results.push_back(writeResult.getStatus());
+    results.reserve(writeResults.results.size());
+    for (size_t i = 0; i < writeResults.results.size(); ++i) {
+        Status status = writeResults.results[i].getStatus();
+        if (!status.isOK()) {
+            results.emplace_back(static_cast<int32_t>(i), std::move(status));
         }
-    }
-    if (results.empty()) {
-        results.push_back(Status::OK());
     }
     return results;
 }
@@ -224,21 +223,16 @@ MongoProcessInterface::InsertResult NonShardServerProcessInterface::insertTimese
     std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
     const WriteConcernOptions& wc,
     boost::optional<OID> targetEpoch) {
-    InsertResult result;
     auto [preConditions, _] = timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
         expCtx->getOperationContext(), ns, *insertCommand, insertCommand->getCollectionUUID());
     auto insertReply = timeseries::write_ops::performTimeseriesWrites(
         expCtx->getOperationContext(), *insertCommand, preConditions);
 
+    InsertResult result;
     if (insertReply.getWriteErrors().has_value()) {
-        for (const auto& writeError : *insertReply.getWriteErrors()) {
-            result.push_back(writeError.getStatus());
-        }
+        result.assign(insertReply.getWriteErrors()->begin(), insertReply.getWriteErrors()->end());
         uassert(10903400, "Write errors must not be empty", !result.empty());
-    } else {
-        result.push_back(Status::OK());
     }
-
     return result;
 }
 

@@ -191,7 +191,7 @@ testEpochChangeDuringAgg({
     expectedError: ErrorCodes.QueryPlanKilled,
 });
 testEpochChangeDuringAgg({
-    mergeSpec: {into: target.getName(), whenMatched: "replace", whenNotMatched: "insert"},
+    mergeSpec: {into: target.getName(), whenMatched: "replace", whenNotMatched: "discard"},
     failpoint: "hangDuringBatchUpdate",
     failpointData: {nss: target.getFullName()},
     expectedError: ErrorCodes.QueryPlanKilled,

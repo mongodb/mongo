@@ -45,7 +45,7 @@ function testWriteConcernError(rs) {
             cursor: {},
         });
 
-        jsTestLog("Testing Mode: " + tojson(whenMatchedMode) + tojson(whenNotMatchedMode));
+        jsTestLog("Testing Mode: " + tojson(whenMatchedMode) + " " + tojson(whenNotMatchedMode));
         jsTestLog("Target collection after $merge: " + tojson(target.find().toArray()));
 
         let oplogEntries = shard0

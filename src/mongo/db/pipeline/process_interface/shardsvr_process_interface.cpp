@@ -224,16 +224,12 @@ MongoProcessInterface::InsertResult ShardServerProcessInterface::insert(
 
     InsertResult result;
     if (!response.getOk()) {
-        result.push_back(response.getTopLevelStatus());
+        result.emplace_back(0, response.getTopLevelStatus());
     } else if (response.isErrDetailsSet()) {
         result.reserve(response.getErrDetails().size());
-        for (const auto& error : response.getErrDetails()) {
-            result.push_back(error.getStatus());
-        }
+        result.assign(response.getErrDetails().begin(), response.getErrDetails().end());
     } else if (response.isWriteConcernErrorSet()) {
-        result.push_back(response.getWriteConcernError()->toStatus());
-    } else {
-        result.push_back(Status::OK());
+        result.emplace_back(0, response.getWriteConcernError()->toStatus());
     }
     return result;
 }
