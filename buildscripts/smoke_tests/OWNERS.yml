@@ -1,26 +1,26 @@
 version: 1.0.0
 filters:
-  - "server_programmability.yml":
+  - "server_programmability":
     approvers:
       - 10gen/server-programmability
-  - "catalog_and_routing.yml":
+  - "catalog_and_routing":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "server_integration.yml":
+  - "server_integration":
     approvers:
       - 10gen/server-storage-engine-integration
-  - "server_integration_backup.yml":
+  - "server_integration_backup":
     approvers:
       - 10gen/server-backup-restore
-  - "server_collection_write_path.yml":
+  - "server_collection_write_path":
     approvers:
       - 10gen/server-collection-write-path
-  - "server_index_builds.yml":
+  - "server_index_builds":
     approvers:
       - 10gen/server-index-builds
-  - "server_storage_engine_integration.yml":
+  - "server_storage_engine_integration":
     approvers:
       - 10gen/server-storage-engine-integration
-  - "server_ttl.yml":
+  - "server_ttl":
     approvers:
       - 10gen/server-ttl

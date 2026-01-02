@@ -73,7 +73,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/errorcodes.py @10gen/server-programmability @svc-auto-approve-bot
 /buildscripts/evergreen_resmoke_job_count.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/evergreen_task_timeout.py @10gen/devprod-correctness @svc-auto-approve-bot
-/buildscripts/evergreen_gen_smoke_test_tasks.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/resmoke_tests_runtime_validate.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/powercycle* @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/golden_test.py @10gen/query-optimization @svc-auto-approve-bot
@@ -304,14 +303,14 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/sbom/ @10gen/code-review-team-ssdlc @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/smoke_tests/OWNERS.yml
-/buildscripts/smoke_tests/**/server_programmability.yml @10gen/server-programmability @svc-auto-approve-bot
-/buildscripts/smoke_tests/**/catalog_and_routing.yml @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/buildscripts/smoke_tests/**/server_integration.yml @10gen/server-storage-engine-integration @svc-auto-approve-bot
-/buildscripts/smoke_tests/**/server_integration_backup.yml @10gen/server-backup-restore @svc-auto-approve-bot
-/buildscripts/smoke_tests/**/server_collection_write_path.yml @10gen/server-collection-write-path @svc-auto-approve-bot
-/buildscripts/smoke_tests/**/server_index_builds.yml @10gen/server-index-builds @svc-auto-approve-bot
-/buildscripts/smoke_tests/**/server_storage_engine_integration.yml @10gen/server-storage-engine-integration @svc-auto-approve-bot
-/buildscripts/smoke_tests/**/server_ttl.yml @10gen/server-ttl @svc-auto-approve-bot
+/buildscripts/smoke_tests/**/server_programmability @10gen/server-programmability @svc-auto-approve-bot
+/buildscripts/smoke_tests/**/catalog_and_routing @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/buildscripts/smoke_tests/**/server_integration @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/buildscripts/smoke_tests/**/server_integration_backup @10gen/server-backup-restore @svc-auto-approve-bot
+/buildscripts/smoke_tests/**/server_collection_write_path @10gen/server-collection-write-path @svc-auto-approve-bot
+/buildscripts/smoke_tests/**/server_index_builds @10gen/server-index-builds @svc-auto-approve-bot
+/buildscripts/smoke_tests/**/server_storage_engine_integration @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/buildscripts/smoke_tests/**/server_ttl @10gen/server-ttl @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/tests/OWNERS.yml
 /buildscripts/tests/ @10gen/devprod-build @svc-auto-approve-bot

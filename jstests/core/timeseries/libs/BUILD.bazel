@@ -9,4 +9,14 @@ mongo_js_library(
     ]),
 )
 
+mongo_js_library(
+    name = "timeseries_writes_util",
+    srcs = ["timeseries_writes_util.js"],
+)
+
+mongo_js_library(
+    name = "viewless_timeseries_util",
+    srcs = ["viewless_timeseries_util.js"],
+)
+
 all_subpackage_javascript_files()

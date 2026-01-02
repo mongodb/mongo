@@ -7,52 +7,50 @@ but are a way to get relatively quick feedback locally.
 
 # Available Smoke Test Suites
 
-Below is information about the smoke test suites available for each team and how to run them. More
-information can be found in the respective .yml files for each team/component within this directory.
+Below is information about the smoke test suites available for each team and how to run them.
 
 ## Catalog And Routing
 
-The integration tests for the smoke test suite can be run with the following command:
+Tests are tagged with `catalog-and-routing`. To run:
 
 ```
-python buildscripts/run_smoke_tests.py --suites=catalog_and_routing
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,catalog-and-routing //...
 ```
 
 ## Server Integration
 
-The integration tests for the smoke test suite can be run with the following command:
+Tests are tagged with `server-integration-smoke`. To run:
 
 ```
-bazel build install-devcore && python buildscripts/run_smoke_tests.py --suites=server_integration
-```
-
-This should be run in conjunction with the unit tests, which can be run with the following:
-
-```
-bazel test --test_tag_filters=server-integration-smoke //...
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-integration-smoke //...
 ```
 
 ## Replication
 
-The integration tests for the smoke test suite can be run with the following command:
+The integration tests for the smoke test are tagged with `replication-smoke`. To run:
 
 ```
-bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=replication
+bazel test --test_tag_filters=replication-smoke //...
 ```
 
 This should be run in conjunction with the unit tests, which can be run with the following:
 
 ```
-bazel test --test_output=summary //src/mongo/db/repl/...
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug //src/mongo/db/repl/...
+```
+
+To run both combined:
+
+```
+bazel test --test_output=summary --test_tag_filters=mongo_unittest,replication-smoke,-wrapper_target,-intermediate_debug //src/mongo/db/repl/... //buildscripts/smoke_tests/...
 ```
 
 ## Server Programmability
 
-Running the unit tests and integration tests together can be accomplished with the following:
+Tests are tagged with `server-programmability`. To run:
 
 ```
-bazel test --test_tag_filters=server-programmability //...
-bazel build install-devcore && python buildscripts/run_smoke_tests.py --suites=server_programmability
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-programmability //...
 ```
 
 ## Storage Execution
@@ -61,18 +59,17 @@ The smoke test suites for storage execution are divided up into components. The 
 for all of the components that storage execution owns can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-bsoncolumn,server-collection-write-path,server-external-sorter,server-index-builds,server-key-string,server-storage-engine-integration,server-timeseries-bucket-catalog,server-tracking-allocators,server-ttl //src/mongo/...
-bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=storage_execution
+bazel test --test_output=summary  --test_tag_filters=-wrapper_target,-intermediate_debug,server-bsoncolumn,server-collection-write-path,server-external-sorter,server-index-builds,server-key-string,server-storage-engine-integration,server-timeseries-bucket-catalog,server-tracking-allocators,server-ttl //...
 ```
 
 The individual components owned by storage execution are as follows:
 
-### Server-BSONColumn
+### Server-BSONColumna
 
 The unit tests for the server-bsoncolumn component can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-bsoncolumn --test_output=summary //src/mongo/...
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-bsoncolumn //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -82,8 +79,7 @@ There are currently no smoke test integration tests for this component.
 The unit and integration tests for the server-collection-write-path component can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-collection-write-path --test_output=summary //src/mongo/...
-bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=server_collection_write_path
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-collection-write-path //...
 ```
 
 ### Server-External-Sorter
@@ -91,7 +87,7 @@ bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites
 The unit tests for the server-external-sorter component can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-external-sorter --test_output=summary //src/mongo/...
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-external-sorter //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -101,8 +97,7 @@ There are currently no smoke test integration tests for this component.
 The unit and integration tests for the server-index-builds component can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-index-builds --test_output=summary //src/mongo/...
-bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=server_index_builds
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-index-builds //...
 ```
 
 ### Server-Key-String
@@ -110,7 +105,7 @@ bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites
 The unit tests for the server-key-string component can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-key-string --test_output=summary //src/mongo/...
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-key-string //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -120,8 +115,7 @@ There are currently no smoke test integration tests for this component.
 The unit and integration tests for the server-storage-engine-integration component can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-storage-engine-integration --test_output=summary //src/mongo/...
-bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=server_storage_engine_integration
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-storage-engine-integration //...
 ```
 
 ### Server-Timeseries-Bucket-Catalog
@@ -129,7 +123,7 @@ bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites
 The unit tests for the server-timeseries-bucket-catalog component can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-timeseries-bucket-catalog --test_output=summary //src/mongo/...
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-timeseries-bucket-catalog //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -139,7 +133,7 @@ There are currently no smoke test integration tests for this component.
 The unit tests for the server-tracking-allocators component can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-tracking-allocators --test_output=summary //src/mongo/...
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-tracking-allocators //...
 ```
 
 There are currently no smoke test integration tests for this component.
@@ -149,6 +143,5 @@ There are currently no smoke test integration tests for this component.
 The unit and integration tests for the server-ttl component can be run with the following:
 
 ```
-bazel test --test_tag_filters=server-ttl --test_output=summary //src/mongo/...
-bazel build install-dist-test && python buildscripts/run_smoke_tests.py --suites=server_ttl
+bazel test --test_output=summary --test_tag_filters=-wrapper_target,-intermediate_debug,server-ttl //...
 ```

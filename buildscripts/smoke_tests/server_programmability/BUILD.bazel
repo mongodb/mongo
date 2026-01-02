@@ -1,0 +1,75 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+
+resmoke_suite_test(
+    name = "core",
+    srcs = [
+        "//jstests/core/testing:failcommand_failpoint.js",
+    ],
+    config = "//buildscripts/resmokeconfig:suites/core.yml",
+    data = ["//buildscripts/resmokeconfig:common_jstest_data"],
+    resmoke_args = ["--runAllFeatureFlagTests"],
+    tags = [
+        "ci-development-critical-single-variant",
+        "server-programmability",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "failpoints",
+    srcs = [
+        "//jstests/fail_point:all_javascript_files",
+    ],
+    config = "//buildscripts/resmokeconfig:suites/failpoints.yml",
+    data = ["//buildscripts/resmokeconfig:common_jstest_data"],
+    resmoke_args = ["--runAllFeatureFlagTests"],
+    tags = [
+        "ci-development-critical-single-variant",
+        "server-programmability",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)
+
+resmoke_suite_test(
+    name = "no_passthrough",
+    srcs = [
+        "//jstests/noPassthrough:reproducible_initializer_order.js",
+        "//jstests/noPassthrough:version.js",
+        "//jstests/noPassthrough:exit_logging.js",
+        "//jstests/noPassthrough:tassert_failpoint.js",
+        # The test below can fail depending on the host's configured ulimits, so it's not included.
+        # "//jstests/noPassthrough/pin_code_segments_on_startup.js",
+        "//jstests/noPassthrough:utf8_paths.js",
+        "//jstests/noPassthrough/bson:all_javascript_files",
+        "//jstests/noPassthrough/interruption:all_javascript_files",
+        "//jstests/noPassthrough/server_parameters:all_javascript_files",
+        "//jstests/noPassthrough/startup_shutdown:all_javascript_files",
+        "//jstests/noPassthrough/architecture:failcommand_failpoint_maxtimems.js",
+        "//jstests/noPassthrough/architecture:failcommand_failpoint_not_parallel.js",
+    ],
+    config = "//buildscripts/resmokeconfig:suites/no_passthrough.yml",
+    data = [
+        "//buildscripts/resmokeconfig:common_jstest_data",
+        "//jstests/libs:key1",
+        "//jstests/libs:testconfig",
+        "//jstests/noPassthrough/libs:all_javascript_files",
+    ],
+    resmoke_args = ["--runAllFeatureFlagTests"],
+    shard_count = 8,
+    tags = [
+        "ci-development-critical-single-variant",
+        "server-programmability",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

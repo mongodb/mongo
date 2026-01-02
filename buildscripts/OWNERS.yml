@@ -32,9 +32,6 @@ filters:
   - "evergreen_task_timeout.py":
     approvers:
       - 10gen/devprod-correctness
-  - "evergreen_gen_smoke_test_tasks.py":
-    approvers:
-      - 10gen/devprod-correctness
   - "resmoke_tests_runtime_validate.py":
     approvers:
       - 10gen/devprod-correctness

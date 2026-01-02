@@ -305,28 +305,17 @@ component_name_to_formal_name = {
     "server-ttl": "Server TTL",
 }
 
-
-component_name_to_integration_test_suite = {
-    "catalog-and-routing": "catalog_and_routing",
-    "replication": "replication",
-    "storage-execution": "storage_execution",
-    "server-integration": "server_integration",
-    "server-collection-write-path": "server_collection_write_path",
-    "server-index-builds": "server_index_builds",
-    "server-programmability": "server_programmability",
-    "server-storage-engine-integration": "server_storage_engine_integration",
-    "server-ttl": "server_ttl",
-}
-
-component_name_to_unit_test_tag = {
+component_name_to_test_tag = {
+    "catalog-and-routing": "catalog-and-routing",
     "server-integration": "server-integration-smoke",
-    "replication": "mongo_unittest",
+    "replication": "mongo_unittest,replication-smoke",
     "storage-execution": "server-bsoncolumn,server-collection-write-path,server-external-sorter,server-index-builds,server-key-string,server-storage-engine-integration,server-timeseries-bucket-catalog,server-tracking-allocators,server-ttl",
     "server-bsoncolumn": "server-bsoncolumn",
     "server-collection-write-path": "server-collection-write-path",
     "server-external-sorter": "server-external-sorter",
     "server-index-builds": "server-index-builds",
     "server-key-string": "server-key-string",
+    "server-programmability": "server-programmability",
     "server-storage-engine-integration": "server-storage-engine-integration",
     "server-timeseries-bucket-catalog": "server-timeseries-bucket-catalog",
     "server-tracking-allocators": "server-tracking-allocators",
@@ -338,7 +327,6 @@ def run_smoke_tests(
     *,
     component_name,
     log_path: Path,
-    upstream_branch: str,
     bazel_args: List[str],
     run_clang_tidy: bool,
     send_slack_notification: bool,
@@ -346,20 +334,16 @@ def run_smoke_tests(
     log_path = log_path.joinpath(REPO_UNIQUE_NAME)
     log_path.mkdir(parents=True, exist_ok=True)
 
-    integration_suite_name = (
-        component_name_to_integration_test_suite[component_name]
-        if component_name in component_name_to_integration_test_suite
+    test_tag = (
+        component_name_to_test_tag[component_name]
+        if component_name in component_name_to_test_tag
         else ""
     )
 
-    unit_test_tag = (
-        component_name_to_unit_test_tag[component_name]
-        if component_name in component_name_to_unit_test_tag
-        else ""
-    )
-
-    unit_test_build_target = (
-        "//src/mongo/db/repl/..." if component_name == "replication" else "//src/mongo/..."
+    test_build_target = (
+        ["//src/mongo/db/repl/...", "//buildscripts/smoke_tests/..."]
+        if component_name == "replication"
+        else ["//..."]
     )
 
     component_name_for_messages = component_name_to_formal_name[component_name]
@@ -405,35 +389,21 @@ def run_smoke_tests(
         deps=formatters,
     )
 
-    integration_tests = None
-    if integration_suite_name != "":
-        integration_tests = runner.command(
-            name=f"run {component_name} smoke tests",
-            args=[
-                MONGO_PYTHON_INTERPRETER,
-                ROOT.joinpath("buildscripts", "run_smoke_tests.py"),
-                "--suites",
-                integration_suite_name,
-            ],
-            log_file="smoke_tests.log",
-            deps=install,
-        )
-
-    unittests = None
-    if unit_test_tag != "":
-        unittests = runner.command(
-            name=f"run {component_name} unittests",
+    tests = None
+    if test_tag != "":
+        tests = runner.command(
+            name=f"run {component_name} tests",
             args=[
                 BAZEL,
                 "test",
                 *bazel_args,
-                f"--test_tag_filters={unit_test_tag}",
+                f"--test_tag_filters={test_tag},-wrapper_target,-intermediate_debug",
                 "--test_output=summary",
                 "--dev_stacktrace=False",
-                unit_test_build_target,
+                *test_build_target,
             ],
             # NOTE: bazel already stores the real logs somewhere else
-            log_file="unittests.log",
+            log_file="tests.log",
             # not a true dep, but bazel access has to be serialized
             deps=install,
         )
@@ -454,7 +424,7 @@ def run_smoke_tests(
             # serializes bazel access. Also prevents clang-tidy from changing
             # the build config from under the smoke test suite before it's
             # finished running.
-            deps=(integration_tests, unittests),
+            deps=(tests),
         )
 
     runner.run()
@@ -477,12 +447,6 @@ def main():
         help="Directory to place logs from smoke test stages",
         default=Path("~/.logs/smoke_tests").expanduser(),
     )
-    p.add_argument(
-        "--upstream-branch",
-        type=str,
-        default="origin/master",
-        help="Git branch to format diff against",
-    )
 
     p.add_argument(
         "--run-clang-tidy",
@@ -502,7 +466,6 @@ def main():
     run_smoke_tests(
         component_name=args.component,
         log_path=args.log_path,
-        upstream_branch=args.upstream_branch,
         bazel_args=bazel_args,
         run_clang_tidy=args.run_clang_tidy,
         send_slack_notification=args.send_slack_notification,

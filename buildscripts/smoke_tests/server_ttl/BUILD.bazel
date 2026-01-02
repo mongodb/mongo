@@ -1,0 +1,34 @@
+load("//bazel/resmoke:resmoke.bzl", "resmoke_suite_test")
+
+resmoke_suite_test(
+    name = "no_passthrough",
+    srcs = [
+        "//jstests/noPassthrough/ttl:ttlMonitorSleepSecs_parameter.js",
+        "//jstests/noPassthrough/ttl:ttl_batch_deletes.js",
+        "//jstests/noPassthrough/ttl:ttl_changes_are_immediate.js",
+        "//jstests/noPassthrough/ttl:ttl_expire_nan_warning_on_startup.js",
+        "//jstests/noPassthrough/ttl:ttl_hidden_index.js",
+        "//jstests/noPassthrough/ttl:ttl_non_int_expire_after_seconds.js",
+        "//jstests/noPassthrough/ttl:ttl_partial_index.js",
+        "//jstests/noPassthrough/ttl:ttl_resharding_collection.js",
+        "//jstests/noPassthrough/ttl:ttl_with_dropIndex.js",
+        "//jstests/noPassthrough/ttl:ttl_with_renameCollection.js",
+        "//jstests/noPassthrough/ttl:ttl_with_restart.js",
+        "//jstests/noPassthrough/ttl:user_write_blocking_ttl_index.js",
+    ],
+    config = "//buildscripts/resmokeconfig:suites/no_passthrough.yml",
+    data = [
+        "//buildscripts/resmokeconfig:common_jstest_data",
+        "//jstests/noPassthrough/libs:all_subpackage_javascript_files",
+    ],
+    resmoke_args = ["--runAllFeatureFlagTests"],
+    tags = [
+        "ci-development-critical-single-variant",
+        "server-ttl",
+    ],
+    deps = [
+        "//src/mongo/db:mongod",
+        "//src/mongo/s:mongos",
+        "//src/mongo/shell:mongo",
+    ],
+)

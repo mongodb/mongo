@@ -9,4 +9,9 @@ mongo_js_library(
     ]),
 )
 
+mongo_js_library(
+    name = "sharded_index_util",
+    srcs = ["sharded_index_util.js"],
+)
+
 all_subpackage_javascript_files()

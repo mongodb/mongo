@@ -485,6 +485,7 @@ tasks:
             --test_tag_filters=${resmoke_tests_tag_filter},-incompatible_with_bazel_remote_test
             --test_arg=--testTimeout=960
             --test_timeout=1500
+            --keep_going
           # Timeouts are 16 minutes for individual tests, the same as the default idle timeout.
           # The bazel test timeout is 25 minutes, slightly shorter than the 30 minute exec
           # timeout, so that it will timeout before the task would.
