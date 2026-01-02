@@ -1987,11 +1987,16 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
 
     // Propagate all the slots created by the children.
     SbSlotVector leftProjectSlots, rightProjectSlots;
-    for (auto& produce : leftOutputs.getAllNameSlotPairsInOrder()) {
-        leftProjectSlots.emplace_back(produce.second);
+    sbe::value::SlotSet dedupSlotId;  // Used to avoid duplicates in the projection list.
+    for (auto& produce : leftOutputs.getAllSlotsInOrder()) {
+        if (dedupSlotId.insert(produce.getId()).second) {
+            leftProjectSlots.emplace_back(produce);
+        }
     }
-    for (auto& produce : rightOutputs.getAllNameSlotPairsInOrder()) {
-        rightProjectSlots.emplace_back(produce.second);
+    for (auto& produce : rightOutputs.getAllSlotsInOrder()) {
+        if (dedupSlotId.insert(produce.getId()).second) {
+            rightProjectSlots.emplace_back(produce);
+        }
     }
 
     // Build the HashJoin stage that implements the hash join.
@@ -2155,12 +2160,20 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
                 generateArrayObliviousPathEvaluation(b, predicate.rightField, rightOutputs))));
     }
 
+    SbSlotVector projectedSlots;
+    sbe::value::SlotSet dedupSlotId;  // Used to avoid duplicates in the projection list.
+    for (auto& produce : leftOutputs.getAllSlotsInOrder()) {
+        if (dedupSlotId.insert(produce.getId()).second) {
+            projectedSlots.emplace_back(produce);
+        }
+    }
+
     // Finally, get the keys from the outer side and feed them to the inner side (ixscan).
     auto indexStage =
         b.makeLoopJoin(std::move(leftStage),
                        std::move(outStage),
-                       leftOutputs.getAllSlotsInOrder() /* outerProjects */,
-                       leftOutputs.getAllSlotsInOrder() /* outerCorrelated */,
+                       projectedSlots /* outerProjects */,
+                       projectedSlots /* outerCorrelated */,
                        {}, /* innerProjects */
                        b.makeBooleanOpTree(abt::Operations::And, std::move(equalityPredicates)));
 

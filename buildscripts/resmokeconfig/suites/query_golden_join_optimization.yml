@@ -9,8 +9,6 @@ selector:
     # No joins in those plan stability tests
     - jstests/query_golden/plan_stability.js
     - jstests/query_golden/plan_stability2.js
-    # TODO SERVER-115633 Join Optimization: "Location4822820: duplicate field" error when projecting the same field twice
-    - jstests/query_golden/complex_pipelines.js
     # Those tests set internalEnableJoinOptimization internally
     - jstests/query_golden/join_opt/**/*.js
 executor:
