@@ -71,3 +71,20 @@ bazel-testlogs/buildscripts/resmokeconfig/core/
 │               ├── journal/
 │               └── diagnostic.data/
 ```
+
+### Tips and Tricks
+
+#### Run a single test from a suite:
+
+```
+bazel test //buildscripts/resmokeconfig:core --test_sharding_strategy=disabled --test_arg=jstests/core/js/jssymbol.js
+```
+
+#### Run resmoke.py outside of bazel with the suite's config:
+
+```
+# Build binaries and the suite's config (the *_config target)
+bazel build install-dist-test //buildscripts/resmokeconfig:core_config
+
+python buildscripts/resmoke.py run --suite bazel-bin/buildscripts/resmokeconfig/core.yml
+```
