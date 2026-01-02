@@ -1,6 +1,6 @@
 function setup_db_contrib_tool {
     # check if db-contrib-tool is already installed
-    if [[ $(type -P db-contrib-tool) ]]; then
+    if [[ -f "${workdir}/bin/db-contrib-tool" ]] || [[ -f "${workdir}/bin/db-contrib-tool.exe" ]]; then
         return 0
     fi
 
