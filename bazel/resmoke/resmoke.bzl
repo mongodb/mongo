@@ -1,3 +1,5 @@
+load("//bazel:test_exec_properties.bzl", "test_exec_properties")
+
 def resmoke_config_impl(ctx):
     base_name = ctx.label.name.removesuffix("_config")
     test_list_file = ctx.actions.declare_file(base_name + ".txt")
@@ -74,6 +76,7 @@ def resmoke_suite_test(
         srcs = [],
         tags = [],
         timeout = "eternal",
+        exec_properties = {},
         **kwargs):
     generated_config = name + "_config"
     resmoke_config(
@@ -158,5 +161,6 @@ def resmoke_suite_test(
             "//bazel/resmoke:installed_dist_test_enabled": {},
             "//conditions:default": {"DEPS_PATH": deps_path},
         }),
+        exec_properties = exec_properties | test_exec_properties(tags),
         **kwargs
     )

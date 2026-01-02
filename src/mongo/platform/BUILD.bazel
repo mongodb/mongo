@@ -103,10 +103,8 @@ mongo_cc_unit_test(
 mongo_cc_unit_test(
     name = "rwmutex_test",
     srcs = ["rwmutex_test.cpp"],
-    minimum_test_resources = {
-        "cpu_cores": 2,
-    },
     tags = [
+        "cpu:2",
         "mongo_unittest_sixth_group",
         "server-programmability",
     ],

@@ -1269,9 +1269,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/window_function:window_function_sum_test.cpp",
         "//src/mongo/s/query/exec:document_source_merge_cursors_test.cpp",
     ],
-    minimum_test_resources = {
-        "cpu_cores": 2,
-    },
     srcs_select = [{
         "//bazel/config:js_engine_mozjs": [
             "accumulator_js_test.cpp",
@@ -1285,6 +1282,7 @@ mongo_cc_unit_test(
         "code_coverage_quarantine",
         "code_coverage_quarantine_SERVER-98846",
         "mongo_unittest_seventh_group",
+        "cpu:2",
     ],
     deps = [
         ":accumulator",

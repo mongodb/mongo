@@ -315,10 +315,8 @@ mongo_cc_unit_test(
         "index_builds_manager_test.cpp",
         "multi_index_block_test.cpp",
     ],
-    minimum_test_resources = {
-        "cpu_cores": 2,
-    },
     tags = [
+        "cpu:2",
         "mongo_unittest_seventh_group",
         "server-index-builds",
     ],
