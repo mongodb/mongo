@@ -499,30 +499,6 @@ public:
     static FLE2FindRangePayloadV2 serializeFindRangeStubV2(const FLE2RangeFindSpec& spec);
 
     /**
-     * Generates a client-side payload that is sent to the server.
-     *
-     * Input is a document with FLE2EncryptionPlaceholder placeholders.
-     *
-     * For each field, transforms the field into BinData 6 with a prefix byte of 4
-     *
-     * {
-     *   d : EDCDerivedFromDataTokenAndContentionFactorToken
-     *   s : ESCDerivedFromDataTokenAndContentionFactorToken
-     *   p : Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken) v :
-     * Encrypt(K_KeyId, value), e : ServerDataEncryptionLevel1Token,
-     * }
-     */
-    static BSONObj transformPlaceholders(const BSONObj& obj, FLEKeyVault* keyVault);
-
-    /**
-     * Generates a client-side payload that is sent to the server. Contention factor is given
-     * explicitly as a lambda expression.
-     */
-    static BSONObj transformPlaceholders(const BSONObj& obj,
-                                         FLEKeyVault* keyVault,
-                                         const ContentionFactorFn& contentionFactor);
-
-    /**
      * Given the original command, the output of query analysis, and a schema map,
      * this generates a client-side payload that is sent to the server.
      * The cryptdResult object parameter is expected to have the fields:

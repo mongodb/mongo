@@ -2021,6 +2021,7 @@ mongo_cc_unit_test(
         "//src/mongo/crypto:aead_encryption",
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/crypto:fle_crypto",
+        "//src/mongo/crypto:fle_crypto_test_utils",
         "//src/mongo/db/exec/document_value:document_value_test_util",
         "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/write_ops",

@@ -1204,6 +1204,7 @@ mongo_cc_unit_test(
         "//src/mongo/crypto:aead_encryption",
         "//src/mongo/crypto:encrypted_field_config",
         "//src/mongo/crypto:fle_crypto",
+        "//src/mongo/crypto:fle_crypto_test_utils",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:fle_crud",
         "//src/mongo/db:fle_mocks",

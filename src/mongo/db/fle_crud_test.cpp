@@ -43,7 +43,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_test_utils.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/crypto/fle_tags.h"
@@ -604,32 +604,18 @@ void FleCrudTest::testValidateTags(BSONObj obj) {
 BSONObj FleCrudTest::transformElementForInsertUpdate(BSONElement element,
                                                      const std::vector<char>& placeholder,
                                                      const EncryptedFieldConfig& efc) {
-    // Wrap the element in a document in an insert command, so libmongocrypt can transform
-    // the placeholders.
-    auto origCmd = write_ops::InsertCommandRequest(_edcNs, {element.wrap()}).toBSON();
-    auto cryptdResponse = [&]() {
+
+    ClientSideEncryptor client(_edcNs, efc);
+    auto inputDoc = element.wrap();
+    auto markedDoc = [&]() {
         BSONObjBuilder docbob;
         docbob.appendBinData(element.fieldNameStringData(),
                              placeholder.size(),
                              BinDataType::Encrypt,
                              placeholder.data());
-        BSONObjBuilder bob;
-        bob.append("hasEncryptionPlaceholders", true);
-        bob.append("schemaRequiresEncryption", true);
-        bob.append("result", write_ops::InsertCommandRequest(_edcNs, {docbob.obj()}).toBSON());
-        return bob.obj();
+        return docbob.obj();
     }();
-    auto finalCmd =
-        FLEClientCrypto::transformPlaceholders(origCmd,
-                                               cryptdResponse,
-                                               BSON(_edcNs.toString_forTest() << efc.toBSON()),
-                                               &_keyVault,
-                                               _edcNs.db_forTest())
-            .addField(BSON("$db" << _edcNs.db_forTest()).firstElement());
-    return write_ops::InsertCommandRequest::parse(finalCmd, IDLParserContext("finalCmd"))
-        .getDocuments()
-        .front()
-        .getOwned();
+    return client.encryptPlaceholders(inputDoc, markedDoc, _keyVault);
 }
 
 void FleCrudTest::doSingleInsert(int id,
@@ -658,6 +644,9 @@ void FleCrudTest::doSingleInsert(int id, BSONObj obj, bool bypassDocumentValidat
 
 void FleCrudTest::doSingleInsertWithContention(
     int id, BSONElement element, int64_t cm, uint64_t cf, EncryptedFieldConfig efc) {
+// TODO: SERVER-116083 re-write this section once libmongocrypt has support for specifying a fixed
+// contention factor.
+#if 0
     auto buf = generateSinglePlaceholder(element, Fle2AlgorithmInt::kEquality, cm);
     BSONObjBuilder builder;
     builder.append("_id", id);
@@ -673,6 +662,7 @@ void FleCrudTest::doSingleInsertWithContention(
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
 
     uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false));
+#endif
 }
 
 void FleCrudTest::doSingleInsertWithContention(
@@ -1580,6 +1570,9 @@ TEST_F(FleTagsTest, InsertAndUpdate) {
     ASSERT_EQ(1, readTags(doc2).size());
 }
 
+// TODO: SERVER-116083 enable this test once libmongocrypt has support for specifying a fixed
+// contention factor.
+#if 0
 TEST_F(FleTagsTest, ContentionFactor) {
     auto efc = EncryptedFieldConfig::parse(fromjson(R"({
         "escCollection": "enxcol_.coll.esc",
@@ -1643,6 +1636,7 @@ TEST_F(FleTagsTest, ContentionFactor) {
     ASSERT_EQ(3, readTags(doc1, 4).size());
     ASSERT_EQ(2, readTags(doc2, 4).size());
 }
+#endif
 
 TEST_F(FleTagsTest, MemoryLimit) {
     auto doc = BSON("encrypted" << "a");

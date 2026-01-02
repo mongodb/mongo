@@ -335,6 +335,17 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "fle_crypto_test_utils",
+    srcs = [
+        "fle_crypto_test_utils.cpp",
+    ],
+    deps = [
+        ":fle_crypto",
+        "//src/mongo/db/query/write_ops",
+    ],
+)
+
 mongo_cc_unit_test(
     name = "crypto_test",
     srcs = [
@@ -363,6 +374,7 @@ mongo_cc_unit_test(
         ":aead_encryption",
         ":encrypted_field_config",
         ":fle_crypto",
+        ":fle_crypto_test_utils",
         ":fle_fields",
         ":jwk_manager_test_framework",
         ":jwt",

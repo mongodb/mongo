@@ -32,14 +32,13 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
-#include "mongo/crypto/fle_crypto_types.h"
+#include "mongo/crypto/fle_crypto_test_utils.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/crypto/symmetric_key.h"
@@ -78,7 +77,6 @@
 #include <set>
 #include <string>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
@@ -228,8 +226,6 @@ protected:
 
     BSONObj generateCompactionTokens(const std::set<std::string>& encryptedFieldNames);
 
-    std::vector<char> generatePlaceholder(UUID keyId, BSONElement value);
-
     void doSingleInsert(int id, BSONObj encryptedFieldsObj);
 
     template <typename Container>
@@ -286,7 +282,7 @@ void FleCompactTest::setUp() {
 
     _queryImpl = std::make_unique<FLEQueryInterfaceMock>(_opCtx.get(), _storage);
 
-    _namespaces.edcNss = NamespaceString::createNamespaceString_forTest("test.edc");
+    _namespaces.edcNss = NamespaceString::createNamespaceString_forTest("test.coll");
     _namespaces.escNss = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.esc");
     _namespaces.ecocNss = NamespaceString::createNamespaceString_forTest("test.enxcol_.coll.ecoc");
     _namespaces.ecocRenameNss = NamespaceString::createNamespaceString_forTest("test.ecoc.compact");
@@ -413,50 +409,32 @@ BSONObj FleCompactTest::generateCompactionTokens(const std::set<std::string>& en
     return FLEClientCrypto::generateCompactionTokens(efc, &_keyVault);
 }
 
-std::vector<char> FleCompactTest::generatePlaceholder(UUID keyId, BSONElement value) {
-    FLE2EncryptionPlaceholder ep;
-
-    ep.setAlgorithm(mongo::Fle2AlgorithmInt::kEquality);
-    ep.setUserKeyId(userKeyId);
-    ep.setIndexKeyId(keyId);
-    ep.setValue(value);
-    ep.setType(mongo::Fle2PlaceholderType::kInsert);
-    ep.setMaxContentionCounter(0);
-
-    BSONObj obj = ep.toBSON();
-
-    std::vector<char> v;
-    v.resize(obj.objsize() + 1);
-    v[0] = static_cast<uint8_t>(EncryptedBinDataType::kFLE2Placeholder);
-    std::copy(obj.objdata(), obj.objdata() + obj.objsize(), v.begin() + 1);
-    return v;
-}
-
 void FleCompactTest::doSingleInsert(int id, BSONObj encryptedFieldsObj) {
     BSONObjBuilder builder;
     builder.append("_id", id);
     builder.append("plainText", "sample");
 
+    ClientSideEncryptor client(_namespaces.edcNss);
+
     for (auto&& elt : encryptedFieldsObj) {
-        UUID uuid = fieldNameToUUID(elt.fieldNameStringData());
-        auto buf = generatePlaceholder(uuid, elt);
-        builder.appendBinData(
-            elt.fieldNameStringData(), buf.size(), BinDataType::Encrypt, buf.data());
+        auto name = elt.fieldNameStringData();
+        UUID uuid = fieldNameToUUID(name);
+
+        client.addEncryptedField(EncryptedFieldHelper::makeEquality(name, elt.type(), uuid, 0));
+        builder.append(elt);
     }
 
-    auto clientDoc = builder.obj();
-
-    auto result = FLEClientCrypto::transformPlaceholders(clientDoc, &_keyVault);
+    auto inputDoc = builder.obj();
+    auto markedDoc =
+        client.replaceWithPlaceholders(inputDoc, Fle2PlaceholderType::kInsert, userKeyId);
+    auto result = client.encryptPlaceholders(inputDoc, markedDoc, _keyVault);
 
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
-
-    auto efc =
-        generateEncryptedFieldConfig(encryptedFieldsObj.getFieldNames<std::set<std::string>>());
 
     int stmtId = 0;
 
     uassertStatusOK(processInsert(
-        _queryImpl.get(), _namespaces.edcNss, serverPayload, efc, &stmtId, result, false));
+        _queryImpl.get(), _namespaces.edcNss, serverPayload, client.efc(), &stmtId, result, false));
 }
 
 template <typename Container>
