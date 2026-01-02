@@ -34,6 +34,7 @@
 #include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/router_role/collection_uuid_mismatch.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/commands/query_cmd/populate_cursor.h"
 #include "mongo/s/transaction_router.h"
@@ -135,7 +136,7 @@ std::shared_ptr<const CollectionUUIDMismatchInfo> getCollectionUUIDMismatchInfo(
 
 // Helper function that prints the contents of 'opsToRetry' to the log if appropriate.
 void logOpsToRetry(const std::vector<WriteOp>& opsToRetry) {
-    if (opsToRetry.empty() &&
+    if (!opsToRetry.empty() &&
         shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(4))) {
         std::stringstream opsStream;
         size_t numOpsInStream = 0;
@@ -148,6 +149,32 @@ void logOpsToRetry(const std::vector<WriteOp>& opsToRetry) {
             10411404, 4, "re-enqueuing ops that didn't complete", "ops"_attr = opsStream.str());
     }
 }
+
+bool isTimeseriesInsert(OperationContext* opCtx,
+                        const RoutingContext& routingCtx,
+                        const WriteOp& op) {
+    if (getWriteOpType(op) != WriteType::kInsert) {
+        return false;
+    }
+
+    if (isRawDataOperation(opCtx)) {
+        return false;
+    }
+
+    const auto& nss = op.getNss();
+    const auto& bucketsNss = nss.makeTimeseriesBucketsNamespace();
+    const bool hasBucketsNss = routingCtx.hasNss(bucketsNss);
+    const bool isViewfulTimeseries = nss.isTimeseriesBucketsCollection() || hasBucketsNss;
+    bool isTrackedTimeseries = false;
+    if (routingCtx.hasNss(nss)) {
+        const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+        isTrackedTimeseries =
+            cri.hasRoutingTable() && cri.getChunkManager().isTimeseriesCollection();
+    }
+
+    return isViewfulTimeseries || isTrackedTimeseries;
+}
+
 }  // namespace
 
 ProcessorResult WriteBatchResponseProcessor::onWriteBatchResponse(
@@ -200,7 +227,7 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
                     // calling queueOpForRetry().
                     queueOpForRetry(op, getItemStatus(itemVar), toRetry, collsToCreate);
                 } else {
-                    // Otherwise, call queueOpForRetry() without a Stauts.
+                    // Otherwise, call queueOpForRetry() without a Status.
                     queueOpForRetry(op, toRetry);
                 }
             }
@@ -323,7 +350,6 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     result.opsToRetry.insert(result.opsToRetry.end(), toRetry.begin(), toRetry.end());
     result.collsToCreate = std::move(collsToCreate);
     result.successfulShardSet = std::move(successfulShardSet);
-
 
     const auto batchSize = itemsByOp.size();
     if (response.isRetryableWriteWithId) {
@@ -857,8 +883,17 @@ void WriteBatchResponseProcessor::retrieveReplyItemsImpl(
 
             result.items.emplace_back(op, std::move(item));
         } else {
-            // Handle the case where we don't have a reply item for 'shardOpId'.
-            if (finalErrorForBatch.isOK()) {
+            // Handle the case where we don't have a reply item for 'shardOpId'. Note that if we are
+            // executing an unordered timeseries insert, then any item beyond the final error must
+            // have succeeded (otherwise, we would have recieved an error for that item). This is
+            // because unlike other writes, unordered timeseries inserts will continue in the face
+            // of stale config errors.
+            // TODO SERVER-80796: This logic can be removed once it is the case that unordered
+            // timeseries inserts stop on the first stale config.
+            if (finalErrorForBatch.isOK() ||
+                (write_op_helpers::isRetryErrCode(finalErrorForBatch.code()) &&
+                 !_cmdRef.getOrdered() && isTimeseriesInsert(opCtx, routingCtx, op))) {
+
                 result.items.emplace_back(op, SucceededWithoutItem{});
             } else {
                 result.items.emplace_back(op, Unexecuted{});
