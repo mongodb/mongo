@@ -12,16 +12,16 @@ let serverStatusAfterTest = db.serverStatus();
 assert.eq(
     serverStatusBeforeTest.metrics.document.updated,
     serverStatusAfterTest.metrics.document.updated,
-    `Before:  ${tojson(serverStatusBeforeTest.metrics.document)}, after: ${tojson(
+    `Before: ${tojson(serverStatusBeforeTest.metrics.document)}, after: ${tojson(
         serverStatusAfterTest.metrics.document,
-    )}`,
+    )}, result: ${tojson(result)}`,
 );
 assert.eq(
     serverStatusBeforeTest.metrics.document.returned,
     serverStatusAfterTest.metrics.document.returned,
     `Before:  ${tojson(serverStatusBeforeTest.metrics.document)}, after: ${tojson(
         serverStatusAfterTest.metrics.document,
-    )}`,
+    )}, result: ${tojson(result)}`,
 );
 
 // Update and return a single document
@@ -33,14 +33,14 @@ assert.eq(
     serverStatusAfterTest.metrics.document.updated,
     `Before:  ${tojson(serverStatusBeforeTest.metrics.document)}, after: ${tojson(
         serverStatusAfterTest.metrics.document,
-    )}`,
+    )}, result: ${tojson(result)}`,
 );
 assert.eq(
     serverStatusBeforeTest.metrics.document.returned + 1,
     serverStatusAfterTest.metrics.document.returned,
     `Before:  ${tojson(serverStatusBeforeTest.metrics.document)}, after: ${tojson(
         serverStatusAfterTest.metrics.document,
-    )}`,
+    )}, result: ${tojson(result)}`,
 );
 
 // Delete and return no document
@@ -52,14 +52,14 @@ assert.eq(
     serverStatusAfterTest.metrics.document.deleted,
     `Before:  ${tojson(serverStatusBeforeTest.metrics.document)}, after: ${tojson(
         serverStatusAfterTest.metrics.document,
-    )}`,
+    )}, result: ${tojson(result)}`,
 );
 assert.eq(
     serverStatusBeforeTest.metrics.document.returned,
     serverStatusAfterTest.metrics.document.returned,
     `Before:  ${tojson(serverStatusBeforeTest.metrics.document)}, after: ${tojson(
         serverStatusAfterTest.metrics.document,
-    )}`,
+    )}, result: ${tojson(result)}`,
 );
 
 // Delete and return a single document
@@ -71,12 +71,12 @@ assert.eq(
     serverStatusAfterTest.metrics.document.deleted,
     `Before:  ${tojson(serverStatusBeforeTest.metrics.document)}, after: ${tojson(
         serverStatusAfterTest.metrics.document,
-    )}`,
+    )}, result: ${tojson(result)}`,
 );
 assert.eq(
     serverStatusBeforeTest.metrics.document.returned + 1,
     serverStatusAfterTest.metrics.document.returned,
     `Before:  ${tojson(serverStatusBeforeTest.metrics.document)}, after: ${tojson(
         serverStatusAfterTest.metrics.document,
-    )}`,
+    )}, result: ${tojson(result)}`,
 );
