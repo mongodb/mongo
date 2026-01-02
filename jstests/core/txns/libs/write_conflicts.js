@@ -6,7 +6,6 @@ import {
     withTxnAndAutoRetryOnMongos,
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 export var WriteConflictHelpers = (function () {
     /**
@@ -64,7 +63,7 @@ export var WriteConflictHelpers = (function () {
             // total WCE metric by the number of shards involved. Similarly, BulkWriteOverride turns
             // a single op into multiple writes and causes multiple WCEs. The unified write executor
             // implements some writes as bulk writes internally.
-            if (FixtureHelpers.isSharded(coll) || TestData.runningWithBulkWriteOverride || isUweEnabled(coll.getDB())) {
+            if (FixtureHelpers.isSharded(coll) || TestData.runningWithBulkWriteOverride) {
                 assert.gte(after, before + 1);
             } else {
                 assert.eq(after, before + 1);

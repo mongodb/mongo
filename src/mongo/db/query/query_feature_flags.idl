@@ -332,9 +332,9 @@ feature_flags:
     featureFlagUnifiedWriteExecutor:
         description: "Feature flag to use the unified write executor."
         cpp_varname: "gFeatureFlagUnifiedWriteExecutor"
-        default: false
+        default: true
         fcv_gated: false
-        incremental_rollout_phase: in_development
+        incremental_rollout_phase: rollout
 
     featureFlagOriginalQueryShapeHash:
         description: "Feature flag to to pass 'originalQueryShapeHash' field in commands from router to shards."

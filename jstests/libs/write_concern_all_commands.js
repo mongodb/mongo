@@ -17,7 +17,6 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const dbName = "testDB";
 const collName = "testColl";
@@ -6129,19 +6128,6 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
         }
 
         if (clusterType == "rs" && command == "setDefaultRWConcern") {
-            jsTestLog("Skipping " + command + " test for failure case.");
-            return true;
-        }
-
-        // When UWE is enabled, a findAndModify update on sharded viewful timeseries collection
-        // may fail on mongos directly, so there's no write concern error to check.
-        if (
-            clusterType == "sharded" &&
-            ["findAndModify", "findOneAndUpdate"].includes(command) &&
-            shardedCollection &&
-            timeseriesViews &&
-            isUweEnabled(coll.getDB())
-        ) {
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }

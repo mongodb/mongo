@@ -7,7 +7,6 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -28,18 +27,15 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.sh
 let fp = configureFailPoint(recipientPrimary, "alwaysThrowStaleConfigInfo");
 
 // Test various read and write commands that are sent with shard versions and thus can return
-// StaleConfig. Batch writes, i.e. insert/update/delete (and findAndModify when UWE is enabled)
-// return batch responses with ok:1 and NoProgressMade write errors when retries are exhausted,
-// so they are excluded.
+// StaleConfig. Batch writes, i.e. insert/update/delete return batch responses with ok:1 and
+// NoProgressMade write errors when retries are exhausted, so they are excluded.
 let kCommands = [
     {aggregate: collName, pipeline: [], cursor: {}},
     {count: collName},
     {distinct: collName, query: {}, key: "_id"},
     {find: collName},
+    {findAndModify: collName, query: {_id: 0}, update: {$set: {x: 1}}},
 ];
-if (!isUweEnabled(st.s)) {
-    kCommands.push({findAndModify: collName, query: {_id: 0}, update: {$set: {x: 1}}});
-}
 
 kCommands.forEach((cmd) => {
     // The recipient shard should return StaleConfig until mongos exhausts its retries and

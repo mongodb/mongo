@@ -21,7 +21,6 @@ import {WriteConflictHelpers} from "jstests/core/txns/libs/write_conflicts.js";
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
-import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 const dbName = "test";
 const collName = "write_conflicts_with_non_txns";

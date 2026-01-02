@@ -560,8 +560,8 @@ buildvariants:
       #   cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency
-    name: amazon_linux2023_arm64_static-unified-write-executor-query-patch-only
-    display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (Unified Write Executor)"
+    name: amazon_linux2023_arm64_static-bulk-batch-write-executor-query-patch-only
+    display_name: "~ Amazon Linux 2023 arm64 Enterprise Query Patch Only (Batch/Bulk Write Executor)" # TODO SERVER-109104: Delete this variant.
     tags: ["experimental"]
     cron: "0 1 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     run_on:
@@ -576,9 +576,8 @@ buildvariants:
       exec_timeout_factor: 1.5
       test_flags: >-
         --runAllFeatureFlagTests
-        --mongodSetParameters="{featureFlagUnifiedWriteExecutor: true}"
-        --mongosSetParameters="{featureFlagUnifiedWriteExecutor: true}"
-    # For now just unified write executor suites but tasks will be added as development continues.
+        --mongodSetParameters="{featureFlagUnifiedWriteExecutor: false}"
+        --mongosSetParameters="{featureFlagUnifiedWriteExecutor: false}"
     tasks:
       - name: compile_integration_and_test_parallel_stream_TG
         distros:
@@ -586,36 +585,34 @@ buildvariants:
       - name: run_unit_tests_TG
         distros:
           - amazon2023-arm64-latest-large
-      - name: unified_write_executor
-      - name: unified_write_executor_sharding
-      - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_gen
-      - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard_gen
-      - name: unified_write_executor_concurrency_sharded_multi_stmt_txn_with_balancer_gen
-      - name: unified_write_executor_sharded_jscore_txns
-      - name: unified_write_executor_sharded_jscore_txns_sharded_collections
-      - name: unified_write_executor_sharded_jscore_txns_without_snapshot
-      - name: unified_write_executor_multi_shard_multi_stmt_txn_jscore_passthrough_gen
-      - name: unified_write_executor_multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
-      - name: unified_write_executor_concurrency_sharded_causal_consistency_gen
-      - name: unified_write_executor_concurrency_sharded_causal_consistency_and_balancer_gen
-      - name: unified_write_executor_sharded_causally_consistent_jscore_passthrough_gen
-      - name: unified_write_executor_sharded_causally_consistent_jscore_txns_passthrough_gen
-      - name: unified_write_executor_sharded_causally_consistent_read_concern_snapshot_passthrough_gen
-      - name: unified_write_executor_sharded_multi_stmt_txn_jscore_passthrough
-      - name: unified_write_executor_bulk_write_multi_op_sharded_collections_jscore_passthrough
-      - name: unified_write_executor_bulk_write_sharded_causally_consistent_jscore_passthrough
-      - name: unified_write_executor_bulk_write_sharded_collections_jscore_passthrough
-      - name: unified_write_executor_bulk_write_sharded_multi_stmt_txn_jscore_passthrough
-      - name: unified_write_executor_concurrency_sharded_replication_gen
-      - name: unified_write_executor_concurrency_sharded_replication_with_balancer_gen
-      - name: unified_write_executor_sharded_collections_jscore_passthrough_gen
-      - name: unified_write_executor_sharding_jscore_passthrough_gen
-      - name: unified_write_executor_sharding_jscore_passthrough_with_balancer_gen
-      - name: unified_write_executor_fle2_sharding
-      - name: unified_write_executor_fle2_sharding_high_cardinality
-      - name: unified_write_executor_sharding_legacy_timeseries_no_rawdata_gen
-      - name: unified_write_executor_sharding_jscore_passthrough_legacy_timeseries_no_rawdata_gen
-      - name: unified_write_executor_concurrency_sharded_initial_sync_gen
+      - name: sharding_gen
+      - name: concurrency_sharded_multi_stmt_txn_gen
+      - name: concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_and_add_remove_shard_gen
+      - name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
+      - name: sharded_jscore_txns
+      - name: sharded_jscore_txns_sharded_collections
+      - name: sharded_jscore_txns_without_snapshot
+      - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
+      - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+      - name: concurrency_sharded_causal_consistency_gen
+      - name: concurrency_sharded_causal_consistency_and_balancer_gen
+      - name: sharded_causally_consistent_jscore_passthrough_gen
+      - name: sharded_causally_consistent_jscore_txns_passthrough
+      - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+      - name: sharded_multi_stmt_txn_jscore_passthrough_gen
+      - name: bulk_write_multi_op_sharded_collections_jscore_passthrough_gen
+      - name: bulk_write_sharded_collections_jscore_passthrough_gen
+      - name: bulk_write_sharded_multi_stmt_txn_jscore_passthrough_gen
+      - name: concurrency_sharded_replication_gen
+      - name: concurrency_sharded_replication_with_balancer_gen
+      - name: sharded_collections_jscore_passthrough_gen
+      - name: sharding_jscore_passthrough_gen
+      - name: sharding_jscore_passthrough_with_balancer_gen
+      - name: fle2_sharding
+      - name: fle2_sharding_high_cardinality
+      - name: sharding_legacy_timeseries_no_rawdata_gen
+      - name: sharding_jscore_passthrough_legacy_timeseries_no_rawdata_gen
+      - name: concurrency_sharded_initial_sync_gen
       - name: burn_in_tests_gen
         depends_on:
           - name: version_burn_in_gen

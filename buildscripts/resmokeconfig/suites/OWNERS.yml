@@ -141,9 +141,6 @@ filters:
   - "write_concern*":
     approvers:
       - 10gen/server-rw-concerns
-  - "unified_write_executor*":
-    approvers:
-      - 10gen/query-execution-router
   - "*config_transitions_and_add_remove_shard.yml":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
