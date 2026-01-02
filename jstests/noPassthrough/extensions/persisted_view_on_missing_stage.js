@@ -19,6 +19,7 @@ const optionsWithExtension = {
     dbpath: dbpath,
     noCleanData: true,
     loadExtensions: extensionNames[0],
+    setParameter: {featureFlagExtensionStubParsers: true},
 };
 const optionsWithoutExtension = {
     dbpath: dbpath,
