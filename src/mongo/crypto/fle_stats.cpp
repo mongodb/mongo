@@ -41,43 +41,6 @@ namespace {
 // We only track fle stats on the shard.
 auto& fleStatusSection =
     *ServerStatusSectionBuilder<FLEStatusSection>("fle").forShard().bind(globalSystemTickSource());
-
-FLEIndexTypeStats countIndexTypeUsages(const EncryptedFieldConfig& efc) {
-    FLEIndexTypeStats counters;
-    visitQueryTypeConfigs(
-        efc,
-        [&counters](const EncryptedField& field, const QueryTypeConfig& qtc) {
-            switch (qtc.getQueryType()) {
-                case QueryTypeEnum::Equality:
-                    counters.setEquality(counters.getEquality() + 1);
-                    break;
-                case QueryTypeEnum::Range:
-                    counters.setRange(counters.getRange() + 1);
-                    break;
-                case QueryTypeEnum::RangePreviewDeprecated:
-                    counters.setRangePreview(counters.getRangePreview() + 1);
-                    break;
-                case QueryTypeEnum::SubstringPreview:
-                    counters.setSubstringPreview(counters.getSubstringPreview() + 1);
-                    break;
-                case QueryTypeEnum::SuffixPreview:
-                    counters.setSuffixPreview(counters.getSuffixPreview() + 1);
-                    break;
-                case QueryTypeEnum::PrefixPreview:
-                    counters.setPrefixPreview(counters.getPrefixPreview() + 1);
-                    break;
-                default:
-                    MONGO_UNREACHABLE;
-            };
-            return false;
-        },
-        [&counters](const EncryptedField&) {
-            counters.setUnindexed(counters.getUnindexed() + 1);
-            return false;
-        });
-    return counters;
-}
-
 }  // namespace
 
 FLEStatusSection::FLEStatusSection(std::string name, ClusterRole role, TickSource* tickSource)
