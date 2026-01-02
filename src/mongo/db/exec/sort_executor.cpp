@@ -34,6 +34,16 @@
 #include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
 
 namespace mongo {
+template <typename T>
+std::unique_ptr<Sorter<Value, T>> SortExecutor<T>::makeSorter() {
+    auto opts = makeSortOptions();
+    return Sorter<Value, T>::template make<Comparator>(
+        opts,
+        Comparator(_sortPattern),
+        (opts.tempDir) ? std::make_unique<FileBasedSorterSpiller<Value, T, Comparator>>(
+                             *opts.tempDir, opts.sorterFileStats)
+                       : nullptr);
+}
 template class SortExecutor<Document>;
 template class SortExecutor<SortableWorkingSetMember>;
 template class SortExecutor<BSONObj>;

@@ -512,7 +512,7 @@ protected:
         indexInfo.setIsMultikey({});
         indexInfo.setMultikeyPaths({});
         indexInfo.setSideWritesTable(pretendSideTable.rs()->getIdent());
-        indexInfo.setFileName(resumableIndexFileName);
+        indexInfo.setStorageIdentifier(resumableIndexFileName);
         indexInfo.setRanges({{}});
         ResumeIndexInfo resumeInfo;
         resumeInfo.setBuildUUID(buildUUID);

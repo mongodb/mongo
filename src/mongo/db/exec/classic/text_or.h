@@ -108,6 +108,14 @@ public:
 
     static const char* kStageType;
 
+    class Comparator {
+    public:
+        explicit Comparator() {}
+        int operator()(const RecordId& lhs, const RecordId& rhs) const {
+            return lhs.compare(rhs);
+        }
+    };
+
 protected:
     void doSaveStateRequiresCollection() final;
 

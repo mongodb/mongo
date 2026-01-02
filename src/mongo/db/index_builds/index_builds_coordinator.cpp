@@ -2234,7 +2234,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
 
             // Clean up the persisted Sorter data since resuming failed.
             for (const auto& index : resumeInfo.getIndexes()) {
-                if (!index.getFileName()) {
+                if (!index.getStorageIdentifier()) {
                     continue;
                 }
 
@@ -2243,12 +2243,12 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
                       "buildUUID"_attr = buildUUID,
                       "collectionUUID"_attr = collUUID,
                       logAttrs(*nss),
-                      "file"_attr = index.getFileName());
+                      "file"_attr = index.getStorageIdentifier());
 
                 boost::system::error_code ec;
                 boost::filesystem::remove(boost::filesystem::path(storageGlobalParams.dbpath) /
                                               std::string{"_tmp"} /
-                                              std::string{*index.getFileName()},
+                                              std::string{*index.getStorageIdentifier()},
                                           ec);
 
                 if (ec) {
@@ -2257,7 +2257,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
                           "buildUUID"_attr = buildUUID,
                           "collectionUUID"_attr = collUUID,
                           logAttrs(*nss),
-                          "file"_attr = index.getFileName(),
+                          "file"_attr = index.getStorageIdentifier(),
                           "error"_attr = ec.message());
                 }
             }

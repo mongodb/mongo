@@ -96,6 +96,17 @@ private:
 
     SortOptions makeSortOptions();
 
+    class Comparator {
+    public:
+        explicit Comparator(const ValueComparator& valueCmp) : _valueCmp(valueCmp) {}
+        int operator()(const Value& lhs, const Value& rhs) const {
+            return _valueCmp.compare(lhs, rhs);
+        }
+
+    private:
+        ValueComparator _valueCmp;
+    };
+
     /**
      * Consumes all of the documents from the source in the pipeline and sorts them by their
      * 'groupBy' value. This method might not be able to finish populating the sorter in a single

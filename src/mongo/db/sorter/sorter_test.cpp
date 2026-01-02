@@ -169,7 +169,6 @@ private:
         };
 
         int currentBufSize = 0;
-        // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
         // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
         FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(makeFile(), *opts->tempDir);
         std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> sorter =
@@ -274,6 +273,8 @@ public:
 class SorterMakeFromExistingRangesTest : public unittest::Test {
 public:
     static std::vector<SorterRange> makeSampleRanges();
+    static std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>
+    makeSorterSpiller(const SortOptions& opts, std::string storageIdentifier = "");
 };
 
 // static
@@ -284,26 +285,88 @@ std::vector<SorterRange> SorterMakeFromExistingRangesTest::makeSampleRanges() {
     return ranges;
 }
 
+// static
+std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>
+SorterMakeFromExistingRangesTest::makeSorterSpiller(const SortOptions& opts,
+                                                    std::string storageIdentifier) {
+    ASSERT(opts.tempDir);
+
+    if (storageIdentifier == "") {
+        return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
+            *opts.tempDir, opts.sorterFileStats);
+    }
+    return std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
+        std::make_shared<SorterFile>(*opts.tempDir / storageIdentifier, opts.sorterFileStats),
+        *opts.tempDir);
+}
+
 using SorterMakeFromExistingRangesTestDeathTest = SorterMakeFromExistingRangesTest;
 DEATH_TEST_F(
     SorterMakeFromExistingRangesTestDeathTest,
     NonZeroLimit,
     "Creating a Sorter from existing ranges is only available with the NoLimitSorter (limit 0)") {
-    auto opts = SortOptions().Limit(1ULL);
-    IWSorter::makeFromExistingRanges("", {}, opts, IWComparator(ASC));
+    auto opts = SortOptions().Limit(1ULL).TempDir("unused_temp_dir");
+    IWSorter::template makeFromExistingRanges<IWComparator>(
+        "", {}, opts, IWComparator(ASC), makeSorterSpiller(opts));
 }
 
-DEATH_TEST_F(SorterMakeFromExistingRangesTestDeathTest, EmptyFileName, "!fileName.empty()") {
+DEATH_TEST_F(SorterMakeFromExistingRangesTestDeathTest,
+             EmptyStorageIdentifier,
+             "!storageIdentifier.empty()") {
     std::string fileName;
     auto opts = SortOptions().TempDir("unused_temp_dir");
-    IWSorter::makeFromExistingRanges(fileName, {}, opts, IWComparator(ASC));
+    IWSorter::template makeFromExistingRanges<IWComparator>(
+        fileName, {}, opts, IWComparator(ASC), makeSorterSpiller(opts, fileName));
+}
+
+DEATH_TEST_F(SorterMakeFromExistingRangesTestDeathTest,
+             NullSorterSpiller,
+             "this->_spillHelper != nullptr") {
+    unittest::TempDir tempDir = makeTempDir();
+    SorterTracker sorterTracker;
+
+    auto opts = SortOptions()
+                    .Limit(0)
+                    .TempDir(tempDir.path())
+                    .MaxMemoryUsageBytes(
+                        sizeof(IWSorter::Data) +
+                        MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize)
+                    .Tracker(&sorterTracker);
+
+    IWPair pairInsertedBeforeShutdown(1, 100);
+
+    // This test uses two sorters. The first sorter is used to persist data to disk in a shutdown
+    // scenario. On startup, we will fail to restore the original state due to having a nullptr
+    // SorterSpiller.
+    IWSorter::PersistedState state;
+    {
+        auto sorterBeforeShutdown =
+            IWSorter::template make<IWComparator>(opts, IWComparator(ASC), makeSorterSpiller(opts));
+        sorterBeforeShutdown->add(pairInsertedBeforeShutdown.first,
+                                  pairInsertedBeforeShutdown.second);
+        state = sorterBeforeShutdown->persistDataForShutdown();
+        ASSERT_FALSE(state.storageIdentifier.empty());
+        ASSERT_EQUALS(1U, state.ranges.size()) << state.ranges.size();
+        ASSERT_EQ(1, sorterBeforeShutdown->stats().numSorted());
+    }
+
+    // On restart, reconstruct sorter from persisted state.
+    // We should fail because we are using a nullptr as the SorterSpiller.
+    // TODO(SERVER-116074): Change to SorterSpiller after removing templating on Comparator.
+    IWSorter::template makeFromExistingRanges<IWComparator>(
+        state.storageIdentifier,
+        state.ranges,
+        opts,
+        IWComparator(ASC),
+        std::unique_ptr<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(nullptr));
 }
 
 TEST_F(SorterMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
     auto fileName = "unused_sorter_file";
     SorterTracker sorterTracker;
     auto opts = SortOptions().TempDir("unused_temp_dir").Tracker(&sorterTracker);
-    auto sorter = IWSorter::makeFromExistingRanges(fileName, {}, opts, IWComparator(ASC));
+    auto sorter = IWSorter::template makeFromExistingRanges<IWComparator>(
+        fileName, {}, opts, IWComparator(ASC), makeSorterSpiller(opts, fileName));
 
     ASSERT_EQ(0, sorter->stats().spilledRanges());
 
@@ -318,7 +381,11 @@ TEST_F(SorterMakeFromExistingRangesTest, MissingFile) {
     auto tempDir = "unused_temp_dir";
     auto opts = SortOptions().TempDir(tempDir);
     ASSERT_THROWS_WITH_CHECK(
-        IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC)),
+        IWSorter::template makeFromExistingRanges<IWComparator>(fileName,
+                                                                makeSampleRanges(),
+                                                                opts,
+                                                                IWComparator(ASC),
+                                                                makeSorterSpiller(opts, fileName)),
         std::exception,
         [&](const auto& ex) {
             ASSERT_STRING_CONTAINS(ex.what(), tempDir);
@@ -335,7 +402,11 @@ TEST_F(SorterMakeFromExistingRangesTest, EmptyFile) {
     auto opts = SortOptions().TempDir(tempDir.path());
     // 16815 - unexpected empty file.
     ASSERT_THROWS_CODE(
-        IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC)),
+        IWSorter::template makeFromExistingRanges<IWComparator>(fileName,
+                                                                makeSampleRanges(),
+                                                                opts,
+                                                                IWComparator(ASC),
+                                                                makeSorterSpiller(opts, fileName)),
         DBException,
         16815);
 }
@@ -351,8 +422,8 @@ TEST_F(SorterMakeFromExistingRangesTest, CorruptedFile) {
     auto fileName = tempFilePath.filename().string();
     SorterTracker sorterTracker;
     auto opts = SortOptions().TempDir(tempDir.path()).Tracker(&sorterTracker);
-    auto sorter =
-        IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC));
+    auto sorter = IWSorter::template makeFromExistingRanges<IWComparator>(
+        fileName, makeSampleRanges(), opts, IWComparator(ASC), makeSorterSpiller(opts, fileName));
 
     // The number of spills is set when NoLimitSorter is constructed from existing ranges.
     ASSERT_EQ(makeSampleRanges().size(), sorter->stats().spilledRanges());
@@ -380,18 +451,23 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
     // data.
     IWSorter::PersistedState state;
     {
-        auto sorterBeforeShutdown = IWSorter::make(opts, IWComparator(ASC));
+        auto sorterBeforeShutdown =
+            IWSorter::template make<IWComparator>(opts, IWComparator(ASC), makeSorterSpiller(opts));
         sorterBeforeShutdown->add(pairInsertedBeforeShutdown.first,
                                   pairInsertedBeforeShutdown.second);
         state = sorterBeforeShutdown->persistDataForShutdown();
-        ASSERT_FALSE(state.fileName.empty());
+        ASSERT_FALSE(state.storageIdentifier.empty());
         ASSERT_EQUALS(1U, state.ranges.size()) << state.ranges.size();
         ASSERT_EQ(1, sorterBeforeShutdown->stats().numSorted());
     }
 
     // On restart, reconstruct sorter from persisted state.
-    auto sorter =
-        IWSorter::makeFromExistingRanges(state.fileName, state.ranges, opts, IWComparator(ASC));
+    auto sorter = IWSorter::template makeFromExistingRanges<IWComparator>(
+        state.storageIdentifier,
+        state.ranges,
+        opts,
+        IWComparator(ASC),
+        makeSorterSpiller(opts, state.storageIdentifier));
 
     // The number of spills is set when NoLimitSorter is constructed from existing ranges.
     ASSERT_EQ(state.ranges.size(), sorter->stats().spilledRanges());
@@ -433,7 +509,6 @@ TEST_F(SorterMakeFromExistingRangesTest, NextWithDeferredValues) {
     IWPair pair2(2, 200);
     auto spillFile =
         std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)), opts.sorterFileStats);
-    // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
     // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
     FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(spillFile, *opts.tempDir);
     std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> writer =
@@ -463,7 +538,8 @@ TEST_F(SorterMakeFromExistingRangesTest, ChecksumVersion) {
 
     // By default checksum version should be v2
     {
-        auto sorter = IWSorter::make(opts, IWComparator(ASC));
+        auto sorter =
+            IWSorter::template make<IWComparator>(opts, IWComparator(ASC), makeSorterSpiller(opts));
         sorter->add(1, -1);
         auto state = sorter->persistDataForShutdown();
         ASSERT_EQUALS(state.ranges[0].getChecksumVersion(), SorterChecksumVersion::v2);
@@ -474,7 +550,8 @@ TEST_F(SorterMakeFromExistingRangesTest, ChecksumVersion) {
     // because v1 did not persist a version.
     {
         opts.ChecksumVersion(SorterChecksumVersion::v1);
-        auto sorter = IWSorter::make(opts, IWComparator(ASC));
+        auto sorter =
+            IWSorter::template make<IWComparator>(opts, IWComparator(ASC), makeSorterSpiller(opts));
         sorter->add(1, -1);
         auto state = sorter->persistDataForShutdown();
         ASSERT_EQUALS(state.ranges[0].getChecksumVersion(), boost::none);
@@ -483,7 +560,7 @@ TEST_F(SorterMakeFromExistingRangesTest, ChecksumVersion) {
 }
 
 struct SpillFileState {
-    std::string fileName;
+    std::string storageIdentifier;
     std::vector<SorterRange> ranges;
     SortOptions opts;
     IWComparator comp{ASC};
@@ -493,11 +570,12 @@ SpillFileState makeSpillFile(unittest::TempDir& tempDir) {
     SpillFileState ret;
     ret.opts = SortOptions().TempDir(tempDir.path());
 
-    auto sorter = IWSorter::make(ret.opts, ret.comp);
+    auto sorter = IWSorter::template make<IWComparator>(
+        ret.opts, ret.comp, SorterMakeFromExistingRangesTest::makeSorterSpiller(ret.opts));
     for (int i = 0; i < 10; ++i)
         sorter->add(i, -i);
     auto state = sorter->persistDataForShutdown();
-    ret.fileName = std::move(state.fileName);
+    ret.storageIdentifier = std::move(state.storageIdentifier);
     ret.ranges = std::move(state.ranges);
     return ret;
 }
@@ -510,7 +588,12 @@ void corruptChecksum(SpillFileState& state) {
 TEST_F(SorterMakeFromExistingRangesTest, ValidChecksumValidation) {
     unittest::TempDir tempDir = makeTempDir();
     auto state = makeSpillFile(tempDir);
-    auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
+    auto it = IWSorter::template makeFromExistingRanges<IWComparator>(
+                  state.storageIdentifier,
+                  state.ranges,
+                  state.opts,
+                  state.comp,
+                  makeSorterSpiller(state.opts, state.storageIdentifier))
                   ->done();
     ASSERT_ITERATORS_EQUIVALENT(it, std::make_unique<IntIterator>(0, 10));
 }
@@ -519,7 +602,12 @@ TEST_F(SorterMakeFromExistingRangesTest, IncompleteReadDoesNotReportChecksumErro
     unittest::TempDir tempDir = makeTempDir();
     auto state = makeSpillFile(tempDir);
     corruptChecksum(state);
-    auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
+    auto it = IWSorter::template makeFromExistingRanges<IWComparator>(
+                  state.storageIdentifier,
+                  state.ranges,
+                  state.opts,
+                  state.comp,
+                  makeSorterSpiller(state.opts, state.storageIdentifier))
                   ->done();
     // Read the first (and only) block of data, but don't deserialize any of it
     ASSERT(it->more());
@@ -532,7 +620,12 @@ DEATH_TEST_F(SorterMakeFromExistingRangesTestDeathTest,
     unittest::TempDir tempDir = makeTempDir();
     auto state = makeSpillFile(tempDir);
     corruptChecksum(state);
-    auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
+    auto it = IWSorter::template makeFromExistingRanges<IWComparator>(
+                  state.storageIdentifier,
+                  state.ranges,
+                  state.opts,
+                  state.comp,
+                  makeSorterSpiller(state.opts, state.storageIdentifier))
                   ->done();
     ASSERT_ITERATORS_EQUIVALENT(it, std::make_unique<IntIterator>(0, 10));
     // it's destructor ends up checking the checksum and aborts due to it being wrong
@@ -544,7 +637,12 @@ DEATH_TEST_F(SorterMakeFromExistingRangesTestDeathTest,
     unittest::TempDir tempDir = makeTempDir();
     auto state = makeSpillFile(tempDir);
     state.ranges[0].setChecksumVersion(boost::none);
-    auto it = IWSorter::makeFromExistingRanges(state.fileName, state.ranges, state.opts, state.comp)
+    auto it = IWSorter::template makeFromExistingRanges<IWComparator>(
+                  state.storageIdentifier,
+                  state.ranges,
+                  state.opts,
+                  state.comp,
+                  makeSorterSpiller(state.opts, state.storageIdentifier))
                   ->done();
     ASSERT_ITERATORS_EQUIVALENT(it, std::make_unique<IntIterator>(0, 10));
     // it's destructor ends up checking the checksum and aborts due to it being wrong (because we

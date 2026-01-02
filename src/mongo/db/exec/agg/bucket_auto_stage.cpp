@@ -101,12 +101,13 @@ SortOptions BucketAutoStage::makeSortOptions() {
 
 GetNextResult BucketAutoStage::populateSorter() {
     if (!_sorter) {
-        const auto& valueCmp = pExpCtx->getValueComparator();
-        auto comparator = [valueCmp](const Value& lhs, const Value& rhs) {
-            return valueCmp.compare(lhs, rhs);
-        };
-
-        _sorter = Sorter<Value, Document>::make(makeSortOptions(), comparator);
+        auto opts = makeSortOptions();
+        _sorter = Sorter<Value, Document>::template make<Comparator>(
+            opts,
+            Comparator(pExpCtx->getValueComparator()),
+            (opts.tempDir) ? std::make_unique<FileBasedSorterSpiller<Value, Document, Comparator>>(
+                                 *opts.tempDir, opts.sorterFileStats)
+                           : nullptr);
     }
 
     auto next = pSource->getNext();

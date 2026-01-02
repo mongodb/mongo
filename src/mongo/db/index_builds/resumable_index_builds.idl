@@ -98,6 +98,7 @@ structs:
                 optional: true
             fileName:
                 description: "The name of the file that sorted data is written to"
+                cpp_name: storageIdentifier
                 type: string
                 optional: true
             numKeys:

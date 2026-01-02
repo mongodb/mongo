@@ -1493,7 +1493,7 @@ HybridBulkBuilder::HybridBulkBuilder(const IndexCatalogEntry* entry,
                       dbName,
                       "Index Build: inserting keys from external sorter into index"),
       _sorter(_makeSorter(
-          maxMemoryUsageBytes, dbName, stateInfo.getFileName(), stateInfo.getRanges())) {}
+          maxMemoryUsageBytes, dbName, stateInfo.getStorageIdentifier(), stateInfo.getRanges())) {}
 
 SharedBufferFragmentBuilder& HybridBulkBuilder::_getMemPool() {
     return _sorter->memPool();
@@ -1504,7 +1504,7 @@ IndexStateInfo HybridBulkBuilder::persistDataForShutdown() {
     auto state = _sorter->persistDataForShutdown();
 
     IndexStateInfo stateInfo;
-    stateInfo.setFileName(state.fileName);
+    stateInfo.setStorageIdentifier(state.storageIdentifier);
     stateInfo.setNumKeys(_keysInserted);
     stateInfo.setRanges(std::move(state.ranges));
 
@@ -1549,16 +1549,29 @@ std::unique_ptr<HybridBulkBuilder::Sorter> HybridBulkBuilder::_makeSorter(
     const DatabaseName& dbName,
     boost::optional<StringData> fileName,
     const boost::optional<std::vector<SorterRange>>& ranges) const {
+    auto fileStats = bulkBuilderFileStats();
+    boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
     return fileName
-        ? Sorter::makeFromExistingRanges(
+        ? Sorter::template makeFromExistingRanges<BtreeExternalSortComparison>(
               std::string{*fileName},
               *ranges,
-              makeSortOptions(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()),
+              makeSortOptions(maxMemoryUsageBytes, dbName, fileStats),
               BtreeExternalSortComparison(),
+              std::make_unique<FileBasedSorterSpiller<key_string::Value,
+                                                      mongo::NullValue,
+                                                      BtreeExternalSortComparison>>(
+                  std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, fileStats),
+                  tmpPath,
+                  dbName),
               _makeSorterSettings())
-        : Sorter::make(makeSortOptions(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()),
-                       BtreeExternalSortComparison(),
-                       _makeSorterSettings());
+        : Sorter::template make<BtreeExternalSortComparison>(
+              makeSortOptions(maxMemoryUsageBytes, dbName, fileStats),
+              BtreeExternalSortComparison(),
+              std::make_unique<FileBasedSorterSpiller<key_string::Value,
+                                                      mongo::NullValue,
+                                                      BtreeExternalSortComparison>>(
+                  tmpPath, fileStats, dbName),
+              _makeSorterSettings());
 }
 
 HybridBulkBuilder::Sorter::Settings HybridBulkBuilder::_makeSorterSettings() const {

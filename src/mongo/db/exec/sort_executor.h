@@ -286,10 +286,12 @@ private:
         return opts;
     }
 
+    std::unique_ptr<DocumentSorter> makeSorter();
+
     void ensureSorter() {
         // This conditional should only pass if no documents were added to the sorter.
         if (!_sorter) {
-            _sorter = DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern));
+            _sorter = makeSorter();
         }
     }
 

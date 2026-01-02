@@ -255,7 +255,6 @@ std::shared_ptr<IWIterator> spillToFile(IteratorPtr inputIter, const unittest::T
     const SortOptions opts = SortOptions().TempDir(tempDir.path());
     auto spillFile =
         std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)), opts.sorterFileStats);
-    // TODO(SERVER-114085): Remove after adding SorterStorage to SortOptions.
     // TODO(SERVER-114080): Ensure testing of non-file-based sorter storage is comprehensive.
     FileBasedSorterStorage<IntWrapper, IntWrapper> sorterStorage(spillFile, *opts.tempDir);
     std::unique_ptr<SortedStorageWriter<IntWrapper, IntWrapper>> writer =

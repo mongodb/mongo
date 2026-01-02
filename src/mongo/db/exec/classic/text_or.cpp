@@ -456,13 +456,16 @@ void TextOrStage::initSorter() {
     // batch to the _sorter.
     static constexpr size_t kMaxMemoryUsageForSorter = std::numeric_limits<size_t>::max();
 
-    _sorterStats = std::make_unique<SorterFileStats>(nullptr /*sorterTracker*/);
-    _sorter = Sorter<RecordId, TextRecordDataForSorter>::make(
-        SortOptions{}
-            .FileStats(_sorterStats.get())
-            .MaxMemoryUsageBytes(kMaxMemoryUsageForSorter)
-            .TempDir(expCtx()->getTempDir()),
-        [](const RecordId& lhs, const RecordId& rhs) { return lhs.compare(rhs); });
+    _sorterStats = std::make_unique<SorterFileStats>(/*sorterTracker=*/nullptr);
+    auto opts = SortOptions{}
+                    .FileStats(_sorterStats.get())
+                    .MaxMemoryUsageBytes(kMaxMemoryUsageForSorter)
+                    .TempDir(expCtx()->getTempDir());
+    _sorter = Sorter<RecordId, TextRecordDataForSorter>::template make<Comparator>(
+        opts,
+        Comparator(),
+        std::make_unique<FileBasedSorterSpiller<RecordId, TextRecordDataForSorter, Comparator>>(
+            *opts.tempDir, opts.sorterFileStats));
 }
 
 }  // namespace mongo

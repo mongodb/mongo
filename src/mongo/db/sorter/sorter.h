@@ -33,6 +33,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/sorter/sorter_checksum_calculator.h"
+#include "mongo/db/sorter/sorter_file_name.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/util/assert_util.h"
@@ -448,6 +449,28 @@ public:
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer) = 0;
 
     virtual size_t getIteratorSize() = 0;
+    /**
+     * Reconstructs a sorter when resuming an index build, following persistFromShutdown.
+     */
+    virtual std::shared_ptr<SortIteratorInterface<Key, Value>> getSortedIterator(
+        const SorterRange& range, const Settings& settings) = 0;
+
+    /**
+     * Gets the storage identifier (e.g. file name, ident) to persist a SorterStorage upon clean
+     * shutdown.
+     */
+    virtual std::string getStorageIdentifier() = 0;
+
+    /**
+     * Retrieves the directory where the storage is created for spilling data.
+     * boost::none if we aren't enabling spilling.
+     */
+    virtual boost::optional<boost::filesystem::path> getSpillDirPath() = 0;
+
+    /**
+     * Persists a SorterStorage upon clean shutdown.
+     */
+    virtual void keep() = 0;
 
     virtual boost::optional<DatabaseName> getDbName() = 0;
 
@@ -501,7 +524,14 @@ public:
 
     size_t getIteratorSize() override;
 
-    boost::optional<boost::filesystem::path> getSpillDirPath();
+    std::shared_ptr<SortIteratorInterface<Key, Value>> getSortedIterator(
+        const SorterRange& range, const Settings& settings) override;
+
+    std::string getStorageIdentifier() override;
+
+    void keep() override;
+
+    boost::optional<boost::filesystem::path> getSpillDirPath() override;
 
 private:
     std::shared_ptr<SorterFile> _file;
@@ -584,9 +614,12 @@ public:
 
     virtual void setStorage(std::unique_ptr<SorterStorage<Key, Value>> newStorage) = 0;
 
+    virtual SorterStorage<Key, Value>& getStorage() = 0;
+
     virtual ~SorterSpiller() = default;
 };
 
+// TODO(SERVER-116074): Remove templating on Comparator
 template <typename Key, typename Value, typename Comparator>
 class SorterSpillerBase : public SorterSpiller<Key, Value> {
 public:
@@ -641,6 +674,10 @@ public:
         _storage = std::move(newStorage);
     }
 
+    SorterStorage<Key, Value>& getStorage() override {
+        return *_storage;
+    }
+
 protected:
     std::unique_ptr<SorterStorage<Key, Value>> _storage;
 
@@ -662,6 +699,7 @@ private:
 /**
  * How we merge spills when we use a file as the underlying storage for the sorter.
  */
+// TODO(SERVER-116074): Remove templating on Comparator
 template <typename Key, typename Value, typename Comparator>
 class FileBasedSorterSpiller : public SorterSpillerBase<Key, Value, Comparator> {
 public:
@@ -670,15 +708,27 @@ public:
                       typename Value::SorterDeserializeSettings>
         Settings;
 
-
+    // TODO(SERVER-116074): Remove templating on Comparator
     explicit FileBasedSorterSpiller(std::unique_ptr<FileBasedSorterStorage<Key, Value>> storage)
         : SorterSpillerBase<Key, Value, Comparator>(std::move(storage)) {}
 
-    explicit FileBasedSorterSpiller(
-        std::shared_ptr<SorterFile> file,
-        boost::filesystem::path tempDir,
-        boost::optional<DatabaseName> dbName = boost::none,
-        SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
+    // TODO(SERVER-116074): Remove templating on Comparator
+    FileBasedSorterSpiller(boost::filesystem::path tempDir,
+                           SorterFileStats* fileStats,
+                           boost::optional<DatabaseName> dbName = boost::none,
+                           SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
+        : SorterSpillerBase<Key, Value, Comparator>(
+              std::make_unique<FileBasedSorterStorage<Key, Value>>(
+                  std::make_shared<SorterFile>(sorter::nextFileName(tempDir), fileStats),
+                  tempDir,
+                  dbName,
+                  checksumVersion)) {}
+
+    // TODO(SERVER-116074): Remove templating on Comparator
+    FileBasedSorterSpiller(std::shared_ptr<SorterFile> file,
+                           boost::filesystem::path tempDir,
+                           boost::optional<DatabaseName> dbName = boost::none,
+                           SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
         : SorterSpillerBase<Key, Value, Comparator>(
               std::make_unique<FileBasedSorterStorage<Key, Value>>(
                   file, tempDir, dbName, checksumVersion)) {}
@@ -716,28 +766,35 @@ public:
         Settings;
 
     struct PersistedState {
-        std::string fileName;
+        std::string storageIdentifier;
         std::vector<SorterRange> ranges;
     };
 
     explicit Sorter(const SortOptions& opts);
 
     /**
-     * ExtSort-only constructor. fileName is the base name of a file in the temp directory.
+     * ExtSort-only constructor. storageIdentifier is the file name or ident for a SorterFile or
+     * container (respectively) in it's spill directory path.
      */
-    Sorter(const SortOptions& opts, std::string fileName);
+    Sorter(const SortOptions& opts, std::string storageIdentifier);
 
+    // TODO(SERVER-116074): Change to SorterSpiller after removing templating on Comparator.
     template <typename Comparator>
-    static std::unique_ptr<Sorter> make(const SortOptions& opts,
-                                        const Comparator& comp,
-                                        const Settings& settings = Settings());
+    static std::unique_ptr<Sorter> make(
+        const SortOptions& opts,
+        const Comparator& comp,
+        std::unique_ptr<SorterSpillerBase<Key, Value, Comparator>> spiller,
+        const Settings& settings = Settings());
 
+    // TODO(SERVER-116074): Change to SorterSpiller after removing templating on Comparator.
     template <typename Comparator>
-    static std::unique_ptr<Sorter> makeFromExistingRanges(std::string fileName,
-                                                          const std::vector<SorterRange>& ranges,
-                                                          const SortOptions& opts,
-                                                          const Comparator& comp,
-                                                          const Settings& settings = Settings());
+    static std::unique_ptr<Sorter> makeFromExistingRanges(
+        std::string fileName,
+        const std::vector<SorterRange>& ranges,
+        const SortOptions& opts,
+        const Comparator& comp,
+        std::unique_ptr<SorterSpillerBase<Key, Value, Comparator>> spiller,
+        const Settings& settings = Settings());
 
     virtual void add(const Key&, const Value&) = 0;
     virtual void emplace(Key&&, ValueProducer) = 0;
@@ -787,8 +844,7 @@ public:
 protected:
     SortOptions _opts;
 
-    // TODO(SERVER-114085): Remove this when we add the SorterSpiller to options.
-    std::shared_ptr<SorterFile> _file;
+    std::shared_ptr<SorterSpiller<Key, Value>> _spiller;
 
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 
