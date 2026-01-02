@@ -426,7 +426,7 @@ private:
 };
 
 /**
- * A class where we provide the factory methods to create a writer or iterator for the
+ * A pure virtual class where we provide the factory methods to create a writer or iterator for the
  * specific type of storage the sorter is using.
  */
 template <typename Key, typename Value>
@@ -448,6 +448,29 @@ public:
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer) = 0;
 
     virtual size_t getIteratorSize() = 0;
+
+    virtual boost::optional<DatabaseName> getDbName() = 0;
+
+    virtual SorterChecksumVersion getChecksumVersion() = 0;
+};
+
+template <typename Key, typename Value>
+class SorterStorageBase : public SorterStorage<Key, Value> {
+public:
+    SorterStorageBase(boost::optional<DatabaseName> dbName, SorterChecksumVersion checksumVersion)
+        : _dbName(dbName), _checksumVersion(checksumVersion) {}
+
+    boost::optional<DatabaseName> getDbName() override {
+        return _dbName;
+    };
+
+    SorterChecksumVersion getChecksumVersion() override {
+        return _checksumVersion;
+    };
+
+private:
+    boost::optional<DatabaseName> _dbName;
+    SorterChecksumVersion _checksumVersion;
 };
 
 /**
@@ -455,7 +478,7 @@ public:
  * file as its underlying storage.
  */
 template <typename Key, typename Value>
-class FileBasedSorterStorage : public SorterStorage<Key, Value> {
+class FileBasedSorterStorage : public SorterStorageBase<Key, Value> {
 public:
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
@@ -480,15 +503,9 @@ public:
 
     boost::optional<boost::filesystem::path> getSpillDirPath();
 
-    boost::optional<DatabaseName> getDbName();
-
-    SorterChecksumVersion getChecksumVersion();
-
 private:
     std::shared_ptr<SorterFile> _file;
     boost::optional<boost::filesystem::path> _pathToSpillDir;
-    boost::optional<DatabaseName> _dbName;
-    SorterChecksumVersion _checksumVersion;
 };
 
 /**

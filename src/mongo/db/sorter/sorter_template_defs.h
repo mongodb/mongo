@@ -1319,10 +1319,9 @@ FileBasedSorterStorage<Key, Value>::FileBasedSorterStorage(std::shared_ptr<Sorte
                                                            boost::filesystem::path pathToSpillDir,
                                                            boost::optional<DatabaseName> dbName,
                                                            SorterChecksumVersion checksumVersion)
-    : _file(std::move(file)),
-      _pathToSpillDir(pathToSpillDir),
-      _dbName(dbName),
-      _checksumVersion(checksumVersion) {}
+    : SorterStorageBase<Key, Value>(dbName, checksumVersion),
+      _file(std::move(file)),
+      _pathToSpillDir(pathToSpillDir) {}
 
 template <typename Key, typename Value>
 std::unique_ptr<SortedStorageWriter<Key, Value>> FileBasedSorterStorage<Key, Value>::makeWriter(
@@ -1351,16 +1350,6 @@ size_t FileBasedSorterStorage<Key, Value>::getIteratorSize() {
 template <typename Key, typename Value>
 boost::optional<boost::filesystem::path> FileBasedSorterStorage<Key, Value>::getSpillDirPath() {
     return _pathToSpillDir;
-}
-
-template <typename Key, typename Value>
-boost::optional<DatabaseName> FileBasedSorterStorage<Key, Value>::getDbName() {
-    return _dbName;
-}
-
-template <typename Key, typename Value>
-SorterChecksumVersion FileBasedSorterStorage<Key, Value>::getChecksumVersion() {
-    return _checksumVersion;
 }
 
 //
