@@ -415,11 +415,19 @@ def generate_mongod_extra_configs(rng):
         config_fuzzer_extra_configs,
     )
 
-    return {
+    generated_config = {
         key: generate_normal_mongo_parameters(rng, value)
         for key, value in config_fuzzer_extra_configs["mongod"].items()
         if not (value.get("enterprise_only", False) and "enterprise" not in config.MODULES)
     }
+
+    # This is needed for our antithesis setup
+    # Our antithesis setup runs twice, once for setup and once at runtime
+    # If this option is different between the two runs, the hook can fail
+    if config.NOOP_MONGO_D_S_PROCESSES:
+        generated_config["auditRuntimeConfiguration"] = "on"
+
+    return generated_config
 
 
 def generate_mongos_parameters(rng):
