@@ -248,20 +248,16 @@ bool LegacyFCVSnapshotOnlyFCVGatedFeatureFlag::isEnabledUseLatestFCVWhenUninitia
 }
 
 namespace {
-std::vector<const IncrementalRolloutFeatureFlag*>& getMutableAllIncrementalRolloutFeatureFlags() {
-    static StaticImmortal<std::vector<const IncrementalRolloutFeatureFlag*>> flags;
+std::vector<IncrementalRolloutFeatureFlag*>& getMutableAllIncrementalRolloutFeatureFlags() {
+    static StaticImmortal<std::vector<IncrementalRolloutFeatureFlag*>> flags;
     return *flags;
 }
 }  // namespace
 
-const std::vector<const IncrementalRolloutFeatureFlag*>& IncrementalRolloutFeatureFlag::getAll() {
-    return getMutableAllIncrementalRolloutFeatureFlags();
-}
-
 IncrementalRolloutFeatureFlag* IncrementalRolloutFeatureFlag::findByName(StringData flagName) {
-    for (auto* flag : getAll()) {
+    for (auto* flag : getMutableAllIncrementalRolloutFeatureFlags()) {
         if (flag->getName() == flagName) {
-            return const_cast<IncrementalRolloutFeatureFlag*>(flag);
+            return flag;
         }
     }
     return nullptr;
@@ -280,6 +276,12 @@ void IncrementalRolloutFeatureFlag::appendFlagStats(BSONArrayBuilder& flagStats)
         .append("falseChecks", static_cast<long long>(_numFalseChecks.loadRelaxed()))
         .append("trueChecks", static_cast<long long>(_numTrueChecks.loadRelaxed()))
         .append("numToggles", static_cast<long long>(_numToggles.loadRelaxed()));
+}
+
+void IncrementalRolloutFeatureFlag::appendFlagsStats(BSONArrayBuilder& flagStats) {
+    for (auto* flag : getMutableAllIncrementalRolloutFeatureFlags()) {
+        flag->appendFlagStats(flagStats);
+    }
 }
 
 void IncrementalRolloutFeatureFlag::appendFlagValueAndMetadata(BSONObjBuilder& flagBuilder) const {

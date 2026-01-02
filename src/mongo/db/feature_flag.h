@@ -33,11 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/version_context.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/version/releases.h"
-
-#include <variant>
-#include <vector>
 
 #include <absl/container/flat_hash_map.h>
 
@@ -357,8 +353,6 @@ enum class RolloutPhase {
 
 class IncrementalRolloutFeatureFlag : public FeatureFlag {
 public:
-    static const std::vector<const IncrementalRolloutFeatureFlag*>& getAll();
-
     static IncrementalRolloutFeatureFlag* findByName(StringData flagName);
 
     IncrementalRolloutFeatureFlag(StringData flagName, RolloutPhase phase, bool value)
@@ -375,8 +369,10 @@ public:
      */
     bool checkEnabled();
 
+    void appendFlagStats(BSONArrayBuilder& flagStats) const;
+
     /**
-     * Add a document to the 'flagStats' array of the form:
+     * For each flag, add a document to the 'flagStats' array of the form:
      * {
      *   "name": <string>,
      *   "value": <bool>,
@@ -385,7 +381,7 @@ public:
      *   "numToggles": <number>,
      * }
      */
-    void appendFlagStats(BSONArrayBuilder& flagStats) const;
+    static void appendFlagsStats(BSONArrayBuilder& flagStats);
 
     const std::string& getName() const {
         return _flagName;
@@ -426,8 +422,7 @@ public:
     }
 
 private:
-    // Adds flag to the global list of flags returned by the 'getAll()' method. Only safe to call as
-    // part of process initialization.
+    // Adds flag to the global list of flags. Only safe to call as part of process initialization.
     static void registerFlag(IncrementalRolloutFeatureFlag* flag);
 
     std::string _flagName;

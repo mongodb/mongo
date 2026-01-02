@@ -44,10 +44,7 @@ public:
                             const BSONElement& configElement) const override {
         BSONObjBuilder builder;
         BSONArrayBuilder arrayBuilder(builder.subarrayStart("featureFlags"_sd));
-
-        for (auto&& flag : IncrementalRolloutFeatureFlag::getAll()) {
-            flag->appendFlagStats(arrayBuilder);
-        }
+        IncrementalRolloutFeatureFlag::appendFlagsStats(arrayBuilder);
 
         arrayBuilder.doneFast();
         return builder.obj();
