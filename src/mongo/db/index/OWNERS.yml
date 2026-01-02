@@ -1,6 +1,9 @@
 version: 1.0.0
 filters:
-  - "index_access_method*":
+  - "*access_method*":
+    approvers:
+      - 10gen/server-index-builds
+  - "index_constants.h":
     approvers:
       - 10gen/server-index-builds
   - "key_gen_bm.cpp":

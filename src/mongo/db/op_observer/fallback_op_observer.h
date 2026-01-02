@@ -38,12 +38,13 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * This OpObserver contains notifications to miscellaneous entities that were sitting in
@@ -94,4 +95,4 @@ public:
                                   bool isTimeseries) final;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

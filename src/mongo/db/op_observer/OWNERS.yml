@@ -6,6 +6,9 @@ filters:
   - "op_observer*":
     approvers:
       - 10gen/server-oplog
+  - "fallback_op_observer.h":
+    approvers:
+      - 10gen/server-oplog
   - "fcv_op_observer*":
     approvers:
       - 10gen/server-fcv

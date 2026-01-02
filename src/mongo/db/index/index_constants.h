@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class IndexConstants {
+class MONGO_MOD_PUBLIC IndexConstants {
 public:
     static constexpr StringData kIdIndexName = "_id_"_sd;
 };

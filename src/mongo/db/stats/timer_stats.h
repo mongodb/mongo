@@ -31,15 +31,14 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/timer.h"
 
-namespace mongo {
-
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
- * Holds timing information in milliseconds
- * keeps track of number of times and total milliseconds
- * so a diff can be computed
+ * Holds timing information in milliseconds. Keeps track of number of times and total milliseconds
+ * so that a diff can be computed.
  */
 class TimerStats {
 public:
@@ -89,4 +88,4 @@ private:
     bool _recorded;
     Timer _t;
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

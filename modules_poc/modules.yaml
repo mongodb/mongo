@@ -256,7 +256,6 @@ query:
     - src/mongo/db/s/shardsvr_resolve_view_command_test.cpp
     - src/mongo/dbtests/commandtests.cpp
     - src/mongo/s/would_change_owning_shard_exception*
-    - src/mongo/db/op_observer/fallback_op_observer*
 
 catalog_and_routing:
   meta:
@@ -1038,6 +1037,7 @@ replication.oplog:
     - src/mongo/db/commands/apply_ops*
     - src/mongo/db/commands/oplog*
     - src/mongo/db/op_observer/op_observer*
+    - src/mongo/db/op_observer/fallback_op_observer*
     - src/mongo/db/op_observer/operation_logger*
     - src/mongo/db/repl/*apply_ops*
     - src/mongo/db/repl/*bgsync*

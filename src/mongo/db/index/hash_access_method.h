@@ -41,6 +41,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <memory>
@@ -55,7 +56,7 @@ class CollatorInterface;
 /**
  * This is the access method for "hashed" indices.
  */
-class HashAccessMethod : public SortedDataIndexAccessMethod {
+class MONGO_MOD_PUBLIC HashAccessMethod : public SortedDataIndexAccessMethod {
 public:
     HashAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
 
