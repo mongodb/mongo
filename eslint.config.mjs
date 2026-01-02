@@ -125,6 +125,7 @@ export default [
                 _rand: true,
                 _replMonitorStats: true,
                 _resultSetsEqualNormalized: true,
+                _resultSetsEqualUnorderedWithUnorderedArrays: true,
                 _resultSetsEqualUnordered: true,
                 _setShellFailPoint: true,
                 _srand: true,

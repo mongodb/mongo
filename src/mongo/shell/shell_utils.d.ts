@@ -29,6 +29,7 @@ declare function _replMonitorStats()
  * @returns True if the result sets compare equal and false otherwise.
  */
 declare function _resultSetsEqualNormalized(a: object[], b: object[]): boolean
+declare function _resultSetsEqualUnorderedWithUnorderedArrays()
 declare function _resultSetsEqualUnordered()
 declare function _setShellFailPoint()
 declare function _srand()
