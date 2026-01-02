@@ -4025,7 +4025,7 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [x.c = c]
+NESTED_LOOP_JOIN_EMBEDDING [x.c = c]
 leftEmbeddingField: "none"
 rightEmbeddingField: "z"
   |  |

@@ -462,7 +462,7 @@ buildvariants:
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_golden_cbr_histogram
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
-      # TODO SERVER-115982: Reenable!
+      # TODO SERVER-114497: Reenable!
       # - name: query_join_optimization_passthrough_gen
       #   cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 
@@ -555,7 +555,7 @@ buildvariants:
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_golden_join_optimization
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
-      # TODO SERVER-115982: Reenable!
+      # TODO SERVER-114497 Reenable!
       # - name: query_join_optimization_passthrough_gen
       #   cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 

@@ -133,6 +133,11 @@ bool isLookupEligible(const DocumentSourceLookUp& lookup) {
         return false;
     }
 
+    // TODO SERVER-116033: Support absorbed single-table additional filter predicates.
+    if (lookup.hasAdditionalFilter()) {
+        return false;
+    }
+
     if (!lookup.hasPipeline()) {
         // A $lookup with no sub-pipeline is eligible.
         return true;

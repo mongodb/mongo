@@ -328,6 +328,10 @@ public:
         return hasPipeline() ? BSONObj() : _additionalFilter.value_or(BSONObj());
     }
 
+    bool hasAdditionalFilter() const {
+        return _additionalFilter.has_value();
+    }
+
     /**
      * Attempts to combine with an immediately following $unwind stage that unwinds the $lookup's
      * "as" field, setting the '_unwindSrc' member to the absorbed $unwind stage. If

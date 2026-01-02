@@ -58,6 +58,32 @@ try {
     });
 
     runTest({
+        description: "Join optimization should be used with mix of local/foreignField and pipeline",
+        coll: baseColl,
+        pipeline: [
+            {
+                $lookup: {
+                    from: foreignColl1.getName(),
+                    localField: "a",
+                    foreignField: "a",
+                    let: {d: "$d"},
+                    pipeline: [{$match: {$expr: {$eq: ["$d", "$$d"]}}}],
+                    as: "foreignColl1",
+                },
+            },
+            {$unwind: "$foreignColl1"},
+            {$project: {_id: 0, "foreignColl1._id": 0}},
+        ],
+        expectedResults: [
+            {a: 1, b: 1, d: 1, foreignColl1: {a: 1, c: "foo", d: 1}},
+            {a: 1, b: 2, d: 2, foreignColl1: {a: 1, c: "bar", d: 2}},
+            {a: 2, b: 1, d: 1, foreignColl1: {a: 2, c: "baz", d: 1}},
+            {a: 2, b: 2, d: 2, foreignColl1: {a: 2, c: "qux", d: 2}},
+        ],
+        expectedUsedJoinOptimization: true,
+    });
+
+    runTest({
         description: "Join optimization should work with $$ROOT",
         coll: baseColl,
         pipeline: [

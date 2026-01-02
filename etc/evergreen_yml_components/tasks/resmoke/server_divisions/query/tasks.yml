@@ -2618,7 +2618,7 @@ tasks:
         vars:
           suite: query_golden_join_optimization
 
-  # TODO SERVER-115982: Re-enable once join optimization passthrough tests are stable.
+  # TODO SERVER-114497: Re-enable once join optimization passthrough tests are stable.
   #- <<: *task_template
   #  name: query_join_optimization_passthrough_gen
   #  tags: [
