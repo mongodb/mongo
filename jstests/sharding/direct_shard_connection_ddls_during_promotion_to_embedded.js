@@ -31,13 +31,15 @@ const testCommands = [
                 documents: [{z: 1}],
             }),
     },
-    // TODO(SERVER-112424): Enable testing of cloneCollectionAsCapped
-    //{
-    //    name: "cloneCollectionAsCapped",
-    //    execute: (db) => db.runCommand(
-    //        {cloneCollectionAsCapped: "implicitColl0", toCollection: "implicitColl0Capped", size:
-    //        100000}),
-    //},
+    {
+        name: "cloneCollectionAsCapped",
+        execute: (db) =>
+            db.runCommand({
+                cloneCollectionAsCapped: "implicitColl0",
+                toCollection: "implicitColl0Capped",
+                size: 100000,
+            }),
+    },
     {
         name: "convertToCapped",
         execute: (db) => db.runCommand({convertToCapped: "testColl1Renamed", size: 10000}),
@@ -383,10 +385,16 @@ describe("Check direct DDLs during promotion and after promotion to sharded clus
             assert.commandWorked(testCommand.execute(this.testDBDirectConnection));
         });
 
-        // We test all the test commands, except applyOps since it cannot be run through mongos
-        testCommands.slice(0, -2).forEach((testCommand) => {
-            jsTest.log.info(`Checking that ${testCommand.name} is allowed through mongos`);
-            assert.commandWorked(testCommand.execute(this.mongos.getDB("testDB")));
+        // We test all the test commands, except cloneCollectionAsCapped and applyOps since they
+        // cannot be run through mongos
+        jsTest.log.info("Checking that DDLs are allowed through mongos");
+        testCommands.forEach((testCommand) => {
+            if (testCommand.name.includes("cloneCollectionAsCapped") || testCommand.name.includes("applyOps")) {
+                jsTest.log.info(`Skipping ${testCommand.name} check since it is not supported on mongos`);
+            } else {
+                jsTest.log.info(`Checking that ${testCommand.name} is allowed through mongos`);
+                assert.commandWorked(testCommand.execute(this.mongos.getDB("testDB")));
+            }
         });
     });
 });

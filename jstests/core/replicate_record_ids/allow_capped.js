@@ -9,9 +9,6 @@
  *   # cloneCollectionAsCapped doesn't exist on mongos.
  *   assumes_against_mongod_not_mongos,
  *   featureFlagRecordIdsReplicated,
- *   # TODO(SERVER-112424): Instantiate ScopedAllowImplicitCollectionCreate_UNSAFE object in
- *   # cloneCollectionAsCapped command
- *   transitioning_replicaset_incompatible,
  * ]
  */
 

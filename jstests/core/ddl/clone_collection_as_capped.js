@@ -13,9 +13,6 @@
  *  # cloneCollectionAsCapped command is not supported on mongos
  *  # TODO: SERVER-85773 Remove assumes_against_mongod_not_mongos tag
  *  assumes_against_mongod_not_mongos,
- *  # TODO(SERVER-112424): Instantiate ScopedAllowImplicitCollectionCreate_UNSAFE object in
- *  # cloneCollectionAsCapped command
- *  transitioning_replicaset_incompatible,
  * ]
  */
 

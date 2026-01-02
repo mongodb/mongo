@@ -16,9 +16,6 @@
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
 //   requires_getmore,
-//   # TODO(SERVER-112424): Instantiate ScopedAllowImplicitCollectionCreate_UNSAFE object in
-//   # cloneCollectionAsCapped command
-//   transitioning_replicaset_incompatible,
 //   # Time series collections cannot be used as a source for `viewOn` or have view-like
 //   # limitations in this context.
 //   exclude_from_timeseries_crud_passthrough,
