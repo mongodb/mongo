@@ -15,20 +15,10 @@ import {getCollectionModel} from "jstests/libs/property_test_helpers/models/coll
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
-import {checkSbeStatus, kSbeRestricted, kSbeDisabled} from "jstests/libs/query/sbe_util.js";
-import {
-    trySbeRestrictedPushdownEligibleAggModel,
-    trySbeEnginePushdownEligibleAggModel,
-} from "jstests/libs/property_test_helpers/common_models.js";
+import {sbePushdownEligibleAggModel} from "jstests/libs/property_test_helpers/common_models.js";
 
 if (isSlowBuild(db)) {
     jsTest.log.info("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
-    quit();
-}
-
-const sbeStatus = checkSbeStatus(db);
-if (sbeStatus === kSbeDisabled) {
-    jsTest.log.info("SBE is disabled, skipping test.");
     quit();
 }
 
@@ -49,30 +39,20 @@ const correctnessProperty = createCorrectnessProperty(
     jsTestLogExplain,
 );
 
-const getAggModel = (foreignName) => {
-    if (sbeStatus === kSbeRestricted) {
-        return trySbeRestrictedPushdownEligibleAggModel(foreignName);
-    } else {
-        // Not distinguishing between trySbeEngine and featureFlagSbeFull here.
-        return trySbeEnginePushdownEligibleAggModel(foreignName);
-    }
-};
-
 // The inner side of the lookup may be out-of-order between control and experiment. There are
 // $unwind's sprinkled in as a workaround. This blocks SBE pushdown for some suffix of the
 // pipeline.
+// TODO SERVER-115463 use a new comparator with kSortArrays.
 testProperty(
     correctnessProperty,
     {controlColl, experimentColl},
     // Control collection is foreign side.
     makeWorkloadModel({
         collModel: getCollectionModel(),
-        aggModel: getAggModel(controlName),
+        aggModel: sbePushdownEligibleAggModel(controlName),
         numQueriesPerRun,
     }),
     numRuns,
-    undefined /*examples*/,
-    true /*sortArrays*/,
 );
 
 testProperty(
@@ -81,10 +61,8 @@ testProperty(
     // Experiment collection is foreign side.
     makeWorkloadModel({
         collModel: getCollectionModel(),
-        aggModel: getAggModel(experimentName),
+        aggModel: sbePushdownEligibleAggModel(experimentName),
         numQueriesPerRun,
     }),
     numRuns,
-    undefined /*examples*/,
-    true /*sortArrays*/,
 );

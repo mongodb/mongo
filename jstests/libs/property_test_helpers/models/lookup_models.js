@@ -5,18 +5,6 @@
 import {assignableFieldArb, fieldArb} from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
-export function getEqLookupArb(from) {
-    return fc
-        .record({
-            localField: fieldArb,
-            foreignField: fieldArb,
-            as: assignableFieldArb,
-        })
-        .map(({localField, foreignField, as}) => {
-            return {$lookup: {from, localField, foreignField, as}};
-        });
-}
-
 export function getEqLookupUnwindArb(from) {
     return fc
         .record({

@@ -1221,18 +1221,6 @@ BSONObj _resultSetsEqualNormalized(const BSONObj& input, void*) {
  * Takes two arrays of documents, and returns whether they contain the same set of BSON Objects. The
  * BSON do not need to be in the same order for this to return true. Has no special logic for
  * handling double/NumberDecimal closeness. Used in property based jstests.
- * Sorts arrays in order to compare the inner side of lookup results.
- */
-BSONObj _resultSetsEqualUnorderedWithUnorderedArrays(const BSONObj& input, void*) {
-    auto opts = NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON |
-        NormalizationOpts::kSortArrays;
-    return BSON("" << compareNormalizedResultSets(input, opts));
-}
-
-/*
- * Takes two arrays of documents, and returns whether they contain the same set of BSON Objects. The
- * BSON do not need to be in the same order for this to return true. Has no special logic for
- * handling double/NumberDecimal closeness. Used in property based jstests.
  */
 BSONObj _resultSetsEqualUnordered(const BSONObj& input, void*) {
     auto opts = NormalizationOpts::kSortResults | NormalizationOpts::kSortBSON;
@@ -1300,8 +1288,6 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("_decimal128Limit", _decimal128Limit);
     scope.injectNative("_fnvHashToHexString", _fnvHashToHexString);
     scope.injectNative("_resultSetsEqualUnordered", _resultSetsEqualUnordered);
-    scope.injectNative("_resultSetsEqualUnorderedWithUnorderedArrays",
-                       _resultSetsEqualUnorderedWithUnorderedArrays);
     scope.injectNative("_resultSetsEqualNormalized", _resultSetsEqualNormalized);
     scope.injectNative("_compareStringsWithCollation", _compareStringsWithCollation);
 

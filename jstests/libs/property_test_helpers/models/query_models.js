@@ -15,7 +15,7 @@ import {
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
 import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
-import {getEqLookupArb, getEqLookupUnwindArb} from "jstests/libs/property_test_helpers/models/lookup_models.js";
+import {getEqLookupUnwindArb} from "jstests/libs/property_test_helpers/models/lookup_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
@@ -80,28 +80,6 @@ export function getSortArb(maxNumSortComponents = 1) {
 export const limitArb = fc.record({$limit: fc.integer({min: 1, max: 5})});
 export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
 
-// Generates a standalone $unwind stage. The path field should reference an array field.
-// According to the schema, "array" is the array field, but we allow other fields as well
-// for flexibility (they may be arrays in some documents).
-export const unwindArb = fc
-    .record({
-        path: fieldArb,
-        preserveNullAndEmptyArrays: fc.boolean(),
-        includeArrayIndex: fc.boolean(),
-        indexFieldName: assignableFieldArb,
-    })
-    .map(({path, preserveNullAndEmptyArrays, includeArrayIndex, indexFieldName}) => {
-        const unwindSpec = {path: "$" + path};
-        if (preserveNullAndEmptyArrays) {
-            unwindSpec.preserveNullAndEmptyArrays = true;
-        }
-        if (includeArrayIndex) {
-            // includeArrayIndex specifies the field name to store the array index.
-            unwindSpec.includeArrayIndex = indexFieldName;
-        }
-        return {$unwind: unwindSpec};
-    });
-
 /*
  * Return the arbitraries for agg stages that are allowed given:
  *    - `allowOrs` for whether we allow $or in $match
@@ -151,66 +129,11 @@ export function getAggPipelineArb({allowOrs = true, deterministicBag = true, all
     return fc.array(oneof(...stages), {minLength: 1, maxLength: 6});
 }
 
-export function getTrySbeRestrictedPushdownEligibleAggPipelineArb(
+export function getSbePushdownEligibleAggPipelineArb(
     foreignCollName,
     {allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {},
 ) {
-    const stages = [groupArb, getEqLookupArb(foreignCollName), getMatchArb()];
-    return fc.array(oneof(...stages), {minLength: 1, maxLength: 6});
-}
-
-export function getTrySbeEnginePushdownEligibleAggPipelineArb(
-    foreignCollName,
-    {allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {},
-) {
-    // Not yet included, $window and $unwind.
-    const stages = [
-        groupArb,
-        getEqLookupArb(foreignCollName),
-        getEqLookupUnwindArb(foreignCollName),
-        getMatchArb(allowOrs),
-        simpleProjectArb,
-        computedProjectArb,
-        addFieldsConstArb,
-        addFieldsVarArb,
-        getSortArb(),
-    ];
-    if (!deterministicBag) {
-        stages.push(limitArb, skipArb);
-    }
-    // eqLookupUnwind returns a javascript array; flatten that here.
-    return fc.array(oneof(...stages), {minLength: 1, maxLength: 6}).map((item) => item.flat());
-}
-
-// According to findSbeCompatibleStagesForPushdown, SbeCompatibility::requiresSbeFull (featureFlagSbeFull)
-// is a superset of requiresTrySbe (trySbeEngine) and additionally allows:
-// - $unwind (SbeCompatibility::requiresSbeFull)
-// - $search/$searchMeta (SbeCompatibility::requiresSbeFull with featureFlagSearchInSbe)
-// Note: Currently, there are no aggregation model arbitraries defined for standalone $unwind or $search
-// stages, so this function includes all stages from trySbeEngine. If models for these stages are added
-// in the future, they should be included here.
-export function getSbeFullPushdownEligibleAggPipelineArb(
-    foreignCollName,
-    {allowOrs = true, deterministicBag = true, allowedStages = [], isTS = false} = {},
-) {
-    // Start with all stages from trySbeEngine (requiresTrySbe is a subset of requiresSbeFull)
-    const stages = [
-        groupArb,
-        getEqLookupArb(foreignCollName),
-        getEqLookupUnwindArb(foreignCollName),
-        getMatchArb(allowOrs),
-        simpleProjectArb,
-        computedProjectArb,
-        addFieldsConstArb,
-        addFieldsVarArb,
-        getSortArb(),
-    ];
-    if (!deterministicBag) {
-        stages.push(limitArb, skipArb);
-    }
-    // Add standalone $unwind (requires SbeCompatibility::requiresSbeFull)
-    stages.push(unwindArb);
-    // TODO: Add $search/$searchMeta arb when available
+    const stages = [groupArb, getEqLookupUnwindArb(foreignCollName), getMatchArb()];
     // eqLookupUnwind returns a javascript array; flatten that here.
     return fc.array(oneof(...stages), {minLength: 1, maxLength: 6}).map((item) => item.flat());
 }
