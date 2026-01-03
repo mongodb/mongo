@@ -149,6 +149,14 @@ CostEstimate operator*(const CardinalityEstimate& ce, const CostCoefficient& cc)
     return cc * ce;
 }
 
+CostEstimate operator*(const CostEstimate& c, double factor) {
+    return {CostType{c._estimate.v() * factor}, c._source};
+}
+
+CostEstimate operator*(double factor, const CostEstimate& c) {
+    return c * factor;
+}
+
 SelectivityEstimate operator/(const CardinalityEstimate& smaller_ce,
                               const CardinalityEstimate& bigger_ce) {
     // Make sure the underlying double values are in correct relationship to produce selectivity.

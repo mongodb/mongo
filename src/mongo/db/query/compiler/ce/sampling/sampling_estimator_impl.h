@@ -242,6 +242,14 @@ public:
         return _collectionCard.toDouble();
     }
 
+    /*
+     * The sample size is calculated based on the confidence level and margin of error(MoE)
+     * required.  n = Z^2 / W^2
+     * where Z is the z-score for the confidence interval and
+     * W is the width of the confidence interval, W = 2 * MoE.
+     */
+    static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError);
+
 protected:
     /*
      * This helper creates a CanonicalQuery for the sampling plan. This CanonicalQuery is “empty”
@@ -251,14 +259,6 @@ protected:
      */
     static std::unique_ptr<CanonicalQuery> makeEmptyCanonicalQuery(const NamespaceString& nss,
                                                                    OperationContext* opCtx);
-
-    /*
-     * The sample size is calculated based on the confidence level and margin of error(MoE)
-     * required.  n = Z^2 / W^2
-     * where Z is the z-score for the confidence interval and
-     * W is the width of the confidence interval, W = 2 * MoE.
-     */
-    static size_t calculateSampleSize(SamplingConfidenceIntervalEnum ci, double marginOfError);
 
     /**
      * This helper checks if an element is within the given Interval.
@@ -335,12 +335,6 @@ private:
      * This sampling method is only used for testing purposes where a repeatable sample is needed.
      */
     void generateSampleBySeqScanningForTesting();
-
-    /*
-     * The SamplingEstimator calculates the size of a sample based on the confidence level and
-     * margin of error required.
-     */
-    size_t calculateSampleSize();
 
     OperationContext* _opCtx;
     // The collection the sampling plan runs against and is the one accessed by the query being

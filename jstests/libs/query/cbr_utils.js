@@ -50,3 +50,16 @@ export function getPlanRankerMode(db) {
         return TestData.setParameters.planRankerMode ? TestData.setParameters.planRankerMode : "multiPlanning";
     }
 }
+
+export function getMultiplanningBatchSize() {
+    const result = db.adminCommand({
+        getParameter: 1,
+        internalQueryPlanEvaluationMaxResults: 1,
+    });
+
+    if (result.ok === 1) {
+        return result.internalQueryPlanEvaluationMaxResults;
+    } else {
+        throw new Error("Failed to retrieve multiplanning batch size: " + JSON.stringify(result));
+    }
+}

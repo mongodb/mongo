@@ -36,7 +36,7 @@ namespace mongo::ce {
 CEResult ExactCardinalityImpl::populateCardinalities(
     const QuerySolutionNode* node,
     const PlanStage* execStage,
-    cost_based_ranker::EstimateMap& cardinalities) const {
+    cost_based_ranker::EstimateMap& cardinalities) {
     const auto commonStats = execStage->getCommonStats();
     cost_based_ranker::QSNEstimate card{
         .outCE = CardinalityEstimate{CardinalityType{(double)commonStats->advanced},

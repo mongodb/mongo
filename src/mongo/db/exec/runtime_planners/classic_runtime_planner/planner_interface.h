@@ -116,7 +116,6 @@ protected:
     stage_builder::PlanStageToQsnMap _planStageQsnMap;
     std::vector<std::unique_ptr<PlanStage>> _cbrRejectedPlanStages;
 
-
     /**
      * Planner state enum. Describes the planner status:
      * kNotInitialized: The planner has not made any planning decision yet, so neither a solution
@@ -214,7 +213,13 @@ public:
      */
     Status pickBestPlan();
     std::unique_ptr<QuerySolution> extractQuerySolution() override;
-    MultiPlanStage::TrialPhaseConfig getTrialPhaseConfig() const;
+    MultiPlanStage::TrialPhaseConfig getTrialPhaseConfig() const {
+        return _multiplanStage->getTrialPhaseConfig();
+    }
+
+    MultiPlanStage::EstimationResult estimateAllPlans() const {
+        return _multiplanStage->estimateAllPlans();
+    }
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;

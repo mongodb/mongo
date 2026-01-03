@@ -71,6 +71,7 @@ enums:
         type: string
         values:
             kCBRForNoMultiplanningResults: "CBRForNoMultiplanningResults"
+            kCBRCostBasedRankerChoice: "CBRCostBasedRankerChoice"
             kHistogramCEWithHeuristicFallback: "HistogramCEWithHeuristicFallback"
 
     SamplingCEMethod:
@@ -1748,6 +1749,32 @@ server_parameters:
         cpp_varname: "internalQuerySamplingBySequentialScan"
         cpp_vartype: AtomicWord<bool>
         default: false
+        redact: false
+
+    internalQueryNumWorksPerPlanForMPEstimation:
+        description: >-
+            Number of works per plan that the cost-based plan ranker choice should do to evaluate
+            the cost of multi-planning.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryNumWorksPerPlanForMPEstimation"
+        cpp_vartype: AtomicWord<int>
+        default: 384
+        validator:
+            gt: 100
+            lt: 10000
+        redact: false
+
+    internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice:
+        description: >-
+            The minimum ratio by which the cost of CBR should be better than the remaining
+            multi-planning cost while choosing between them during AutomaticCE.
+        set_at: [startup, runtime]
+        cpp_varname: "internalQueryMinRequiredImprovementRatioForCostBasedRankerChoice"
+        cpp_vartype: AtomicWord<double>
+        default: 2.0
+        validator:
+            gte: 1.0
+            lte: 10.0
         redact: false
 
     internalQueryGetMoreMaxCursorPinRetryAttempts:

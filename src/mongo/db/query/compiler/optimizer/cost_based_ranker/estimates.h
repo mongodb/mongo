@@ -471,6 +471,13 @@ public:
     CostType cost() const {
         return _estimate;
     }
+
+    // Multiplication is undefined for two costs - this operation has no meaning - the unit of the
+    // result would be CostEstimate^2. However, it is useful to multiply costs by some unitless
+    // factor.
+    friend CostEstimate operator*(const CostEstimate& c, double factor);
+
+    friend CostEstimate operator*(double factor, const CostEstimate& c);
 };
 
 /**

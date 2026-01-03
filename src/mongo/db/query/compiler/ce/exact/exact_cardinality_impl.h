@@ -45,8 +45,9 @@ using CEResult = StatusWith<CardinalityEstimate>;
  * that consist of QSN nodes, MatchExpression filter nodes, and Intervals. This is meant for use
  * with the "exactCE" mode.
  *
- * The calculation is done by executing the query plan and then using the execution stats to
- * populate the estimates map.
+ * There are two ways to use the class and compute exact cardinalities:
+ * (a) execute the query plan and then use the execution stats to populate the estimates map, or
+ * (b) take an already executed plan, and use its execution stats to populate the estimates map.
  */
 class ExactCardinalityImpl : public ExactCardinalityEstimator {
 public:
@@ -61,20 +62,30 @@ public:
     ExactCardinalityImpl& operator=(ExactCardinalityImpl&&) = delete;
 
     ~ExactCardinalityImpl() override {};
+
     /**
      * Entry point for the exact cardinality calculation, performs it for the given plan.
      */
     CEResult calculateExactCardinality(
         const QuerySolution& plan, cost_based_ranker::EstimateMap& cardinalities) const override;
 
+    /**
+     * Calculate the exact cardinality for a plan 'execStage' that has already been run.
+     */
+    static CEResult calculateExactCardinality(const QuerySolution* plan,
+                                              const PlanStage* execStage,
+                                              cost_based_ranker::EstimateMap& cardinalities) {
+        return populateCardinalities(plan->root(), execStage, cardinalities);
+    }
+
 private:
     /**
      * Helper method to populate the cardinalities map given the execution stats.
      * We also pass in the QSN as these are the keys in the estimates map.
      */
-    CEResult populateCardinalities(const QuerySolutionNode* node,
-                                   const PlanStage* execStage,
-                                   cost_based_ranker::EstimateMap& cardinalities) const;
+    static CEResult populateCardinalities(const QuerySolutionNode* node,
+                                          const PlanStage* execStage,
+                                          cost_based_ranker::EstimateMap& cardinalities);
     const CanonicalQuery& _cq;
     OperationContext* _opCtx;
     const CollectionAcquisition _coll;

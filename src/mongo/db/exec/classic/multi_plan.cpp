@@ -38,6 +38,11 @@
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/compiler/ce/ce_common.h"
+#include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cost_estimator.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_explainer.h"
@@ -67,6 +72,7 @@
 
 
 namespace mongo {
+using namespace cost_based_ranker;
 using std::unique_ptr;
 
 // static
@@ -569,6 +575,46 @@ bool MultiPlanStage::bestSolutionEof() const {
     tassert(8523500, "The best plan is not chosen by the multi-planner", bestPlanChosen());
     auto& bestPlan = _candidates[_bestPlanIdx];
     return bestPlan.root->isEOF();
+}
+
+MultiPlanStage::EstimationResult MultiPlanStage::estimateAllPlans() const {
+    EstimateMap ceMap;
+    CostEstimator costEstimator(ceMap);
+    CostEstimate totalCost = zeroCost;
+    double bestProductivity = 0.0;
+    size_t bestPlanNumResults = 0;
+    size_t numWorksPerPlan = _specificStats.totalWorks / numCandidatePlans();
+
+    for (size_t ix = 0; ix < _candidates.size(); ++ix) {
+        auto& candidate = _candidates[ix];
+        const QuerySolution* plan = candidate.solution.get();
+        const PlanStage* execPlan = candidate.root;
+
+        const auto res = ce::ExactCardinalityImpl::calculateExactCardinality(plan, execPlan, ceMap);
+        uassertStatusOK(res);  // TODO: handle error
+        const auto planCost = costEstimator.estimatePlan(*plan);
+        totalCost += planCost;
+
+        // Queries with SKIP usually will not produce any documents within the allocated budget
+        // TODO SERVER-115645 use the child of LIMIT/SORT nodes to estimate plan productivity
+        //  Compute planProductivity from the statistics of the child node, and then use that to
+        //  estimate the number of additional works needed to fill the skip value.
+        //  For example: child productivity=0.3, skip=42, extra works needed to skip = 42/0.3
+        //  StageType nodeType = plan->root()->getType();
+        //  if (nodeType == STAGE_SKIP) {
+        //      const auto childNode = plan->root()->children[0].get();
+        //      extract childNode stats;
+        //  }
+
+        const size_t numDocs = candidate.results.size();
+        if (const double planProductivity = static_cast<double>(numDocs) / numWorksPerPlan;
+            planProductivity >= bestProductivity) {
+            bestPlanNumResults = numDocs;
+            bestProductivity = planProductivity;
+        }
+    }
+    tassert(11306809, "Total MP cost must be > 0", totalCost > zeroCost);
+    return {totalCost, bestProductivity, bestPlanNumResults};
 }
 
 unique_ptr<PlanStageStats> MultiPlanStage::getStats() {

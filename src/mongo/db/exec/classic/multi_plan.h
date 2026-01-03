@@ -39,6 +39,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_ranker.h"
@@ -75,6 +76,15 @@ public:
         // How many results per plan are we targeting to retrieve during the trial period.
         // If a plan returns this many results, we can stop the trial period early.
         size_t targetNumResults;
+    };
+
+    struct EstimationResult {
+        // The total cost of all plans (sum of plan costs).
+        cost_based_ranker::CostEstimate totalCost;
+        // The productivity of the best plan.
+        double bestPlanProductivity;
+        // The number of documents retrieved by the best plan.
+        size_t bestPlanNumResults;
     };
 
     /**
@@ -183,6 +193,16 @@ public:
      * Illegal to call if the best plan has not yet been selected.
      */
     bool bestSolutionEof() const;
+
+    /**
+     * Estimate the cost and productivity of all plans based on actual execution statistics
+     * collected during multi-planning.
+     * Return:
+     * - the total cost of all plans
+     * - its productivity
+     * - the number of retrieved documents
+     */
+    EstimationResult estimateAllPlans() const;
 
     /**
      * Returns true if a backup plan was picked.

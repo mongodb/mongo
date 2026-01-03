@@ -93,7 +93,4 @@ std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
     return nullptr;
 }
 
-MultiPlanStage::TrialPhaseConfig MultiPlanner::getTrialPhaseConfig() const {
-    return _multiplanStage->getTrialPhaseConfig();
-}
 }  // namespace mongo::classic_runtime_planner

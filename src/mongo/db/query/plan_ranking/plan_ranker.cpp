@@ -34,6 +34,7 @@
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
+#include "mongo/db/query/plan_ranking/cost_based_plan_ranking.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -67,7 +68,7 @@ StatusWith<QueryPlanner::PlanRankingResult> PlanRanker::rankPlans(
                         .getPlanRankingStrategyForAutomaticQueryPlanRankerMode()) {
                 case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
                     kCBRForNoMultiplanningResults: {
-                    plan_ranking::CBRForNoMPResultsStrategy ranker;
+                    CBRForNoMPResultsStrategy ranker;
                     auto statusWithSolns = ranker.rankPlans(query,
                                                             plannerParams,
                                                             yieldPolicy,
@@ -77,7 +78,19 @@ StatusWith<QueryPlanner::PlanRankingResult> PlanRanker::rankPlans(
                     _ws = ranker.extractWorkingSet();
                     return statusWithSolns;
                 }
-                case mongo::QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
+                case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
+                    kCBRCostBasedRankerChoice: {
+                    CostBasedPlanRankingStrategy ranker;
+                    auto statusWithSolns = ranker.rankPlans(opCtx,
+                                                            query,
+                                                            plannerParams,
+                                                            yieldPolicy,
+                                                            collections,
+                                                            std::move(plannerData));
+                    _ws = ranker.extractWorkingSet();
+                    return statusWithSolns;
+                }
+                case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
                     kHistogramCEWithHeuristicFallback: {
                     _ws = std::move(plannerData.workingSet);
                     return CBRPlanRankingStrategy().rankPlans(
@@ -111,5 +124,6 @@ std::unique_ptr<WorkingSet> PlanRanker::extractWorkingSet() {
     _ws = nullptr;
     return result;
 }
+
 }  // namespace plan_ranking
 }  // namespace mongo
