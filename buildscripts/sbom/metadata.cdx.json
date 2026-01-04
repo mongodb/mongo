@@ -911,13 +911,13 @@
         },
         {
           "name": "import_script_path",
-          "value": "src/third_party/googletest_restricted_for_disagg_only/scripts/import.sh"
+          "value": "src/third_party/googletest/scripts/import.sh"
         }
       ],
       "evidence": {
         "occurrences": [
           {
-            "location": "src/third_party/googletest_restricted_for_disagg_only"
+            "location": "src/third_party/googletest"
           }
         ]
       },

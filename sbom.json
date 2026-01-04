@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:a973a3fe-5abe-4432-91fa-cc30c1034545",
-  "version": 10,
+  "version": 11,
   "metadata": {
-    "timestamp": "2025-12-08T06:08:24Z",
+    "timestamp": "2026-01-02T06:04:51Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -1175,6 +1175,59 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:github/google/googletest@v1.17.0",
+      "supplier": {
+        "name": "Google LLC",
+        "url": [
+          "https://opensource.google/"
+        ]
+      },
+      "author": "The Google Test and Google Mock Communities",
+      "group": "google.opensource",
+      "name": "googletest",
+      "version": "1.17.0",
+      "description": "GoogleTest - Google Testing and Mocking Framework",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "copyright": "Copyright 2008, Google Inc. All rights reserved.",
+      "cpe": "cpe:2.3:a:google:google_test:1.17.0:*:*:*:*:*:*:*",
+      "purl": "pkg:github/google/googletest@v1.17.0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/google/googletest.git",
+          "type": "distribution"
+        }
+      ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Disaggregated Storage"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/googletest/scripts/import.sh"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/googletest"
+          }
+        ]
+      },
+      "scope": "excluded"
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:github/google/re2@2025-08-05",
       "supplier": {
         "name": "Google LLC",
@@ -1326,49 +1379,6 @@
         ]
       },
       "scope": "required"
-    },
-    {
-      "supplier": {
-        "name": "Organization: github"
-      },
-      "name": "googletest",
-      "version": "1.17.0",
-      "licenses": [
-        {
-          "license": {
-            "id": "BSD-3-Clause"
-          }
-        }
-      ],
-      "purl": "pkg:github/googletest/googletest@v1.17.0",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "info_link",
-          "value": "https://github.com/google/googletest"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/googletest/scripts/import.sh"
-        }
-      ],
-      "type": "library",
-      "bom-ref": "e57f94bd-b0b1-4e47-912e-c690a01e4f95",
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/googletest"
-          }
-        ]
-      },
-      "scope": "excluded"
     },
     {
       "type": "library",
