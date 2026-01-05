@@ -21,6 +21,9 @@ filters:
   - "remove_shard_util.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "last_lts_mongod_commands.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
   - "last_lts_mongos_commands.js":
     approvers:
       - 10gen/server-catalog-and-routing
