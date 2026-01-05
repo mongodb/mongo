@@ -61,9 +61,6 @@ filters:
   - "aggregation_context_fixture.h":
     approvers:
       - 10gen/query-optimization
-  - "aggregation_mongod_context_fixture.h":
-    approvers:
-      - 10gen/query-optimization
   - "aggregation.cpp":
     approvers:
       - 10gen/query-optimization

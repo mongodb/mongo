@@ -2400,7 +2400,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation_hint_translation.h @10gen/query-integration-timeseries @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation_request* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation_context_fixture.h @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/pipeline/**/aggregation_mongod_context_fixture.h @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/aggregation.cpp @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*change_stream* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/catalog_resource_handle.h @10gen/query-execution-classic @svc-auto-approve-bot
