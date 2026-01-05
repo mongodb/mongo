@@ -1,0 +1,29 @@
+# Run tests that may contain $lookup using internalEnableJoinOptimization=true
+test_kind: js_test
+selector:
+  roots:
+    - jstests/noPassthroughWithMongod/**/*.js
+  exclude_files:
+    # Tests that expect a specific plan
+    - jstests/noPassthroughWithMongod/query/lookup_with_limit.js
+    - jstests/noPassthroughWithMongod/query/lookup_match_pushdown.js
+    - jstests/noPassthroughWithMongod/query/plan_selection_no_results.js
+    - jstests/noPassthroughWithMongod/query/plan_ranking/cbrForNoMPResults.js
+    # Unrelated test times out for an unrelated reason
+    - jstests/noPassthroughWithMongod/ttl/ttl1.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config: {}
+  hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 1
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalEnableJoinOptimization: true
