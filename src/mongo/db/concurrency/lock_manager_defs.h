@@ -42,6 +42,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/platform/random.h"
 
 namespace mongo {
 
@@ -225,6 +226,14 @@ static const char* resourceGlobalIdName(ResourceGlobalId id) {
     return ResourceGlobalIdNames[static_cast<uint8_t>(id)];
 }
 
+inline static uint64_t hashStringDataForResourceId(StringData str, uint64_t salt) {
+    // We salt the hash with a given random value to generate randomness in ResourceId selection on
+    // every restart. This aids in testing for detecting lock ordering issues.
+    char hash[16];
+    MurmurHash3_x64_128(str.rawData(), str.size(), salt, hash);
+    return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
+}
+
 /**
  * Uniquely identifies a lockable resource.
  */
@@ -236,14 +245,19 @@ class ResourceId {
 public:
     ResourceId() : _fullHash(0) {}
     ResourceId(ResourceType type, const NamespaceString& nss)
-        : _fullHash(fullHash(type, hashStringData(nss.toStringWithTenantId()))) {
+        : _fullHash(fullHash(
+              type,
+              hashStringDataForResourceId(nss.toStringWithTenantId(), kHashingSaltForResourceId))) {
         verifyNoResourceMutex(type);
     }
     ResourceId(ResourceType type, const DatabaseName& dbName)
-        : _fullHash(fullHash(type, hashStringData(dbName.toStringWithTenantId()))) {
+        : _fullHash(fullHash(type,
+                             hashStringDataForResourceId(dbName.toStringWithTenantId(),
+                                                         kHashingSaltForResourceId))) {
         verifyNoResourceMutex(type);
     }
-    ResourceId(ResourceType type, StringData str) : _fullHash(fullHash(type, hashStringData(str))) {
+    ResourceId(ResourceType type, StringData str)
+        : _fullHash(fullHash(type, hashStringDataForResourceId(str, kHashingSaltForResourceId))) {
         // Resources of type database, collection, or tenant must never be passed as a raw string.
         invariant(type != RESOURCE_DATABASE && type != RESOURCE_COLLECTION);
         verifyNoResourceMutex(type);
@@ -273,7 +287,9 @@ public:
         return _fullHash & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits);
     }
 
-    std::string toString() const;
+    // String representation of the resource type that omits the parts not intended to be read by
+    // humans. Intended to be used for error messages that are returned to the client.
+    std::string toStringForErrorMessage() const;
 
     template <typename H>
     friend H AbslHashValue(H h, const ResourceId& resource) {
@@ -281,6 +297,8 @@ public:
     }
 
 private:
+    friend std::string toStringForLogging(const ResourceId&);
+
     ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
 
     // Used to allow Lock::ResourceMutex to create ResourceIds with RESOURCE_MUTEX type
@@ -307,12 +325,16 @@ private:
             (hashId & (std::numeric_limits<uint64_t>::max() >> resourceTypeBits));
     }
 
-    static uint64_t hashStringData(StringData str) {
-        char hash[16];
-        MurmurHash3_x64_128(str.rawData(), str.size(), 0, hash);
-        return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
-    }
+    static inline const uint64_t kHashingSaltForResourceId = [] {
+        SecureUrbg entropy;
+        const auto result = entropy();
+        static_assert(std::is_same_v<std::remove_const_t<decltype(result)>, uint64_t>,
+                      "salting hash entropy must be a uint64");
+        return result;
+    }();
 };
+
+std::string toStringForLogging(const ResourceId&);
 
 #ifndef MONGO_CONFIG_DEBUG_BUILD
 // Treat the resource ids as 64-bit integers in release mode in order to ensure we do

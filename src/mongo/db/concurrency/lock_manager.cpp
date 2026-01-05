@@ -904,7 +904,7 @@ void LockManager::_buildLocksArray(const std::map<LockerId, BSONObj>& lockToClie
             auto o = BSONObjBuilder(locks->subobjStart());
             if (forLogging)
                 o.append("lockAddr", formatPtr(lock));
-            o.append("resourceId", lock->resourceId.toString());
+            o.append("resourceId", toStringForLogging(lock->resourceId));
             struct {
                 StringData key;
                 LockRequest* iter;
@@ -972,19 +972,45 @@ LockHead* LockManager::LockBucket::findOrInsert(ResourceId resId) {
 //
 // ResourceId
 //
-std::string ResourceId::toString() const {
+std::string toStringForLogging(const ResourceId& rId) {
     StringBuilder ss;
-    ss << "{" << _fullHash << ": " << resourceTypeName(getType()) << ", " << getHashId();
-    if (getType() == RESOURCE_MUTEX) {
-        ss << ", " << Lock::ResourceMutex::getName(*this);
-    }
-
-    if (getType() == RESOURCE_DATABASE || getType() == RESOURCE_COLLECTION) {
-        if (auto resourceName = ResourceCatalog::get(getGlobalServiceContext()).name(*this)) {
+    const auto type = rId.getType();
+    ss << "{" << rId._fullHash << ": " << resourceTypeName(type) << ", " << rId.getHashId();
+    if (type == RESOURCE_DATABASE || type == RESOURCE_COLLECTION) {
+        if (auto resourceName = ResourceCatalog::get(getGlobalServiceContext()).name(rId)) {
             ss << ", " << *resourceName;
         }
     }
+    if (type == RESOURCE_MUTEX) {
+        ss << ", " << Lock::ResourceMutex::getName(rId);
+    }
+    ss << "}";
 
+    return ss.str();
+}
+
+std::string ResourceId::toStringForErrorMessage() const {
+    StringBuilder ss;
+    const auto type = getType();
+    ss << "{" << resourceTypeName(type);
+    switch (type) {
+        case RESOURCE_GLOBAL:
+            ss << " : " << getHashId();
+            break;
+        case RESOURCE_DATABASE:
+        case RESOURCE_COLLECTION:
+            if (auto resourceName = ResourceCatalog::get(getGlobalServiceContext()).name(*this)) {
+                ss << " : " << *resourceName;
+            }
+            break;
+        case RESOURCE_MUTEX:
+            ss << " : " << Lock::ResourceMutex::getName(*this);
+            break;
+        case ResourceTypesCount:
+        case RESOURCE_INVALID:
+        case RESOURCE_METADATA:
+            break;
+    }
     ss << "}";
 
     return ss.str();
