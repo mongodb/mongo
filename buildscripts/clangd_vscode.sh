@@ -7,8 +7,8 @@ ARGS=("$@")
 # Ordered list of possible clangd locations (each candidate must be a single path)
 CANDIDATES=(
     "$(command -v custom-clangd || true)"
-    "$(find .compiledb -path '*/compiledb-*/external/mongo_toolchain_v5/v5/bin/clangd' -type f -print -quit 2>/dev/null || true)"
-    "$(find . -path './bazel-*/external/mongo_toolchain_v5/v5/bin/clangd' -type f -print -quit 2>/dev/null || true)"
+    "$(find -L .compiledb -path '*/compiledb-*/external/mongo_toolchain_v5/v5/bin/clangd' -type f -print -quit 2>/dev/null || true)"
+    "$(find -L . -path './bazel-*/external/mongo_toolchain_v5/v5/bin/clangd' -type f -print -quit 2>/dev/null || true)"
     "/opt/mongodbtoolchain/v5/bin/clangd"
 )
 
