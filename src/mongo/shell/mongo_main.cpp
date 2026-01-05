@@ -788,9 +788,13 @@ int mongo_main(int argc, char* argv[]) {
         if (shellGlobalParams.files.size() > 0) {
             boost::system::error_code ec;
             auto loadPath =
-                boost::filesystem::canonical(shellGlobalParams.files[0], ec).parent_path().string();
+                boost::filesystem::absolute(shellGlobalParams.files[0], ec).parent_path();
             if (!ec) {
-                mongo::getGlobalScriptEngine()->setLoadPath(loadPath);
+                if (boost::filesystem::exists(loadPath, ec)) {
+                    if (!ec) {
+                        mongo::getGlobalScriptEngine()->setLoadPath(loadPath.string());
+                    }
+                }
             }
         }
 
