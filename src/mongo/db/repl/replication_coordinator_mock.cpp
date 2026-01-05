@@ -427,7 +427,8 @@ int ReplicationCoordinatorMock::getMyId() const {
 }
 
 HostAndPort ReplicationCoordinatorMock::getMyHostAndPort() const {
-    return HostAndPort();
+    // Set to a non-empty value to satisfy the deserializer parser.
+    return HostAndPort("test1", 1234);
 }
 
 Status ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
