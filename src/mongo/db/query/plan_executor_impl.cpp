@@ -84,6 +84,8 @@ const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKno
 // namespace.
 MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
 
+MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeLogAndBackoff);
+
 PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    std::unique_ptr<WorkingSet> ws,
                                    std::unique_ptr<PlanStage> rt,
@@ -285,23 +287,36 @@ void hangBeforeShouldWaitForInsertsIfFailpointEnabled(PlanExecutorImpl* exec) {
         planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
     }
 }
+}  // namespace
+
 
 /**
- * Helper function used to construct lambda passed into yielding logic.
+ *
  */
-void doYield(OperationContext* opCtx) {
+void PlanExecutorImpl::doWaitDuringYield() {
     // If we yielded because we encountered a sharding critical section, wait for the critical
     // section to end before continuing. By waiting for the critical section to be exited we avoid
     // busy spinning immediately and encountering the same critical section again. It is important
     // that this wait happens after having released the lock hierarchy -- otherwise deadlocks could
     // happen, or the very least, locks would be unnecessarily held while waiting.
-    const auto& shardingCriticalSection = planExecutorShardingState(opCtx).criticalSectionFuture;
+    const auto& shardingCriticalSection = planExecutorShardingState(_opCtx).criticalSectionFuture;
     if (shardingCriticalSection) {
-        refresh_util::waitForCriticalSectionToComplete(opCtx, *shardingCriticalSection).ignore();
-        planExecutorShardingState(opCtx).criticalSectionFuture.reset();
+        refresh_util::waitForCriticalSectionToComplete(_opCtx, *shardingCriticalSection).ignore();
+        planExecutorShardingState(_opCtx).criticalSectionFuture.reset();
+    }
+
+    if (_writeConflictsInARowToLog) {
+        if (MONGO_unlikely(planExecutorHangBeforeLogAndBackoff.shouldFail())) {
+            planExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
+        }
+        logAndRecordWriteConflictAndBackoff(_opCtx,
+                                            *_writeConflictsInARowToLog,
+                                            "plan execution",
+                                            ""_sd,
+                                            NamespaceStringOrUUID(_nss));
+        _writeConflictsInARowToLog = boost::none;
     }
 }
-}  // namespace
 
 /**
  * This function waits for all oplog entries before the read to become visible. This must be done
@@ -378,20 +393,20 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Document* objOut, RecordI
     // capped insert notifier is necessary for the notifierVersion to advance.
     auto notifier = makeNotifier();
 
+    // This callback is used by the yielding code once all storage resources are released.
+    const auto afterSnapshotAndLocksRelinquishedCb = [&]() {
+        doWaitDuringYield();
+    };
+
     for (;;) {
         // These are the conditions which can cause us to yield:
         //   1) The yield policy's timer elapsed, or
         //   2) some stage requested a yield, or
         //   3) we need to yield and retry due to a WriteConflictException.
         // In all cases, the actual yielding happens here.
-
-        const auto whileYieldingFn = [&]() {
-            doYield(_opCtx);
-        };
-
         if (_yieldPolicy->shouldYieldOrInterrupt(_opCtx)) {
             uassertStatusOK(_yieldPolicy->yieldOrInterrupt(_opCtx,
-                                                           whileYieldingFn,
+                                                           afterSnapshotAndLocksRelinquishedCb,
                                                            RestoreContext::RestoreType::kYield,
                                                            _afterSnapshotAbandonFn));
         }
@@ -515,8 +530,10 @@ void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
         }
 
         writeConflictsInARow++;
-        logAndRecordWriteConflictAndBackoff(
-            _opCtx, writeConflictsInARow, "plan execution", ""_sd, NamespaceStringOrUUID(_nss));
+
+        // Set this member variable to indicate that when we yield, after resources are
+        // relinquished, we should log and backoff.
+        _writeConflictsInARowToLog = writeConflictsInARow;
     }
 
     // Yield next time through the loop.
@@ -560,8 +577,8 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
     const bool includeMetadata = _expCtx && _expCtx->getNeedsMerge();
     const bool hasAppendFn = static_cast<bool>(append);
 
-    const auto whileYieldingFn = [opCtx = _opCtx]() {
-        return doYield(opCtx);
+    const auto whileYieldingFn = [this]() {
+        return doWaitDuringYield();
     };
     auto notifier = makeNotifier();
 
