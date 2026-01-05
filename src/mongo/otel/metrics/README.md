@@ -4,21 +4,23 @@ This module provides an OpenTelemetry-compatible metrics API for instrumenting M
 
 ## Creating Metrics
 
-Metrics are created through the [`MetricsService`](https://github.com/mongodb/mongo/blob/a013280e0e5dc374f78adbc4cb68b4d190c1d9ed/src/mongo/otel/metrics/metrics_service.h), which is accessed via the `ServiceContext`:
+Metrics are created by calling the `create*` functions on the [`MetricsService`](https://github.com/mongodb/mongo/blob/a013280e0e5dc374f78adbc4cb68b4d190c1d9ed/src/mongo/otel/metrics/metrics_service.h), which is accessed via the `ServiceContext`:
 
 ```cpp
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_service.h"
 
 void initializeMetrics(ServiceContext* svcCtx) {
-    auto& metricsService = MetricsService::get(svcCtx);
+    auto& metricsService = otel::metrics::MetricsService::get(svcCtx);
 
     auto* operationsCounter = metricsService.createInt64Counter(
-        MetricNames::kQueryCount,        // name
+        otel::metrics::MetricNames::kQueryCount,        // name
         "Number of queries executed",   // description
-        MetricUnit::kQueries);          // unit
+        otel::metrics::MetricUnit::kQueries);          // unit
 }
 ```
+
+Metrics should be stashed once they are created to avoid taking a lock on the global list of metrics.
 
 ### MetricName Registry
 
@@ -34,8 +36,8 @@ When adding a new metric, add a `static constexpr MetricName` entry to the `Metr
 class MetricNames {
 public:
     // Query Team Metrics
-    static constexpr MetricName kQueryCount = {"query.count"};
-    static constexpr MetricName kQueryLatency = {"query.latency"};
+    static constexpr MetricName kQueryCount = {"num_queries"};
+    static constexpr MetricName kQueryLatency = {"query_latency"};
 };
 ```
 
@@ -43,8 +45,8 @@ public:
 
 Follow [OpenTelemetry naming conventions](https://opentelemetry.io/docs/specs/semconv/general/naming/):
 
-- Use lowercase with dots as separators for namespaces (e.g., `connections.active`), and underscores to separate words within namespaces (`slow_queries.count`)
-- Be descriptive but concise
+- Use lowercase with dots as separators for namespaces (e.g., `connections.active`), and underscores to separate words within namespaces (`slow_queries`)
+- Be descriptive but concise, there is no need to restate the units as part of the metric name
 
 `mongodb.` will be automatically prepended to all metric names because it is the service name provided to OTel.
 
@@ -69,10 +71,10 @@ Choose the appropriate metric type based on what you're measuring:
 - Query count
 
 ```cpp
-auto* counter = MetricsService::get(svcCtx).createInt64Counter(
-    MetricNames::kOperationsTotal,
+auto* counter = otel::metrics::MetricsService::get(svcCtx).createInt64Counter(
+    otel::metrics::MetricNames::kOperationsTotal,
     "Total number of operations performed",
-    MetricUnit::kOperations);
+    otel::metrics::MetricUnit::kOperations);
 
 counter->add(1);  // Increment by 1
 counter->add(10); // Increment by 10
@@ -106,7 +108,7 @@ The [`metrics_test_util.h`](https://github.com/mongodb/mongo/blob/a013280e0e5dc3
 
 ### OtelMetricsCapturer
 
-The [`OtelMetricsCapturer`](https://github.com/mongodb/mongo/blob/a013280e0e5dc374f78adbc4cb68b4d190c1d9ed/src/mongo/otel/metrics/metrics_test_util.h#L96) sets up an in-memory metrics exporter that captures all metrics created during a test. **It must be constructed before creating any metrics** to ensure they are captured.
+The [`OtelMetricsCapturer`](https://github.com/mongodb/mongo/blob/a013280e0e5dc374f78adbc4cb68b4d190c1d9ed/src/mongo/otel/metrics/metrics_test_util.h#L96) sets up an in-memory metrics exporter that captures all metrics created during a test. **OtelMetricsCapturer must be constructed before any metrics are created** to ensure they are captured.
 
 ```cpp
 #include "mongo/otel/metrics/metric_names.h"
@@ -117,15 +119,15 @@ The [`OtelMetricsCapturer`](https://github.com/mongodb/mongo/blob/a013280e0e5dc3
 namespace mongo::otel::metrics {
 
 TEST(MyFeatureTest, RecordsMetrics) {
-    OtelMetricsCapturer capturer;
+    otel::metrics::OtelMetricsCapturer capturer;
 
-    auto* counter = MetricsService::get(getServiceContext()).createInt64Counter(
-        MetricNames::kMyFeatureEvents,
+    auto* counter = otel::metrics::MetricsService::get(getServiceContext()).createInt64Counter(
+        otel::metrics::MetricNames::kMyFeatureEvents,
         "Number of events processed",
-        MetricUnit::kOperations);
+        otel::metrics::MetricUnit::kOperations);
     counter->add(5);
 
-    ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kMyFeatureEvents), 5);
+    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kMyFeatureEvents), 5);
 }
 
 }  // namespace mongo::otel::metrics

@@ -60,7 +60,8 @@ public:
     /**
      * Creates a counter with the provided parameters. The result is never null but will throw an
      * exception if the counter would collide with an existing metric (i.e., same name but different
-     * type or other parameters).
+     * type or other parameters). Metrics should be stashed once they are created to avoid taking a
+     * lock on the global list of metrics in performance-sensitive codepaths.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
@@ -72,7 +73,8 @@ public:
     /**
      * Creates an int64_t histogram with the provided parameters. The result is never null but will
      * throw an exception if the counter would collide with an existing metric (i.e., same name but
-     * different type or other parameters).
+     * different type or other parameters). Metrics should be stashed once they are created to avoid
+     * taking a lock on the global list of metrics in performance-sensitive codepaths.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
@@ -83,7 +85,8 @@ public:
     /**
      * Creates a double histogram with the provided parameters. The result is never null but will
      * throw an exception if the counter would collide with an existing metric (i.e., same name but
-     * different type or other parameters).
+     * different type or other parameters). Metrics should be stashed once they are created to avoid
+     * taking a lock on the global list of metrics in performance-sensitive codepaths.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      */
