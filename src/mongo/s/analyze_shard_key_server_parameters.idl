@@ -72,7 +72,7 @@ server_parameters:
         cpp_varname: gNumShardKeyRanges
         default: 100
         validator:
-            gt: 0
+            gt: 1
             lte: 10000
         redact: false
 
