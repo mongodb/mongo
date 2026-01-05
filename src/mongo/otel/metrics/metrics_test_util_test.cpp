@@ -37,13 +37,36 @@ namespace mongo::otel::metrics {
 
 class OtelMetricsCapturerTest : public ServiceContextTest {};
 
-TEST_F(OtelMetricsCapturerTest, ReadInt64ThrowsExceptionIfMetricNotFound) {
+TEST_F(OtelMetricsCapturerTest, ReadThrowsExceptionIfMetricNotFound) {
     OtelMetricsCapturer metricsCapturer;
     ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest1),
                        DBException,
                        ErrorCodes::KeyNotFound);
+    ASSERT_THROWS_CODE(metricsCapturer.readInt64Histogram(MetricNames::kTest1),
+                       DBException,
+                       ErrorCodes::KeyNotFound);
+    ASSERT_THROWS_CODE(metricsCapturer.readDoubleHistogram(MetricNames::kTest1),
+                       DBException,
+                       ErrorCodes::KeyNotFound);
 }
 
-// TODO(SERVER-115964): Add some tests for if the name is correct but the type is wrong.
+TEST_F(OtelMetricsCapturerTest, CorrectNameWrongTypeThrowsException) {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Histogram<int64_t>* int64Histogram = metricsService.createInt64Histogram(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    Histogram<double>* doubleHistogram = metricsService.createDoubleHistogram(
+        MetricNames::kTest2, "description1", MetricUnit::kSeconds);
+    // A value must be recorded for the histogram to be initialized in the underlying metrics
+    // exporter.
+    int64Histogram->record(1);
+    doubleHistogram->record(1);
 
+    ASSERT_THROWS_CODE(metricsCapturer.readDoubleHistogram(MetricNames::kTest1),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(metricsCapturer.readInt64Histogram(MetricNames::kTest2),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
+}
 }  // namespace mongo::otel::metrics

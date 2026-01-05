@@ -128,6 +128,9 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
     Counter<int64_t>* counter_2 =
         metricsService.createInt64Counter(MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
+    ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 0);
+    ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 0);
+
     counter_1->add(10);
     counter_2->add(1);
     counter_1->add(5);
@@ -143,7 +146,59 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
 
 using CreateHistogramTest = MetricsServiceTest;
 
-// TODO(SERVER-115964): Add RecordsValue test for histogram.
+TEST_F(CreateHistogramTest, RecordsValues) {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Histogram<int64_t>* int64Histogram = metricsService.createInt64Histogram(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    Histogram<double>* doubleHistogram = metricsService.createDoubleHistogram(
+        MetricNames::kTest2, "description1", MetricUnit::kSeconds);
+
+    const std::vector<double> expectedBoundaries = {
+        0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000};
+
+    int64Histogram->record(5);
+    const auto data1 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+    ASSERT_EQ(data1.boundaries, expectedBoundaries);
+    ASSERT_EQ(data1.sum, 5);
+    ASSERT_EQ(data1.min, 5);
+    ASSERT_EQ(data1.max, 5);
+    ASSERT_EQ(data1.counts,
+              std::vector<uint64_t>({0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}));
+    ASSERT_EQ(data1.count, 1);
+
+    int64Histogram->record(15);
+    const auto data2 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+    ASSERT_EQ(data2.boundaries, expectedBoundaries);
+    ASSERT_EQ(data2.sum, 20);
+    ASSERT_EQ(data2.min, 5);
+    ASSERT_EQ(data2.max, 15);
+    ASSERT_EQ(data2.counts,
+              std::vector<uint64_t>({0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}));
+    ASSERT_EQ(data2.count, 2);
+
+    doubleHistogram->record(103.14);
+    const auto data3 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
+    ASSERT_EQ(data3.boundaries, expectedBoundaries);
+    ASSERT_EQ(data3.sum, 103.14);
+    ASSERT_EQ(data3.min, 103.14);
+    ASSERT_EQ(data3.max, 103.14);
+    ASSERT_EQ(data3.counts,
+              std::vector<uint64_t>({0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0}));
+    ASSERT_EQ(data3.count, 1);
+
+    doubleHistogram->record(10.0);
+    const auto data4 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
+    ASSERT_EQ(data4.boundaries, expectedBoundaries);
+    ASSERT_DOUBLE_EQ(data4.sum, 113.14);
+    ASSERT_EQ(data4.min, 10.0);
+    ASSERT_EQ(data4.max, 103.14);
+    ASSERT_EQ(data4.counts,
+              std::vector<uint64_t>({0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0}));
+    ASSERT_EQ(data4.count, 2);
+
+    // TODO(SERVER-114951): Test custom boundaries and associated counts.
+}
 
 TEST_F(CreateHistogramTest, SameHistogramReturnedOnSameCreate) {
     auto& metricsService = MetricsService::get(getServiceContext());

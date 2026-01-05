@@ -61,7 +61,7 @@ int64_t OtelMetricsCapturer::readInt64Counter(MetricName name) {
     const SimpleAggregateInMemoryMetricData::AttributeToPoint& attributeToPoint =
         _metrics->Get(std::string(toStdStringViewForInterop(MetricsService::kMeterName)),
                       std::string(toStdStringViewForInterop(name.getName())));
-    auto it = attributeToPoint.find({});
+    const auto it = attributeToPoint.find({});
     massert(ErrorCodes::KeyNotFound,
             fmt::format("No metric with name {} exists", name.getName()),
             it != attributeToPoint.end());
@@ -76,5 +76,39 @@ int64_t OtelMetricsCapturer::readInt64Counter(MetricName name) {
             std::holds_alternative<int64_t>(sumPointData.value_));
 
     return std::get<int64_t>(sumPointData.value_);
+}
+
+HistogramData<int64_t> OtelMetricsCapturer::readInt64Histogram(MetricName name) {
+    _metrics->Clear();
+    _reader->triggerMetricExport();
+
+    const SimpleAggregateInMemoryMetricData::AttributeToPoint& attributeToPoint =
+        _metrics->Get(std::string(toStdStringViewForInterop(MetricsService::kMeterName)),
+                      std::string(toStdStringViewForInterop(name.getName())));
+    const auto it = attributeToPoint.find({});
+    massert(ErrorCodes::KeyNotFound,
+            fmt::format("No metric with name {} exists", name.getName()),
+            it != attributeToPoint.end());
+    massert(ErrorCodes::TypeMismatch,
+            fmt::format("Metric {} does not have histogram values", name.getName()),
+            std::holds_alternative<opentelemetry::sdk::metrics::HistogramPointData>(it->second));
+    return std::get<opentelemetry::sdk::metrics::HistogramPointData>(it->second);
+}
+
+HistogramData<double> OtelMetricsCapturer::readDoubleHistogram(MetricName name) {
+    _metrics->Clear();
+    _reader->triggerMetricExport();
+
+    const SimpleAggregateInMemoryMetricData::AttributeToPoint& attributeToPoint =
+        _metrics->Get(std::string(toStdStringViewForInterop(MetricsService::kMeterName)),
+                      std::string(toStdStringViewForInterop(name.getName())));
+    const auto it = attributeToPoint.find({});
+    massert(ErrorCodes::KeyNotFound,
+            fmt::format("No metric with name {} exists", name.getName()),
+            it != attributeToPoint.end());
+    massert(ErrorCodes::TypeMismatch,
+            fmt::format("Metric {} does not have histogram values", name.getName()),
+            std::holds_alternative<opentelemetry::sdk::metrics::HistogramPointData>(it->second));
+    return std::get<opentelemetry::sdk::metrics::HistogramPointData>(it->second);
 }
 }  // namespace mongo::otel::metrics

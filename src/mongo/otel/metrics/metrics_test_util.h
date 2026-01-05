@@ -91,6 +91,57 @@ inline bool isNoopMeterProvider(opentelemetry::metrics::MeterProvider* provider)
 }
 
 /**
+ * Class used for reading the data of an OpenTelemtry histogram.
+ */
+template <typename T>
+class HistogramData {
+public:
+    HistogramData(opentelemetry::sdk::metrics::HistogramPointData data);
+
+    /**
+     * These values denote the upper and lower bounds for the histogram buckets.
+     *
+     * Bucket upper-bounds are inclusive (except when the upper-bound is +inf), and bucket
+     * lower-bounds are exclusive. The implicit first boundary is -inf and the implicit last
+     * boundary is +inf. Given a list of n boundaries, there are n + 1 buckets. For example,
+     *
+     * boundaries = {2, 4}
+     * buckets = (-inf, 2], (2, 4], (4, +inf)
+     *
+     * If, for example, the value 2 is recorded, the corresponding `counts` vector is as follows:
+     * {1, 0, 0}.
+     *
+     * See https://opentelemetry.io/docs/specs/otel/metrics/data-model/#histogram for more
+     * information.
+     */
+    std::vector<double> boundaries;
+    T sum;
+    T min;
+    T max;
+    std::vector<uint64_t> counts;
+    uint64_t count;
+
+private:
+    /**
+     * Gets the underlying value of the provided ValueType, either int64_t or double.
+     */
+    T getValue(opentelemetry::sdk::metrics::ValueType valueType) {
+        massert(ErrorCodes::TypeMismatch,
+                "The internal type of the histogram and the requested type do not match",
+                std::holds_alternative<T>(valueType));
+        return std::get<T>(valueType);
+    }
+};
+
+template <typename T>
+HistogramData<T>::HistogramData(opentelemetry::sdk::metrics::HistogramPointData data)
+    : boundaries(data.boundaries_), counts(data.counts_), count(data.count_) {
+    sum = getValue(data.sum_);
+    min = getValue(data.min_);
+    max = getValue(data.max_);
+};
+
+/**
  * Sets up a MetricProvider with an in-memory exporter so tests can create and inspect metrics.
  * This must be constructed before creating any metrics in order to capture them.
  */
@@ -104,8 +155,20 @@ public:
                 new opentelemetry::metrics::NoopMeterProvider()));
     }
 
-    // Gets the value of an Int64 counter, and throws an exception if it is not found.
+    /**
+     * Gets the value of an int64_t counter and throws an exception if it is not found.
+     */
     int64_t readInt64Counter(MetricName name);
+
+    /**
+     * Gets the data of an int64_t histogram and throws an exception if it is not found.
+     */
+    HistogramData<int64_t> readInt64Histogram(MetricName name);
+
+    /**
+     * Gets the data of an double histogram and throws an exception if it is not found.
+     */
+    HistogramData<double> readDoubleHistogram(MetricName name);
 
 private:
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagOtelMetrics", true};
