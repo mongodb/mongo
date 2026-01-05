@@ -51,7 +51,9 @@ export const forceSyncSource = (rst, node, syncSource) => {
 
     // The node will not replicate this write. This is necessary to ensure that the sync source
     // is ahead of us, so that we can accept it as our sync source.
-    assert.commandWorked(primaryColl.insert({"forceSyncSourceWrite": "1"}));
+    // Use {w: 1} because 'node' has replication paused via stopReplProducer, so majority may not
+    // be achievable if other secondaries are also blocked.
+    assert.commandWorked(primaryColl.insert({"forceSyncSourceWrite": "1"}, {writeConcern: {w: 1}}));
     rst.awaitReplication(null, null, [syncSource]);
 
     stopReplProducer.wait();
