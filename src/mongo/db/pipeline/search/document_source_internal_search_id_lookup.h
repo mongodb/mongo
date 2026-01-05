@@ -147,14 +147,14 @@ public:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
-     * This stage must be run on each shard.
+     * This stage must be run on each shard, but that must be enforced at a higher-level in the
+     * pipeline-splitting logic.
+     *
+     * For the purposes of this function, we want default behavior to happen upon seeing an idLookup
+     * (which is to push it down to the shards and continue forward in looking for a split point).
      */
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        DistributedPlanLogic logic;
-
-        logic.shardsStage = this;
-
-        return logic;
+        return boost::none;
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
