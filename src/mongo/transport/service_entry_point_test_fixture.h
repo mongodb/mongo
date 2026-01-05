@@ -98,7 +98,7 @@ public:
     void testCommandMaxTimeMS();
     void testOpCtxInterrupt(bool deferHandling);
     void testReadConcernClientUnspecifiedNoDefault();
-    void testReadConcernClientUnspecifiedWithDefault();
+    void testReadConcernClientUnspecifiedWithDefault(bool expectClusterDefault);
     void testReadConcernClientSuppliedLevelNotAllowed(bool exceptionLogged);
     void testReadConcernClientSuppliedAllowed();
     void testReadConcernExtractedOnException();
@@ -106,7 +106,7 @@ public:
     void testExhaustCommandNextInvocationSet();
     void testWriteConcernClientSpecified();
     void testWriteConcernClientUnspecifiedNoDefault();
-    void testWriteConcernClientUnspecifiedWithDefault();
+    void testWriteConcernClientUnspecifiedWithDefault(bool expectClusterDefault);
 
 protected:
     ReadWriteConcernDefaultsLookupMock _lookupMock;

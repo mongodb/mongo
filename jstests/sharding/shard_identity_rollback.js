@@ -44,7 +44,7 @@ var shardIdentityDoc = {
 };
 
 assert.commandWorked(priConn.getDB('admin').system.version.update(
-    {_id: 'shardIdentity'}, shardIdentityDoc, {upsert: true, writeConcern: {w: 1}}));
+    {_id: 'shardIdentity'}, shardIdentityDoc, {upsert: true}));
 
 // Ensure sharding state on the primary was initialized
 var res = priConn.getDB('admin').runCommand({shardingState: 1});
@@ -62,9 +62,8 @@ secondaries.forEach(function(secondary) {
 });
 
 // Ensure manually deleting the shardIdentity document is not allowed.
-assert.writeErrorWithCode(
-    priConn.getDB('admin').system.version.remove({_id: 'shardIdentity'}, {writeConcern: {w: 1}}),
-    40070);
+assert.writeErrorWithCode(priConn.getDB('admin').system.version.remove({_id: 'shardIdentity'}),
+                          40070);
 
 jsTest.log("shutting down primary");
 // Shut down the primary so a secondary gets elected that definitely won't have replicated the

@@ -236,7 +236,7 @@ TEST_F(ServiceEntryPointShardServerTest, TestReadConcernClientUnspecifiedNoDefau
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestReadConcernClientUnspecifiedWithDefault) {
-    testReadConcernClientUnspecifiedWithDefault();
+    testReadConcernClientUnspecifiedWithDefault(false);
 }
 
 TEST_F(ServiceEntryPointShardServerTest, TestReadConcernClientSuppliedLevelNotAllowed) {
@@ -271,7 +271,7 @@ TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedNoDefa
 
 TEST_F(ServiceEntryPointShardServerTest, TestWriteConcernClientUnspecifiedWithDefault) {
     _replCoordMock->setWriteConcernMajorityShouldJournal(false);
-    testWriteConcernClientUnspecifiedWithDefault();
+    testWriteConcernClientUnspecifiedWithDefault(false);
 }
 
 
@@ -348,7 +348,7 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestReadConcernClientUnspecifiedNoDefaul
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestReadConcernClientUnspecifiedWithDefault) {
-    testReadConcernClientUnspecifiedWithDefault();
+    testReadConcernClientUnspecifiedWithDefault(true);
 }
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestReadConcernClientSuppliedLevelNotAllowed) {
@@ -383,7 +383,7 @@ TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedNoDefau
 
 TEST_F(ServiceEntryPointReplicaSetTest, TestWriteConcernClientUnspecifiedWithDefault) {
     _replCoordMock->setWriteConcernMajorityShouldJournal(false);
-    testWriteConcernClientUnspecifiedWithDefault();
+    testWriteConcernClientUnspecifiedWithDefault(true);
 }
 
 }  // namespace
