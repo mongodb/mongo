@@ -23,6 +23,9 @@ const ChangeStreamReadingMode = {
  * ChangeStreamReader class for reading and recording change stream events.
  */
 class ChangeStreamReader {
+    /** Default batch size for cursor getMore operations. */
+    static kDefaultGetMoreBatchSize = 1;
+
     /**
      * Run the change stream reader with the given configuration.
      * @param {Mongo} conn - MongoDB connection.
@@ -34,6 +37,7 @@ class ChangeStreamReader {
      *   - numberOfEventsToRead: Number of events to read before stopping.
      *   - readingMode: ChangeStreamReadingMode value. Default: Continuous.
      *   - showExpandedEvents: Optional boolean to show expanded events (default: false).
+     *   - batchSize: Optional cursor batch size for getMore operations (default: 1).
      */
     static run(conn, config) {
         switch (config.readingMode) {
@@ -92,6 +96,7 @@ class ChangeStreamReader {
         const watchOptions = {
             pipeline: pipeline,
             collection: config.watchMode === ChangeStreamWatchMode.kCollection ? config.collName : 1, // 1 means watch all collections
+            aggregateOptions: {cursor: {batchSize: config.batchSize ?? ChangeStreamReader.kDefaultGetMoreBatchSize}},
         };
 
         const cursor = cst.startWatchingChanges(watchOptions);
