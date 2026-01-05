@@ -617,4 +617,4 @@ try-import %workspace%/.bazelrc.sync
 try-import %workspace%/.bazelrc.engflow_creds
 
 # Repository root absolute path to set --execution_log_compact_file
-try-import %workspace%/.bazelrc.exec_log_file
+#try-import %workspace%/.bazelrc.exec_log_file
