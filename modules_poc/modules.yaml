@@ -790,6 +790,7 @@ index_builds: # authoritative: @10gen/server-index-builds
   files:
     - src/mongo/db/index_builds
     - src/mongo/db/index/index_access_method*
+    - src/mongo/db/index/preallocated_container_pool*
     - src/mongo/db/index_key_validate*
     - src/mongo/db/index_spec_validate*
     - src/mongo/db/commands/set_index_commit_quorum*
