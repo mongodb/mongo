@@ -42,6 +42,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/service_context.h"
@@ -403,9 +404,10 @@ void assertTxnMetadata(BSONObj obj,
         ASSERT_BSONOBJ_EQ(obj["readConcern"].Obj(), *readConcern);
     } else if (startTransaction) {
         // If we didn't expect an explicit read concern, the startTransaction request should still
-        // send the implicit default read concern.
-        ASSERT_BSONOBJ_EQ(obj["readConcern"].Obj(),
-                          repl::ReadConcernArgs::kImplicitDefault.toBSONInner());
+        // send the implicit default read concern which is local.
+        ASSERT_BSONOBJ_EQ(
+            obj["readConcern"].Obj(),
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern).toBSONInner());
     } else {
         ASSERT(obj["readConcern"].eoo()) << obj;
     }
@@ -433,6 +435,8 @@ protected:
 
     void setUp() final {
         ServiceContextTest::setUp();
+
+        ReadWriteConcernDefaults::create(getService(), _lookupMock.getFetchDefaultsFn());
 
         _opCtx = makeOperationContext();
 
@@ -560,6 +564,8 @@ private:
     txn_api::details::MockTransactionClient* _mockClient{nullptr};
     MockResourceYielder* _resourceYielder{nullptr};
     std::unique_ptr<txn_api::SyncTransactionWithRetries> _txnWithRetries;
+    // Allows for commands to not specify a default read/write concern.
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
 class MockClusterOperationTransactionClient : public txn_api::TransactionClient {
