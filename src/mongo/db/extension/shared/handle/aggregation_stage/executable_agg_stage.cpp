@@ -81,7 +81,6 @@ BSONObj ExecAggStageAPI::explain(mongo::ExplainOptions::Verbosity verbosity) con
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.
-    // TODO: SERVER-112442 Avoid the BSON copy in getOwned() once the work is completed.
     ExtensionByteBufHandle ownedBuf{buf};
     return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
