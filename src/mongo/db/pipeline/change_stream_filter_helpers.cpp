@@ -156,6 +156,8 @@ std::unique_ptr<MatchExpression> buildOperationFilter(
     if (expCtx->changeStreamSpec->getShowSystemEvents()) {
         orCmdEvents->add(MatchExpressionParser::parseAndNormalize(
             BSON("o.startIndexBuild" << BSONRegEx{collRegex}), expCtx));
+        orCmdEvents->add(MatchExpressionParser::parseAndNormalize(
+            BSON("o.abortIndexBuild" << BSONRegEx{collRegex}), expCtx));
     }
 
     // Omit dropDatabase on single-collection streams. While the stream will be invalidated before

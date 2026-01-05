@@ -639,6 +639,10 @@ last-continuous:
     ticket: SERVER-113532
   - test_file: jstests/core/index/index_on_incorrect_collection.js
     ticket: SERVER-113888
+  - test_file: jstests/change_streams/show_resharding_system_events.js
+    ticket: SERVER-93153
+  - test_file: jstests/change_streams/ddl_abort_index_build_event.js
+    ticket: SERVER-93154
   suites: null
 last-lts:
   all:
@@ -1330,4 +1334,8 @@ last-lts:
     ticket: SERVER-113532
   - test_file: jstests/core/index/index_on_incorrect_collection.js
     ticket: SERVER-113888
+  - test_file: jstests/change_streams/show_resharding_system_events.js
+    ticket: SERVER-93153
+  - test_file: jstests/change_streams/ddl_abort_index_build_event.js
+    ticket: SERVER-93154
   suites: null

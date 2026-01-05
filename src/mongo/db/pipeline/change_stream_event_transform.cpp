@@ -296,6 +296,11 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
                                                                  nssField.getStringData());
                 operationDescription = Value(Document{{"indexes", oField.getField("indexes")}});
+            } else if (auto nssField = oField.getField("abortIndexBuild"); !nssField.missing()) {
+                operationType = DocumentSourceChangeStream::kAbortIndexBuildOpType;
+                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
+                                                                 nssField.getStringData());
+                operationDescription = Value(Document{{"indexes", oField.getField("indexes")}});
             } else if (auto nssField = oField.getField("dropIndexes"); !nssField.missing()) {
                 const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
                 operationType = DocumentSourceChangeStream::kDropIndexesOpType;
