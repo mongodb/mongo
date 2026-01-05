@@ -32,6 +32,18 @@ global:
         - "mongo/db/admission/ingress_request_rate_limiter.h"
         - "mongo/db/server_options.h"
 
+imports:
+    - "mongo/db/basic_types.idl"
+
+structs:
+    ApplicationExemptionListParameters:
+        description: "A parameter value containing a list of exempted application names"
+        strict: true
+        fields:
+            appNames:
+                description: "An array of exempted application names"
+                type: array<string>
+
 server_parameters:
     ingressRequestRateLimiterEnabled:
         description: Controls whether ingress request rate limiter mechanism is enabled.
@@ -70,7 +82,16 @@ server_parameters:
         description: "A document containing a list of CIDR ranges to be exempted from ingress request rate limiting."
         set_at: [startup, runtime]
         cpp_class:
-            name: "IngressRequestRateLimiterExemptions"
+            name: "IngressRequestRateLimiterIPExemptions"
             # Expects the payload to be an instance of `CIDRRangeListParameters`.
+            override_set: true
+        redact: false
+
+    ingressRequestRateLimiterApplicationExemptions:
+        description: "A document containing a list of application names to be exempted from ingress request rate limiting."
+        set_at: [startup, runtime]
+        cpp_class:
+            name: "IngressRequestRateLimiterAppExemptions"
+            # Expects the payload to be an instance of `ApplicationExemptionListParameters`
             override_set: true
         redact: false

@@ -32,6 +32,7 @@ mongo_cc_library(
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db:service_context",
         "//src/mongo/db/auth",
+        "//src/mongo/rpc:client_metadata",
         "//src/mongo/transport:cidr_range_list_parameter",
     ],
 )
@@ -182,6 +183,9 @@ mongo_idl_library(
 mongo_idl_library(
     name = "ingress_request_rate_limiter_idl",
     src = "ingress_request_rate_limiter.idl",
+    idl_deps = [
+        "//src/mongo/db:basic_types_idl_gen",
+    ],
 )
 
 mongo_idl_library(

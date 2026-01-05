@@ -284,6 +284,13 @@ public:
     StringData getApplicationName() const;
 
     /**
+     * Get the Driver Name for the client metadata document.
+     *
+     * Return: May be empty.
+     */
+    StringData getDriverName() const;
+
+    /**
      * Get the BSON Document of the client metadata document. In the example above in the class
      * comment, this is the document in the "client" field.
      *
@@ -357,6 +364,7 @@ private:
     // Application Name extracted from the client metadata document.
     // May be empty
     std::string _appName;
+    std::string _driverName;
 
     // See documentWithoutMongosInfo().
     Deferred<BSONObj (*)(const BSONObj&)> _documentWithoutMongosInfo{

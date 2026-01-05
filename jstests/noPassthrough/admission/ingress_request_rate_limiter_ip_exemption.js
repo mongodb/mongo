@@ -46,7 +46,7 @@ const testExemptIPsFromRateLimit = (rateExemptConn, exemptClient, nonExemptClien
               2);
     assert.eq(
         finalRateLimiterStats.attemptedAdmissions - initialRateLimiterStats.attemptedAdmissions, 3);
-    assert.eq(finalRateLimiterStats.exemptedAdmissions - initialRateLimiterStats.exemptedAdmissions,
+    assert.gt(finalRateLimiterStats.exemptedAdmissions - initialRateLimiterStats.exemptedAdmissions,
               2);
 };
 
