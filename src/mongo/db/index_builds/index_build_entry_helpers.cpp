@@ -239,9 +239,7 @@ void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
                 AutoGetCollection autoColl(
                     opCtx, NamespaceString::kIndexBuildEntryNamespace, LockMode::MODE_IX);
                 CollectionOptions defaultCollectionOptions;
-                // TODO(SERVER-103400): Investigate usage validity of
-                // CollectionPtr::CollectionPtr_UNSAFE
-                CollectionPtr collection = CollectionPtr::CollectionPtr_UNSAFE(db->createCollection(
+                CollectionPtr collection(db->createCollection(
                     opCtx, NamespaceString::kIndexBuildEntryNamespace, defaultCollectionOptions));
 
                 // Ensure the collection exists.
