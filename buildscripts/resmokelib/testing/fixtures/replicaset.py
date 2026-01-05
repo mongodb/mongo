@@ -1223,10 +1223,10 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                         continue
                     if coll_name in excluded_any_db_collections:
                         continue
-                    # TODO SERVER-114904 Skip collections with names that end with a dot.
-                    # Even though the server allows their creation, db.get_collection() below
-                    # throws an InvalidName error.
-                    if coll_name.endswith("."):
+                    # TODO SERVER-114904 Skip collections with names that end with a dot or contain
+                    # double dots. Even though the server allows their creation, db.get_collection()
+                    # below throws an InvalidName error.
+                    if coll_name.endswith(".") or ".." in coll_name:
                         continue
                     # Skip collections that contain TTL indexes or TTL options.
                     indexes = db.get_collection(coll_name).list_indexes()
