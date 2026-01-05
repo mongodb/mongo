@@ -1924,8 +1924,11 @@ struct __wt_session {
      * 1000 will trigger a controlled crash during the checkpoint process.  Lower values will
      * trigger crashes in the initial phase of checkpoint\, while higher values will result in
      * crashes in the final phase of the checkpoint process., an integer; default \c -1.}
-     * @config{
-     * ),,}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;key_provider_trigger_crash_points, non-negative number
+     * between 1 and 3 will trigger a controlled crash during the key provider process.  A lower
+     * value would trigger crashes in the initial phase of key provider\, while a higher value would
+     * result in crashes in a later phase., an integer; default \c 0.}
+     * @config{ ),,}
      * @config{drop, specify a list of checkpoints to drop.  The list may additionally contain one
      * of the following keys: \c "from=all" to drop all checkpoints\, \c "from=<checkpoint>" to drop
      * all checkpoints after and including the named checkpoint\, or \c "to=<checkpoint>" to drop

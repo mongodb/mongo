@@ -4761,6 +4761,18 @@ tasks:
           format_test_script_args: -c ../../../test/format/CONFIG.disagg -t 10 -- disagg.page_log=palm disagg.mode=follower runs.rows=10000 runs.ops=50000 disk.encryption=none
           num_jobs: 1  # MSAN builds (with PALM) can cause OOM issues if multiple jobs are run in parallel.
 
+  - name: format-stress-disagg-leader-long-running
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # FIXME-WT-16228: Re-evaluate whether increased cache settings (size & triggers) are needed after PALI.
+          # For sustained throughput over long runs, larger cache and higher eviction triggers help.
+          format_args: disagg.mode=leader runs.timer=30:45 cache=10000 cache.eviction_dirty_trigger=50 cache.eviction_updates_trigger=50
+          times: 1
+
   - name: format-stress-test-no-barrier
     tags: ["stress-test-no-barrier"]
     exec_timeout_secs: 25200
@@ -7224,8 +7236,9 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-disagg"
     - name: ".stress-test-no-barrier"
+    - name: ".stress-test-disagg"
+    - name: format-stress-disagg-leader-long-running
     - name: format-abort-recovery-stress-test
     - name: ".cppsuite-stress-test"
       batchtime: 720 # 12 hours
@@ -7249,6 +7262,8 @@ buildvariants:
     - name: format-abort-recovery-stress-test
       distros: ubuntu2004-arm64-large
     - name: ".stress-test-disagg"
+      distros: ubuntu2004-arm64-large
+    - name: format-stress-disagg-leader-long-running
       distros: ubuntu2004-arm64-large
     - name: make-check-test
     - name: unit-test
@@ -7295,6 +7310,8 @@ buildvariants:
       distros: amazon2023-arm64-latest-large-m8g
     - name: ".stress-test-disagg"
       distros: amazon2023-arm64-latest-large-m8g
+    - name: format-stress-disagg-leader-long-running
+      distros: amazon2023-arm64-latest-large-m8g
     - name: make-check-test
     - name: unit-test
     - name: unit-test-extra-long
@@ -7321,8 +7338,9 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
-    - name: ".stress-test-disagg"
     - name: ".stress-test-no-barrier"
+    - name: ".stress-test-disagg"
+    - name: format-stress-disagg-leader-long-running
     - name: format-abort-recovery-stress-test
     - name: ".cppsuite-stress-test"
       batchtime: 720 # 12 hours

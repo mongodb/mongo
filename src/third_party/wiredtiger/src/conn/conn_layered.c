@@ -29,17 +29,6 @@ static int __layered_iterate_ingest_tables_for_gc_pruning(
   WT_SESSION_IMPL *session, wt_timestamp_t checkpoint_timestamp);
 static int __layered_last_checkpoint_order(
   WT_SESSION_IMPL *session, const char *shared_uri, int64_t *ckpt_order);
-static int __disagg_save_meta(WT_SESSION_IMPL *session, WT_SESSION_IMPL *internal_session,
-  WT_CURSOR *md_cursor, const char *metadata_value, char **metadata_value_cfgp,
-  size_t *metadata_value_cfg_lenp);
-static int __disagg_load_checkpoint_meta(WT_SESSION_IMPL *session, char *meta_buf,
-  char **metadata_valuep, uint64_t *checkpoint_timestampp);
-static int __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session,
-  const WT_DISAGG_CHECKPOINT_META *ckpt_meta, WT_SESSION_IMPL *internal_session,
-  WT_CURSOR *md_cursor, char **metadata_value_cfgp, size_t *metadata_value_cfg_lenp);
-static int __disagg_update_checkpoint_meta(WT_SESSION_IMPL *session,
-  const WT_DISAGG_CHECKPOINT_META *ckpt_meta, WT_SESSION_IMPL *internal_session,
-  WT_CONNECTION_IMPL *conn, char *root, uint64_t checkpoint_timestamp);
 
 /*
  * __layered_get_disagg_checkpoint --
@@ -207,27 +196,21 @@ err:
 }
 
 /*
- * __disagg_get_meta --
- *     Read metadata from disaggregated storage.
+ * __disagg_get_page --
+ *     Read a page from disaggregated storage. Note: The caller assumes ownership of the returned
+ *     item.
  */
 static int
-__disagg_get_meta(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn, WT_ITEM *item)
+__disagg_get_page(WT_SESSION_IMPL *session, WT_PAGE_LOG_HANDLE *page_log, uint64_t page_id,
+  uint64_t lsn, WT_ITEM *item)
 {
-    WT_CONNECTION_IMPL *conn;
-    WT_DISAGGREGATED_STORAGE *disagg;
     WT_PAGE_LOG_GET_ARGS get_args;
     u_int count, retry;
 
-    conn = S2C(session);
-    disagg = &conn->disaggregated_storage;
-
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
-
-    if (disagg->page_log_meta == NULL)
+    if (page_log == NULL)
         return (ENOTSUP);
 
-    WT_ASSERT_ALWAYS(session, page_id <= WT_DISAGG_METADATA_MAX_PAGE_ID,
-      "Metadata page ID %" PRIu64 " out of range", page_id);
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
 
     WT_CLEAR(get_args);
     get_args.lsn = lsn;
@@ -235,8 +218,7 @@ __disagg_get_meta(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn, WT_I
     retry = 0;
     for (;;) {
         count = 1;
-        WT_RET(disagg->page_log_meta->plh_get(
-          disagg->page_log_meta, &session->iface, page_id, 0, &get_args, item, &count));
+        WT_RET(page_log->plh_get(page_log, &session->iface, page_id, 0, &get_args, item, &count));
         WT_ASSERT(session, count <= 1); /* Corrupt data. */
 
         /* Found the data. */
@@ -246,16 +228,131 @@ __disagg_get_meta(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn, WT_I
         /* Otherwise retry up to 100 times to account for page materialization delay. */
         if (retry > 100) {
             __wt_verbose_error(session, WT_VERB_READ,
-              "read failed for metadata page ID %" PRIu64 ", lsn %" PRIu64, page_id, lsn);
+              "read failed for page ID %" PRIu64 ", lsn %" PRIu64, page_id, lsn);
             return (EIO);
         }
         __wt_verbose_notice(session, WT_VERB_READ,
-          "retry #%" PRIu32 " for metadata page_id %" PRIu64 ", lsn %" PRIu64, retry, page_id, lsn);
+          "retry #%" PRIu32 " for page_id %" PRIu64 ", lsn %" PRIu64, retry, page_id, lsn);
         __wt_sleep(0, 10000 + retry * 5000);
         ++retry;
     }
 
-    disagg->last_metadata_page_lsn[page_id] = get_args.lsn;
+    return (0);
+}
+
+/*
+ * __disagg_get_meta --
+ *     Read metadata from disaggregated storage. Note: The caller assumes ownership of the returned
+ *     item.
+ */
+static int
+__disagg_get_meta(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn, WT_ITEM *item)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DISAGGREGATED_STORAGE *disagg;
+
+    conn = S2C(session);
+    disagg = &conn->disaggregated_storage;
+
+    WT_ASSERT_ALWAYS(session, page_id <= WT_DISAGG_METADATA_MAX_PAGE_ID,
+      "Metadata page ID %" PRIu64 " out of range", page_id);
+
+    WT_RET(__disagg_get_page(session, disagg->page_log_meta, page_id, lsn, item));
+
+    disagg->last_metadata_page_lsn[page_id] = lsn;
+
+    return (0);
+}
+
+/*
+ * __disagg_get_crypt_key --
+ *     Read encryption key data from disaggregated storage. Note: The caller assumes ownership of
+ *     the returned item.
+ */
+static int
+__disagg_get_crypt_key(WT_SESSION_IMPL *session, uint64_t page_id, uint64_t lsn, WT_ITEM *item)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DISAGGREGATED_STORAGE *disagg;
+
+    conn = S2C(session);
+    disagg = &conn->disaggregated_storage;
+
+    WT_ASSERT_ALWAYS(session, page_id <= WT_DISAGG_KEY_PROVIDER_MAX_PAGE_ID,
+      "Multiple key provider pages is not currently supported");
+
+    WT_RET(__disagg_get_page(session, disagg->page_log_key_provider, page_id, lsn, item));
+
+    disagg->last_key_provider_page_lsn[page_id] = lsn;
+
+    return (0);
+}
+
+/*
+ * __disagg_validate_crypt --
+ *     Validate the crypt header and payload stored in key_item.
+ */
+static int
+__disagg_validate_crypt(WT_SESSION_IMPL *session, const WT_ITEM *key_item, WT_CRYPT_HEADER *header)
+{
+    WT_DECL_RET;
+    uint32_t checksum = 0;
+
+    if (key_item->size < sizeof(WT_CRYPT_HEADER)) {
+        WT_ERR_MSG(session, EIO,
+          "Encryption key data too small: expected at least %" WT_SIZET_FMT ", got %" WT_SIZET_FMT,
+          sizeof(WT_CRYPT_HEADER), key_item->size);
+    }
+    memcpy(header, key_item->data, sizeof(WT_CRYPT_HEADER));
+    __wt_crypt_header_byteswap(header);
+
+    WT_ASSERT_ALWAYS(session, header->signature == WT_CRYPT_HEADER_SIGNATURE,
+      "Invalid encryption key data signature: expected 0x%08" PRIx32 ", got 0x%08" PRIx32,
+      WT_CRYPT_HEADER_SIGNATURE, header->signature);
+    WT_ASSERT_ALWAYS(session, header->version == WT_CRYPT_HEADER_VERSION,
+      "Unsupported encryption key data version: expected %u, got %u", WT_CRYPT_HEADER_VERSION,
+      header->version);
+    if (key_item->size - sizeof(WT_CRYPT_HEADER) != header->crypt_size) {
+        WT_ERR_MSG(session, EIO, "Encryption key data size mismatch: expected %u, got %u",
+          header->crypt_size, (uint32_t)(key_item->size - sizeof(WT_CRYPT_HEADER)));
+    }
+
+    checksum =
+      __wt_checksum((uint8_t *)key_item->data + sizeof(WT_CRYPT_HEADER), header->crypt_size);
+    if (checksum != header->checksum) {
+        WT_ERR_MSG(session, EIO,
+          "Encryption key data checksum mismatch: expected %" PRIx32 ", got %" PRIx32,
+          header->checksum, checksum);
+    }
+
+err:
+    return (ret);
+}
+
+/*
+ * __disagg_put_page --
+ *     Write a page to disaggregated storage.
+ */
+static int
+__disagg_put_page(WT_SESSION_IMPL *session, WT_PAGE_LOG_HANDLE *page_log, uint64_t page_id,
+  const WT_ITEM *item, uint64_t last_page_lsn[], uint64_t *lsnp)
+{
+    WT_PAGE_LOG_PUT_ARGS put_args;
+
+    if (page_log == NULL)
+        return (ENOTSUP);
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+
+    WT_CLEAR(put_args);
+    put_args.backlink_lsn = last_page_lsn[page_id];
+
+    WT_RET(page_log->plh_put(page_log, &session->iface, page_id, 0, &put_args, item));
+    last_page_lsn[page_id] = put_args.lsn;
+
+    if (lsnp != NULL)
+        *lsnp = put_args.lsn;
+
     return (0);
 }
 
@@ -269,26 +366,16 @@ __disagg_put_crypt_key(
 {
     WT_CONNECTION_IMPL *conn;
     WT_DISAGGREGATED_STORAGE *disagg;
-    WT_PAGE_LOG_PUT_ARGS put_args;
 
     conn = S2C(session);
     disagg = &conn->disaggregated_storage;
 
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
-
-    if (conn->key_provider == NULL)
-        return (ENOTSUP);
-
     WT_ASSERT_ALWAYS(session, page_id <= WT_DISAGG_KEY_PROVIDER_MAX_PAGE_ID,
       "Multiple key provider pages is not currently supported");
-    WT_CLEAR(put_args);
-    put_args.backlink_lsn = disagg->last_key_provider_page_lsn[page_id];
 
-    WT_RET(disagg->page_log_key_provider->plh_put(
-      disagg->page_log_key_provider, &session->iface, page_id, 0, &put_args, item));
-    disagg->last_key_provider_page_lsn[page_id] = put_args.lsn;
-    if (lsnp != NULL)
-        *lsnp = put_args.lsn;
+    WT_RET(__disagg_put_page(session, disagg->page_log_key_provider, page_id, item,
+      disagg->last_key_provider_page_lsn, lsnp));
+
     return (0);
 }
 
@@ -301,29 +388,17 @@ __disagg_put_meta(WT_SESSION_IMPL *session, uint64_t page_id, const WT_ITEM *ite
 {
     WT_CONNECTION_IMPL *conn;
     WT_DISAGGREGATED_STORAGE *disagg;
-    WT_PAGE_LOG_PUT_ARGS put_args;
 
     conn = S2C(session);
     disagg = &conn->disaggregated_storage;
 
-    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
-
-    if (disagg->page_log_meta == NULL)
-        return (ENOTSUP);
-
     WT_ASSERT_ALWAYS(session, page_id <= WT_DISAGG_METADATA_MAX_PAGE_ID,
       "Metadata page ID %" PRIu64 " out of range", page_id);
 
-    WT_CLEAR(put_args);
-    put_args.backlink_lsn = disagg->last_metadata_page_lsn[page_id];
-
-    WT_RET(disagg->page_log_meta->plh_put(
-      disagg->page_log_meta, &session->iface, page_id, 0, &put_args, item));
-    disagg->last_metadata_page_lsn[page_id] = put_args.lsn;
-
-    if (lsnp != NULL)
-        *lsnp = put_args.lsn;
+    WT_RET(__disagg_put_page(
+      session, disagg->page_log_meta, page_id, item, disagg->last_metadata_page_lsn, lsnp));
     __wt_atomic_add_uint64_v(&disagg->num_meta_put, 1);
+
     return (0);
 }
 
@@ -350,6 +425,9 @@ __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
     lsn = 0;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
+    if (session->ckpt.key_provider_crash_point == KEY_PROVIDER_CRASH_BEFORE_KEY_ROTATION)
+        __wt_debug_crash(session);
 
     /* Check for a new encryption key data. If the size is 0, there is none so we can skip. */
     WT_ERR(key_provider->get_key(key_provider, (WT_SESSION *)session, &crypt));
@@ -381,6 +459,9 @@ __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
     /* Write the encryption key data to disaggregated storage. */
     ret = __disagg_put_crypt_key(session, WT_DISAGG_KEY_PROVIDER_MAIN_PAGE_ID, &crypt.keys, &lsn);
 
+    if (session->ckpt.key_provider_crash_point == KEY_PROVIDER_CRASH_DURING_KEY_ROTATION)
+        __wt_debug_crash(session);
+
     /* Callback to update key provider on the result of new encryption key data . */
     if (ret == 0) {
         /* Point to the same encryption data on callback. */
@@ -394,6 +475,9 @@ __wt_disagg_put_crypt_helper(WT_SESSION_IMPL *session)
         crypt.keys.size = 0;
     }
     WT_IGNORE_RET(key_provider->on_key_update(key_provider, (WT_SESSION *)session, &crypt));
+
+    if (session->ckpt.key_provider_crash_point == KEY_PROVIDER_CRASH_AFTER_KEY_ROTATION)
+        __wt_debug_crash(session);
 done:
 err:
     __wt_scr_free(session, &buf);
@@ -409,16 +493,13 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
   size_t checkpoint_root_size, uint64_t checkpoint_timestamp)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_DECL_ITEM(buf);
-    WT_DECL_ITEM(key_provider_buf);
+    WT_DECL_ITEM(metadata_buf);
     WT_DECL_RET;
     WT_DISAGGREGATED_STORAGE *disagg;
     uint64_t lsn;
     uint32_t checksum;
     char *checkpoint_root_copy, ts_string[WT_TS_INT_STRING_SIZE];
 
-    buf = NULL;
-    key_provider_buf = NULL;
     checkpoint_root_copy = NULL;
     conn = S2C(session);
     disagg = &conn->disaggregated_storage;
@@ -434,8 +515,15 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
         checkpoint_root_size = strlen(checkpoint_root);
 
     WT_ERR(__wt_strndup(session, checkpoint_root, checkpoint_root_size, &checkpoint_root_copy));
+    WT_ERR(__wt_scr_alloc(session, 0, &metadata_buf));
 
-    /* Write key provider information to the metadata page log.  */
+    /* Format metadata settings. */
+    WT_ERR(__wt_buf_fmt(session, metadata_buf,
+      "checkpoint=%s,\n"
+      "timestamp=%" PRIx64,
+      checkpoint_root_copy, checkpoint_timestamp));
+
+    /* Append key provider metadata, if available. */
     if (conn->key_provider != NULL) {
         /*
          * The key provider LSN field should always be initialized. The LSN is provided either
@@ -444,31 +532,23 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
         WT_ASSERT(session,
           conn->disaggregated_storage
               .last_key_provider_page_lsn[WT_DISAGG_KEY_PROVIDER_MAIN_PAGE_ID] != 0);
-        WT_ERR(__wt_scr_alloc(session, 0, &key_provider_buf));
-        WT_ERR(__wt_buf_fmt(session, key_provider_buf,
-          "key_provider=((page.1=(page_id=%d,lsn=%" PRIu64 ")),version=1)",
+
+        WT_ERR(__wt_buf_catfmt(session, metadata_buf,
+          ",\n"
+          "key_provider=(page.1=(page_id=%d,lsn=%" PRIu64 "),version=1)",
           WT_DISAGG_KEY_PROVIDER_MAIN_PAGE_ID,
           conn->disaggregated_storage
             .last_key_provider_page_lsn[WT_DISAGG_KEY_PROVIDER_MAIN_PAGE_ID]));
     }
 
-    WT_ERR(__wt_scr_alloc(session, 0, &buf));
-    WT_ERR(
-      __wt_buf_fmt(session, buf,
-        "checkpoint=%s,\n"
-        "timestamp=%" PRIx64 ",\n"
-        "%s",
-        checkpoint_root_copy, checkpoint_timestamp,
-        key_provider_buf != NULL ? (const char *)key_provider_buf->data : ""));
-
     /* Compute the checksum for the metadata page. */
-    checksum = __wt_checksum(buf->data, buf->size);
+    checksum = __wt_checksum(metadata_buf->data, metadata_buf->size);
 
     /*
      * Write the metadata to disaggregated storage. This should be the last statement in this
      * function that is allowed to fail.
      */
-    WT_ERR(__disagg_put_meta(session, WT_DISAGG_METADATA_MAIN_PAGE_ID, buf, &lsn));
+    WT_ERR(__disagg_put_meta(session, WT_DISAGG_METADATA_MAIN_PAGE_ID, metadata_buf, &lsn));
 
     /*
      * Do the bookkeeping. We cannot fail this function past this point, so that our bookkeeping is
@@ -490,8 +570,137 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
 
 err:
     __wt_free(session, checkpoint_root_copy);
-    __wt_scr_free(session, &key_provider_buf);
-    __wt_scr_free(session, &buf);
+    __wt_scr_free(session, &metadata_buf);
+
+    return (ret);
+}
+
+/*
+ * __wti_disagg_parse_crypt_meta --
+ *     Parse key provider metadata to extract page ID and LSN.
+ */
+int
+__wti_disagg_parse_crypt_meta(
+  WT_SESSION_IMPL *session, const WT_DISAGG_METADATA *metadata, uint64_t *page_idp, uint64_t *lsnp)
+{
+    WT_CONFIG meta_cfg, page_cfg;
+    WT_CONFIG_ITEM cfg_key, cfg_value;
+    WT_DECL_RET;
+    unsigned int version;
+
+    WT_CLEAR(meta_cfg);
+    WT_CLEAR(page_cfg);
+    version = 0u;
+
+    *page_idp = 0;
+    *lsnp = 0;
+
+    __wt_config_initn(session, &meta_cfg, metadata->key_provider, metadata->key_provider_len);
+    while ((ret = __wt_config_next(&meta_cfg, &cfg_key, &cfg_value)) == 0) {
+        if (WT_CONFIG_LIT_MATCH("page.1", cfg_key)) {
+            __wt_config_subinit(session, &page_cfg, &cfg_value);
+            while ((ret = __wt_config_next(&page_cfg, &cfg_key, &cfg_value)) == 0) {
+                if (WT_CONFIG_LIT_MATCH("page_id", cfg_key) &&
+                  cfg_value.type == WT_CONFIG_ITEM_NUM) {
+                    WT_ASSERT_ALWAYS(
+                      session, *page_idp == 0, "Duplicate page_id entry in key_provider metadata");
+                    *page_idp = (uint64_t)cfg_value.val;
+                } else if (WT_CONFIG_LIT_MATCH("lsn", cfg_key) &&
+                  cfg_value.type == WT_CONFIG_ITEM_NUM) {
+                    WT_ASSERT_ALWAYS(
+                      session, *lsnp == 0, "Duplicate lsn entry in key_provider metadata");
+                    *lsnp = (uint64_t)cfg_value.val;
+                } else {
+                    WT_ERR_MSG(session, EINVAL,
+                      "Unknown or invalid entry \"%.*s\"=\"%.*s\" in key_provider page metadata",
+                      (int)cfg_key.len, cfg_key.str, (int)cfg_value.len, cfg_value.str);
+                }
+            }
+            WT_ERR_NOTFOUND_OK(ret, false);
+        } else if (WT_CONFIG_LIT_MATCH("version", cfg_key) &&
+          cfg_value.type == WT_CONFIG_ITEM_NUM) {
+            version = (unsigned int)cfg_value.val;
+        } else {
+            WT_ERR_MSG(session, EINVAL,
+              "Unknown or invalid entry \"%.*s\"=\"%.*s\" in key_provider metadata",
+              (int)cfg_key.len, cfg_key.str, (int)cfg_value.len, cfg_value.str);
+        }
+    }
+    WT_ERR_NOTFOUND_OK(ret, false);
+
+    if (version != 1) {
+        WT_ERR_MSG(session, EINVAL, "Unsupported key_provider metadata version: %u", version);
+    }
+
+    if (*page_idp == 0 || *lsnp == 0) {
+        WT_ERR_MSG(session, EINVAL,
+          "Incomplete key_provider metadata: page_id=%" PRIu64 ", lsn=%" PRIu64, *page_idp, *lsnp);
+    }
+
+    if (*page_idp > WT_DISAGG_KEY_PROVIDER_MAX_PAGE_ID) {
+        WT_ERR_MSG(session, EINVAL, "Key provider page ID %" PRIu64 " out of range", *page_idp);
+    }
+
+err:
+    return (ret);
+}
+
+/*
+ * __disagg_load_crypt_key --
+ *     Load encryption key data from disaggregated storage into the key provider.
+ */
+static int
+__disagg_load_crypt_key(WT_SESSION_IMPL *session, WT_DISAGG_METADATA *metadata)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_CRYPT_HEADER crypt_header;
+    WT_CRYPT_KEYS crypt;
+    WT_DECL_RET;
+    WT_ITEM key_item;
+    WT_KEY_PROVIDER *key_provider;
+
+    conn = S2C(session);
+    key_provider = conn->key_provider;
+
+    WT_CLEAR(crypt);
+    WT_CLEAR(crypt_header);
+    WT_CLEAR(key_item);
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
+    /* No key provider configured. */
+    if (key_provider == NULL)
+        return (0);
+
+    /*
+     * No key provider information stored in disaggregated storage. Use empty crypt keys to let the
+     * key provider decide about the appropriate key.
+     */
+    if (metadata->key_provider == NULL) {
+        WT_ERR(key_provider->load_key(key_provider, (WT_SESSION *)session, &crypt));
+        return (0);
+    }
+
+    /* Parse crypt key metadata to get page ID and LSN. */
+    uint64_t page_id, lsn;
+    WT_ERR(__wti_disagg_parse_crypt_meta(session, metadata, &page_id, &lsn));
+
+    /* Read the encryption key data from disaggregated storage. */
+    WT_ERR(__disagg_get_crypt_key(session, page_id, lsn, &key_item));
+
+    /* Validate the crypt data. */
+    WT_ERR(__disagg_validate_crypt(session, &key_item, &crypt_header));
+
+    /* Prepare the crypt keys for loading. */
+    crypt.keys.data = (uint8_t *)key_item.data + sizeof(WT_CRYPT_HEADER);
+    crypt.keys.size = crypt_header.crypt_size;
+    crypt.r.lsn = lsn;
+
+    /* Callback to load the encryption key data into the key provider. */
+    WT_ERR(key_provider->load_key(key_provider, (WT_SESSION *)session, &crypt));
+
+err:
+    __wt_buf_free(session, &key_item);
     return (ret);
 }
 
@@ -501,26 +710,18 @@ err:
  */
 static int
 __disagg_fetch_shared_meta(
-  WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT_META *ckpt_meta, char **bufp)
+  WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT_META *ckpt_meta, WT_ITEM *item)
 {
     WT_DECL_RET;
-    WT_ITEM item;
-    size_t len;
-    uint32_t checksum;
-    char *buf;
-
-    buf = NULL;
-    WT_CLEAR(item);
-    *bufp = NULL;
 
     /* Read the checkpoint metadata of the shared metadata table from the special metadata page. */
     WT_ERR_MSG_CHK(session,
-      __disagg_get_meta(session, WT_DISAGG_METADATA_MAIN_PAGE_ID, ckpt_meta->metadata_lsn, &item),
+      __disagg_get_meta(session, WT_DISAGG_METADATA_MAIN_PAGE_ID, ckpt_meta->metadata_lsn, item),
       "Disagg metadata fetching failed, with lsn: %" PRIu64, ckpt_meta->metadata_lsn);
 
     /* Validate the checksum. */
     if (ckpt_meta->has_metadata_checksum) {
-        checksum = __wt_checksum(item.data, item.size);
+        const uint32_t checksum = __wt_checksum(item->data, item->size);
         if (checksum != ckpt_meta->metadata_checksum) {
             WT_ERR_MSG(session, EIO,
               "Checkpoint metadata checksum mismatch: expected %" PRIx32 ", got %" PRIx32,
@@ -528,112 +729,107 @@ __disagg_fetch_shared_meta(
         }
     }
 
-    /* Add the terminating zero byte to the end of the buffer. */
-    len = item.size + 1;
-    WT_ERR(__wt_calloc_def(session, len, &buf));
-    memcpy(buf, item.data, item.size);
-
-    *bufp = buf;
-    buf = NULL;
+    /* !!!
+     * FIXME-WT-16386 Config parser reads beyond config length limit
+     * Add a zero terminator to the metadata buffer for safe parsing.
+     */
+    WT_ERR(__wt_buf_grow(session, item, item->size + 1));
+    ((char *)item->data)[item->size] = '\0';
 
 err:
-    __wt_free(session, buf);
-    __wt_free(session, item.mem);
     return (ret);
 }
 
 /*
- * __disagg_load_checkpoint_meta --
- *     Parse checkpoint metadata pulled from the shared metadata buffer.
+ * __wti_disagg_parse_meta --
+ *     Parse metadata pulled from the shared metadata buffer. Note: No allocations performed during
+ *     the parsing. Resulting WT_DISAGG_METADATA fields will point into meta_buf.
  */
-static int
-__disagg_load_checkpoint_meta(
-  WT_SESSION_IMPL *session, char *meta_buf, char **metadata_valuep, uint64_t *checkpoint_timestampp)
+int
+__wti_disagg_parse_meta(
+  WT_SESSION_IMPL *session, const WT_ITEM *meta_buf, WT_DISAGG_METADATA *metadata)
 {
     WT_CONFIG meta_cfg;
     WT_CONFIG_ITEM cfg_key, cfg_value;
     WT_DECL_RET;
-    uint64_t checkpoint_timestamp;
-    char *metadata_value;
-    bool checkpoint_found, timestamp_found;
 
     WT_CLEAR(meta_cfg);
-    metadata_value = NULL;
-    checkpoint_timestamp = WT_TS_NONE;
-    checkpoint_found = timestamp_found = false;
 
-    __wt_config_init(session, &meta_cfg, meta_buf);
+    WT_CLEAR(*metadata);
+    metadata->checkpoint_timestamp = WT_TS_MAX; /* Invalid timestamp by default. */
+
+    __wt_config_initn(session, &meta_cfg, meta_buf->data, meta_buf->size);
     while ((ret = __wt_config_next(&meta_cfg, &cfg_key, &cfg_value)) == 0) {
         __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
           "Disaggregated checkpoint metadata item \"%.*s\"=\"%.*s\"", (int)cfg_key.len, cfg_key.str,
           (int)cfg_value.len, cfg_value.str);
+
         if (WT_CONFIG_LIT_MATCH("checkpoint", cfg_key)) {
-            WT_ASSERT_ALWAYS(session, !checkpoint_found,
+            WT_ASSERT_ALWAYS(session, metadata->checkpoint == NULL,
               "Duplicate checkpoint entry in disaggregated storage metadata");
-            WT_ERR(__wt_strndup(session, cfg_value.str, cfg_value.len, &metadata_value));
-            checkpoint_found = true;
+
+            metadata->checkpoint = cfg_value.str;
+            metadata->checkpoint_len = cfg_value.len;
         } else if (WT_CONFIG_LIT_MATCH("timestamp", cfg_key)) {
-            WT_ASSERT_ALWAYS(session, !timestamp_found,
+            WT_ASSERT_ALWAYS(session, metadata->checkpoint_timestamp == WT_TS_MAX,
               "Duplicate timestamp entry in disaggregated storage metadata");
+
             if (cfg_value.len > 0 && cfg_value.val == 0)
-                checkpoint_timestamp = WT_TS_NONE;
+                metadata->checkpoint_timestamp = WT_TS_NONE;
             else
                 WT_ERR(__wt_txn_parse_timestamp(
-                  session, "checkpoint timestamp", &checkpoint_timestamp, &cfg_value));
-            timestamp_found = true;
+                  session, "checkpoint timestamp", &metadata->checkpoint_timestamp, &cfg_value));
         } else if (WT_CONFIG_LIT_MATCH("key_provider", cfg_key)) {
-            /* FIXME-WT-16055 Implement key read path mechanism */
+            WT_ASSERT_ALWAYS(session, metadata->key_provider == NULL,
+              "Duplicate key_provider entry in disaggregated storage metadata");
+
+            metadata->key_provider = cfg_value.str;
+            metadata->key_provider_len = cfg_value.len;
+        } else {
+            WT_ERR_MSG(session, EINVAL, "Unknown entry \"%.*s\" in disaggregated storage metadata",
+              (int)cfg_key.len, cfg_key.str);
         }
     }
     WT_ERR_NOTFOUND_OK(ret, false);
 
-    if (!checkpoint_found)
+    if (metadata->checkpoint == NULL)
         WT_ERR_MSG(session, EINVAL, "Missing checkpoint entry in disaggregated storage metadata");
-    if (!timestamp_found)
+    if (metadata->checkpoint_timestamp == WT_TS_MAX)
         WT_ERR_MSG(session, EINVAL, "Missing timestamp entry in disaggregated storage metadata");
-
-    *metadata_valuep = metadata_value;
-    *checkpoint_timestampp = checkpoint_timestamp;
-    metadata_value = NULL;
+    /* Key provider entry is optional. */
 
 err:
-    __wt_free(session, metadata_value);
     return (ret);
 }
 
 /*
- * __disagg_save_meta --
+ * __disagg_save_checkpoint_meta --
  *     Update the local metadata entry with the supplied checkpoint configuration.
  */
 static int
-__disagg_save_meta(WT_SESSION_IMPL *session, WT_SESSION_IMPL *internal_session,
-  WT_CURSOR *md_cursor, const char *metadata_value, char **metadata_value_cfgp,
-  size_t *metadata_value_cfg_lenp)
+__disagg_save_checkpoint_meta(WT_SESSION_IMPL *session, WT_SESSION_IMPL *internal_session,
+  WT_CURSOR *md_cursor, const WT_DISAGG_METADATA *metadata)
 {
+    WT_DECL_ITEM(metadata_cfg);
     WT_DECL_RET;
-    size_t len;
-    char *cfg_ret, *metadata_value_cfg;
+    char *cfg_ret;
     const char *cfg[3], *current_value, *metadata_key;
 
     cfg_ret = NULL;
     metadata_key = WT_DISAGG_METADATA_URI;
-    metadata_value_cfg = *metadata_value_cfgp;
 
     /* Pull the value out. */
     md_cursor->set_key(md_cursor, metadata_key);
     WT_ERR(md_cursor->search(md_cursor));
     WT_ERR(md_cursor->get_value(md_cursor, &current_value));
 
-    /* Allocate/create a new config we're going to insert */
-    len = strlen("checkpoint=") + strlen(metadata_value) + 1 /* for NUL */;
-    WT_ERR(__wt_calloc_def(session, len, &metadata_value_cfg));
-    *metadata_value_cfg_lenp = len;
-    *metadata_value_cfgp = metadata_value_cfg;
-
-    WT_ERR(__wt_snprintf(metadata_value_cfg, len, "checkpoint=%s", metadata_value));
+    /* Create the new checkpoint config string. */
+    WT_ERR(__wt_scr_alloc(session, 0, &metadata_cfg));
+    WT_ERR(__wt_buf_fmt(session, metadata_cfg, "checkpoint=%.*s", (int)metadata->checkpoint_len,
+      metadata->checkpoint));
 
     cfg[0] = current_value;
-    cfg[1] = metadata_value_cfg;
+    cfg[1] = metadata_cfg->data;
     cfg[2] = NULL;
     WT_ERR(__wt_config_collapse(session, cfg, &cfg_ret));
 
@@ -641,11 +837,12 @@ __disagg_save_meta(WT_SESSION_IMPL *session, WT_SESSION_IMPL *internal_session,
     WT_ERR(__wt_metadata_insert(internal_session, metadata_key, cfg_ret));
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
-      "Updated the local metadata for key \"%s\" to include the new checkpoint: \"%s\"",
-      metadata_key, metadata_value);
+      "Updated the local metadata for key \"%s\" to include the new checkpoint: \"%.*s\"",
+      metadata_key, (int)metadata->checkpoint_len, metadata->checkpoint);
 
 err:
     __wt_free(session, cfg_ret);
+    __wt_scr_free(session, &metadata_cfg);
     return (ret);
 }
 
@@ -654,24 +851,21 @@ err:
  *     Process the metadata entries stored in the shared metadata table for a new checkpoint.
  */
 static int
-__disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT_META *ckpt_meta,
-  WT_SESSION_IMPL *internal_session, WT_CURSOR *md_cursor, char **metadata_value_cfgp,
-  size_t *metadata_value_cfg_lenp)
+__disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, WT_SESSION_IMPL *internal_session,
+  WT_CURSOR *md_cursor, const WT_DISAGG_CHECKPOINT_META *ckpt_meta)
 {
     WT_CONFIG_ITEM cval;
     WT_CURSOR *cursor;
+    WT_DECL_ITEM(metadata_cfg);
     WT_DECL_RET;
     WT_SESSION_IMPL *shared_metadata_session;
-    size_t len, metadata_value_cfg_len;
     uint32_t existing_tables, new_tables, new_ingest;
-    char *layered_ingest_uri, *cfg_ret, *metadata_value_cfg;
+    char *layered_ingest_uri, *cfg_ret;
     const char *cfg[3], *current_value, *metadata_key, *metadata_value;
 
     cursor = NULL;
     shared_metadata_session = NULL;
     layered_ingest_uri = cfg_ret = NULL;
-    metadata_value_cfg = *metadata_value_cfgp;
-    metadata_value_cfg_len = *metadata_value_cfg_lenp;
     existing_tables = new_tables = new_ingest = 0;
 
     /* We need a separate internal session to pick up the new checkpoint. */
@@ -693,6 +887,8 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
     cfg[1] = NULL;
     WT_ERR(__wt_open_cursor(shared_metadata_session, WT_DISAGG_METADATA_URI, NULL, cfg, &cursor));
 
+    WT_ERR(__wt_scr_alloc(session, 0, &metadata_cfg));
+
     while ((ret = cursor->next(cursor)) == 0) {
         WT_ERR(cursor->get_key(cursor, &metadata_key));
         WT_ERR(cursor->get_value(cursor, &metadata_value));
@@ -703,19 +899,12 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
         if (ret == 0 && WT_PREFIX_MATCH(metadata_key, "file:")) {
             /* Existing table: Just apply the new metadata. */
             WT_ERR(__wt_config_getones(session, metadata_value, "checkpoint", &cval));
-            len = strlen("checkpoint=") + strlen(metadata_value) + 1 /* for NUL */;
-            if (len > metadata_value_cfg_len) {
-                metadata_value_cfg_len = len;
-                WT_ERR(
-                  __wt_realloc_noclear(session, NULL, metadata_value_cfg_len, &metadata_value_cfg));
-            }
-            WT_ERR(
-              __wt_snprintf(metadata_value_cfg, len, "checkpoint=%.*s", (int)cval.len, cval.str));
+            WT_ERR(__wt_buf_fmt(session, metadata_cfg, "checkpoint=%.*s", (int)cval.len, cval.str));
 
             /* Merge the new checkpoint metadata into the current table metadata. */
             WT_ERR(md_cursor->get_value(md_cursor, &current_value));
             cfg[0] = current_value;
-            cfg[1] = metadata_value_cfg;
+            cfg[1] = metadata_cfg->data;
             cfg[2] = NULL;
             WT_ERR(__wt_config_collapse(session, cfg, &cfg_ret));
 
@@ -784,12 +973,10 @@ __disagg_apply_checkpoint_meta(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPO
       " new ingest tables",
       existing_tables, new_tables, new_ingest);
 
-    *metadata_value_cfgp = metadata_value_cfg;
-    *metadata_value_cfg_lenp = metadata_value_cfg_len;
-
 err:
     __wt_free(session, layered_ingest_uri);
     __wt_free(session, cfg_ret);
+    __wt_scr_free(session, &metadata_cfg);
     if (cursor != NULL)
         WT_TRET(cursor->close(cursor));
     if (shared_metadata_session != NULL)
@@ -802,11 +989,11 @@ err:
  *     Finalize checkpoint bookkeeping after processing shared metadata entries.
  */
 static int
-__disagg_update_checkpoint_meta(WT_SESSION_IMPL *session,
-  const WT_DISAGG_CHECKPOINT_META *ckpt_meta, WT_SESSION_IMPL *internal_session,
-  WT_CONNECTION_IMPL *conn, char *root, uint64_t checkpoint_timestamp)
+__disagg_update_checkpoint_meta(WT_SESSION_IMPL *session, WT_SESSION_IMPL *internal_session,
+  const WT_DISAGG_CHECKPOINT_META *ckpt_meta, const WT_DISAGG_METADATA *metadata)
 {
     WT_DECL_RET;
+    WT_CONNECTION_IMPL *conn = S2C(session);
 
     /*
      * Update the checkpoint metadata LSN. This doesn't require further synchronization, because the
@@ -817,15 +1004,17 @@ __disagg_update_checkpoint_meta(WT_SESSION_IMPL *session,
 
     /* Update the checkpoint timestamp. */
     __wt_atomic_store_uint64_release(
-      &conn->disaggregated_storage.last_checkpoint_timestamp, checkpoint_timestamp);
+      &conn->disaggregated_storage.last_checkpoint_timestamp, metadata->checkpoint_timestamp);
 
     /* Remember the root config of the last checkpoint. */
     __wt_free(session, conn->disaggregated_storage.last_checkpoint_root);
-    WT_ERR(__wt_strdup(session, root, &conn->disaggregated_storage.last_checkpoint_root));
+    WT_ERR(__wt_strndup(session, metadata->checkpoint, metadata->checkpoint_len,
+      &conn->disaggregated_storage.last_checkpoint_root));
 
     /* Update ingest tables' prune timestamps. */
     WT_ERR_MSG_CHK(session,
-      __layered_iterate_ingest_tables_for_gc_pruning(internal_session, checkpoint_timestamp),
+      __layered_iterate_ingest_tables_for_gc_pruning(
+        internal_session, metadata->checkpoint_timestamp),
       "Updating prune timestamp failed");
 
 err:
@@ -842,21 +1031,19 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *md_cursor;
     WT_DECL_RET;
+    WT_DISAGG_METADATA metadata;
+    WT_ITEM metadata_buf;
     WT_SESSION_IMPL *internal_session;
-    size_t metadata_value_cfg_len;
-    uint64_t checkpoint_timestamp, current_meta_lsn;
-    char *buf, *metadata_value, *metadata_value_cfg;
+    uint64_t current_meta_lsn;
     char ts_string[WT_TS_INT_STRING_SIZE];
 
     conn = S2C(session);
 
-    buf = NULL;
+    WT_CLEAR(ts_string);
+    WT_CLEAR(metadata_buf);
+    WT_CLEAR(metadata);
     internal_session = NULL;
     md_cursor = NULL;
-    metadata_value = NULL;
-    metadata_value_cfg = NULL;
-    metadata_value_cfg_len = 0;
-    checkpoint_timestamp = WT_TS_NONE;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
 
@@ -887,15 +1074,19 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
      * Part 1: Get the metadata of the shared metadata table and insert it into our metadata table.
      */
 
-    WT_ERR(__disagg_fetch_shared_meta(session, ckpt_meta, &buf));
-    WT_ERR(__disagg_load_checkpoint_meta(session, buf, &metadata_value, &checkpoint_timestamp));
+    WT_ERR(__disagg_fetch_shared_meta(session, ckpt_meta, &metadata_buf));
+    WT_ERR(__wti_disagg_parse_meta(session, &metadata_buf, &metadata));
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Picking up disaggregated storage checkpoint: metadata_lsn=%" PRIu64 ", timestamp=%" PRIu64
       " %s"
-      ", root=\"%s\"",
-      ckpt_meta->metadata_lsn, checkpoint_timestamp,
-      __wt_timestamp_to_string(checkpoint_timestamp, ts_string), metadata_value);
+      ", root=\"%.*s\"",
+      ckpt_meta->metadata_lsn, metadata.checkpoint_timestamp,
+      __wt_timestamp_to_string(metadata.checkpoint_timestamp, ts_string),
+      (int)metadata.checkpoint_len, metadata.checkpoint);
+
+    /* Load crypt key data with the key provider extension, if any. */
+    WT_ERR(__disagg_load_crypt_key(session, &metadata));
 
     /* We need an internal session when modifying metadata. */
     WT_ERR(__wt_open_internal_session(conn, "checkpoint-pick-up", false, 0, 0, &internal_session));
@@ -903,22 +1094,20 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     /* Open up a metadata cursor pointing at our table */
     WT_ERR(__wt_metadata_cursor(internal_session, &md_cursor));
 
-    WT_ERR(__disagg_save_meta(session, internal_session, md_cursor, metadata_value,
-      &metadata_value_cfg, &metadata_value_cfg_len));
+    /* Update our local metadata with the new checkpoint entry. */
+    WT_ERR(__disagg_save_checkpoint_meta(session, internal_session, md_cursor, &metadata));
 
     /*
      * Part 2: Apply the metadata for other tables from the shared metadata table.
      */
 
-    WT_ERR(__disagg_apply_checkpoint_meta(session, ckpt_meta, internal_session, md_cursor,
-      &metadata_value_cfg, &metadata_value_cfg_len));
+    WT_ERR(__disagg_apply_checkpoint_meta(session, internal_session, md_cursor, ckpt_meta));
 
     /*
      * Part 3: Do the bookkeeping.
      */
 
-    WT_ERR(__disagg_update_checkpoint_meta(
-      session, ckpt_meta, internal_session, conn, metadata_value, checkpoint_timestamp));
+    WT_ERR(__disagg_update_checkpoint_meta(session, internal_session, ckpt_meta, &metadata));
 
     /* Log the completion of the checkpoint pick-up. */
     __wt_verbose_debug1(session, WT_VERB_DISAGGREGATED_STORAGE,
@@ -941,9 +1130,7 @@ err:
     if (internal_session != NULL)
         WT_TRET(__wt_session_close_internal(internal_session));
 
-    __wt_free(session, metadata_value);
-    __wt_free(session, buf);
-    __wt_free(session, metadata_value_cfg);
+    __wt_buf_free(session, &metadata_buf);
 
     return (ret);
 }
