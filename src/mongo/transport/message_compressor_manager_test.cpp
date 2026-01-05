@@ -511,5 +511,149 @@ TEST(MessageCompressorManager, RuntMessage) {
     ASSERT_NOT_OK(status);
 }
 
+/**
+ * Test: Undersized zlib payload is rejected
+ * CVE-2025-14847 defense-in-depth: minimum payload size validation
+ */
+TEST(ZlibMessageCompressor, CVE2025_14847_RejectsUndersizedPayload) {
+    auto compressor = std::make_unique<ZlibMessageCompressor>();
+
+    // Payload smaller than kMinZlibPayloadSize (8 bytes)
+    std::vector<char> tooSmall = {0x78, 0x9c, 0x03, 0x00};  // Only 4 bytes
+    ConstDataRange input(tooSmall.data(), tooSmall.size());
+
+    std::vector<char> output(1024);
+    DataRange outputRange(output.data(), output.size());
+
+    auto result = compressor->decompressData(input, outputRange);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+}
+
+/**
+ * Test: Invalid zlib header is rejected
+ * CVE-2025-14847 defense-in-depth: header format validation
+ */
+TEST(ZlibMessageCompressor, CVE2025_14847_RejectsInvalidHeader) {
+    auto compressor = std::make_unique<ZlibMessageCompressor>();
+
+    // Invalid header: wrong compression method (not deflate)
+    std::vector<char> invalidHeader = {
+        0x70, 0x9c,  // Invalid CMF (method != 8)
+        0x63, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00};
+    ConstDataRange input(invalidHeader.data(), invalidHeader.size());
+
+    std::vector<char> output(1024);
+    DataRange outputRange(output.data(), output.size());
+
+    auto result = compressor->decompressData(input, outputRange);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+}
+
+/**
+ * Test: Excessive decompression ratio is rejected (zip bomb protection)
+ * CVE-2025-14847 defense-in-depth: ratio limit validation
+ */
+TEST(ZlibMessageCompressor, CVE2025_14847_RejectsZipBomb) {
+    auto compressor = std::make_unique<ZlibMessageCompressor>();
+
+    // Valid zlib header but requesting huge output buffer
+    std::vector<char> smallPayload = {
+        0x78, 0x9c,  // Valid zlib header
+        0x63, 0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01};
+    ConstDataRange input(smallPayload.data(), smallPayload.size());
+
+    // Request output buffer > 1024x input size
+    const size_t hugeSize = 20 * 1024 * 1024;  // 20 MB
+    std::vector<char> hugeOutput(hugeSize);
+    DataRange outputRange(hugeOutput.data(), hugeOutput.size());
+
+    auto result = compressor->decompressData(input, outputRange);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+}
+
+/**
+ * Test: Valid compression still works after hardening
+ * CVE-2025-14847: Ensure defense-in-depth doesn't break normal operation
+ */
+TEST(ZlibMessageCompressor, CVE2025_14847_ValidCompressionWorks) {
+    auto compressor = std::make_unique<ZlibMessageCompressor>();
+
+    const std::string testData = "Hello, MongoDB! CVE-2025-14847 hardening test.";
+    ConstDataRange input(testData.data(), testData.size());
+
+    // Compress
+    std::vector<char> compressed(compressor->getMaxCompressedSize(testData.size()));
+    DataRange compressedRange(compressed.data(), compressed.size());
+
+    auto compressResult = compressor->compressData(input, compressedRange);
+    ASSERT_OK(compressResult);
+    ASSERT_GT(compressResult.getValue(), 0u);
+
+    // Decompress
+    std::vector<char> decompressed(testData.size() + 100);
+    DataRange decompressedRange(decompressed.data(), decompressed.size());
+
+    ConstDataRange compressedInput(compressed.data(), compressResult.getValue());
+    auto decompressResult = compressor->decompressData(compressedInput, decompressedRange);
+
+    ASSERT_OK(decompressResult);
+    ASSERT_EQ(decompressResult.getValue(), testData.size());
+    ASSERT_EQ(memcmp(decompressed.data(), testData.data(), testData.size()), 0);
+}
+
+/**
+ * Test: Returned length is actual size, not buffer size
+ * CVE-2025-14847 root cause: length mismatch fix verification
+ */
+TEST(ZlibMessageCompressor, CVE2025_14847_ReturnsCorrectLength) {
+    auto compressor = std::make_unique<ZlibMessageCompressor>();
+
+    const std::string testData = "Short";
+    ConstDataRange input(testData.data(), testData.size());
+
+    // Compress
+    std::vector<char> compressed(compressor->getMaxCompressedSize(testData.size()));
+    DataRange compressedRange(compressed.data(), compressed.size());
+
+    auto compressResult = compressor->compressData(input, compressedRange);
+    ASSERT_OK(compressResult);
+
+    // Decompress into MUCH larger buffer
+    const size_t largeBufferSize = 10000;
+    std::vector<char> largeBuffer(largeBufferSize);
+    DataRange largeRange(largeBuffer.data(), largeBuffer.size());
+
+    ConstDataRange compressedInput(compressed.data(), compressResult.getValue());
+    auto decompressResult = compressor->decompressData(compressedInput, largeRange);
+
+    ASSERT_OK(decompressResult);
+
+    // CRITICAL: Must return actual decompressed length, NOT buffer size
+    // This is the exact bug that caused CVE-2025-14847
+    ASSERT_EQ(decompressResult.getValue(), testData.size());
+    ASSERT_NE(decompressResult.getValue(), largeBufferSize);
+}
+
+/**
+ * Test: Empty payload is rejected
+ * CVE-2025-14847 defense-in-depth: edge case handling
+ */
+TEST(ZlibMessageCompressor, CVE2025_14847_RejectsEmptyPayload) {
+    auto compressor = std::make_unique<ZlibMessageCompressor>();
+
+    std::vector<char> empty;
+    ConstDataRange input(empty.data(), empty.size());
+
+    std::vector<char> output(1024);
+    DataRange outputRange(output.data(), output.size());
+
+    auto result = compressor->decompressData(input, outputRange);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -45,6 +45,38 @@
 
 namespace mongo {
 
+    namespace {
+
+    // Minimum valid zlib compressed payload size (header + minimal data + checksum)
+    constexpr size_t kMinZlibPayloadSize = 8;
+
+    // Maximum allowed decompression ratio to prevent zip bombs
+    // A ratio above 1024:1 is suspicious for typical MongoDB messages
+    constexpr size_t kMaxDecompressionRatio = 1024;
+
+    // Validates zlib header bytes for correctness before decompression.
+    bool isValidZlibHeader(const Bytef* data, size_t length) {
+        if (length < 2) {
+            return false;
+        }
+        
+        uint8_t cmf = data[0];
+        uint8_t flg = data[1];
+        
+        // Check compression method is deflate (method 8)
+        if ((cmf & 0x0F) != 8) {
+            return false;
+        }
+        
+        // Check CMF and FLG checksum (must be multiple of 31)
+        if (((static_cast<uint16_t>(cmf) * 256 + flg) % 31) != 0) {
+            return false;
+        }
+        
+        return true;
+    }
+    }  // namespace
+
 ZlibMessageCompressor::ZlibMessageCompressor() : MessageCompressorBase(MessageCompressor::kZlib) {}
 
 std::size_t ZlibMessageCompressor::getMaxCompressedSize(size_t inputSize) {
@@ -69,6 +101,25 @@ StatusWith<std::size_t> ZlibMessageCompressor::compressData(ConstDataRange input
 
 StatusWith<std::size_t> ZlibMessageCompressor::decompressData(ConstDataRange input,
                                                               DataRange output) {
+    // Check 1: Minimum payload size
+    if (input.length() < kMinZlibPayloadSize) {
+        return Status{ErrorCodes::BadValue, 
+            "Compressed payload too small for valid zlib data"};
+    }
+    
+    // Check 2: Validate zlib header format
+    if (!isValidZlibHeader(reinterpret_cast<const Bytef*>(input.data()), 
+                           input.length())) {
+        return Status{ErrorCodes::BadValue, 
+            "Invalid zlib header format"};
+    }
+    
+    // Check 3: Decompression ratio sanity check (zip bomb protection)
+    if (output.length() > input.length() * kMaxDecompressionRatio) {
+        return Status{ErrorCodes::BadValue, 
+            "Requested decompression ratio exceeds safety limits"};
+    }
+    
     uLongf length = output.length();
     int ret = ::uncompress(const_cast<Bytef*>(reinterpret_cast<const Bytef*>(output.data())),
                            &length,
@@ -79,7 +130,9 @@ StatusWith<std::size_t> ZlibMessageCompressor::decompressData(ConstDataRange inp
         return Status{ErrorCodes::BadValue, "Compressed message was invalid or corrupted"};
     }
 
-    counterHitDecompress(input.length(), output.length());
+    // FIX: Use actual decompressed length for metrics
+    // Previous code incorrectly used output.length() (buffer size)
+    counterHitDecompress(input.length(), length);
     return {length};
 }
 
