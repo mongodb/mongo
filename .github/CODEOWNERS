@@ -1836,7 +1836,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/dbmessage* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/default_baton* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/diagnostic_printers_test.cpp @10gen/query-integration-observability @svc-auto-approve-bot
-/src/mongo/db/**/keypattern.h @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/**/keypattern* @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/**/error_labels* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/field_parser* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/db/**/generic_argument_util.* @10gen/server-programmability @svc-auto-approve-bot
@@ -2884,6 +2884,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/stats/**/change_stream* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /src/mongo/db/stats/**/system_buckets_metrics* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/stats/**/timer_stats* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/db/stats/**/counter_ops.h @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/storage/OWNERS.yml
 /src/mongo/db/storage/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot

@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 class AggJoinModelFixture : public AggregationContextFixture {

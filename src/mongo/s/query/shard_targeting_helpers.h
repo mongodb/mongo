@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

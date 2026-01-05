@@ -37,6 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <bitset>
@@ -45,7 +46,7 @@
 #include <memory>
 #include <utility>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 /**
  * This class represents the metadata that the query execution engine can associate with a
  * particular intermediate result (either index key or document) passing between execution stages.
@@ -559,4 +560,4 @@ using QueryMetadataBitSet = std::bitset<DocumentMetadataFields::MetaType::kNumFi
 // Prints the metadata's name to the given stream.
 std::ostream& operator<<(std::ostream& stream, DocumentMetadataFields::MetaType type);
 StringBuilder& operator<<(StringBuilder& sb, DocumentMetadataFields::MetaType type);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

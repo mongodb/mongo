@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/query/client_cursor/generic_cursor_gen.h"
+#include "mongo/util/modules.h"
 
 #include <ostream>
 

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <map>
@@ -41,7 +42,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class ValueComparator {
 public:
@@ -241,4 +242,4 @@ template <typename T>
 using ValueFlatUnorderedMap =
     absl::flat_hash_map<Value, T, ValueComparator::Hasher, ValueComparator::EqualTo>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

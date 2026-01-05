@@ -60,6 +60,7 @@ core:
     - src/mongo/executor/task_executor[._]*
     - src/mongo/executor/thread_pool[._]*
     - src/mongo/db/exec/scoped_timer*
+    - src/mongo/db/stats/counter_ops.h
 
 core.bson:
   files:
@@ -273,6 +274,7 @@ catalog_and_routing:
     - src/mongo/db/rs_local_client*
     - src/mongo/db/database_name[._]*
     - src/mongo/db/namespace_string[._]*
+    - src/mongo/db/stats/system_buckets_metrics*
     - src/mongo/util/namespace_string[._]*
     - src/mongo/util/database_name[._]*
 
@@ -375,6 +377,7 @@ transactions:
     - src/mongo/db/commands/*session*
     - src/mongo/dbtests/logical_sessions_tests.cpp
     - src/mongo/s/client_transport_observer_mongos*
+    - src/mongo/db/stats/read_preference_metrics.idl
 
 fcv:
   meta:
@@ -1074,6 +1077,7 @@ replication.server_rw_concerns:
     - src/mongo/db/repl/*speculative_majority_read_info*
     - src/mongo/db/stats/server_write_concern*
     - src/mongo/db/stats/server_read_concern*
+    - src/mongo/db/stats/read_concern_stats.idl
     - src/mongo/db/write_concern*
 
 replication.rs_aware_service:

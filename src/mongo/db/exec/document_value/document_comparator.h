@@ -34,13 +34,14 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <map>
 #include <set>
 
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class DocumentComparator {
 public:
@@ -203,4 +204,4 @@ template <typename T>
 using DocumentUnorderedMap =
     stdx::unordered_map<Document, T, DocumentComparator::Hasher, DocumentComparator::EqualTo>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

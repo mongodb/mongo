@@ -52,7 +52,7 @@ filters:
   - "diagnostic_printers_test.cpp":
     approvers:
       - 10gen/query-integration-observability
-  - "keypattern.h":
+  - "keypattern*":
     approvers:
       - 10gen/query-optimization
       - 10gen/query-execution

@@ -47,6 +47,7 @@
 #include "mongo/s/query/exec/router_stage_merge.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -57,7 +58,8 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+// TODO SERVER-111290: Remove 'CheckMetadataConsistencyCmd' dependency on this header.
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 
 DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(MergeCursors);
 
@@ -194,4 +196,4 @@ private:
     bool _ownCursors = true;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

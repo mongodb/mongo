@@ -30,10 +30,11 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Helper functions to operate on AtomicWord<long long> and int64_t interchangibly.
@@ -76,4 +77,4 @@ static void add(AtomicWord<long long>& counter, int64_t value) {
 }
 
 };  // namespace counter_ops
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

@@ -33,6 +33,7 @@
 #include "mongo/db/commands/query_cmd/bulk_write_crud_op.h"
 #include "mongo/db/commands/query_cmd/bulk_write_parser.h"
 #include "mongo/s/write_ops/write_command_ref.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace write_op_helpers {
