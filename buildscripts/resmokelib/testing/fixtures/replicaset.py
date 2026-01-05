@@ -1162,14 +1162,19 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         previous_value = primary_client.admin.command({"getParameter": 1, "ttlMonitorEnabled": 1})
         primary_client.admin.command({"setParameter": 1, "ttlMonitorEnabled": False})
 
-        coll = primary_client["test"]["validate.hook"].with_options(
-            write_concern=pymongo.write_concern.WriteConcern(w=len(self.nodes))
+        all_nodes_wc = pymongo.write_concern.WriteConcern(w=len(self.nodes))
+        coll = primary_client["test"]["validate.hook"].with_options(write_concern=all_nodes_wc)
+        res = primary_client.test.command(
+            {
+                "insert": "validate.hook",
+                "documents": [{"a": 1}],
+                "writeConcern": all_nodes_wc.document,
+            }
         )
-        res = primary_client.test.command({"insert": "validate.hook", "documents": [{"a": 1}]})
         clusterTime = res["opTime"]["ts"]
         coll.drop()
 
-        self.logger.info("Performing Internode Validation")
+        self.logger.info(f"Performing Internode Validation: atClusterTime={clusterTime}")
 
         # Collections we exclude from the hash comparisons. This is because these collections can contain different document contents for valid reasons (i.e. implicitly replicated, TTL indexes, updated by background threads, etc)
         excluded_config_collections = [
