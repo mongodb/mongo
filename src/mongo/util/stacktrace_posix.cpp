@@ -448,7 +448,24 @@ void StackTraceAddressMetadata::printTo(StackTraceSink& sink) const {
 
 size_t rawBacktrace(void** addrs, size_t capacity) {
 #if (MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND)
-    return ::unw_backtrace(addrs, capacity);
+    unw_context_t context;
+    if (unw_getcontext(&context) < 0)
+        return 0;
+    unw_cursor_t cursor;
+    if (unw_init_local(&cursor, &context) < 0)
+        return 0;
+    void** cur;
+    for (cur = addrs; cur < addrs + capacity;) {
+        if (unw_step(&cursor) <= 0)
+            break;
+        unw_word_t pc;
+        if (unw_get_reg(&cursor, UNW_REG_IP, &pc) < 0)
+            break;
+        if (pc == 0)
+            break;
+        *cur++ = reinterpret_cast<void*>(static_cast<uintptr_t>(pc));
+    }
+    return cur - addrs;
 #elif (MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_EXECINFO)
     return ::backtrace(addrs, capacity);
 #else
