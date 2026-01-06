@@ -7,8 +7,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=grpc
-REVISION="v1.59.5-mongo.1"
-VERSION="1.59.5"
+REVISION="v1.74.1"
+VERSION="1.74.1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/grpc
 PATCH_DIR=$(git rev-parse --show-toplevel)/src/third_party/grpc/patches
@@ -19,7 +19,7 @@ fi
 
 git clone --branch $REVISION https://github.com/mongodb-forks/grpc.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
-git apply $PATCH_DIR/*.patch
+#git apply $PATCH_DIR/*.patch
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
 rm -rf cmake
 rm -rf doc

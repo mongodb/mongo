@@ -62,7 +62,7 @@ mongo_cc_library(
         "//src/mongo/util/net:network",
         "//src/mongo/util/net:ssl_util",
         "//src/mongo/util/options_parser",
-        "//src/third_party/grpc:grpc++_reflection",
+        "@com_github_grpc_grpc//:grpc++_reflection",
     ],
 )
 
@@ -219,8 +219,8 @@ mongo_cc_unit_test(
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
         "//src/mongo/util:periodic_runner_factory",
-        "//src/third_party/grpc:grpc++_reflection",
-        "//src/third_party/protobuf",
+        "@com_github_grpc_grpc//:grpc++_reflection",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 
@@ -241,9 +241,9 @@ mongo_cc_unit_test(
         "core_test_cc_grpc",
         "core_test_strip_prefix_cc_grpc",
         "//src/mongo:base",
-        "//src/third_party/grpc:grpc++_reflection",
-        "//src/third_party/protobuf",
+        "@com_github_grpc_grpc//:grpc++_reflection",
         "@com_google_absl//absl/status",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 
@@ -257,7 +257,7 @@ mongo_cc_integration_test(
         "//src/mongo/transport:transport_layer_egress_init",
         "//src/mongo/transport:transport_layer_integration_test_fixture",
         "//src/mongo/util/net:ssl_options_server",
-        "//src/third_party/grpc:grpc++_reflection",
-        "//src/third_party/protobuf",
+        "@com_github_grpc_grpc//:grpc++_reflection",
+        "@com_google_protobuf//:protobuf",
     ],
 )

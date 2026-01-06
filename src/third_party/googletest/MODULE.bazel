@@ -1,0 +1,19 @@
+module(
+    name = "googletest",
+)
+
+bazel_dep(
+    name = "platforms",
+    version = "0.0.9",
+)
+
+bazel_dep(
+    name = "abseil-cpp",
+    version = "20250512.1",
+    repo_name = "com_google_absl",
+)
+
+bazel_dep(
+    name = "re2",
+    version = "2025-08-12",
+)

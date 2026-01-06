@@ -35,6 +35,6 @@ mongo_cc_library(
         "//src/third_party/opentelemetry-cpp/sdk:headers",
         "//src/third_party/opentelemetry-cpp/sdk/src/common:global_log_handler",
         "//src/third_party/opentelemetry-cpp/sdk/src/common:random",
-        "//src/third_party/zlib",
+        "@zlib",
     ],
 )

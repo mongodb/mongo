@@ -15,35 +15,30 @@
 #ifndef GRPC_SRC_CORE_LIB_EVENT_ENGINE_POSIX_ENGINE_EV_POLL_POSIX_H
 #define GRPC_SRC_CORE_LIB_EVENT_ENGINE_POSIX_ENGINE_EV_POLL_POSIX_H
 
+#include <grpc/event_engine/event_engine.h>
 #include <grpc/support/port_platform.h>
 
-#include <atomic>
 #include <memory>
 #include <string>
 
 #include "absl/base/thread_annotations.h"
 #include "absl/functional/function_ref.h"
 #include "absl/strings/string_view.h"
-
-#include <grpc/event_engine/event_engine.h>
-
-#include "src/core/lib/event_engine/forkable.h"
 #include "src/core/lib/event_engine/poller.h"
 #include "src/core/lib/event_engine/posix_engine/event_poller.h"
 #include "src/core/lib/event_engine/posix_engine/wakeup_fd_posix.h"
-#include "src/core/lib/gprpp/sync.h"
+#include "src/core/util/sync.h"
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 class PollEventHandle;
 
 // Definition of poll based poller.
-class PollPoller : public PosixEventPoller, public Forkable {
+class PollPoller : public PosixEventPoller,
+                   public std::enable_shared_from_this<PollPoller> {
  public:
-  explicit PollPoller(Scheduler* scheduler);
-  PollPoller(Scheduler* scheduler, bool use_phony_poll);
-  EventHandle* CreateHandle(int fd, absl::string_view name,
+  explicit PollPoller(Scheduler* scheduler, bool use_phony_poll = false);
+  EventHandle* CreateHandle(FileDescriptor fd, absl::string_view name,
                             bool track_err) override;
   Poller::WorkResult Work(
       grpc_event_engine::experimental::EventEngine::Duration timeout,
@@ -51,24 +46,17 @@ class PollPoller : public PosixEventPoller, public Forkable {
   std::string Name() override { return "poll"; }
   void Kick() override;
   Scheduler* GetScheduler() { return scheduler_; }
-  void Shutdown() override;
   bool CanTrackErrors() const override { return false; }
   ~PollPoller() override;
 
-  // Forkable
-  void PrepareFork() override;
-  void PostforkParent() override;
-  void PostforkChild() override;
-
   void Close();
 
+#ifdef GRPC_ENABLE_FORK_SUPPORT
+  void HandleForkInChild() override;
+#endif  // GRPC_ENABLE_FORK_SUPPORT
+  void ResetKickState() override;
+
  private:
-  void Ref() { ref_count_.fetch_add(1, std::memory_order_relaxed); }
-  void Unref() {
-    if (ref_count_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-      delete this;
-    }
-  }
   void KickExternal(bool ext);
   void PollerHandlesListAddHandle(PollEventHandle* handle)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
@@ -84,7 +72,6 @@ class PollPoller : public PosixEventPoller, public Forkable {
   };
   grpc_core::Mutex mu_;
   Scheduler* scheduler_;
-  std::atomic<int> ref_count_{1};
   bool use_phony_poll_;
   bool was_kicked_ ABSL_GUARDED_BY(mu_);
   bool was_kicked_ext_ ABSL_GUARDED_BY(mu_);
@@ -98,9 +85,9 @@ class PollPoller : public PosixEventPoller, public Forkable {
 // It use_phony_poll is true, it implies that the poller is declared
 // non-polling and any attempt to schedule a blocking poll will result in a
 // crash failure.
-PollPoller* MakePollPoller(Scheduler* scheduler, bool use_phony_poll);
+std::shared_ptr<PollPoller> MakePollPoller(Scheduler* scheduler,
+                                           bool use_phony_poll);
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental
 
 #endif  // GRPC_SRC_CORE_LIB_EVENT_ENGINE_POSIX_ENGINE_EV_POLL_POSIX_H

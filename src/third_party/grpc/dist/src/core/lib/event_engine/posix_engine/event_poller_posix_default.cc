@@ -14,17 +14,17 @@
 
 #include <grpc/support/port_platform.h>
 
+#include <memory>
+
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-
-#include "src/core/lib/config/config_vars.h"
+#include "src/core/config/config_vars.h"
 #include "src/core/lib/event_engine/posix_engine/ev_epoll1_linux.h"
 #include "src/core/lib/event_engine/posix_engine/ev_poll_posix.h"
 #include "src/core/lib/event_engine/posix_engine/event_poller.h"
 #include "src/core/lib/iomgr/port.h"
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 #ifdef GRPC_POSIX_SOCKET_TCP
 namespace {
@@ -32,11 +32,10 @@ namespace {
 bool PollStrategyMatches(absl::string_view strategy, absl::string_view want) {
   return strategy == "all" || strategy == want;
 }
-
 }  // namespace
 
-PosixEventPoller* MakeDefaultPoller(Scheduler* scheduler) {
-  PosixEventPoller* poller = nullptr;
+std::shared_ptr<PosixEventPoller> MakeDefaultPoller(Scheduler* scheduler) {
+  std::shared_ptr<PosixEventPoller> poller;
   auto strings =
       absl::StrSplit(grpc_core::ConfigVars::Get().PollStrategy(), ',');
   for (auto it = strings.begin(); it != strings.end() && poller == nullptr;
@@ -58,11 +57,10 @@ PosixEventPoller* MakeDefaultPoller(Scheduler* scheduler) {
 
 #else  // GRPC_POSIX_SOCKET_TCP
 
-PosixEventPoller* MakeDefaultPoller(Scheduler* /*scheduler*/) {
+std::shared_ptr<PosixEventPoller> MakeDefaultPoller(Scheduler* /*scheduler*/) {
   return nullptr;
 }
 
 #endif  // GRPC_POSIX_SOCKET_TCP
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental

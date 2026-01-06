@@ -1803,6 +1803,9 @@ def _impl(ctx):
                 flag_groups = [flag_group(flags = [
                     "-Wno-attributes",
                     "-Wno-implicit-fallthrough",
+                    "-Wno-uninitialized",
+                    "-Wno-sign-compare",
+                    "-Wno-unused-result",
                 ])],
             ),
         ],

@@ -1,0 +1,438 @@
+# Copyright 2009 The RE2 Authors.  All Rights Reserved.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file.
+
+# Bazel (http://bazel.build/) BUILD file for RE2.
+
+licenses(["notice"])
+
+exports_files(["LICENSE"])
+
+cc_library(
+    name = "re2",
+    srcs = [
+        "re2/bitmap256.cc",
+        "re2/bitmap256.h",
+        "re2/bitstate.cc",
+        "re2/compile.cc",
+        "re2/dfa.cc",
+        "re2/filtered_re2.cc",
+        "re2/mimics_pcre.cc",
+        "re2/nfa.cc",
+        "re2/onepass.cc",
+        "re2/parse.cc",
+        "re2/perl_groups.cc",
+        "re2/pod_array.h",
+        "re2/prefilter.cc",
+        "re2/prefilter.h",
+        "re2/prefilter_tree.cc",
+        "re2/prefilter_tree.h",
+        "re2/prog.cc",
+        "re2/prog.h",
+        "re2/re2.cc",
+        "re2/regexp.cc",
+        "re2/regexp.h",
+        "re2/set.cc",
+        "re2/simplify.cc",
+        "re2/sparse_array.h",
+        "re2/sparse_set.h",
+        "re2/tostring.cc",
+        "re2/unicode_casefold.cc",
+        "re2/unicode_casefold.h",
+        "re2/unicode_groups.cc",
+        "re2/unicode_groups.h",
+        "re2/walker-inl.h",
+        "util/rune.cc",
+        "util/strutil.cc",
+        "util/strutil.h",
+        "util/utf.h",
+    ],
+    hdrs = [
+        "re2/filtered_re2.h",
+        "re2/re2.h",
+        "re2/set.h",
+        "re2/stringpiece.h",
+    ],
+    copts = select({
+        # WebAssembly support for threads is... fraught at every level.
+        "@platforms//cpu:wasm32": [],
+        "@platforms//cpu:wasm64": [],
+        "@platforms//os:emscripten": [],
+        "@platforms//os:wasi": [],
+        "@platforms//os:windows": [],
+        "//conditions:default": ["-pthread"],
+    }),
+    linkopts = select({
+        # macOS doesn't need `-pthread' when linking and it appears that
+        # older versions of Clang will warn about the unused command line
+        # argument, so just don't pass it.
+        "@platforms//os:macos": [],
+        # WebAssembly support for threads is... fraught at every level.
+        "@platforms//cpu:wasm32": [],
+        "@platforms//cpu:wasm64": [],
+        "@platforms//os:emscripten": [],
+        "@platforms//os:wasi": [],
+        "@platforms//os:windows": [],
+        "//conditions:default": ["-pthread"],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:fixed_array",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/types:optional",
+        "@abseil-cpp//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "testing",
+    testonly = 1,
+    srcs = [
+        "re2/testing/backtrack.cc",
+        "re2/testing/dump.cc",
+        "re2/testing/exhaustive_tester.cc",
+        "re2/testing/null_walker.cc",
+        "re2/testing/regexp_generator.cc",
+        "re2/testing/string_generator.cc",
+        "re2/testing/tester.cc",
+        "util/pcre.cc",
+    ],
+    hdrs = [
+        "re2/testing/exhaustive_tester.h",
+        "re2/testing/regexp_generator.h",
+        "re2/testing/string_generator.h",
+        "re2/testing/tester.h",
+        "util/malloc_counter.h",
+        "util/pcre.h",
+
+        # Exposed for testing only.
+        "re2/bitmap256.h",
+        "re2/pod_array.h",
+        "re2/prefilter.h",
+        "re2/prefilter_tree.h",
+        "re2/prog.h",
+        "re2/regexp.h",
+        "re2/sparse_array.h",
+        "re2/sparse_set.h",
+        "re2/unicode_casefold.h",
+        "re2/unicode_groups.h",
+        "re2/walker-inl.h",
+        "util/strutil.h",
+        "util/utf.h",
+    ],
+    visibility = [":__subpackages__"],
+    deps = [
+        ":re2",
+        "@abseil-cpp//absl/base",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@googletest//:gtest",
+    ],
+)
+
+cc_test(
+    name = "charclass_test",
+    size = "small",
+    srcs = ["re2/testing/charclass_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/strings:str_format",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "compile_test",
+    size = "small",
+    srcs = ["re2/testing/compile_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/strings",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "filtered_re2_test",
+    size = "small",
+    srcs = ["re2/testing/filtered_re2_test.cc"],
+    deps = [
+        ":re2",
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "mimics_pcre_test",
+    size = "small",
+    srcs = ["re2/testing/mimics_pcre_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "parse_test",
+    size = "small",
+    srcs = ["re2/testing/parse_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "possible_match_test",
+    size = "small",
+    srcs = ["re2/testing/possible_match_test.cc"],
+    deps = [
+        ":re2",
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/strings",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "re2_arg_test",
+    size = "small",
+    srcs = ["re2/testing/re2_arg_test.cc"],
+    deps = [
+        ":re2",
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/types:optional",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "re2_test",
+    size = "small",
+    srcs = ["re2/testing/re2_test.cc"],
+    deps = [
+        ":re2",
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "regexp_test",
+    size = "small",
+    srcs = ["re2/testing/regexp_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "required_prefix_test",
+    size = "small",
+    srcs = ["re2/testing/required_prefix_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "search_test",
+    size = "small",
+    srcs = ["re2/testing/search_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "set_test",
+    size = "small",
+    srcs = ["re2/testing/set_test.cc"],
+    deps = [
+        ":re2",
+        ":testing",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "simplify_test",
+    size = "small",
+    srcs = ["re2/testing/simplify_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "string_generator_test",
+    size = "small",
+    srcs = ["re2/testing/string_generator_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/strings",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "dfa_test",
+    size = "large",
+    srcs = ["re2/testing/dfa_test.cc"],
+    deps = [
+        ":re2",
+        ":testing",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "exhaustive1_test",
+    size = "large",
+    srcs = ["re2/testing/exhaustive1_test.cc"],
+    deps = [
+        ":testing",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "exhaustive2_test",
+    size = "large",
+    srcs = ["re2/testing/exhaustive2_test.cc"],
+    deps = [
+        ":testing",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "exhaustive3_test",
+    size = "large",
+    srcs = ["re2/testing/exhaustive3_test.cc"],
+    deps = [
+        ":testing",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "exhaustive_test",
+    size = "large",
+    srcs = ["re2/testing/exhaustive_test.cc"],
+    deps = [
+        ":testing",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "random_test",
+    size = "large",
+    srcs = ["re2/testing/random_test.cc"],
+    deps = [
+        ":testing",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/strings:str_format",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_binary(
+    name = "regexp_benchmark",
+    testonly = 1,
+    srcs = ["re2/testing/regexp_benchmark.cc"],
+    deps = [
+        ":re2",
+        ":testing",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@abseil-cpp//absl/synchronization",
+        "@google_benchmark//:benchmark_main",
+    ],
+)

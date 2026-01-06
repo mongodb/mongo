@@ -17,15 +17,15 @@
 
 #include <grpc/support/port_platform.h>
 
+#include <optional>
 #include <type_traits>
-#include <utility>
 
 #include "absl/functional/any_invocable.h"
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
-
 #include "src/core/lib/promise/detail/promise_like.h"
 #include "src/core/lib/promise/poll.h"
+#include "src/core/util/function_signature.h"
+#include "src/core/util/json/json.h"
 
 namespace grpc_core {
 
@@ -39,7 +39,7 @@ using Promise = absl::AnyInvocable<Poll<T>()>;
 // nothing.
 template <typename Promise>
 auto NowOrNever(Promise promise)
-    -> absl::optional<typename promise_detail::PromiseLike<Promise>::Result> {
+    -> std::optional<typename promise_detail::PromiseLike<Promise>::Result> {
   auto r = promise_detail::PromiseLike<Promise>(std::move(promise))();
   if (auto* p = r.value_if_ready()) {
     return std::move(*p);
@@ -58,9 +58,12 @@ namespace promise_detail {
 template <typename T>
 class Immediate {
  public:
-  explicit Immediate(T value) : value_(std::move(value)) {}
+  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit Immediate(T value)
+      : value_(std::move(value)) {}
 
-  Poll<T> operator()() { return std::move(value_); }
+  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Poll<T> operator()() {
+    return std::move(value_);
+  }
 
  private:
   T value_;
@@ -69,26 +72,33 @@ class Immediate {
 
 // Return \a value immediately
 template <typename T>
-promise_detail::Immediate<T> Immediate(T value) {
+GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline promise_detail::Immediate<T>
+Immediate(T value) {
   return promise_detail::Immediate<T>(std::move(value));
 }
 
 // Return status Ok immediately
 struct ImmediateOkStatus {
-  Poll<absl::Status> operator()() { return absl::OkStatus(); }
+  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Poll<absl::Status> operator()() {
+    return absl::OkStatus();
+  }
 };
 
 // Typecheck that a promise returns the expected return type.
-// usage: auto promise = WithResult<int>([]() { return 3; });
+// usage: auto promise = AssertResultType<int>([]() { return 3; });
 // NOTE: there are tests in promise_test.cc that are commented out because they
 // should fail to compile. When modifying this code these should be uncommented
 // and their miscompilation verified.
 template <typename T, typename F>
-auto WithResult(F f) ->
+GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline auto AssertResultType(F f) ->
     typename std::enable_if<std::is_same<decltype(f()), Poll<T>>::value,
                             F>::type {
   return f;
 }
+
+template <typename Promise>
+using PromiseResult = typename PollTraits<
+    typename promise_detail::PromiseLike<Promise>::Result>::Type;
 
 }  // namespace grpc_core
 

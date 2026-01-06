@@ -7,7 +7,7 @@ IFS=$'\n\t'
 set -vx
 
 NAME=protobuf
-VERSION="v4.25.0"
+VERSION="v31.1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf
 PATCH_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf/patches
@@ -18,7 +18,7 @@ fi
 
 git clone --branch $VERSION https://github.com/mongodb-forks/protobuf.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
-git apply $PATCH_DIR/*.patch
+#git apply $PATCH_DIR/*.patch
 rm -rf benchmarks
 rm -rf cmake
 rm -rf conformance
@@ -38,6 +38,7 @@ rm -rf php
 rm -rf python
 rm -rf ruby
 rm -rf rust
+rm -rf compatibility
 
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
 find . -type d -name "Google.Protobuf.Test" -exec rm -rf {} \;

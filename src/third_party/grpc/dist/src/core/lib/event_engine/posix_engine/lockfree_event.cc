@@ -11,22 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include <grpc/support/port_platform.h>
-
 #include "src/core/lib/event_engine/posix_engine/lockfree_event.h"
+
+#include <grpc/support/atm.h>
+#include <grpc/support/port_platform.h>
 
 #include <atomic>
 #include <cstdint>
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
-
-#include <grpc/support/atm.h>
-#include <grpc/support/log.h>
-
 #include "src/core/lib/event_engine/posix_engine/event_poller.h"
 #include "src/core/lib/event_engine/posix_engine/posix_engine_closure.h"
-#include "src/core/lib/gprpp/crash.h"
-#include "src/core/lib/gprpp/status_helper.h"
+#include "src/core/util/crash.h"
+#include "src/core/util/status_helper.h"
 
 //  'state' holds the to call when the fd is readable or writable respectively.
 //    It can contain one of the following values:
@@ -59,8 +57,7 @@
 //     For 2, 3 : See NotifyOn() function
 //     For 5,6,7: See SetShutdown() function
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 void LockfreeEvent::InitEvent() {
   // Perform an atomic store to start the state machine.
@@ -79,7 +76,7 @@ void LockfreeEvent::DestroyEvent() {
     if (curr & kShutdownBit) {
       grpc_core::internal::StatusFreeHeapPtr(curr & ~kShutdownBit);
     } else {
-      GPR_ASSERT(curr == kClosureNotReady || curr == kClosureReady);
+      CHECK(curr == kClosureNotReady || curr == kClosureReady);
     }
     // we CAS in a shutdown, no error value here. If this event is interacted
     // with post-deletion (see the note in the constructor) we want the bit
@@ -250,5 +247,4 @@ void LockfreeEvent::SetReady() {
   }
 }
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental

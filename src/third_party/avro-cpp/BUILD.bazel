@@ -44,7 +44,7 @@ mongo_cc_library(
     target_compatible_with = TARGET_COMPATIBILITY,
     deps = [
         "//src/third_party/fmt",
-        "//src/third_party/zlib",
+        "@zlib",
         "//src/mongo/util:boost_assert_shim",  # Required when using boost headers
         "//src/third_party/boost:boost_program_options",  # For boost/program_options.hpp
         "//src/third_party/boost:boost_iostreams",  # For boost/iostreams/*

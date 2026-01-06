@@ -1,8 +1,6 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
-
 package(default_visibility = ["//visibility:public"])
 
-mongo_cc_library(
+cc_library(
     name = "zlib",
     srcs = [
         "adler32.c",
@@ -19,10 +17,8 @@ mongo_cc_library(
     ],
     hdrs = glob(["*.h"]),
     copts = select({
-        "@//bazel/config:not_windows": [
-            "-Wno-implicit-fallthrough",
-        ],
-        "//conditions:default": [],
+        "@platforms//os:windows": [],
+        "//conditions:default": ["-Wno-implicit-fallthrough"],
     }),
     includes = ["."],
     local_defines = select({

@@ -15,25 +15,22 @@
 #ifndef GRPC_SRC_CORE_LIB_SLICE_SLICE_H
 #define GRPC_SRC_CORE_LIB_SLICE_SLICE_H
 
+#include <grpc/event_engine/internal/slice_cast.h>
+#include <grpc/event_engine/slice.h>
+#include <grpc/slice.h>
 #include <grpc/support/port_platform.h>
-
 #include <string.h>
 
 #include <cstdint>
 #include <string>
 #include <utility>
 
+#include "absl/log/check.h"
 #include "absl/strings/string_view.h"
-
-#include <grpc/event_engine/internal/slice_cast.h>
-#include <grpc/event_engine/slice.h>
-#include <grpc/slice.h>
-#include <grpc/support/log.h>
-
-#include "src/core/lib/gpr/string.h"
-#include "src/core/lib/gprpp/debug_location.h"
 #include "src/core/lib/slice/slice_internal.h"
 #include "src/core/lib/slice/slice_refcount.h"
+#include "src/core/util/debug_location.h"
+#include "src/core/util/string.h"
 
 // Herein lies grpc_core::Slice and its team of thin wrappers around grpc_slice.
 // They aim to keep you safe by providing strong guarantees around lifetime and
@@ -244,7 +241,7 @@ class StaticSlice : public slice_detail::BaseSlice,
   StaticSlice() = default;
   explicit StaticSlice(const grpc_slice& slice)
       : slice_detail::BaseSlice(slice) {
-    GPR_DEBUG_ASSERT(slice.refcount == grpc_slice_refcount::NoopRefcount());
+    DCHECK(slice.refcount == grpc_slice_refcount::NoopRefcount());
   }
 
   StaticSlice(const StaticSlice& other)
@@ -268,7 +265,7 @@ class GPR_MSVC_EMPTY_BASE_CLASS_WORKAROUND MutableSlice
   MutableSlice() = default;
   explicit MutableSlice(const grpc_slice& slice)
       : slice_detail::BaseSlice(slice) {
-    GPR_DEBUG_ASSERT(slice.refcount == nullptr || slice.refcount->IsUnique());
+    DCHECK(slice.refcount == nullptr || slice.refcount->IsUnique());
   }
   ~MutableSlice() { CSliceUnref(c_slice()); }
 
@@ -294,7 +291,12 @@ class GPR_MSVC_EMPTY_BASE_CLASS_WORKAROUND MutableSlice
   // Split this slice in two, returning the first n bytes and leaving the
   // remainder.
   MutableSlice TakeFirst(size_t n) {
-    return MutableSlice(grpc_slice_split_head(c_slice_ptr(), n));
+    return MutableSlice(NoCheck{}, grpc_slice_split_head(c_slice_ptr(), n));
+  }
+
+  MutableSlice TakeFirstNoInline(size_t n) {
+    return MutableSlice(NoCheck{},
+                        grpc_slice_split_head_no_inline(c_slice_ptr(), n));
   }
 
   // Iterator access to the underlying bytes
@@ -306,6 +308,11 @@ class GPR_MSVC_EMPTY_BASE_CLASS_WORKAROUND MutableSlice
   uint8_t& operator[](size_t i) { return mutable_data()[i]; }
 
   using slice_detail::BaseSlice::c_slice_ptr;
+
+ private:
+  struct NoCheck {};
+  MutableSlice(NoCheck, const grpc_slice& slice)
+      : slice_detail::BaseSlice(slice) {}
 };
 
 class GPR_MSVC_EMPTY_BASE_CLASS_WORKAROUND Slice
@@ -429,6 +436,12 @@ class GPR_MSVC_EMPTY_BASE_CLASS_WORKAROUND Slice
 
   static Slice FromExternalString(absl::string_view str) {
     return FromStaticString(str);
+  }
+
+  static Slice ZeroContentsWithLength(size_t length) {
+    grpc_slice backing = grpc_slice_malloc(length);
+    memset(GRPC_SLICE_START_PTR(backing), 0, length);
+    return Slice(backing);
   }
 };
 

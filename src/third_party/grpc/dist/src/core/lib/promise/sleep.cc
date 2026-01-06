@@ -12,20 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <grpc/support/port_platform.h>
-
 #include "src/core/lib/promise/sleep.h"
+
+#include <grpc/event_engine/event_engine.h>
+#include <grpc/support/port_platform.h>
 
 #include <utility>
 
-#include <grpc/event_engine/event_engine.h>
-
-#include "src/core/lib/event_engine/default_event_engine.h"  // IWYU pragma: keep
-#include "src/core/lib/gprpp/time.h"
+#include "src/core/lib/event_engine/event_engine_context.h"  // IWYU pragma: keep
 #include "src/core/lib/iomgr/exec_ctx.h"
 #include "src/core/lib/promise/activity.h"
 #include "src/core/lib/promise/context.h"
 #include "src/core/lib/promise/poll.h"
+#include "src/core/util/time.h"
 
 namespace grpc_core {
 
@@ -38,9 +37,12 @@ Sleep::~Sleep() {
 }
 
 Poll<absl::Status> Sleep::operator()() {
-  // Invalidate now so that we see a fresh version of the time.
-  // TODO(ctiller): the following can be safely removed when we remove ExecCtx.
-  ExecCtx::Get()->InvalidateNow();
+  if (!IsSleepPromiseExecCtxRemovalEnabled()) {
+    // Invalidate now so that we see a fresh version of the time.
+    // TODO(ctiller): the following can be safely removed when we remove
+    // ExecCtx.
+    ExecCtx::Get()->InvalidateNow();
+  }
   const auto now = Timestamp::Now();
   // If the deadline is earlier than now we can just return.
   if (deadline_ <= now) return absl::OkStatus();
@@ -54,12 +56,12 @@ Poll<absl::Status> Sleep::operator()() {
 }
 
 Sleep::ActiveClosure::ActiveClosure(Timestamp deadline)
-    : waker_(Activity::current()->MakeOwningWaker()),
-      timer_handle_(GetContext<EventEngine>()->RunAfter(
-          deadline - Timestamp::Now(), this)) {}
+    : waker_(GetContext<Activity>()->MakeOwningWaker()),
+      event_engine_(GetContext<EventEngine>()->shared_from_this()),
+      timer_handle_(
+          event_engine_->RunAfter(deadline - Timestamp::Now(), this)) {}
 
 void Sleep::ActiveClosure::Run() {
-  ApplicationCallbackExecCtx callback_exec_ctx;
   ExecCtx exec_ctx;
   auto waker = std::move(waker_);
   if (Unref()) {

@@ -20,17 +20,17 @@
 #define GRPC_SRC_CORE_TSI_TRANSPORT_SECURITY_H
 
 #include <grpc/support/port_platform.h>
-
 #include <stdbool.h>
 
 #include "src/core/lib/debug/trace.h"
 #include "src/core/tsi/transport_security_interface.h"
 
-extern grpc_core::TraceFlag tsi_tracing_enabled;
-
 // Base for tsi_frame_protector implementations.
 // See transport_security_interface.h for documentation.
 // All methods must be implemented.
+// Implementations must provide the following thread-safety guarantees:
+// - protect and unprotect can be called concurrently,
+// - protect_flush and unprotect can be called concurrently.
 struct tsi_frame_protector_vtable {
   tsi_result (*protect)(tsi_frame_protector* self,
                         const unsigned char* unprotected_bytes,

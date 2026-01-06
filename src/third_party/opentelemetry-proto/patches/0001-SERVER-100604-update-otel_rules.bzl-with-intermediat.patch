@@ -28,7 +28,7 @@ index 31feebb9fb7..611db43259f 100644
          cc_deps = [":" + proto_cc_name],
          copts = OTEL_COPTS,
          deps = [
-             "//src/third_party/protobuf",
+             "@com_google_protobuf//:protobuf",
          ],
 +        no_undefined_ref_DO_NOT_USE = False,
      )

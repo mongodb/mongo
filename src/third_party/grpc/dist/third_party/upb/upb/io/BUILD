@@ -1,13 +1,11 @@
-# begin:google_only
-# package(default_applicable_licenses = ["//:license"])
-# end:google_only
+package(default_applicable_licenses = ["//:license"])
 
 cc_library(
     name = "string",
     hdrs = ["string.h"],
     deps = [
-        "//:mem",
-        "//:port",
+        "//upb/mem",
+        "//upb:port",
     ],
 )
 
@@ -18,10 +16,10 @@ cc_library(
     deps = [
         ":string",
         ":zero_copy_stream",
-        "//:base",
-        "//:lex",
-        "//:mem",
-        "//:port",
+        "//upb/base",
+        "//upb/mem",
+        "//upb:port",
+        "//upb/lex",
     ],
 )
 
@@ -32,9 +30,9 @@ cc_library(
         "zero_copy_output_stream.h",
     ],
     deps = [
-        "//:base",
-        "//:mem",
-        "//:port",
+        "//upb/base",
+        "//upb/mem",
+        "//upb:port",
     ],
 )
 
@@ -53,8 +51,8 @@ cc_library(
     ],
     deps = [
         ":zero_copy_stream",
-        "//:upb",
-        "//:port",
+        "//upb/mem",
+        "//upb:port",
     ],
 )
 
@@ -64,8 +62,9 @@ cc_test(
     srcs = ["string_test.cc"],
     deps = [
         ":string",
-        "//:upb",
-        "@com_google_googletest//:gtest_main",
+        "//upb/mem",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -78,12 +77,13 @@ cc_test(
         ":string",
         ":tokenizer",
         ":zero_copy_stream",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "//:upb",
-        "//:lex",
-        "//:port",
-        "@com_google_googletest//:gtest_main",
+        "//upb/mem",
+        "//upb:port",
+        "//upb/lex",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -96,7 +96,9 @@ cc_test(
     deps = [
         ":chunked_stream",
         ":zero_copy_stream",
-        "//:upb",
-        "@com_google_googletest//:gtest_main",
+        "//upb/base",
+        "//upb/mem",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
     ],
 )

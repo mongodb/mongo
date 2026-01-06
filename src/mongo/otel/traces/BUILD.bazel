@@ -104,7 +104,7 @@ mongo_cc_library(
         "//src/third_party/opentelemetry-cpp/sdk/src/trace",
         "//src/third_party/opentelemetry-proto:resource_proto_cc",
         "//src/third_party/opentelemetry-proto:trace_proto_cc",
-        "//src/third_party/protobuf",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 

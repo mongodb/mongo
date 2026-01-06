@@ -1090,7 +1090,7 @@ mongo_cc_library(
     target_compatible_with = TARGET_COMPATIBILITY,
     deps = [
         "aws-crt-cpp",
-        "//src/third_party/zlib",
+        "@zlib",
     ],
 )
 

@@ -12,108 +12,365 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <grpc/support/port_platform.h>
-
 #include "src/core/ext/transport/chaotic_good/client_transport.h"
 
+#include <grpc/event_engine/event_engine.h>
+#include <grpc/grpc.h>
+#include <grpc/slice.h>
+#include <grpc/support/port_platform.h>
+
+#include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <tuple>
+#include <utility>
 
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "absl/random/bit_gen_ref.h"
+#include "absl/random/random.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
-
-#include <grpc/event_engine/event_engine.h>
-#include <grpc/slice.h>
-#include <grpc/support/log.h>
-
 #include "src/core/ext/transport/chaotic_good/frame.h"
 #include "src/core/ext/transport/chaotic_good/frame_header.h"
-#include "src/core/ext/transport/chttp2/transport/hpack_encoder.h"
-#include "src/core/lib/gprpp/match.h"
-#include "src/core/lib/promise/activity.h"
-#include "src/core/lib/promise/event_engine_wakeup_scheduler.h"
-#include "src/core/lib/promise/join.h"
+#include "src/core/ext/transport/chaotic_good/frame_transport.h"
+#include "src/core/lib/event_engine/event_engine_context.h"
+#include "src/core/lib/event_engine/query_extensions.h"
+#include "src/core/lib/iomgr/exec_ctx.h"
 #include "src/core/lib/promise/loop.h"
-#include "src/core/lib/slice/slice.h"
+#include "src/core/lib/promise/map.h"
+#include "src/core/lib/promise/switch.h"
+#include "src/core/lib/promise/try_seq.h"
+#include "src/core/lib/resource_quota/arena.h"
+#include "src/core/lib/resource_quota/resource_quota.h"
 #include "src/core/lib/slice/slice_buffer.h"
-#include "src/core/lib/slice/slice_internal.h"
 #include "src/core/lib/transport/promise_endpoint.h"
+#include "src/core/util/ref_counted_ptr.h"
 
 namespace grpc_core {
 namespace chaotic_good {
 
-ClientTransport::ClientTransport(
-    std::unique_ptr<PromiseEndpoint> control_endpoint,
-    std::unique_ptr<PromiseEndpoint> data_endpoint,
-    std::shared_ptr<grpc_event_engine::experimental::EventEngine> event_engine)
-    : outgoing_frames_(MpscReceiver<ClientFrame>(4)),
-      control_endpoint_(std::move(control_endpoint)),
-      data_endpoint_(std::move(data_endpoint)),
-      control_endpoint_write_buffer_(SliceBuffer()),
-      data_endpoint_write_buffer_(SliceBuffer()),
-      hpack_compressor_(std::make_unique<HPackCompressor>()),
-      event_engine_(event_engine) {
-  auto write_loop = Loop([this] {
-    return Seq(
-        // Get next outgoing frame.
-        this->outgoing_frames_.Next(),
-        // Construct data buffers that will be sent to the endpoints.
-        [this](ClientFrame client_frame) {
-          MatchMutable(
-              &client_frame,
-              [this](ClientFragmentFrame* frame) mutable {
-                control_endpoint_write_buffer_.Append(
-                    frame->Serialize(hpack_compressor_.get()));
-                if (frame->message != nullptr) {
-                  auto frame_header =
-                      FrameHeader::Parse(
-                          reinterpret_cast<const uint8_t*>(GRPC_SLICE_START_PTR(
-                              control_endpoint_write_buffer_.c_slice_buffer()
-                                  ->slices[0])))
-                          .value();
-                  std::string message_padding(frame_header.message_padding,
-                                              '0');
-                  Slice slice(grpc_slice_from_cpp_string(message_padding));
-                  // Append message payload to data_endpoint_buffer.
-                  data_endpoint_write_buffer_.Append(std::move(slice));
-                  // Append message payload to data_endpoint_buffer.
-                  frame->message->payload()->MoveFirstNBytesIntoSliceBuffer(
-                      frame->message->payload()->Length(),
-                      data_endpoint_write_buffer_);
-                }
-              },
-              [this](CancelFrame* frame) mutable {
-                control_endpoint_write_buffer_.Append(
-                    frame->Serialize(hpack_compressor_.get()));
-              });
-          return absl::OkStatus();
-        },
-        // Write buffers to corresponding endpoints concurrently.
-        [this]() {
-          return Join(this->control_endpoint_->Write(
-                          std::move(control_endpoint_write_buffer_)),
-                      this->data_endpoint_->Write(
-                          std::move(data_endpoint_write_buffer_)));
-        },
-        // Finish writes and return status.
-        [](std::tuple<absl::Status, absl::Status> ret)
-            -> LoopCtl<absl::Status> {
-          // If writes failed, return failure status.
-          if (!(std::get<0>(ret).ok() || std::get<1>(ret).ok())) {
-            // TODO(ladynana): handle the promise endpoint write failures with
-            // closing the transport.
-            return absl::InternalError("Promise endpoint writes failed.");
-          }
-          return Continue();
-        });
+ChaoticGoodClientTransport::StreamDispatch::StreamDispatch(
+    MpscSender<OutgoingFrame> outgoing_frames)
+    : outgoing_frames_(std::move(outgoing_frames)) {}
+
+RefCountedPtr<ChaoticGoodClientTransport::Stream>
+ChaoticGoodClientTransport::StreamDispatch::LookupStream(uint32_t stream_id) {
+  MutexLock lock(&mu_);
+  auto it = stream_map_.find(stream_id);
+  if (it == stream_map_.end()) {
+    return nullptr;
+  }
+  return it->second;
+}
+
+auto ChaoticGoodClientTransport::StreamDispatch::PushFrameIntoCall(
+    ServerInitialMetadataFrame frame, RefCountedPtr<Stream> stream) {
+  DCHECK(stream->message_reassembly.in_message_boundary());
+  auto headers = ServerMetadataGrpcFromProto(frame.body);
+  if (!headers.ok()) {
+    LOG_EVERY_N_SEC(INFO, 10) << "Encode headers failed: " << headers.status();
+    return Immediate(StatusFlag(Failure{}));
+  }
+  return Immediate(stream->call.PushServerInitialMetadata(std::move(*headers)));
+}
+
+auto ChaoticGoodClientTransport::StreamDispatch::PushFrameIntoCall(
+    MessageFrame frame, RefCountedPtr<Stream> stream) {
+  return stream->message_reassembly.PushFrameInto(std::move(frame),
+                                                  stream->call);
+}
+
+auto ChaoticGoodClientTransport::StreamDispatch::PushFrameIntoCall(
+    BeginMessageFrame frame, RefCountedPtr<Stream> stream) {
+  return stream->message_reassembly.PushFrameInto(std::move(frame),
+                                                  stream->call);
+}
+
+auto ChaoticGoodClientTransport::StreamDispatch::PushFrameIntoCall(
+    MessageChunkFrame frame, RefCountedPtr<Stream> stream) {
+  return stream->message_reassembly.PushFrameInto(std::move(frame),
+                                                  stream->call);
+}
+
+auto ChaoticGoodClientTransport::StreamDispatch::PushFrameIntoCall(
+    ServerTrailingMetadataFrame frame, RefCountedPtr<Stream> stream) {
+  auto trailers = ServerMetadataGrpcFromProto(frame.body);
+  if (!trailers.ok()) {
+    stream->call.PushServerTrailingMetadata(
+        CancelledServerMetadataFromStatus(trailers.status()));
+  } else if (!stream->message_reassembly.in_message_boundary() &&
+             (*trailers)
+                     ->get(GrpcStatusMetadata())
+                     .value_or(GRPC_STATUS_UNKNOWN) == GRPC_STATUS_OK) {
+    stream->call.PushServerTrailingMetadata(CancelledServerMetadataFromStatus(
+        GRPC_STATUS_INTERNAL,
+        "End of call received while still receiving last message - this is a "
+        "protocol error"));
+  } else {
+    stream->call.PushServerTrailingMetadata(std::move(*trailers));
+  }
+  return Immediate(Success{});
+}
+
+template <typename T>
+void ChaoticGoodClientTransport::StreamDispatch::DispatchFrame(
+    IncomingFrame incoming_frame) {
+  auto stream = LookupStream(incoming_frame.header().stream_id);
+  if (stream == nullptr) return;
+  auto dispatcher = stream->frame_dispatch_serializer;
+  dispatcher->Spawn([stream,
+                     incoming_frame = std::move(incoming_frame)]() mutable {
+    auto& call = stream->call;
+    return Map(call.CancelIfFails(TrySeq(
+                   incoming_frame.Payload(),
+                   [stream = std::move(stream)](Frame frame) mutable {
+                     auto& call = stream->call;
+                     return Map(
+                         call.CancelIfFails(PushFrameIntoCall(
+                             std::move(std::get<T>(frame)), std::move(stream))),
+                         [](auto) { return absl::OkStatus(); });
+                   })),
+               [](auto) {});
   });
-  writer_ = MakeActivity(
-      // Continuously write next outgoing frames to promise endpoints.
-      std::move(write_loop), EventEngineWakeupScheduler(event_engine_),
-      [](absl::Status status) {
-        GPR_ASSERT(status.code() == absl::StatusCode::kCancelled ||
-                   status.code() == absl::StatusCode::kInternal);
+}
+
+void ChaoticGoodClientTransport::StreamDispatch::OnIncomingFrame(
+    IncomingFrame incoming_frame) {
+  switch (incoming_frame.header().type) {
+    case FrameType::kServerInitialMetadata:
+      DispatchFrame<ServerInitialMetadataFrame>(std::move(incoming_frame));
+      break;
+    case FrameType::kServerTrailingMetadata:
+      DispatchFrame<ServerTrailingMetadataFrame>(std::move(incoming_frame));
+      break;
+    case FrameType::kMessage:
+      DispatchFrame<MessageFrame>(std::move(incoming_frame));
+      break;
+    case FrameType::kBeginMessage:
+      DispatchFrame<BeginMessageFrame>(std::move(incoming_frame));
+      break;
+    case FrameType::kMessageChunk:
+      DispatchFrame<MessageChunkFrame>(std::move(incoming_frame));
+      break;
+    default:
+      LOG_EVERY_N_SEC(INFO, 10)
+          << "Unhandled frame of type: " << incoming_frame.header().type;
+  }
+}
+
+void ChaoticGoodClientTransport::StreamDispatch::OnFrameTransportClosed(
+    absl::Status status) {
+  // Mark transport as unavailable when the endpoint write/read failed.
+  GRPC_TRACE_LOG(chaotic_good, INFO)
+      << "CHAOTIC_GOOD: OnFrameTransportClosed: " << status;
+  ReleasableMutexLock lock(&mu_);
+  StreamMap stream_map = std::move(stream_map_);
+  stream_map_.clear();
+  next_stream_id_ = kClosedTransportStreamId;
+  state_tracker_.SetState(GRPC_CHANNEL_SHUTDOWN,
+                          absl::UnavailableError("transport closed"),
+                          "transport closed");
+  lock.Release();
+  for (auto& pair : stream_map) {
+    auto stream = std::move(pair.second);
+    auto& call = stream->call;
+    call.SpawnInfallible("cancel", [stream = std::move(stream)]() mutable {
+      stream->call.PushServerTrailingMetadata(ServerMetadataFromStatus(
+          absl::UnavailableError("Transport closed.")));
+    });
+  }
+}
+
+uint32_t ChaoticGoodClientTransport::StreamDispatch::MakeStream(
+    CallHandler call_handler) {
+  MutexLock lock(&mu_);
+  if (next_stream_id_ == kClosedTransportStreamId) return 0;
+  const uint32_t stream_id = next_stream_id_++;
+  const bool on_done_added = call_handler.OnDone(
+      [self = RefAsSubclass<StreamDispatch>(), stream_id](bool cancelled) {
+        GRPC_TRACE_LOG(chaotic_good, INFO)
+            << "CHAOTIC_GOOD: Client call " << self.get() << " id=" << stream_id
+            << " done: cancelled=" << cancelled;
+        if (cancelled) {
+          self->outgoing_frames_.UnbufferedImmediateSend(
+              UntracedOutgoingFrame(CancelFrame{stream_id}), 1);
+        }
+        MutexLock lock(&self->mu_);
+        self->stream_map_.erase(stream_id);
       });
+  if (!on_done_added) return 0;
+  stream_map_.emplace(stream_id,
+                      MakeRefCounted<Stream>(std::move(call_handler)));
+  return stream_id;
+}
+
+void ChaoticGoodClientTransport::StreamDispatch::StartConnectivityWatch(
+    grpc_connectivity_state state,
+    OrphanablePtr<ConnectivityStateWatcherInterface> watcher) {
+  MutexLock lock(&mu_);
+  state_tracker_.AddWatcher(state, std::move(watcher));
+}
+
+void ChaoticGoodClientTransport::StreamDispatch::StopConnectivityWatch(
+    ConnectivityStateWatcherInterface* watcher) {
+  MutexLock lock(&mu_);
+  state_tracker_.RemoveWatcher(watcher);
+}
+
+ChaoticGoodClientTransport::ChaoticGoodClientTransport(
+    const ChannelArgs& args, OrphanablePtr<FrameTransport> frame_transport,
+    MessageChunker message_chunker)
+    : channelz::DataSource(frame_transport->ctx()->socket_node),
+      ctx_(frame_transport->ctx()),
+      allocator_(args.GetObject<ResourceQuota>()
+                     ->memory_quota()
+                     ->CreateMemoryAllocator("chaotic-good")),
+      message_chunker_(message_chunker),
+      frame_transport_(std::move(frame_transport)) {
+  CHECK(ctx_ != nullptr);
+  auto party_arena = SimpleArenaAllocator(0)->MakeArena();
+  party_arena->SetContext<grpc_event_engine::experimental::EventEngine>(
+      ctx_->event_engine.get());
+  party_ = Party::Make(std::move(party_arena));
+  MpscReceiver<OutgoingFrame> outgoing_frames{256 * 1024 * 1024};
+  outgoing_frames_ = outgoing_frames.MakeSender();
+  stream_dispatch_ =
+      MakeRefCounted<StreamDispatch>(outgoing_frames.MakeSender());
+  frame_transport_->Start(party_.get(), std::move(outgoing_frames),
+                          stream_dispatch_);
+  SourceConstructed();
+}
+
+ChaoticGoodClientTransport::~ChaoticGoodClientTransport() {
+  DCHECK(party_.get() == nullptr);
+}
+
+void ChaoticGoodClientTransport::Orphan() {
+  SourceDestructing();
+  stream_dispatch_->OnFrameTransportClosed(
+      absl::UnavailableError("Transport closed"));
+  party_.reset();
+  frame_transport_.reset();
+  Unref();
+}
+
+void ChaoticGoodClientTransport::AddData(channelz::DataSink sink) {
+  // TODO(ctiller): add calls in stream dispatch
+  party_->ExportToChannelz("transport_party", sink);
+}
+
+auto ChaoticGoodClientTransport::CallOutboundLoop(uint32_t stream_id,
+                                                  CallHandler call_handler) {
+  CallTracerInterface* const tracer =
+      call_handler.arena()->GetContext<CallTracerInterface>();
+  std::shared_ptr<TcpCallTracer> call_tracer;
+  if (tracer != nullptr && tracer->IsSampled()) {
+    call_tracer = tracer->StartNewTcpTrace();
+  }
+  auto send_fragment = [this, call_tracer, stream_id](auto frame) mutable {
+    frame.stream_id = stream_id;
+    auto tokens = FrameMpscTokens(frame);
+    return outgoing_frames_.Send(OutgoingFrame{std::move(frame), call_tracer},
+                                 tokens);
+  };
+  auto send_message = [this, stream_id, call_tracer,
+                       message_chunker =
+                           message_chunker_](MessageHandle message) mutable {
+    if (ctx_->socket_node != nullptr) {
+      ctx_->socket_node->RecordMessagesSent(1);
+    }
+    return message_chunker.Send(std::move(message), stream_id, call_tracer,
+                                outgoing_frames_);
+  };
+  return GRPC_LATENT_SEE_PROMISE(
+      "CallOutboundLoop",
+      TrySeq(
+          // Wait for initial metadata then send it out.
+          call_handler.PullClientInitialMetadata(),
+          [send_fragment](ClientMetadataHandle md) mutable {
+            GRPC_TRACE_LOG(chaotic_good, INFO)
+                << "CHAOTIC_GOOD: Sending initial metadata: "
+                << md->DebugString();
+            ClientInitialMetadataFrame frame;
+            frame.body = ClientMetadataProtoFromGrpc(*md);
+            return send_fragment(std::move(frame));
+          },
+          // Continuously send client frame with client to server messages.
+          ForEach(MessagesFrom(call_handler), std::move(send_message)),
+          [send_fragment]() mutable {
+            ClientEndOfStream frame;
+            return send_fragment(std::move(frame));
+          },
+          [call_handler]() mutable {
+            return Map(call_handler.WasCancelled(),
+                       [](bool cancelled) { return StatusFlag(!cancelled); });
+          }));
+}
+
+void ChaoticGoodClientTransport::StartCall(CallHandler call_handler) {
+  // At this point, the connection is set up.
+  // Start sending data frames.
+  call_handler.SpawnGuarded(
+      "outbound_loop", [self = RefAsSubclass<ChaoticGoodClientTransport>(),
+                        call_handler]() mutable {
+        const uint32_t stream_id =
+            self->stream_dispatch_->MakeStream(call_handler);
+        return If(
+            stream_id != 0,
+            [stream_id, &call_handler, self = std::move(self)]() mutable {
+              return Map(
+                  self->CallOutboundLoop(stream_id, std::move(call_handler)),
+                  [self, stream_id](StatusFlag result) -> StatusFlag {
+                    GRPC_TRACE_LOG(chaotic_good, INFO)
+                        << "CHAOTIC_GOOD: Call " << stream_id
+                        << " finished with " << result.ToString();
+                    if (!result.ok()) {
+                      GRPC_TRACE_LOG(chaotic_good, INFO)
+                          << "CHAOTIC_GOOD: Send cancel";
+                      if (!self->outgoing_frames_
+                               .UnbufferedImmediateSend(
+                                   UntracedOutgoingFrame(
+                                       CancelFrame{stream_id}),
+                                   1)
+                               .ok()) {
+                        GRPC_TRACE_LOG(chaotic_good, INFO)
+                            << "CHAOTIC_GOOD: Send cancel failed";
+                      }
+                    }
+                    return result;
+                  });
+            },
+            [&call_handler]() {
+              call_handler.PushServerTrailingMetadata(
+                  CancelledServerMetadataFromStatus(
+                      absl::UnavailableError("Transport closed.")));
+              return []() -> Poll<StatusFlag> { return Success{}; };
+            });
+      });
+}
+
+void ChaoticGoodClientTransport::PerformOp(grpc_transport_op* op) {
+  bool did_stuff = false;
+  if (op->start_connectivity_watch != nullptr) {
+    stream_dispatch_->StartConnectivityWatch(
+        op->start_connectivity_watch_state,
+        std::move(op->start_connectivity_watch));
+    did_stuff = true;
+  }
+  if (op->stop_connectivity_watch != nullptr) {
+    stream_dispatch_->StopConnectivityWatch(op->stop_connectivity_watch);
+    did_stuff = true;
+  }
+  if (op->set_accept_stream) {
+    Crash("set_accept_stream not supported on clients");
+  }
+  if (!did_stuff) {
+    Crash(absl::StrCat("unimplemented transport perform op: ",
+                       grpc_transport_op_string(op)));
+  }
+  ExecCtx::Run(DEBUG_LOCATION, op->on_consumed, absl::OkStatus());
 }
 
 }  // namespace chaotic_good

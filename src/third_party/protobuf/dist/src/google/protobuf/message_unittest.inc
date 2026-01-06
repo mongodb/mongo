@@ -18,9 +18,10 @@
 #include <sys/types.h>
 
 #include <cmath>
-#include <functional>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
-#include <vector>
+#include <string>
 
 #ifndef _MSC_VER
 #include <unistd.h>
@@ -28,15 +29,20 @@
 #include <fstream>
 #include <sstream>
 
+#include "google/protobuf/testing/file.h"
+#include "google/protobuf/testing/file.h"
 #include "google/protobuf/descriptor.pb.h"
 #include <gmock/gmock.h>
 #include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
+#include "absl/base/config.h"
 #include "absl/log/absl_check.h"
 #include "absl/log/scoped_mock_log.h"
 #include "absl/strings/cord.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "google/protobuf/arena.h"
+#include "google/protobuf/arena_test_util.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/generated_message_reflection.h"
@@ -47,11 +53,16 @@
 #include "google/protobuf/io/zero_copy_stream_impl.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/reflection_ops.h"
+#include "google/protobuf/test_util.h"
 #include "google/protobuf/test_util2.h"
+#include "google/protobuf/wire_format_lite.h"
 
 
 // Must be included last.
 #include "google/protobuf/port_def.inc"
+
+using ::testing::IsEmpty;
+using ::testing::Not;
 
 namespace google {
 namespace protobuf {
@@ -71,6 +82,20 @@ using google::protobuf::io::win32::open;
 #endif
 #endif
 
+namespace {
+
+UNITTEST::NestedTestAllTypes InitNestedProto(int depth) {
+  UNITTEST::NestedTestAllTypes p;
+  auto* child = p.mutable_child();
+  for (int i = 0; i < depth; i++) {
+    child->mutable_payload()->set_optional_int32(i);
+    child = child->mutable_child();
+  }
+  // -1 becomes \xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x1
+  child->mutable_payload()->set_optional_int32(-1);
+  return p;
+}
+}  // namespace
 
 TEST(MESSAGE_TEST_NAME, SerializeHelpers) {
   // TODO:  Test more helpers?  They're all two-liners so it seems
@@ -101,6 +126,24 @@ TEST(MESSAGE_TEST_NAME, SerializeHelpers) {
 
 }
 
+TEST(MESSAGE_TEST_NAME, RoundTrip) {
+  UNITTEST::TestAllTypes message;
+  TestUtil::SetAllFields(&message);
+  TestUtil::ExpectAllFieldsSet(message);
+
+  UNITTEST::TestAllTypes copied, merged, parsed;
+  copied = message;
+  TestUtil::ExpectAllFieldsSet(copied);
+
+  merged.MergeFrom(message);
+  TestUtil::ExpectAllFieldsSet(merged);
+
+  std::string data;
+  ASSERT_TRUE(message.SerializeToString(&data));
+  ASSERT_TRUE(parsed.ParseFromString(data));
+  TestUtil::ExpectAllFieldsSet(parsed);
+}
+
 TEST(MESSAGE_TEST_NAME, SerializeToBrokenOstream) {
   std::ofstream out;
   UNITTEST::TestAllTypes message;
@@ -110,8 +153,12 @@ TEST(MESSAGE_TEST_NAME, SerializeToBrokenOstream) {
 }
 
 TEST(MESSAGE_TEST_NAME, ParseFromFileDescriptor) {
-  std::string filename =
-      TestUtil::GetTestDataPath("google/protobuf/testdata/golden_message");
+  std::string filename = absl::StrCat(TestTempDir(), "/golden_message");
+  UNITTEST::TestAllTypes expected_message;
+  TestUtil::SetAllFields(&expected_message);
+  ABSL_CHECK_OK(File::SetContents(
+      filename, expected_message.SerializeAsString(), true));
+
   int file = open(filename.c_str(), O_RDONLY | O_BINARY);
   ASSERT_GE(file, 0);
 
@@ -123,8 +170,12 @@ TEST(MESSAGE_TEST_NAME, ParseFromFileDescriptor) {
 }
 
 TEST(MESSAGE_TEST_NAME, ParsePackedFromFileDescriptor) {
-  std::string filename = TestUtil::GetTestDataPath(
-      "google/protobuf/testdata/golden_packed_fields_message");
+  std::string filename = absl::StrCat(TestTempDir(), "/golden_message");
+  UNITTEST::TestPackedTypes expected_message;
+  TestUtil::SetPackedFields(&expected_message);
+  ABSL_CHECK_OK(File::SetContents(
+      filename, expected_message.SerializeAsString(), true));
+
   int file = open(filename.c_str(), O_RDONLY | O_BINARY);
   ASSERT_GE(file, 0);
 
@@ -321,6 +372,29 @@ TEST(MESSAGE_TEST_NAME, ExplicitLazyExceedRecursionLimit) {
   EXPECT_NE(parsed.lazy_child().child().payload().optional_int32(), -1);
 }
 
+TEST(MESSAGE_TEST_NAME, ExplicitLazyBadLengthDelimitedSize) {
+  std::string serialized;
+
+  // This is a regression test for a bug in lazy field verification.  It
+  // requires invalid wire format to trigger the bug.
+
+  // NestedMessage optional_lazy_message = 27 [lazy=true];
+  uint32_t tag = internal::WireFormatLite::MakeTag(
+      1, internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED);
+  ASSERT_LT(tag, INT8_MAX);
+  serialized.push_back(tag);
+  serialized.push_back(6);
+
+  // bytes bytes_field = 1;
+  serialized.push_back(tag);
+
+  // To trigger this bug, we need an overlong size.
+  serialized.append(5, 0xff);
+
+  UNITTEST::TestLazyMessage parsed;
+  EXPECT_FALSE(parsed.ParseFromString(serialized));
+}
+
 TEST(MESSAGE_TEST_NAME, NestedLazyRecursionLimit) {
   UNITTEST::NestedTestAllTypes original, parsed;
   original.mutable_lazy_child()
@@ -350,6 +424,12 @@ TEST(MESSAGE_TEST_NAME, UnparsedEmpty) {
   EXPECT_FALSE(message.ParseFromArray(encoded, sizeof(encoded)));
   EXPECT_TRUE(message.has_lazy_child());
   EXPECT_EQ(message.lazy_child().ByteSizeLong(), 0);
+}
+
+TEST(MESSAGE_TEST_NAME, DefaultInstanceByteSizeLong) {
+  EXPECT_EQ(UNITTEST::NestedTestAllTypes::default_instance().ByteSizeLong(), 0);
+  EXPECT_EQ(UNITTEST::NestedTestAllTypes::default_instance().GetCachedSize(),
+            0);
 }
 
 TEST(MESSAGE_TEST_NAME, ParseFailNonCanonicalZeroTag) {
@@ -536,18 +616,6 @@ TEST(MESSAGE_TEST_NAME, UninitializedAndMalformed) {
   EXPECT_FALSE(p2.IsInitialized());
 }
 
-inline UNITTEST::NestedTestAllTypes InitNestedProto(int depth) {
-  UNITTEST::NestedTestAllTypes p;
-  auto* child = p.mutable_child();
-  for (int i = 0; i < depth; i++) {
-    child->mutable_payload()->set_optional_int32(i);
-    child = child->mutable_child();
-  }
-  // -1 becomes \xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x1
-  child->mutable_payload()->set_optional_int32(-1);
-  return p;
-}
-
 // Parsing proto must not access beyond the bound.
 TEST(MESSAGE_TEST_NAME, ParseStrictlyBoundedStream) {
   UNITTEST::NestedTestAllTypes o, p;
@@ -563,63 +631,6 @@ TEST(MESSAGE_TEST_NAME, ParseStrictlyBoundedStream) {
   TestUtil::BoundedArrayInputStream stream(data.data(), data.size());
   EXPECT_TRUE(p.ParseFromBoundedZeroCopyStream(&stream, data.size()));
   TestUtil::ExpectAllFieldsSet(p.child().payload());
-}
-
-TEST(MESSAGE_TEST_NAME, AllSetMethodsOnStringField) {
-  UNITTEST::TestAllTypes msg;
-
-  msg.set_optional_string(absl::string_view("Abcdef"));
-  EXPECT_EQ(msg.optional_string(), "Abcdef");
-
-  msg.set_optional_string("Asciiz");
-  EXPECT_EQ(msg.optional_string(), "Asciiz");
-
-  msg.set_optional_string("Length delimited", 6);
-  EXPECT_EQ(msg.optional_string(), "Length");
-
-  std::string value = "std::string value 1";
-  msg.set_optional_string(value);
-  EXPECT_EQ(msg.optional_string(), "std::string value 1");
-
-  value = "std::string value 2";
-  msg.set_optional_string(std::cref(value));
-  EXPECT_EQ(msg.optional_string(), "std::string value 2");
-
-  value = "std::string value 3";
-  msg.set_optional_string(std::move(value));
-  EXPECT_EQ(msg.optional_string(), "std::string value 3");
-}
-
-
-TEST(MESSAGE_TEST_NAME, AllAddMethodsOnRepeatedStringField) {
-  UNITTEST::TestAllTypes msg;
-
-  msg.add_repeated_string(absl::string_view("Abcdef"));
-  EXPECT_EQ(msg.repeated_string(0), "Abcdef");
-  msg.clear_repeated_string();
-
-  msg.add_repeated_string("Asciiz");
-  EXPECT_EQ(msg.repeated_string(0), "Asciiz");
-  msg.clear_repeated_string();
-
-  msg.add_repeated_string("Length delimited", 6);
-  EXPECT_EQ(msg.repeated_string(0), "Length");
-  msg.clear_repeated_string();
-
-  std::string value = "std::string value 1";
-  msg.add_repeated_string(value);
-  EXPECT_EQ(msg.repeated_string(0), "std::string value 1");
-  msg.clear_repeated_string();
-
-  value = "std::string value 2";
-  msg.add_repeated_string(std::cref(value));
-  EXPECT_EQ(msg.repeated_string(0), "std::string value 2");
-  msg.clear_repeated_string();
-
-  value = "std::string value 3";
-  msg.add_repeated_string(std::move(value));
-  EXPECT_EQ(msg.repeated_string(0), "std::string value 3");
-  msg.clear_repeated_string();
 }
 
 // Helper functions to touch any nested lazy field
@@ -761,13 +772,13 @@ TEST(MESSAGE_TEST_NAME, Swap) {
   {
     Arena arena;
     UNITTEST::NestedTestAllTypes* p1 =
-        Arena::CreateMessage<UNITTEST::NestedTestAllTypes>(&arena);
+        Arena::Create<UNITTEST::NestedTestAllTypes>(&arena);
 
     // Should parse correctly.
     EXPECT_TRUE(p1->ParseFromString(serialized));
 
     UNITTEST::NestedTestAllTypes* p2 =
-        Arena::CreateMessage<UNITTEST::NestedTestAllTypes>(&arena);
+        Arena::Create<UNITTEST::NestedTestAllTypes>(&arena);
 
     p1->Swap(p2);
 
@@ -787,88 +798,114 @@ TEST(MESSAGE_TEST_NAME, InitializationErrorString) {
   EXPECT_EQ("a, b, c", message.InitializationErrorString());
 }
 
-TEST(MESSAGE_TEST_NAME, DynamicCastToGenerated) {
+TEST(MESSAGE_TEST_NAME, DynamicCastMessage) {
   UNITTEST::TestAllTypes test_all_types;
 
-  Message* test_all_types_pointer = &test_all_types;
-  EXPECT_EQ(&test_all_types, DynamicCastToGenerated<UNITTEST::TestAllTypes>(
-                                 test_all_types_pointer));
-  EXPECT_EQ(nullptr, DynamicCastToGenerated<UNITTEST::TestRequired>(
-                         test_all_types_pointer));
-
-  const Message* test_all_types_pointer_const = &test_all_types;
+  MessageLite* test_all_types_pointer = &test_all_types;
   EXPECT_EQ(&test_all_types,
-            DynamicCastToGenerated<const UNITTEST::TestAllTypes>(
-                test_all_types_pointer_const));
-  EXPECT_EQ(nullptr, DynamicCastToGenerated<const UNITTEST::TestRequired>(
+            DynamicCastMessage<UNITTEST::TestAllTypes>(test_all_types_pointer));
+  EXPECT_EQ(nullptr,
+            DynamicCastMessage<UNITTEST::TestRequired>(test_all_types_pointer));
+
+  const MessageLite* test_all_types_pointer_const = &test_all_types;
+  EXPECT_EQ(&test_all_types, DynamicCastMessage<const UNITTEST::TestAllTypes>(
+                                 test_all_types_pointer_const));
+  EXPECT_EQ(nullptr, DynamicCastMessage<const UNITTEST::TestRequired>(
                          test_all_types_pointer_const));
 
-  Message* test_all_types_pointer_nullptr = nullptr;
-  EXPECT_EQ(nullptr, DynamicCastToGenerated<UNITTEST::TestAllTypes>(
+  MessageLite* test_all_types_pointer_nullptr = nullptr;
+  EXPECT_EQ(nullptr, DynamicCastMessage<UNITTEST::TestAllTypes>(
                          test_all_types_pointer_nullptr));
 
-  Message& test_all_types_pointer_ref = test_all_types;
-  EXPECT_EQ(&test_all_types, &DynamicCastToGenerated<UNITTEST::TestAllTypes>(
+  MessageLite& test_all_types_pointer_ref = test_all_types;
+  EXPECT_EQ(&test_all_types, &DynamicCastMessage<UNITTEST::TestAllTypes>(
                                  test_all_types_pointer_ref));
 
-  const Message& test_all_types_pointer_const_ref = test_all_types;
-  EXPECT_EQ(&test_all_types, &DynamicCastToGenerated<UNITTEST::TestAllTypes>(
+  const MessageLite& test_all_types_pointer_const_ref = test_all_types;
+  EXPECT_EQ(&test_all_types, &DynamicCastMessage<UNITTEST::TestAllTypes>(
                                  test_all_types_pointer_const_ref));
 }
 
-TEST(MESSAGE_TEST_NAME, DynamicCastToGeneratedInvalidReferenceType) {
+TEST(MESSAGE_TEST_NAME, DynamicCastMessageInvalidReferenceType) {
   UNITTEST::TestAllTypes test_all_types;
-  const Message& test_all_types_pointer_const_ref = test_all_types;
-  ASSERT_DEATH(DynamicCastToGenerated<UNITTEST::TestRequired>(
+  const MessageLite& test_all_types_pointer_const_ref = test_all_types;
+#if defined(ABSL_HAVE_EXCEPTIONS)
+  EXPECT_THROW(DynamicCastMessage<UNITTEST::TestRequired>(
                    test_all_types_pointer_const_ref),
-               "Cannot downcast " + test_all_types.GetTypeName() + " to " +
-                   UNITTEST::TestRequired::default_instance().GetTypeName());
+               std::bad_cast);
+#else
+  ASSERT_DEATH(
+      DynamicCastMessage<UNITTEST::TestRequired>(
+          test_all_types_pointer_const_ref),
+      absl::StrCat("Cannot downcast ", test_all_types.GetTypeName(), " to ",
+                   UNITTEST::TestRequired::default_instance().GetTypeName()));
+#endif
 }
 
-TEST(MESSAGE_TEST_NAME, DownCastToGeneratedValidType) {
+TEST(MESSAGE_TEST_NAME, DownCastMessageValidType) {
   UNITTEST::TestAllTypes test_all_types;
 
-  Message* test_all_types_pointer = &test_all_types;
-  EXPECT_EQ(&test_all_types, DownCastToGenerated<UNITTEST::TestAllTypes>(
-                                 test_all_types_pointer));
+  MessageLite* test_all_types_pointer = &test_all_types;
+  EXPECT_EQ(&test_all_types,
+            DownCastMessage<UNITTEST::TestAllTypes>(test_all_types_pointer));
 
-  const Message* test_all_types_pointer_const = &test_all_types;
-  EXPECT_EQ(&test_all_types, DownCastToGenerated<const UNITTEST::TestAllTypes>(
+  const MessageLite* test_all_types_pointer_const = &test_all_types;
+  EXPECT_EQ(&test_all_types, DownCastMessage<const UNITTEST::TestAllTypes>(
                                  test_all_types_pointer_const));
 
-  Message* test_all_types_pointer_nullptr = nullptr;
-  EXPECT_EQ(nullptr, DownCastToGenerated<UNITTEST::TestAllTypes>(
+  MessageLite* test_all_types_pointer_nullptr = nullptr;
+  EXPECT_EQ(nullptr, DownCastMessage<UNITTEST::TestAllTypes>(
                          test_all_types_pointer_nullptr));
 
-  Message& test_all_types_pointer_ref = test_all_types;
-  EXPECT_EQ(&test_all_types, &DownCastToGenerated<UNITTEST::TestAllTypes>(
+  MessageLite& test_all_types_pointer_ref = test_all_types;
+  EXPECT_EQ(&test_all_types, &DownCastMessage<UNITTEST::TestAllTypes>(
                                  test_all_types_pointer_ref));
 
-  const Message& test_all_types_pointer_const_ref = test_all_types;
-  EXPECT_EQ(&test_all_types, &DownCastToGenerated<UNITTEST::TestAllTypes>(
+  const MessageLite& test_all_types_pointer_const_ref = test_all_types;
+  EXPECT_EQ(&test_all_types, &DownCastMessage<UNITTEST::TestAllTypes>(
                                  test_all_types_pointer_const_ref));
 }
 
-TEST(MESSAGE_TEST_NAME, DownCastToGeneratedInvalidPointerType) {
+TEST(MESSAGE_TEST_NAME, DownCastMessageInvalidPointerType) {
   UNITTEST::TestAllTypes test_all_types;
 
-  Message* test_all_types_pointer = &test_all_types;
+  MessageLite* test_all_types_pointer = &test_all_types;
 
   ASSERT_DEBUG_DEATH(
-      DownCastToGenerated<UNITTEST::TestRequired>(test_all_types_pointer),
-      "Cannot downcast " + test_all_types.GetTypeName() + " to " +
-          UNITTEST::TestRequired::default_instance().GetTypeName());
+      DownCastMessage<UNITTEST::TestRequired>(test_all_types_pointer),
+      absl::StrCat("Cannot downcast ", test_all_types.GetTypeName(), " to ",
+                   UNITTEST::TestRequired::default_instance().GetTypeName()));
 }
 
-TEST(MESSAGE_TEST_NAME, DownCastToGeneratedInvalidReferenceType) {
+TEST(MESSAGE_TEST_NAME, DownCastMessageInvalidReferenceType) {
   UNITTEST::TestAllTypes test_all_types;
 
-  Message& test_all_types_pointer = test_all_types;
+  MessageLite& test_all_types_ref = test_all_types;
 
   ASSERT_DEBUG_DEATH(
-      DownCastToGenerated<UNITTEST::TestRequired>(test_all_types_pointer),
-      "Cannot downcast " + test_all_types.GetTypeName() + " to " +
-          UNITTEST::TestRequired::default_instance().GetTypeName());
+      DownCastMessage<UNITTEST::TestRequired>(test_all_types_ref),
+      absl::StrCat("Cannot downcast ", test_all_types.GetTypeName(), " to ",
+                   UNITTEST::TestRequired::default_instance().GetTypeName()));
+}
+
+TEST(MESSAGE_TEST_NAME, MessageDebugStringMatchesBehindPointerAndLitePointer) {
+  UNITTEST::TestAllTypes test_all_types;
+  test_all_types.set_optional_string("foo");
+  Message* msg_full_pointer = &test_all_types;
+  MessageLite* msg_lite_pointer = &test_all_types;
+  ASSERT_EQ(test_all_types.DebugString(), msg_full_pointer->DebugString());
+  ASSERT_EQ(test_all_types.DebugString(), msg_lite_pointer->DebugString());
+}
+
+TEST(MESSAGE_TEST_NAME, CordFieldGetsProperlyRegisteredInTheArena) {
+  Arena arena;
+  auto* msg = Arena::Create<UNITTEST::TestCord>(&arena);
+  // Very large input that needs allocation.
+  msg->set_optional_bytes_cord(std::string(1000, 'x'));
+  // Something should be registered for destruction.
+  EXPECT_THAT(internal::ArenaTestPeer::PeekCleanupListForTesting(&arena),
+              Not(IsEmpty()));
+  // We expect memory leaks here if the Cord was not properly destroyed.
 }
 
 #if GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet.
@@ -1053,7 +1090,7 @@ TEST(MESSAGE_TEST_NAME, MessageIsStillValidAfterParseFails) {
   {
     Arena arena;
     UNITTEST::TestAllTypes* arena_message =
-        Arena::CreateMessage<UNITTEST::TestAllTypes>(&arena);
+        Arena::Create<UNITTEST::TestAllTypes>(&arena);
     EXPECT_FALSE(arena_message->ParseFromString(invalid_string_data));
     arena_message->Clear();
     EXPECT_EQ("", arena_message->optional_string());
@@ -1083,9 +1120,7 @@ TEST(MESSAGE_TEST_NAME, Zero5BTagLazy) {
   EXPECT_FALSE(message.ParseFromArray(encoded, sizeof(encoded)));
 }
 
-
 namespace {
-
 void ExpectMessageMerged(const UNITTEST::TestAllTypes& message) {
   EXPECT_EQ(3, message.optional_int32());
   EXPECT_EQ(2, message.optional_int64());
@@ -1100,7 +1135,6 @@ void AssignParsingMergeMessages(UNITTEST::TestAllTypes* msg1,
   msg3->set_optional_int32(3);
   msg3->set_optional_string("hello");
 }
-
 }  // namespace
 
 // Test that if an optional or required message/group field appears multiple
@@ -1327,6 +1361,15 @@ TEST(MESSAGE_TEST_NAME, MOMIParserEdgeCases) {
   }
 }
 
+TEST(MESSAGE_TEST_NAME, MessageTraitsWork) {
+  EXPECT_EQ(
+      &UNITTEST::TestAllTypes::default_instance(),
+      internal::MessageTraits<UNITTEST::TestAllTypes>::default_instance());
+  EXPECT_EQ(
+      internal::GetClassData(UNITTEST::TestAllTypes::default_instance()),
+      internal::MessageTraits<UNITTEST::TestAllTypes>::class_data());
+}
+
 
 TEST(MESSAGE_TEST_NAME, CheckSerializationWhenInterleavedExtensions) {
   UNITTEST::TestExtensionRangeSerialize in_message;
@@ -1406,6 +1449,7 @@ TEST(MESSAGE_TEST_NAME,
   EXPECT_FALSE(in_message.ParseFromString(serialized));
 }
 
+namespace {
 const uint8_t* SkipTag(const uint8_t* buf) {
   while (*buf & 0x80) ++buf;
   ++buf;
@@ -1426,6 +1470,15 @@ uint8_t* AddNonCanonicalBytes(const uint8_t* buf, uint8_t* p,
     ++p;
   }
   return p;
+}
+
+std::string EncodeBoolValue(int number, bool value, int non_canonical_bytes) {
+  uint8_t buf[100];
+  uint8_t* p = buf;
+
+  p = internal::WireFormatLite::WriteBoolToArray(number, value, p);
+  p = AddNonCanonicalBytes(SkipTag(buf), p, non_canonical_bytes);
+  return std::string(buf, p);
 }
 
 std::string EncodeEnumValue(int number, int value, int non_canonical_bytes,
@@ -1514,6 +1567,7 @@ static std::vector<const FieldDescriptor*> GetFields() {
   }
   return fields;
 }
+}  // namespace
 
 TEST(MESSAGE_TEST_NAME, TestEnumParsers) {
   UNITTEST::EnumParseTester obj;
@@ -1535,7 +1589,7 @@ TEST(MESSAGE_TEST_NAME, TestEnumParsers) {
 
   constexpr int kInvalidValue = 0x900913;
   auto* ref = obj.GetReflection();
-  PROTOBUF_UNUSED auto* descriptor = obj.descriptor();
+  [[maybe_unused]] auto* descriptor = obj.descriptor();
   for (bool use_packed : {false, true}) {
     SCOPED_TRACE(use_packed);
     for (bool use_tail_field : {false, true}) {
@@ -1632,7 +1686,7 @@ TEST(MESSAGE_TEST_NAME, TestEnumParserForUnknownEnumValue) {
   // For unknown enum values, for consistency we must include the
   // int32_t enum value in the unknown field set, which might not be exactly the
   // same as the input.
-  PROTOBUF_UNUSED auto* descriptor = non_dynamic.descriptor();
+  [[maybe_unused]] auto* descriptor = non_dynamic.descriptor();
 
   const std::vector<const FieldDescriptor*> fields =
       GetFields<UNITTEST::EnumParseTester>();
@@ -1668,15 +1722,6 @@ TEST(MESSAGE_TEST_NAME, TestEnumParserForUnknownEnumValue) {
   }
 }
 
-std::string EncodeBoolValue(int number, bool value, int non_canonical_bytes) {
-  uint8_t buf[100];
-  uint8_t* p = buf;
-
-  p = internal::WireFormatLite::WriteBoolToArray(number, value, p);
-  p = AddNonCanonicalBytes(SkipTag(buf), p, non_canonical_bytes);
-  return std::string(buf, p);
-}
-
 TEST(MESSAGE_TEST_NAME, TestBoolParsers) {
   UNITTEST::BoolParseTester obj;
 
@@ -1694,7 +1739,7 @@ TEST(MESSAGE_TEST_NAME, TestBoolParsers) {
       GetFields<UNITTEST::BoolParseTester>();
 
   auto* ref = obj.GetReflection();
-  PROTOBUF_UNUSED auto* descriptor = obj.descriptor();
+  [[maybe_unused]] auto* descriptor = obj.descriptor();
   for (bool use_tail_field : {false, true}) {
     SCOPED_TRACE(use_tail_field);
     for (int non_canonical_bytes = 0; non_canonical_bytes < 10;
@@ -1758,7 +1803,7 @@ TEST(MESSAGE_TEST_NAME, TestInt32Parsers) {
       GetFields<UNITTEST::Int32ParseTester>();
 
   auto* ref = obj.GetReflection();
-  PROTOBUF_UNUSED auto* descriptor = obj.descriptor();
+  [[maybe_unused]] auto* descriptor = obj.descriptor();
   for (bool use_tail_field : {false, true}) {
     SCOPED_TRACE(use_tail_field);
     for (int non_canonical_bytes = 0; non_canonical_bytes < 10;
@@ -1823,7 +1868,7 @@ TEST(MESSAGE_TEST_NAME, TestInt64Parsers) {
       GetFields<UNITTEST::Int64ParseTester>();
 
   auto* ref = obj.GetReflection();
-  PROTOBUF_UNUSED auto* descriptor = obj.descriptor();
+  [[maybe_unused]] auto* descriptor = obj.descriptor();
   for (bool use_tail_field : {false, true}) {
     SCOPED_TRACE(use_tail_field);
     for (int non_canonical_bytes = 0; non_canonical_bytes < 10;
@@ -1880,6 +1925,7 @@ TEST(MESSAGE_TEST_NAME, IsDefaultInstance) {
   EXPECT_FALSE(r->IsDefaultInstance(msg));
 }
 
+namespace {
 std::string EncodeStringValue(int number, const std::string& value) {
   uint8_t buf[100];
   return std::string(
@@ -1917,60 +1963,7 @@ class TestInputStream final : public io::ZeroCopyInputStream {
   absl::string_view payload_;
   size_t break_pos_;
 };
-
-template <typename T>
-static const internal::TcParseTableBase* GetTableIfAvailable(...) {
-  return nullptr;
-}
-
-template <typename T>
-static const internal::TcParseTableBase* GetTableIfAvailable(
-    decltype(internal::TcParser::GetTable<T>())) {
-  return internal::TcParser::GetTable<T>();
-}
-
-TEST(MESSAGE_TEST_NAME, TestRegressionInlinedStringAuxIdxMismatchOnFastParser) {
-  using Proto = UNITTEST::InlinedStringIdxRegressionProto;
-
-  auto* table = GetTableIfAvailable<Proto>(nullptr);
-  // Only test when TDP is on, and we have these fields inlined.
-  if (table != nullptr &&
-      table->fast_entry(1)->target() == internal::TcParser::FastSiS1) {
-    // optional string str1 = 1;
-    EXPECT_EQ(table->fast_entry(1)->bits.aux_idx(), 1);
-    // optional InlinedStringIdxRegressionProto sub = 2;
-    EXPECT_EQ(table->fast_entry(2)->bits.aux_idx(), 2);
-    // optional string str2 = 3;
-    // The aux_idx points to the inlined_string_idx and not the actual aux_idx.
-    EXPECT_EQ(table->fast_entry(3)->bits.aux_idx(), 2);
-    // optional string str3 = 4;
-    // The aux_idx points to the inlined_string_idx and not the actual aux_idx.
-    EXPECT_EQ(table->fast_entry(0)->bits.aux_idx(), 3);
-  }
-
-  std::string encoded;
-  {
-    Proto proto;
-    // We use strings longer than SSO.
-    proto.set_str1(std::string(100, 'a'));
-    proto.set_str2(std::string(100, 'a'));
-    proto.set_str3(std::string(100, 'a'));
-    encoded = proto.SerializeAsString();
-  }
-  Arena arena;
-  auto* proto = Arena::CreateMessage<Proto>(&arena);
-  // We don't alter donation here, so it works even if the idx are bad.
-  ASSERT_TRUE(proto->ParseFromString(encoded));
-  // Now we alter donation bits. str2's bit (#2) will be off, but its aux_idx
-  // (#3) will point to a donated string.
-  proto = Arena::CreateMessage<Proto>(&arena);
-  proto->mutable_str1();
-  proto->mutable_str2();
-  proto->mutable_str3();
-  // With the bug, this breaks the cleanup list, causing UB on arena
-  // destruction.
-  ASSERT_TRUE(proto->ParseFromString(encoded));
-}
+}  // namespace
 
 TEST(MESSAGE_TEST_NAME, TestRepeatedStringParsers) {
   google::protobuf::Arena arena;
@@ -1979,7 +1972,7 @@ TEST(MESSAGE_TEST_NAME, TestRepeatedStringParsers) {
       "abcdefghijklmnopqrstuvwxyz"
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-  PROTOBUF_UNUSED const auto* const descriptor =
+  [[maybe_unused]] const auto* const descriptor =
       UNITTEST::StringParseTester::descriptor();
 
   const std::vector<const FieldDescriptor*> fields =
@@ -2001,7 +1994,7 @@ TEST(MESSAGE_TEST_NAME, TestRepeatedStringParsers) {
       for (size_t i = 1; i <= encoded.size(); ++i) {
         TestInputStream input_stream(encoded, i);
 
-        auto& obj = *arena.CreateMessage<UNITTEST::StringParseTester>(&arena);
+        auto& obj = *arena.Create<UNITTEST::StringParseTester>(&arena);
         auto* ref = obj.GetReflection();
         EXPECT_TRUE(obj.ParseFromZeroCopyStream(&input_stream));
         if (field->is_repeated()) {
@@ -2084,8 +2077,90 @@ TEST(MESSAGE_TEST_NAME, TestRegressionOverwrittenLazyOneofDoesNotLeak) {
   // This call had a bug where the LazyField was not destroyed in any way
   // causing the Cord inside it to leak its contents.
   EXPECT_TRUE(
-      Arena::CreateMessage<UNITTEST::TestAllTypes>(&arena)->ParseFromString(
-          str));
+      Arena::Create<UNITTEST::TestAllTypes>(&arena)->ParseFromString(str));
+}
+
+TEST(MESSAGE_TEST_NAME, AllSetMethodsOnStringField) {
+  UNITTEST::TestAllTypes msg;
+
+  msg.set_optional_string(absl::string_view("Abcdef"));
+  EXPECT_EQ(msg.optional_string(), "Abcdef");
+
+  msg.set_optional_string("Asciiz");
+  EXPECT_EQ(msg.optional_string(), "Asciiz");
+
+  std::string value = "std::string value 1";
+  msg.set_optional_string(value);
+  EXPECT_EQ(msg.optional_string(), "std::string value 1");
+
+  value = "std::string value 2";
+  msg.set_optional_string(std::cref(value));
+  EXPECT_EQ(msg.optional_string(), "std::string value 2");
+
+  value = "std::string value 3";
+  msg.set_optional_string(std::move(value));
+  EXPECT_EQ(msg.optional_string(), "std::string value 3");
+
+  msg.set_optional_string({'a', 'b', 'c'});
+  EXPECT_EQ(msg.optional_string(), "abc");
+}
+
+TEST(MESSAGE_TEST_NAME, AllSetMethodsOnRepeatedStringField) {
+  UNITTEST::TestAllTypes msg;
+
+  msg.add_repeated_string("");
+
+  msg.set_repeated_string(0, absl::string_view("Abcdef"));
+  EXPECT_EQ(msg.repeated_string(0), "Abcdef");
+
+  msg.set_repeated_string(0, "Asciiz");
+  EXPECT_EQ(msg.repeated_string(0), "Asciiz");
+
+  std::string value = "std::string value 1";
+  msg.set_repeated_string(0, value);
+  EXPECT_EQ(msg.repeated_string(0), "std::string value 1");
+
+  value = "std::string value 2";
+  msg.set_repeated_string(0, std::cref(value));
+  EXPECT_EQ(msg.repeated_string(0), "std::string value 2");
+
+  value = "std::string value 3";
+  msg.set_repeated_string(0, std::move(value));
+  EXPECT_EQ(msg.repeated_string(0), "std::string value 3");
+
+  msg.set_repeated_string(0, {'a', 'b', 'c'});
+  EXPECT_EQ(msg.repeated_string(0), "abc");
+}
+
+TEST(MESSAGE_TEST_NAME, AllAddMethodsOnRepeatedStringField) {
+  UNITTEST::TestAllTypes msg;
+
+  msg.add_repeated_string(absl::string_view("Abcdef"));
+  EXPECT_EQ(msg.repeated_string(0), "Abcdef");
+  msg.clear_repeated_string();
+
+  msg.add_repeated_string("Asciiz");
+  EXPECT_EQ(msg.repeated_string(0), "Asciiz");
+  msg.clear_repeated_string();
+
+  std::string value = "std::string value 1";
+  msg.add_repeated_string(value);
+  EXPECT_EQ(msg.repeated_string(0), "std::string value 1");
+  msg.clear_repeated_string();
+
+  value = "std::string value 2";
+  msg.add_repeated_string(std::cref(value));
+  EXPECT_EQ(msg.repeated_string(0), "std::string value 2");
+  msg.clear_repeated_string();
+
+  value = "std::string value 3";
+  msg.add_repeated_string(std::move(value));
+  EXPECT_EQ(msg.repeated_string(0), "std::string value 3");
+  msg.clear_repeated_string();
+
+  msg.add_repeated_string({'a', 'b', 'c'});
+  EXPECT_EQ(msg.repeated_string(0), "abc");
+  msg.clear_repeated_string();
 }
 
 }  // namespace protobuf

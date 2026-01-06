@@ -1,18 +1,41 @@
-# GRPC Python setup requirements
-coverage==4.5.4
-cython==0.29.21
-protobuf>=3.5.0.post1, < 4.0dev
-wheel==0.38.1
-oauth2client==4.1.0
-requests==2.25.1
-urllib3==1.26.5
-chardet==3.0.4
-certifi==2023.7.22
-idna==2.7
-gevent==22.08.0
-zope.event==4.5.0
-setuptools==44.1.1
-xds-protos==0.0.11
-opencensus==0.10.0
-opencensus-ext-stackdriver==0.8.0
-absl-py==1.4.0
+# Copyright 2025 gRPC authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# This file provides the source for generating requirements.bazel.lock.
+# Instructions for generation follow:
+# Use the oldest supported version of Python
+#
+#   $ docker run -it --rm -v $(pwd):/grpc python:3.8 /bin/bash
+#   # cd grpc
+#   # pip install pip-tools
+#   # pip-compile --allow-unsafe requirements.bazel.txt > requirements.bazel.lock
+#   # exit
+#   $ sudo chown $USER requirements.bazel.lock
+
+absl-py
+certifi
+chardet
+gevent
+google-auth
+googleapis-common-protos
+idna
+opentelemetry-api
+opentelemetry-exporter-prometheus
+opentelemetry-resourcedetector-gcp
+opentelemetry-sdk
+protobuf
+pyyaml  # for DNS test
+requests
+twisted  # for DNS test
+urllib3

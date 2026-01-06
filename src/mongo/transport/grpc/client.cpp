@@ -58,7 +58,7 @@
 #include <grpcpp/security/tls_certificate_verifier.h>
 #include <grpcpp/security/tls_credentials_options.h>
 #include <grpcpp/support/async_stream.h>
-#include <src/core/lib/security/security_connector/ssl_utils.h>
+#include <src/core/credentials/transport/tls/ssl_utils.h>
 #include <src/core/tsi/ssl_transport_security.h>
 #include <src/core/tsi/transport_security_interface.h>
 

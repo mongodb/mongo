@@ -153,7 +153,7 @@ index 00000000000..31feebb9fb7
 +        cc_deps = [":" + proto_cc_name],
 +        copts = OTEL_COPTS,
 +        deps = [
-+            "//src/third_party/protobuf",
++            "@com_google_protobuf//:protobuf",
 +        ],
 +    )
 -- 

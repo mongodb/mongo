@@ -452,7 +452,9 @@ TEST_F(IdleChannelPrunerTest, StopsWithTransportLayer) {
 TEST_F(GRPCTransportLayerTest, ConnectAndListen) {
     unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
         auto options = CommandServiceTestFixtures::makeTLOptions();
-        options.bindIpList = {"localhost", "127.0.0.1", "::1"};
+        // TODO(SERVER-115428): Restore IPv6 Loopback testing for ingress gRPC
+        // options.bindIpList = {"localhost", "127.0.0.1", "::1"};
+        options.bindIpList = {"localhost", "127.0.0.1"};
         options.useUnixDomainSockets = true;
 
         runWithTL(

@@ -97,6 +97,13 @@ common:windows --repo_env=BAZEL_VC_FULL_VERSION=14.31.31103
 # Default the Visual C Redistribution to v14.3 for Windows installer.
 common:windows --repo_env=MONGO_VC_REDIST_FULL_VERSION=v143
 
+# host_features will build tools that are meant to run in the build
+# we don't care about running sanitizer checks on tools that run in the build
+common:linux --host_features=-any_sanitizer
+common:linux --host_features=-asan
+common:linux --host_features=-fsan
+common:linux --host_features=-ubsan
+common:linux --host_features=-tsan
 
 # while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
 # targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
