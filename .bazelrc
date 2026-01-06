@@ -55,7 +55,7 @@ common --nolegacy_external_runfiles
 common --remote_download_outputs=all
 
 # Files we always want to download for debugging and error checking
-common --remote_download_regex=.*\.(dwo|h|cpp|test.xml)$
+common --remote_download_regex=.*\.(dwo|h|cpp|test.xml|clang-tidy|clang-tidy\.strict)$
 
 # Disable caching of test results by default since many of our tests are non-deterministic.
 common --cache_test_results=no
