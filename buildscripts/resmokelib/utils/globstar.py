@@ -35,6 +35,29 @@ def iglob(globbed_pathname):
     expanded to match zero or more subdirectories.
     """
 
-    for pathname in _glob.iglob(globbed_pathname, recursive=True):
+    results = _glob.iglob(globbed_pathname, recursive=True)
+
+    # Python 3.13 changed glob behavior for recursive patterns.
+    # In Python 3.10, when pattern is "dir/**", _glob2() always yields empty string
+    # which becomes "dir" when joined. Python 3.13's _glob2() only yields if dir exists.
+    # Peek at first result to check if glob returned anything without consuming the iterator.
+    first_result = next(results, None)
+
+    if first_result is None:
+        # No results from glob - simulate Python 3.10 behavior for recursive patterns
+        dirname, basename = os.path.split(globbed_pathname)
+        # Check if basename is exactly "**" (recursive wildcard)
+        is_recursive = basename == "**" or (isinstance(basename, bytes) and basename == b"**")
+        if _glob.has_magic(basename) and is_recursive:
+            # Mimic Python 3.10: _glob2 yields empty string, joined with dirname = dirname
+            if dirname:
+                yield os.path.normpath(dirname)
+        return
+
+    # Yield the first result we peeked at
+    yield os.path.normpath(first_result)
+
+    # Then yield the rest
+    for pathname in results:
         # Normalize 'pathname' so exact string comparison can be used later.
         yield os.path.normpath(pathname)
