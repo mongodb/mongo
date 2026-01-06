@@ -73,7 +73,7 @@ std::vector<std::pair<std::string, MultikeyComponents>> generatePathsToInsert(
     // Maximum length of each component of a dotted field path
     // The size of the range of possible lengths we choose from is 10 by default, and the bottom
     // bound must always be at least 1.
-    int maxFieldNameLength = static_cast<int>(2);
+    int maxFieldNameLength = static_cast<int>(state.range(2));
     std::pair<int, int> rangeFieldNameLength(std::max(maxFieldNameLength - 10, 1),
                                              maxFieldNameLength);
 
