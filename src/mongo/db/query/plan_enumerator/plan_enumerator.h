@@ -52,13 +52,7 @@
 #include <utility>
 #include <vector>
 
-#include <boost/functional/hash.hpp>
-#include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/member.hpp>
-#include <boost/multi_index/sequenced_index.hpp>
-#include <boost/multi_index_container.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/tuple/tuple.hpp>
 
 namespace mongo {
 namespace plan_enumerator {
@@ -188,51 +182,13 @@ private:
         std::deque<size_t> route;
     };
 
-    struct OutsidePred {
-        MatchExpression* key;
-        OutsidePredRoute predRoute;
-    };
-
-    // This container provides two different ways of iterating/accessing the data. In most cases,
-    // the order in which we iterate through this container does not matter - in such cases we can
-    // use the hashed_unique index. In other cases, the order needs to be consistent otherwise the
-    // plan enumerator is not deterministic (such as deciding which predicate can be pushed down
-    // under an OR) - in those cases we use the sequenced index which keeps track of insertion
-    // order.
-    using OutsidePredContainer = boost::multi_index_container<
-        OutsidePred,
-        boost::multi_index::indexed_by<
-            boost::multi_index::sequenced<>,
-            boost::multi_index::hashed_unique<
-                boost::multi_index::member<OutsidePred, MatchExpression*, &OutsidePred::key>,
-                boost::hash<MatchExpression*>,
-                std::equal_to<MatchExpression*>>>>;
-
-    // Some helpers for OutsidePredContainer to improve code legibility.
-    static OutsidePredContainer::nth_index<0>::type& getOutsidePredSequencedIdx(
-        OutsidePredContainer& container) {
-        return container.get<0>();
-    }
-    static const OutsidePredContainer::nth_index<0>::type& getOutsidePredSequencedIdx(
-        const OutsidePredContainer& container) {
-        return container.get<0>();
-    }
-    static OutsidePredContainer::nth_index<1>::type& getOutsidePredHashedIdx(
-        OutsidePredContainer& container) {
-        return container.get<1>();
-    }
-    static const OutsidePredContainer::nth_index<1>::type& getOutsidePredHashedIdx(
-        const OutsidePredContainer& container) {
-        return container.get<1>();
-    }
-
     struct PrepMemoContext {
         PrepMemoContext() : elemMatchExpr(nullptr) {}
         MatchExpression* elemMatchExpr;
 
         // Maps from indexable predicates that can be pushed into the current node to the route
         // through ORs that they have taken to get to this node.
-        OutsidePredContainer outsidePreds;
+        stdx::unordered_map<MatchExpression*, OutsidePredRoute> outsidePreds;
     };
 
     /**
@@ -413,9 +369,10 @@ private:
      * This function should only be called if the index has path-level multikey information.
      * Otherwise, getMultikeyCompoundablePreds() and compound() should be used instead.
      */
-    void assignMultikeySafePredicates(const std::vector<MatchExpression*>& couldAssign,
-                                      const OutsidePredContainer& outsidePreds,
-                                      OneIndexAssignment* indexAssignment);
+    void assignMultikeySafePredicates(
+        const std::vector<MatchExpression*>& couldAssign,
+        const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
+        OneIndexAssignment* indexAssignment);
 
     /**
      * 'andAssignment' contains assignments that we've already committed to outputting,
@@ -464,11 +421,12 @@ private:
      * and idxToNotFirst (and the sub-trees in 'subnodes').  Outputs the assignments into
      * 'andAssignment'. The predicates in 'outsidePreds' are considered for OrPushdownTags.
      */
-    void enumerateOneIndex(IndexToPredMap idxToFirst,
-                           IndexToPredMap idxToNotFirst,
-                           const std::vector<MemoID>& subnodes,
-                           const OutsidePredContainer& outsidePreds,
-                           AndAssignment* andAssignment);
+    void enumerateOneIndex(
+        IndexToPredMap idxToFirst,
+        IndexToPredMap idxToNotFirst,
+        const std::vector<MemoID>& subnodes,
+        const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
+        AndAssignment* andAssignment);
 
     /**
      * Generate single-index assignments for queries which contain mandatory
@@ -517,10 +475,11 @@ private:
      * 'outsidePreds'. 'pred' must be able to use the index and be multikey-safe to add to
      * 'indexAssignment'.
      */
-    void assignPredicate(const OutsidePredContainer& outsidePreds,
-                         MatchExpression* pred,
-                         size_t position,
-                         OneIndexAssignment* indexAssignment);
+    void assignPredicate(
+        const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
+        MatchExpression* pred,
+        size_t position,
+        OneIndexAssignment* indexAssignment);
 
     /**
      * Sets a flag on all outside pred routes that descend through an $elemMatch object node.
