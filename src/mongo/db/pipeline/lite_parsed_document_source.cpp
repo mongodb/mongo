@@ -208,92 +208,6 @@ const std::vector<LiteParsedPipeline>& LiteParsedDocumentSource::getSubPipelines
     return kNoSubPipeline;
 }
 
-LiteParsedDocumentSourceNestedPipelines::LiteParsedDocumentSourceNestedPipelines(
-    const BSONElement& spec,
-    boost::optional<NamespaceString> foreignNss,
-    std::vector<LiteParsedPipeline> pipelines)
-    : LiteParsedDocumentSource(spec),
-      _foreignNss(std::move(foreignNss)),
-      _pipelines(std::move(pipelines)) {}
-
-LiteParsedDocumentSourceNestedPipelines::LiteParsedDocumentSourceNestedPipelines(
-    const BSONElement& spec,
-    boost::optional<NamespaceString> foreignNss,
-    boost::optional<LiteParsedPipeline> pipeline)
-    : LiteParsedDocumentSourceNestedPipelines(
-          spec, std::move(foreignNss), std::vector<LiteParsedPipeline>{}) {
-    if (pipeline)
-        _pipelines.emplace_back(std::move(pipeline.value()));
-}
-
-stdx::unordered_set<NamespaceString>
-LiteParsedDocumentSourceNestedPipelines::getInvolvedNamespaces() const {
-    stdx::unordered_set<NamespaceString> involvedNamespaces;
-    if (_foreignNss)
-        involvedNamespaces.insert(*_foreignNss);
-
-    for (auto&& pipeline : _pipelines) {
-        const auto& involvedInSubPipe = pipeline.getInvolvedNamespaces();
-        involvedNamespaces.insert(involvedInSubPipe.begin(), involvedInSubPipe.end());
-    }
-    return involvedNamespaces;
-}
-
-void LiteParsedDocumentSourceNestedPipelines::getForeignExecutionNamespaces(
-    stdx::unordered_set<NamespaceString>& nssSet) const {
-    for (auto&& pipeline : _pipelines) {
-        auto nssVector = pipeline.getForeignExecutionNamespaces();
-        for (const auto& nssOrUUID : nssVector) {
-            tassert(6458500,
-                    "nss expected to contain a NamespaceString",
-                    nssOrUUID.isNamespaceString());
-            nssSet.insert(nssOrUUID.nss());
-        }
-    }
-}
-
-bool LiteParsedDocumentSourceNestedPipelines::isExemptFromIngressAdmissionControl() const {
-    return std::any_of(_pipelines.begin(), _pipelines.end(), [](auto&& pipeline) {
-        return pipeline.isExemptFromIngressAdmissionControl();
-    });
-}
-
-Status LiteParsedDocumentSourceNestedPipelines::checkShardedForeignCollAllowed(
-    const NamespaceString& nss, bool inMultiDocumentTransaction) const {
-    for (auto&& pipeline : _pipelines) {
-        if (auto status = pipeline.checkShardedForeignCollAllowed(nss, inMultiDocumentTransaction);
-            !status.isOK()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
-ReadConcernSupportResult LiteParsedDocumentSourceNestedPipelines::supportsReadConcern(
-    repl::ReadConcernLevel level, bool isImplicitDefault) const {
-    // Assume that the document source holding the pipeline has no constraints of its own, so
-    // return the strictest of the constraints on the sub-pipelines.
-    auto result = ReadConcernSupportResult::allSupportedAndDefaultPermitted();
-    for (auto& pipeline : _pipelines) {
-        result.merge(pipeline.sourcesSupportReadConcern(level, isImplicitDefault));
-        // If both result statuses are already not OK, stop checking.
-        if (!result.readConcernSupport.isOK() && !result.defaultReadConcernPermit.isOK()) {
-            break;
-        }
-    }
-    return result;
-}
-
-PrivilegeVector LiteParsedDocumentSourceNestedPipelines::requiredPrivilegesBasic(
-    bool isMongos, bool bypassDocumentValidation) const {
-    PrivilegeVector requiredPrivileges;
-    for (auto&& pipeline : _pipelines) {
-        Privilege::addPrivilegesToPrivilegeVector(
-            &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
-    }
-    return requiredPrivileges;
-}
-
 const ParserMap& LiteParsedDocumentSource::getParserMap() {
     return parserMap;
 }
@@ -328,6 +242,5 @@ DisallowViewsPolicy::DisallowViewsPolicy()
 
 DisallowViewsPolicy::DisallowViewsPolicy(ViewPolicyCallbackFn&& fn)
     : ViewPolicy(kFirstStageApplicationPolicy::kDoNothing, std::move(fn)) {}
-
 
 }  // namespace mongo

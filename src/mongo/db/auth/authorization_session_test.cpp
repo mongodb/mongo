@@ -2375,7 +2375,7 @@ class TestDocumentSourceNoPrivsWithAuthzChecks : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$testNoPrivsWithAuthzChecks"_sd;
 
-    class LiteParsed : public LiteParsedDocumentSource {
+    class LiteParsed : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -2383,7 +2383,7 @@ public:
             return std::make_unique<LiteParsed>(spec);
         }
 
-        LiteParsed(const BSONElement& spec) : LiteParsedDocumentSource(spec) {}
+        LiteParsed(const BSONElement& spec) : LiteParsedDocumentSourceDefault(spec) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return {};
@@ -2392,6 +2392,10 @@ public:
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
             return {};
+        }
+
+        bool requiresAuthzChecks() const override {
+            return true;
         }
 
         std::unique_ptr<StageParams> getStageParams() const override {

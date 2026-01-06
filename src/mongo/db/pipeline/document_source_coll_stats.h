@@ -71,7 +71,7 @@ class DocumentSourceCollStats : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$collStats"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& specElem,
@@ -87,7 +87,9 @@ public:
         LiteParsed(const BSONElement& specElem,
                    NamespaceString nss,
                    DocumentSourceCollStatsSpec spec)
-            : LiteParsedDocumentSource(specElem), _nss(std::move(nss)), _spec(std::move(spec)) {}
+            : LiteParsedDocumentSourceDefault(specElem),
+              _nss(std::move(nss)),
+              _spec(std::move(spec)) {}
 
         bool isCollStats() const final {
             return true;

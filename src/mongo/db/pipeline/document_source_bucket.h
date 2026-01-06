@@ -49,14 +49,14 @@ class DocumentSourceBucket final {
 public:
     static constexpr StringData kStageName = "$bucket"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
                                                  const LiteParserOptions& options) {
             return std::make_unique<LiteParsed>(spec);
         }
-        explicit LiteParsed(const BSONElement& spec) : LiteParsedDocumentSource(spec) {}
+        explicit LiteParsed(const BSONElement& spec) : LiteParsedDocumentSourceDefault(spec) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return {};

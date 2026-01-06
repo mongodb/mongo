@@ -88,7 +88,7 @@ class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$graphLookup"_sd;
 
-    class LiteParsed : public LiteParsedDocumentSourceForeignCollection {
+    class LiteParsed : public LiteParsedDocumentSourceForeignCollection<LiteParsed> {
     public:
         LiteParsed(const BSONElement& spec, NamespaceString foreignNss)
             : LiteParsedDocumentSourceForeignCollection(spec, std::move(foreignNss)) {}

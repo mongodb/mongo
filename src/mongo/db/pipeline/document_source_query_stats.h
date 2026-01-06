@@ -68,7 +68,7 @@ class DocumentSourceQueryStats final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$queryStats"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -78,7 +78,7 @@ public:
                    const boost::optional<TenantId>& tenantId,
                    TransformAlgorithmEnum algorithm,
                    std::string hmacKey)
-            : LiteParsedDocumentSource(spec),
+            : LiteParsedDocumentSourceDefault(spec),
               _algorithm(algorithm),
               _hmacKey(hmacKey),
               _privileges(

@@ -79,7 +79,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ChangeStream);
  */
 class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceChangeStream final {
 public:
-    class LiteParsed : public LiteParsedDocumentSource {
+    class LiteParsed : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -91,7 +91,7 @@ public:
         }
 
         LiteParsed(const BSONElement& spec, NamespaceString nss)
-            : LiteParsedDocumentSource(spec), _nss(std::move(nss)) {}
+            : LiteParsedDocumentSourceDefault(spec), _nss(std::move(nss)) {}
 
         bool isChangeStream() const final {
             return true;
@@ -452,6 +452,10 @@ public:
 
     std::unique_ptr<StageParams> getStageParams() const final {
         return std::make_unique<StageParamsT>(_originalBson);
+    }
+
+    std::unique_ptr<LiteParsedDocumentSource> clone() const final {
+        return std::make_unique<DocumentSourceChangeStreamLiteParsedInternal>(*this);
     }
 };
 

@@ -167,6 +167,11 @@ public:
             return false;
         }
 
+        std::unique_ptr<LiteParsedDocumentSource> clone() const override {
+            // TODO SERVER-115949.
+            MONGO_UNREACHABLE_TASSERT(11550300);
+        }
+
     private:
         /**
          * Carries per-invocation validation state for recursive expansion performed by
@@ -272,6 +277,11 @@ public:
             // are required. Otherwise, it is safe to opt out of auth checks.
             const auto& properties = _properties.getRequiredPrivileges();
             return properties.has_value() && !properties->empty();
+        }
+
+        std::unique_ptr<LiteParsedDocumentSource> clone() const override {
+            // TODO SERVER-115949.
+            MONGO_UNREACHABLE_TASSERT(11550301);
         }
 
     private:

@@ -50,7 +50,8 @@ public:
     /**
      * A 'LiteParsed' representation of the $listSearchIndexes stage.
      */
-    class LiteParsedListSearchIndexes final : public LiteParsedDocumentSource {
+    class LiteParsedListSearchIndexes final
+        : public LiteParsedDocumentSourceDefault<LiteParsedListSearchIndexes> {
     public:
         static std::unique_ptr<LiteParsedListSearchIndexes> parse(
             const NamespaceString& nss, const BSONElement& spec, const LiteParserOptions& options) {
@@ -90,7 +91,7 @@ public:
         }
 
         LiteParsedListSearchIndexes(const BSONElement& spec, NamespaceString nss)
-            : LiteParsedDocumentSource(spec), _nss(std::move(nss)) {}
+            : LiteParsedDocumentSourceDefault(spec), _nss(std::move(nss)) {}
 
     private:
         const NamespaceString _nss;

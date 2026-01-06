@@ -68,7 +68,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalShardServerInfo);
  */
 class DocumentSourceInternalShardServerInfo final : public DocumentSource {
 public:
-    class LiteParsed : public LiteParsedDocumentSource {
+    class LiteParsed : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -76,7 +76,7 @@ public:
             return std::make_unique<LiteParsed>(spec);
         }
 
-        LiteParsed(const BSONElement& spec) : LiteParsedDocumentSource(spec) {}
+        LiteParsed(const BSONElement& spec) : LiteParsedDocumentSourceDefault(spec) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();

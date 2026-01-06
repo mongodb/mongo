@@ -70,7 +70,7 @@ public:
 
     DocumentSourceInternalListCollections(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -79,7 +79,7 @@ public:
         }
 
         LiteParsed(const BSONElement& spec, const boost::optional<TenantId>& tenantId)
-            : LiteParsedDocumentSource(spec),
+            : LiteParsedDocumentSourceDefault(spec),
               _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
                                      ActionType::internal)}) {}
 

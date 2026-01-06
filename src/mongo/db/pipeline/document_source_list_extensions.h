@@ -60,7 +60,7 @@ class MONGO_MOD_NEEDS_REPLACEMENT DocumentSourceListExtensions final {
 public:
     static constexpr StringData kStageName = "$listExtensions"_sd;
 
-    class LiteParsed : public LiteParsedDocumentSource {
+    class LiteParsed : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& specElem,
@@ -69,7 +69,7 @@ public:
         }
 
         LiteParsed(const BSONElement& spec)
-            : LiteParsedDocumentSource(spec),
+            : LiteParsedDocumentSourceDefault(spec),
               _privileges({Privilege(ResourcePattern::forClusterResource(boost::none),
                                      ActionType::listExtensions)}) {}
 

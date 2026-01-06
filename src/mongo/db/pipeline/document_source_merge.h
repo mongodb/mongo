@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_document_source_nested_pipelines.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/merge_processor.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -100,7 +101,7 @@ public:
      * collection is unsharded. This ensures that the unique index verification happens once on
      * mongos and can be bypassed on the shards.
      */
-    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
+    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines<LiteParsed> {
     public:
         LiteParsed(const BSONElement& spec,
                    NamespaceString foreignNss,

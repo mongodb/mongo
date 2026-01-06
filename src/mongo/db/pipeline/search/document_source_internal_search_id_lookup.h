@@ -61,7 +61,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -99,7 +99,7 @@ public:
 
         // TODO SERVER-114038 Remove redundancy of storing both originalBson and ownedSpec.
         LiteParsed(const BSONElement& specElem, BSONObj spec)
-            : LiteParsedDocumentSource(specElem),
+            : LiteParsedDocumentSourceDefault(specElem),
               _ownedSpec(spec.isOwned() ? std::move(spec) : spec.getOwned()) {}
 
     private:

@@ -67,7 +67,7 @@ class DocumentSourcePlanCacheStats final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$planCacheStats"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -76,7 +76,7 @@ public:
         }
 
         LiteParsed(const BSONElement& spec, NamespaceString nss)
-            : LiteParsedDocumentSource(spec), _nss(std::move(nss)) {}
+            : LiteParsedDocumentSourceDefault(spec), _nss(std::move(nss)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             // There are no foreign collections.

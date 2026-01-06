@@ -65,7 +65,7 @@ class DocumentSourceListCatalog final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$listCatalog"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -74,7 +74,7 @@ public:
         }
 
         LiteParsed(const BSONElement& spec, NamespaceString ns)
-            : LiteParsedDocumentSource(spec), _ns(std::move(ns)) {}
+            : LiteParsedDocumentSourceDefault(spec), _ns(std::move(ns)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();

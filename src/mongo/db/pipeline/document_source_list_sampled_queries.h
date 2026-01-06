@@ -84,7 +84,7 @@ class DocumentSourceListSampledQueries final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$listSampledQueries"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& specElem,
@@ -93,7 +93,7 @@ public:
         LiteParsed(const BSONElement& specElem,
                    NamespaceString nss,
                    DocumentSourceListSampledQueriesSpec spec)
-            : LiteParsedDocumentSource(specElem),
+            : LiteParsedDocumentSourceDefault(specElem),
               _nss(std::move(nss)),
               _privileges({Privilege(ResourcePattern::forClusterResource(_nss.tenantId()),
                                      ActionType::listSampledQueries)}) {}

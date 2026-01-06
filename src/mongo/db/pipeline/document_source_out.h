@@ -88,7 +88,7 @@ public:
      * A "lite parsed" $out stage is similar to other stages involving foreign collections except in
      * some cases the foreign collection is allowed to be sharded.
      */
-    class LiteParsed final : public LiteParsedDocumentSourceForeignCollection {
+    class LiteParsed final : public LiteParsedDocumentSourceForeignCollection<LiteParsed> {
     public:
         using LiteParsedDocumentSourceForeignCollection::LiteParsedDocumentSourceForeignCollection;
 
