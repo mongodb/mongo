@@ -77,7 +77,7 @@ TEST_F(InMemIterTest, Sorted) {
 
 TEST_F(InMemIterTest, DoesNoReorderGivenInput) {
     static const int unsorted[] = {6, 3, 7, 4, 0, 9, 5, 7, 1, 8};
-    class UnsortedIter : public IWIterator {
+    class UnsortedIter : public IWIteratorBase {
     public:
         UnsortedIter() : _pos(0) {}
         bool more() override {

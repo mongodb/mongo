@@ -259,26 +259,19 @@ public:
 
     virtual ~Iterator() = default;
 
-    virtual SorterRange getRange() const {
-        invariant(false, "Only FileIterator has ranges");
-        MONGO_UNREACHABLE;
-    }
+    virtual SorterRange getRange() const = 0;
 
     /**
      * Returns true iff it is valid to call spill() method on this iterator.
      */
-    virtual bool spillable() const {
-        return false;
-    }
+    virtual bool spillable() const = 0;
 
     /**
      * Spills not-yet-returned data to disk and returns a new iterator. Invalidates the current
      * iterator.
      */
     [[nodiscard]] virtual std::unique_ptr<sorter::Iterator<Key, Value>> spill(
-        const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) {
-        MONGO_UNREACHABLE_TASSERT(9917200);
-    }
+        const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) = 0;
 };
 
 /**
