@@ -144,6 +144,51 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
     ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 20);
 }
 
+using CreateInt64GaugeTest = MetricsServiceTest;
+
+TEST_F(CreateInt64GaugeTest, SameGaugeReturnedOnSameCreate) {
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Gauge<int64_t>* gauge_1 =
+        metricsService.createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    Gauge<int64_t>* gauge_2 =
+        metricsService.createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_EQ(gauge_1, gauge_2);
+}
+
+TEST_F(CreateInt64GaugeTest, ExceptionWhenSameNameButDifferentParameters) {
+    auto& metricsService = MetricsService::get(getServiceContext());
+    metricsService.createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_THROWS_CODE(metricsService.createInt64Gauge(
+                           MetricNames::kTest1, "different_description", MetricUnit::kSeconds),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(
+        metricsService.createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kBytes),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
+}
+
+TEST_F(CreateInt64GaugeTest, RecordsValues) {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Gauge<int64_t>* gauge_1 =
+        metricsService.createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    Gauge<int64_t>* gauge_2 =
+        metricsService.createInt64Gauge(MetricNames::kTest2, "description2", MetricUnit::kBytes);
+
+    ASSERT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 0);
+    ASSERT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2), 0);
+
+    gauge_1->set(10);
+    gauge_2->set(3);
+
+    ASSERT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 10);
+    ASSERT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2), 3);
+
+    gauge_1->set(20);
+    ASSERT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 20);
+}
+
 using CreateHistogramTest = MetricsServiceTest;
 
 TEST_F(CreateHistogramTest, RecordsValues) {

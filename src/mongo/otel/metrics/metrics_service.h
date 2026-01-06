@@ -35,6 +35,7 @@
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
+#include "mongo/otel/metrics/metrics_gauge.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
 #include "mongo/util/modules.h"
 
@@ -67,7 +68,15 @@ public:
      */
     Counter<int64_t>* createInt64Counter(MetricName name, std::string description, MetricUnit unit);
 
-    // TODO SERVER-114954 Implement MetricsService::createUInt64Gauge
+    /**
+     * Creates or returns an existing gauge with the provided parameters. The result is never null
+     * but will throw an exception if the gauge would collide with an different metric (i.e., same
+     * name but different type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    Gauge<int64_t>* createInt64Gauge(MetricName name, std::string description, MetricUnit unit);
+
     // TODO SERVER-114955 Implement MetricsService::createDoubleGauge
 
     /**
@@ -122,6 +131,7 @@ private:
     T* getDuplicateMetric(WithLock, const std::string& name, MetricIdentifier identifier);
 
     using OwnedMetric = std::variant<std::unique_ptr<Counter<int64_t>>,
+                                     std::unique_ptr<Gauge<int64_t>>,
                                      std::unique_ptr<Histogram<double>>,
                                      std::unique_ptr<Histogram<int64_t>>>;
 

@@ -38,6 +38,7 @@
 #include <opentelemetry/exporters/memory/in_memory_metric_exporter_factory.h>
 #include <opentelemetry/metrics/noop.h>
 #include <opentelemetry/metrics/provider.h>
+#include <opentelemetry/sdk/metrics/data/metric_data.h>
 #include <opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_factory.h>
 #include <opentelemetry/sdk/metrics/export/periodic_exporting_metric_reader_options.h>
 #include <opentelemetry/sdk/metrics/meter_provider.h>
@@ -161,6 +162,11 @@ public:
     int64_t readInt64Counter(MetricName name);
 
     /**
+     * Gets the value of an Int64 gauge and throws an exception if it is not found.
+     */
+    int64_t readInt64Gauge(MetricName name);
+
+    /**
      * Gets the data of an int64_t histogram and throws an exception if it is not found.
      */
     HistogramData<int64_t> readInt64Histogram(MetricName name);
@@ -171,6 +177,29 @@ public:
     HistogramData<double> readDoubleHistogram(MetricName name);
 
 private:
+    // Gets a specific opentelemetry Instrument type based on the instrument's name. The MetricType
+    // must be a PointType as defined here in the opentelemetry library:
+    // https://github.com/open-telemetry/opentelemetry-cpp/blob/f0a1da286f3b130df1eb3db79ffc1ae427c9532b/sdk/include/opentelemetry/sdk/metrics/data/metric_data.h#L21
+    template <typename DataType>
+    DataType getMetricData(MetricName name) {
+        _metrics->Clear();
+        _reader->triggerMetricExport();
+
+        const opentelemetry::exporter::memory::SimpleAggregateInMemoryMetricData::AttributeToPoint&
+            attributeToPoint =
+                _metrics->Get(std::string(toStdStringViewForInterop(MetricsService::kMeterName)),
+                              std::string(toStdStringViewForInterop(name.getName())));
+        auto it = attributeToPoint.find({});
+        massert(ErrorCodes::KeyNotFound,
+                fmt::format("No metric with name {} exists", name.getName()),
+                it != attributeToPoint.end());
+
+        massert(ErrorCodes::TypeMismatch,
+                fmt::format("Metric {} does not have matching metric type", name.getName()),
+                std::holds_alternative<DataType>(it->second));
+        return std::get<DataType>(it->second);
+    }
+
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagOtelMetrics", true};
 
     // Stash the reader so that callers can trigger on-demand metric collection.

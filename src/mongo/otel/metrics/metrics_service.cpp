@@ -55,6 +55,18 @@ void observableCounterCallback(opentelemetry::metrics::ObserverResult observer_r
     invariant(observer != nullptr && *observer != nullptr);
     (*observer)->Observe(value);
 }
+
+// Static callback function for observable gauges.
+void observableGaugeCallback(opentelemetry::metrics::ObserverResult observer_result, void* state) {
+    invariant(state != nullptr);
+    auto* const gauge = static_cast<Gauge<int64_t>*>(state);
+    int64_t value = gauge->value();
+
+    auto observer = std::get_if<std::shared_ptr<opentelemetry::metrics::ObserverResultT<int64_t>>>(
+        &observer_result);
+    invariant(observer != nullptr && *observer != nullptr);
+    (*observer)->Observe(value);
+}
 }  // namespace
 
 template <typename T>
@@ -80,7 +92,7 @@ T* MetricsService::getDuplicateMetric(WithLock,
 Counter<int64_t>* MetricsService::createInt64Counter(MetricName name,
                                                      std::string description,
                                                      MetricUnit unit) {
-    std::string nameStr{name.getName()};
+    std::string nameStr(name.getName());
     MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Counter<int64_t>>(lock, nameStr, identifier);
@@ -108,6 +120,38 @@ Counter<int64_t>* MetricsService::createInt64Counter(MetricName name,
     _observableInstruments.push_back(std::move(observableCounter));
 
     return counter_ptr;
+}
+
+Gauge<int64_t>* MetricsService::createInt64Gauge(MetricName name,
+                                                 std::string description,
+                                                 MetricUnit unit) {
+    std::string nameStr(name.getName());
+    MetricIdentifier identifier{.description = description, .unit = unit};
+    stdx::lock_guard lock(_mutex);
+    auto duplicate = getDuplicateMetric<Gauge<int64_t>>(lock, nameStr, identifier);
+    if (duplicate) {
+        return duplicate;
+    }
+
+    // Make the raw gauge.
+    auto gauge = std::make_unique<GaugeImpl<int64_t>>();
+    Gauge<int64_t>* const gauge_ptr = gauge.get();
+    _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(gauge)};
+
+    // Observe the raw gauge.
+    std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableGauge =
+        opentelemetry::metrics::Provider::GetMeterProvider()
+            ->GetMeter(std::string{kMeterName})
+            ->CreateInt64ObservableGauge(toStdStringViewForInterop(nameStr),
+                                         description,
+                                         toStdStringViewForInterop(toString(unit)));
+    tassert(ErrorCodes::InternalError,
+            fmt::format("Could not create observable gauge for metric: {}", nameStr),
+            observableGauge != nullptr);
+    observableGauge->AddCallback(observableGaugeCallback, gauge_ptr);
+    _observableInstruments.push_back(std::move(observableGauge));
+
+    return gauge_ptr;
 }
 
 Histogram<double>* MetricsService::createDoubleHistogram(MetricName name,
