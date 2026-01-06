@@ -79,51 +79,6 @@ variables:
           resmoke_jobs_max: 1
           suite: benchmark_suite
 
-  # THIS HAS COPIES IN
-  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
-  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
-  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
-  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &jstestfuzz_config_vars
-    is_jstestfuzz: true
-    num_files: 15
-    num_tasks: 5 # Upperbound by `max_sub_suites` specified through the variant with each task still running `num_files` files.
-    # It is error prone to require each fuzzer-related Evergreen task to need to override the
-    # resmoke_args variable. However, the resmoke_args variable must be defined as a string in the
-    # task generation configuration to satisfy mongodb/mongo-task-generator. We therefore specify an
-    # empty string for the variable to reflect there are no additional arguments provided to resmoke
-    # by default for the fuzzer-related tasks.
-    resmoke_args: ""
-    resmoke_jobs_max: 1
-    should_shuffle: false
-    continue_on_failure: false
-    # Terminate the function when there has been no output to stdout for 30 minutes. E.g. when something is stuck in an infinite loop.
-    # resmoke.py writes the test output to logkeeper and only writes to stdout when starting the next test.
-    # resmoke.py not producing output on stdout means that the test is still running and presumably not going to finish.
-    # Note that timeout_secs is different from exec_timeout_secs, which applies to a task and times out regardless of whether output has been written to stdout.
-    timeout_secs: 1800
-
-  # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
-  # THIS HAS COPIES IN
-  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
-  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
-  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
-  # - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &jstestfuzz_template
-    name: jstestfuzz_template
-    exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
-    depends_on:
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
-      - archive_dist_test
-    commands:
-      - func: "generate resmoke tasks"
-
 ################################################
 #                    Tasks                     #
 ################################################
@@ -523,6 +478,7 @@ task_groups:
       - func: "upload mongodatafiles"
       - func: "attach multiversion download links"
       - func: "save failed tests"
+      - func: "f_expansions_write"
       - func: "kill processes"
       - func: "save mongo coredumps"
       - func: "generate hang analyzer tasks"

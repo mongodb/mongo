@@ -461,6 +461,8 @@ buildvariants:
         distros:
           - rhel8.8-large
       - name: hotBackups_gen
+        distros:
+          - rhel8.8-large
       - name: generate_buildid_to_debug_symbols_mapping
 
   - name: &enterprise-rhel8-sdam-replica-set-monitor-64-bit enterprise-rhel8-sdam-replica-set-monitor-64-bit
@@ -487,7 +489,10 @@ buildvariants:
           - rhel8.8-large
       - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
       - name: .jscore .common !.requires_large_host
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
+        distros:
+          - rhel8.8-large
       - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
       - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
       - name: generate_buildid_to_debug_symbols_mapping
@@ -529,6 +534,8 @@ buildvariants:
       - name: .multi_shard
       - name: multiversion_auth_gen
       - name: noPassthrough_gen
+        distros:
+          - rhel8.8-large
       - name: .query_fuzzer
       - name: .replica_sets !.large
       - name: .resharding_fuzzer
@@ -588,8 +595,12 @@ buildvariants:
         patch_only: true
         distros:
           - rhel8.8-large
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
         patch_only: true
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
+        patch_only: true
+        distros:
+          - rhel8.8-large
       - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
         patch_only: true
       - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen

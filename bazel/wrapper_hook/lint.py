@@ -26,6 +26,8 @@ SUPPORTED_EXTENSIONS = (
     ".defs",
     ".inl",
     ".idl",
+    ".yml",
+    ".yaml",
 )
 
 
@@ -148,8 +150,8 @@ class LintRunner:
             self.fail = True
             if not self.keep_going:
                 raise LinterFail("File missing bazel target.")
-
-        print(f"All {type_name} files have BUILD.bazel targets!")
+        else:
+            print(f"All {type_name} files have BUILD.bazel targets!")
 
     def run_bazel(self, target: str, args: List = []):
         p = subprocess.run([self.bazel_bin, "run", target] + (["--"] + args if args else []))
@@ -302,7 +304,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
     )
     lint_all = parsed_args.all or "..." in args or "//..." in args
     files_to_lint = [arg for arg in args if not arg.startswith("-")]
-    if not lint_all and files_to_lint:
+    if not lint_all and not files_to_lint:
         origin_branch = parsed_args.origin_branch
         max_distance = 100
         distance = _git_distance([f"{origin_branch}..HEAD"])
@@ -335,7 +337,10 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
     if lint_all:
         lr.run_bazel("//buildscripts:pyrightlint", ["lint-all"])
     elif any(file.endswith(".py") for file in files_to_lint):
-        lr.run_bazel("//buildscripts:pyrightlint", ["lints"] + files_to_lint)
+        lr.run_bazel(
+            "//buildscripts:pyrightlint",
+            ["lints"] + [str(file) for file in files_to_lint if file.endswith(".py")],
+        )
 
     if lint_all or "poetry.lock" in files_to_lint or "pyproject.toml" in files_to_lint:
         lr.run_bazel("//buildscripts:poetry_lock_check")
@@ -347,6 +352,7 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
                 f"--evg-project-name={parsed_args.lint_yaml_project}",
             ],
         )
+        lr.run_bazel("//buildscripts:yamllinters")
 
     if lint_all or parsed_args.large_files:
         lr.run_bazel("buildscripts:large_file_check", ["--exclude", "src/third_party/*"])

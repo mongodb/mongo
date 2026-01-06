@@ -2350,7 +2350,7 @@ tasks:
         vars:
           suite: query_golden_join_optimization
 
-  - <<: *task_template
+  - <<: *gen_task_template
     name: query_join_optimization_passthrough_gen
     tags: [
         "assigned_to_jira_team_server_query_optimization",
@@ -2362,7 +2362,7 @@ tasks:
         vars:
           resmoke_jobs_max: 5
 
-  - <<: *task_template
+  - <<: *gen_task_template
     name: query_join_optimization_no_passthrough_with_mongod_gen
     tags: [
         "assigned_to_jira_team_server_query_optimization",
@@ -2441,7 +2441,7 @@ tasks:
     name: config_fuzzer_aggregation_mongos_passthrough_gen
     tags:
       [
-        "assigned_to_jira_team_query_integration",
+        "assigned_to_jira_team_server_query_integration",
         "default",
         "config_fuzzer",
         "large",

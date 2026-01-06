@@ -408,3 +408,24 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [],  # 'requests' optional (external link checks skipped if absent)
 )
+
+py_binary(
+    name = "yamllinters",
+    srcs = ["yamllinters.py"],
+    main = "yamllinters.py",
+    visibility = ["//visibility:public"],
+    deps = [
+        dependency(
+            "yamllint",
+            group = "lint",
+        ),
+        dependency(
+            "evergreen-lint",
+            group = "lint",
+        ),
+        dependency(
+            "evergreen-py",
+            group = "testing",
+        ),
+    ],
+)

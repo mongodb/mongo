@@ -484,8 +484,7 @@ tasks:
           display_name: "LibFuzzer Tests"
 
   ## compile_dbtest ##
-  - &compile_dbtest
-    name: compile_dbtest
+  - name: compile_dbtest
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
       - name: archive_dist_test
@@ -497,8 +496,7 @@ tasks:
             --config=evg
 
   ## run_dbtest ##
-  - &run_dbtest
-    name: run_dbtest
+  - name: run_dbtest
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
     depends_on:
       - name: compile_dbtest
@@ -513,8 +511,7 @@ tasks:
           suite: dbtest
           install_dir: bazel-bin/install/bin
 
-  - &archive_dbtest
-    name: archive_dbtest
+  - name: archive_dbtest
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
     depends_on:
       - name: compile_dbtest
@@ -1200,6 +1197,7 @@ tasks:
           content_type: application/tar
           display_name: gcc_pgo
           optional: true
+      - func: "f_expansions_write"
       - command: subprocess.exec
         params:
           binary: bash
@@ -1218,6 +1216,7 @@ tasks:
     run_on: rhel8.7-small
     tags: [
         "assigned_to_jira_team_devprod_build",
+        "auxiliary",
         "incompatible_aubsan",
         "incompatible_community",
         "incompatible_development_variant",

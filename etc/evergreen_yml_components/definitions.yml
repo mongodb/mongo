@@ -343,7 +343,7 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz.sha256
 
-  "fetch binary zstd shas": &fetch_zstd_binary_shas
+  "fetch binary zstd shas":
     command: s3.get
     display_name: "fetch binary zstd shas"
     params:
@@ -1463,6 +1463,7 @@ functions:
   "generate resmoke tasks":
     - *fetch_artifacts
     - *fetch_artifacts_zstd
+    - *f_expansions_write
     - *extract_artifacts
     - *f_expansions_write
     - *kill_processes
@@ -3492,7 +3493,7 @@ functions:
         args:
           - "./src/evergreen/container_registry_login.sh"
 
-  "build and push module images": &build_and_push_module_images
+  "build and push module images":
     command: subprocess.exec
     params:
       binary: bash
