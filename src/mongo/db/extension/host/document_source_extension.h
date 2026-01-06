@@ -129,8 +129,7 @@ public:
               }()) {}
 
         std::unique_ptr<StageParams> getStageParams() const override {
-            // TODO SERVER-115655: Clone instead of moving the node.
-            return std::make_unique<ExpandableStageParams>(std::move(_parseNode));
+            return std::make_unique<ExpandableStageParams>(_parseNode->clone());
         }
 
         /**
@@ -202,8 +201,7 @@ public:
                                          const NamespaceString& nss,
                                          const LiteParserOptions& options);
 
-        // TODO SERVER-115655: Revert back to const.
-        mutable AggStageParseNodeHandle _parseNode;
+        const AggStageParseNodeHandle _parseNode;
         const NamespaceString _nss;
         const LiteParserOptions _options;
         const StageSpecs _expanded;
@@ -232,8 +230,7 @@ public:
               _nss(nss) {}
 
         std::unique_ptr<StageParams> getStageParams() const override {
-            // TODO SERVER-115655: Clone instead of moving the node.
-            return std::make_unique<ExpandedStageParams>(std::move(_astNode));
+            return std::make_unique<ExpandedStageParams>(_astNode->clone());
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -285,8 +282,7 @@ public:
         }
 
     private:
-        // TODO SERVER-115655: Revert back to const.
-        mutable AggStageAstNodeHandle _astNode;
+        const AggStageAstNodeHandle _astNode;
         const MongoExtensionStaticProperties _properties;
         const NamespaceString _nss;
     };

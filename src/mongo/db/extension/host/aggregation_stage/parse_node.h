@@ -166,12 +166,23 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _hostClone(const ::MongoExtensionAggStageParseNode* parseNode,
+                                              ::MongoExtensionAggStageParseNode** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            auto* hostParseNode = static_cast<const HostAggStageParseNode*>(parseNode);
+            auto clonedParseNode =
+                std::make_unique<AggStageParseNode>(hostParseNode->getBsonSpec());
+            *output = new HostAggStageParseNode(std::move(clonedParseNode));
+        });
+    }
+
     static constexpr ::MongoExtensionAggStageParseNodeVTable VTABLE{
         .destroy = &_hostDestroy,
         .get_name = &_hostGetName,
         .get_query_shape = &_hostGetQueryShape,
         .get_expanded_size = &_hostGetExpandedSize,
-        .expand = &_hostExpand};
+        .expand = &_hostExpand,
+        .clone = &_hostClone};
 
     std::unique_ptr<AggStageParseNode> _parseNode;
 };

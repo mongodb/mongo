@@ -77,6 +77,10 @@ public:
         return BSON(kMatchTopNName << _input);
     }
 
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<MatchTopNParseNode>(_input);
+    }
+
 private:
     const BSONObj _input;      // {filter: {...}, sort: {...}, limit: <num>}
     const BSONObj _matchSpec;  // {$match: {...}}

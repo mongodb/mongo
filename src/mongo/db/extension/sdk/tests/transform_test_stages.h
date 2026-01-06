@@ -76,6 +76,10 @@ public:
     TransformAggStageAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
         : TestAstNode(stageName, arguments) {}
 
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<TransformAggStageAstNode>(getName(), _arguments);
+    }
+
     static std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<TransformAggStageAstNode>();
     }
@@ -87,6 +91,10 @@ public:
 
     TransformAggStageParseNode(std::string_view stageName, const mongo::BSONObj& arguments)
         : TestParseNode(stageName, arguments) {}
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<TransformAggStageParseNode>(getName(), _arguments);
+    }
 
     static std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<TransformAggStageParseNode>();

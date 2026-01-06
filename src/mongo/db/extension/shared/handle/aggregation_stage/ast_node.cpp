@@ -56,4 +56,14 @@ LogicalAggStageHandle AggStageAstNodeAPI::bind() const {
 
     return LogicalAggStageHandle(logicalStagePtr);
 }
+
+AggStageAstNodeHandle AggStageAstNodeAPI::clone() const {
+    assertValid();
+    ::MongoExtensionAggStageAstNode* astNodePtr{nullptr};
+
+    // The API's contract mandates that astNodePtr will only be allocated if status is OK.
+    invokeCAndConvertStatusToException([&]() { return vtable().clone(get(), &astNodePtr); });
+
+    return AggStageAstNodeHandle(astNodePtr);
+}
 }  // namespace mongo::extension

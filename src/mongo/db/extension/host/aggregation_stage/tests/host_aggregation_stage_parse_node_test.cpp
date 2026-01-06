@@ -60,6 +60,10 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<NoOpExtensionParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<NoOpExtensionParseNode>();
     }
@@ -159,5 +163,85 @@ DEATH_TEST(HostParseNodeTestDeathTest, HostExpandUnimplemented, "10977801") {
     ::MongoExtensionExpandedArray expanded = {};
     handle->vtable().expand(noOpParseNode, &expanded);
 }
+
+TEST(HostParseNodeCloneTest, CloneHostAllocatedParseNodePreservesSpec) {
+    auto spec = BSON("$match" << BSON("x" << 1));
+
+    auto parseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make(spec));
+    auto handle = AggStageParseNodeHandle{parseNode};
+
+    // Clone the parse node.
+    auto clonedHandle = handle->clone();
+
+    // Verify the clone has the same spec and name.
+    ASSERT_TRUE(host::HostAggStageParseNode::isHostAllocated(*clonedHandle.get()));
+    ASSERT_TRUE(static_cast<host::HostAggStageParseNode*>(clonedHandle.get())
+                    ->getBsonSpec()
+                    .binaryEqual(spec));
+    ASSERT_EQ(handle->getName(), clonedHandle->getName());
+}
+
+TEST(HostParseNodeCloneTest, CloneHostAllocatedParseNodeIsIndependent) {
+    auto spec = BSON("$skip" << 5);
+
+    auto parseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make(spec));
+    auto handle = AggStageParseNodeHandle{parseNode};
+
+    // Clone the parse node.
+    auto clonedHandle = handle->clone();
+
+    // Verify they are different objects (different pointers).
+    ASSERT_NE(handle.get(), clonedHandle.get());
+
+    // Both should be valid handles.
+    ASSERT_TRUE(handle.isValid());
+    ASSERT_TRUE(clonedHandle.isValid());
+}
+
+TEST(HostParseNodeCloneTest, ClonedParseNodeSurvivesOriginalDestruction) {
+    auto spec = BSON("$project" << BSON("_id" << 0));
+    AggStageParseNodeHandle clonedHandle{nullptr};
+
+    {
+        auto parseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make(spec));
+        auto handle = AggStageParseNodeHandle{parseNode};
+
+        // Clone before original goes out of scope.
+        clonedHandle = handle->clone();
+    }
+
+    // Cloned handle should still be valid and contain the correct spec.
+    ASSERT_TRUE(clonedHandle.isValid());
+    ASSERT_TRUE(host::HostAggStageParseNode::isHostAllocated(*clonedHandle.get()));
+    ASSERT_TRUE(static_cast<host::HostAggStageParseNode*>(clonedHandle.get())
+                    ->getBsonSpec()
+                    .binaryEqual(spec));
+}
+
+TEST(HostParseNodeCloneTest, MultipleCloneAreIndependent) {
+    auto spec = BSON("$match" << BSON("x" << 1));
+
+    auto parseNode = new host::HostAggStageParseNode(NoOpHostParseNode::make(spec));
+    auto handle = AggStageParseNodeHandle{parseNode};
+
+    // Create multiple clones.
+    auto clone1 = handle->clone();
+    auto clone2 = handle->clone();
+    auto clone3 = clone1->clone();
+
+    // All four should be different objects.
+    ASSERT_NE(handle.get(), clone1.get());
+    ASSERT_NE(handle.get(), clone2.get());
+    ASSERT_NE(handle.get(), clone3.get());
+    ASSERT_NE(clone1.get(), clone2.get());
+    ASSERT_NE(clone1.get(), clone3.get());
+    ASSERT_NE(clone2.get(), clone3.get());
+
+    // All should have same name.
+    ASSERT_EQ(handle->getName(), clone1->getName());
+    ASSERT_EQ(handle->getName(), clone2->getName());
+    ASSERT_EQ(handle->getName(), clone3->getName());
+}
+
 }  // namespace
 }  // namespace mongo::extension

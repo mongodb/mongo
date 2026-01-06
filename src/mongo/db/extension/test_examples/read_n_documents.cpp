@@ -125,6 +125,10 @@ public:
         properties.serialize(&builder);
         return builder.obj();
     }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<ProduceIdsAstNode>(getName(), _arguments);
+    }
 };
 
 DEFAULT_PARSE_NODE(ProduceIds);
@@ -146,6 +150,10 @@ public:
         expanded.emplace_back(
             extension::sdk::HostServicesAPI::getInstance()->createIdLookup(kIdLookupSpec));
         return expanded;
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ReadNDocumentsParseNode>(getName(), _arguments);
     }
 
 private:

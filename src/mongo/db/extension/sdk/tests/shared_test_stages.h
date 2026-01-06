@@ -163,6 +163,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToExtAstParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<shared_test_stages::FruitsAsDocumentsParseNode>(kExpandToExtAstName,
                                                                                 BSONObj());
@@ -203,6 +207,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToExtParseParseNode>();
     }
 };
 
@@ -248,6 +256,10 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return BSONObj();
     }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToHostParseParseNode>();
+    }
 };
 
 class ExpandToHostParseDescriptor : public sdk::AggStageDescriptor {
@@ -282,6 +294,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToHostAstParseNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
@@ -330,6 +346,10 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return BSONObj();
     }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToMixedParseNode>();
+    }
 };
 
 class ExpandToMixedDescriptor : public sdk::AggStageDescriptor {
@@ -358,6 +378,9 @@ public:
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<TransformLogicalAggStage>();
     }
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<LeafAAstNode>();
+    }
 };
 
 class LeafBAstNode : public sdk::AggStageAstNode {
@@ -365,6 +388,9 @@ public:
     LeafBAstNode() : sdk::AggStageAstNode(kLeafBName) {}
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<TransformLogicalAggStage>();
+    }
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<LeafBAstNode>();
     }
 };
 
@@ -374,6 +400,9 @@ public:
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<TransformLogicalAggStage>();
     }
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<LeafCAstNode>();
+    }
 };
 
 class LeafDAstNode : public sdk::AggStageAstNode {
@@ -381,6 +410,9 @@ public:
     LeafDAstNode() : sdk::AggStageAstNode(kLeafDName) {}
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<TransformLogicalAggStage>();
+    }
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<LeafDAstNode>();
     }
 };
 
@@ -401,6 +433,9 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
     }
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<MidAParseNode>();
+    }
 };
 
 class MidBParseNode : public sdk::AggStageParseNode {
@@ -420,6 +455,9 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
     }
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<MidBParseNode>();
+    }
 };
 
 class TopParseNode : public sdk::AggStageParseNode {
@@ -438,6 +476,9 @@ public:
     }
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
+    }
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<TopParseNode>();
     }
 };
 
@@ -468,6 +509,10 @@ public:
         return _properties;
     }
 
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<CustomPropertiesAstNode>(_properties);
+    }
+
 protected:
     BSONObj _properties;
 };
@@ -487,6 +532,10 @@ public:
                     << BSON_ARRAY("searchHighlights") << "preservesUpstreamMetadata" << false);
     }
 
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<SearchLikeSourceAggStageAstNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<SearchLikeSourceAggStageAstNode>();
     }
@@ -500,6 +549,10 @@ public:
                     << "anyShard"
                     << "requiredMetadataFields" << BSON_ARRAY("score") << "providedMetadataFields"
                     << BSON_ARRAY("searchHighlights") << "preservesUpstreamMetadata" << true);
+    }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<SearchLikeSourceWithPreserveUpstreamMetadataAstNode>();
     }
 
     static std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -518,6 +571,10 @@ public:
                     << "providedMetadataFields" << BSON_ARRAY("searchScore" << "searchHighlights"));
     }
 
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<SearchLikeSourceWithPreserveUpstreamMetadataAstNode>();
+    }
+
     static std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<SearchLikeSourceWithInvalidRequiredMetadataFieldAstNode>();
     }
@@ -533,6 +590,10 @@ public:
                     << "requiredMetadataFields" << BSON_ARRAY("searchScore")
                     << "providedMetadataFields"
                     << BSON_ARRAY("customSearchScore" << "searchHighlights"));
+    }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<SearchLikeSourceWithInvalidProvidedMetadataFieldAstNode>();
     }
 
     static std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -570,6 +631,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<DesugarToEmptyParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<DesugarToEmptyParseNode>();
     }
@@ -589,6 +654,10 @@ public:
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<TransformLogicalAggStage>();
+    }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<CountingAst>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -622,6 +691,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<CountingParse>();
     }
 
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
@@ -672,6 +745,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<NestedDesugaringParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<NestedDesugaringParseNode>();
     }
@@ -698,6 +775,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<GetExpandedSizeLessThanActualExpansionSizeParseNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
@@ -728,6 +809,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<GetExpandedSizeGreaterThanActualExpansionSizeParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<GetExpandedSizeGreaterThanActualExpansionSizeParseNode>();
     }
@@ -755,6 +840,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToHostParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<ExpandToHostParseNode>();
     }
@@ -779,6 +868,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<NameMismatchParseNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {

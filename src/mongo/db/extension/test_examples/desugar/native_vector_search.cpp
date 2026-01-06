@@ -174,6 +174,10 @@ public:
         return std::make_unique<MetricsLogicalStage>(_algorithm);
     }
 
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<MetricsAstNode>(_algorithm);
+    }
+
 private:
     std::string _algorithm;
 };
@@ -204,6 +208,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<MetricsParseNode>(_algorithm);
     }
 
 private:
@@ -310,6 +318,11 @@ public:
             bob.append("numCandidates", *_numCandidates);
         }
         return BSON(kNativeVectorSearchName << bob.obj());
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<NativeVectorSearchParseNode>(
+            _path, _queryVector, _metric, _limit, _normalizeScore, _filter, _numCandidates);
     }
 
 private:

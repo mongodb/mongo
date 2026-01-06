@@ -267,6 +267,10 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return BSONObj();
     }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToHostParseBadSpecParseNode>();
+    }
 };
 }  // namespace
 
@@ -351,6 +355,10 @@ public:
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<DepthLeafAstNode>();
+    }
 };
 
 // Helper to ensure each recursive stage used for depth checking has a unique name.
@@ -388,6 +396,10 @@ public:
         return {};
     }
 
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<DepthChainParseNode>(_remaining);
+    }
+
 private:
     int _remaining;
 };
@@ -412,6 +424,10 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
     }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<AdjacentCycleParseNode>();
+    }
 };
 
 // Non-adjacent cycle where a stage expands into a stage that then expands into itself: A -> B -> A
@@ -428,6 +444,10 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
     }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<NodeAParseNode>();
+    }
 };
 
 class NodeBParseNode : public sdk::AggStageParseNode {
@@ -442,6 +462,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
+    }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<NodeBParseNode>();
     }
 };
 
@@ -481,6 +505,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
+    }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<TopSameNameChildrenParseNode>();
     }
 };
 }  // namespace
@@ -616,6 +644,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<TransformAggStageParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<TransformAggStageParseNode>();
     }
@@ -646,6 +678,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<SearchLikeSourceAggStageParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<SearchLikeSourceAggStageParseNode>();
     }
@@ -673,6 +709,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToSearchAggStageParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<ExpandToSearchAggStageParseNode>();
     }
@@ -692,6 +732,10 @@ public:
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
+    }
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<SingleActionRequiredPrivilegesAggStageAstNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -717,6 +761,10 @@ public:
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<MultipleActionsRequiredPrivilegesAggStageAstNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<MultipleActionsRequiredPrivilegesAggStageAstNode>();
     }
@@ -739,6 +787,10 @@ public:
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
+    }
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<MultipleRequiredPrivilegesAggStageAstNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -781,6 +833,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<MultipleChildrenRequiredPrivilegesAggStageParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<MultipleChildrenRequiredPrivilegesAggStageParseNode>();
     }
@@ -802,6 +858,10 @@ public:
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<EmptyActionsArrayRequiredPrivilegesAggStageAstNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<EmptyActionsArrayRequiredPrivilegesAggStageAstNode>();
     }
@@ -819,6 +879,10 @@ public:
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
+    }
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<EmptyRequiredPrivilegesAggStageAstNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {

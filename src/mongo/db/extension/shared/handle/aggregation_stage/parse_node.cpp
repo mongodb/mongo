@@ -96,6 +96,16 @@ std::vector<VariantNodeHandle> AggStageParseNodeAPI::expand() const {
     return abiArrayToRaiiVector(expandedArray);
 }
 
+AggStageParseNodeHandle AggStageParseNodeAPI::clone() const {
+    assertValid();
+    ::MongoExtensionAggStageParseNode* parseNodePtr{nullptr};
+
+    // The API's contract mandates that parseNodePtr will only be allocated if status is OK.
+    invokeCAndConvertStatusToException([&] { return vtable().clone(get(), &parseNodePtr); });
+
+    return AggStageParseNodeHandle(parseNodePtr);
+}
+
 template <>
 struct RaiiVectorElemType<::MongoExtensionDPLArrayElement> {
     using type = VariantDPLHandle;

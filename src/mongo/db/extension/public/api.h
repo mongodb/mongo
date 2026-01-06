@@ -639,6 +639,12 @@ typedef struct MongoExtensionAggStageParseNodeVTable {
      */
     MongoExtensionStatus* (*expand)(const MongoExtensionAggStageParseNode* parseNode,
                                     MongoExtensionExpandedArray* expanded);
+
+    /**
+     * Clones the parse node. Ownership of the output pointer is transferred to the caller.
+     */
+    MongoExtensionStatus* (*clone)(const MongoExtensionAggStageParseNode* parseNode,
+                                   MongoExtensionAggStageParseNode** output);
 } MongoExtensionAggStageParseNodeVTable;
 
 /**
@@ -669,6 +675,12 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
      */
     MongoExtensionStatus* (*bind)(const MongoExtensionAggStageAstNode* astNode,
                                   MongoExtensionLogicalAggStage** logicalStage);
+
+    /**
+     * Clones the AST node. Ownership of the output pointer is transferred to the caller.
+     */
+    MongoExtensionStatus* (*clone)(const MongoExtensionAggStageAstNode* astNode,
+                                   MongoExtensionAggStageAstNode** output);
 } MongoExtensionAggStageAstNodeVTable;
 
 /**

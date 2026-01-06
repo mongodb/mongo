@@ -133,6 +133,10 @@ public:
         return _stageBson;
     }
 
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<LimitParseNode>(getName(), _stageBson);
+    }
+
 protected:
     const mongo::BSONObj _stageBson;
 };

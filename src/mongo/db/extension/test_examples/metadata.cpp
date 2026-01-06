@@ -129,6 +129,10 @@ public:
         properties.serialize(&builder);
         return builder.obj();
     }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<ValidateMultiSortKeyAstNode>(getName(), _arguments);
+    }
 };
 
 DEFAULT_PARSE_NODE(ValidateMultiSortKey);

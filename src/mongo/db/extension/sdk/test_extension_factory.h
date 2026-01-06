@@ -98,6 +98,10 @@ public:
         return std::make_unique<LogicalStageType>(getName(), _arguments);
     };
 
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<TestAstNode>(_name, _arguments);
+    }
+
 protected:
     const mongo::BSONObj _arguments;
 };
@@ -123,6 +127,10 @@ public:
     }
     mongo::BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
         return BSON(_name << _arguments);
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<TestParseNode>(_name, _arguments);
     }
 
 protected:
