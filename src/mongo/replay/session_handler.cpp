@@ -63,6 +63,7 @@ void SessionHandler::createSession(key_t key, PacketSource source) {
             }
             stopAllSessions();
         }
+        std::unique_lock ul(_notificationMutex);
         --_runningSessionCount;
         notify();
     }).detach();
