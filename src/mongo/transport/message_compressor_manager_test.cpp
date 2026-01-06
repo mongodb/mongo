@@ -209,12 +209,13 @@ void checkUndersize(const Message& compressedMsg,
     ASSERT_EQ(ErrorCodes::BadValue, swm.getStatus());
 }
 
-// Helper: assert that given payload fails zlib decompression with BadValue.
-void assertZlibDecompressBadValue(const std::vector<char>& payload) {
+// Helper: assert that decompression of payload fails with BadValue.
+// Optionally specify a custom output buffer size (default 1024 bytes).
+void assertZlibDecompressBadValue(const std::vector<char>& payload, size_t outputSize = 1024) {
     auto compressor = std::make_unique<ZlibMessageCompressor>();
     ConstDataRange input(payload.data(), payload.size());
 
-    std::vector<char> output(1024);
+    std::vector<char> output(outputSize);
     DataRange outputRange(output.data(), output.size());
 
     auto result = compressor->decompressData(input, outputRange);
@@ -537,20 +538,9 @@ TEST(ZlibMessageCompressor, RejectsInvalidHeader) {
 }
 
 TEST(ZlibMessageCompressor, RejectsExcessiveDecompressionRatio) {
-    auto compressor = std::make_unique<ZlibMessageCompressor>();
-
-    // Valid zlib header but request an unreasonably large output capacity
+    // Valid zlib header but request an unreasonably large output capacity (>1024x input).
     std::vector<char> smallPayload = {0x78, 0x9c, 0x63, 0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01};
-    ConstDataRange input(smallPayload.data(), smallPayload.size());
-
-    // Request output buffer > 1024x input size
-    const size_t hugeSize = 20 * 1024 * 1024;  // 20 MB
-    std::vector<char> hugeOutput(hugeSize);
-    DataRange outputRange(hugeOutput.data(), hugeOutput.size());
-
-    auto result = compressor->decompressData(input, outputRange);
-    ASSERT_NOT_OK(result);
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    assertZlibDecompressBadValue(smallPayload, 20 * 1024 * 1024);  // 20 MB buffer
 }
 
 TEST(ZlibMessageCompressor, ValidCompressionWorks) {
