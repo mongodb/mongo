@@ -450,9 +450,9 @@ tasks:
             --simple_build_id=True
             --define=MONGO_VERSION=${version}
             --config=evg
-            --config=opt_profiled
             --features=strip_debug
             --separate_debug=False
+            --remote_download_outputs=minimal
 
 task_groups:
   - name: resmoke_tests_TG
