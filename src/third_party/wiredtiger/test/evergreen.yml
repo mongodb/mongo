@@ -4695,7 +4695,7 @@ tasks:
     name: format-stress-test-disagg-follower-2
     tags: ["stress-test-disagg"]
 
-  # FIXME-WT-14566: Enable disagg switch mode on all platforms once failures have been resolved.
+  # FIXME-WT-16394: Enable disagg switch mode on all platforms once failures have been resolved.
   - <<: *format-stress-test-disagg-switch
     name: format-stress-test-disagg-switch-1
     tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]

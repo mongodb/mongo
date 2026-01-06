@@ -201,6 +201,7 @@ of the documentation.
 - @subpage arch-toc-disaggregated-storage
     - @ref arch-disagg-layered
     - @ref arch-disagg-layered-cursor
+    - @ref arch-disagg-key-provider
 
 - @subpage arch-glossary
 
@@ -385,6 +386,7 @@ operation.
 
 @subpage arch-disagg-layered
 @subpage arch-disagg-layered-cursor
+@subpage arch-disagg-key-provider
 
 WiredTiger includes support for a disaggregated storage layer, allowing persisted data
 to be stored and retrieved using network services. This work is in active development, so

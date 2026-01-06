@@ -1253,12 +1253,13 @@ __clayered_lookup(WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, WT_ITEM
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *c, *cursor;
     WT_DECL_RET;
-    bool found;
+    bool found, reset_ignore_prepare;
 
     c = NULL;
     conn = S2C(session);
     cursor = &clayered->iface;
     found = false;
+    reset_ignore_prepare = false;
 
     if (!conn->layered_table_manager.leader) {
         c = clayered->ingest_cursor;
@@ -1280,6 +1281,17 @@ __clayered_lookup(WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, WT_ITEM
      */
     if (!found && F_ISSET(clayered, WT_CLAYERED_OPEN_READ) && clayered->stable_cursor != NULL) {
         c = clayered->stable_cursor;
+        /*
+         * Temporarily set ignore prepared flag when searching for update in the stable cursor. In
+         * disaggregated storage, the stable table may contain prepared updates that is rolled back
+         * on ingest table. If reading this prepared update on stable table, it will cause prepared
+         * conflict issue. Therefore for layered cursor operations, we need to ignore these prepared
+         * updates to allow reading through to committed data.
+         */
+        if (!conn->layered_table_manager.leader && !F_ISSET(session->txn, WT_TXN_IGNORE_PREPARE)) {
+            reset_ignore_prepare = true;
+            F_SET(session->txn, WT_TXN_IGNORE_PREPARE);
+        }
         WT_ERR_NOTFOUND_OK(__clayered_lookup_constituent(c, clayered, value), true);
         if (ret == 0)
             found = true;
@@ -1289,6 +1301,8 @@ __clayered_lookup(WT_SESSION_IMPL *session, WT_CURSOR_LAYERED *clayered, WT_ITEM
         F_CLR(c, WT_CURSTD_KEY_SET);
 
 err:
+    if (reset_ignore_prepare)
+        F_CLR(session->txn, WT_TXN_IGNORE_PREPARE);
     if (ret == 0) {
         F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
         F_SET(cursor, WT_CURSTD_KEY_INT);

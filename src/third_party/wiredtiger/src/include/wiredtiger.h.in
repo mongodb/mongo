@@ -5722,16 +5722,8 @@ struct __wt_page_log {
 };
 
 #ifndef SWIG
-/*
+/*!
  * A structure that represents encrypted keys stored by WiredTiger.
- *
- * The data field is a flexible array member for storing variable-length
- * data in a contiguous memory block.
- *
- * The struct represents an on-disk format for encrypted keys.
- * Fields must not be added or modified arbitrarily to preserve
- * compatibility. The 64-bit int space will be re-used to store
- * metadata information to ensure integrity.
  */
 struct __wt_crypt_keys {
     union {
@@ -5750,7 +5742,7 @@ struct __wt_key_provider {
     /*!
      * Loads the current persisted key during checkpoint load.
      *
-     * WiredTiger stores the LSN of the checkpoint that key was persisted to.
+     * WiredTiger stores the LSN of the persisted key.
      *
      * @param kp the WT_KEY_PROVIDER instance.
      * @param session the current WiredTiger session.
@@ -5784,7 +5776,7 @@ struct __wt_key_provider {
     /*!
      * Callback function indicating that whether the key has been persisted.
      *
-     * On success, the result field contains LSN of the checkpoint the key belongs to.
+     * On success, the result field contains LSN of the key.
      * On failure, the result field is set to the error code and the size is set to 0.
      *
      * @param kp the WT_KEY_PROVIDER instance.
