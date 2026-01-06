@@ -115,6 +115,9 @@ public:
     void gotAcceptableErrorInCommand() {
         _checkWrap(&OpCounters::_acceptableErrorInCommand, 1);
     }
+    void gotRecordIdsReplicatedDocIdMismatch() {
+        _checkWrap(&OpCounters::_recordIdsReplicatedDocIdMismatch, 1);
+    }
 
     // thse are used by metrics things, do not remove
     const AtomicWord<long long>* getInsert() const {
@@ -153,6 +156,9 @@ public:
     const AtomicWord<long long>* getAcceptableErrorInCommand() const {
         return &*_acceptableErrorInCommand;
     }
+    const AtomicWord<long long>* getRecordIdsReplicatedDocIdMismatch() const {
+        return &*_recordIdsReplicatedDocIdMismatch;
+    }
 
     // Reset all counters. To used for testing purposes only.
     void resetForTest() {
@@ -179,6 +185,7 @@ private:
     CacheExclusive<AtomicWord<long long>> _deleteWasEmpty;
     CacheExclusive<AtomicWord<long long>> _deleteFromMissingNamespace;
     CacheExclusive<AtomicWord<long long>> _acceptableErrorInCommand;
+    CacheExclusive<AtomicWord<long long>> _recordIdsReplicatedDocIdMismatch;
 
     // Counter for the deprecated OP_QUERY opcode.
     CacheExclusive<AtomicWord<long long>> _queryDeprecated;

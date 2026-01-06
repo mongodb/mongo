@@ -1484,6 +1484,82 @@ void logOplogConstraintViolation(OperationContext* opCtx,
     oplogConstraintViolationLogger->logViolationIfReady(type, opObj, status);
 }
 
+DeleteResult deleteObjectByRid(OperationContext* opCtx,
+                               const OplogEntry& op,
+                               const CollectionPtr& collection,
+                               OpCounters* opCounters,
+                               const BSONElement& idField,
+                               OplogApplication::Mode mode,
+                               const DeleteRequest& request) {
+    DeleteResult result;
+    auto rid = *op.getDurableReplOperation().getRecordId();
+
+    Snapshotted<BSONObj> preImage;
+    bool foundPreImage = collection->findDoc(opCtx, rid, &preImage);
+
+    if (!foundPreImage) {
+        // The record could not be found in the collection.
+        return {.nDeleted = 0};
+    }
+
+    // Check for a mismatch between the _id in the oplog entry and the _id
+    // in the fetched record. A difference during steady state replication
+    // is indicative of data corruption.
+    auto fetchedIdField = preImage.value()["_id"];
+    if (!idField.binaryEqual(fetchedIdField)) {
+        if (mode == OplogApplication::Mode::kSecondary) {
+            const auto& opObj = redact(op.toBSONForLogging());
+            opCounters->gotRecordIdsReplicatedDocIdMismatch();
+            logOplogConstraintViolation(
+                opCtx,
+                op.getNss(),
+                OplogConstraintViolationEnum::kRecordIdsReplicatedDocIdMismatch,
+                "delete",
+                opObj,
+                boost::none /* status */);
+            // This error is fatal when we are enforcing steady state
+            // constraints. We throw an error here since instead of
+            // deferring to the typical nDeleted = 0 handling since this
+            // should also be a fatal error for capped collections.
+            uassert(783500,
+                    fmt::format("While applying an oplog entry : '{}' during steady "
+                                "state replication to a replicated record id "
+                                "collection, the record : '{}' had a different _id "
+                                "than we were expecting.",
+                                opObj.toString(),
+                                redact(preImage.value()).toString()),
+                    !oplogApplicationEnforcesSteadyStateConstraints.load());
+        }
+        return {.nDeleted = 0};
+    }
+
+    // Perform the delete.
+    WriteUnitOfWork wuow{opCtx};
+    collection_internal::deleteDocument(
+        opCtx,
+        collection,
+        preImage,
+        request.getStmtId(),
+        rid,
+        &CurOp::get(opCtx)->debug(),
+        false, /* fromMigrate */
+        false, /* noWarn */
+        request.getReturnDeleted() ? collection_internal::StoreDeletedDoc::On
+                                   : collection_internal::StoreDeletedDoc::Off,
+        CheckRecordId::Off,
+        repl::ReplicationCoordinator::get(opCtx)->isRetryableWrite(opCtx)
+            ? collection_internal::RetryableWrite::kYes
+            : collection_internal::RetryableWrite::kNo);
+    wuow.commit();
+
+    // Update nDeleted and include the preImage if it was requested.
+    result.nDeleted = 1;
+    if (request.getReturnDeleted()) {
+        result.requestedPreImage = std::move(preImage.value());
+    }
+    return result;
+}
+
 // @return failure status if an update should have happened and the document DNE.
 // See replset initial sync code.
 Status applyOperation_inlock(OperationContext* opCtx,
@@ -1606,6 +1682,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     op.getDurableReplOperation().getRecordId().has_value() ==
                         collection->areRecordIdsReplicated());
         }
+    }
+
+    if (auto ridOpt = op.getDurableReplOperation().getRecordId(); ridOpt.has_value()) {
+        tassert(7835000, "The RecordId in an oplog entry cannot be Null", !ridOpt->isNull());
     }
 
     BSONObj o = op.getObject();
@@ -2152,7 +2232,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
             // The o field may contain additional fields besides the _id (like the shard key
             // fields), but we want to do the delete by just _id so we can take advantage of the
-            // IDHACK.
+            // Express executor.
             BSONObj deleteCriteria = idField.wrap();
 
             Timestamp timestamp;
@@ -2192,7 +2272,16 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         request.setReturnDeleted(true);
                     }
 
-                    DeleteResult result = deleteObject(opCtx, collectionAcquisition, request);
+                    // If an oplog entry has a recordId, we can bypass the query system and fetch
+                    // and delete the document using the storage and collection APIs.
+                    DeleteResult result;
+                    if (op.getDurableReplOperation().getRecordId().has_value()) {
+                        result = deleteObjectByRid(
+                            opCtx, op, collection, opCounters, idField, mode, request);
+                    } else {
+                        // Run an Express delete by _id query.
+                        result = deleteObject(opCtx, collectionAcquisition, request);
+                    }
                     if (op.getNeedsRetryImage()) {
                         // Even if `result.nDeleted` is 0, we want to perform a write to the
                         // imageCollection to advance the txnNumber/ts and invalidate the image.

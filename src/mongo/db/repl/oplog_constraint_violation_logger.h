@@ -52,6 +52,9 @@ static constexpr StringData kDeleteWasEmptyMsg = "applied a delete that did not 
 static constexpr StringData kDeleteOnMissingNs = "applied a delete on missing namespace"_sd;
 static constexpr StringData kAcceptableErrorInCommand =
     "received an acceptable error during oplog application"_sd;
+static constexpr StringData kRecordIdsReplicatedDocIdMismatch =
+    "the _id in the oplog entry for a replicated record id collection did not match the _id of the "
+    "document found at the rid";
 
 enum class OplogConstraintViolationEnum {
     kInsertOnExistingDoc = 0,
@@ -59,6 +62,7 @@ enum class OplogConstraintViolationEnum {
     kDeleteWasEmpty,
     kDeleteOnMissingNs,
     kAcceptableErrorInCommand,
+    kRecordIdsReplicatedDocIdMismatch,
     NUM_VIOLATION_TYPES,
 };
 

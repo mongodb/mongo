@@ -56,6 +56,8 @@ StringData toString(OplogConstraintViolationEnum type) {
             return kDeleteOnMissingNs;
         case OplogConstraintViolationEnum::kAcceptableErrorInCommand:
             return kAcceptableErrorInCommand;
+        case mongo::repl::OplogConstraintViolationEnum::kRecordIdsReplicatedDocIdMismatch:
+            return kRecordIdsReplicatedDocIdMismatch;
         default:
             return "";
     }
