@@ -105,7 +105,8 @@ public:
         {  // test empty (no inputs)
             std::vector<std::shared_ptr<IWIterator>> vec;
             std::shared_ptr<IWIterator> mergeIter(
-                IWIterator::merge(vec, SortOptions(), IWComparator()));
+                sorter::merge<IntWrapper, IntWrapper, IWComparator>(
+                    vec, SortOptions(), IWComparator()));
             ASSERT_ITERATORS_EQUIVALENT(mergeIter, std::make_shared<EmptyIterator>());
         }
         {  // test empty (only empty inputs)

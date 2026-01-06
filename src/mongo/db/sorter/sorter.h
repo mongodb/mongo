@@ -259,12 +259,6 @@ public:
 
     virtual ~Iterator() = default;
 
-    // Returns an iterator that merges the passed in iterators
-    template <typename Comparator>
-    static std::unique_ptr<Iterator> merge(std::span<std::shared_ptr<Iterator>> iters,
-                                           const SortOptions& opts,
-                                           const Comparator& comp);
-
     virtual SorterRange getRange() const {
         invariant(false, "Only FileIterator has ranges");
         MONGO_UNREACHABLE;
@@ -286,6 +280,14 @@ public:
         MONGO_UNREACHABLE_TASSERT(9917200);
     }
 };
+
+/**
+ * Returns an iterator that merges the passed-in iterators.
+ */
+template <typename Key, typename Value, typename Comparator>
+std::unique_ptr<Iterator<Key, Value>> merge(std::span<std::shared_ptr<Iterator<Key, Value>>> iters,
+                                            const SortOptions& opts,
+                                            const Comparator& comp);
 
 }  // namespace sorter
 

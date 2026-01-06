@@ -811,7 +811,7 @@ public:
         spill();
         this->_mergeSpills(this->_spillsNumToRespectMemoryLimits);
 
-        return Iterator::merge(this->_iters, this->_opts, this->_comp);
+        return sorter::merge<Key, Value, Comparator>(this->_iters, this->_opts, this->_comp);
     }
 
     std::unique_ptr<Iterator> pause() override {
@@ -1108,7 +1108,7 @@ public:
         this->_mergeSpills(this->_spillsNumToRespectMemoryLimits);
 
         _done = true;
-        return Iterator::merge(this->_iters, this->_opts, this->_comp);
+        return sorter::merge<Key, Value, Comparator>(this->_iters, this->_opts, this->_comp);
     }
 
     std::unique_ptr<Iterator> pause() override {
@@ -1426,7 +1426,7 @@ FileBasedSorterSpiller<Key, Value, Comparator>::mergeSpills(
             LOGV2_DEBUG(
                 6033102, 2, "Merging spills", "beginIdx"_attr = i, "endIdx"_attr = i + count - 1);
 
-            auto mergeIterator = Iterator::merge(spillsToMerge, opts, comp);
+            auto mergeIterator = sorter::merge<Key, Value, Comparator>(spillsToMerge, opts, comp);
             sorterStorage = FileBasedSorterStorage<Key, Value>(newSpillsFile, *opts.tempDir);
             std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
                 sorterStorage.makeWriter(opts, settings);
@@ -1912,7 +1912,8 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill(size_t maxMemoryU
             _spillIter.get())) {
         mergeIter->addSource(std::move(iteratorPtr));
     } else {
-        _spillIter = SpillIterator::merge(std::span(&iteratorPtr, 1), _opts, compare);
+        _spillIter =
+            sorter::merge<Key, Value, Comparator>(std::span(&iteratorPtr, 1), _opts, compare);
     }
 
     dassert(_spillIter->more());
@@ -1924,12 +1925,16 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill(size_t maxMemoryU
 // Factory Functions
 //
 
-template <typename Key, typename Value>
-template <typename Comparator>
-std::unique_ptr<sorter::Iterator<Key, Value>> sorter::Iterator<Key, Value>::merge(
-    std::span<std::shared_ptr<Iterator>> iters, const SortOptions& opts, const Comparator& comp) {
+namespace sorter {
+
+template <typename Key, typename Value, typename Comparator>
+std::unique_ptr<Iterator<Key, Value>> merge(std::span<std::shared_ptr<Iterator<Key, Value>>> iters,
+                                            const SortOptions& opts,
+                                            const Comparator& comp) {
     return std::make_unique<sorter::MergeIterator<Key, Value, Comparator>>(iters, opts, comp);
 }
+
+}  // namespace sorter
 
 // TODO(SERVER-116074): Change to SorterSpiller after removing templating on Comparator.
 template <typename Key, typename Value>

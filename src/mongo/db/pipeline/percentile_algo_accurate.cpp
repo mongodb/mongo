@@ -174,7 +174,7 @@ vector<double> AccuratePercentile::computePercentiles(const vector<double>& ps) 
 
         // Initializes _sorterIterator as a MergeIterator that merge sorts the spilled sorted
         // segments of data together so that values can be iterated through in sorted order.
-        _sorterIterator = Sorter<Value, Value>::Iterator::merge(
+        _sorterIterator = sorter::merge<Value, Value, SorterComparator>(
             _spilledSortedSegments, SortOptions(), SorterComparator(ValueComparator()));
         _indexNextSorted = 0;
 

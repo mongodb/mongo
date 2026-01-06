@@ -167,7 +167,7 @@ void GroupProcessor::readyGroups() {
             spill();
         }
 
-        _sorterIterator = Sorter<Value, Value>::Iterator::merge(
+        _sorterIterator = sorter::merge<Value, Value, SorterComparator>(
             _sortedFiles, SortOptions(), SorterComparator(_expCtx->getValueComparator()));
 
         // prepare current to accumulate data

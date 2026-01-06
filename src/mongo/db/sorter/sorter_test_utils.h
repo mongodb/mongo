@@ -277,7 +277,7 @@ std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
         // Spill iterator outputs to a file and obtain a new iterator for it.
         vec.push_back(spillToFile(std::move(it), tempDir));
     }
-    return IWIterator::merge(vec, opts, IWComparator(Dir));
+    return sorter::merge<IntWrapper, IntWrapper, IWComparator>(vec, opts, IWComparator(Dir));
 }
 }  // namespace mongo::sorter
 
