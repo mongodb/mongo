@@ -87,6 +87,14 @@ def generate(env):
     if not exists(env):
         return
 
+    if 'TARGET_ARCH' not in env or env['TARGET_ARCH'] is None:
+        env['TARGET_ARCH'] = "x86_64"
+
+    if env['TARGET_ARCH'] not in target_arch_expansion_map:
+        raise Exception(
+            f"TARGET_ARCH={env['TARGET_ARCH']}, TARGET_ARCH must be in {target_arch_expansion_map.keys()} on windows."
+        )
+
     env.Tool("msvc")
 
     env.AddMethod(_get_merge_module_name_for_feature, "GetMergeModuleNameForFeature")
@@ -127,6 +135,9 @@ def generate(env):
         mergemodulepath = os.path.join(programfilesx86, "Common Files", "Merge Modules")
         if os.path.isdir(mergemodulepath):
             env["MSVS"]["VCREDISTMERGEMODULEPATH"] = mergemodulepath
+
+    if 'VSINSTALLDIR' in env:
+        env["MSVS"]["VSINSTALLDIR"] = env["VSINSTALLDIR"]
 
     if not "VSINSTALLDIR" in env["MSVS"]:
 

@@ -1260,21 +1260,28 @@ env_vars.Add(
     default=version_data['githash'],
 )
 
+VSINSTALLDIR = 'C:/Program Files/Microsoft Visual Studio/2022/Professional'
+MSVC_TOOLSET_VERSION = "14.31.31103"
+
+env_vars.Add('MSVC_USE_SCRIPT', help='Sets the script used to setup Visual Studio.',
+             default=f'{VSINSTALLDIR}/VC/Auxiliary/Build/vcvarsall.bat')
+
+env_vars.Add('VSINSTALLDIR', help='The path where Visual Studio is installed.',
+             default=VSINSTALLDIR)
+
+env_vars.Add('MSVC_USE_SCRIPT_ARGS', help='Sets the script used to setup Visual Studio.',
+             default=f'x64 -vcvars_ver={MSVC_TOOLSET_VERSION}')
+
 env_vars.Add(
-    'MSVC_USE_SCRIPT',
-    help='Sets the script used to setup Visual Studio.',
+    'MSVC_TOOLSET_VERSION',
+    help='Sets the full toolset version of Visual C++ to use.',
+    default=MSVC_TOOLSET_VERSION,
 )
 
 env_vars.Add(
     'MSVC_VERSION',
     help='Sets the version of Visual C++ to use (e.g. 14.2 for VS2019, 14.3 for VS2022)',
     default="14.3",
-)
-
-env_vars.Add(
-    'MSVC_TOOLSET_VERSION',
-    help='Sets the full toolset version of Visual C++ to use.',
-    default="14.31.31103",
 )
 
 env_vars.Add(
@@ -1647,6 +1654,9 @@ envDict = dict(
     LIBDEPS_TAG_EXPANSIONS=[],
     MSVC_VERSION=variables_only_env.get("MSVC_VERSION"),
     MSVC_TOOLSET_VERSION=variables_only_env.get("MSVC_TOOLSET_VERSION"),
+    VSINSTALLDIR=variables_only_env.get("VSINSTALLDIR"),
+    MSVC_USE_SCRIPT=variables_only_env.get("MSVC_USE_SCRIPT"),
+    MSVC_USE_SCRIPT_ARGS=variables_only_env.get("MSVC_USE_SCRIPT_ARGS"),
 )
 
 # By default, we will get the normal SCons tool search. But if the
