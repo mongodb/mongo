@@ -138,7 +138,12 @@ StatusWith<int64_t> WiredTigerIndexUtil::compact(OperationContext* opCtx,
                       str::stream() << "Compaction interrupted on " << uri.c_str());
     }
 
-    invariantWTOK(ret, *s);
+    if (ret == ENOENT) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Can't compact missing URI " << uri);
+    }
+
+    invariantWTOK(ret, *s, uri);
 
     return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(*s, uri) : 0;
 }
