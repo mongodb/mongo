@@ -37,7 +37,6 @@
 #include "mongo/db/shard_role/lock_manager/locker.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
-#include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
 #include "mongo/db/shard_role/shard_catalog/database_holder.h"
@@ -219,14 +218,18 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
 
 void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                                      UpgradeDowngradeTimeseriesLocks&& locks,
-                                     const boost::optional<UUID>& expectedUUID) {
+                                     const boost::optional<UUID>& expectedUUID,
+                                     bool skipViewCreation) {
     const auto& mainColl = locks.mainColl;
     const auto& mainNs = mainColl.getNss();
     const auto& bucketsColl = locks.bucketsColl;
     const auto& bucketsNs = bucketsColl.getNss();
     auto db = mainColl.getDb();
 
-    LOGV2(11483009, "Started downgrade of timeseries collection format", logAttrs(mainNs));
+    LOGV2(11483009,
+          "Started downgrade of timeseries collection format",
+          logAttrs(mainNs),
+          "skipViewCreation"_attr = skipViewCreation);
 
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
     tassert(11483011,
@@ -235,14 +238,17 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                 VersionContext::getDecoration(opCtx)));
 
     writeConflictRetry(opCtx, "viewlessTimeseriesDowngrade", mainNs, [&] {
-        // Idempotency check
+        // Idempotency check: already downgraded to viewful format
         if (bucketsColl && bucketsColl->isTimeseriesCollection() &&
-            !bucketsColl->isNewTimeseriesWithoutView() && !mainColl && mainColl.getView() &&
-            mainColl.getView()->timeseries()) {
+            !bucketsColl->isNewTimeseriesWithoutView() && !mainColl) {
             // TODO(SERVER-114517): Investigate if we should relax this check.
             tassert(11483012,
-                    "Found an already downgraded timeseries collection but with an unexpected UUID",
+                    "Found an already downgraded timeseries collection but with unexpected UUID",
                     !expectedUUID || bucketsColl->uuid() == *expectedUUID);
+            tassert(11613400,
+                    "Didn't find the expected timeseries view after viewless timeseries downgrade",
+                    // On non-primary shards, no view is expected
+                    skipViewCreation || (mainColl.getView() && mainColl.getView()->timeseries()));
             return;
         }
 
@@ -260,7 +266,10 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                 !bucketsColl);
 
         // Create system.views if it does not exist. This is done in a separate WUOW.
-        db->createSystemDotViewsIfNecessary(opCtx);
+        // Only needed if we're creating the view.
+        if (!skipViewCreation) {
+            db->createSystemDotViewsIfNecessary(opCtx);
+        }
 
         WriteUnitOfWork wuow(opCtx);
 
@@ -268,16 +277,20 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
         {
             repl::UnreplicatedWritesBlock uwb(opCtx);
 
-            // Rename the collection to the buckets NSS and create the view on the main NSS.
+            // Rename the collection to the buckets NSS.
             uassertStatusOK(db->renameCollection(opCtx, mainNs, bucketsNs, true /* stayTemp */));
 
-            CollectionOptions viewOptions;
-            viewOptions.viewOn = std::string{bucketsNs.coll()};
-            viewOptions.collation = mainColl->getCollectionOptions().collation;
-            constexpr bool asArray = true;
-            viewOptions.pipeline =
-                timeseries::generateViewPipeline(*mainColl->getTimeseriesOptions(), asArray);
-            uassertStatusOK(db->userCreateNS(opCtx, mainNs, viewOptions, /*createIdIndex=*/false));
+            // Only create the view on the primary shard.
+            if (!skipViewCreation) {
+                CollectionOptions viewOptions;
+                viewOptions.viewOn = std::string{bucketsNs.coll()};
+                viewOptions.collation = mainColl->getCollectionOptions().collation;
+                constexpr bool asArray = true;
+                viewOptions.pipeline =
+                    timeseries::generateViewPipeline(*mainColl->getTimeseriesOptions(), asArray);
+                uassertStatusOK(
+                    db->userCreateNS(opCtx, mainNs, viewOptions, /*createIdIndex=*/false));
+            }
 
             // Add validator to the buckets collection.
             CollectionWriter collWriter{opCtx, bucketsNs};
@@ -293,19 +306,23 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.
         opCtx->getServiceContext()->getOpObserver()->onUpgradeDowngradeViewlessTimeseries(
-            opCtx, mainNs, mainColl->uuid());
+            opCtx, mainNs, mainColl->uuid(), skipViewCreation);
 
         wuow.commit();
     });
 
-    LOGV2(11483017, "Finished downgrade of timeseries collection format", logAttrs(mainNs));
+    LOGV2(11483017,
+          "Finished downgrade of timeseries collection format",
+          logAttrs(mainNs),
+          "skipViewCreation"_attr = skipViewCreation);
 }
 
 void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                                      const NamespaceString& mainNs,
-                                     const boost::optional<UUID>& expectedUUID) {
+                                     const boost::optional<UUID>& expectedUUID,
+                                     bool skipViewCreation) {
     auto locks = acquireLocksForTimeseriesUpgradeDowngrade(opCtx, mainNs);
-    downgradeFromViewlessTimeseries(opCtx, std::move(locks), expectedUUID);
+    downgradeFromViewlessTimeseries(opCtx, std::move(locks), expectedUUID, skipViewCreation);
 }
 
 /**
@@ -379,8 +396,10 @@ void downgradeAllTimeseriesFromViewless(OperationContext* opCtx) {
 
         forEachTimeseriesCollectionFromDb(
             opCtx, dbName, true /* isViewless */, [&](UpgradeDowngradeTimeseriesLocks&& locks) {
-                timeseries::downgradeFromViewlessTimeseries(
-                    opCtx, std::move(locks), boost::none /* expectedUUID */);
+                timeseries::downgradeFromViewlessTimeseries(opCtx,
+                                                            std::move(locks),
+                                                            boost::none /* expectedUUID */,
+                                                            false /* skipViewCreation */);
             });
     }
 }

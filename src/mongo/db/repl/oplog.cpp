@@ -1291,7 +1291,10 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          if (isUpgrade) {
              timeseries::upgradeToViewlessTimeseries(opCtx, ns, entry.getUuid());
          } else {
-             timeseries::downgradeFromViewlessTimeseries(opCtx, ns, entry.getUuid());
+             // Use skipViewCreation from oplog entry if present, otherwise default to false.
+             const bool skipViewCreation = cmd.getSkipViewCreation().value_or(false);
+             timeseries::downgradeFromViewlessTimeseries(
+                 opCtx, ns, entry.getUuid(), skipViewCreation);
          }
 
          return Status::OK();

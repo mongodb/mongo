@@ -758,12 +758,16 @@ public:
      * `nss` is the main namespace (i.e. without the 'system.buckets' prefix).
      * `uuid` is the UUID associated of the time series collection.
      * For viewful time series collections, that is the UUID of the system.buckets collection.
-
+     * `skipViewCreation` when true, indicates that the view should not be created during
+     * downgrade. This is used for non-primary shards in a sharded cluster, where only the
+     * primary shard of the database should have the view.
+     *
      * TODO(SERVER-114573): Remove this method once 9.0 becomes lastLTS.
      */
     virtual void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                                       const NamespaceString& nss,
-                                                      const UUID& uuid) = 0;
+                                                      const UUID& uuid,
+                                                      bool skipViewCreation = false) = 0;
 
     struct Times;
 

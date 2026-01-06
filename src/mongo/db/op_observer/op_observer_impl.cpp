@@ -2433,7 +2433,8 @@ void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
 
 void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                                           const NamespaceString& nss,
-                                                          const UUID& uuid) {
+                                                          const UUID& uuid,
+                                                          bool skipViewCreation) {
     tassert(11450500,
             "Expecting the main namespace for timeseries upgrade/downgrade ops",
             !nss.isTimeseriesBucketsCollection());
@@ -2446,6 +2447,9 @@ void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCt
     }
 
     UpgradeDowngradeViewlessTimeseriesOplogEntry objectEntry(std::string{nss.coll()});
+    if (skipViewCreation) {
+        objectEntry.setSkipViewCreation(true);
+    }
 
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);

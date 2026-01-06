@@ -300,7 +300,8 @@ public:
 
     void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                               const NamespaceString& nss,
-                                              const UUID& uuid) final;
+                                              const UUID& uuid,
+                                              bool skipViewCreation = false) final;
 
 private:
     std::unique_ptr<OperationLogger> _operationLogger;

@@ -53,3 +53,10 @@ structs:
                     The name of the timeseries collection being upgraded or downgraded.
                     This is the main colection name, i.e. it never has the system.buckets prefix.
                 type: string
+            skipViewCreation:
+                description: >
+                    If true, the view creation is skipped during downgrade. This is used for
+                    non-primary shards in a sharded cluster where only the primary shard
+                    should have the view.
+                type: bool
+                optional: true
