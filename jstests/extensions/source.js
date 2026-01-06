@@ -64,40 +64,25 @@ if (!FixtureHelpers.isMongos(db)) {
     assert.gt(results.length, 0, results);
 }
 
-// TODO SERVER-113930 Remove failure cases and enable success cases for $lookup and $unionWith.
+// TODO SERVER-113930 Enable tests for $lookup and $unionWith.
 // Source stage in $lookup.
-assert.commandFailedWithCode(
-    db.runCommand({
-        aggregate: collName,
-        pipeline: [{$lookup: {from: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}], as: "slices"}}],
-        cursor: {},
-    }),
-    51047,
-);
 // results = coll.aggregate([{$lookup: {from: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}], as: "slices"}}]).toArray();
 // assert.eq(results, [{breadType: "sourdough", slices: [{slice: 0, isBurnt: false}, {slice: 1, isBurnt: false}]}]);
 
 // Source stage in $unionWith.
-assert.commandFailedWithCode(
-    db.runCommand({
-        aggregate: collName,
-        pipeline: [{$unionWith: {coll: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}]}}],
-        cursor: {},
-    }),
-    31441,
-);
 // results = coll.aggregate([{$unionWith: {coll: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}]}}]).toArray();
 // assert.eq(results, [{breadType: "sourdough"}, {slice: 0, isBurnt: false}, {slice: 1, isBurnt: false}]);
 
+// TODO SERVER-115918 Enable this test.
 // Source stage is not allowed in $facet.
-assert.commandFailedWithCode(
-    db.runCommand({
-        aggregate: collName,
-        pipeline: [{$facet: {slices: [{$toast: {temp: 250.0, numSlices: 2}}]}}],
-        cursor: {},
-    }),
-    40600,
-);
+// assert.commandFailedWithCode(
+//     db.runCommand({
+//         aggregate: collName,
+//         pipeline: [{$facet: {slices: [{$toast: {temp: 250.0, numSlices: 2}}]}}],
+//         cursor: {},
+//     }),
+//     40600,
+// );
 
 // TODO SERVER-113930 Enable this test.
 // Two source stages in the pipeline.

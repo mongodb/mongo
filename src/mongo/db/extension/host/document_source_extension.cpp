@@ -209,10 +209,10 @@ StageConstraints DocumentSourceExtension::constraints(PipelineSplitState pipeSta
                                         PositionRequirement::kNone,
                                         HostTypeRequirement::kNone,
                                         DiskUseRequirement::kNoDiskUse,
-                                        FacetRequirement::kNotAllowed,
+                                        FacetRequirement::kAllowed,
                                         TransactionRequirement::kNotAllowed,
-                                        LookupRequirement::kNotAllowed,
-                                        UnionRequirement::kNotAllowed,
+                                        LookupRequirement::kAllowed,
+                                        UnionRequirement::kAllowed,
                                         ChangeStreamRequirement::kDenylist);
     constraints.canRunOnTimeseries = false;
 

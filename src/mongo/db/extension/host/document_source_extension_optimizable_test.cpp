@@ -114,6 +114,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageWithDefaultStaticProperties)
     ASSERT_TRUE(staticProperties.getPreservesUpstreamMetadata());
     ASSERT_FALSE(staticProperties.getRequiredMetadataFields().has_value());
     ASSERT_FALSE(staticProperties.getProvidedMetadataFields().has_value());
+    ASSERT_TRUE(staticProperties.getUnionWithIsAllowed());
+    ASSERT_TRUE(staticProperties.getLookupIsAllowed());
+    ASSERT_TRUE(staticProperties.getFacetIsAllowed());
 
     auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
 
@@ -121,6 +124,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageWithDefaultStaticProperties)
     ASSERT_EQ(constraints.hostRequirement, StageConstraints::HostTypeRequirement::kNone);
     ASSERT_TRUE(constraints.requiresInputDocSource);
     ASSERT_TRUE(constraints.consumesLogicalCollectionData);
+    ASSERT_EQ(constraints.unionRequirement, StageConstraints::UnionRequirement::kAllowed);
+    ASSERT_EQ(constraints.lookupRequirement, StageConstraints::LookupRequirement::kAllowed);
+    ASSERT_EQ(constraints.facetRequirement, StageConstraints::FacetRequirement::kAllowed);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, searchLikeStageWithSourceStageStaticProperties) {
@@ -235,6 +241,27 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     deps.setMetadataAvailable(DocumentMetadataFields::kSearchScore);
 
     ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 17308);
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest, stageWithNonDefaultSubPipelineStaticProperties) {
+    auto properties = BSON("unionWithIsAllowed" << false << "lookupIsAllowed" << false
+                                                << "facetIsAllowed" << false);
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(properties));
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    const auto& staticProperties = optimizable->getStaticProperties();
+    ASSERT_FALSE(staticProperties.getUnionWithIsAllowed());
+    ASSERT_FALSE(staticProperties.getLookupIsAllowed());
+    ASSERT_FALSE(staticProperties.getFacetIsAllowed());
+
+    auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
+    ASSERT_EQ(constraints.unionRequirement, StageConstraints::UnionRequirement::kNotAllowed);
+    ASSERT_EQ(constraints.lookupRequirement, StageConstraints::LookupRequirement::kNotAllowed);
+    ASSERT_EQ(constraints.facetRequirement, StageConstraints::FacetRequirement::kNotAllowed);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, distributedPlanLogicReturnsNoneWhenNoDPL) {

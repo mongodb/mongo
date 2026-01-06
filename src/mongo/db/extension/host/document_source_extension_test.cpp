@@ -772,7 +772,8 @@ public:
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
             std::make_unique<MultipleRequiredPrivilegesAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::NonePosAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(
+                BSON("position" << "none"))));
         return expanded;
     }
 

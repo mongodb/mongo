@@ -458,121 +458,26 @@ public:
  * Stage Constraints-related testing
  * =========================================================
  */
-static constexpr std::string_view kNoneName = "$none";
-static constexpr std::string_view kFirstName = "$first";
-static constexpr std::string_view kLastName = "$last";
-static constexpr std::string_view kBadPosName = "$badPos";
-static constexpr std::string_view kBadPosTypeName = "$badPosType";
-static constexpr std::string_view kUnknownPropertyName = "$unknownProperty";
+class CustomPropertiesAstNode : public sdk::TestAstNode<TransformLogicalAggStage> {
+public:
+    CustomPropertiesAstNode(BSONObj properties)
+        : sdk::TestAstNode<TransformLogicalAggStage>("$customProperties", BSONObj()),
+          _properties(properties.getOwned()) {}
+
+    BSONObj getProperties() const override {
+        return _properties;
+    }
+
+protected:
+    BSONObj _properties;
+};
+
 static constexpr std::string_view kSearchLikeSourceStageName = "$searchLikeSource";
-static constexpr std::string_view kBadRequiresInputDocSourceTypeName =
-    "$badRequiresInputDocSourceType";
 
-class NonePosAggStageAstNode : public sdk::AggStageAstNode {
+class SearchLikeSourceAggStageAstNode : public sdk::TestAstNode<TransformLogicalAggStage> {
 public:
-    NonePosAggStageAstNode() : sdk::AggStageAstNode(kNoneName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("position" << "none");
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<NonePosAggStageAstNode>();
-    }
-};
-
-class FirstPosAggStageAstNode : public sdk::AggStageAstNode {
-public:
-    FirstPosAggStageAstNode() : sdk::AggStageAstNode(kFirstName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("position" << "first");
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<FirstPosAggStageAstNode>();
-    }
-};
-
-class LastPosAggStageAstNode : public sdk::AggStageAstNode {
-public:
-    LastPosAggStageAstNode() : sdk::AggStageAstNode(kLastName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("position" << "last");
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<LastPosAggStageAstNode>();
-    }
-};
-
-class BadPosAggStageAstNode : public sdk::AggStageAstNode {
-public:
-    BadPosAggStageAstNode() : sdk::AggStageAstNode(kBadPosName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("position" << "bogus");
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<BadPosAggStageAstNode>();
-    }
-};
-
-class BadPosTypeAggStageAstNode : public sdk::AggStageAstNode {
-public:
-    BadPosTypeAggStageAstNode() : sdk::AggStageAstNode(kBadPosTypeName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("position" << BSONArray(BSON_ARRAY(1)));
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<BadPosTypeAggStageAstNode>();
-    }
-};
-
-class UnknownPropertyAggStageAstNode : public sdk::AggStageAstNode {
-public:
-    UnknownPropertyAggStageAstNode() : sdk::AggStageAstNode(kUnknownPropertyName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("unknownProperty" << "null");
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<UnknownPropertyAggStageAstNode>();
-    }
-};
-
-class SearchLikeSourceAggStageAstNode : public sdk::AggStageAstNode {
-public:
-    SearchLikeSourceAggStageAstNode() : sdk::AggStageAstNode(kSearchLikeSourceStageName) {}
+    SearchLikeSourceAggStageAstNode()
+        : sdk::TestAstNode<TransformLogicalAggStage>(kSearchLikeSourceStageName, BSONObj()) {}
 
     BSONObj getProperties() const override {
         return BSON("requiresInputDocSource"
@@ -580,10 +485,6 @@ public:
                     << "anyShard"
                     << "requiredMetadataFields" << BSON_ARRAY("score") << "providedMetadataFields"
                     << BSON_ARRAY("searchHighlights") << "preservesUpstreamMetadata" << false);
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<TransformLogicalAggStage>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -636,24 +537,6 @@ public:
 
     static std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<SearchLikeSourceWithInvalidProvidedMetadataFieldAstNode>();
-    }
-};
-
-class BadRequiresInputDocSourceTypeAggStageAstNode : public sdk::AggStageAstNode {
-public:
-    BadRequiresInputDocSourceTypeAggStageAstNode()
-        : sdk::AggStageAstNode(kBadRequiresInputDocSourceTypeName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("requiresInputDocSource" << BSONArray(BSON_ARRAY(1)));
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<BadRequiresInputDocSourceTypeAggStageAstNode>();
     }
 };
 

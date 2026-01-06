@@ -284,49 +284,77 @@ TEST_F(AggStageTest, TransformAstNodeWithDefaultGetPropertiesSucceeds) {
 }
 
 TEST_F(AggStageTest, NonePosAstNodeSucceeds) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::NonePosAggStageAstNode::make());
+    auto nonePosProperties = BSON("position" << "none");
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(nonePosProperties));
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
 }
 
 TEST_F(AggStageTest, FirstPosAstNodeSucceeds) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::FirstPosAggStageAstNode::make());
+    auto firstPosProperties = BSON("position" << "first");
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(firstPosProperties));
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kFirst);
 }
 
 TEST_F(AggStageTest, LastPosAstNodeSucceeds) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::LastPosAggStageAstNode::make());
+    auto lastPosProperties = BSON("position" << "last");
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(lastPosProperties));
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kLast);
 }
 
 TEST_F(AggStageTest, BadPosAstNodeFails) {
-    auto astNode =
-        new sdk::ExtensionAggStageAstNode(sdk::shared_test_stages::BadPosAggStageAstNode::make());
+    auto badPosProperties = BSON("position" << "bogus");
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(badPosProperties));
     auto handle = AggStageAstNodeHandle{astNode};
     ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::BadValue);
 }
 
 TEST_F(AggStageTest, BadPosTypeAstNodeFails) {
+    auto badPosTypeProperties = BSON("position" << BSONArray(BSON_ARRAY(1)));
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::BadPosTypeAggStageAstNode::make());
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(badPosTypeProperties));
     auto handle = AggStageAstNodeHandle{astNode};
     ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::TypeMismatch);
 }
 
 TEST_F(AggStageTest, UnknownPropertyAstNodeIsIgnored) {
+    auto unknownProperties = BSON("unknownProperty" << "null");
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::UnknownPropertyAggStageAstNode::make());
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(unknownProperties));
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle->getProperties();
     ASSERT_EQ(props.getPosition(), MongoExtensionPositionRequirementEnum::kNone);
+}
+
+TEST_F(AggStageTest, SubPipelineRequirementPropertiesDefaultValues) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(BSONObj()));
+    auto handle = AggStageAstNodeHandle{astNode};
+    auto props = handle->getProperties();
+    ASSERT_TRUE(props.getUnionWithIsAllowed());
+    ASSERT_TRUE(props.getLookupIsAllowed());
+    ASSERT_TRUE(props.getFacetIsAllowed());
+}
+
+TEST_F(AggStageTest, SubPipelineRequirementProperties) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(
+            BSON("unionWithIsAllowed" << false << "lookupIsAllowed" << false << "facetIsAllowed"
+                                      << false)));
+    auto handle = AggStageAstNodeHandle{astNode};
+    auto props = handle->getProperties();
+    ASSERT_FALSE(props.getUnionWithIsAllowed());
+    ASSERT_FALSE(props.getLookupIsAllowed());
+    ASSERT_FALSE(props.getFacetIsAllowed());
 }
 
 TEST_F(AggStageTest, TransformAggStageAstNodeSucceeds) {
@@ -360,91 +388,47 @@ TEST_F(AggStageTest, SearchLikeSourceAggStageAstNodeSucceeds) {
 }
 
 TEST_F(AggStageTest, BadRequiresInputDocSourceTypeAggStageAstNodeFails) {
+    auto badRequiresInputDocSourceTypeProperties =
+        BSON("requiresInputDocSource" << BSONArray(BSON_ARRAY(1)));
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        sdk::shared_test_stages::BadRequiresInputDocSourceTypeAggStageAstNode::make());
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(
+            badRequiresInputDocSourceTypeProperties));
     auto handle = AggStageAstNodeHandle{astNode};
     ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::TypeMismatch);
 }
 
-class InvalidResourcePatternRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
-public:
-    static constexpr std::string_view kName = "$invalidResourcePattern";
-
-    InvalidResourcePatternRequiredPrivilegesAggStageAstNode() : sdk::AggStageAstNode(kName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("requiredPrivileges" << BSON_ARRAY(BSON(
-                        "resourcePattern" << "database"
-                                          << "actions" << BSON_ARRAY(BSON("action" << "find")))));
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<InvalidResourcePatternRequiredPrivilegesAggStageAstNode>();
-    }
-};
-
-class InvalidActionTypeRequiredPrivilegesAggStageAstNode : public sdk::AggStageAstNode {
-public:
-    static constexpr std::string_view kName = "$invalidActionType";
-
-    InvalidActionTypeRequiredPrivilegesAggStageAstNode() : sdk::AggStageAstNode(kName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("requiredPrivileges" << BSON_ARRAY(BSON(
-                        "resourcePattern" << "namespace"
-                                          << "actions" << BSON_ARRAY(BSON("action" << "update")))));
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<InvalidActionTypeRequiredPrivilegesAggStageAstNode>();
-    }
-};
-
-class BadTypeRequiredPrivilegesAstNode : public sdk::AggStageAstNode {
-public:
-    static constexpr std::string_view kName = "$badTypeRequiredPrivileges";
-
-    BadTypeRequiredPrivilegesAstNode() : sdk::AggStageAstNode(kName) {}
-
-    BSONObj getProperties() const override {
-        return BSON("requiredPrivileges" << BSON(
-                        "resourcePattern" << "namespace"
-                                          << "actions" << BSON_ARRAY(BSON("action" << "find"))));
-    }
-
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
-        return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
-    }
-
-    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
-        return std::make_unique<BadTypeRequiredPrivilegesAstNode>();
-    }
-};
-
 TEST_F(AggStageTest, InvalidResourcePatternRequiredPrivilegesAggStageAstNodeFails) {
+    auto invalidResourcePatternRequiredPrivileges =
+        BSON("requiredPrivileges" << BSON_ARRAY(
+                 BSON("resourcePattern" << "database"
+                                        << "actions" << BSON_ARRAY(BSON("action" << "find")))));
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        InvalidResourcePatternRequiredPrivilegesAggStageAstNode::make());
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(
+            invalidResourcePatternRequiredPrivileges));
     auto handle = AggStageAstNodeHandle{astNode};
     ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::BadValue);
 }
 
 TEST_F(AggStageTest, InvalidActionTypeRequiredPrivilegesAggStageAstNodeFails) {
+    auto invalidActionTypeRequiredPrivileges =
+        BSON("requiredPrivileges" << BSON_ARRAY(
+                 BSON("resourcePattern" << "namespace"
+                                        << "actions" << BSON_ARRAY(BSON("action" << "update")))));
     auto astNode = new sdk::ExtensionAggStageAstNode(
-        InvalidActionTypeRequiredPrivilegesAggStageAstNode::make());
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(
+            invalidActionTypeRequiredPrivileges));
     auto handle = AggStageAstNodeHandle{astNode};
     ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::BadValue);
 }
 
 TEST_F(AggStageTest, BadTypeRequiredPrivilegesAstNodeFails) {
-    auto astNode = new sdk::ExtensionAggStageAstNode(BadTypeRequiredPrivilegesAstNode::make());
+    auto badTypeRequiredPrivileges =
+        BSON("requiredPrivileges" << BSON("resourcePattern"
+                                          << "namespace"
+                                          << "actions" << BSON_ARRAY(BSON("action" << "find"))));
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(
+            badTypeRequiredPrivileges));
     auto handle = AggStageAstNodeHandle{astNode};
     ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::TypeMismatch);
 }

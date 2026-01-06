@@ -51,7 +51,7 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
 
 StageConstraints DocumentSourceExtensionOptimizable::constraints(
     PipelineSplitState pipeState) const {
-    // Default properties if unset
+    // Default properties if unset.
     auto constraints = DocumentSourceExtension::constraints(pipeState);
 
     // Apply potential overrides from static properties.
@@ -63,6 +63,15 @@ StageConstraints DocumentSourceExtensionOptimizable::constraints(
     }
     if (auto host = static_properties_util::toHostTypeRequirement(_properties.getHostType())) {
         constraints.hostRequirement = *host;
+    }
+    if (!_properties.getUnionWithIsAllowed()) {
+        constraints.unionRequirement = StageConstraints::UnionRequirement::kNotAllowed;
+    }
+    if (!_properties.getLookupIsAllowed()) {
+        constraints.lookupRequirement = StageConstraints::LookupRequirement::kNotAllowed;
+    }
+    if (!_properties.getFacetIsAllowed()) {
+        constraints.facetRequirement = StageConstraints::FacetRequirement::kNotAllowed;
     }
 
     return constraints;
