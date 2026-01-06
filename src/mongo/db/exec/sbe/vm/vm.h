@@ -50,7 +50,6 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/modules.h"
 
-#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>

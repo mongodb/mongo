@@ -36,7 +36,6 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
-#include <cstdint>
 
 /**
  * TODO SERVER-114832 Break audit dependency on this class.

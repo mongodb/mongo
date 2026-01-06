@@ -54,7 +54,6 @@
 
 #include <exception>
 #include <string>
-#include <variant>
 #include <vector>
 
 #include <boost/none.hpp>

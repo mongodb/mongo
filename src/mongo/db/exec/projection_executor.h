@@ -46,7 +46,6 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
 
-#include <memory>
 #include <set>
 
 #include <boost/intrusive_ptr.hpp>

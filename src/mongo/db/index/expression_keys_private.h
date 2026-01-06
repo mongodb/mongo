@@ -42,8 +42,6 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/shared_buffer_fragment.h"
 
-#include <vector>
-
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

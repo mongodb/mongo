@@ -39,7 +39,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <memory>
 #include <vector>
 
 #include <boost/intrusive_ptr.hpp>

@@ -47,7 +47,6 @@
 #include "mongo/util/serialization_context.h"
 
 #include <cstddef>
-#include <string>
 #include <utility>
 #include <vector>
 

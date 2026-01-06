@@ -32,7 +32,6 @@
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/util/modules.h"
 
-#include <type_traits>
 
 namespace mongo {
 

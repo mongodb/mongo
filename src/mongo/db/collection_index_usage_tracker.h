@@ -38,8 +38,6 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 
-#include <memory>
-
 #include <boost/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>

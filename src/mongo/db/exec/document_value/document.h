@@ -51,7 +51,6 @@
 #include <initializer_list>
 #include <iosfwd>
 #include <string>
-#include <type_traits>
 #include <typeinfo>
 #include <utility>
 #include <vector>

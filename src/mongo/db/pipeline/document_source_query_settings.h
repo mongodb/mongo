@@ -55,8 +55,6 @@
 
 #include <memory>
 #include <set>
-#include <string>
-#include <utility>
 
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>

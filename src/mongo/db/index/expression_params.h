@@ -33,8 +33,6 @@
 #include "mongo/db/hasher.h"
 #include "mongo/util/modules.h"
 
-#include <string>
-#include <vector>
 
 namespace mongo {
 

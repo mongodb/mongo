@@ -55,10 +55,8 @@
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
-#include <limits>
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include <absl/container/inlined_vector.h>

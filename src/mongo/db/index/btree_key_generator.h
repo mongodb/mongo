@@ -42,7 +42,6 @@
 #include "mongo/util/shared_buffer_fragment.h"
 
 #include <cstddef>
-#include <memory>
 #include <set>
 #include <vector>
 

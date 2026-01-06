@@ -45,9 +45,7 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
-#include <memory>
 #include <tuple>
-#include <variant>
 #include <vector>
 
 #include <absl/container/node_hash_map.h>

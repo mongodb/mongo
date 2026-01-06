@@ -33,7 +33,6 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/util/modules.h"
 
-#include <string>
 
 MONGO_MOD_PUBLIC;
 namespace mongo::CollationSpec {

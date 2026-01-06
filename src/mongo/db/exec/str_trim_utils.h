@@ -35,7 +35,6 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/modules.h"
 
-#include <string>
 #include <vector>
 
 namespace mongo::str_trim_utils {
