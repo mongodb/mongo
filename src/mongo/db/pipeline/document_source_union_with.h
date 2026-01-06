@@ -67,7 +67,7 @@
 namespace mongo {
 
 struct UnionWithSharedState {
-    enum ExecutionProgress {
+    enum class ExecutionProgress {
         // We haven't yet iterated 'pSource' to completion.
         kIteratingSource,
 
@@ -82,6 +82,11 @@ struct UnionWithSharedState {
         // There are no more results.
         kFinished
     };
+
+    UnionWithSharedState(std::unique_ptr<Pipeline> pipeline,
+                         std::unique_ptr<exec::agg::Pipeline> execPipeline,
+                         ExecutionProgress executionState = ExecutionProgress::kIteratingSource);
+
     // This pipeline will not be translated nor optimized, but the view will be resolved.
     // Pre-optimization rewrites and optimizations will happen right before the subpipeline is
     // executed in 'UnionWithStage::doGetNext'.

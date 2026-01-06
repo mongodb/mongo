@@ -233,8 +233,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     : DocumentSource(kStageName, expCtx),
       _fromNs(std::move(fromNs)),
       _as(std::move(as)),
-      _variables(expCtx->variables),
-      _variablesParseState(expCtx->variablesParseState.copyWith(_variables.useIdGenerator())),
+      _variablesParseState(_variables.useIdGenerator()),
       _sharedState(std::make_shared<LookUpSharedState>()) {
     if (!_fromNs.isOnInternalDb()) {
         serviceOpCounters(expCtx->getOperationContext()).gotNestedAggregate();
@@ -253,6 +252,10 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
     _fromExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNamespace.ns, resolvedNamespace.uuid, _fromNs);
     _fromExpCtx->setInLookup(true);
+    // We must use variables from the sub-pipeline's ExpressionContext, because some extra varialbes
+    // might have been defined in makeCopyForSubPipelineFromExpressionContext
+    _variables = _fromExpCtx->variables;
+    _variablesParseState = _fromExpCtx->variablesParseState.copyWith(_variables.useIdGenerator());
 }
 
 DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
