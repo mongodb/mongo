@@ -8,7 +8,7 @@
  */
 
 import {findMatchingLogLine} from "jstests/libs/log.js";
-import {code, linebreak, section, subSection} from "jstests/libs/pretty_md.js";
+import {code, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 

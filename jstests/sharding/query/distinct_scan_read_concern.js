@@ -8,7 +8,7 @@
  * ]
  */
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
-import {setupShardedCollectionWithOrphans} from "jstests/libs/query_golden_sharding_utils.js";
+import {setupShardedCollectionWithOrphans} from "jstests/libs/query/golden_sharding_utils.js";
 
 TestData.skipCheckOrphans = true; // Deliberately inserts orphans.
 

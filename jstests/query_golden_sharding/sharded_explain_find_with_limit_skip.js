@@ -10,7 +10,7 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {section} from "jstests/libs/pretty_md.js";
+import {section} from "jstests/libs/query/pretty_md.js";
 import {outputFindPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

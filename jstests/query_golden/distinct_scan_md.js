@@ -7,7 +7,7 @@
  *   requires_fcv_82
  * ]
  */
-import {section, subSection} from "jstests/libs/pretty_md.js";
+import {section, subSection} from "jstests/libs/query/pretty_md.js";
 import {outputAggregationPlanAndResults, outputDistinctPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 
 const coll = db[jsTestName()];

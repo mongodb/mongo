@@ -2,7 +2,7 @@
  * Tests that we generate correct IXSCANs using compound wildcard indexes.
  */
 import {normalizeArray} from "jstests/libs/golden_test.js";
-import {code, linebreak, section, subSection} from "jstests/libs/pretty_md.js";
+import {code, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 /**

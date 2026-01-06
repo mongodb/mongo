@@ -8,9 +8,9 @@
  * ]
  */
 
-import {section} from "jstests/libs/pretty_md.js";
+import {section} from "jstests/libs/query/pretty_md.js";
 import {validateAggPlanCacheUse} from "jstests/libs/query/golden_test_utils.js";
-import {setupShardedCollectionWithOrphans} from "jstests/libs/query_golden_sharding_utils.js";
+import {setupShardedCollectionWithOrphans} from "jstests/libs/query/golden_sharding_utils.js";
 
 TestData.skipCheckOrphans = true; // Deliberately inserts orphans.
 const {shardingTest, coll} = setupShardedCollectionWithOrphans();

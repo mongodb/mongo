@@ -6,7 +6,7 @@
  *   requires_fcv_82
  * ]
  */
-import {section} from "jstests/libs/pretty_md.js";
+import {section} from "jstests/libs/query/pretty_md.js";
 import {
     runDistinctAndOutputPlanCacheStats,
     validateAggPlanCacheUse,
