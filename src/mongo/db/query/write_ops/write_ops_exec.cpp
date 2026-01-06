@@ -1451,14 +1451,6 @@ void registerRequestForQueryStats(OperationContext* opCtx,
             return;
     }
 
-    // TODO (SERVER-113907): Implement query shape for update with array filters.
-    if (modType == write_ops::UpdateModification::Type::kModifier) {
-        // Skip modifier updates that contains array filters.
-        if (!parsedUpdate.getRequest()->getArrayFilters().empty()) {
-            return;
-        }
-    }
-
     // TODO(SERVER-113688): Support recording query stats for pipeline updates containing
     // $_internalApplyOplogUpdate.
     if (modType == write_ops::UpdateModification::Type::kPipeline) {

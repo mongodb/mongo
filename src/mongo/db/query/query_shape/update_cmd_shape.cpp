@@ -110,7 +110,14 @@ Value shapifyUpdateOp(const ParsedUpdate& parsedUpdate,
         case write_ops::UpdateModification::Type::kPipeline:
             return Value(static_cast<const PipelineExecutor*>(executor)->serialize(opts));
         case write_ops::UpdateModification::Type::kModifier: {
-            auto value = static_cast<const UpdateTreeExecutor*>(executor)->serialize(opts);
+            SerializationOptions modifierOpts = opts;
+            if (!(parsedUpdate.arrayFilters == nullptr || parsedUpdate.arrayFilters->empty())) {
+                // If there are array filters present, field paths need to be serialized
+                // accordingly.
+                modifierOpts.serializeForUpdateArrayFilters = true;
+            }
+
+            auto value = static_cast<const UpdateTreeExecutor*>(executor)->serialize(modifierOpts);
             return value.getDocument().empty()
                 ? Value(makeNoopModifierUpdateOpShape(
                       parsedUpdate.getRequest()->getUpdateModification().getUpdateModifier()))
@@ -145,6 +152,25 @@ boost::optional<BSONObj> shapifyUpdateConstants(const ParsedUpdate& parsedUpdate
     return shapifiedConstants.obj();
 }
 
+boost::optional<std::vector<BSONObj>> shapifyArrayFilters(const ParsedUpdate& parsedUpdate,
+                                                          const SerializationOptions& opts) {
+    if (parsedUpdate.getDriver()->type() != UpdateDriver::UpdateType::kOperator) {
+        return boost::none;
+    }
+
+    if (parsedUpdate.arrayFilters == nullptr || parsedUpdate.arrayFilters->empty()) {
+        return boost::none;
+    }
+
+    std::vector<BSONObj> shapifiedFilters;
+    for (const auto& filterPair : *parsedUpdate.arrayFilters) {
+        const auto& filterExpr = filterPair.second->getFilter();
+        shapifiedFilters.push_back(filterExpr->serialize(opts));
+    }
+
+    return shapifiedFilters;
+}
+
 }  // namespace
 
 UpdateCmdShapeComponents::UpdateCmdShapeComponents(const ParsedUpdate& parsedUpdate,
@@ -153,11 +179,10 @@ UpdateCmdShapeComponents::UpdateCmdShapeComponents(const ParsedUpdate& parsedUpd
     : representativeQ(shapifyQuery(parsedUpdate, opts)),
       _representativeUObj(shapifyUpdateOp(parsedUpdate, opts).wrap(""_sd)),
       representativeC(shapifyUpdateConstants(parsedUpdate, opts)),
+      representativeArrayFilters(shapifyArrayFilters(parsedUpdate, opts)),
       multi(parsedUpdate.getRequest()->getMulti()),
       upsert(parsedUpdate.getRequest()->isUpsert()),
-      let(let) {
-    // TODO(SERVER-113907): Support representativeArrayFilters when shapifying update modifiers.
-}
+      let(let) {}
 
 void UpdateCmdShapeComponents::HashValue(absl::HashState state) const {
     state = absl::HashState::combine(
@@ -168,8 +193,6 @@ void UpdateCmdShapeComponents::HashValue(absl::HashState state) const {
         state = absl::HashState::combine(std::move(state), simpleHash(*representativeC));
     }
     if (representativeArrayFilters) {
-        // TODO(SERVER-113907): Revisit here when supporting representativeArrayFilters when
-        // shapifying update modifiers.
         for (const auto& filter : *representativeArrayFilters) {
             state = absl::HashState::combine(std::move(state), simpleHash(filter));
         }
@@ -286,12 +309,6 @@ QueryShapeHash UpdateCmdShape::sha256Hash(OperationContext*, const Serialization
     auto nssDataRange = nssOrUUID.asDataRange();
     updateCommandShapeBuffer.appendBuf(nssDataRange.data(), nssDataRange.length());
     updateCommandShapeBuffer.appendBuf(collation.objdata(), collation.objsize());
-
-    // TODO(SERVER-113907): Revisit here when supporting representativeArrayFilters when
-    // shapifying update modifiers.
-    // TODO: Because representativeArrayFilters is variable-sized, updateCommandShapeBuffer could
-    // potentially exceed the stack allocation and require heap allocation. Consider using a
-    // BSONArray instead of a vector of BSONObj and pass in asDataRange(...) to computeHash(...).
     if (_components.representativeArrayFilters) {
         const auto& filters = *_components.representativeArrayFilters;
         updateCommandShapeBuffer.appendNum(static_cast<uint32_t>(filters.size()));
