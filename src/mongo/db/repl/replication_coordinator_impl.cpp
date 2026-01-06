@@ -5139,6 +5139,9 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     if (_updateCommittedSnapshot(lk, stableOpTime)) {
         // Update the stable timestamp for the storage engine.
         _storage->setStableTimestamp(getServiceContext(), stableOpTime.getTimestamp(), force);
+
+        // Update our understanding of the oldest available snapshot timestamp.
+        setOldestTimestampMetric(_storage->getOldestTimestamp(getServiceContext()));
     }
 }
 
@@ -5356,8 +5359,12 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(const GenericArguments& gen
         invariantStatusOK(oplogQueryMetadata->writeToMetadata(builder));
 }
 
-void ReplicationCoordinatorImpl::setOldestTimestamp(const Timestamp& timestamp) {
+void ReplicationCoordinatorImpl::setOldestTimestampMetric(const Timestamp& timestamp) {
     oldestTimestampMetric = timestamp;
+}
+
+void ReplicationCoordinatorImpl::setOldestTimestamp(const Timestamp& timestamp) {
+    setOldestTimestampMetric(timestamp);
     return ReplicationCoordinator::setOldestTimestamp(timestamp);
 }
 

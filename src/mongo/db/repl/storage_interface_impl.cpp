@@ -1397,6 +1397,11 @@ Timestamp StorageInterfaceImpl::getLatestOplogTimestamp(OperationContext* opCtx)
     return statusWithTimestamp.getValue();
 }
 
+Timestamp StorageInterfaceImpl::getOldestTimestamp(ServiceContext* serviceCtx) {
+    StorageEngine* storageEngine = serviceCtx->getStorageEngine();
+    return storageEngine->getOldestTimestamp();
+}
+
 StatusWith<StorageInterface::CollectionSize> StorageInterfaceImpl::getCollectionSize(
     OperationContext* opCtx, const NamespaceString& nss) {
     const auto coll =

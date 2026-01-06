@@ -408,6 +408,12 @@ public:
      */
     virtual Timestamp getLatestOplogTimestamp(OperationContext* opCtx) = 0;
 
+    /**
+     * Gets the oldest timestamp for which the storage engine must maintain snapshot history
+     * through.
+     */
+    virtual Timestamp getOldestTimestamp(ServiceContext* serviceCtx) = 0;
+
     using CollectionSize = uint64_t;
     using CollectionCount = uint64_t;
 

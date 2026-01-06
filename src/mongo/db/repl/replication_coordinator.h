@@ -269,7 +269,7 @@ public:
 
 
     /**
-     * Sets oldest timestamp value
+     * Sets oldest timestamp metric value and set it on the storage engine.
      */
     virtual void setOldestTimestamp(const Timestamp& timestamp);
 

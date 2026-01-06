@@ -467,6 +467,7 @@ public:
                              BSONObjBuilder* builder) const override;
 
 
+    void setOldestTimestampMetric(const Timestamp& timestamp);
     void setOldestTimestamp(const Timestamp& timestamp) override;
 
     Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,
