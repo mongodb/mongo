@@ -189,6 +189,19 @@ TEST_F(OtelMetricsInitializationTest, ValidCompressionParam) {
 
     shutdown();
 }
+
+TEST_F(OtelMetricsInitializationTest, TimeoutGreaterThanIntervalFails) {
+    RAIIServerParameterControllerForTest directoryParam{"openTelemetryMetricsDirectory",
+                                                        getMetricsPath()};
+    // Set timeout greater than interval (interval defaults to 1000, timeout defaults to 500)
+    RAIIServerParameterControllerForTest intervalParam{"openTelemetryExportIntervalMillis", 500};
+    RAIIServerParameterControllerForTest timeoutParam{"openTelemetryExportTimeoutMillis", 1000};
+
+    ASSERT_EQ(initialize().code(), ErrorCodes::InvalidOptions);
+
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    ASSERT_TRUE(isNoopMeterProvider(provider.get()));
+}
 }  // namespace
 }  // namespace mongo::otel::metrics
 
