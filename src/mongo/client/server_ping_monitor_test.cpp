@@ -90,11 +90,9 @@ protected:
     }
 
     void tearDown() override {
-        _topologyListener.reset();
         _executor->shutdown();
         executor::NetworkInterfaceMock::InNetworkGuard(_net)->runReadyNetworkOperations();
         _executor->join();
-        _executor.reset();
     }
 
     sdam::TopologyListenerMock* getTopologyListener() {
@@ -123,9 +121,13 @@ protected:
     }
 
     /**
-     * Checks that a ping has been made to the server at hostAndPort and schedules a response.
+     * Checks that a ping has been made to the server at hostAndPort and schedules a response
+     * according to the provided status. Note that the response status will always be an error if
+     * the node representing hostAndPort is down.
      */
-    void processPingRequest(const HostAndPort& hostAndPort, MockReplicaSet* replSet) {
+    void processPingRequest(const HostAndPort& hostAndPort,
+                            MockReplicaSet* replSet,
+                            Status status = Status::OK()) {
         ASSERT(hasReadyRequests());
 
         InNetworkGuard guard(_net);
@@ -145,10 +147,14 @@ protected:
         node->setCommandReply("ping", BSON("ok" << 1));
 
         if (node->isRunning()) {
-            const auto opmsg = static_cast<OpMsgRequest>(request);
-            const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
-            _net->scheduleSuccessfulResponse(
-                noi, RemoteCommandResponse::make_forTest(reply, Milliseconds(0)));
+            if (status.isOK()) {
+                const auto opmsg = static_cast<OpMsgRequest>(request);
+                const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
+                _net->scheduleSuccessfulResponse(
+                    noi, RemoteCommandResponse::make_forTest(reply, Milliseconds(0)));
+            } else {
+                _net->scheduleErrorResponse(noi, std::move(status));
+            }
         } else {
             _net->scheduleErrorResponse(noi, Status(ErrorCodes::HostUnreachable, ""));
         }
@@ -169,13 +175,15 @@ protected:
     }
 
     /**
-     * Checks that exactly one successful ping occurs at the time the method is called and ensures
-     * no additional pings are issued for at least pingFrequency.
+     * Checks that exactly one ping occurs at the time the method is called and ensures no
+     * additional pings are issued for at least pingFrequency. If the ping response was not an error
+     * (according to `status`), also verifies that it reported a positive latency.
      */
     void checkSinglePing(Milliseconds pingFrequency,
                          const HostAndPort& hostAndPort,
-                         MockReplicaSet* replSet) {
-        processPingRequest(hostAndPort, replSet);
+                         MockReplicaSet* replSet,
+                         Status status = Status::OK()) {
+        processPingRequest(hostAndPort, replSet, status);
         auto deadline = elapsed() + pingFrequency;
         while (elapsed() < deadline && !_topologyListener->hasPingResponse(hostAndPort)) {
             advanceTime(Milliseconds(100));
@@ -185,13 +193,15 @@ protected:
         ASSERT_LT(elapsed(), deadline);
         auto pingResponse = _topologyListener->getPingResponse(hostAndPort);
 
-        // There should only be one "hello" response queued up.
+        // There should only be one ping response queued up.
         ASSERT_EQ(pingResponse.size(), 1);
-        ASSERT(pingResponse[0].isOK());
+        ASSERT_EQ(pingResponse[0].getStatus(), status);
 
-        // The latency is from the ping monitor's local timer; not from the mocked clock.
-        // Just assert that we receive a signal.
-        ASSERT_GTE(durationCount<Microseconds>(pingResponse[0].getValue()), 1);
+        if (status.isOK()) {
+            // The latency is from the ping monitor's local timer; not from the mocked clock.
+            // Just assert that we receive a signal.
+            ASSERT_GTE(durationCount<Microseconds>(pingResponse[0].getValue()), 1);
+        }
 
         checkNoActivityBefore(deadline, hostAndPort);
     }
@@ -285,8 +295,9 @@ protected:
         return ssPingMonitor;
     }
 
-    void checkSinglePing(Milliseconds pingFrequency) {
-        ServerPingMonitorTestFixture::checkSinglePing(pingFrequency, _hostAndPort, getReplSet());
+    void checkSinglePing(Milliseconds pingFrequency, Status status = Status::OK()) {
+        ServerPingMonitorTestFixture::checkSinglePing(
+            pingFrequency, _hostAndPort, getReplSet(), std::move(status));
     }
 
     void checkNoActivityBefore(Milliseconds deadline) {
@@ -302,7 +313,7 @@ private:
     HostAndPort _hostAndPort;
 };
 
-TEST_F(SingleServerPingMonitorTest, pingFrequencyCheck) {
+TEST_F(SingleServerPingMonitorTest, PingFrequencyCheck) {
     auto pingFrequency = Seconds(10);
     auto ssPingMonitor = initSingleServerPingMonitor(pingFrequency);
 
@@ -316,7 +327,7 @@ TEST_F(SingleServerPingMonitorTest, pingFrequencyCheck) {
  * Confirms that the SingleServerPingMonitor continues to try and ping a dead server at
  * pingFrequency and successfully does so once the server is restored.
  */
-TEST_F(SingleServerPingMonitorTest, pingDeadServer) {
+TEST_F(SingleServerPingMonitorTest, PingDeadServer) {
     // Kill the server before starting up the SingleServerPingMonitor.
     auto hostAndPort = getHostAndPort();
     {
@@ -353,11 +364,22 @@ TEST_F(SingleServerPingMonitorTest, pingDeadServer) {
     checkSinglePing(pingFrequency);
 }
 
+TEST_F(SingleServerPingMonitorTest, CancelledPingDoesNotStopFuturePings) {
+    auto pingFrequency = Seconds(10);
+    auto ssPingMonitor = initSingleServerPingMonitor(pingFrequency);
+
+    checkSinglePing(pingFrequency);
+    checkSinglePing(pingFrequency);
+    checkSinglePing(pingFrequency,
+                    Status(ErrorCodes::ShutdownInProgress, "Cancelling due to shutdown"));
+    checkSinglePing(pingFrequency);
+}
+
 /**
  * Checks that no more events are published to the TopologyListener and no more pings are issued to
  * the server after the SingleServerPingMonitor is closed.
  */
-TEST_F(SingleServerPingMonitorTest, noPingAfterSingleServerPingMonitorClosed) {
+TEST_F(SingleServerPingMonitorTest, NoPingAfterSingleServerPingMonitorClosed) {
     auto pingFrequency = Seconds(10);
     auto ssPingMonitor = initSingleServerPingMonitor(pingFrequency);
 
@@ -380,7 +402,7 @@ protected:
 /**
  * Adds and removes a SingleServerPingMonitor from the ServerPingMonitor.
  */
-TEST_F(ServerPingMonitorTest, singleNodeServerPingMonitorCycle) {
+TEST_F(ServerPingMonitorTest, SingleNodeServerPingMonitorCycle) {
     auto pingFrequency = Seconds(10);
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
@@ -403,7 +425,7 @@ TEST_F(ServerPingMonitorTest, singleNodeServerPingMonitorCycle) {
  * Adds two SingleServerPingMonitors to the ServerPingMonitor, removes one SingleServerPingMonitor
  * but not the other.
  */
-TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneClosed) {
+TEST_F(ServerPingMonitorTest, TwoNodeServerPingMonitorOneClosed) {
     auto pingFrequency = Seconds(10);
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
@@ -434,7 +456,7 @@ TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorOneClosed) {
  * is safe to call multiple times - once explicitly and a second time implicitly through its
  * destructor.
  */
-TEST_F(ServerPingMonitorTest, twoNodeServerPingMonitorMutlipleShutdown) {
+TEST_F(ServerPingMonitorTest, TwoNodeServerPingMonitorMultipleShutdown) {
     auto pingFrequency = Seconds(10);
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);

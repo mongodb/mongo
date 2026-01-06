@@ -170,19 +170,8 @@ void SingleServerPingMonitor::_doServerPing() {
         request,
         [anchor = shared_from_this(),
          timer = Timer()](const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
-            if (ErrorCodes::isCancellationError(result.response.status)) {
-                // Do no more work if the SingleServerPingMonitor is removed or the request is
-                // canceled.
-                LOGV2(7926103,
-                      "ServerPingMonitor stopping pings to host because monitor was removed or "
-                      "request was cancelled",
-                      "host"_attr = anchor->_hostAndPort,
-                      "status"_attr = result.response.status);
-                return;
-            }
             {
                 stdx::lock_guard lk(anchor->_mutex);
-                int rttValue = 0;
                 if (anchor->_isDropped) {
                     LOGV2(7926104,
                           "ServerPingMonitor stopping pings to host because the component was "
@@ -200,7 +189,7 @@ void SingleServerPingMonitor::_doServerPing() {
                         << "Failing the ping command to " << (anchor->_hostAndPort);
                     anchor->_rttListener->onServerPingFailedEvent(
                         anchor->_hostAndPort, {ErrorCodes::HostUnreachable, reason});
-                } else if (MONGO_unlikely(
+                } else if (int rttValue = 0; MONGO_unlikely(
                                serverPingMonitorSetRTT.shouldFail([&](const BSONObj& data) {
                                    if (data.hasField(anchor->_hostAndPort.toString())) {
                                        rttValue = data.getIntField(anchor->_hostAndPort.toString());
