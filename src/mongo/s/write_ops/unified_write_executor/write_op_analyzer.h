@@ -30,9 +30,8 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/global_catalog/chunk_manager.h"
-#include "mongo/db/router_role/collection_routing_info_targeter.h"
 #include "mongo/db/router_role/routing_context.h"
+#include "mongo/s/query/exec/target_write_op.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/write_ops/pause_migrations_during_multi_updates_enablement.h"
 #include "mongo/s/write_ops/unified_write_executor/stats.h"
@@ -95,8 +94,8 @@ private:
      * Record the targeting stats of the write op, this is only called for certain write types.
      */
     void recordTargetingStats(OperationContext* opCtx,
-                              const CollectionRoutingInfoTargeter& targeter,
-                              const NSTargeter::TargetingResult& tr,
+                              const CollectionRoutingInfo& cri,
+                              const TargetOpResult& tr,
                               const WriteOp& op);
 
     Stats& _stats;

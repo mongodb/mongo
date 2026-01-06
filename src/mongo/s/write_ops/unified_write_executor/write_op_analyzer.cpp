@@ -31,50 +31,62 @@
 
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
-#include "mongo/s/write_ops/write_op_helper.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace unified_write_executor {
 
-
 void WriteOpAnalyzerImpl::recordTargetingStats(OperationContext* opCtx,
-                                               const CollectionRoutingInfoTargeter& targeter,
-                                               const NSTargeter::TargetingResult& tr,
+                                               const CollectionRoutingInfo& cri,
+                                               const TargetOpResult& tr,
                                                const WriteOp& op) {
     // FindAndModify command does not record the following metrics.
     if (op.isFindAndModify()) {
         return;
     }
 
+    int aproxNShardsOwningChunks =
+        cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks() : 0;
+
     _stats.recordTargetingStats(tr.endpoints,
                                 op.getNsInfoIdx(),
-                                targeter.isTargetedCollectionSharded(),
-                                targeter.getAproxNShardsOwningChunks(),
+                                cri.isSharded(),
+                                aproxNShardsOwningChunks,
                                 getWriteOpType(op));
 }
 
 StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                                                   RoutingContext& routingCtx,
                                                   const WriteOp& op) try {
-    // TODO SERVER-106874 remove the namespace translation check in this function entirely once 9.0
-    // becomes last LTS. By then we will only have viewless timeseries that do not require nss
-    // translation.
-    // TODO SERVER-103782 Don't use CRITargeter.
     auto nss = op.getNss();
-    CollectionRoutingInfoTargeter targeter(nss, routingCtx);
+    bool isViewfulTimeseries = false;
+
+    // TODO SERVER-106874 remove the namespace translation check entirely once 9.0 becomes last
+    // LTS. By then we will only have viewless timeseries that do not require nss translation.
+    auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+    if (routingCtx.hasNss(bucketsNss)) {
+        nss = bucketsNss;
+        isViewfulTimeseries = true;
+    }
+
+    const CollectionRoutingInfo& cri = routingCtx.getCollectionRoutingInfo(nss);
+    const bool isTimeseriesCollection =
+        cri.hasRoutingTable() && cri.getChunkManager().isTimeseriesCollection();
+    invariant(!cri.hasRoutingTable() || cri.getChunkManager().getNss() == nss);
+
     // TODO SERVER-103146 Add kChangesOwnership.
-    NSTargeter::TargetingResult tr;
+    TargetOpResult tr;
     switch (getWriteOpType(op)) {
         case WriteType::kInsert: {
-            tr.endpoints.emplace_back(targeter.targetInsert(opCtx, op.getInsertOp().getDocument()));
+            tr.endpoints.emplace_back(
+                targetInsert(opCtx, nss, cri, isViewfulTimeseries, op.getInsertOp().getDocument()));
         } break;
         case WriteType::kUpdate: {
-            tr = targeter.targetUpdate(opCtx, op);
+            tr = targetUpdate(opCtx, nss, cri, isViewfulTimeseries, op);
         } break;
         case WriteType::kDelete: {
-            tr = targeter.targetDelete(opCtx, op);
+            tr = targetDelete(opCtx, nss, cri, isViewfulTimeseries, op);
         } break;
         default: {
             MONGO_UNREACHABLE;
@@ -82,36 +94,29 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     }
 
     tassert(10346500, "Expected write to affect at least one shard", !tr.endpoints.empty());
-    const bool isTimeseries = targeter.isTrackedTimeSeriesNamespace();
     const bool isUpdate = getWriteOpType(op) == WriteType::kUpdate;
-    const bool isRetryableWrite = opCtx->isRetryableWrite();
+    const bool isDelete = getWriteOpType(op) == WriteType::kDelete;
+    const bool isMultiWrite = op.getMulti();
     const bool inTxn = static_cast<bool>(TransactionRouter::get(opCtx));
     const bool isRawData = isRawDataOperation(opCtx);
     const bool isTimeseriesRetryableUpdateOp =
-        isTimeseries && isUpdate && isRetryableWrite && !inTxn && !isRawData;
-    // We consider the request to be on the main namespace of a viewful timeseries collection when
-    // the underlying CRI is a non-viewless timeseries entry and the client request is on the main
-    // namespace not the buckets namespace.
-    auto isRequestOnTimeseriesBucketCollection = nss.isTimeseriesBucketsCollection();
-    const bool isViewfulTimeseries =
-        targeter.isTrackedTimeSeriesBucketsNamespace() && !isRequestOnTimeseriesBucketCollection;
+        isTimeseriesCollection && isUpdate && opCtx->isRetryableWrite() && !inTxn && !isRawData;
 
     const bool enableMultiWriteBlockingMigrations =
         coordinate_multi_update_util::shouldCoordinateMultiWrite(
             opCtx, _pauseMigrationsDuringMultiUpdatesParameter);
-    const bool isMultiWrite = op.getMulti();
-    const bool isDelete = getWriteOpType(op) == WriteType::kDelete;
+
     const bool isMultiWriteBlockingMigrations =
         (isUpdate || isDelete) && isMultiWrite && enableMultiWriteBlockingMigrations;
 
-    if (isTimeseries && op.isFindAndModify()) {
+    if (isTimeseriesCollection && op.isFindAndModify()) {
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform findAndModify with sort on a timeseries collection",
-                !op.getSort() || isRawDataOperation(opCtx));
+                !op.getSort() || isRawData);
     }
 
-    auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
-        opCtx, targeter.getNS(), op.getOpType(), tr.endpoints);
+    auto targetedSampleId =
+        analyze_shard_key::tryGenerateTargetedSampleId(opCtx, nss, op.getOpType(), tr.endpoints);
 
     if (tr.isNonTargetedRetryableWriteWithId) {
         // For a retryable write without shard key with id operation, there is a special case where
@@ -124,7 +129,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         // disabled.
         // TODO SERVER-101167: For WithoutShardKeyWithId write ops, we should only target the shards
         // that are needed (instead of targeting all shards).
-        const bool targetAllShards = [&]() {
+        const bool shouldTargetAllShards = [&]() {
             const bool isUpdateOrDelete = (isUpdate || isDelete);
             if (isUpdateOrDelete && !inTxn && tr.endpoints.size() > 1) {
                 if (op.getMulti()) {
@@ -135,19 +140,19 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
             return false;
         }();
 
-        if (targetAllShards) {
-            tr.endpoints = targeter.targetAllShards(opCtx);
+        if (shouldTargetAllShards) {
+            tr.endpoints = targetAllShards(opCtx, cri);
             // Regenerate the targetedSampleId since we changed the endpoints to target all shards.
             targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
-                opCtx, targeter.getNS(), op.getOpType(), tr.endpoints);
+                opCtx, nss, op.getOpType(), tr.endpoints);
         }
-        recordTargetingStats(opCtx, targeter, tr, op);
+        recordTargetingStats(opCtx, cri, tr, op);
         return Analysis{AnalysisType::kRetryableWriteWithId,
                         std::move(tr.endpoints),
                         isViewfulTimeseries,
                         std::move(targetedSampleId)};
     } else if (tr.useTwoPhaseWriteProtocol) {
-        recordTargetingStats(opCtx, targeter, tr, op);
+        recordTargetingStats(opCtx, cri, tr, op);
         return Analysis{AnalysisType::kTwoPhaseWrite,
                         std::move(tr.endpoints),
                         isViewfulTimeseries,
@@ -170,10 +175,10 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         // the request a second time.
         return Analysis{AnalysisType::kInternalTransaction,
                         std::move(tr.endpoints),
-                        false /* isTimeseries */,
+                        false /* isViewfulTimeseries */,
                         std::move(targetedSampleId)};
     } else if (tr.endpoints.size() == 1) {
-        recordTargetingStats(opCtx, targeter, tr, op);
+        recordTargetingStats(opCtx, cri, tr, op);
         return Analysis{AnalysisType::kSingleShard,
                         std::move(tr.endpoints),
                         isViewfulTimeseries,
@@ -183,10 +188,10 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         // than one endpoint, all shards are targeted -AND- 'shardVersion' is set to IGNORED on all
         // endpoints. The exception to this is when 'onlyTargetDataOwningShardsForMultiWrites' is
         // true.
-        const bool targetAllShards = (isUpdate || isDelete) &&
+        const bool shouldTargetAllShards = (isUpdate || isDelete) &&
             write_op_helpers::shouldTargetAllShardsSVIgnored(inTxn, op.getMulti());
-        if (targetAllShards) {
-            auto endpoints = targeter.targetAllShards(opCtx);
+        if (shouldTargetAllShards) {
+            auto endpoints = targetAllShards(opCtx, cri);
 
             for (auto& endpoint : endpoints) {
                 endpoint.shardVersion->setPlacementVersionIgnored();
@@ -195,10 +200,10 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
 
             // Regenerate the targetedSampleId since we changed the endpoints to target all shards.
             targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
-                opCtx, targeter.getNS(), op.getOpType(), tr.endpoints);
+                opCtx, nss, op.getOpType(), tr.endpoints);
         }
 
-        recordTargetingStats(opCtx, targeter, tr, op);
+        recordTargetingStats(opCtx, cri, tr, op);
 
         return Analysis{AnalysisType::kMultiShard,
                         std::move(tr.endpoints),
