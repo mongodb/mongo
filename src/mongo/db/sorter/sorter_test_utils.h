@@ -76,7 +76,7 @@ private:
 };
 
 typedef std::pair<IntWrapper, IntWrapper> IWPair;
-typedef SortIteratorInterface<IntWrapper, IntWrapper> IWIterator;
+typedef sorter::Iterator<IntWrapper, IntWrapper> IWIterator;
 typedef Sorter<IntWrapper, IntWrapper> IWSorter;
 
 enum Direction { ASC = 1, DESC = -1 };

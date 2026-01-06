@@ -223,14 +223,13 @@ public:
 template <typename Key, typename Value>
 class Sorter;
 
+namespace sorter {
+
 /**
  * This is the sorted output iterator from the sorting framework.
  */
 template <typename Key, typename Value>
-class SortIteratorInterface {
-    SortIteratorInterface(const SortIteratorInterface&) = delete;
-    SortIteratorInterface& operator=(const SortIteratorInterface&) = delete;
-
+class Iterator {
 public:
     typedef std::pair<Key, Value> Data;
     typedef std::pair<typename Key::SorterDeserializeSettings,
@@ -258,14 +257,13 @@ public:
     // Returns the next key without advancing the iterator.
     virtual const Key& peek() = 0;
 
-    virtual ~SortIteratorInterface() {}
+    virtual ~Iterator() = default;
 
     // Returns an iterator that merges the passed in iterators
     template <typename Comparator>
-    static std::unique_ptr<SortIteratorInterface> merge(
-        std::span<std::shared_ptr<SortIteratorInterface>> iters,
-        const SortOptions& opts,
-        const Comparator& comp);
+    static std::unique_ptr<Iterator> merge(std::span<std::shared_ptr<Iterator>> iters,
+                                           const SortOptions& opts,
+                                           const Comparator& comp);
 
     virtual SorterRange getRange() const {
         invariant(false, "Only FileIterator has ranges");
@@ -283,14 +281,13 @@ public:
      * Spills not-yet-returned data to disk and returns a new iterator. Invalidates the current
      * iterator.
      */
-    [[nodiscard]] virtual std::unique_ptr<SortIteratorInterface<Key, Value>> spill(
+    [[nodiscard]] virtual std::unique_ptr<sorter::Iterator<Key, Value>> spill(
         const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) {
         MONGO_UNREACHABLE_TASSERT(9917200);
     }
-
-protected:
-    SortIteratorInterface() {}  // can only be constructed as a base
 };
+
+}  // namespace sorter
 
 class SorterBase {
 public:
@@ -320,7 +317,7 @@ class SortedStorageWriter {
     SortedStorageWriter& operator=(const SortedStorageWriter&) = delete;
 
 public:
-    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
@@ -442,17 +439,17 @@ public:
     virtual std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(
         const SortOptions& opts, const Settings& settings = Settings()) = 0;
 
-    virtual std::shared_ptr<SortIteratorInterface<Key, Value>> makeIterator(
+    virtual std::shared_ptr<sorter::Iterator<Key, Value>> makeIterator(
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer) = 0;
 
-    virtual std::unique_ptr<SortIteratorInterface<Key, Value>> makeIteratorUnique(
+    virtual std::unique_ptr<sorter::Iterator<Key, Value>> makeIteratorUnique(
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer) = 0;
 
     virtual size_t getIteratorSize() = 0;
     /**
      * Reconstructs a sorter when resuming an index build, following persistFromShutdown.
      */
-    virtual std::shared_ptr<SortIteratorInterface<Key, Value>> getSortedIterator(
+    virtual std::shared_ptr<sorter::Iterator<Key, Value>> getSortedIterator(
         const SorterRange& range, const Settings& settings) = 0;
 
     /**
@@ -516,15 +513,15 @@ public:
     std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(
         const SortOptions& opts, const Settings& settings = Settings()) override;
 
-    std::shared_ptr<SortIteratorInterface<Key, Value>> makeIterator(
+    std::shared_ptr<sorter::Iterator<Key, Value>> makeIterator(
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override;
 
-    std::unique_ptr<SortIteratorInterface<Key, Value>> makeIteratorUnique(
+    std::unique_ptr<sorter::Iterator<Key, Value>> makeIteratorUnique(
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override;
 
     size_t getIteratorSize() override;
 
-    std::shared_ptr<SortIteratorInterface<Key, Value>> getSortedIterator(
+    std::shared_ptr<sorter::Iterator<Key, Value>> getSortedIterator(
         const SorterRange& range, const Settings& settings) override;
 
     std::string getStorageIdentifier() override;
@@ -544,7 +541,7 @@ private:
 template <typename Key, typename Value>
 class MONGO_MOD_PRIVATE Stream {
 public:
-    typedef SortIteratorInterface<Key, Value> Input;
+    typedef sorter::Iterator<Key, Value> Input;
     Stream(size_t fileNum, std::shared_ptr<Input> iter)
         : fileNum(fileNum), _current(iter->nextWithDeferredValue()), _rest(std::move(iter)) {}
 
@@ -595,7 +592,7 @@ struct MONGO_MOD_PRIVATE Greater {
 template <typename Key, typename Value>
 class SorterSpiller {
 public:
-    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef sorter::Iterator<Key, Value> Iterator;
     // TODO(SERVER-115336): Settings is a file-specific type that should be added to
     // FileBasedSorterStorage.
     typedef std::pair<typename Key::SorterDeserializeSettings,
@@ -623,7 +620,7 @@ public:
 template <typename Key, typename Value, typename Comparator>
 class SorterSpillerBase : public SorterSpiller<Key, Value> {
 public:
-    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<Key, Value> KV;
     // TODO(SERVER-115336): Settings is a file-specific type that should be added to
     // FileBasedSorterStorage.
@@ -665,7 +662,7 @@ public:
         const SortOptions& opts,
         const Settings& settings,
         SorterStats& stats,
-        std::vector<std::shared_ptr<SortIteratorInterface<Key, Value>>>& iters,
+        std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
         Comparator comp,
         std::size_t numTargetedSpills,
         std::size_t numParallelSpills) = 0;
@@ -703,7 +700,7 @@ private:
 template <typename Key, typename Value, typename Comparator>
 class FileBasedSorterSpiller : public SorterSpillerBase<Key, Value, Comparator> {
 public:
-    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
@@ -737,7 +734,7 @@ public:
         const SortOptions& opts,
         const Settings& settings,
         SorterStats& stats,
-        std::vector<std::shared_ptr<SortIteratorInterface<Key, Value>>>& iters,
+        std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
         Comparator comp,
         std::size_t numTargetedSpills,
         std::size_t numParallelSpills) override;
@@ -760,7 +757,7 @@ class Sorter : public SorterBase {
 public:
     typedef std::pair<Key, Value> Data;
     typedef std::function<Value()> ValueProducer;
-    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
@@ -987,7 +984,7 @@ public:
     const BoundMaker makeBound;
 
 private:
-    using SpillIterator = SortIteratorInterface<Key, Value>;
+    using SpillIterator = sorter::Iterator<Key, Value>;
 
     void _spill(size_t maxMemoryUsageBytes);
 
@@ -1008,7 +1005,7 @@ private:
 template <typename Key, typename Value>
 class SortedFileWriter final : public SortedStorageWriter<Key, Value> {
 public:
-    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;

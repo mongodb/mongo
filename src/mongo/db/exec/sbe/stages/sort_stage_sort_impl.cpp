@@ -203,7 +203,7 @@ public:
     }
 
 private:
-    using SorterIterator = SortIteratorInterface<KeyRow, ValueRow>;
+    using SorterIterator = sorter::Iterator<KeyRow, ValueRow>;
     using SorterData = std::pair<KeyRow, ValueRow>;
     class Comparator {
     public:

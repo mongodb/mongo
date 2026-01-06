@@ -936,7 +936,7 @@ namespace {
 class BaseBulkBuilder : public IndexAccessMethod::BulkBuilder {
 public:
     using Data = std::pair<key_string::Value, mongo::NullValue>;
-    using Iterator = SortIteratorInterface<key_string::Value, mongo::NullValue>;
+    using Iterator = sorter::Iterator<key_string::Value, mongo::NullValue>;
     using KeyHandlerFn = IndexAccessMethod::KeyHandlerFn;
     using OnSuppressedErrorFn = IndexAccessMethod::OnSuppressedErrorFn;
     using RecordIdHandlerFn = IndexAccessMethod::RecordIdHandlerFn;

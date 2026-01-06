@@ -146,7 +146,7 @@ void dassertCompIsSane(const Comparator& comp, const Key& lhs, const Key& rhs) {
  * Returns results from sorted in-memory storage.
  */
 template <typename Key, typename Value>
-class InMemIterator : public SortIteratorInterface<Key, Value> {
+class InMemIterator : public sorter::Iterator<Key, Value> {
 public:
     typedef std::pair<Key, Value> Data;
 
@@ -187,7 +187,7 @@ public:
         return _index < _data.size();
     }
 
-    std::unique_ptr<SortIteratorInterface<Key, Value>> spill(
+    std::unique_ptr<sorter::Iterator<Key, Value>> spill(
         const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) override {
         tassert(9917201, "spill() method is called when spillable() returns false", spillable());
 
@@ -232,7 +232,7 @@ private:
  * storage.
  */
 template <typename Key, typename Value, typename Container>
-class InMemReadOnlyIterator : public SortIteratorInterface<Key, Value> {
+class InMemReadOnlyIterator : public sorter::Iterator<Key, Value> {
 public:
     typedef std::pair<Key, Value> Data;
 
@@ -271,7 +271,7 @@ private:
  * and end offsets.
  */
 template <typename Key, typename Value>
-class FileIterator final : public SortIteratorInterface<Key, Value> {
+class FileIterator final : public sorter::Iterator<Key, Value> {
 public:
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
@@ -464,9 +464,9 @@ private:
  * responsible for deleting the data source file upon destruction.
  */
 template <typename Key, typename Value, typename Comparator>
-class MergeIterator final : public SortIteratorInterface<Key, Value> {
+class MergeIterator final : public sorter::Iterator<Key, Value> {
 public:
-    typedef SortIteratorInterface<Key, Value> Input;
+    typedef sorter::Iterator<Key, Value> Input;
     typedef std::pair<Key, Value> Data;
 
     MergeIterator(std::span<std::shared_ptr<Input>> iters,
@@ -610,7 +610,7 @@ public:
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
-    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef sorter::Iterator<Key, Value> Iterator;
 
     // TODO(SERVER-116074): Change to SorterSpiller after removing templating on Comparator.
     MergeableSorter(const SortOptions& opts,
@@ -930,7 +930,7 @@ class LimitOneSorter : public Sorter<Key, Value> {
 public:
     typedef std::pair<Key, Value> Data;
     typedef std::function<Value()> ValueProducer;
-    typedef SortIteratorInterface<Key, Value> Iterator;
+    typedef sorter::Iterator<Key, Value> Iterator;
 
     LimitOneSorter(const SortOptions& opts, const Comparator& comp)
         : Sorter<Key, Value>(opts), _comp(comp), _haveData(false) {
@@ -1325,13 +1325,13 @@ std::unique_ptr<SortedStorageWriter<Key, Value>> FileBasedSorterStorage<Key, Val
 }
 
 template <typename Key, typename Value>
-std::shared_ptr<SortIteratorInterface<Key, Value>> FileBasedSorterStorage<Key, Value>::makeIterator(
+std::shared_ptr<sorter::Iterator<Key, Value>> FileBasedSorterStorage<Key, Value>::makeIterator(
     std::unique_ptr<SortedStorageWriter<Key, Value>> writer) {
     return writer->done();
 }
 
 template <typename Key, typename Value>
-std::unique_ptr<SortIteratorInterface<Key, Value>>
+std::unique_ptr<sorter::Iterator<Key, Value>>
 FileBasedSorterStorage<Key, Value>::makeIteratorUnique(
     std::unique_ptr<SortedStorageWriter<Key, Value>> writer) {
     return writer->doneUnique();
@@ -1343,9 +1343,8 @@ size_t FileBasedSorterStorage<Key, Value>::getIteratorSize() {
 }
 
 template <typename Key, typename Value>
-std::shared_ptr<SortIteratorInterface<Key, Value>>
-FileBasedSorterStorage<Key, Value>::getSortedIterator(const SorterRange& range,
-                                                      const Settings& settings) {
+std::shared_ptr<sorter::Iterator<Key, Value>> FileBasedSorterStorage<Key, Value>::getSortedIterator(
+    const SorterRange& range, const Settings& settings) {
     return std::make_shared<sorter::FileIterator<Key, Value>>(
         this->_file,
         range.getStartOffset(),
@@ -1380,7 +1379,7 @@ FileBasedSorterSpiller<Key, Value, Comparator>::mergeSpills(
     const SortOptions& opts,
     const Settings& settings,
     SorterStats& sorterStats,
-    std::vector<std::shared_ptr<SortIteratorInterface<Key, Value>>>& iters,
+    std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
     Comparator comp,
     std::size_t numTargetedSpills,
     std::size_t numParallelSpills) {
@@ -1705,7 +1704,7 @@ void SortedFileWriter<Key, Value>::writeChunk() {
 }
 
 template <typename Key, typename Value>
-std::shared_ptr<SortIteratorInterface<Key, Value>> SortedFileWriter<Key, Value>::done() {
+std::shared_ptr<sorter::Iterator<Key, Value>> SortedFileWriter<Key, Value>::done() {
     writeChunk();
 
     return std::make_shared<sorter::FileIterator<Key, Value>>(_file,
@@ -1718,7 +1717,7 @@ std::shared_ptr<SortIteratorInterface<Key, Value>> SortedFileWriter<Key, Value>:
 }
 
 template <typename Key, typename Value>
-std::unique_ptr<SortIteratorInterface<Key, Value>> SortedFileWriter<Key, Value>::doneUnique() {
+std::unique_ptr<sorter::Iterator<Key, Value>> SortedFileWriter<Key, Value>::doneUnique() {
     writeChunk();
 
     return std::make_unique<sorter::FileIterator<Key, Value>>(_file,
@@ -1927,10 +1926,8 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill(size_t maxMemoryU
 
 template <typename Key, typename Value>
 template <typename Comparator>
-std::unique_ptr<SortIteratorInterface<Key, Value>> SortIteratorInterface<Key, Value>::merge(
-    std::span<std::shared_ptr<SortIteratorInterface>> iters,
-    const SortOptions& opts,
-    const Comparator& comp) {
+std::unique_ptr<sorter::Iterator<Key, Value>> sorter::Iterator<Key, Value>::merge(
+    std::span<std::shared_ptr<Iterator>> iters, const SortOptions& opts, const Comparator& comp) {
     return std::make_unique<sorter::MergeIterator<Key, Value, Comparator>>(iters, opts, comp);
 }
 
