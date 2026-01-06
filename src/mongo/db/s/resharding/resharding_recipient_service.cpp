@@ -316,6 +316,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _oplogBatchTaskCount{recipientDoc.getOplogBatchTaskCount()},
       _skipCloningAndApplying{recipientDoc.getSkipCloningAndApplying().value_or(false)},
       _skipCloning{recipientDoc.getSkipCloning().value_or(false)},
+      _skipBuildingIndexes{recipientDoc.getSkipBuildingIndexes().value_or(false)},
       _storeOplogFetcherProgress{recipientDoc.getStoreOplogFetcherProgress().value_or(false)},
       _relaxed{recipientDoc.getRelaxed()},
       _recipientCtx{recipientDoc.getMutableState()},
@@ -1149,6 +1150,16 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
     const CancelableOperationContextFactory& factory) {
     if (_recipientCtx.getState() > RecipientStateEnum::kBuildingIndex) {
         return ExecutorFuture(**executor);
+    }
+
+    if (_skipBuildingIndexes) {
+        LOGV2(9110904,
+              "Skip building indexes since this recipient shard is not going to own any "
+              "chunks for the collection after resharding.",
+              "reshardingUUID"_attr = _metadata.getReshardingUUID());
+        return ExecutorFuture<void>(**executor).then([this, &factory] {
+            _transitionToApplying(factory);
+        });
     }
 
     if (!_skipCloningAndApplying) {

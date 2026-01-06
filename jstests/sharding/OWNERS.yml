@@ -145,3 +145,6 @@ filters:
   - "shard_identity_rollback.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "index_not_cloned_on_non_owner_shards.js":
+    approvers:
+      - 10gen/server-cluster-scalability

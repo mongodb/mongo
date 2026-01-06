@@ -530,6 +530,7 @@ struct TestOptions {
     bool isAlsoDonor;
     bool skipCloningAndApplying;
     bool skipCloning;
+    bool skipBuildingIndexes = false;
     bool noChunksToCopy;
     bool storeOplogFetcherProgress = true;
     bool performVerification = true;
@@ -541,6 +542,7 @@ struct TestOptions {
         bob.append("isAlsoDonor", isAlsoDonor);
         bob.append("skipCloningAndApplying", skipCloningAndApplying);
         bob.append("skipCloning", skipCloning);
+        bob.append("skipBuildingIndexes", skipBuildingIndexes);
         bob.append("noChunksToCopy", noChunksToCopy);
         bob.append("storeOplogFetcherProgress", storeOplogFetcherProgress);
         bob.append("performVerification", performVerification);
@@ -570,9 +572,16 @@ std::vector<TestOptions> makeBasicTestOptions() {
                         "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
 
                     bool noChunksToCopy = skipCloningAndApplying || skipCloning;
+
+                    // TODO (SERVER-115222): skipBuildingIndexes is false unless
+                    // explicitly set to true in unit tests. Leaving it off so that unit test
+                    // time doesn't grow unnecessarily. Update this once we audit necessary
+                    // test combinations.
+                    bool skipBuildingIndexes = false;
                     testOptions.push_back({isAlsoDonor,
                                            skipCloningAndApplying,
                                            skipCloning,
+                                           skipBuildingIndexes,
                                            noChunksToCopy,
                                            driveCloneNoRefresh});
                 }
@@ -600,9 +609,16 @@ std::vector<TestOptions> makeAllTestOptions() {
                                     cloneNoRefreshFeatureFlagController(
                                         "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
 
+                                // TODO (SERVER-115222): skipBuildingIndexes is false unless
+                                // explicitly set to true in unit tests. Leaving it off so that unit
+                                // tests time doesn't grow unnecessarily. Update this once we audit
+                                // necessary test combinations.
+                                bool skipBuildingIndexes = false;
+
                                 testOptions.push_back({isAlsoDonor,
                                                        skipCloningAndApplying,
                                                        skipCloning,
+                                                       skipBuildingIndexes,
                                                        noChunksToCopy,
                                                        storeOplogFetcherProgress,
                                                        performVerification,
@@ -792,6 +808,7 @@ public:
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
         doc.setSkipCloningAndApplying(testOptions.skipCloningAndApplying);
         doc.setSkipCloning(testOptions.skipCloning);
+        doc.setSkipBuildingIndexes(testOptions.skipBuildingIndexes);
         doc.setStoreOplogFetcherProgress(testOptions.storeOplogFetcherProgress);
         doc.setPerformVerification(testOptions.performVerification);
         return doc;
@@ -2171,6 +2188,33 @@ TEST_F(ReshardingRecipientServiceTest, skipCloning) {
         notifyReshardingCommitting(opCtx.get(), *recipient, doc);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
     }
+}
+
+TEST_F(ReshardingRecipientServiceTest, SkipBuildingIndexesPhase) {
+    TestOptions testOptions{
+        .isAlsoDonor = false,
+        .skipCloningAndApplying = false,
+        .skipCloning = false,
+        .skipBuildingIndexes = true,
+        .noChunksToCopy = false,
+    };
+
+    auto doc = makeRecipientDocument(testOptions);
+    auto opCtx = makeOperationContext();
+    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyToStartCloning(opCtx.get(), *recipient, doc);
+    awaitChangeStreamsMonitorStarted(opCtx.get(), *recipient, doc);
+    notifyCriticalSectionStarted(opCtx.get(), *recipient, doc);
+    ASSERT_OK(recipient->awaitInStrictConsistencyOrError().getNoThrow());
+
+    // Verify the operation completed successfully - the metrics will be set, but the actual
+    // index building work was skipped. Similar to skipCloning tests, we just verify functional
+    // correctness rather than checking specific metric values.
+    awaitChangeStreamsMonitorCompleted(opCtx.get(), *recipient, doc);
+    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+    ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(ReshardingRecipientServiceTest, MetricsSuccessfullyShutDownOnUserCancelation) {

@@ -87,6 +87,15 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingSkipCloningIfApplicable
         default: false
         fcv_gated: true
+    featureFlagReshardingSkipBuildingIndexesIfApplicable:
+        mod_visibility: public
+        description:
+            "Feature flag to make recipient shards that are not going to own any chunks for
+            the collection after resharding skip building indexes for the
+            collection."
+        cpp_varname: gFeatureFlagReshardingSkipBuildingIndexesIfApplicable
+        default: false
+        fcv_gated: true
     featureFlagReshardingStoreOplogFetcherProgress:
         mod_visibility: public
         description:
