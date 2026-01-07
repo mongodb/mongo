@@ -37,6 +37,7 @@
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
+#include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
@@ -201,7 +202,7 @@ public:
     /**
      * Runs the trial period by working all candidate plans for as long as given in 'trialConfig'.
      */
-    Status runTrials(MultiPlanStage::TrialPhaseConfig trialConfig);
+    Status runTrials(trial_period::TrialPhaseConfig trialConfig);
 
     /**
      * Returns the specific stats from the multi-planner stage.
@@ -213,7 +214,7 @@ public:
      */
     Status pickBestPlan();
     std::unique_ptr<QuerySolution> extractQuerySolution() override;
-    MultiPlanStage::TrialPhaseConfig getTrialPhaseConfig() const {
+    trial_period::TrialPhaseConfig getTrialPhaseConfig() const {
         return _multiplanStage->getTrialPhaseConfig();
     }
 

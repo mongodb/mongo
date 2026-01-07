@@ -70,7 +70,7 @@ const MultiPlanStats* MultiPlanner::getSpecificStats() const {
     return static_cast<const MultiPlanStats*>(_multiplanStage->getSpecificStats());
 }
 
-Status MultiPlanner::runTrials(MultiPlanStage::TrialPhaseConfig trialConfig) {
+Status MultiPlanner::runTrials(trial_period::TrialPhaseConfig trialConfig) {
     tassert(
         11451402, "MultiPlanner::runTrials() called in invalid state", _state == kNotInitialized);
     auto trialPeriodYieldPolicy = makeClassicYieldPolicy(

@@ -79,7 +79,7 @@ std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
     return _multiPlanStage->extractBestSolution();
 };
 
-Status MultiPlanner::runTrials(MultiPlanStage::TrialPhaseConfig trialConfig) {
+Status MultiPlanner::runTrials(trial_period::TrialPhaseConfig trialConfig) {
     auto trialPeriodYieldPolicy = makeClassicYieldPolicy(
         opCtx(), cq()->nss(), static_cast<PlanStage*>(_multiPlanStage.get()), yieldPolicy());
     return _multiPlanStage->runTrials(trialPeriodYieldPolicy.get(), trialConfig);
