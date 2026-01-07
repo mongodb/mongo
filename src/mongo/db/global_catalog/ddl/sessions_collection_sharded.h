@@ -60,7 +60,8 @@ public:
      */
     void checkSessionsCollectionExists(OperationContext* opCtx) final;
 
-    void refreshSessions(OperationContext* opCtx, const LogicalSessionRecordSet& sessions) override;
+    SessionsCollection::RefreshSessionsResult refreshSessions(
+        OperationContext* opCtx, const LogicalSessionRecordSet& sessions) override;
 
     void removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override;
 

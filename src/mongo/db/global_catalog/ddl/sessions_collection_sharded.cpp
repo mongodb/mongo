@@ -94,10 +94,9 @@ std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwnin
 
     std::multimap<ShardId, LogicalSessionId> sessionIdsByOwningShard;
     for (const auto& session : sessions) {
+        const auto idObj = BSON("_id" << session.getId().toBSON());
         sessionIdsByOwningShard.emplace(
-            cri.getChunkManager()
-                .findIntersectingChunkWithSimpleCollation(session.getId().toBSON())
-                .getShardId(),
+            cri.getChunkManager().findIntersectingChunkWithSimpleCollation(idObj).getShardId(),
             session);
     }
 
@@ -122,10 +121,9 @@ std::vector<LogicalSessionRecord> SessionsCollectionSharded::_groupSessionRecord
 
     std::multimap<ShardId, LogicalSessionRecord> sessionsByOwningShard;
     for (const auto& session : sessions) {
+        const auto idObj = BSON("_id" << session.getId().toBSON());
         sessionsByOwningShard.emplace(
-            cri.getChunkManager()
-                .findIntersectingChunkWithSimpleCollation(session.getId().toBSON())
-                .getShardId(),
+            cri.getChunkManager().findIntersectingChunkWithSimpleCollation(idObj).getShardId(),
             session);
     }
 
@@ -159,25 +157,24 @@ void SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* 
             cm.isSharded());
 }
 
-void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
-                                                const LogicalSessionRecordSet& sessions) {
+SessionsCollection::RefreshSessionsResult SessionsCollectionSharded::refreshSessions(
+    OperationContext* opCtx, const LogicalSessionRecordSet& sessions) {
     auto send = [&](BSONObj toSend) {
         auto opMsg =
             OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
                                         NamespaceString::kLogicalSessionsNamespace.dbName(),
                                         toSend);
         auto request = BatchedCommandRequest::parseUpdate(opMsg);
-
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
         cluster::write(opCtx, request, nullptr /* nss */, &stats, &response);
-        uassertStatusOK(response.toStatus());
+        return response.toStatus();
     };
 
-    _doRefresh(NamespaceString::kLogicalSessionsNamespace,
-               _groupSessionRecordsByOwningShard(opCtx, sessions),
-               send);
+    return _doRefresh(NamespaceString::kLogicalSessionsNamespace,
+                      _groupSessionRecordsByOwningShard(opCtx, sessions),
+                      send);
 }
 
 void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
@@ -191,9 +188,8 @@ void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
 
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-
         cluster::write(opCtx, request, nullptr, &stats, &response);
-        uassertStatusOK(response.toStatus());
+        return response.toStatus();
     };
 
     _doRemove(NamespaceString::kLogicalSessionsNamespace,

@@ -56,6 +56,15 @@ public:
 
     virtual ~SessionsCollection();
 
+    struct RefreshSessionsResult {
+        LogicalSessionRecordSet failedSessions;
+        std::vector<Status> errors;  // One per batch that had issues
+
+        bool hasErrors() const {
+            return !errors.empty();
+        }
+    };
+
     /**
      * Ensures that the sessions collection exists and has the proper indexes. Implementations of
      * this method must support multiple concurrent invocations.
@@ -71,8 +80,8 @@ public:
      * Updates the last-use times on the given sessions to be greater than or equal to the given
      * time. Throws an exception if a networking issue occurred.
      */
-    virtual void refreshSessions(OperationContext* opCtx,
-                                 const LogicalSessionRecordSet& sessions) = 0;
+    virtual RefreshSessionsResult refreshSessions(OperationContext* opCtx,
+                                                  const LogicalSessionRecordSet& sessions) = 0;
 
     /**
      * Removes the authoritative records for the specified sessions.
@@ -105,7 +114,7 @@ public:
 protected:
     SessionsCollection();
 
-    using SendBatchFn = std::function<void(BSONObj batch)>;
+    using SendBatchFn = std::function<Status(BSONObj batch)>;
     static SendBatchFn makeSendFnForCommand(const NamespaceString& ns, DBClientBase* client);
     static SendBatchFn makeSendFnForBatchWrite(const NamespaceString& ns, DBClientBase* client);
 
@@ -115,9 +124,9 @@ protected:
     /**
      * Formats and sends batches of refreshes for the given set of sessions.
      */
-    void _doRefresh(const NamespaceString& ns,
-                    const std::vector<LogicalSessionRecord>& sessions,
-                    SendBatchFn send);
+    RefreshSessionsResult _doRefresh(const NamespaceString& ns,
+                                     const std::vector<LogicalSessionRecord>& sessions,
+                                     SendBatchFn send);
 
     /**
      * Formats and sends batches of deletes for the given set of sessions.

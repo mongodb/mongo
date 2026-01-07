@@ -144,14 +144,20 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionStatusErrTest) {
         auto thePast = now - Minutes(5);
 
         auto record1 = makeRecord(thePast);
-        _collection.refreshSessions(operationContext(), {record1});
+        auto result = _collection.refreshSessions(operationContext(), {record1});
+
+        ASSERT_TRUE(result.hasErrors());
+        ASSERT_EQ(result.errors.size(), 1u);
+        ASSERT_EQ(result.errors[0].code(), ErrorCodes::BSONObjectTooLarge);
+
+        ASSERT_EQ(result.failedSessions.size(), 1u);
     });
 
     onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
         return Status(ErrorCodes::BSONObjectTooLarge, "BSON size limit hit while parsing message");
     });
 
-    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::BSONObjectTooLarge);
+    future.default_timed_get();
 }
 
 TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
@@ -167,7 +173,12 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
             auto thePast = now - Minutes(5);
 
             auto record1 = makeRecord(thePast);
-            _collection.refreshSessions(operationContext(), {record1});
+            auto result = _collection.refreshSessions(operationContext(), {record1});
+            ASSERT_TRUE(result.hasErrors());
+            ASSERT_EQ(result.errors.size(), 1u);
+            ASSERT_EQ(result.errors[0].code(), ErrorCodes::NotWritablePrimary);
+
+            ASSERT_EQ(result.failedSessions.size(), 1u);
         });
 
         onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
@@ -179,7 +190,7 @@ TEST_F(SessionsCollectionShardedTest, RefreshOneSessionWriteErrTest) {
             return response.toBSON();
         });
 
-        ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::NotWritablePrimary);
+        future.default_timed_get();
     }
 }
 

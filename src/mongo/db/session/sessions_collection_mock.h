@@ -65,7 +65,8 @@ public:
 
     MockSessionsCollectionImpl();
 
-    using RefreshHook = std::function<void(const LogicalSessionRecordSet&)>;
+    using RefreshHook =
+        std::function<SessionsCollection::RefreshSessionsResult(const LogicalSessionRecordSet&)>;
     using RemoveHook = std::function<void(const LogicalSessionIdSet&)>;
 
     // Set custom hooks to override default behavior
@@ -76,7 +77,8 @@ public:
     void clearHooks();
 
     // Forwarding methods from the MockSessionsCollection
-    void refreshSessions(const LogicalSessionRecordSet& sessions);
+    SessionsCollection::RefreshSessionsResult refreshSessions(
+        const LogicalSessionRecordSet& sessions);
     void removeRecords(const LogicalSessionIdSet& sessions);
 
     // Test-side methods that operate on the _sessions map
@@ -91,7 +93,8 @@ public:
 
 private:
     // Default implementations, may be overridden with custom hooks.
-    void _refreshSessions(const LogicalSessionRecordSet& sessions);
+    SessionsCollection::RefreshSessionsResult _refreshSessions(
+        const LogicalSessionRecordSet& sessions);
     void _removeRecords(const LogicalSessionIdSet& sessions);
 
     stdx::mutex _mutex;
@@ -115,9 +118,9 @@ public:
 
     void checkSessionsCollectionExists(OperationContext* opCtx) override {}
 
-    void refreshSessions(OperationContext* opCtx,
-                         const LogicalSessionRecordSet& sessions) override {
-        _impl->refreshSessions(sessions);
+    SessionsCollection::RefreshSessionsResult refreshSessions(
+        OperationContext* opCtx, const LogicalSessionRecordSet& sessions) override {
+        return _impl->refreshSessions(sessions);
     }
 
     void removeRecords(OperationContext* opCtx, const LogicalSessionIdSet& sessions) override {

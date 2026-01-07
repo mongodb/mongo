@@ -358,22 +358,41 @@ Status LogicalSessionCacheImpl::_refresh(Client* client) {
     }
 
 
-    try {
-        // Refresh the active sessions in the sessions collection.
-        _sessionsColl->refreshSessions(opCtx, activeSessionRecords);
-        activeSessionsBackSwapper.dismiss();
-        {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            _stats.setLastSessionsCollectionJobEntriesRefreshed(activeSessionRecords.size());
-            _stats.setLastSessionsCollectionJobEntriesRefreshedUpdatedTimestamp(_service->now());
+    // Refresh the active sessions in the sessions collection.
+    auto refreshRes = _sessionsColl->refreshSessions(opCtx, activeSessionRecords);
+    activeSessionsBackSwapper.dismiss();
+    if (refreshRes.hasErrors()) {
+        const auto numFailed = refreshRes.failedSessions.size();
+        for (const auto& error : refreshRes.errors) {
+            LOGV2_ERROR(94001000,
+                        "Failed to refresh some active sessions, continuing without these",
+                        "numFailed"_attr = numFailed,
+                        "totalAttempted"_attr = activeSessionRecords.size(),
+                        "error"_attr = redact(error));
         }
-    } catch (DBException& ex) {
-        LOGV2_ERROR(94001000,
-                    "Failed to refresh active sessions, continuing without this",
-                    "error"_attr = redact(ex));
-        refreshStatus = ex.toStatus();
+        // Return the first error to the caller after logging them all.
+        refreshStatus = refreshRes.errors[0];
     }
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
+        // Store sessions that failed to update back in _activeSessions to be retried next time.
+        LogicalSessionIdSet failedLsids;
+        for (const auto& record : refreshRes.failedSessions) {
+            failedLsids.insert(record.getId());
+        }
+
+        for (const auto& [lsid, record] : activeSessions) {
+            if (failedLsids.count(lsid) > 0) {
+                _activeSessions.emplace(lsid, record);
+            }
+        }
+
+        size_t successCount = activeSessionRecords.size() - refreshRes.failedSessions.size();
+        _stats.setLastSessionsCollectionJobEntriesRefreshed(successCount);
+        _stats.setLastSessionsCollectionJobEntriesFailedToRefresh(refreshRes.failedSessions.size());
+        _stats.setLastSessionsCollectionJobEntriesRefreshedUpdatedTimestamp(_service->now());
+    }
     // Remove the ending sessions from the sessions collection.
     _sessionsColl->removeRecords(opCtx, explicitlyEndingSessions);
     explicitlyEndingBackSwapper.dismiss();
@@ -404,17 +423,6 @@ Status LogicalSessionCacheImpl::_refresh(Client* client) {
 
     try {
         auto removedSessions = _sessionsColl->findRemovedSessions(opCtx, openCursorSessions);
-        // We were not able to refresh the status of the active sessions earlier, so do not kill
-        // cursors on them
-        if (!refreshStatus.isOK()) {
-            for (const auto& it : activeSessions) {
-                auto newSessionIt = removedSessions.find(it.first);
-                if (newSessionIt != removedSessions.end()) {
-                    removedSessions.erase(newSessionIt);
-                }
-            }
-        }
-
         for (const auto& lsid : removedSessions) {
             patterns.emplace(makeKillAllSessionsByPattern(opCtx, lsid));
         }

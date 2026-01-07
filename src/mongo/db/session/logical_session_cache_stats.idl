@@ -56,6 +56,9 @@ structs:
                 type: date
             lastSessionsCollectionJobTimestamp:
                 type: date
+            lastSessionsCollectionJobEntriesFailedToRefresh:
+                type: int
+                default: 0
             lastSessionsCollectionJobEntriesRefreshed:
                 type: int
                 default: 0

@@ -38,7 +38,9 @@
 namespace mongo {
 
 MockSessionsCollectionImpl::MockSessionsCollectionImpl()
-    : _refresh([=, this](const LogicalSessionRecordSet& sessions) { _refreshSessions(sessions); }),
+    : _refresh(
+          [=, this](const LogicalSessionRecordSet& sessions)
+              -> SessionsCollection::RefreshSessionsResult { return _refreshSessions(sessions); }),
       _remove([=, this](const LogicalSessionIdSet& sessions) { _removeRecords(sessions); }) {}
 
 void MockSessionsCollectionImpl::setRefreshHook(RefreshHook hook) {
@@ -50,16 +52,19 @@ void MockSessionsCollectionImpl::setRemoveHook(RemoveHook hook) {
 }
 
 void MockSessionsCollectionImpl::clearHooks() {
-    _refresh = [=, this](const LogicalSessionRecordSet& sessions) {
-        _refreshSessions(sessions);
+    _refresh =
+        [=, this](
+            const LogicalSessionRecordSet& sessions) -> SessionsCollection::RefreshSessionsResult {
+        return _refreshSessions(sessions);
     };
     _remove = [=, this](const LogicalSessionIdSet& sessions) {
         _removeRecords(sessions);
     };
 }
 
-void MockSessionsCollectionImpl::refreshSessions(const LogicalSessionRecordSet& sessions) {
-    _refresh(sessions);
+SessionsCollection::RefreshSessionsResult MockSessionsCollectionImpl::refreshSessions(
+    const LogicalSessionRecordSet& sessions) {
+    return _refresh(sessions);
 }
 
 void MockSessionsCollectionImpl::removeRecords(const LogicalSessionIdSet& sessions) {
@@ -90,12 +95,14 @@ const MockSessionsCollectionImpl::SessionMap& MockSessionsCollectionImpl::sessio
     return _sessions;
 }
 
-void MockSessionsCollectionImpl::_refreshSessions(const LogicalSessionRecordSet& sessions) {
+SessionsCollection::RefreshSessionsResult MockSessionsCollectionImpl::_refreshSessions(
+    const LogicalSessionRecordSet& sessions) {
     for (auto& record : sessions) {
         if (!has(record.getId())) {
             _sessions.insert({record.getId(), record});
         }
     }
+    return {};
 }
 
 void MockSessionsCollectionImpl::_removeRecords(const LogicalSessionIdSet& sessions) {
