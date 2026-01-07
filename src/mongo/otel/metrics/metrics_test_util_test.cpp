@@ -50,7 +50,7 @@ TEST_F(OtelMetricsCapturerTest, ReadThrowsExceptionIfMetricNotFound) {
                        ErrorCodes::KeyNotFound);
 }
 
-TEST_F(OtelMetricsCapturerTest, CorrectNameWrongTypeThrowsException) {
+TEST_F(OtelMetricsCapturerTest, HistogramWrongValueTypeThrowsException) {
     OtelMetricsCapturer metricsCapturer;
     auto& metricsService = MetricsService::get(getServiceContext());
     Histogram<int64_t>* int64Histogram = metricsService.createInt64Histogram(
@@ -66,6 +66,27 @@ TEST_F(OtelMetricsCapturerTest, CorrectNameWrongTypeThrowsException) {
                        DBException,
                        ErrorCodes::TypeMismatch);
     ASSERT_THROWS_CODE(metricsCapturer.readInt64Histogram(MetricNames::kTest2),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST_F(OtelMetricsCapturerTest, CounterWrongValueTypeThrowsException) {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Counter<int64_t>* int64Counter = metricsService.createInt64Counter(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    Counter<double>* doubleCounter = metricsService.createDoubleCounter(
+        MetricNames::kTest2, "description2", MetricUnit::kSeconds);
+    // A value must be added for the counter to be initialized in the underlying metrics exporter.
+    int64Counter->add(1);
+    doubleCounter->add(1.0);
+
+    // Reading an int64 counter as a double counter should throw TypeMismatch.
+    ASSERT_THROWS_CODE(metricsCapturer.readDoubleCounter(MetricNames::kTest1),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
+    // Reading a double counter as an int64 counter should throw TypeMismatch.
+    ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest2),
                        DBException,
                        ErrorCodes::TypeMismatch);
 }

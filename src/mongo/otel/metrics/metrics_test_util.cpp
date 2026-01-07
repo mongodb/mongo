@@ -61,6 +61,16 @@ int64_t OtelMetricsCapturer::readInt64Counter(MetricName name) {
     return std::get<int64_t>(data.value_);
 }
 
+double OtelMetricsCapturer::readDoubleCounter(MetricName name) {
+    auto data = getMetricData<opentelemetry::sdk::metrics::SumPointData>(name);
+
+    massert(ErrorCodes::TypeMismatch,
+            fmt::format("Metric {} does not have matching value type", name.getName()),
+            std::holds_alternative<double>(data.value_));
+
+    return std::get<double>(data.value_);
+}
+
 int64_t OtelMetricsCapturer::readInt64Gauge(MetricName name) {
     auto data = getMetricData<opentelemetry::sdk::metrics::LastValuePointData>(name);
 

@@ -162,6 +162,11 @@ public:
     int64_t readInt64Counter(MetricName name);
 
     /**
+     * Gets the value of an double counter and throws an exception if it is not found.
+     */
+    double readDoubleCounter(MetricName name);
+
+    /**
      * Gets the value of an Int64 gauge and throws an exception if it is not found.
      */
     int64_t readInt64Gauge(MetricName name);

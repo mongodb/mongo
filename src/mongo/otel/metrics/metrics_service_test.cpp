@@ -43,6 +43,99 @@ namespace {
 
 class MetricsServiceTest : public ServiceContextTest {};
 
+/**
+ * Type traits for creating different metric types via MetricsService.
+ * Each specialization provides a static `create` method that wraps the
+ * appropriate MetricsService::create*() method.
+ */
+template <typename T>
+struct MetricCreator;
+
+template <>
+struct MetricCreator<Counter<int64_t>> {
+    static Counter<int64_t>* create(MetricsService& svc,
+                                    MetricName name,
+                                    std::string desc,
+                                    MetricUnit unit) {
+        return svc.createInt64Counter(name, std::move(desc), unit);
+    }
+};
+
+template <>
+struct MetricCreator<Counter<double>> {
+    static Counter<double>* create(MetricsService& svc,
+                                   MetricName name,
+                                   std::string desc,
+                                   MetricUnit unit) {
+        return svc.createDoubleCounter(name, std::move(desc), unit);
+    }
+};
+
+template <>
+struct MetricCreator<Gauge<int64_t>> {
+    static Gauge<int64_t>* create(MetricsService& svc,
+                                  MetricName name,
+                                  std::string desc,
+                                  MetricUnit unit) {
+        return svc.createInt64Gauge(name, std::move(desc), unit);
+    }
+};
+
+template <>
+struct MetricCreator<Histogram<int64_t>> {
+    static Histogram<int64_t>* create(MetricsService& svc,
+                                      MetricName name,
+                                      std::string desc,
+                                      MetricUnit unit) {
+        return svc.createInt64Histogram(name, std::move(desc), unit);
+    }
+};
+
+template <>
+struct MetricCreator<Histogram<double>> {
+    static Histogram<double>* create(MetricsService& svc,
+                                     MetricName name,
+                                     std::string desc,
+                                     MetricUnit unit) {
+        return svc.createDoubleHistogram(name, std::move(desc), unit);
+    }
+};
+
+/**
+ * Type-parameterized test fixture for testing metric creation behavior
+ * that is common across all metric types (Counter, Gauge, Histogram).
+ */
+template <typename T>
+class MetricCreationTest : public ServiceContextTest {};
+
+using MetricTypes = testing::
+    Types<Counter<int64_t>, Counter<double>, Gauge<int64_t>, Histogram<int64_t>, Histogram<double>>;
+TYPED_TEST_SUITE(MetricCreationTest, MetricTypes);
+
+TYPED_TEST(MetricCreationTest, SameMetricReturnedOnSameCreate) {
+    auto& metricsService = MetricsService::get(this->getServiceContext());
+    auto* metric1 = MetricCreator<TypeParam>::create(
+        metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    auto* metric2 = MetricCreator<TypeParam>::create(
+        metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_EQ(metric1, metric2);
+}
+
+TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentParameters) {
+    auto& metricsService = MetricsService::get(this->getServiceContext());
+    MetricCreator<TypeParam>::create(
+        metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_THROWS_CODE(
+        MetricCreator<TypeParam>::create(
+            metricsService, MetricNames::kTest1, "different_description", MetricUnit::kSeconds),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(
+                           metricsService, MetricNames::kTest1, "description", MetricUnit::kBytes),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+}
+
 // Assert that when a valid MeterProvider in place, we create a working Meter implementation with
 // the expected metadata.
 TEST_F(MetricsServiceTest, MeterIsInitialized) {
@@ -98,28 +191,6 @@ TEST_F(MetricsServiceTest, SerializeMetrics) {
 
 using CreateInt64CounterTest = MetricsServiceTest;
 
-TEST_F(CreateInt64CounterTest, SameCounterReturnedOnSameCreate) {
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Counter<int64_t>* counter_1 =
-        metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    Counter<int64_t>* counter_2 =
-        metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    ASSERT_EQ(counter_1, counter_2);
-}
-
-TEST_F(CreateInt64CounterTest, ExceptionWhenSameNameButDifferentParameters) {
-    auto& metricsService = MetricsService::get(getServiceContext());
-    metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    ASSERT_THROWS_CODE(metricsService.createInt64Counter(
-                           MetricNames::kTest1, "different_description", MetricUnit::kSeconds),
-                       DBException,
-                       ErrorCodes::ObjectAlreadyExists);
-    ASSERT_THROWS_CODE(
-        metricsService.createInt64Counter(MetricNames::kTest1, "description", MetricUnit::kBytes),
-        DBException,
-        ErrorCodes::ObjectAlreadyExists);
-}
-
 TEST_F(CreateInt64CounterTest, RecordsValues) {
     OtelMetricsCapturer metricsCapturer;
     auto& metricsService = MetricsService::get(getServiceContext());
@@ -144,29 +215,30 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
     ASSERT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 20);
 }
 
+using CreateDoubleCounterTest = MetricsServiceTest;
+
+TEST_F(CreateDoubleCounterTest, RecordsValues) {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Counter<double>* counter_1 = metricsService.createDoubleCounter(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    Counter<double>* counter_2 =
+        metricsService.createDoubleCounter(MetricNames::kTest2, "description2", MetricUnit::kBytes);
+
+    ASSERT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 0.0);
+    ASSERT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 0.0);
+
+    counter_1->add(10.5);
+    counter_2->add(1.25);
+    counter_1->add(5.5);
+    counter_2->add(1.25);
+    counter_2->add(1.25);
+
+    ASSERT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 16.0);
+    ASSERT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 3.75);
+}
+
 using CreateInt64GaugeTest = MetricsServiceTest;
-
-TEST_F(CreateInt64GaugeTest, SameGaugeReturnedOnSameCreate) {
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Gauge<int64_t>* gauge_1 =
-        metricsService.createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    Gauge<int64_t>* gauge_2 =
-        metricsService.createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    ASSERT_EQ(gauge_1, gauge_2);
-}
-
-TEST_F(CreateInt64GaugeTest, ExceptionWhenSameNameButDifferentParameters) {
-    auto& metricsService = MetricsService::get(getServiceContext());
-    metricsService.createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    ASSERT_THROWS_CODE(metricsService.createInt64Gauge(
-                           MetricNames::kTest1, "different_description", MetricUnit::kSeconds),
-                       DBException,
-                       ErrorCodes::ObjectAlreadyExists);
-    ASSERT_THROWS_CODE(
-        metricsService.createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kBytes),
-        DBException,
-        ErrorCodes::ObjectAlreadyExists);
-}
 
 TEST_F(CreateInt64GaugeTest, RecordsValues) {
     OtelMetricsCapturer metricsCapturer;
@@ -243,44 +315,6 @@ TEST_F(CreateHistogramTest, RecordsValues) {
     ASSERT_EQ(data4.count, 2);
 
     // TODO(SERVER-114951): Test custom boundaries and associated counts.
-}
-
-TEST_F(CreateHistogramTest, SameHistogramReturnedOnSameCreate) {
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Histogram<int64_t>* histogram_1 = metricsService.createInt64Histogram(
-        MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    Histogram<int64_t>* histogram_2 = metricsService.createInt64Histogram(
-        MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    ASSERT_EQ(histogram_1, histogram_2);
-
-    Histogram<double>* histogram_3 = metricsService.createDoubleHistogram(
-        MetricNames::kTest2, "description", MetricUnit::kSeconds);
-    Histogram<double>* histogram_4 = metricsService.createDoubleHistogram(
-        MetricNames::kTest2, "description", MetricUnit::kSeconds);
-    ASSERT_EQ(histogram_3, histogram_4);
-}
-
-TEST_F(CreateHistogramTest, ExceptionWhenSameNameButDifferentParameters) {
-    auto& metricsService = MetricsService::get(getServiceContext());
-    metricsService.createInt64Histogram(MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    ASSERT_THROWS_CODE(metricsService.createInt64Histogram(
-                           MetricNames::kTest1, "different_description", MetricUnit::kSeconds),
-                       DBException,
-                       ErrorCodes::ObjectAlreadyExists);
-    ASSERT_THROWS_CODE(
-        metricsService.createInt64Histogram(MetricNames::kTest1, "description", MetricUnit::kBytes),
-        DBException,
-        ErrorCodes::ObjectAlreadyExists);
-
-    metricsService.createDoubleHistogram(MetricNames::kTest2, "description", MetricUnit::kSeconds);
-    ASSERT_THROWS_CODE(metricsService.createDoubleHistogram(
-                           MetricNames::kTest2, "different_description", MetricUnit::kSeconds),
-                       DBException,
-                       ErrorCodes::ObjectAlreadyExists);
-    ASSERT_THROWS_CODE(metricsService.createDoubleHistogram(
-                           MetricNames::kTest2, "description", MetricUnit::kBytes),
-                       DBException,
-                       ErrorCodes::ObjectAlreadyExists);
 }
 
 TEST_F(CreateHistogramTest, ExceptionWhenSameNameButDifferentType) {
