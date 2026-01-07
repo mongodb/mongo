@@ -80,3 +80,4 @@ structs:
                 description:
                     "If true, this cluster parameter change can run during a topology
                     change"
+                optional: true

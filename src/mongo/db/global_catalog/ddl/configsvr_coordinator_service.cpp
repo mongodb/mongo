@@ -157,7 +157,7 @@ void ConfigsvrCoordinatorService::checkIfConflictsWithOtherInstances(
     if (op.getId().getCoordinatorType() == ConfigsvrCoordinatorTypeEnum::kSetClusterParameter) {
         const auto stateDoc = SetClusterParameterCoordinatorDocument::parse(
             initialState, IDLParserContext("CoordinatorDocument"));
-        if (stateDoc.getCompatibleWithTopologyChange()) {
+        if (stateDoc.getCompatibleWithTopologyChange().value_or(false)) {
             return;
         }
     }
