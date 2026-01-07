@@ -16,6 +16,7 @@
  * ];
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 import {randomUpdateDelete} from "jstests/concurrency/fsm_workload_modifiers/random_update_delete.js";
 
 const $baseConfig = {
@@ -90,7 +91,7 @@ export const $config = extendWorkload($partialConfig, function ($config, $super)
             return;
         }
 
-        const shardNames = Object.keys(connCache.shards);
+        const shardNames = ShardingTopologyHelpers.getShardNames(db);
         const toShard = shardNames[Random.randInt(shardNames.length)];
         const namespace = `${db}.${collName}`;
         jsTestLog(`Attempting to move collection ${namespace} to shard ${toShard}`);

@@ -10,6 +10,7 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js";
 import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
@@ -67,7 +68,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         const fromShard = chunkToMove.shard;
 
         // Choose a random shard to move the chunk to.
-        const shardNames = Object.keys(connCache.shards);
+        const shardNames = ShardingTopologyHelpers.getShardNames(db);
         const destinationShards = shardNames.filter(function (shard) {
             if (shard !== fromShard) {
                 return shard;

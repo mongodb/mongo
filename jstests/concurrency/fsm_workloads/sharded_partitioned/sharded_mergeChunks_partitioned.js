@@ -10,6 +10,7 @@
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_base_partitioned.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -129,7 +130,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         }
 
         // Verify that no docs were lost in the moveChunk.
-        let shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk1.shard]);
+        let shardInfo = ShardingTopologyHelpers.getShardInfo(db, this.tid);
+        let shardPrimary = ChunkHelper.getPrimary(shardInfo.shards[chunk1.shard]);
         let shardNumDocsAfter = ChunkHelper.getNumDocs(shardPrimary, ns, chunk1.min._id, chunk2.max._id);
         let msg = "Chunk1's shard should contain all documents after mergeChunks.\n" + msgBase;
         assert.eq(shardNumDocsAfter, numDocsBefore, msg);
@@ -158,7 +160,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Regardless of whether the mergeChunks operation succeeded or failed,
         // verify that the shard chunk1 was on returns all data for the chunk.
-        shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk1.shard]);
+        shardPrimary = ChunkHelper.getPrimary(shardInfo.shards[chunk1.shard]);
         shardNumDocsAfter = ChunkHelper.getNumDocs(shardPrimary, ns, chunk1.min._id, chunk2.max._id);
         msg = "Chunk1's shard should contain all documents after mergeChunks.\n" + msgBase;
         assert.eq(shardNumDocsAfter, numDocsBefore, msg);

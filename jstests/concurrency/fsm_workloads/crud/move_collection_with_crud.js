@@ -11,6 +11,8 @@
  * ]
  */
 
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
+
 export const $config = (function () {
     const kTotalWorkingDocuments = 500;
     const iterations = 20;
@@ -34,8 +36,8 @@ export const $config = (function () {
         return documents;
     }
 
-    function calculateToShard(conn, ns) {
-        let config = conn.rsConns.config.getDB("config");
+    function calculateToShard(mongosConn, ns) {
+        let config = mongosConn.getSiblingDB("config");
         let unshardedColl = config.collections.findOne({_id: ns});
         // In case the collection is untracked the current shard is the primary shard.
         let currentShardFn = () => {
@@ -50,7 +52,7 @@ export const $config = (function () {
             }
         };
         let currentShard = currentShardFn();
-        let shards = Object.keys(conn.shards);
+        let shards = ShardingTopologyHelpers.getShardNames(mongosConn);
         let destinationShards = shards.filter(function (shard) {
             if (shard !== currentShard) {
                 return shard;
@@ -104,7 +106,7 @@ export const $config = (function () {
             const shouldContinueMoveCollection = this.moveCollectionCount <= kMaxMoveCollectionExecutions;
             if (this.tid === 0 && shouldContinueMoveCollection) {
                 const coll = db.getCollection(collName);
-                const toShard = calculateToShard(connCache, coll.getFullName());
+                const toShard = calculateToShard(db, coll.getFullName());
                 executeMoveCollectionCommand(db, coll, toShard);
 
                 this.moveCollectionCount += 1;

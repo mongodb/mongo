@@ -8,6 +8,8 @@
  *  ]
  */
 
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
+
 export const $config = (function () {
     const kCollNamePrefix = "unsharded_coll_";
     const kInitialCollSize = 100;
@@ -150,7 +152,7 @@ export const $config = (function () {
             // Move the primary shard of the database to a random shard (which could coincide with
             // the starting one).
 
-            const shards = Object.keys(connCache.shards);
+            const shards = ShardingTopologyHelpers.getShardNames(db);
             const toShard = shards[Random.randInt(shards.length)];
             jsTestLog(`Running movePrimary: db=${db} to=${toShard}`);
 
