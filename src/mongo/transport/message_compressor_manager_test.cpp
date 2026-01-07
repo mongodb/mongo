@@ -209,18 +209,15 @@ void checkUndersize(const Message& compressedMsg,
     ASSERT_EQ(ErrorCodes::BadValue, swm.getStatus());
 }
 
-// Helper: assert that decompression of payload fails with BadValue.
-// Optionally specify a custom output buffer size (default 1024 bytes).
-void assertZlibDecompressBadValue(const std::vector<char>& payload, size_t outputSize = 1024) {
+/** Decompress zlib payload into provided output buffer, returning status and actual size. */
+StatusWith<size_t> zlibDecompress(const std::vector<char>& payload, std::vector<char>& output) {
     auto compressor = std::make_unique<ZlibMessageCompressor>();
     ConstDataRange input(payload.data(), payload.size());
-
-    std::vector<char> output(outputSize);
     DataRange outputRange(output.data(), output.size());
-
     auto result = compressor->decompressData(input, outputRange);
-    ASSERT_NOT_OK(result);
-    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
+    if (result.isOK())
+        output.resize(result.getValue());
+    return result;
 }
 
 Message buildMessage() {
@@ -526,44 +523,33 @@ TEST(MessageCompressorManager, RuntMessage) {
 }
 
 TEST(ZlibMessageCompressor, RejectsUndersizedPayload) {
-    // Payload smaller than kMinZlibPayloadSize (8 bytes)
-    assertZlibDecompressBadValue(std::vector<char>{0x78, 0x9c, 0x03, 0x00});
+    std::vector<char> output(1024);
+    auto result = zlibDecompress({0x78, 0x9c, 0x03, 0x00}, output);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 }
 
 TEST(ZlibMessageCompressor, RejectsInvalidHeader) {
-    // Invalid header: wrong compression method (not deflate)
-    assertZlibDecompressBadValue(std::vector<char>{
-        0x70, 0x9c,  // Invalid CMF (method != Z_DEFLATED)
-        0x63, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00});
-}
-
-TEST(ZlibMessageCompressor, RejectsExcessiveDecompressionRatio) {
-    // Valid zlib header but request an unreasonably large output capacity (>1024x input).
-    std::vector<char> smallPayload = {0x78, 0x9c, 0x63, 0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01};
-    assertZlibDecompressBadValue(smallPayload, 20 * 1024 * 1024);  // 20 MB buffer
+    // Invalid CMF: compression method != Z_DEFLATED
+    std::vector<char> output(1024);
+    auto result = zlibDecompress({0x70, 0x9c, 0x63, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00}, output);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 }
 
 TEST(ZlibMessageCompressor, ValidCompressionWorks) {
     auto compressor = std::make_unique<ZlibMessageCompressor>();
-
     const std::string testData = "Hello, MongoDB! Compression hardening test.";
     ConstDataRange input(testData.data(), testData.size());
-
-    // Compress
     std::vector<char> compressed(compressor->getMaxCompressedSize(testData.size()));
     DataRange compressedRange(compressed.data(), compressed.size());
-
     auto compressResult = compressor->compressData(input, compressedRange);
     ASSERT_OK(compressResult);
     ASSERT_GT(compressResult.getValue(), 0u);
-
-    // Decompress
     std::vector<char> decompressed(testData.size() + 100);
     DataRange decompressedRange(decompressed.data(), decompressed.size());
-
     ConstDataRange compressedInput(compressed.data(), compressResult.getValue());
     auto decompressResult = compressor->decompressData(compressedInput, decompressedRange);
-
     ASSERT_OK(decompressResult);
     ASSERT_EQ(decompressResult.getValue(), testData.size());
     ASSERT_EQ(memcmp(decompressed.data(), testData.data(), testData.size()), 0);
@@ -571,34 +557,27 @@ TEST(ZlibMessageCompressor, ValidCompressionWorks) {
 
 TEST(ZlibMessageCompressor, ReturnsCorrectLength) {
     auto compressor = std::make_unique<ZlibMessageCompressor>();
-
     const std::string testData = "Short";
     ConstDataRange input(testData.data(), testData.size());
-
-    // Compress
     std::vector<char> compressed(compressor->getMaxCompressedSize(testData.size()));
     DataRange compressedRange(compressed.data(), compressed.size());
-
     auto compressResult = compressor->compressData(input, compressedRange);
     ASSERT_OK(compressResult);
-
-    // Decompress into MUCH larger buffer
     const size_t largeBufferSize = 10000;
     std::vector<char> largeBuffer(largeBufferSize);
     DataRange largeRange(largeBuffer.data(), largeBuffer.size());
-
     ConstDataRange compressedInput(compressed.data(), compressResult.getValue());
     auto decompressResult = compressor->decompressData(compressedInput, largeRange);
-
     ASSERT_OK(decompressResult);
-
-    // Must return actual decompressed length, NOT buffer size
     ASSERT_EQ(decompressResult.getValue(), testData.size());
     ASSERT_NE(decompressResult.getValue(), largeBufferSize);
 }
 
 TEST(ZlibMessageCompressor, RejectsEmptyPayload) {
-    assertZlibDecompressBadValue(std::vector<char>{});
+    std::vector<char> output(1024);
+    auto result = zlibDecompress({}, output);
+    ASSERT_NOT_OK(result);
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::BadValue);
 }
 
 }  // namespace

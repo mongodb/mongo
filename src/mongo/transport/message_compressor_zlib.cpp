@@ -46,24 +46,16 @@
 namespace mongo {
 namespace {
 
-// Minimum valid zlib compressed payload size (header + minimal data + checksum)
 constexpr size_t kMinZlibPayloadSize = 8;
 
-// Maximum allowed decompression ratio to prevent zip bombs
-// A ratio above 1024:1 is suspicious for typical MongoDB messages
-constexpr size_t kMaxDecompressionRatio = 1024;
-
-// Per RFC1950: validate first two bytes (CMF, FLG). CM (CMF & 0x0F) must be
-// Z_DEFLATED (8) and (CMF*256 + FLG) must be a multiple of 31.
 bool isValidZlibHeader(const char* data, size_t length) {
+    // Spec references are referring to RFC1950.
     if (length < 2)
         return false;
-
     auto cmf = static_cast<uint8_t>(data[0]);
     auto flg = static_cast<uint8_t>(data[1]);
-
     // `CM` (compression method) is `CMF[0:3]`.
-    if (cmf & 0xf != Z_DEFLATED)
+    if ((cmf & 0xf) != Z_DEFLATED)
         return false;
     // `FCHECK` is `FLG[0:4]`:
     //     The FCHECK value must be such that CMF and FLG, when viewed as
@@ -104,9 +96,6 @@ StatusWith<std::size_t> ZlibMessageCompressor::decompressData(ConstDataRange inp
         return Status{ErrorCodes::BadValue, "Compressed data too small"};
     if (!isValidZlibHeader(input.data(), input.length()))
         return Status{ErrorCodes::BadValue, "Invalid zlib header"};
-    if (output.length() > input.length() * kMaxDecompressionRatio)
-        return Status{ErrorCodes::BadValue, "Decompression ratio too large"};
-
     uLongf length = output.length();
     int ret = ::uncompress(const_cast<Bytef*>(reinterpret_cast<const Bytef*>(output.data())),
                            &length,
