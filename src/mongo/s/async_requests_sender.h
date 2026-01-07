@@ -58,8 +58,11 @@
 namespace mongo {
 
 /**
- * The AsyncRequestsSender allows for sending requests to a set of remote shards in parallel.
- * Work on remote nodes is accomplished by scheduling remote work in a TaskExecutor's event loop.
+ * The AsyncRequestsSender allows for sending requests to a set of remote shards in parallel. Work
+ * on remote nodes is accomplished by scheduling remote work in a TaskExecutor's event loop. Note
+ * that while AsyncRequestsSender immediately schedules requests, sending each request is a
+ * multi-step process, so the only way to guarantee that all requests have been successfully sent is
+ * to wait for AsyncRequestsSender::done().
  *
  * Typical usage is:
  *
@@ -70,11 +73,13 @@ namespace mongo {
  * AsyncRequestsSender ars(opCtx, executor, db, requests, readPrefSetting);
  *
  * while (!ars.done()) {
- *     // Schedule a round of retries if needed and wait for next response or error.
+ *     // Wait for next response or error. This will automatically schedule retries if needed.
  *     auto response = ars.next();
  *
  *     if (!response.swResponse.isOK()) {
- *         // If partial results are tolerable, process the error as needed and continue.
+ *         // If partial results are tolerable, or you need to guarantee that all requests have been
+ *         // successfully sent (even if the result is an error), process the error as needed and
+ *         // continue.
  *         continue;
  *
  *         // If partial results are not tolerable but you need to retrieve responses for all
