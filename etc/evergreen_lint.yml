@@ -54,7 +54,7 @@ rules:
   - rule: "enforce-tasks-distro-with-special-tag"
     tags:
       - task_tag_name: "requires_large_host"
-        allowed_distro_regex: "(.*-x*large|.*-medium|macos-.*|ubi.*)"
+        allowed_distro_regex: "(.*large|.*-medium|macos-.*|ubi.*)"
 
   - rule: "enforce-tags-for-tasks"
     tag_groups:

@@ -104,7 +104,7 @@ buildvariants:
     display_name: "Amazon Linux 2 arm64"
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - amazon2-arm64-latest-small
+      - amazon2-arm64-latest-m8g-xlarge
     expansions:
       test_flags: >-
         --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source
@@ -125,29 +125,30 @@ buildvariants:
       packager_arch: aarch64
       packager_distro: amazon2
       repo_edition: org
-      large_distro_name: amazon2-arm64-latest-large
+      core_analyzer_distro_name: amazon2-arm64-latest-m8g-4xlarge
+      large_distro_name: amazon2-arm64-latest-m8g-4xlarge
       compile_variant: amazon2-arm64
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-16xlarge
       - name: test_packages
         distros:
           - ubuntu2204-arm64-large
       - name: .development_critical !.incompatible_community !.requires_large_host
       - name: .development_critical !.incompatible_community .requires_large_host
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: .release_critical !.incompatible_community !.requires_large_host
       - name: .release_critical !.incompatible_community .requires_large_host
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
 
   - name: enterprise-amazon2-arm64
     display_name: "Enterprise Amazon Linux 2 arm64"
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
-      - amazon2-arm64-latest-small
+      - amazon2-arm64-latest-m8g-xlarge
     tags: ["emergency_release"]
     expansions:
       additional_package_targets: >-
@@ -171,23 +172,23 @@ buildvariants:
       packager_distro: amazon2
       repo_edition: enterprise
       compile_variant: enterprise-amazon2-arm64
-      core_analyzer_distro_name: amazon2-arm64-latest-large
-      large_distro_name: amazon2-arm64-latest-large
+      core_analyzer_distro_name: amazon2-arm64-latest-m8g-4xlarge
+      large_distro_name: amazon2-arm64-latest-m8g-4xlarge
     tasks:
       - name: compile_test_and_package_serial_no_unittests_TG
         distros:
-          - amazon2-arm64-latest-xlarge
+          - amazon2-arm64-latest-m8g-16xlarge
       - name: test_packages
         distros:
           - ubuntu2204-arm64-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
       - name: .release_critical !.requires_large_host
       - name: .release_critical .requires_large_host
         distros:
-          - amazon2-arm64-latest-large
+          - amazon2-arm64-latest-m8g-4xlarge
 
   - name: amazon2023
     display_name: Amazon Linux 2023.3
