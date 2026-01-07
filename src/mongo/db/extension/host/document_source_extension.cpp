@@ -160,6 +160,25 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
     return outExpanded;
 }
 
+LiteParsedDesugarer::StageExpander DocumentSourceExtension::LiteParsedExpandable::stageExpander =
+    [](LiteParsedPipeline* pipeline, size_t index, LiteParsedDocumentSource& stage) {
+        auto& expandable = static_cast<DocumentSourceExtension::LiteParsedExpandable&>(stage);
+        auto expanded = expandable.getExpandedPipeline();
+
+        // Replace the one LPDS with its desugared form; return next index.
+        return pipeline->replaceStageWith(index, std::move(expanded));
+    };
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForLiteParsedExtensionExpandable,
+                                     ("EndStageIdAllocation"))
+(InitializerContext*) {
+    tassert(11533001,
+            "ExpandableStageParams::id must be allocated before registering expander",
+            ExpandableStageParams::id != StageParams::kUnallocatedId);
+    LiteParsedDesugarer::registerStageExpander(
+        ExpandableStageParams::id, DocumentSourceExtension::LiteParsedExpandable::stageExpander);
+}
+
 // static
 void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor) {
     auto nameStringData = descriptor->getName();

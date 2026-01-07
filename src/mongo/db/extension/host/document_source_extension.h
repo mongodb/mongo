@@ -36,6 +36,7 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/desugarer.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
@@ -133,10 +134,15 @@ public:
         }
 
         /**
-         * Return the pre-computed expanded pipeline.
+         * Return a copy to the pre-computed expanded pipeline.
          */
-        const StageSpecs& getExpandedPipeline() const {
-            return _expanded;
+        StageSpecs getExpandedPipeline() const {
+            StageSpecs cloned;
+            cloned.reserve(_expanded.size());
+            for (const auto& stage : _expanded) {
+                cloned.push_back(stage->clone());
+            }
+            return cloned;
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -170,6 +176,9 @@ public:
             return std::make_unique<LiteParsedExpandable>(
                 getOriginalBson(), _parseNode->clone(), _nss, _options);
         }
+
+        // Define how to desugar a LiteParsedExpandable.
+        static LiteParsedDesugarer::StageExpander stageExpander;
 
     private:
         /**
@@ -212,7 +221,7 @@ public:
      * AggStageAstNode.
      *
      * NOTE: This class is only instantiated during expansion of an extension stage, existing in the
-     * LiteParseExpandable's _expanded list. That means it will never exist at the top-level
+     * LiteParsedExpandable's _expanded list. That means it will never exist at the top-level
      * LiteParsedPipeline.
      */
     class LiteParsedExpanded : public LiteParsedDocumentSource {

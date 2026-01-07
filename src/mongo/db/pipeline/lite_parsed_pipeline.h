@@ -336,6 +336,23 @@ public:
         return _stageSpecs;
     }
 
+    /**
+     * Replaces the stage at 'index' with the stages in 'newSources'. Returns the index after the
+     * inserted block.
+     */
+    size_t replaceStageWith(size_t index,
+                            std::vector<std::unique_ptr<LiteParsedDocumentSource>>&& newSources);
+
+    /**
+     * Resets the deferred caches for hasChangeStream and involvedNamespaces. Should be called after
+     * _stageSpecs has been modified.
+     */
+    void resetDeferredCaches() {
+        _hasChangeStream = Deferred<bool (*)(const StageSpecs&)>(&computeHasChangeStream);
+        _involvedNamespaces = Deferred<stdx::unordered_set<NamespaceString> (*)(const StageSpecs&)>(
+            &computeInvolvedNamespaces);
+    }
+
 private:
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.

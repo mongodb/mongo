@@ -438,6 +438,18 @@ public:
     }
 };
 
+class MidADescriptor : public sdk::AggStageDescriptor {
+public:
+    static inline const std::string kStageName = std::string(kMidAName);
+    MidADescriptor() : sdk::AggStageDescriptor(kStageName) {}
+    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj) const override {
+        return std::make_unique<MidAParseNode>();
+    }
+    static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
+        return std::make_unique<MidADescriptor>();
+    }
+};
+
 class MidBParseNode : public sdk::AggStageParseNode {
 public:
     MidBParseNode() : sdk::AggStageParseNode(kMidBName) {}
@@ -457,6 +469,18 @@ public:
     }
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {
         return std::make_unique<MidBParseNode>();
+    }
+};
+
+class MidBDescriptor : public sdk::AggStageDescriptor {
+public:
+    static inline const std::string kStageName = std::string(kMidBName);
+    MidBDescriptor() : sdk::AggStageDescriptor(kStageName) {}
+    std::unique_ptr<sdk::AggStageParseNode> parse(BSONObj) const override {
+        return std::make_unique<MidBParseNode>();
+    }
+    static inline std::unique_ptr<sdk::AggStageDescriptor> make() {
+        return std::make_unique<MidBDescriptor>();
     }
 };
 

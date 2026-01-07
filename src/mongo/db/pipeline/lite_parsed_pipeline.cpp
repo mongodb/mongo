@@ -188,4 +188,22 @@ void LiteParsedPipeline::checkStagesAllowedInViewDefinition() const {
     }
 }
 
+size_t LiteParsedPipeline::replaceStageWith(
+    size_t index, std::vector<std::unique_ptr<LiteParsedDocumentSource>>&& newSources) {
+    tassert(11533000,
+            str::stream() << "replaceStageWith index " << index << " out of range "
+                          << _stageSpecs.size(),
+            index < _stageSpecs.size());
+
+    auto& stages = _stageSpecs;
+    const auto numInserted = newSources.size();
+
+    stages.erase(stages.begin() + index);
+    stages.insert(stages.begin() + index,
+                  std::make_move_iterator(newSources.begin()),
+                  std::make_move_iterator(newSources.end()));
+
+    return index + numInserted;
+}
+
 }  // namespace mongo

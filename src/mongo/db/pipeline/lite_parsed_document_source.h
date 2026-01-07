@@ -560,6 +560,7 @@ private:
     friend class LiteParsedDocumentSourceParseTest;
     friend class extension::host::LoadExtensionsTest;
     friend class extension::host::LoadNativeVectorSearchTest;
+    friend class LiteParsedDesugarerTest;
 
     /**
      * Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding
