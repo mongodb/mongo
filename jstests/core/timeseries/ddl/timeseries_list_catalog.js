@@ -20,6 +20,9 @@ import {
     getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
+// TODO SERVER-114640 Remove this line once aggregate won't report NamespaceNotFound if the db gets dropped.
+TestData.pinToSingleMongos = true;
+
 assert.commandWorked(db.dropDatabase());
 
 const collName = "coll";

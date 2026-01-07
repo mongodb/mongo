@@ -94,7 +94,7 @@ function testRename(conn, dbName, fromCollName, toCollName, dropTarget, mustFail
         fromDB.adminCommand({renameCollection: unshardedColl.getFullName(), to: `${toDB.getName()}.${toCollName}`}),
     );
     assert.eq(0, unshardedColl.countDocuments({}));
-    assert.eq(1, db.getSiblingDB(toDB)[toCollName].countDocuments({}));
+    assert.eq(1, toDB[toCollName].countDocuments({}));
 }
 
 {

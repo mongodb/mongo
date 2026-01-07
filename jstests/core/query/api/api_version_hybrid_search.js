@@ -17,11 +17,11 @@ const unstableHybridSearchPipelines = [[{$project: {output: {$sigmoid: 0}}}]];
 
 for (const pipeline of unstableHybridSearchPipelines) {
     // Assert error thrown when running a pipeline with syntax not in API Version 1.
-    APIVersionHelpers.assertAggregateFailsWithAPIStrict(pipeline, collName, ErrorCodes.APIStrictError);
+    APIVersionHelpers.assertAggregateFailsWithAPIStrict(db, pipeline, collName, ErrorCodes.APIStrictError);
 
     // If we don't specify apiStrict then the pipeline succeeds.
-    APIVersionHelpers.assertAggregateSucceedsAPIVersionWithoutAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertAggregateSucceedsAPIVersionWithoutAPIStrict(db, pipeline, collName);
 
     // Assert error thrown when creating a view on a pipeline with syntax not in APIv1.
-    APIVersionHelpers.assertViewFailsWithAPIStrict(pipeline, viewName, collName);
+    APIVersionHelpers.assertViewFailsWithAPIStrict(db, pipeline, viewName, collName);
 }

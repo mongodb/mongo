@@ -12,6 +12,11 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
+// This test makes assertions about sessions on a particular node, which are not compatible with
+// random mongos dispatching.
+// pinToSingleMongos due to $listLocalSessions.
+TestData.pinToSingleMongos = true;
+
 const testDb = db.getSiblingDB(jsTestName());
 const adminDb = db.getSiblingDB("admin");
 const collName = "api_version_pipeline_stages";

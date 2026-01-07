@@ -14,6 +14,11 @@
  *   multi_clients_incompatible,
  * ]
  */
+
+// This test makes assertions on the "arrayFilters" metric from the serverStatus, which is mongos specific.
+// pinToSingleMongos due to serverStatus command with "arrayFilters" metric.
+TestData.pinToSingleMongos = true;
+
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.update_metrics;

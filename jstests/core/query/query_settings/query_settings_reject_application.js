@@ -12,6 +12,10 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
+// This test makes assertions on the "reject" metric from the serverStatus, which is mongos specific.
+// pinToSingleMongos due to serverStatus command with "reject" metric.
+TestData.pinToSingleMongos = true;
+
 // Creating the collection.
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());

@@ -94,10 +94,10 @@ const stablePipelines = [
 
 for (const pipeline of stablePipelines) {
     // Assert running a pipeline with stages in API Version 1 succeeds.
-    APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(testDb, pipeline, collName);
 
     // Assert creating a view on a pipeline with stages in API Version 1 succeeds.
-    APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, viewName, collName);
+    APIVersionHelpers.assertViewSucceedsWithAPIStrict(testDb, pipeline, viewName, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
     assert.commandWorked(

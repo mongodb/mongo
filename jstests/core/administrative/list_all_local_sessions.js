@@ -14,6 +14,11 @@
 //   requires_getmore,
 // ]
 
+// This test makes assertions about sessions on a particular node, which are not compatible with
+// random mongos dispatching.
+// pinToSingleMongos due to $listLocalSessions.
+TestData.pinToSingleMongos = true;
+
 const admin = db.getSiblingDB("admin");
 
 // Get current log level.

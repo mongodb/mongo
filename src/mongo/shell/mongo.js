@@ -329,24 +329,25 @@ Mongo.prototype.getReadConcern = function () {
 // - 1 node as a standalone deployment
 // - A list of end points where some might not have a listening server.
 // This factory attempts to catch cluster fixtures and define the right connections type.
-function connectionFactory(uri, apiParameters) {
+function connectionFactory(uri, encryptedDBClientCallback, apiParameters) {
     const mongouri = new MongoURI(uri);
     // For one end point we always fall back to Mongo.
     if (mongouri.servers.length < 2) {
-        return new Mongo(uri, undefined /* encryptedDBClientCallback */, apiParameters);
+        return new Mongo(uri, encryptedDBClientCallback, apiParameters);
     }
     // In case of multiple connection, check if setName is not "". This implies a replica-set connection.
     if (mongouri.setName.length > 0) {
-        return new Mongo(uri, undefined /* encryptedDBClientCallback */, apiParameters);
+        return new Mongo(uri, encryptedDBClientCallback, apiParameters);
     } else {
         // The Multi-Router Mongo doesn't accept that any of the listed url can't connect.
         // On the other hand, the Mongo object connects with the first available end point.
         // Some tests provide some fake uris to tests the Mongo object.
         // This try-catch attempts to catch this case and falls back to the original implementation.
         try {
-            return new MultiRouterMongo(uri, undefined /* encryptedDBClientCallback */, apiParameters);
+            return new MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters);
         } catch (e) {
-            return new Mongo(uri, undefined /* encryptedDBClientCallback */, apiParameters);
+            chatty("Exception. Falling back to Mongo connector due to error " + tojson(e));
+            return new Mongo(uri, encryptedDBClientCallback, apiParameters);
         }
     }
 }
@@ -404,7 +405,7 @@ globalThis.connect = function (url, user, pass, apiParameters) {
     chatty("connecting to: " + safeURL);
     let m;
     try {
-        m = connectionFactory(url, apiParameters);
+        m = connectionFactory(url, undefined /*encryptedDBClientCallback*/, apiParameters);
     } catch (e) {
         let dest;
         if (url.indexOf(".query.mongodb.net") != -1) {
@@ -672,4 +673,8 @@ Mongo.prototype.watch = function (pipeline, options) {
     const [changeStreamStage, aggOptions] = this._extractChangeStreamOptions(options);
     changeStreamStage.$changeStream.allChangesForCluster = true;
     return this.getDB("admin")._runAggregate({aggregate: 1, pipeline: [changeStreamStage, ...pipeline]}, aggOptions);
+};
+
+Mongo.prototype.refreshClusterParameters = function () {
+    return this.adminCommand({getClusterParameter: "*"});
 };

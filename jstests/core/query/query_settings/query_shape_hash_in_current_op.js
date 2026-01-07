@@ -21,6 +21,11 @@ import {before, describe, it} from "jstests/libs/mochalite.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
+// The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
+// Certain tasks (such as "sharding_jscore...") may use test fixtures with multiple mongos.
+// pinToSingleMongos due to configureFailPoint command.
+TestData.pinToSingleMongos = true;
+
 describe("Query shape hash in $currentOp", function () {
     const coll = assertDropAndRecreateCollection(db, jsTestName());
     const qsutils = new QuerySettingsUtils(db, coll.getName());

@@ -6,7 +6,7 @@ export var APIVersionHelpers = (function () {
      * Asserts that the pipeline fails with the given code when apiStrict is set to true and
      * apiVersion is "1".
      */
-    function assertAggregateFailsWithAPIStrict(pipeline, collName, errorCodes) {
+    function assertAggregateFailsWithAPIStrict(db, pipeline, collName, errorCodes) {
         assert.commandFailedWithCode(
             db.runCommand({
                 aggregate: collName,
@@ -23,7 +23,7 @@ export var APIVersionHelpers = (function () {
     /**
      * Asserts that the pipeline succeeds when apiStrict is set to true and apiVersion is "1".
      */
-    function assertAggregateSucceedsWithAPIStrict(pipeline, collName, errorCodes) {
+    function assertAggregateSucceedsWithAPIStrict(db, pipeline, collName, errorCodes) {
         if (errorCodes) {
             assert.commandWorkedOrFailedWithCode(
                 db.runCommand({
@@ -54,7 +54,7 @@ export var APIVersionHelpers = (function () {
      * Asserts that the pipeline succeeds with the given code when apiStrict is set to false and
      * apiVersion is "1".
      */
-    function assertAggregateSucceedsAPIVersionWithoutAPIStrict(pipeline, collName) {
+    function assertAggregateSucceedsAPIVersionWithoutAPIStrict(db, pipeline, collName) {
         assert.commandWorked(
             db.runCommand({
                 aggregate: collName,
@@ -71,7 +71,7 @@ export var APIVersionHelpers = (function () {
      * Asserts that the given pipeline cannot be used to define a view when apiStrict is set to true
      * and apiVersion is "1" on the create command.
      */
-    function assertViewFailsWithAPIStrict(pipeline, viewName, collName) {
+    function assertViewFailsWithAPIStrict(db, pipeline, viewName, collName) {
         assert.commandFailedWithCode(
             db.runCommand({
                 create: viewName,
@@ -89,7 +89,7 @@ export var APIVersionHelpers = (function () {
      * Asserts that the given pipeline can be used to define a view when apiStrict is set to true
      * and apiVersion is "1" on the create command.
      */
-    function assertViewSucceedsWithAPIStrict(pipeline, viewName, collName) {
+    function assertViewSucceedsWithAPIStrict(db, pipeline, viewName, collName) {
         assert.commandWorked(
             db.runCommand({
                 create: viewName,

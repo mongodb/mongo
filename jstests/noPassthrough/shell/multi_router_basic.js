@@ -6,6 +6,7 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
 
 const st = new ShardingTest({shards: 1, mongos: 3});
 const getMongosesURI = function () {
@@ -310,18 +311,18 @@ function insertSampleData(coll, totalDocs) {
     coll.insertMany(docs);
 }
 
-function overrideRunCommandCountingGetMoreCalls(conn) {
+function overrideRunCommandCountingCallsForCommand(conn, commandName) {
     // Track getMore calls
-    let getMoreCount = 0;
+    let commandCount = 0;
     const originalRunCommand = conn.runCommand.bind(conn);
     conn.runCommand = function (dbname, cmd, options) {
-        if (cmd.getMore) {
-            getMoreCount++;
+        if (cmd[commandName]) {
+            commandCount++;
         }
         return originalRunCommand(dbname, cmd, options);
     };
     return {
-        count: () => getMoreCount,
+        count: () => commandCount,
     };
 }
 
@@ -335,7 +336,7 @@ testCase("Testing basic find + getMore will stick to the same connection", () =>
     insertSampleData(coll, kTotalDocs);
 
     // Track getMore calls
-    const getMoreTracker = overrideRunCommandCountingGetMoreCalls(conn);
+    const getMoreTracker = overrideRunCommandCountingCallsForCommand(conn, "getMore");
 
     // Track _getNextMongo calls
     const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
@@ -368,7 +369,7 @@ testCase("Testing basic aggregate + getMore will stick to the same connection", 
     insertSampleData(coll, kTotalDocs);
 
     // Track getMore calls
-    const getMoreTracker = overrideRunCommandCountingGetMoreCalls(conn);
+    const getMoreTracker = overrideRunCommandCountingCallsForCommand(conn, "getMore");
 
     // Track _getNextMongo calls
     const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
@@ -402,7 +403,7 @@ testCase("Testing basic aggregate + getMore run explicitly will stick to the sam
     insertSampleData(coll, kTotalDocs);
 
     // Track getMore calls
-    const getMoreTracker = overrideRunCommandCountingGetMoreCalls(conn);
+    const getMoreTracker = overrideRunCommandCountingCallsForCommand(conn, "getMore");
 
     // Track _getNextMongo calls
     const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
@@ -410,10 +411,72 @@ testCase("Testing basic aggregate + getMore run explicitly will stick to the sam
     // Create cursor with small batch size and force a getMore.
     const cursor = coll.aggregate([{$match: {value: {$gte: 0}}}], {cursor: {batchSize: 2}});
     assert.commandWorked(db.runCommand({getMore: cursor.getId(), collection: "cursorTest"}));
+
     // We must have called getMore via proxy
     assert.eq(getMoreTracker.count(), 1, "Must have executed getMore commands");
+
     // Only the aggregate command must have run _getNextMongo
     assert.eq(getNextMongoTracker.count(), 1, "Must run getNextMongoCount only once when executing the aggregate");
+    assert.eq(conn._cursorTracker.count(), 1, "Should have exactly 1 tracked cursor");
+
+    coll.drop();
+});
+
+testCase("Testing basic find + releaseMemory will stick to the same connection", () => {
+    const uri = getMongosesURI();
+    const db = connect(uri);
+    const conn = db.getMongo();
+    const coll = db.cursorTest;
+    const kTotalDocs = 120;
+
+    // Insert sample data
+    insertSampleData(coll, kTotalDocs);
+
+    // Track releaseMemory calls
+    const releaseMemoryTracker = overrideRunCommandCountingCallsForCommand(conn, "releaseMemory");
+
+    // Track _getNextMongo calls
+    const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
+
+    // Create cursor with small batch size to force ReleaseMemory.
+    const cursor = coll.find({value: {$gte: 0}}).batchSize(2);
+    assert.commandWorked(db.adminCommand({releaseMemory: [cursor.getId()]}));
+
+    // We must have called releaseMemory via proxy
+    assert.eq(releaseMemoryTracker.count(), 1, "Must have releaseMemory commands");
+
+    // Only the find command must have run _getNextMongo
+    assert.eq(getNextMongoTracker.count(), 1, "Must run getNextMongoCount only once when executing the find");
+    assert.eq(conn._cursorTracker.count(), 1, "Should have exactly 1 tracked cursor");
+
+    coll.drop();
+});
+
+testCase("Testing basic find + killCursors will stick to the same connection", () => {
+    const uri = getMongosesURI();
+    const db = connect(uri);
+    const conn = db.getMongo();
+    const coll = db.cursorTest;
+    const kTotalDocs = 120;
+
+    // Insert sample data
+    insertSampleData(coll, kTotalDocs);
+
+    // Track killCursors calls
+    const killCursorsTracker = overrideRunCommandCountingCallsForCommand(conn, "killCursors");
+
+    // Track _getNextMongo calls
+    const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
+
+    // Create cursor with small batch size to force killCursors.
+    const cursor = coll.find({value: {$gte: 0}}).batchSize(2);
+    assert.commandWorked(db.adminCommand({killCursors: "cursorTest", cursors: [cursor.getId()]}));
+
+    // We must have called killCursors via proxy
+    assert.eq(killCursorsTracker.count(), 1, "Must have tracked killCursors commands");
+
+    // Only the find command must have run _getNextMongo
+    assert.eq(getNextMongoTracker.count(), 1, "Must run getNextMongoCount only once when executing the find");
     assert.eq(conn._cursorTracker.count(), 1, "Should have exactly 1 tracked cursor");
 
     coll.drop();
@@ -430,8 +493,9 @@ testCase("Testing isMultiRoutingDisabled will make the proxy run like a single r
 
     // Track _getNextMongo calls
     const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
+    assert.eq(conn.isMultiRouter, true, "Should be MultiRouterMongo");
 
-    TestData.skipMultiRouterRotation = true;
+    TestData.pinToSingleMongos = true;
     // Run commands
     let adminDb = conn.getDB("admin");
     for (let i = 0; i < kTotalCount; i++) {
@@ -439,10 +503,17 @@ testCase("Testing isMultiRoutingDisabled will make the proxy run like a single r
     }
 
     // We should never call _getNextMongo if multi routing is disabled
+    assert.neq(
+        conn.isMultiRouter,
+        true,
+        "When pinToSingleMongos is false, the connection should not be identified as MultiRouterMongo",
+    );
     assert.eq(0, getNextMongoTracker.count(), "Should never call _getNextMongo when multi routing is disabled");
-
     // Set back to false for other tests
-    TestData.skipMultiRouterRotation = false;
+    TestData.pinToSingleMongos = false;
+    assert.eq(conn.isMultiRouter, true, "Should be MultiRouterMongo");
+    // TODO (SERVER-116289) remove this assertion.
+    assert.eq(conn.hasPrimaryMongoRefreshed, true, "Should be MultiRouterMongo");
 });
 
 // ============================================================================
@@ -906,7 +977,7 @@ testCase("Testing encryption state is independently maintained per mongos", () =
     });
 
     // Clean up
-    conn.unsetAutoEncryption();
+    assert(conn.unsetAutoEncryption());
 
     // Verify all connections are cleaned up
     conn._mongoConnections.forEach((mongo, idx) => {
@@ -916,46 +987,157 @@ testCase("Testing encryption state is independently maintained per mongos", () =
 });
 
 testCase("Testing encrypted inserts are routed randomly", () => {
+    // Skip if not enterprise shell or the EncryptedClient is unavailable
+    if (!isEnterpriseShell()) {
+        return;
+    }
     const uri = getMongosesURI();
     const conn = connect(uri).getMongo();
-    const db = conn.getDB("test");
-    const coll = db.encryptionTest;
     const kOperations = 10;
+    const kCollName = "encryptedColl";
 
-    const localKMS = {
-        key: BinData(
-            0,
-            "/tu9jUCBqZdwCelwE/EAm/4WqdxrSMi04B8e9uAV+m30rI1J2nhKZZtQjdvsSCwuI4erR6IEcEK+5eGUAODv43NDNIR9QheT2edWFewUfHKsl9cnzTc86meIzOmYl6dr",
-        ),
-    };
+    let client = new EncryptedClient(conn, "test");
+    let edb = client.getDB();
+    assert(edb.getMongo().isMultiRouter, "EncryptedClient should be MultiRouterMongo");
 
-    const clientSideFLEOptions = {
-        kmsProviders: {local: localKMS},
-        keyVaultNamespace: "test.keystore",
-        schemaMap: {},
-    };
+    assert.commandWorked(
+        client.createEncryptionCollection(kCollName, {
+            encryptedFields: {
+                "fields": [{"path": "first", "bsonType": "string", "queries": {"queryType": "equality"}}],
+            },
+        }),
+    );
 
-    // Set auto encryption
-    assert(conn.setAutoEncryption(clientSideFLEOptions), "setAutoEncryption should succeed");
-    assert(conn.toggleAutoEncryption(true), "toggleAutoEncryption(true) should succeed");
+    const ecoll = edb.getCollection(kCollName);
 
     // Track _getNextMongo calls
     const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
 
-    // Perform encrypted inserts
     for (let i = 0; i < kOperations; i++) {
-        coll.insert({x: i, type: "encrypted-insert"});
+        ecoll.einsertOne({x: i, type: "insert"});
     }
 
-    // Should route randomly for all encrypted insert operations
-    assert.gte(getNextMongoTracker.count(), kOperations, "Should route randomly for encrypted insert operations");
+    // Should route randomly for all operations
+    assert.gte(getNextMongoTracker.count(), kOperations, "Should route randomly for insert operations");
 
-    // Verify all documents were inserted
-    assert.eq(kOperations, coll.count({type: "encrypted-insert"}), "All encrypted inserts should succeed");
+    ecoll.drop();
+    assert(edb.dropDatabase());
+});
 
-    // Clean up
-    coll.drop();
-    conn.unsetAutoEncryption();
+// ============================================================================
+// Test unsupported commands
+// ============================================================================
+
+testCase("Testing unsupported commands throw errors", () => {
+    const uri = getMongosesURI();
+    const conn = connect(uri).getMongo();
+    const db = conn.getDB("test");
+
+    // Test releaseMemory with multiple targets
+    assert.throws(() => {
+        db.runCommand({releaseMemory: ["target1", "target2"]});
+    });
+
+    // Test killCursors with multiple cursors
+    assert.throws(() => {
+        db.runCommand({killCursors: "collection", cursors: [NumberLong(1), NumberLong(2)]});
+    });
+
+    // Test aggregate with $currentOp and localOps: true
+    assert.throws(() => {
+        db.runCommand({aggregate: 1, pipeline: [{$currentOp: {localOps: true}}], cursor: {}});
+    });
+
+    // Test aggregate with $listLocalSessions
+    assert.throws(() => {
+        db.runCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}], cursor: {}});
+    });
+
+    // Test getShardVersion
+    assert.throws(() => {
+        db.runCommand({getShardVersion: "test.collection"});
+    });
+
+    // Test getDatabaseVersion
+    assert.throws(() => {
+        db.runCommand({getDatabaseVersion: "test.collection"});
+    });
+});
+
+// ============================================================================
+// Test broadcast commands
+// ============================================================================
+
+function spyUnderlyingConnectionsRunCommand(multiRouterConn, predicate) {
+    const counts = new Array(multiRouterConn._mongoConnections.length).fill(0);
+    multiRouterConn._mongoConnections.forEach((conn, idx) => {
+        const originalRunCommand = conn.runCommand.bind(conn);
+        conn.runCommand = function (dbname, cmd, options) {
+            if (predicate(dbname, cmd, options)) {
+                counts[idx]++;
+            }
+            return originalRunCommand(dbname, cmd, options);
+        };
+    });
+    return {
+        getCounts: () => counts,
+    };
+}
+
+testCase("Testing setLogLevel hits every mongos", () => {
+    const uri = getMongosesURI();
+    const conn = connect(uri).getMongo();
+
+    const spy = spyUnderlyingConnectionsRunCommand(conn, (dbname, cmd, options) => {
+        return cmd.setParameter;
+    });
+
+    conn.setLogLevel(1);
+
+    const counts = spy.getCounts();
+    const nMongos = conn._mongoConnections.length;
+    assert.eq(counts.length, nMongos, "Should have correct number of connections");
+    counts.forEach((count, idx) => {
+        assert.eq(count, 1, `Mongos ${idx} should have received setLogLevel`);
+    });
+});
+
+testCase("Testing refreshLogicalSessionCacheNow is broadcasted", () => {
+    const uri = getMongosesURI();
+    const conn = connect(uri).getMongo();
+    const db = conn.getDB("admin");
+
+    const spy = spyUnderlyingConnectionsRunCommand(conn, (dbname, cmd, options) => {
+        return cmd.refreshLogicalSessionCacheNow;
+    });
+
+    assert.commandWorked(db.runCommand({refreshLogicalSessionCacheNow: 1}));
+
+    const counts = spy.getCounts();
+    const nMongos = conn._mongoConnections.length;
+    assert.eq(counts.length, nMongos, "Should have correct number of connections");
+    counts.forEach((count, idx) => {
+        assert.eq(count, 1, `Mongos ${idx} should have received refreshLogicalSessionCacheNow`);
+    });
+});
+
+testCase("Testing setParameters is broadcasted", () => {
+    const uri = getMongosesURI();
+    const conn = connect(uri).getMongo();
+    const db = conn.getDB("admin");
+
+    const spy = spyUnderlyingConnectionsRunCommand(conn, (dbname, cmd, options) => {
+        return cmd.setParameter;
+    });
+
+    assert.commandWorked(db.runCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
+
+    const counts = spy.getCounts();
+    const nMongos = conn._mongoConnections.length;
+    assert.eq(counts.length, nMongos, "Should have correct number of connections");
+    counts.forEach((count, idx) => {
+        assert.eq(count, 1, `Mongos ${idx} should have received setParameters`);
+    });
 });
 
 st.stop();

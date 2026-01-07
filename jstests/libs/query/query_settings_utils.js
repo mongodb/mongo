@@ -161,6 +161,14 @@ export class QuerySettingsUtils {
     }
 
     /**
+     * Forces a refresh of the query settings cache on all mongos nodes.
+     */
+    forceRefresh() {
+        const mongo = this._db.getMongo();
+        mongo.refreshClusterParameters();
+    }
+
+    /**
      * Helper function to assert equality of QueryShapeConfigurations. In order to ease the
      * assertion logic, 'queryShapeHash' field is removed from the QueryShapeConfiguration prior
      * to assertion.
@@ -175,6 +183,7 @@ export class QuerySettingsUtils {
         shouldRunExplain = true,
         ignoreRepresentativeQueryFields = [],
     ) {
+        this.forceRefresh();
         const isRunningFCVUpgradeDowngradeSuite = TestData.isRunningFCVUpgradeDowngradeSuite || false;
 
         // In case 'expectedQueryShapeConfigurations' has no 'representativeQuery' attribute, we do
@@ -310,6 +319,7 @@ export class QuerySettingsUtils {
             if (representativeQuery) {
                 expectedQueryShapeConfiguration.representativeQuery = representativeQuery;
             }
+            this.forceRefresh();
             assert.soonNoExcept(() => {
                 const settings = this.getQuerySettings({filter: {queryShapeHash}, showQueryShapeHash: true});
                 assert.sameMembers(settings, [expectedQueryShapeConfiguration]);
@@ -329,6 +339,7 @@ export class QuerySettingsUtils {
                     removeQuerySettings: representativeQuery ?? queryShapeHash,
                 };
                 assert.commandWorked(this._db.adminCommand(removeQuerySettingsCmd));
+                this.forceRefresh();
                 assert.soon(() => this.getQuerySettings({filter: {queryShapeHash}}).length === 0);
             }
         }
@@ -465,6 +476,8 @@ export class QuerySettingsUtils {
      * shape, `queryPrime`, and does _not_ fail a query of differing shape, `unrelatedQuery`.
      */
     assertRejection({query, queryPrime, unrelatedQuery}) {
+        // Asserting the the total amount of rejections requires executing the rejected operations and the server status on the same node each time.
+        assert(TestData.pinToSingleMongos === true);
         // Confirm there's no pre-existing settings.
         this.assertQueryShapeConfiguration([]);
 
@@ -475,6 +488,7 @@ export class QuerySettingsUtils {
 
         const assertRejectedDelta = (delta) => {
             let actual;
+            this.forceRefresh();
             assert.soon(
                 () => (actual = getRejectCount()) == delta + rejectBaseline,
                 () =>

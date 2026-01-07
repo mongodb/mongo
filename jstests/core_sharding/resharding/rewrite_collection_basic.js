@@ -16,6 +16,11 @@ import {getShardNames} from "jstests/sharding/libs/sharding_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
+// The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
+// Certain tasks (such as "sharding_jscore...") may use test fixtures with multiple mongos.
+// pinToSingleMongos due to configureFailPoint command.
+TestData.pinToSingleMongos = true;
+
 const shardNames = getShardNames(db);
 const collName = jsTestName();
 const dbName = db.getName();

@@ -5,6 +5,10 @@
 //    does_not_support_stepdowns,
 // ]
 
+// This test makes assertions on the "uptimeMillis" metric from the serverStatus, which is mongos specific.
+// pinToSingleMongos due to serverStatus command with "uptimeMillis" metric.
+TestData.pinToSingleMongos = true;
+
 let t = db.dbadmin;
 t.save({x: 1});
 t.save({x: 1});
