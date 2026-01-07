@@ -316,8 +316,13 @@ export class QuerySettingsUtils {
                 return true;
             });
 
+            // Run the test callback first, then execute hooks.
+            // This ensures that any explains in runTest() see the same database state
+            // as explains captured before withQuerySettings was called, because hooks
+            // may execute commands that modify state (e.g., $merge creating collections).
+            const result = runTest();
             this._onSetQuerySettingsHooks.forEach((hook) => hook());
-            return runTest();
+            return result;
         } finally {
             if (queryShapeHash) {
                 const removeQuerySettingsCmd = {
