@@ -3,31 +3,59 @@ import {describe, it} from "jstests/libs/mochalite.js";
 globalThis.TestData ??= {};
 
 describe("tojson", function () {
-    it("should indent and lint properly", function () {
-        const obj = ["foo", "bar"];
+    it("should indent and lint arrays properly", function () {
+        const arr = ["foo", "bar"];
         let json;
 
-        json = tojson(obj);
+        json = tojson(arr);
         assert.eq(json, '[ "foo", "bar" ]');
 
-        json = tojson(obj, "", true);
+        json = tojson(arr, "", true);
         assert.eq(json, '[ "foo", "bar" ]');
 
-        json = tojson(obj, "", false);
-        assert.eq(json, '[\n\t"foo",\n\t"bar"\n]');
+        json = tojson(arr, "", false);
+        assert.eq(
+            json,
+            `\
+[
+	"foo",
+	"bar"
+]`,
+        );
 
-        json = tojson(obj, "\t", false);
-        assert.eq(json, '[\n\t\t"foo",\n\t\t"bar"\n\t]');
+        json = tojson(arr, "\t", false);
+        assert.eq(
+            json,
+            `\
+[
+		"foo",
+		"bar"
+	]`,
+        );
 
-        json = tojson(obj, "X", false);
-        assert.eq(json, '[\nX\t"foo",\nX\t"bar"\n\t]');
+        json = tojson(arr, "X", false);
+        assert.eq(
+            json,
+            `\
+[
+X	"foo",
+X	"bar"
+	]`,
+        );
 
         // multiple chars aren't typical, but this captures current behavior
-        json = tojson(obj, "ABC", false);
-        assert.eq(json, '[\nABC\t"foo",\nABC\t"bar"\nBC\t]');
+        json = tojson(arr, "ABC", false);
+        assert.eq(
+            json,
+            `\
+[
+ABC	"foo",
+ABC	"bar"
+BC	]`,
+        );
 
         // indents are ignored if linting is off
-        json = tojson(obj, "baz", true);
+        json = tojson(arr, "baz", true);
         assert.eq(json, '[ "foo", "bar" ]');
     });
 
@@ -41,7 +69,8 @@ describe("tojson", function () {
         json = tojson(obj, "", false);
         assert.eq(
             json,
-            `{
+            `\
+{
 	"x" : null,
 	"y" : true,
 	"z" : 123,
@@ -52,6 +81,45 @@ describe("tojson", function () {
 
         json = toJsonForLog(obj);
         assert.eq(json, '{"x":null,"y":true,"z":123,"w":"foo","a":{"$undefined":true}}');
+    });
+
+    it("makes short objects a oneliner", function () {
+        const obj = {"x": 1, "y": 2};
+        let json;
+
+        // this should be a multiline, but gets shortened because it can fit on one line
+        json = tojson(obj);
+        assert.eq(json, '{ "x" : 1, "y" : 2 }');
+
+        json = tojson(obj, "", undefined); // implicitly the same as above
+        assert.eq(json, '{ "x" : 1, "y" : 2 }');
+
+        json = tojson(obj, "", true); // explicitly a oneliner
+        assert.eq(json, '{ "x" : 1, "y" : 2 }');
+
+        json = tojson(obj, "", false); // force pretty print
+        assert.eq(
+            json,
+            `\
+{
+	"x" : 1,
+	"y" : 2
+}`,
+        );
+
+        const longZ = "z".repeat(80);
+        obj.z = longZ;
+        json = tojson(obj);
+        // uses default indent of "\t" with pretty printing
+        assert.eq(
+            json,
+            `\
+{
+	"x" : 1,
+	"y" : 2,
+	"z" : "${longZ}"
+}`,
+        );
     });
 
     it("parses nulls", function () {
@@ -82,7 +150,16 @@ describe("tojson", function () {
             assert.eq(json, '{"x":[],"y":{}}');
 
             json = tojson(obj, "", false);
-            assert.eq(json, '{\n\t"x" : [ ],\n\t"y" : {\n\t\t\n\t}\n}');
+            assert.eq(
+                json,
+                `\
+{
+	"x" : [ ],
+	"y" : {
+		
+	}
+}`,
+            );
         });
 
         it("deep", function () {
@@ -101,7 +178,8 @@ describe("tojson", function () {
             json = tojson(obj, "", false);
             assert.eq(
                 json,
-                `{
+                `\
+{
 	"x" : [
 		{
 			"x" : [
@@ -120,6 +198,81 @@ describe("tojson", function () {
 	],
 	"y" : null
 }`,
+            );
+
+            json = tojson(obj, " ", false);
+            assert.eq(
+                json,
+                `\
+{
+ 	"x" : [
+ 		{
+ 			"x" : [
+ 				1,
+ 				2,
+ 				[ ]
+				],
+ 			"z" : "ok",
+ 			"y" : [
+ 				[ ]
+				]
+			},
+ 		{
+ 			"foo" : "bar"
+			}
+		],
+ 	"y" : null
+	}`,
+            );
+
+            json = tojson(obj, "  ", false);
+            assert.eq(
+                json,
+                `\
+{
+  	"x" : [
+  		{
+  			"x" : [
+  				1,
+  				2,
+  				[ ]
+ 				],
+  			"z" : "ok",
+  			"y" : [
+  				[ ]
+ 				]
+ 			},
+  		{
+  			"foo" : "bar"
+ 			}
+ 		],
+  	"y" : null
+ 	}`,
+            );
+
+            json = tojson(obj, "ABC", false);
+            assert.eq(
+                json,
+                `\
+{
+ABC	"x" : [
+ABC		{
+ABC			"x" : [
+ABC				1,
+ABC				2,
+ABC				[ ]
+BC				],
+ABC			"z" : "ok",
+ABC			"y" : [
+ABC				[ ]
+BC				]
+BC			},
+ABC		{
+ABC			"foo" : "bar"
+BC			}
+BC		],
+ABC	"y" : null
+BC	}`,
             );
         });
     });
@@ -413,7 +566,8 @@ describe("tojson", function () {
 
             assert.eq(
                 json,
-                `{
+                `\
+{
 		"a" : 1,
 		"b" : [
 			2,
@@ -427,32 +581,84 @@ describe("tojson", function () {
 
 describe("tojsonObject", () => {
     it("empty object", () => {
-        assert.eq(tojsonObject({}, "", false), "{\n\t\n}");
+        assert.eq(
+            tojsonObject({}, "", false),
+            `\
+{
+	
+}`,
+        );
         assert.eq(tojsonObject({}, "", true), "{  }");
-        assert.eq(tojsonObject({}, "\t\t", false), "{\n\t\t\t\n\t\t}");
+        assert.eq(
+            tojsonObject({}, "\t\t", false),
+            `\
+{
+			
+		}`,
+        );
     });
 
     it("single field", () => {
-        assert.eq(tojsonObject({a: 1}, "", false), '{\n\t"a" : 1\n}');
+        assert.eq(
+            tojsonObject({a: 1}, "", false),
+            `\
+{
+	"a" : 1
+}`,
+        );
         assert.eq(tojsonObject({a: 1}, "", true), '{ "a" : 1 }');
-        assert.eq(tojsonObject({a: 1}, "\t\t", false), '{\n\t\t\t"a" : 1\n\t\t}');
+        assert.eq(
+            tojsonObject({a: 1}, "\t\t", false),
+            `\
+{
+			"a" : 1
+		}`,
+        );
     });
 
     it("multiple fields", () => {
-        assert.eq(tojsonObject({a: 1, b: 2}, "", false), '{\n\t"a" : 1,\n\t"b" : 2\n}');
+        assert.eq(
+            tojsonObject({a: 1, b: 2}, "", false),
+            `\
+{
+	"a" : 1,
+	"b" : 2
+}`,
+        );
         assert.eq(tojsonObject({a: 1, b: 2}, "", true), '{ "a" : 1, "b" : 2 }');
-        assert.eq(tojsonObject({a: 1, b: 2}, "\t\t", false), '{\n\t\t\t"a" : 1,\n\t\t\t"b" : 2\n\t\t}');
+        assert.eq(
+            tojsonObject({a: 1, b: 2}, "\t\t", false),
+            `\
+{
+			"a" : 1,
+			"b" : 2
+		}`,
+        );
     });
 
     it("nested fields", () => {
         assert.eq(
             tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", false),
-            '{\n\t"a" : 1,\n\t"b" : {\n\t\t"bb" : 2,\n\t\t"cc" : 3\n\t}\n}',
+            `\
+{
+	"a" : 1,
+	"b" : {
+		"bb" : 2,
+		"cc" : 3
+	}
+}`,
         );
         assert.eq(tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "", true), '{ "a" : 1, "b" : { "bb" : 2, "cc" : 3 } }');
         assert.eq(
             tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "\t\t", false),
-            '{\n\t\t\t"a" : 1,\n\t\t\t"b" : {\n\t\t\t\t"bb" : 2,\n\t\t\t\t"cc" : 3\n\t\t\t}\n\t\t}',
+            `\
+{
+			"a" : 1,
+			"b" : {
+				"bb" : 2,
+				"cc" : 3
+			}
+		}`,
         );
     });
 });
