@@ -1243,7 +1243,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     tassert(11321303, "canonicalQuery must not be null", canonicalQuery);
 
     // Ensure that the shard filter option is set if this is a shard.
-    if (OperationShardingState::isComingFromRouter(opCtx)) {
+    if (collections.getMainCollectionAcquisition().getShardingDescription().isSharded()) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
@@ -1956,7 +1956,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     }
 
     size_t plannerOptions = QueryPlannerParams::DEFAULT;
-    if (OperationShardingState::isComingFromRouter(opCtx)) {
+    if (coll.getShardingDescription().isSharded()) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 

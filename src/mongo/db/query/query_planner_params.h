@@ -130,7 +130,7 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
         // Set this if you're running on a sharded cluster.  We'll add a "drop all docs that
         // shouldn't be on this shard" stage before projection.
         //
-        // In order to set this, you must check OperationShardingState::isComingFromRouter() in the
+        // In order to set this, you must check the collectionAcquisition isSharded() value in the
         // same lock that you use to build the query executor. You must also wrap the PlanExecutor
         // in a ClientCursor within the same lock.
         //

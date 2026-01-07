@@ -684,11 +684,6 @@ bool QueryPlannerParams::requiresShardFiltering(const CanonicalQuery& canonicalQ
         // Shard filter was not requested; cmd may not be from a router.
         return false;
     }
-    // If the caller wants a shard filter, make sure we're actually sharded.
-    if (!collection.isSharded_DEPRECATED()) {
-        // Not actually sharded.
-        return false;
-    }
 
     // Check whether the query is running over multiple shards and will require merging.
     const auto expCtx = canonicalQuery.getExpCtx();
