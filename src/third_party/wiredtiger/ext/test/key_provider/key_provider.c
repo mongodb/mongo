@@ -60,6 +60,10 @@
 /* Date format for ISO 8601 */
 #define DATE_FORMAT_ISO8601 "%Y-%m-%dT%H:%M:%S%z"
 
+#define KEY_ONESHOT_EXPIRE(kp) (kp)->key_expires = -((kp)->key_expires)
+#define KEY_NEVER_USED(kp) ((kp)->key_expires < 0)
+#define KEY_RESET_EXPIRE(kp) (kp)->key_expires = abs((kp)->key_expires)
+
 /* Default initial key */
 static const char DEFAULT_KEY_DATA[] = "abcdefghijklmnopqrstuvwxyz";
 
@@ -112,7 +116,6 @@ kp_set_key(KEY_PROVIDER *kp, const WT_CRYPT_KEYS *crypt)
 
     kp->state.key_time = clock();
     kp->state.key_state = KEY_STATE_CURRENT;
-
     return (0);
 }
 
@@ -134,6 +137,10 @@ kp_load_key(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, const WT_CRYPT_KEYS *cry
     assert(kp->state.key_state == KEY_STATE_CURRENT);
     kp_set_key(kp, crypt);
 
+    /* Reset expiration if a valid key was loaded. */
+    if (crypt->keys.data != NULL)
+        KEY_RESET_EXPIRE(kp);
+
     return (0);
 }
 
@@ -144,14 +151,13 @@ kp_load_key(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, const WT_CRYPT_KEYS *cry
 static bool
 kp_key_expired(KEY_PROVIDER *kp)
 {
-    if (kp->key_expires == KEY_EXPIRES_NEVER)
-        return (false); /* Key does not expire */
-    else if (kp->key_expires == KEY_EXPIRES_ALWAYS)
-        return (true); /* Key always expires */
+    if (KEY_NEVER_USED(kp)) {
+        KEY_RESET_EXPIRE(kp);
+        return (true);
+    }
 
     const clock_t now = clock();
     double elapsed_sec = CLOCK_SECS(now - kp->state.key_time);
-
     return (elapsed_sec >= kp->key_expires);
 }
 
@@ -333,7 +339,6 @@ kp_terminate(WT_KEY_PROVIDER *wtkp, WT_SESSION *session)
 }
 
 /* Configuration parsing helpers */
-
 static int
 configure_int(const char *param, const WT_CONFIG_ITEM *k, const WT_CONFIG_ITEM *v, int *dest)
 {
@@ -450,6 +455,9 @@ wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
     LOG_INFO(kp, NULL,
       "Key provider initialized successfully; config: {verbose=%d, key_expires=%d}", kp->verbose,
       kp->key_expires);
+
+    /* One-shot key expiration: first get_key call always expires the key. */
+    KEY_ONESHOT_EXPIRE(kp);
 
     return (0);
 

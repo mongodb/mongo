@@ -5,7 +5,9 @@ test_autoclose.py
 test_checkpoint06.py # FIXME: WT-15507
 test_config02.py
 test_config09.py
+test_cursor13.py  # FIXME: WT-15369
 test_cursor21.py  # FIXME: WT-15369
+test_cursor_random.py # FIXME: WT-15189
 test_drop03.py
 test_dump.py
 test_dump01.py
@@ -41,6 +43,8 @@ test_readonly03.py  # WT-14582
 test_shared_cache01.py
 test_stat01.py
 test_stat_log02.py
+test_sweep05
+test_timestamp26.py # FIXME: WT-16182
 test_truncate01.py # FIXME: WT-15474
 test_truncate21.py # FIXME: WT-15472
 test_truncate24.py # FIXME: WT-15473

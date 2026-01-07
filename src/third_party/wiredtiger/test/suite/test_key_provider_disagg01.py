@@ -125,7 +125,7 @@ class test_key_provider_disagg01(wttest.WiredTigerTestCase):
         ds.check()
 
         # Validate that key persists after crash/restart.
-        self.key_expire = -1
+        self.key_expire = 43200  # Keys expire after 12 hours.
         if (self.crash):
             simulate_crash_restart(self, ".", "RESTART")
             self.validate_meta_file("RESTART")

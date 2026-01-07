@@ -1624,6 +1624,8 @@ extern int __wti_verify_ckpt_load(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_verify_ckpt_unload(WT_SESSION_IMPL *session, WT_BLOCK *block, bool skip_verify)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int64_t __wti_config_parse_dec(const char *str, size_t len, char **endptr)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern size_t __wt_json_unpack_str(u_char *dest, size_t dest_len, const u_char *src, size_t src_len)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern ssize_t __wt_json_strlen(const char *src, size_t srclen) WT_GCC_FUNC_DECL_ATTRIBUTE(

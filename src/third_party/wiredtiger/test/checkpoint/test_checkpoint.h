@@ -119,6 +119,8 @@ extern GLOBAL g;
 
 #define log_print_err(m, e, fatal) log_print_err_worker(__func__, __LINE__, m, e, fatal)
 
+#define WARN(fmt, ...) fprintf(stderr, "%s: WARNING: " fmt "\n", progname, __VA_ARGS__)
+
 void end_threads(void);
 int disagg_switch_roles(void);
 int log_print_err_worker(const char *, int, const char *, int, int);

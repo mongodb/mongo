@@ -13,7 +13,7 @@
 
 #include "wt_internal.h"
 
-#include "wrappers/connection_wrapper.h"
+#include "wrappers/mock_session.h"
 #include "utils.h"
 
 /*
@@ -60,12 +60,12 @@ struct disagg_fixture {
         return result;
     }
 
-    connection_wrapper conn;
+    std::shared_ptr<mock_session> session_wrapper;
     WT_SESSION_IMPL *session = nullptr;
 
-    disagg_fixture() : conn(DB_HOME, "create,in_memory")
+    disagg_fixture() : session_wrapper(mock_session::build_test_mock_session())
     {
-        session = conn.create_session();
+        session = session_wrapper->get_wt_session_impl();
         REQUIRE(session != nullptr);
 
         REQUIRE(config.size() == KEY_PROVIDER + 1);
@@ -213,6 +213,96 @@ TEST_CASE_METHOD(disagg_fixture, "Parse crypt key metadata", "[disagg]")
 
             uint64_t page_id = 0, lsn = 0;
             const auto ret = __wti_disagg_parse_crypt_meta(session, &metadata, &page_id, &lsn);
+            REQUIRE(ret == EINVAL);
+        }
+    }
+}
+
+TEST_CASE_METHOD(disagg_fixture, "Legacy metadata format", "[disagg]")
+{
+    const std::string checkpoint =
+      "(WiredTigerCheckpoint.1=(addr=\"00c025808282bd21596019\",order=1,time=1766470626))";
+    const std::string timestamp = "timestamp=c0ffee12"; /* hex number */
+    const std::string legacy_metadata = checkpoint + "\n" + timestamp;
+
+    SECTION("Complete metadata")
+    {
+        WT_ITEM metadata_buf{};
+        metadata_buf.data = (const void *)legacy_metadata.data();
+        metadata_buf.size = legacy_metadata.length();
+        WT_DISAGG_METADATA metadata{};
+
+        const auto ret = __wti_disagg_parse_meta(session, &metadata_buf, &metadata);
+        REQUIRE(ret == 0);
+        REQUIRE(checkpoint == std::string_view(metadata.checkpoint, metadata.checkpoint_len));
+        const uint64_t expected_timestamp = std::stoull("c0ffee12", nullptr, 16);
+        REQUIRE(expected_timestamp == metadata.checkpoint_timestamp);
+        REQUIRE(metadata.key_provider == nullptr);
+        REQUIRE(metadata.key_provider_len == 0);
+    }
+
+    SECTION("Length limited")
+    {
+        WT_ITEM metadata_buf{};
+        metadata_buf.data = (const void *)legacy_metadata.data();
+        /* truncate the last 2 digits from the timestamp */
+        metadata_buf.size = legacy_metadata.length() - 2;
+        WT_DISAGG_METADATA metadata{};
+
+        const auto ret = __wti_disagg_parse_meta(session, &metadata_buf, &metadata);
+        REQUIRE(ret == 0);
+        REQUIRE(checkpoint == std::string_view(metadata.checkpoint, metadata.checkpoint_len));
+        const uint64_t expected_timestamp = std::stoull("c0ffee", nullptr, 16);
+        REQUIRE(expected_timestamp == metadata.checkpoint_timestamp);
+        REQUIRE(metadata.key_provider == nullptr);
+        REQUIRE(metadata.key_provider_len == 0);
+    }
+
+    SECTION("Missing timestamp")
+    {
+        const std::string incomplete_metadata = checkpoint;
+
+        WT_ITEM metadata_buf{};
+        metadata_buf.data = (const void *)incomplete_metadata.data();
+        metadata_buf.size = incomplete_metadata.length();
+        WT_DISAGG_METADATA metadata{};
+
+        const auto ret = __wti_disagg_parse_meta(session, &metadata_buf, &metadata);
+        REQUIRE(ret == EINVAL);
+    }
+
+    SECTION("Missing timestamp 2")
+    {
+        const std::string incomplete_metadata = checkpoint + "\n";
+
+        WT_ITEM metadata_buf{};
+        metadata_buf.data = (const void *)incomplete_metadata.data();
+        metadata_buf.size = incomplete_metadata.length();
+        WT_DISAGG_METADATA metadata{};
+
+        const auto ret = __wti_disagg_parse_meta(session, &metadata_buf, &metadata);
+        REQUIRE(ret == EINVAL);
+    }
+
+    SECTION("Invalid timestamp")
+    {
+        const char *invalid_ts[] = {
+          "timestamp=",                               /* empty timestamp */
+          "timestamp=zzzz",                           /* non-hex characters */
+          "timestamp=-1234",                          /* negative number */
+          "timestamp=123456789012345678901234567890", /* too large */
+          "tmstmp=c0ffee12"                           /* misspelled key */
+        };
+
+        for (const auto &ts : invalid_ts) {
+            const std::string incomplete_metadata = checkpoint + "\n" + ts;
+
+            WT_ITEM metadata_buf{};
+            metadata_buf.data = (const void *)incomplete_metadata.data();
+            metadata_buf.size = incomplete_metadata.length();
+            WT_DISAGG_METADATA metadata{};
+
+            const auto ret = __wti_disagg_parse_meta(session, &metadata_buf, &metadata);
             REQUIRE(ret == EINVAL);
         }
     }
