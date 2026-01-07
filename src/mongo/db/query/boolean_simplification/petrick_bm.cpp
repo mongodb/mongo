@@ -37,16 +37,16 @@ namespace mongo::boolean_simplification {
  */
 void petrick_classic(benchmark::State& state) {
     std::vector<CoveredOriginalMinterms> data{
-        {0, 1},
-        {0, 3},
-        {1, 2},
-        {3, 4},
-        {2, 5},
-        {4, 5},
+        CoveredOriginalMinterms{"000011"},
+        CoveredOriginalMinterms{"001001"},
+        CoveredOriginalMinterms{"000110"},
+        CoveredOriginalMinterms{"011000"},
+        CoveredOriginalMinterms{"100100"},
+        CoveredOriginalMinterms{"110000"},
     };
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(petricksMethod(data));
+        benchmark::DoNotOptimize(petricksMethod(data, 1000));
     }
 }
 
@@ -58,11 +58,12 @@ BENCHMARK(petrick_classic);
 void petrick_noSimplifications(benchmark::State& state) {
     std::vector<CoveredOriginalMinterms> data(100);
     for (size_t i = 0; i < data.size(); ++i) {
-        data[i].emplace_back(static_cast<CoveredOriginalMinterms::value_type>(i));
+        data[i].resize(100);
+        data[i].set(i);
     }
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(petricksMethod(data));
+        benchmark::DoNotOptimize(petricksMethod(data, 1000));
     }
 }
 
@@ -73,16 +74,16 @@ BENCHMARK(petrick_noSimplifications);
  */
 void petrick_essentialWithSimplications(benchmark::State& state) {
     std::vector<CoveredOriginalMinterms> data{
-        {0, 1, 2},
-        {2, 3},
-        {0, 3},
-        {4},
-        {5},
-        {6},
+        CoveredOriginalMinterms{"0000111"},
+        CoveredOriginalMinterms{"0001100"},
+        CoveredOriginalMinterms{"0001001"},
+        CoveredOriginalMinterms{"0010000"},
+        CoveredOriginalMinterms{"0100000"},
+        CoveredOriginalMinterms{"1000000"},
     };
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(petricksMethod(data));
+        benchmark::DoNotOptimize(petricksMethod(data, 1000));
     }
 }
 
