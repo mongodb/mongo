@@ -346,6 +346,11 @@ std::tuple<ShardId, int64_t> BalancerPolicy::_getMostOverloadedShard(
             continue;
         }
 
+        if (chunkZone != ZoneInfo::kNoZoneName && !stat.shardZones.count(chunkZone)) {
+            // Skip shard not belonging to zone
+            continue;
+        }
+
         const auto& shardSizeIt = collDataSizeInfo.shardToDataSizeMap.find(stat.shardId);
         if (shardSizeIt == collDataSizeInfo.shardToDataSizeMap.end()) {
             // Skip if stats not available (may happen if add|remove shard during a round)
