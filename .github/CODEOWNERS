@@ -1330,6 +1330,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthrough/network/OWNERS.yml
 /jstests/noPassthrough/network/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/observability/OWNERS.yml
+/jstests/noPassthrough/observability/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/oplog/OWNERS.yml
 /jstests/noPassthrough/oplog/**/* @10gen/server-oplog @svc-auto-approve-bot
 /jstests/noPassthrough/oplog/**/check_for_oplog_cap_maintainer_thread.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
