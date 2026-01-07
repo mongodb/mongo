@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_fcv_71,
  *   requires_replication,
+ *   requires_commit_quorum,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

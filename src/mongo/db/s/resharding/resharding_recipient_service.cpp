@@ -1265,7 +1265,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
 
                                .commitQuorum =
                                    (isPrimaryDrivenIndexBuild
-                                        ? CommitQuorumOptions(CommitQuorumOptions::kDisabled)
+                                        ? CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote)
                                         : CommitQuorumOptions(
                                               CommitQuorumOptions::kVotingMembers))};
 

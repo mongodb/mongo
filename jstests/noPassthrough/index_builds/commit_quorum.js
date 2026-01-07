@@ -50,6 +50,11 @@ assert.eq("votingMembers", res.commitQuorum);
 res = assert.commandWorked(testDB[collName].createIndex({y: 1}, {}, 1));
 assert.eq(1, res.commitQuorum);
 
+assert.commandWorked(testDB[collName].dropIndex({y: 1}));
+// CommitQuorum of 0 should be rounded up to 1 for backwards-compatibility.
+res = assert.commandWorked(testDB[collName].createIndex({y: 1}, {}, 0));
+assert.eq(1, res.commitQuorum);
+
 // Use createIndex(es) to build indexes and check the commit quorum default.
 res = assert.commandWorked(testDB[collName].createIndexes([{i: 1}]));
 assert.eq("votingMembers", res.commitQuorum);
@@ -86,11 +91,6 @@ try {
             indexNames: ["a_1"],
             commitQuorum: "someTag",
         }),
-    );
-    // setIndexCommitQuorum should fail as it is illegal to disable commit quorum for in-progress
-    // index builds with commit quorum enabled.
-    assert.commandFailed(
-        testDB.runCommand({setIndexCommitQuorum: "twoPhaseIndexBuild", indexNames: ["a_1"], commitQuorum: 0}),
     );
 
     assert.commandWorked(

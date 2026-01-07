@@ -171,7 +171,7 @@ function testReadConcernLevel(level) {
     // Adding an index does not bump the min snapshot for a collection. Collection scans are
     // possible, however the index is not guaranteed to be usable until the majority-committed
     // snapshot advances.
-    t.createIndex({version: 1}, {}, 0);
+    t.createIndex({version: 1}, {}, 1);
     assert.eq(getCursorForReadConcernLevel().itcount(), 10);
     assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
 

@@ -339,7 +339,8 @@ public:
         }
     }
 
-    void create(NamespaceString nss) const {
+    UUID create(NamespaceString nss) const {
+        const auto uuid = UUID::gen();
         ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss, [&] {
             shard_role_details::getRecoveryUnit(_opCtx)->setTimestampReadSource(
                 RecoveryUnit::ReadSource::kNoTimestamp);
@@ -364,9 +365,10 @@ public:
                 ASSERT_OK(
                     shard_role_details::getRecoveryUnit(_opCtx)->setTimestamp(Timestamp(1, 1)));
             }
-            invariant(db->createCollection(_opCtx, nss));
+            invariant(db->createCollection(_opCtx, nss, {.uuid = uuid}));
             wunit.commit();
         });
+        return uuid;
     }
 
     void insertDocument(const CollectionPtr& coll, const InsertStatement& stmt) {
@@ -2087,7 +2089,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
 
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("unittests.timestampMultiIndexBuilds");
-    create(nss);
+    auto collUUID = create(nss);
 
     std::vector<std::string> origIdents;
     {
@@ -2125,11 +2127,25 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
                                << "a_1");
         auto index2 = BSON("v" << kIndexVersion << "key" << BSON("b" << 1) << "name"
                                << "b_1");
-        auto createIndexesCmdObj =
-            BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1 << index2)
-                                 << "commitQuorum" << 0);
-        BSONObj result;
-        ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
+        auto indexBuildInfo1 = IndexBuildInfo(index1, std::string{"index-1"});
+        indexBuildInfo1.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        auto indexBuildInfo2 = IndexBuildInfo(index2, std::string{"index-2"});
+        indexBuildInfo2.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+
+        auto buildUUID = UUID::gen();
+        const IndexBuildsCoordinator::IndexBuildOptions options = {.commitQuorum =
+                                                                       CommitQuorumOptions(1)};
+        auto fut = unittest::assertGet(
+            IndexBuildsCoordinator::get(_opCtx)->startIndexBuild(_opCtx,
+                                                                 nss.dbName(),
+                                                                 collUUID,
+                                                                 {indexBuildInfo1, indexBuildInfo2},
+                                                                 buildUUID,
+                                                                 IndexBuildProtocol::kTwoPhase,
+                                                                 options));
+        ASSERT_OK(IndexBuildsCoordinator::get(_opCtx)->voteCommitIndexBuild(
+            _opCtx, buildUUID, repl::ReplicationCoordinator::get(_opCtx)->getMyHostAndPort()));
+        unittest::assertGet(fut.getNoThrow());
     }
 
     auto indexCreateInitTs =
@@ -2194,7 +2210,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         "unittests.timestampMultiIndexBuildsDuringRename");
-    create(nss);
+    auto collUUID = create(nss);
 
     {
         auto collAcq = acquireCollection(
@@ -2221,17 +2237,28 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
 
     DBDirectClient client(_opCtx);
     {
-        // Disable index build commit quorum as we don't have support of replication subsystem
-        // for voting.
         auto index1 = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
                                << "a_1");
         auto index2 = BSON("v" << kIndexVersion << "key" << BSON("b" << 1) << "name"
                                << "b_1");
-        auto createIndexesCmdObj =
-            BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1 << index2)
-                                 << "commitQuorum" << 0);
-        BSONObj result;
-        ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
+        auto indexBuildInfo1 = IndexBuildInfo(index1, std::string{"index-1"});
+        indexBuildInfo1.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        auto indexBuildInfo2 = IndexBuildInfo(index2, std::string{"index-2"});
+        indexBuildInfo2.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        auto buildUUID = UUID::gen();
+        const IndexBuildsCoordinator::IndexBuildOptions options = {.commitQuorum =
+                                                                       CommitQuorumOptions(1)};
+        auto fut = unittest::assertGet(
+            IndexBuildsCoordinator::get(_opCtx)->startIndexBuild(_opCtx,
+                                                                 nss.dbName(),
+                                                                 collUUID,
+                                                                 {indexBuildInfo1, indexBuildInfo2},
+                                                                 buildUUID,
+                                                                 IndexBuildProtocol::kTwoPhase,
+                                                                 options));
+        ASSERT_OK(IndexBuildsCoordinator::get(_opCtx)->voteCommitIndexBuild(
+            _opCtx, buildUUID, repl::ReplicationCoordinator::get(_opCtx)->getMyHostAndPort()));
+        unittest::assertGet(fut.getNoThrow());
     }
 
     NamespaceString renamedNss = NamespaceString::createNamespaceString_forTest(
@@ -2311,7 +2338,7 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
 
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("unittests.timestampAbortIndexBuild");
-    create(nss);
+    auto collUUID = create(nss);
 
     std::vector<std::string> origIdents;
     {
@@ -2349,19 +2376,26 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
     }
 
     {
-        // Disable index build commit quorum as we don't have support of replication subsystem
-        // for voting.
         auto index1 = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
                                << "a_1"
                                << "unique" << true);
-        auto createIndexesCmdObj =
-            BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1) << "commitQuorum"
-                                 << 0);
 
-        DBDirectClient client(_opCtx);
-        BSONObj result;
-        ASSERT_FALSE(client.runCommand(nss.dbName(), createIndexesCmdObj, result));
-        ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatusFromCommandResult(result));
+        auto indexBuildInfo1 = IndexBuildInfo(index1, std::string{"index-1"});
+        indexBuildInfo1.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        auto buildUUID = UUID::gen();
+        const IndexBuildsCoordinator::IndexBuildOptions options = {.commitQuorum =
+                                                                       CommitQuorumOptions(1)};
+        auto fut = unittest::assertGet(
+            IndexBuildsCoordinator::get(_opCtx)->startIndexBuild(_opCtx,
+                                                                 nss.dbName(),
+                                                                 collUUID,
+                                                                 {indexBuildInfo1},
+                                                                 buildUUID,
+                                                                 IndexBuildProtocol::kTwoPhase,
+                                                                 options));
+        ASSERT_OK(IndexBuildsCoordinator::get(_opCtx)->voteCommitIndexBuild(
+            _opCtx, buildUUID, repl::ReplicationCoordinator::get(_opCtx)->getMyHostAndPort()));
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey, fut.getNoThrow().getStatus().code());
     }
 
     // Confirm that startIndexBuild and abortIndexBuild oplog entries have been written to the
@@ -3015,7 +3049,7 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
 
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest("unittests.timestampVectoredInsertMultikey");
-    create(nss);
+    auto collUUID = create(nss);
 
     {
         auto collAcq = acquireCollection(
@@ -3034,17 +3068,30 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
 
     DBDirectClient client(_opCtx);
     {
+        const auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
         auto index1 = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
                                << "a_1");
         auto index2 = BSON("v" << kIndexVersion << "key" << BSON("b" << 1) << "name"
                                << "b_1");
-        // Disable index build commit quorum as we don't have support of replication subsystem for
-        // voting.
-        auto createIndexesCmdObj =
-            BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1 << index2)
-                                 << "commitQuorum" << 0);
-        BSONObj result;
-        ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
+        auto indexBuildInfo1 = IndexBuildInfo(index1, std::string{"index-1"});
+        indexBuildInfo1.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+        auto indexBuildInfo2 = IndexBuildInfo(index2, std::string{"index-2"});
+        indexBuildInfo2.setInternalIdents(*storageEngine, VersionContext::getDecoration(_opCtx));
+
+        auto buildUUID = UUID::gen();
+        const IndexBuildsCoordinator::IndexBuildOptions options = {.commitQuorum =
+                                                                       CommitQuorumOptions(1)};
+        auto fut = unittest::assertGet(
+            IndexBuildsCoordinator::get(_opCtx)->startIndexBuild(_opCtx,
+                                                                 nss.dbName(),
+                                                                 collUUID,
+                                                                 {indexBuildInfo1, indexBuildInfo2},
+                                                                 buildUUID,
+                                                                 IndexBuildProtocol::kTwoPhase,
+                                                                 options));
+        ASSERT_OK(IndexBuildsCoordinator::get(_opCtx)->voteCommitIndexBuild(
+            _opCtx, buildUUID, repl::ReplicationCoordinator::get(_opCtx)->getMyHostAndPort()));
+        unittest::assertGet(fut.getNoThrow());
     }
 
     auto collAcq = acquireCollection(

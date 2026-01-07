@@ -617,7 +617,7 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
 
     IndexBuildsCoordinator::IndexBuildOptions twoPhaseOptions;
     twoPhaseOptions.indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
-    twoPhaseOptions.commitQuorum = CommitQuorumOptions(0);
+    twoPhaseOptions.commitQuorum = CommitQuorumOptions(1);
     auto twoPhaseFuture =
         unittest::assertGet(indexBuildsCoord->startIndexBuild(opCtx,
                                                               twoPhaseNss.dbName(),
@@ -629,7 +629,7 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
 
     IndexBuildsCoordinator::IndexBuildOptions singlePhaseOptions;
     singlePhaseOptions.indexBuildMethod = IndexBuildMethodEnum::kPrimaryDriven;
-    singlePhaseOptions.commitQuorum = CommitQuorumOptions(0);
+    singlePhaseOptions.commitQuorum = CommitQuorumOptions(1);
     auto singlePhaseFuture =
         unittest::assertGet(indexBuildsCoord->startIndexBuild(opCtx,
                                                               singlePhaseNss.dbName(),

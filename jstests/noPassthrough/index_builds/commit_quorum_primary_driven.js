@@ -1,7 +1,7 @@
 /**
  * Tests:
  * (1) We can set commitQuorum when creating an primary-driven index, but it's a no-op.
- * (2) The default commit quorum for a primary-driven index build is 0 (disabled).
+ * (2) The default commit quorum for a primary-driven index build is 1.
  * (3) We can set the commitQuorum when the primary-driven index build is running, but it's a no-op.
  * @tags: [
  *   requires_replication,
@@ -59,7 +59,7 @@ let res = assert.commandWorked(
         commitQuorum: "majority",
     }),
 );
-assert.eq(0, res.commitQuorum);
+assert.eq(1, res.commitQuorum);
 assert(checkLog.checkContainsWithCountJson(primaryDB, 11302400, undefined, 1), "Expecting to see log with id 11302400");
 
 rst.awaitReplication();

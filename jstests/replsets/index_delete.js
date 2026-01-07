@@ -54,9 +54,9 @@ for (let i = 0; i < size; ++i) {
 assert.commandWorked(bulk.execute());
 
 // This test create indexes with fail point enabled on secondary which prevents secondary from
-// voting. So, disabling index build commit quorum.
+// voting. So, set commit quorum to 1.
 jsTest.log("Creating index");
-assert.commandWorked(primaryDB[collName].createIndex({i: 1}, {}, 0));
+assert.commandWorked(primaryDB[collName].createIndex({i: 1}, {}, 1));
 assert.eq(2, primaryDB[collName].getIndexes().length);
 
 try {

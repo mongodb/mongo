@@ -407,7 +407,7 @@ StatusWith<CommitQuorumOptions> getCommitQuorum(OperationContext* opCtx, UUID in
     if (fcvSnapshot.isVersionInitialized() &&
         feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
             VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-        return CommitQuorumOptions(CommitQuorumOptions::kDisabled);
+        return CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote);
     }
     StatusWith<IndexBuildEntry> status = getIndexBuildEntry(opCtx, indexBuildUUID);
     if (!status.isOK()) {

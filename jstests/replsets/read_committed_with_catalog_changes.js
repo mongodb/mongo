@@ -138,8 +138,8 @@ const testCases = {
         },
         performOp: function (db) {
             // This test create indexes with majority of nodes not available for replication.
-            // So, disabling index build commit quorum.
-            assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
+            // So, set commit quorum to 1.
+            assert.commandWorked(db.coll.createIndex({x: 1}, {}, 1));
         },
         blockedCollections: [],
         unblockedCollections: ["coll", "other"],
@@ -147,8 +147,8 @@ const testCases = {
     collMod: {
         prepare: function (db) {
             // This test create indexes with majority of nodes not available for replication.
-            // So, disabling index build commit quorum.
-            assert.commandWorked(db.coll.createIndex({x: 1}, {expireAfterSeconds: 60 * 60}, 0));
+            // So, set commit quorum to 1.
+            assert.commandWorked(db.coll.createIndex({x: 1}, {expireAfterSeconds: 60 * 60}, 1));
             assert.commandWorked(db.coll.insert({_id: 1, x: 1}));
         },
         performOp: function (db) {
@@ -165,8 +165,8 @@ const testCases = {
             assert.commandWorked(db.coll.insert({_id: 1}));
 
             // This test create indexes with majority of nodes not available for replication.
-            // So, disabling index build commit quorum.
-            assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
+            // So, set commit quorum to 1.
+            assert.commandWorked(db.coll.createIndex({x: 1}, {}, 1));
         },
         performOp: function (db) {
             assert.commandWorked(db.coll.dropIndex({x: 1}));
@@ -183,8 +183,8 @@ const testCases = {
             assert.commandWorked(db.coll.insert({_id: 1}));
 
             // This test create indexes with majority of nodes not available for replication.
-            // So, disabling index build commit quorum.
-            assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
+            // So, set commit quorum to 1.
+            assert.commandWorked(db.coll.createIndex({x: 1}, {}, 1));
         },
         performOp: function (db) {
             let res = db.coll.runCommand("compact", {force: true});

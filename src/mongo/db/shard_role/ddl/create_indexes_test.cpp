@@ -75,12 +75,10 @@ TEST_F(CreateIndexesTest, CreateIndexesFailsWhenIndexBuildsCollectionIsMissing) 
     DBDirectClient client(opCtx);
     const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
     {
-        // Disable index build commit quorum as we don't have support of replication subsystem
-        // for voting.
         auto index = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
                               << "a_1");
         auto createIndexesCmdObj = BSON(
-            "createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index) << "commitQuorum" << 0);
+            "createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index) << "commitQuorum" << 1);
         BSONObj result;
         // This should fail since config.system.indexBuilds does not exist.
         unittest::LogCaptureGuard logs;
@@ -100,7 +98,7 @@ TEST_F(CreateIndexesTest, CreateIndexOnPreimagesCollectionFails) {
     auto index = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
                           << "a_1");
     auto cmd = BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index)
-                                    << "commitQuorum" << 0);
+                                    << "commitQuorum" << 1);
     BSONObj result;
     // This should fail because it is not permitted to create indexes on config.system.preimages.
     ASSERT_FALSE(client.runCommand(nss.dbName(), cmd, result)) << result;

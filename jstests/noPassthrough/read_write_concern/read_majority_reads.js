@@ -114,7 +114,7 @@ function runTests(coll, mongodConnection) {
         assert.commandWorked(mongodConnection.adminCommand({"setCommittedSnapshot": snapshot}));
     }
 
-    assert.commandWorked(coll.createIndex({point: "2dsphere"}, {}, 0));
+    assert.commandWorked(coll.createIndex({point: "2dsphere"}, {}, 1));
     for (var testName in cursorTestCases) {
         jsTestLog("Running " + testName + " against " + coll.toString());
         let getCursor = cursorTestCases[testName];

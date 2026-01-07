@@ -215,7 +215,7 @@ const awaitIndexBuild = IndexBuildTest.startIndexBuild(
 );
 const buildingOpId = IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, buildingIndexName);
 
-// Add a non-resumable index build to the listIndexes result by providing a commit quorum of zero,
+// Add a non-resumable index build to the listIndexes result by providing a commit quorum of 1,
 // though any commit quorum other than the default of all voting members will do the job.
 const buildingIndexNameNonResumable = "c_1";
 const awaitIndexBuildNonResumable = IndexBuildTest.startIndexBuild(
@@ -224,7 +224,7 @@ const awaitIndexBuildNonResumable = IndexBuildTest.startIndexBuild(
     {c: 1},
     {name: buildingIndexNameNonResumable},
     [],
-    /*commitQuorum=*/ 0,
+    /*commitQuorum=*/ 1,
 );
 const buildingOpIdNonResumable = IndexBuildTest.waitForIndexBuildToScanCollection(
     db,

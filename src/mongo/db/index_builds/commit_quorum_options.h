@@ -56,10 +56,10 @@ public:
     static const char kMajority[];               // = "majority"
     static const char kVotingMembers[];          // = "votingMembers"
 
-    static const int kUninitializedNumNodes = -1;
-    static const int kDisabled = 0;
-    static const BSONObj Majority;       // = {"commitQuorum": "majority"}
-    static const BSONObj VotingMembers;  // = {"commitQuorum": "votingMembers"}
+    static constexpr int kUninitializedNumNodes = -1;
+    static constexpr int kPrimarySelfVote = 1;  // Primary just needs 1 vote (from itself).
+    static const BSONObj Majority;              // = {"commitQuorum": "majority"}
+    static const BSONObj VotingMembers;         // = {"commitQuorum": "votingMembers"}
 
     CommitQuorumOptions() {
         reset();

@@ -50,7 +50,14 @@ TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseIfCommitQuorumIsNotNumber
     ASSERT_EQUALS("commitQuorum has to be a number or a string", status.reason());
 }
 
-TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseIfCommitQuorumIsANegativeNumber) {
+TEST(CommitQuorumOptionsTest, CommitQuorumZeroRoundsUpToOne) {
+    BSONObj obj = BSON("commitQuorum" << 0);
+    CommitQuorumOptions options;
+    ASSERT_OK(options.parse(obj.getField("commitQuorum")));
+    ASSERT_EQ(1, options.numNodes);
+}
+
+TEST(CommitQuorumOptionsTest, ParseReturnsFailedToParseIfCommitQuorumIsNegative) {
     BSONObj obj = BSON("commitQuorum" << -1);
     auto status = CommitQuorumOptions().parse(obj.getField("commitQuorum"));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
