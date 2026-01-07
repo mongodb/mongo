@@ -523,6 +523,8 @@ testCase("Testing transaction operations pin to same mongos", () => {
     const getNextMongoTracker = overrideGetNextMongoCountingCalls(conn);
 
     withRetryOnTransientTxnError(() => {
+        getNextMongoTracker.reset();
+
         session.startTransaction();
 
         // First operation in transaction
