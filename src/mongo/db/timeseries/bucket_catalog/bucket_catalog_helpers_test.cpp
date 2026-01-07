@@ -30,15 +30,14 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -47,17 +46,12 @@
 #include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
-#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 #include <cstddef>
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::timeseries::bucket_catalog {
@@ -76,14 +70,10 @@ protected:
 void BucketCatalogHelpersTest::_insertIntoBucketColl(const NamespaceString& ns,
                                                      const BSONObj& bucketDoc) {
     AutoGetCollection autoColl(_opCtx, ns.makeTimeseriesBucketsNamespace(), MODE_IX);
-    OpDebug* const nullOpDebug = nullptr;
 
-    {
-        WriteUnitOfWork wuow(_opCtx);
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *autoColl, InsertStatement(bucketDoc), nullOpDebug));
-        wuow.commit();
-    }
+    WriteUnitOfWork wuow(_opCtx);
+    ASSERT_OK(Helpers::insert(_opCtx, *autoColl, bucketDoc));
+    wuow.commit();
 }
 
 BSONObj BucketCatalogHelpersTest::_findSuitableBucket(const NamespaceString& bucketNss,

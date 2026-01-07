@@ -30,10 +30,9 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
@@ -463,21 +462,20 @@ TEST_F(StorageInterfaceImplTest,
     createCollection(opCtx, nss, options);
     // StorageInterfaceImpl::insertDocuments should fall back on inserting the batch one at a time.
     StorageInterfaceImpl storage;
-    auto doc1 = InsertStatement(BSON("_id" << 1));
-    auto doc2 = InsertStatement(BSON("_id" << 2));
-    std::vector<InsertStatement> docs{doc1, doc2};
+    auto doc1 = BSON("_id" << 1);
+    auto doc2 = BSON("_id" << 2);
     // Confirm that Collection::insertDocuments fails to insert the batch all at once.
     {
         AutoGetCollection autoCollection(opCtx, nss, MODE_IX);
         WriteUnitOfWork wunit(opCtx);
         ASSERT_EQUALS(ErrorCodes::OperationCannotBeBatched,
-                      collection_internal::insertDocuments(
-                          opCtx, *autoCollection, docs.cbegin(), docs.cend(), nullptr, false));
+                      Helpers::insert(opCtx, *autoCollection, std::vector{doc1, doc2}));
     }
-    ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
+    ASSERT_OK(storage.insertDocuments(
+        opCtx, nss, std::vector{InsertStatement{doc1}, InsertStatement{doc2}}));
 
     // Check collection contents.
-    _assertDocumentsInCollectionEquals(opCtx, nss, {doc1.doc, doc2.doc});
+    _assertDocumentsInCollectionEquals(opCtx, nss, {doc1, doc2});
 }
 
 TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLastOperation) {

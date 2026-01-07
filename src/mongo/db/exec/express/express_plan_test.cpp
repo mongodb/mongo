@@ -32,8 +32,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -88,13 +88,10 @@ public:
             wuow.commit();
         }
 
-        OpDebug* const nullOpDebug = nullptr;
-        for (const auto& document : documentList) {
+        {
             WriteUnitOfWork wuow(operationContext());
-            ASSERT_OK(collection_internal::insertDocument(operationContext(),
-                                                          collection.getCollectionPtr(),
-                                                          InsertStatement(document),
-                                                          nullOpDebug));
+            ASSERT_OK(
+                Helpers::insert(operationContext(), collection.getCollectionPtr(), documentList));
             wuow.commit();
         }
 

@@ -36,6 +36,7 @@
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -163,28 +164,18 @@ protected:
                           ->lookupCollectionByNamespace(operationContext(), nss)
                           ->uuid();
 
-        std::vector<ChangeStreamPreImage> preImages;
+        std::vector<BSONObj> preImageDocs;
         for (int64_t i = 0; i < numRecords; i++) {
-            preImages.push_back(
-                generatePreImage(nsUUID, Timestamp{startOperationTime + Milliseconds{i}}));
+            preImageDocs.push_back(
+                generatePreImage(nsUUID, Timestamp{startOperationTime + Milliseconds{i}}).toBSON());
         }
-
-        std::vector<InsertStatement> preImageInsertStatements;
-        std::transform(preImages.begin(),
-                       preImages.end(),
-                       std::back_inserter(preImageInsertStatements),
-                       [](const auto& preImage) { return InsertStatement{preImage.toBSON()}; });
 
         AutoGetCollection preImagesCollectionRaii(opCtx, preImagesCollectionNss, MODE_IX);
         ASSERT(preImagesCollectionRaii);
         WriteUnitOfWork wuow(opCtx);
         auto& changeStreamPreImagesCollection = *preImagesCollectionRaii;
 
-        auto status = collection_internal::insertDocuments(opCtx,
-                                                           changeStreamPreImagesCollection,
-                                                           preImageInsertStatements.begin(),
-                                                           preImageInsertStatements.end(),
-                                                           nullptr);
+        ASSERT_OK(Helpers::insert(opCtx, changeStreamPreImagesCollection, preImageDocs));
         wuow.commit();
     };
 

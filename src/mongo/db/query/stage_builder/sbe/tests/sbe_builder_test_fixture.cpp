@@ -30,7 +30,7 @@
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -120,8 +120,6 @@ SbeStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
 
 void SbeStageBuilderTestFixture::insertDocuments(const NamespaceString& nss,
                                                  const std::vector<BSONObj>& docs) {
-    std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-
     auto coll = acquireCollection(
         operationContext(),
         CollectionAcquisitionRequest(nss,
@@ -129,15 +127,9 @@ void SbeStageBuilderTestFixture::insertDocuments(const NamespaceString& nss,
                                      repl::ReadConcernArgs::get(operationContext()),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
-    {
-        WriteUnitOfWork wuow{operationContext()};
-        ASSERT_OK(collection_internal::insertDocuments(operationContext(),
-                                                       coll.getCollectionPtr(),
-                                                       inserts.begin(),
-                                                       inserts.end(),
-                                                       nullptr /* opDebug */));
-        wuow.commit();
-    }
+    WriteUnitOfWork wuow{operationContext()};
+    ASSERT_OK(Helpers::insert(operationContext(), coll.getCollectionPtr(), docs));
+    wuow.commit();
 }
 
 void GoldenSbeStageBuilderTestFixture::createCollection(const std::vector<BSONObj>& docs,

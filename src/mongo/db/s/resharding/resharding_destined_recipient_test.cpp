@@ -39,7 +39,6 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -325,8 +324,7 @@ protected:
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
             MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocument(
-            opCtx, coll.getCollectionPtr(), InsertStatement(doc), nullptr));
+        ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), doc));
         wuow.commit();
     }
 
@@ -354,9 +352,7 @@ protected:
         ASSERT(!rid.isNull());
 
         WriteUnitOfWork wuow(opCtx);
-        OpDebug opDebug;
-        collection_internal::deleteDocument(
-            opCtx, coll.getCollectionPtr(), kUninitializedStmtId, rid, &opDebug);
+        Helpers::deleteByRid(opCtx, coll, rid);
         wuow.commit();
     }
 

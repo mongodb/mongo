@@ -36,10 +36,10 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/client/index_spec.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_constants.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/index_builds/multi_index_block.h"
@@ -159,19 +159,8 @@ public:
         auto& coll = collection();
         {
             WriteUnitOfWork wunit(_opCtx);
-            OpDebug* const nullOpDebug = nullptr;
-            ASSERT_OK(collection_internal::insertDocument(_opCtx,
-                                                          coll.get(),
-                                                          InsertStatement(BSON("_id" << 1 << "a"
-                                                                                     << "dup")),
-                                                          nullOpDebug,
-                                                          true));
-            ASSERT_OK(collection_internal::insertDocument(_opCtx,
-                                                          coll.get(),
-                                                          InsertStatement(BSON("_id" << 2 << "a"
-                                                                                     << "dup")),
-                                                          nullOpDebug,
-                                                          true));
+            ASSERT_OK(Helpers::insert(_opCtx, coll.get(), BSON("_id" << 1 << "a" << "dup")));
+            ASSERT_OK(Helpers::insert(_opCtx, coll.get(), BSON("_id" << 2 << "a" << "dup")));
             wunit.commit();
         }
 
@@ -214,19 +203,8 @@ public:
             auto& coll = collection();
             {
                 WriteUnitOfWork wunit(_opCtx);
-                OpDebug* const nullOpDebug = nullptr;
-                ASSERT_OK(collection_internal::insertDocument(_opCtx,
-                                                              coll.get(),
-                                                              InsertStatement(BSON("_id" << 1 << "a"
-                                                                                         << "dup")),
-                                                              nullOpDebug,
-                                                              true));
-                ASSERT_OK(collection_internal::insertDocument(_opCtx,
-                                                              coll.get(),
-                                                              InsertStatement(BSON("_id" << 2 << "a"
-                                                                                         << "dup")),
-                                                              nullOpDebug,
-                                                              true));
+                ASSERT_OK(Helpers::insert(_opCtx, coll.get(), BSON("_id" << 1 << "a" << "dup")));
+                ASSERT_OK(Helpers::insert(_opCtx, coll.get(), BSON("_id" << 2 << "a" << "dup")));
                 wunit.commit();
             }
         }
@@ -277,10 +255,8 @@ public:
                     _opCtx, coll.getWritableCollection(_opCtx), true, {});
                 // Insert some documents.
                 int32_t nDocs = 1000;
-                OpDebug* const nullOpDebug = nullptr;
                 for (int32_t i = 0; i < nDocs; ++i) {
-                    ASSERT_OK(collection_internal::insertDocument(
-                        _opCtx, coll.get(), InsertStatement(BSON("a" << i)), nullOpDebug));
+                    ASSERT_OK(Helpers::insert(_opCtx, coll.get(), BSON("a" << i)));
                 }
                 wunit.commit();
             }
@@ -327,16 +303,11 @@ public:
             coll->getIndexCatalog()->dropAllIndexes(_opCtx, coll, true, {});
             // Insert some documents.
             int32_t nDocs = 1000;
-            OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
                 // TODO(SERVER-103400): Investigate usage validity of
                 // CollectionPtr::CollectionPtr_UNSAFE
-                ASSERT_OK(
-                    collection_internal::insertDocument(_opCtx,
-                                                        CollectionPtr::CollectionPtr_UNSAFE(coll),
-                                                        InsertStatement(BSON("_id" << i)),
-                                                        nullOpDebug,
-                                                        true));
+                ASSERT_OK(Helpers::insert(
+                    _opCtx, CollectionPtr::CollectionPtr_UNSAFE(coll), BSON("_id" << i)));
             }
             wunit.commit();
             // Request an interrupt.

@@ -285,7 +285,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         opCtx, outputColl.getCollectionPtr(), idQuery, outputCollDoc);
 
     if (!foundDoc) {
-        uassertStatusOK(Helpers::insert(opCtx, outputColl, oField));
+        uassertStatusOK(Helpers::insert(opCtx, outputColl.getCollectionPtr(), oField));
 
         return;
     }
@@ -314,7 +314,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 
     // The doc does not belong to '_donorShardId' under the original shard key, so apply rule #4
     // and insert the contents of 'op' to the stash collection.
-    uassertStatusOK(Helpers::insert(opCtx, stashColl, oField));
+    uassertStatusOK(Helpers::insert(opCtx, stashColl.getCollectionPtr(), oField));
 
     _applierMetrics->onWriteToStashCollections();
 }
@@ -575,7 +575,7 @@ void ReshardingOplogApplicationRules::_applyDelete(OperationContext* opCtx,
         // Insert the doc we just deleted from one of the stash collections into the output
         // collection.
         if (!doc.isEmpty()) {
-            uassertStatusOK(Helpers::insert(opCtx, outputColl, doc));
+            uassertStatusOK(Helpers::insert(opCtx, outputColl.getCollectionPtr(), doc));
         }
 
         // Because we called findByIdAndNoopUpdate in this wuow, we have to ensure that this wuow

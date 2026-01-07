@@ -32,7 +32,6 @@
 #include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
@@ -90,8 +89,7 @@ void DbCheckTest::insertDocs(OperationContext* opCtx,
                              int numDocs,
                              const std::vector<std::string>& fieldNames,
                              bool duplicateFieldNames) {
-    const AutoGetCollection coll(opCtx, kNss, MODE_IX);
-    std::vector<InsertStatement> inserts;
+    std::vector<BSONObj> inserts;
     for (int i = 0; i < numDocs; ++i) {
         BSONObjBuilder bsonBuilder;
         bsonBuilder << "_id" << i + startIDNum;
@@ -105,38 +103,29 @@ void DbCheckTest::insertDocs(OperationContext* opCtx,
             bsonBuilder << fieldNames[0] << i + startIDNum + 1;
         }
 
-        const auto obj = bsonBuilder.obj();
-        inserts.push_back(InsertStatement(obj));
+        inserts.push_back(bsonBuilder.obj());
     }
 
-    {
-        WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocuments(
-            opCtx, *coll, inserts.begin(), inserts.end(), nullptr, false));
-        wuow.commit();
-    }
+    AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_OK(Helpers::insert(opCtx, *coll, inserts));
+    wuow.commit();
 }
 
 void DbCheckTest::insertInvalidUuid(OperationContext* opCtx,
                                     int startIDNum,
                                     const std::vector<std::string>& fieldNames) {
-    const AutoGetCollection coll(opCtx, kNss, MODE_IX);
-    std::vector<InsertStatement> inserts;
-
     BSONObjBuilder bsonBuilder;
     bsonBuilder << "_id" << startIDNum;
     uint8_t uuidBytes[] = {0, 0, 0, 0, 0, 0, 0x40, 0, 0x80, 0, 0, 0, 0, 0, 0, 0};
     // The UUID is invalid because its length is 10 instead of 16.
     bsonBuilder << "invalid uuid" << BSONBinData(uuidBytes, 10, newUUID);
     const auto obj = bsonBuilder.obj();
-    inserts.push_back(InsertStatement(obj));
 
-    {
-        WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocuments(
-            opCtx, *coll, inserts.begin(), inserts.end(), nullptr, false));
-        wuow.commit();
-    }
+    AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_OK(Helpers::insert(opCtx, *coll, obj));
+    wuow.commit();
 }
 
 void DbCheckTest::deleteDocs(OperationContext* opCtx, int startIDNum, int numDocs) {

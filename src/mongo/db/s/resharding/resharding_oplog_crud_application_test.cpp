@@ -36,6 +36,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection_common_types_gen.h"
@@ -793,11 +794,8 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpAtomicallyMovesFromOtherStash
                     opCtx.get(), otherStashNss(), AcquisitionPrerequisites::kWrite),
                 MODE_IX);
             WriteUnitOfWork wuow(opCtx.get());
-            ASSERT_OK(
-                collection_internal::insertDocument(opCtx.get(),
-                                                    otherStashColl.getCollectionPtr(),
-                                                    InsertStatement{BSON("_id" << 0 << sk() << -3)},
-                                                    nullptr /* opDebug */));
+            ASSERT_OK(Helpers::insert(
+                opCtx.get(), otherStashColl.getCollectionPtr(), BSON("_id" << 0 << sk() << -3)));
             wuow.commit();
         }
 

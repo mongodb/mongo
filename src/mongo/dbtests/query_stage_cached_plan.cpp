@@ -33,9 +33,9 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/classic/cached_plan.h"
 #include "mongo/db/exec/classic/mock_stage.h"
 #include "mongo/db/exec/classic/plan_stage.h"
@@ -142,10 +142,7 @@ public:
 
     void insertDocument(const CollectionAcquisition& collection, BSONObj obj) {
         WriteUnitOfWork wuow(&_opCtx);
-
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            &_opCtx, collection.getCollectionPtr(), InsertStatement(obj), nullOpDebug));
+        ASSERT_OK(Helpers::insert(&_opCtx, collection.getCollectionPtr(), obj));
         wuow.commit();
     }
 

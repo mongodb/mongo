@@ -33,8 +33,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
@@ -108,12 +108,9 @@ void ThrottleCursorTest::setUp() {
     AutoGetCollection collection(operationContext(), kNss, MODE_X);
     invariant(collection);
 
-    OpDebug* const nullOpDebug = nullptr;
     for (int i = 0; i < 10; i++) {
         WriteUnitOfWork wuow(operationContext());
-
-        ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), *collection, InsertStatement(BSON("_id" << i)), nullOpDebug));
+        ASSERT_OK(Helpers::insert(operationContext(), *collection, BSON("_id" << i)));
         wuow.commit();
     }
 }

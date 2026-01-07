@@ -40,6 +40,7 @@
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/classic/fetch.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/queued_data_stage.h"
@@ -560,12 +561,10 @@ public:
 
         // We should have read in the first 'firstRead' recordIds.  Invalidate the first.
         exec->saveState();
-        OpDebug* const nullOpDebug = nullptr;
         std::set<RecordId>::iterator it = recordIds.begin();
         {
             WriteUnitOfWork wuow(&_opCtx);
-            collection_internal::deleteDocument(
-                &_opCtx, coll.getCollectionPtr(), kUninitializedStmtId, *it++, nullOpDebug);
+            Helpers::deleteByRid(&_opCtx, coll, *it++);
             wuow.commit();
         }
         exec->restoreState(nullptr);
@@ -581,8 +580,7 @@ public:
         while (it != recordIds.end()) {
             {
                 WriteUnitOfWork wuow(&_opCtx);
-                collection_internal::deleteDocument(
-                    &_opCtx, coll.getCollectionPtr(), kUninitializedStmtId, *it++, nullOpDebug);
+                Helpers::deleteByRid(&_opCtx, coll, *it++);
                 wuow.commit();
             }
         }

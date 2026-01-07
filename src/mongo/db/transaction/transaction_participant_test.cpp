@@ -27,26 +27,16 @@
  *    it in the license file.
  */
 
+#include "mongo/db/transaction/transaction_participant.h"
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
-#include "mongo/db/repl/read_concern_args.h"
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-// IWYU pragma: no_include "cxxabi.h"
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/bsontypes_util.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
@@ -59,16 +49,15 @@
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/local_oplog_info.h"
-#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -79,7 +68,6 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_control.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -98,7 +86,6 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
-#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/txn_retry_counter_too_old_info.h"
 #include "mongo/idl/idl_parser.h"
@@ -128,8 +115,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <future>
-#include <iterator>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -498,13 +485,8 @@ void insertTxnRecord(OperationContext* opCtx, unsigned i, DurableTxnStateEnum st
     WriteUnitOfWork wuow(opCtx);
     auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     ASSERT(coll);
-    OpDebug* const nullOpDebug = nullptr;
     // TODO(SERVER-103411): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    ASSERT_OK(collection_internal::insertDocument(opCtx,
-                                                  CollectionPtr::CollectionPtr_UNSAFE(coll),
-                                                  InsertStatement(record.toBSON()),
-                                                  nullOpDebug,
-                                                  false));
+    ASSERT_OK(Helpers::insert(opCtx, CollectionPtr::CollectionPtr_UNSAFE(coll), record.toBSON()));
     wuow.commit();
 }
 }  // namespace
@@ -5355,9 +5337,13 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
         AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx());
         ASSERT(db);
+        auto acquisition = acquireCollection(
+            opCtx(),
+            CollectionAcquisitionRequest::fromOpCtx(opCtx(), nss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        ASSERT(acquisition.exists());
+        auto& coll = acquisition.getCollectionPtr();
         WriteUnitOfWork wuow(opCtx());
-        auto coll = CollectionCatalog::get(opCtx())->lookupCollectionByNamespace(opCtx(), nss);
-        ASSERT(coll);
         auto cursor = coll->getCursor(opCtx());
         while (auto record = cursor->next()) {
             auto bson = record.value().data.toBson();
@@ -5366,13 +5352,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
             }
 
             if (bson["startOpTime"]["ts"].timestamp() == ts) {
-                // TODO(SERVER-103411): Investigate usage validity of
-                // CollectionPtr::CollectionPtr_UNSAFE
-                collection_internal::deleteDocument(opCtx(),
-                                                    CollectionPtr::CollectionPtr_UNSAFE(coll),
-                                                    kUninitializedStmtId,
-                                                    record->id,
-                                                    nullptr);
+                Helpers::deleteByRid(opCtx(), acquisition, record->id);
                 wuow.commit();
                 return;
             }
@@ -6864,8 +6844,6 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     DurableHistoryRegistry::set(opCtx->getServiceContext(),
                                 std::make_unique<DurableHistoryRegistry>());
 
-    OpDebug* const nullOpDbg = nullptr;
-
     dynamic_cast<repl::ReplicationCoordinatorMock*>(repl::ReplicationCoordinator::get(opCtx))
         ->setUpdateCommittedSnapshot(false);
     // Initiate the term from 0 to 1 for familiarity.
@@ -6893,23 +6871,17 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
     const std::vector<repl::SplitSessionInfo>& splitSessions = splitPrepareManager->splitSession(
         opCtx->getLogicalSessionId().get(), opCtx->getTxnNumber().get(), requesterIds);
     // Insert an `_id: 1` document.
-    callUnderSplitSession(splitSessions[0].session, [nullOpDbg](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[0].session, [](OperationContext* opCtx) {
         auto userColl = acquireUserColl(opCtx);
         ASSERT_OK(
-            collection_internal::insertDocument(opCtx,
-                                                userColl->getCollectionPtr(),
-                                                InsertStatement(BSON("_id" << 1 << "value" << 1)),
-                                                nullOpDbg));
+            Helpers::insert(opCtx, userColl->getCollectionPtr(), BSON("_id" << 1 << "value" << 1)));
     });
 
     // Insert an `_id: 2` document.
-    callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[1].session, [](OperationContext* opCtx) {
         auto userColl = acquireUserColl(opCtx);
         ASSERT_OK(
-            collection_internal::insertDocument(opCtx,
-                                                userColl->getCollectionPtr(),
-                                                InsertStatement(BSON("_id" << 2 << "value" << 1)),
-                                                nullOpDbg));
+            Helpers::insert(opCtx, userColl->getCollectionPtr(), BSON("_id" << 2 << "value" << 1)));
     });
 
     // Mimic the methods to call for a secondary performing a split prepare. Those are called inside
@@ -6971,11 +6943,9 @@ TEST_F(TxnParticipantTest, AbortSplitPreparedTransaction) {
 
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_DOES_NOT_THROW(auto _ = collection_internal::insertDocument(
-                                  opCtx,
-                                  userColl->getCollectionPtr(),
-                                  InsertStatement(BSON("_id" << 1 << "value" << 1)),
-                                  nullOpDbg));
+        ASSERT_DOES_NOT_THROW(auto _ = Helpers::insert(opCtx,
+                                                       userColl->getCollectionPtr(),
+                                                       BSON("_id" << 1 << "value" << 1)));
         wuow.commit();
     }
 
@@ -7044,8 +7014,6 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     DurableHistoryRegistry::set(opCtx->getServiceContext(),
                                 std::make_unique<DurableHistoryRegistry>());
 
-    OpDebug* const nullOpDbg = nullptr;
-
     dynamic_cast<repl::ReplicationCoordinatorMock*>(repl::ReplicationCoordinator::get(opCtx))
         ->setUpdateCommittedSnapshot(false);
     // Initiate the term from 0 to 1 for familiarity.
@@ -7075,28 +7043,22 @@ TEST_F(TxnParticipantTest, CommitSplitPreparedTransaction) {
     const auto& splitSessions = splitPrepareManager->splitSession(
         opCtx->getLogicalSessionId().get(), opCtx->getTxnNumber().get(), requesterIds);
     // Insert an `_id: 1` document.
-    callUnderSplitSession(splitSessions[0].session, [nullOpDbg](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[0].session, [](OperationContext* opCtx) {
         auto userColl = acquireUserColl(opCtx);
         ASSERT_OK(
-            collection_internal::insertDocument(opCtx,
-                                                userColl->getCollectionPtr(),
-                                                InsertStatement(BSON("_id" << 1 << "value" << 1)),
-                                                nullOpDbg));
+            Helpers::insert(opCtx, userColl->getCollectionPtr(), BSON("_id" << 1 << "value" << 1)));
     });
 
     // Insert an `_id: 2` document.
-    callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[1].session, [](OperationContext* opCtx) {
         auto userColl = acquireUserColl(opCtx);
         ASSERT_OK(
-            collection_internal::insertDocument(opCtx,
-                                                userColl->getCollectionPtr(),
-                                                InsertStatement(BSON("_id" << 2 << "value" << 1)),
-                                                nullOpDbg));
+            Helpers::insert(opCtx, userColl->getCollectionPtr(), BSON("_id" << 2 << "value" << 1)));
     });
 
     // Update `2` to increment its `value` to 2. This must be done in the same split session as the
     // insert.
-    callUnderSplitSession(splitSessions[1].session, [nullOpDbg](OperationContext* opCtx) {
+    callUnderSplitSession(splitSessions[1].session, [](OperationContext* opCtx) {
         auto userColl = acquireUserColl(opCtx);
         Helpers::update(opCtx, *userColl, BSON("_id" << 2), BSON("$inc" << BSON("value" << 1)));
     });

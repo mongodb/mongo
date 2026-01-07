@@ -30,8 +30,8 @@
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -155,23 +155,15 @@ protected:
         CatalogTestFixture::tearDown();
     }
 
-    void insertDocuments(const NamespaceString& nss, std::vector<BSONObj> docs) {
-        std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-
+    void insertDocuments(const NamespaceString& nss, std::span<BSONObj> docs) {
         const auto coll = acquireCollection(
             operationContext(),
             CollectionAcquisitionRequest::fromOpCtx(
                 operationContext(), nss, AcquisitionPrerequisites::OperationType::kWrite),
             MODE_IX);
-        {
-            WriteUnitOfWork wuow{operationContext()};
-            ASSERT_OK(collection_internal::insertDocuments(operationContext(),
-                                                           coll.getCollectionPtr(),
-                                                           inserts.begin(),
-                                                           inserts.end(),
-                                                           nullptr /* opDebug */));
-            wuow.commit();
-        }
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(), coll.getCollectionPtr(), docs));
+        wuow.commit();
     }
 
     std::pair<boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline>,

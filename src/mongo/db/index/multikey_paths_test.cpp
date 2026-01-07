@@ -30,7 +30,6 @@
 #include "mongo/db/index/multikey_paths.h"
 
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -39,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
@@ -60,7 +60,6 @@
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
 
 #include <memory>
@@ -168,12 +167,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreation) {
         invariant(collection);
 
         WriteUnitOfWork wuow(_opCtx.get());
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx.get(),
-            *collection,
-            InsertStatement(BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3))),
-            nullOpDebug));
+        ASSERT_OK(Helpers::insert(_opCtx.get(),
+                                  *collection,
+                                  BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3))));
         wuow.commit();
     }
 
@@ -192,17 +188,12 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnIndexCreationWithMultipleDocuments) {
         invariant(collection);
 
         WriteUnitOfWork wuow(_opCtx.get());
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx.get(),
-            *collection,
-            InsertStatement(BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3))),
-            nullOpDebug));
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx.get(),
-            *collection,
-            InsertStatement(BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2 << 3) << "b" << 5)),
-            nullOpDebug));
+        ASSERT_OK(Helpers::insert(_opCtx.get(),
+                                  *collection,
+                                  BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3))));
+        ASSERT_OK(Helpers::insert(_opCtx.get(),
+                                  *collection,
+                                  BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2 << 3) << "b" << 5)));
         wuow.commit();
     }
 
@@ -226,12 +217,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx.get(),
-            *collection,
-            InsertStatement(BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3))),
-            nullOpDebug));
+        ASSERT_OK(Helpers::insert(_opCtx.get(),
+                                  *collection,
+                                  BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3))));
         wuow.commit();
     }
 
@@ -239,12 +227,9 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentInsert) {
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx.get(),
-            *collection,
-            InsertStatement(BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2 << 3) << "b" << 5)),
-            nullOpDebug));
+        ASSERT_OK(Helpers::insert(_opCtx.get(),
+                                  *collection,
+                                  BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2 << 3) << "b" << 5)));
         wuow.commit();
     }
 
@@ -261,9 +246,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx.get(), *collection, InsertStatement(BSON("_id" << 0 << "a" << 5)), nullOpDebug));
+        ASSERT_OK(Helpers::insert(_opCtx.get(), *collection, BSON("_id" << 0 << "a" << 5)));
         wuow.commit();
     }
 
@@ -307,9 +290,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
     auto oldDoc = BSON("_id" << 0 << "a" << 5);
     {
         WriteUnitOfWork wuow(_opCtx.get());
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx.get(), *collection, InsertStatement(oldDoc), nullOpDebug));
+        ASSERT_OK(Helpers::insert(_opCtx.get(), *collection, oldDoc));
         wuow.commit();
     }
 
@@ -355,36 +336,32 @@ TEST_F(MultikeyPathsTest, PathsNotUpdatedOnDocumentDelete) {
                 BSON("name" << "a_1_b_1"
                             << "key" << keyPattern << "v" << static_cast<int>(kIndexVersion)))
         .transitional_ignore();
-    AutoGetCollection collection(_opCtx.get(), _nss, MODE_IX);
+    auto collection = acquireCollection(_opCtx.get(),
+                                        CollectionAcquisitionRequest::fromOpCtx(
+                                            _opCtx.get(), _nss, AcquisitionPrerequisites::kWrite),
+                                        MODE_IX);
 
     {
         WriteUnitOfWork wuow(_opCtx.get());
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx.get(),
-            *collection,
-            InsertStatement(BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3))),
-            nullOpDebug));
+        ASSERT_OK(Helpers::insert(_opCtx.get(),
+                                  collection.getCollectionPtr(),
+                                  BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3))));
         wuow.commit();
     }
 
-    assertMultikeyPaths(*collection, keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(collection.getCollectionPtr(), keyPattern, {MultikeyComponents{}, {0U}});
 
     {
-        auto cursor = collection->getCursor(_opCtx.get());
+        auto cursor = collection.getCollectionPtr()->getCursor(_opCtx.get());
         auto record = cursor->next();
         invariant(record);
 
-        {
-            WriteUnitOfWork wuow(_opCtx.get());
-            OpDebug* const nullOpDebug = nullptr;
-            collection_internal::deleteDocument(
-                _opCtx.get(), *collection, kUninitializedStmtId, record->id, nullOpDebug);
-            wuow.commit();
-        }
+        WriteUnitOfWork wuow(_opCtx.get());
+        Helpers::deleteByRid(_opCtx.get(), collection, record->id);
+        wuow.commit();
     }
 
-    assertMultikeyPaths(*collection, keyPattern, {MultikeyComponents{}, {0U}});
+    assertMultikeyPaths(collection.getCollectionPtr(), keyPattern, {MultikeyComponents{}, {0U}});
 }
 
 TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
@@ -403,13 +380,10 @@ TEST_F(MultikeyPathsTest, PathsUpdatedForMultipleIndexesOnDocumentInsert) {
     AutoGetCollection collection(_opCtx.get(), _nss, MODE_IX);
     {
         WriteUnitOfWork wuow(_opCtx.get());
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection_internal::insertDocument(
+        ASSERT_OK(Helpers::insert(
             _opCtx.get(),
             *collection,
-            InsertStatement(
-                BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2 << 3) << "b" << 5 << "c" << 8)),
-            nullOpDebug));
+            BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2 << 3) << "b" << 5 << "c" << 8)));
         wuow.commit();
     }
 

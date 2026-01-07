@@ -27,26 +27,19 @@
  *    it in the license file.
  */
 
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
-#include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_options.h"
 #include "mongo/db/shard_role/shard_catalog/database.h"
-#include "mongo/db/shard_role/shard_catalog/db_raii.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/validate/collection_validation.h"
@@ -56,9 +49,7 @@
 #include "mongo/dbtests/storage_debug_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/shared_buffer_fragment.h"
 
 #include <cmath>
 #include <string>
@@ -143,12 +134,10 @@ public:
 
             // Insert documents on both collections.
             for (const auto& doc : _coll1Contents) {
-                ASSERT_OK(collection_internal::insertDocument(
-                    &_opCtx, coll1, InsertStatement(doc), /*opDebug=*/nullptr));
+                ASSERT_OK(Helpers::insert(&_opCtx, coll1, doc));
             }
             for (const auto& doc : _coll2Contents) {
-                ASSERT_OK(collection_internal::insertDocument(
-                    &_opCtx, coll2, InsertStatement(doc), /*opDebug=*/nullptr));
+                ASSERT_OK(Helpers::insert(&_opCtx, coll2, doc));
             }
             commitTransaction();
         }

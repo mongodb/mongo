@@ -31,9 +31,8 @@
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/operation_context.h"
@@ -79,13 +78,10 @@ void IndexBuildsCoordinatorTest::createCollectionWithDuplicateDocs(OperationCont
     invariant(collection.exists());
 
     // Insert some data.
-    OpDebug* const nullOpDebug = nullptr;
     for (int i = 0; i < 10; i++) {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocument(opCtx,
-                                                      collection.getCollectionPtr(),
-                                                      InsertStatement(BSON("_id" << i << "a" << 1)),
-                                                      nullOpDebug));
+        ASSERT_OK(
+            Helpers::insert(opCtx, collection.getCollectionPtr(), BSON("_id" << i << "a" << 1)));
         wuow.commit();
     }
 
@@ -294,10 +290,8 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexOnNonEmptyCollectionReplicatesIden
     {
         auto collection = getCollectionExclusive(operationContext(), nss);
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(collection_internal::insertDocument(operationContext(),
-                                                      collection.getCollectionPtr(),
-                                                      InsertStatement(BSON("_id" << 1 << "a" << 1)),
-                                                      nullptr));
+        ASSERT_OK(Helpers::insert(
+            operationContext(), collection.getCollectionPtr(), BSON("_id" << 1 << "a" << 1)));
         wuow.commit();
 
         auto indexBuildsCoord = IndexBuildsCoordinator::get(operationContext());
@@ -324,10 +318,8 @@ TEST_F(IndexBuildsCoordinatorTest, CreateIndexUsesSpecifiedIdent) {
     {
         auto collection = getCollectionExclusive(operationContext(), nss);
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(collection_internal::insertDocument(operationContext(),
-                                                      collection.getCollectionPtr(),
-                                                      InsertStatement(BSON("_id" << 1 << "a" << 1)),
-                                                      nullptr));
+        ASSERT_OK(Helpers::insert(
+            operationContext(), collection.getCollectionPtr(), BSON("_id" << 1 << "a" << 1)));
         wuow.commit();
 
         auto storageEngine = operationContext()->getServiceContext()->getStorageEngine();
@@ -519,10 +511,8 @@ TEST_F(IndexBuildsCoordinatorTest, StartIndexBuildOnNonEmptyCollectionReplicates
         auto collection = getCollectionExclusive(operationContext(), nss);
 
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(collection_internal::insertDocument(operationContext(),
-                                                      collection.getCollectionPtr(),
-                                                      InsertStatement(BSON("_id" << 1 << "a" << 1)),
-                                                      nullptr));
+        ASSERT_OK(Helpers::insert(
+            operationContext(), collection.getCollectionPtr(), BSON("_id" << 1 << "a" << 1)));
         wuow.commit();
 
         return collection.uuid();
@@ -585,8 +575,7 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
     auto twoPhaseUUID = [&] {
         auto collection = getCollectionExclusive(opCtx, twoPhaseNss);
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocument(
-            opCtx, collection.getCollectionPtr(), InsertStatement(BSON("_id" << 1)), nullptr));
+        ASSERT_OK(Helpers::insert(opCtx, collection.getCollectionPtr(), BSON("_id" << 1)));
         wuow.commit();
         return collection.uuid();
     }();
@@ -594,8 +583,7 @@ TEST_F(IndexBuildsCoordinatorTest, StepUpPrimaryDrivenAbortsOnlyTwoPhaseBuilds) 
     auto singlePhaseUUID = [&] {
         auto collection = getCollectionExclusive(opCtx, singlePhaseNss);
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocument(
-            opCtx, collection.getCollectionPtr(), InsertStatement(BSON("_id" << 1)), nullptr));
+        ASSERT_OK(Helpers::insert(opCtx, collection.getCollectionPtr(), BSON("_id" << 1)));
         wuow.commit();
         return collection.uuid();
     }();

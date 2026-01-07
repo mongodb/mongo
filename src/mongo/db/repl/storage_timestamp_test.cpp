@@ -2728,11 +2728,7 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
     {
         RecordId badRecord = Helpers::findOne(_opCtx, collectionAcquisition, BSON("_id" << 1));
         WriteUnitOfWork wuow(_opCtx);
-        collection_internal::deleteDocument(_opCtx,
-                                            collectionAcquisition.getCollectionPtr(),
-                                            kUninitializedStmtId,
-                                            badRecord,
-                                            nullptr);
+        Helpers::deleteByRid(_opCtx, collectionAcquisition, badRecord);
         wuow.commit();
     }
 

@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/matcher/matcher.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
@@ -74,8 +75,6 @@ void initializeSamplingEstimator(DataConfiguration& configuration,
 void SamplingEstimatorTest::insertDocuments(const NamespaceString& nss,
                                             const std::vector<BSONObj> docs,
                                             int batchSize) {
-    std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-
     const auto coll = acquireCollection(
         operationContext(),
         CollectionAcquisitionRequest(nss,
@@ -83,27 +82,17 @@ void SamplingEstimatorTest::insertDocuments(const NamespaceString& nss,
                                      repl::ReadConcernArgs::get(operationContext()),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
-    {
-        size_t currentInsertion = 0;
-        while (currentInsertion < inserts.size()) {
-            WriteUnitOfWork wuow{operationContext()};
+    for (size_t currentInsertion = 0; currentInsertion < docs.size();) {
+        WriteUnitOfWork wuow{operationContext()};
 
-            int insertionsBeforeCommit = 0;
-            while (true) {
-                ASSERT_OK(collection_internal::insertDocument(operationContext(),
-                                                              coll.getCollectionPtr(),
-                                                              inserts[currentInsertion],
-                                                              nullptr /* opDebug */));
-                insertionsBeforeCommit++;
-                currentInsertion++;
-
-                if (insertionsBeforeCommit > batchSize || currentInsertion == inserts.size()) {
-                    insertionsBeforeCommit = 0;
-                    break;
-                }
-            }
-            wuow.commit();
+        int insertionsBeforeCommit = 0;
+        while (insertionsBeforeCommit <= batchSize && currentInsertion < docs.size()) {
+            ASSERT_OK(Helpers::insert(
+                operationContext(), coll.getCollectionPtr(), docs[currentInsertion]));
+            insertionsBeforeCommit++;
+            currentInsertion++;
         }
+        wuow.commit();
     }
 }
 
@@ -209,8 +198,6 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
         wunit.commit();
     });
 
-    std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-
     auto coll = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(nss,
@@ -218,12 +205,9 @@ void createCollAndInsertDocuments(OperationContext* opCtx,
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kWrite),
         MODE_IX);
-    {
-        WriteUnitOfWork wuow{opCtx};
-        ASSERT_OK(collection_internal::insertDocuments(
-            opCtx, coll.getCollectionPtr(), inserts.begin(), inserts.end(), nullptr /* opDebug */));
-        wuow.commit();
-    }
+    WriteUnitOfWork wuow{opCtx};
+    ASSERT_OK(Helpers::insert(opCtx, coll.getCollectionPtr(), docs));
+    wuow.commit();
 }
 
 int evaluateMatchExpressionAgainstDataWithLimit(const std::unique_ptr<MatchExpression> expr,

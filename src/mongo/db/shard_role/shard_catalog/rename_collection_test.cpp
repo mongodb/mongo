@@ -38,8 +38,8 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
@@ -591,9 +591,7 @@ void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const 
                                 << nss.toStringForErrorMsg() << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx);
-        OpDebug* const opDebug = nullptr;
-        ASSERT_OK(
-            collection_internal::insertDocument(opCtx, *collection, InsertStatement(doc), opDebug));
+        ASSERT_OK(Helpers::insert(opCtx, *collection, doc));
         wuow.commit();
     });
 }

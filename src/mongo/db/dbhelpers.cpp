@@ -36,8 +36,8 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
@@ -54,6 +54,7 @@
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -69,7 +70,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -332,17 +332,31 @@ void Helpers::update(OperationContext* opCtx,
     ::mongo::update(opCtx, coll, request);
 }
 
-Status Helpers::insert(OperationContext* opCtx,
-                       const CollectionAcquisition& coll,
-                       const BSONObj& doc) {
+Status Helpers::insert(OperationContext* opCtx, const CollectionPtr& coll, const BSONObj& doc) {
     AutoStatsTracker statsTracker(opCtx,
-                                  coll.nss(),
+                                  coll->ns(),
                                   Top::LockType::WriteLocked,
                                   AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                   DatabaseProfileSettings::get(opCtx->getServiceContext())
-                                      .getDatabaseProfileLevel(coll.nss().dbName()));
-    return collection_internal::insertDocument(
-        opCtx, coll.getCollectionPtr(), InsertStatement{doc}, &CurOp::get(opCtx)->debug());
+                                      .getDatabaseProfileLevel(coll->ns().dbName()));
+    std::vector<InsertStatement> inserts;
+    inserts.emplace_back(doc);
+    return collection_internal::insertDocuments(
+        opCtx, coll, inserts.begin(), inserts.end(), &CurOp::get(opCtx)->debug(), false);
+}
+
+Status Helpers::insert(OperationContext* opCtx,
+                       const CollectionPtr& coll,
+                       std::span<const BSONObj> docs) {
+    AutoStatsTracker statsTracker(opCtx,
+                                  coll->ns(),
+                                  Top::LockType::WriteLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(coll->ns().dbName()));
+    std::vector<InsertStatement> inserts(docs.begin(), docs.end());
+    return collection_internal::insertDocuments(
+        opCtx, coll, inserts.begin(), inserts.end(), &CurOp::get(opCtx)->debug(), false);
 }
 
 void Helpers::deleteByRid(OperationContext* opCtx,

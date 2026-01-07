@@ -29,9 +29,10 @@
 
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
@@ -68,8 +69,7 @@ TEST_F(TimeseriesWriteOpsTest, PerformAtomicTimeseriesWritesWithTransform) {
         _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *bucketsColl, InsertStatement{compressedBucket}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, compressedBucket));
         wunit.commit();
     }
 

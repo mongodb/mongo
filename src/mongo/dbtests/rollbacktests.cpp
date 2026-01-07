@@ -33,8 +33,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -134,13 +134,8 @@ Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
 
 void insertRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
     auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-    OpDebug* const nullOpDebug = nullptr;
     // TODO(SERVER-103411): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    ASSERT_OK(collection_internal::insertDocument(opCtx,
-                                                  CollectionPtr::CollectionPtr_UNSAFE(coll),
-                                                  InsertStatement(data),
-                                                  nullOpDebug,
-                                                  false));
+    ASSERT_OK(Helpers::insert(opCtx, CollectionPtr::CollectionPtr_UNSAFE(coll), data));
 }
 
 void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {

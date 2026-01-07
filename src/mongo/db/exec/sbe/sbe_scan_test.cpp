@@ -33,7 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/generic_scan.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -56,15 +56,10 @@ namespace mongo::sbe {
 class ScanStageTest : public PlanStageTestFixture {
 public:
     void insertDocuments(const std::vector<BSONObj>& docs) {
-        std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-
         AutoGetCollection agc(operationContext(), _nss, LockMode::MODE_IX);
-        {
-            WriteUnitOfWork wuow{operationContext()};
-            ASSERT_OK(collection_internal::insertDocuments(
-                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
-            wuow.commit();
-        }
+        WriteUnitOfWork wuow{operationContext()};
+        ASSERT_OK(Helpers::insert(operationContext(), *agc, docs));
+        wuow.commit();
     }
 
     MultipleCollectionAccessor createCollection(const std::vector<BSONObj>& docs,

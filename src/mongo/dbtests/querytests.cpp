@@ -220,23 +220,16 @@ protected:
 
     void insert(const BSONObj& o) {
         WriteUnitOfWork wunit(&_opCtx);
-        OpDebug* const nullOpDebug = nullptr;
         if (o["_id"].eoo()) {
             BSONObjBuilder b;
             OID oid;
             oid.init();
             b.appendOID("_id", &oid);
             b.appendElements(o);
-            collection_internal::insertDocument(&_opCtx,
-                                                _collection->getCollectionPtr(),
-                                                InsertStatement(b.obj()),
-                                                nullOpDebug,
-                                                false)
+            Helpers::insert(&_opCtx, _collection->getCollectionPtr(), b.obj())
                 .transitional_ignore();
         } else {
-            collection_internal::insertDocument(
-                &_opCtx, _collection->getCollectionPtr(), InsertStatement(o), nullOpDebug, false)
-                .transitional_ignore();
+            Helpers::insert(&_opCtx, _collection->getCollectionPtr(), o).transitional_ignore();
         }
         wunit.commit();
     }

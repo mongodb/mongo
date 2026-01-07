@@ -34,8 +34,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/classic/index_scan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/exec/classic/working_set.h"
@@ -103,10 +103,8 @@ public:
 
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
-        OpDebug* const nullOpDebug = nullptr;
         // TODO(SERVER-103403): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-        ASSERT_OK(collection_internal::insertDocument(
-            &_opCtx, _collection->getCollectionPtr(), InsertStatement(doc), nullOpDebug, false));
+        ASSERT_OK(Helpers::insert(&_opCtx, _collection->getCollectionPtr(), doc));
         wunit.commit();
     }
 
