@@ -67,8 +67,12 @@ export class CollectionValidator {
                                 currHashes[db][coll].all,
                                 "Collection hashes are different for " + db + "." + coll,
                             );
-                            // Skip metadata for config.transactions, and for multiversion tests. Multiversion tests can have different fields in their indexes due to fields removed in newer versions.
-                            if (isMultiversion || (db == "config" && coll == "transactions")) {
+                            // Skip collections that are not explicitly replicated, tests running initial sync, and for multiversion tests. The collections are not guaranteed to have the same idents for these cases.
+                            if (
+                                TestData.isRunningInitialSync ||
+                                isMultiversion ||
+                                (db == "config" && coll == "transactions")
+                            ) {
                                 return;
                             }
                             assert.eq(

@@ -102,7 +102,7 @@ public:
                              ValidateResults* results,
                              ValidationVersion validationVersion);
     /**
-     * Computes the hash of the collection's local catalog entry and sets it in 'results'.
+     * Computes the hash of the collection's local catalog idents and sets it in 'results'.
      **/
     void computeMetadataHash(OperationContext* opCtx,
                              const CollectionPtr& coll,

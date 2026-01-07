@@ -768,29 +768,6 @@ TimeseriesValidationStatus _validateTimeSeriesBucketRecord(OperationContext* opC
 
     return {TimeseriesValidationResult::kValid, ""};
 }
-
-// Computes the hash of 'md' field by XORing the hash of subfields with 'metadataHash'. For
-// 'indexes' subfield, uses the hash of each entries without the array index.
-void computeMDHash(const BSONObj& mdField, SHA256Block& metadataHash) {
-    for (const auto& field : mdField) {
-        if (field.fieldNameStringData() == "indexes") {
-            for (const auto& indexField : field.Obj()) {
-                // The multikey fields are not guaranteed to be consistent across different nodes.
-                // Some issues that can cause inconsistent multikey fields:
-                //  * Aborted multi-doc transaction with writes that set multikey fields.
-                //  * Initial syncing from a collection with multikey set but no longer has data
-                //    that sets multikey fields.
-                const auto& filteredIndexField =
-                    indexField.Obj().removeFields({"multikey", "multikeyPaths"});
-                metadataHash.xorInline(SHA256Block::computeHash(
-                    {ConstDataRange(filteredIndexField.objdata(), filteredIndexField.objsize())}));
-            }
-        } else {
-            metadataHash.xorInline(
-                SHA256Block::computeHash({ConstDataRange(field.rawdata(), field.size())}));
-        }
-    }
-}
 }  // namespace
 
 Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
@@ -931,14 +908,16 @@ void ValidateAdaptor::computeMetadataHash(OperationContext* opCtx,
     metadataHash.xorInline(metadataHash);
     for (const auto& field : catalogEntry) {
         auto fieldName = field.fieldNameStringData();
-        if (fieldName == "ident" || fieldName == "idxIdent") {
-            continue;
-        }
-        if (fieldName == "md") {
-            computeMDHash(field.Obj(), metadataHash);
-        } else {
+        if (fieldName == "ident") {
             metadataHash.xorInline(
                 SHA256Block::computeHash({ConstDataRange(field.rawdata(), field.size())}));
+        }
+        if (fieldName == "idxIdent") {
+            // XOR the hashes of subfields with 'metadataHash'.
+            for (const auto& idxField : field.Obj()) {
+                metadataHash.xorInline(SHA256Block::computeHash(
+                    {ConstDataRange(idxField.rawdata(), idxField.size())}));
+            }
         }
     }
     results->setMetadataHash(metadataHash.toHexString());

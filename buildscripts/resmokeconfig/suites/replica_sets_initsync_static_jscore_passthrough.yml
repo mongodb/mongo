@@ -32,6 +32,9 @@ executor:
   config:
     shell_options:
       eval: "globalThis.testingReplication = true;"
+      global_vars:
+        TestData:
+          isRunningInitialSync: true
   hooks:
     - class: IntermediateInitialSync
       n: *run_hook_interval

@@ -71,6 +71,8 @@ import {waitForState} from "jstests/replsets/rslib.js";
  *     set. Ignored if 'replSet' is provided.
  */
 export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
+    TestData.isRunningInitialSync = true;
+
     const State = {
         kStopped: "kStopped",
         kRollbackOps: "kRollbackOps",
