@@ -167,8 +167,8 @@ public:
         }
 
         std::unique_ptr<LiteParsedDocumentSource> clone() const override {
-            // TODO SERVER-115949.
-            MONGO_UNREACHABLE_TASSERT(11550300);
+            return std::make_unique<LiteParsedExpandable>(
+                getOriginalBson(), _parseNode->clone(), _nss, _options);
         }
 
     private:
@@ -277,8 +277,8 @@ public:
         }
 
         std::unique_ptr<LiteParsedDocumentSource> clone() const override {
-            // TODO SERVER-115949.
-            MONGO_UNREACHABLE_TASSERT(11550301);
+            return std::make_unique<LiteParsedExpanded>(
+                getParseTimeName(), _astNode->clone(), _nss);
         }
 
     private:
