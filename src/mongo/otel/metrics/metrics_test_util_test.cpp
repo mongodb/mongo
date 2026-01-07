@@ -73,13 +73,8 @@ TEST_F(OtelMetricsCapturerTest, HistogramWrongValueTypeThrowsException) {
 TEST_F(OtelMetricsCapturerTest, CounterWrongValueTypeThrowsException) {
     OtelMetricsCapturer metricsCapturer;
     auto& metricsService = MetricsService::get(getServiceContext());
-    Counter<int64_t>* int64Counter = metricsService.createInt64Counter(
-        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-    Counter<double>* doubleCounter = metricsService.createDoubleCounter(
-        MetricNames::kTest2, "description2", MetricUnit::kSeconds);
-    // A value must be added for the counter to be initialized in the underlying metrics exporter.
-    int64Counter->add(1);
-    doubleCounter->add(1.0);
+    metricsService.createInt64Counter(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    metricsService.createDoubleCounter(MetricNames::kTest2, "description2", MetricUnit::kSeconds);
 
     // Reading an int64 counter as a double counter should throw TypeMismatch.
     ASSERT_THROWS_CODE(metricsCapturer.readDoubleCounter(MetricNames::kTest1),
