@@ -998,6 +998,7 @@ error_codes:
       categories: [RetriableError],
       extra: IFRFlagRetryInfo,
     }
+  - {code: 480, name: UnrecognizedIFRFlag}
 
   # Error codes 4000-8999 are reserved.
 

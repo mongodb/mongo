@@ -70,6 +70,12 @@ struct LiteParserOptions {
     // to use foreign db syntax for $lookup beyond the exempted internal collections during lite
     // parsing since lite parsing doesn't have an expressionContext.
     bool allowGenericForeignDbLookup = false;
+
+    // Optional IFR context to use for parser selection. When provided, parser selection will use
+    // per-request flag values from this context instead of querying the flag directly. This ensures
+    // consistent parser selection across the query execution, especially when flag values are
+    // modified mid-query.
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr;
 };
 
 namespace exec::agg {
@@ -222,7 +228,8 @@ public:
      */
     class LiteParserRegistration {
     public:
-        const LiteParserInfo& getParserInfo() const;
+        const LiteParserInfo& getParserInfo(
+            const LiteParserOptions& options = LiteParserOptions{}) const;
 
         void setPrimaryParser(LiteParserInfo&& lpi);
 

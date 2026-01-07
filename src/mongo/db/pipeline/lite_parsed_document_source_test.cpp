@@ -77,6 +77,22 @@ protected:
         ASSERT_EQ(parserInfo.allowedWithClientType, AllowedWithClientType::kInternal);
     }
 
+    std::pair<LiteParsedDocumentSource::LiteParserRegistration, LiteParserOptions>
+    makeRegistrationWithOptions(IncrementalRolloutFeatureFlag& mockFlag,
+                                const boost::optional<bool> ifrFlagValue = boost::none) {
+        LiteParsedDocumentSource::LiteParserRegistration registration;
+        mockFlag.registerFlag();
+        registration.setFallbackParser(std::move(fallbackParser), &mockFlag);
+        registration.setPrimaryParser(std::move(primaryParser));
+        LiteParserOptions options;
+        if (ifrFlagValue) {
+            std::vector<BSONObj> flagValues{
+                BSON("name" << mockFlag.getName() << "value" << *ifrFlagValue)};
+            options.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+        }
+        return {std::move(registration), std::move(options)};
+    }
+
     LiteParsedDocumentSource::LiteParserInfo primaryParser;
     LiteParsedDocumentSource::LiteParserInfo fallbackParser;
 };
@@ -151,6 +167,36 @@ TEST_F(LiteParserRegistrationTest, GetParserWithChangingFeatureFlag) {
     // Disable it and check that the fallback parser is chosen.
     mockFlag.setForServerParameter(false);
     assertParserIsFallback(registration.getParserInfo());
+}
+
+TEST_F(LiteParserRegistrationTest, GetParserWithIfrContextFlagEnabled) {
+    static IncrementalRolloutFeatureFlag mockFlag(
+        "testFlag1"_sd, RolloutPhase::inDevelopment, false);
+    const auto& [registration, options] = makeRegistrationWithOptions(mockFlag, true);
+
+    // Should return primary parser because ifrContext overrides to enabled.
+    const auto& parserInfo = registration.getParserInfo(options);
+    assertParserIsPrimary(parserInfo);
+}
+
+TEST_F(LiteParserRegistrationTest, GetParserWithIfrContextFlagDisabled) {
+    static IncrementalRolloutFeatureFlag mockFlag(
+        "testFlag2"_sd, RolloutPhase::inDevelopment, true);
+    const auto& [registration, options] = makeRegistrationWithOptions(mockFlag, false);
+
+    // Should return fallback parser because ifrContext overrides to disabled.
+    const auto& parserInfo = registration.getParserInfo(options);
+    assertParserIsFallback(parserInfo);
+}
+
+TEST_F(LiteParserRegistrationTest, GetParserWithEmptyIfrContextFlag) {
+    static IncrementalRolloutFeatureFlag mockFlag(
+        "testFlag3"_sd, RolloutPhase::inDevelopment, true);
+    const auto& [registration, options] = makeRegistrationWithOptions(mockFlag);
+
+    // Should use checkEnabled() and return fallback parser.
+    const auto& parserInfo = registration.getParserInfo(options);
+    assertParserIsPrimary(parserInfo);
 }
 
 class LiteParsedDocumentSourceParseTest : public unittest::Test {

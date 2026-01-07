@@ -61,7 +61,8 @@ StringSet metricsAlreadyRegistered;
 }  // namespace
 
 const LiteParsedDocumentSource::LiteParserInfo&
-LiteParsedDocumentSource::LiteParserRegistration::getParserInfo() const {
+LiteParsedDocumentSource::LiteParserRegistration::getParserInfo(
+    const LiteParserOptions& options) const {
     // If no fallback is set, use the primary parser. This is the standard case for most stages.
     if (!_fallbackIsSet) {
         tassert(11395400, "Primary parser must be set if no fallback parser exists", _primaryIsSet);
@@ -77,12 +78,19 @@ LiteParsedDocumentSource::LiteParserRegistration::getParserInfo() const {
     }
 
     // Both a primary and fallback parser have been set. Check the value of the associated feature
-    // flag to evaluate which parser we should use.
-    if (_primaryParserFeatureFlag == nullptr || _primaryParserFeatureFlag->checkEnabled()) {
-        return _primaryParser;
-    } else {
-        return _fallbackParser;
-    }
+    // flag, prioritizing per-request IFR flag values (from IFRContext) to ensure consistent view of
+    // flag value across query execution.
+    const bool isFeatureEnabled = [&]() -> bool {
+        if (_primaryParserFeatureFlag == nullptr) {
+            return true;
+        }
+        if (options.ifrContext) {
+            return options.ifrContext->getSavedFlagValue(*_primaryParserFeatureFlag);
+        }
+        return _primaryParserFeatureFlag->checkEnabled();
+    }();
+
+    return isFeatureEnabled ? _primaryParser : _fallbackParser;
 }
 
 void LiteParsedDocumentSource::LiteParserRegistration::setPrimaryParser(LiteParserInfo&& lpi) {
@@ -197,7 +205,7 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    auto lpInfo = it->second.getParserInfo();
+    auto lpInfo = it->second.getParserInfo(options);
     auto lpds = lpInfo.parser(nss, specElem, options);
     lpds->setApiStrict(lpInfo.allowedWithApiStrict);
     lpds->setClientType(lpInfo.allowedWithClientType);

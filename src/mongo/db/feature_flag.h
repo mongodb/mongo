@@ -447,6 +447,14 @@ private:
  */
 class IncrementalFeatureRolloutContext {
 public:
+    IncrementalFeatureRolloutContext() = default;
+
+    /**
+     * Construct an IFRContext using flag values from a request. This is used on the shard side to
+     * update the IFRContext with flag values received from the router.
+     */
+    IncrementalFeatureRolloutContext(std::span<const BSONObj> flags);
+
     /**
      * Returns the saved value of a feature flag when there is one or queries the flag via
      * 'checkEnabled()' and saves its value when there is not.
@@ -465,6 +473,9 @@ public:
      * aggregate command, with the value of a previously-enabled IFR flag disabled.
      */
     void disableFlag(IncrementalRolloutFeatureFlag& flag);
+
+    std::vector<BSONObj> serializeFlagValues(
+        const std::vector<IncrementalRolloutFeatureFlag*>& flags);
 
 private:
     absl::flat_hash_map<const IncrementalRolloutFeatureFlag*, bool> _savedFlagValues;

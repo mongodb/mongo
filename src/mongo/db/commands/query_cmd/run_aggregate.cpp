@@ -1308,8 +1308,14 @@ Status runAggregate(
     boost::optional<ExplainOptions::Verbosity> verbosity,
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
-        usedExternalDataSources) {
-
+        usedExternalDataSources,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+    // Creates or passes IFRContext for the aggregation, which will be shared among the root
+    // ExpressionContext and any child ExpressionContexts that are created, for example, as part
+    // of sub-pipeline execution.
+    if (ifrContext == nullptr) {
+        ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+    }
     auto body = [&]() {
         auto aggExState = std::make_unique<AggExState>(opCtx,
                                                        request,
@@ -1317,7 +1323,8 @@ Status runAggregate(
                                                        cmdObj,
                                                        privileges,
                                                        usedExternalDataSources,
-                                                       verbosity);
+                                                       verbosity,
+                                                       std::move(ifrContext));
 
         // NOTE: It's possible this aggExState will be unusable by the time _runAggregate returns.
         auto status = _runAggregate(std::move(aggExState), result);

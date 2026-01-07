@@ -172,7 +172,13 @@ public:
               _request(request),
               _dbName(aggregationRequest.getDbName()),
               _aggregationRequest(std::move(aggregationRequest)),
-              _liteParsedPipeline(_aggregationRequest),
+              _ifrContext([&]() {
+                  if (const auto& requestFlagValues = _aggregationRequest.getIfrFlags()) {
+                      return std::make_shared<IncrementalFeatureRolloutContext>(*requestFlagValues);
+                  }
+                  return std::make_shared<IncrementalFeatureRolloutContext>();
+              }()),
+              _liteParsedPipeline(_aggregationRequest, false, {.ifrContext = _ifrContext}),
               _privileges(std::move(privileges)) {
             auto externalDataSources = _aggregationRequest.getExternalDataSources();
             // Support collection-less aggregate commands without $_externalDataSources.
@@ -288,7 +294,8 @@ public:
                                          _privileges,
                                          verbosity,
                                          reply,
-                                         _usedExternalDataSources));
+                                         _usedExternalDataSources,
+                                         _ifrContext));
 
             // The aggregate command's response is unstable when 'explain' or 'exchange' fields are
             // set.
@@ -321,7 +328,8 @@ public:
                                          _privileges,
                                          verbosity,
                                          result,
-                                         _usedExternalDataSources));
+                                         _usedExternalDataSources,
+                                         _ifrContext));
         }
 
         bool canRetryOnStaleShardMetadataError(const OpMsgRequest& opMsgRequest) const override {
@@ -354,6 +362,12 @@ public:
         const OpMsgRequest& _request;
         const DatabaseName _dbName;
         AggregateCommandRequest _aggregationRequest;
+        // Store the IFR context as a shared pointer. This object is mutable while running the
+        // command. It must be shared because commands with subpipelines pass the same IFR context
+        // in to child subpipeline expression contexts, rather than copying it. We want to ensure
+        // that a consistent and single IFR context is used across the entirety of query processing,
+        // including in child subpipelines.
+        std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext;
         const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;
         std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>

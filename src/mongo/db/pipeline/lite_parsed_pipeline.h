@@ -67,10 +67,12 @@ public:
      * validation happens later, during Pipeline construction.
      */
     LiteParsedPipeline(const AggregateCommandRequest& request,
-                       const bool isRunningAgainstView_ForHybridSearch = false)
-        : LiteParsedPipeline(
-              request.getNamespace(), request.getPipeline(), isRunningAgainstView_ForHybridSearch) {
-    }
+                       const bool isRunningAgainstView_ForHybridSearch = false,
+                       const LiteParserOptions& options = LiteParserOptions{})
+        : LiteParsedPipeline(request.getNamespace(),
+                             request.getPipeline(),
+                             isRunningAgainstView_ForHybridSearch,
+                             options) {}
     /**
      * Constructs a LiteParsedPipeline from the raw BSON stages in 'pipelineStages'.
      *

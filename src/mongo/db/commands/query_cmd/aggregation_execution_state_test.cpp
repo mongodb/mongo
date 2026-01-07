@@ -235,7 +235,8 @@ protected:
                                             _cmdObj,
                                             _privileges,
                                             _externalSources,
-                                            boost::none /* verbosity */);
+                                            boost::none /* verbosity */,
+                                            _ifrContext);
     }
 
     /**
@@ -261,7 +262,8 @@ protected:
                                             _cmdObj,
                                             _privileges,
                                             _externalSources,
-                                            boost::none /* verbosity */);
+                                            boost::none /* verbosity */,
+                                            _ifrContext);
     }
 
     /**
@@ -290,7 +292,8 @@ protected:
                                                        _cmdObj,
                                                        _privileges,
                                                        _externalSources,
-                                                       boost::none /* verbosity */);
+                                                       boost::none /* verbosity */,
+                                                       _ifrContext);
 
         return aggExState;
     }
@@ -318,7 +321,8 @@ protected:
                                             _cmdObj,
                                             _privileges,
                                             _externalSources,
-                                            boost::none /* verbosity */);
+                                            boost::none /* verbosity */,
+                                            _ifrContext);
     }
 
 private:
@@ -327,6 +331,8 @@ private:
     PrivilegeVector _privileges;
     BSONObj _cmdObj;
     std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>> _externalSources;
+    std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext =
+        std::make_shared<IncrementalFeatureRolloutContext>();
     DatabaseVersion _dbVersion = {UUID::gen(), Timestamp(1, 0)};
     const DatabaseName _dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
 };

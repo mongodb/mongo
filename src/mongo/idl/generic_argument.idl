@@ -398,6 +398,13 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Records IFR flags from the router's IFRContext. This ensures consistent view of feature flag across nodes
+            # throughout the query's execution. Currently, used only in Agg command pipeline.
+            ifrFlags:
+                type: array<object_owned>
+                forward_to_shards: true
+                optional: true
+                stability: "internal"
 
     GenericReplyFields:
         description: "Fields that may appear in any command reply."
