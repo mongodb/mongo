@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/profile_settings.h"
+#include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
@@ -766,25 +767,51 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
     const auto& resolvedNamespaces = uassertStatusOK(_aggExState.resolveInvolvedNamespaces());
     auto requiresExtendedRange = requiresExtendedRangeSupportForTimeseries(resolvedNamespaces);
 
-    auto expCtx = ExpressionContextBuilder{}
-                      .fromRequest(_aggExState.getOpCtx(),
-                                   _aggExState.getRequest(),
-                                   allowDiskUseByDefault.load())
-                      .collator(std::move(collator))
-                      .collUUID(getUUID())
-                      .mongoProcessInterface(MongoProcessInterface::create(_aggExState.getOpCtx()))
-                      .mayDbProfile(CurOp::get(_aggExState.getOpCtx())->dbProfileLevel() > 0)
-                      .ns(_aggExState.hasChangeStream() ? _aggExState.getOriginalNss()
-                                                        : _aggExState.getExecutionNss())
-                      .resolvedNamespace(std::move(resolvedNamespaces))
-                      .originalNs(_aggExState.getOriginalNss())
-                      .requiresTimeseriesExtendedRangeSupport(requiresExtendedRange)
-                      .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
-                      .collationMatchesDefault(collationMatchesDefault)
-                      .canBeRejected(canPipelineBeRejected)
-                      .explain(_aggExState.getVerbosity())
-                      .ifrContext(_aggExState.getIfrContext())
-                      .build();
+
+    ExpressionContextBuilder builder;
+    builder
+        .fromRequest(_aggExState.getOpCtx(), _aggExState.getRequest(), allowDiskUseByDefault.load())
+        .collator(std::move(collator))
+        .collUUID(getUUID())
+        .mongoProcessInterface(MongoProcessInterface::create(_aggExState.getOpCtx()))
+        .mayDbProfile(CurOp::get(_aggExState.getOpCtx())->dbProfileLevel() > 0)
+        .ns(_aggExState.hasChangeStream() ? _aggExState.getOriginalNss()
+                                          : _aggExState.getExecutionNss())
+        .resolvedNamespace(std::move(resolvedNamespaces))
+        .originalNs(_aggExState.getOriginalNss())
+        .requiresTimeseriesExtendedRangeSupport(requiresExtendedRange)
+        .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
+        .collationMatchesDefault(collationMatchesDefault)
+        .canBeRejected(canPipelineBeRejected)
+        .explain(_aggExState.getVerbosity())
+        .ifrContext(_aggExState.getIfrContext());
+
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
+        // Get the mainCollection and all secondary collections so that we can access the
+        // PathArrayness info in each.
+        const auto& mainColl = getCollections().getMainCollection();
+        const auto& secondaryColls = getCollections().getSecondaryCollections();
+
+        // Fetch the PathArrayness map for any secondary collections.
+        stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
+            secondaryCollsPathArrayness;
+        for (const auto& [nss, coll] : secondaryColls) {
+            if (!coll) {
+                continue;
+            }
+            secondaryCollsPathArrayness.emplace(nss,
+                                                CollectionQueryInfo::get(coll).getPathArrayness());
+        }
+
+        // TODO: SERVER-111384: When removing feature flag, we can collapse the builder into one
+        // chained call.
+        builder
+            .mainCollPathArrayness(mainColl ? CollectionQueryInfo::get(mainColl).getPathArrayness()
+                                            : nullptr)
+            .secondaryCollsPathArrayness(std::move(secondaryCollsPathArrayness));
+    }
+
+    auto expCtx = builder.build();
 
     if (_aggExState.getRequest().getIsHybridSearch()) {
         expCtx->setIsHybridSearch();

@@ -47,6 +47,15 @@ public:
     ~PathArrayness() = default;
 
     /**
+     * Returns a reference to an empty PathArrayness instance. This represents the conservative
+     * case: all field paths are treated as potentially containing arrays. This empty case may be
+     * encountered when no Collection acquisition is possible (e.g. when running on a 'mongos').
+     *
+     * The returned reference is backed by a function-local static instance of PathArrayness.
+     */
+    static const PathArrayness& emptyPathArrayness();
+
+    /**
      * Insert a path into the trie.
      */
     void addPath(const FieldPath& path, const MultikeyComponents& multikeyPath);

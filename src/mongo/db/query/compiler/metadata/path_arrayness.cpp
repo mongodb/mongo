@@ -39,6 +39,11 @@ using namespace mongo::multikey_paths;
 
 namespace mongo {
 
+const PathArrayness& PathArrayness::emptyPathArrayness() {
+    static const PathArrayness kEmptyPathArrayness;
+    return kEmptyPathArrayness;
+}
+
 void PathArrayness::addPath(const FieldPath& path, const MultikeyComponents& multikeyPath) {
     _root.insertPath(path, multikeyPath, 0);
 }

@@ -391,6 +391,22 @@ ExpressionContextBuilder& ExpressionContextBuilder::mainCollPathArrayness(
     return *this;
 }
 
+ExpressionContextBuilder& ExpressionContextBuilder::secondaryCollsPathArrayness(
+    stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
+        secondaryCollsPathArrayness) {
+    params.secondaryCollsPathArrayness = std::move(secondaryCollsPathArrayness);
+    return *this;
+}
+
+ExpressionContextBuilder& ExpressionContextBuilder::pathArraynessFrom(
+    const ExpressionContext& other) {
+    // ExpressionContextBuilder is a friend of ExpressionContext,
+    // so this can access other._params directly.
+    params.mainCollPathArrayness = other._params.mainCollPathArrayness;
+    params.secondaryCollsPathArrayness = other._params.secondaryCollsPathArrayness;
+    return *this;
+}
+
 ExpressionContextBuilder& ExpressionContextBuilder::fromRequest(
     OperationContext* operationContext,
     const FindCommandRequest& request,
@@ -575,45 +591,50 @@ boost::intrusive_ptr<ExpressionContext> makeCopyFromExpressionContext(
     // Some of the properties of expression context are not cloned (e.g runtimeConstants,
     // letParameters, view). In case new fields need to be cloned, they will need to be added in the
     // builder and the proper setter called here.
-    auto expCtx =
-        ExpressionContextBuilder()
-            .opCtx(other->getOperationContext(), other->getVersionContext())
-            .ifrContext(other->getIfrContext())
-            .collator(std::move(collator))
-            .mongoProcessInterface(other->getMongoProcessInterface())
-            // For stages like $lookup and $unionWith that have a $rankFusion as subpipeline, we
-            // want to pass the namespace of the spec (aka the executionNs) to avoid running against
-            // an incorrect namespace, e.g.
-            // db.collA.aggregate([$unionWith: {coll: collB, pipeline: <rankFusionCollB>}]);
-            .originalNs(userNs.value_or(ns))
-            .ns(std::move(ns))
-            .resolvedNamespace(other->getResolvedNamespaces())
-            .mayDbProfile(other->getMayDbProfile())
-            .fromRouter(other->getFromRouter())
-            .mergeType(other->mergeType())
-            .forPerShardCursor(other->getForPerShardCursor())
-            .allowDiskUse(other->getAllowDiskUse())
-            .bypassDocumentValidation(other->getBypassDocumentValidation())
-            .collUUID(uuid)
-            .explain(other->getExplain())
-            .inRouter(other->getInRouter())
-            .tmpDir(other->getTempDir())
-            .serializationContext(other->getSerializationContext())
-            .inLookup(other->getInLookup())
-            .isParsingViewDefinition(other->getIsParsingViewDefinition())
-            .exprUnstableForApiV1(other->getExprUnstableForApiV1())
-            .exprDeprecatedForApiV1(other->getExprDeprecatedForApiV1())
-            .jsHeapLimitMB(other->getJsHeapLimitMB())
-            .changeStreamTokenVersion(other->getChangeStreamTokenVersion())
-            .changeStreamSpec(other->getChangeStreamSpec())
-            .originalAggregateCommand(other->getOriginalAggregateCommand())
-            .subPipelineDepth(other->getSubPipelineDepth())
-            .initialPostBatchResumeToken(other->getInitialPostBatchResumeToken().getOwned())
-            .view(std::move(clonedView))
-            .requiresTimeseriesExtendedRangeSupport(
-                other->getRequiresTimeseriesExtendedRangeSupport())
-            .isHybridSearch(other->isHybridSearch())
-            .build();
+    ExpressionContextBuilder builder;
+    builder.opCtx(other->getOperationContext(), other->getVersionContext())
+        .ifrContext(other->getIfrContext())
+        .collator(std::move(collator))
+        .mongoProcessInterface(other->getMongoProcessInterface())
+        // For stages like $lookup and $unionWith that have a $rankFusion as subpipeline, we
+        // want to pass the namespace of the spec (aka the executionNs) to avoid running against
+        // an incorrect namespace, e.g.
+        // db.collA.aggregate([$unionWith: {coll: collB, pipeline: <rankFusionCollB>}]);
+        .originalNs(userNs.value_or(ns))
+        .ns(std::move(ns))
+        .resolvedNamespace(other->getResolvedNamespaces())
+        .mayDbProfile(other->getMayDbProfile())
+        .fromRouter(other->getFromRouter())
+        .mergeType(other->mergeType())
+        .forPerShardCursor(other->getForPerShardCursor())
+        .allowDiskUse(other->getAllowDiskUse())
+        .bypassDocumentValidation(other->getBypassDocumentValidation())
+        .collUUID(uuid)
+        .explain(other->getExplain())
+        .inRouter(other->getInRouter())
+        .tmpDir(other->getTempDir())
+        .serializationContext(other->getSerializationContext())
+        .inLookup(other->getInLookup())
+        .isParsingViewDefinition(other->getIsParsingViewDefinition())
+        .exprUnstableForApiV1(other->getExprUnstableForApiV1())
+        .exprDeprecatedForApiV1(other->getExprDeprecatedForApiV1())
+        .jsHeapLimitMB(other->getJsHeapLimitMB())
+        .changeStreamTokenVersion(other->getChangeStreamTokenVersion())
+        .changeStreamSpec(other->getChangeStreamSpec())
+        .originalAggregateCommand(other->getOriginalAggregateCommand())
+        .subPipelineDepth(other->getSubPipelineDepth())
+        .initialPostBatchResumeToken(other->getInitialPostBatchResumeToken().getOwned())
+        .view(std::move(clonedView))
+        .requiresTimeseriesExtendedRangeSupport(other->getRequiresTimeseriesExtendedRangeSupport())
+        .isHybridSearch(other->isHybridSearch());
+
+    // TODO: SERVER-111384: When removing feature flag, we can collapse the builder into one
+    // chained call.
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
+        builder.pathArraynessFrom(*other);
+    }
+
+    auto expCtx = builder.build();
 
     if (other->getIgnoreCollator()) {
         expCtx->setIgnoreCollator();

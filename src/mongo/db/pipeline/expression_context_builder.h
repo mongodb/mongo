@@ -107,6 +107,10 @@ public:
     ExpressionContextBuilder& isHybridSearch(bool);
     ExpressionContextBuilder& mainCollPathArrayness(
         std::shared_ptr<const PathArrayness> mainCollPathArrayness);
+    ExpressionContextBuilder& secondaryCollsPathArrayness(
+        stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
+            secondaryCollsPathArrayness);
+    ExpressionContextBuilder& pathArraynessFrom(const ExpressionContext& other);
 
     /**
      * Add kSessionTransactionsTableNamespace, and kRsOplogNamespace
