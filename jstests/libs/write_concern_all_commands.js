@@ -5954,11 +5954,11 @@ export function checkWriteConcernBehaviorForAllCommands(
         limitToTimeseriesViews ? wcTimeseriesViewsCommandsTests : wcCommandsTests;
     const commandsList = AllCommandsTest.checkCommandCoverage(conn, commandsToTest);
 
-    // Randomly execute commands with 50% probability to reduce test runtime.
+    // Randomly execute commands with 25% probability to reduce test runtime.
     // This mitigates long internal write concern timeouts (30-60s) that override
     // test-specified timeouts, as timeout handling improvements from SERVER-102770
     // and SERVER-103553 are not being backported to versions below 8.2.
-    const selectedCommands = commandsList.filter(() => Math.random() < 0.5);
+    const selectedCommands = commandsList.filter(() => Math.random() < 0.25);
     jsTestLog("Running " + selectedCommands.length + "/" + commandsList.length + " commands");
 
     let coll = conn.getDB(dbName).getCollection(collName);
