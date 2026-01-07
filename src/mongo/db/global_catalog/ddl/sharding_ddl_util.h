@@ -30,10 +30,8 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_util_detail.h"
@@ -104,6 +102,19 @@ sendAuthenticatedCommandToShards(
         boost::none /* shardVersions */,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         throwOnError);
+}
+
+template <typename CommandType>
+MONGO_MOD_NEEDS_REPLACEMENT std::vector<AsyncRequestsSender::Response>
+sendAuthenticatedVersionedCommandTargetedByRoutingTable(
+    OperationContext* opCtx,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> originalOpts,
+    RoutingContext& routingCtx,
+    const NamespaceString& nss,
+    const ReadPreferenceSetting readPref = ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+    bool throwOnError = true) {
+    return sharding_ddl_util_detail::sendAuthenticatedVersionedCommandTargetedByRoutingTable(
+        opCtx, originalOpts, routingCtx, nss, readPref, throwOnError);
 }
 
 /**

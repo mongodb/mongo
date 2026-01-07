@@ -31,7 +31,6 @@
 #include "mongo/db/global_catalog/ddl/refine_collection_shard_key_coordinator.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/client.h"
@@ -45,7 +44,6 @@
 #include "mongo/db/global_catalog/ddl/sharding_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/router_role.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -64,7 +62,6 @@
 #include "mongo/logv2/log.h"
 
 #include <string>
-#include <tuple>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -276,36 +273,22 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                         token);
                 }
 
-                ShardsvrValidateShardKeyCandidate validateRequest(ns);
-                validateRequest.setKey(_doc.getNewShardKey());
-                validateRequest.setEnforceUniquenessCheck(_request.getEnforceUniquenessCheck());
-                validateRequest.setDbName(DatabaseName::kAdmin);
-                const auto bsonCmd = validateRequest.toBSON();
+                auto opts = [&] {
+                    ShardsvrValidateShardKeyCandidate validateRequest(ns);
+                    validateRequest.setKey(_doc.getNewShardKey());
+                    validateRequest.setEnforceUniquenessCheck(_request.getEnforceUniquenessCheck());
+                    validateRequest.setDbName(DatabaseName::kAdmin);
+                    return std::make_shared<
+                        async_rpc::AsyncRPCOptions<ShardsvrValidateShardKeyCandidate>>(
+                        **executor, token, std::move(validateRequest));
+                }();
 
                 sharding::router::CollectionRouter router(opCtx, ns);
                 router.routeWithRoutingContext(
                     "validating indexes for refineCollectionShardKey"_sd,
                     [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-                        // TODO SERVER-115323: Consider using a (new) variant of
-                        // sendAuthenticatedCommandToShards()
-                        const auto responses = scatterGatherVersionedTargetByRoutingTable(
-                            opCtx,
-                            routingCtx,
-                            ns,
-                            bsonCmd,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            Shard::RetryPolicy::kIdempotent,
-                            /*query=*/{},
-                            /*collation=*/{},
-                            /*letParameters=*/boost::none,
-                            /*runtimeConstants=*/boost::none,
-                            /*eligibleForSampling=*/false,
-                            **executor);
-
-                        for (const auto& response : responses) {
-                            uassertStatusOK(
-                                AsyncRequestsSender::Response::getEffectiveStatus(response));
-                        }
+                        sharding_ddl_util::sendAuthenticatedVersionedCommandTargetedByRoutingTable(
+                            opCtx, opts, routingCtx, ns);
                     });
             }))
         .then(_buildPhaseHandler(
