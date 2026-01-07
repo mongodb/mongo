@@ -65,7 +65,7 @@ private:
 class MetricNames {
 public:
     // Networking & Observability Team Metrics
-    static constexpr MetricName kConnectionsProcessed = {"connections_processed"};
+    static constexpr MetricName kConnectionsProcessed = {"network.connections_processed"};
     // Test-only
     static constexpr MetricName kTest1 = {"test_only.metric1"};
     static constexpr MetricName kTest2 = {"test_only.metric2"};

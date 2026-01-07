@@ -1,10 +1,10 @@
 /**
- * Tests that the OpenTelemetry connections_processed counter metric is properly exported
+ * Tests that the OpenTelemetry network.connections_processed counter metric is properly exported
  * to the file exporter when a connection is established.
  *
  * This test verifies the end-to-end OTel metrics export flow:
  * 1. Configure mongod with file-based OTel metrics export
- * 2. Establish connections which trigger the connections_processed counter
+ * 2. Establish connections which trigger the network.connections_processed counter
  * 3. Verify the metric appears in the exported JSONL file
  */
 
@@ -42,7 +42,7 @@ const mongod = MongoRunner.runMongod({
 assert.neq(null, mongod, "mongod was unable to start up with OTel metrics configuration");
 
 // Run a simple command to ensure the connection is established and processed
-// This will trigger the connections_processed counter increment
+// This will trigger the network.connections_processed counter increment
 const testDB = mongod.getDB("test");
 assert.commandWorked(testDB.runCommand({ping: 1}));
 
@@ -68,22 +68,22 @@ assert.soon(
             const records = readJsonlFile(file.name);
             jsTest.log.info("Found " + records.length + " record(s) in file");
 
-            const foundMetric = findMetric(records, "connections_processed");
+            const foundMetric = findMetric(records, "network.connections_processed");
             if (foundMetric) {
-                jsTest.log.info("Found connections_processed metric: " + tojson(foundMetric));
+                jsTest.log.info("Found network.connections_processed metric: " + tojson(foundMetric));
                 let totalValue = 0;
                 for (const dataPoint of foundMetric.sum.dataPoints) {
                     totalValue += dataPoint.asInt;
                 }
 
-                jsTest.log.info("Total connections_processed value: " + totalValue);
+                jsTest.log.info("Total network.connections_processed value: " + totalValue);
                 return totalValue == newConnections + 1;
             }
         }
 
         return false;
     },
-    `connections_processed counter should have recorded ${newConnections + 1} connections`,
+    `network.connections_processed counter should have recorded ${newConnections + 1} connections`,
     30000,
     1000,
 );
