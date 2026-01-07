@@ -64,6 +64,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/rename_collection.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/tenant_id.h"
@@ -89,6 +90,11 @@ namespace mongo {
 namespace {
 
 void createQEClusteredStateCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    // Create QE state collection locally. This local collection creation is safe here because we
+    // instantiate a ScopedReplicaSetDDL object prior to this call. This object registers this DDL
+    // operation with the DDL tracker, ensuring proper metadata synchronization when the replica set
+    // gets promoted to a shard server.
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE allowCreate(opCtx, nss);
     CreateCommand createCmd(nss);
     mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
     CreateCollectionRequest request;
