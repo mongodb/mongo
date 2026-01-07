@@ -50,20 +50,13 @@
 
 namespace mongo {
 /**
- * Creates all of the databases referenced by 'nssList' (if they don't already exist), and then
- * creates and returns a RoutingContext that can be used for targeting write ops.
- */
-MONGO_MOD_PUBLIC std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtx(
-    OperationContext* opCtx, const std::vector<NamespaceString>& nssList);
-
-/**
  * NSTargeter based on a CollectionRoutingInfo implementation. Wraps all exception codepaths and
  * returns NamespaceNotFound status on applicable failures.
  *
  * Must be initialized before use, and initialization may fail.
  *
- * TODO (SERVER-114286): The NSTargeter(s) hierarchy is a mixture of router role and query-specific
- * canonicalization logic. It needs to be decomposed into these parts and removed.
+ * TODO (SERVER-116151): The NSTargeter(s) hierarchy is a legacy implementation. When it is no
+ * longer needed by BatchWriteExec and bulk_write_exec it should be removed.
  */
 class MONGO_MOD_NEEDS_REPLACEMENT CollectionRoutingInfoTargeter final : public NSTargeter {
 public:
@@ -171,34 +164,7 @@ public:
 
     const CollectionRoutingInfo& getRoutingInfo() const;
 
-    static BSONObj extractBucketsShardKeyFromTimeseriesDoc(
-        const BSONObj& doc,
-        const ShardKeyPattern& pattern,
-        const TimeseriesOptions& timeseriesOptions);
-
-    /**
-     * This returns "does the query have an _id field" and "is the _id field querying for a direct
-     * value like _id : 3 and not _id : { $gt : 3 }"
-     *
-     * If the query does not use the collection default collation, the _id field cannot contain
-     * strings, objects, or arrays.
-     *
-     * Ex: { _id : 1 } => true
-     *     { foo : <anything>, _id : 1 } => true
-     *     { _id : { $lt : 30 } } => false
-     *     { foo : <anything> } => false
-     */
-    static bool isExactIdQuery(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const BSONObj& query,
-                               const BSONObj& collation,
-                               const ChunkManager& cm);
-
 private:
-    std::unique_ptr<RoutingContext> _createDatabaseAndGetRoutingCtx(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    bool refresh);
-
     /**
      * Initializes and returns the RoutingContext which needs to be used for targeting.
      * If 'refresh' is true, additionally fetches the latest routing info from the config servers.

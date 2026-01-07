@@ -33,6 +33,7 @@
 #include "mongo/db/global_catalog/ddl/cannot_implicitly_create_collection_info.h"
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
+#include "mongo/db/router_role/router_role.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/s/query/exec/target_write_op.h"
 
@@ -41,7 +42,8 @@
 namespace mongo {
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(waitForDatabaseToBeDropped);
+MONGO_FAIL_POINT_DEFINE(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue);
+MONGO_FAIL_POINT_DEFINE(isTrackedTimeSeriesNamespaceAlwaysTrue);
 
 /**
  * Returns true if the two CollectionRoutingInfo objects are different.
@@ -57,8 +59,6 @@ bool isMetadataDifferent(const CollectionRoutingInfo& criA, const CollectionRout
     return criA.getDbVersion() != criB.getDbVersion();
 }
 }  // namespace
-
-constexpr size_t kMaxDatabaseCreationAttempts = 3;
 
 CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(OperationContext* opCtx,
                                                              const NamespaceString& nss,
@@ -86,97 +86,12 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceStri
             !_cri.hasRoutingTable() || _cri.getChunkManager().getNss() == _nss);
 }
 
-namespace {
-std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtxImpl(
-    OperationContext* opCtx,
-    const std::vector<NamespaceString>& nssList,
-    bool checkTimeseriesBucketsNss,
-    bool refresh) {
-    for (const auto& nss : nssList) {
-        uassert(
-            ErrorCodes::InvalidNamespace,
-            str::stream() << "Must use a real namespace with CollectionRoutingInfoTargeter, got "
-                          << nss.toStringForErrorMsg(),
-            !nss.isCollectionlessAggregateNS());
-    }
-
-    // Scan 'nssList' and make a de-duplicated list of relevant databases.
-    auto dbList = [&]() {
-        std::vector<DatabaseName> dbList;
-        std::set<DatabaseName> dedup;
-        for (const auto& nss : nssList) {
-            if (auto [it, inserted] = dedup.insert(nss.dbName()); inserted) {
-                dbList.emplace_back(*it);
-            }
-        }
-
-        return dbList;
-    }();
-
-    size_t attempts = 1;
-    while (true) {
-        try {
-            // Ensure all the relevant databases exist.
-            for (const auto& dbName : dbList) {
-                cluster::createDatabase(opCtx, dbName);
-            }
-
-            if (refresh) {
-                for (const auto& nss : nssList) {
-                    Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
-                        nss, boost::none /* wantedVersion */);
-                }
-            }
-
-            if (MONGO_unlikely(waitForDatabaseToBeDropped.shouldFail())) {
-                LOGV2(8314600, "Hanging due to waitForDatabaseToBeDropped fail point");
-                waitForDatabaseToBeDropped.pauseWhileSet(opCtx);
-            }
-
-            // Create a RoutingContext and return it. If the RoutingContext constructor fails,
-            // an exception will be thrown.
-            const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
-                shard_role_details::getLocker(opCtx)->isLocked();
-
-            return std::make_unique<RoutingContext>(
-                opCtx, nssList, allowLocks, checkTimeseriesBucketsNss);
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            LOGV2_INFO(8314601,
-                       "Failed initialization of routing info because the database has been "
-                       "concurrently dropped",
-                       "db"_attr = dbList,
-                       "attemptNumber"_attr = attempts,
-                       "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
-
-            if (attempts++ >= kMaxDatabaseCreationAttempts) {
-                // The maximum number of attempts has been reached, so the procedure fails as it
-                // could be a logical error. At this point, it is unlikely that the error is
-                // caused by concurrent drop database operations.
-                throw;
-            }
-        }
-    }
-}
-}  // namespace
-
-std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtx(
-    OperationContext* opCtx, const std::vector<NamespaceString>& nssList) {
-    const bool checkTSBucketsNss = true;
-    const bool refresh = false;
-
-    return createDatabasesAndGetRoutingCtxImpl(opCtx, nssList, checkTSBucketsNss, refresh);
-}
-
-std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_createDatabaseAndGetRoutingCtx(
-    OperationContext* opCtx, const NamespaceString& nss, bool refresh) {
-    const bool checkTSBucketsNss = false;
-
-    return createDatabasesAndGetRoutingCtxImpl(opCtx, {nss}, checkTSBucketsNss, refresh);
-}
-
 std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_init(OperationContext* opCtx,
                                                                      bool refresh) {
-    auto routingCtx = _createDatabaseAndGetRoutingCtx(opCtx, _nss, refresh);
+    const bool checkTsBucketsNss = false;
+
+    auto routingCtx = sharding::router::createDatabasesAndGetRoutingCtx(
+        opCtx, {_nss}, checkTsBucketsNss, refresh);
     const auto& cm = routingCtx->getCollectionRoutingInfo(_nss).getChunkManager();
 
     const auto checkStaleEpoch = [&](const ChunkManager& cm) {
@@ -208,7 +123,8 @@ std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_init(OperationCo
     // will only have viewless timeseries that do not require nss translation.
     if (!cm.hasRoutingTable() && !_nss.isTimeseriesBucketsCollection()) {
         auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
-        auto bucketsRoutingCtx = _createDatabaseAndGetRoutingCtx(opCtx, bucketsNs, refresh);
+        auto bucketsRoutingCtx = sharding::router::createDatabasesAndGetRoutingCtx(
+            opCtx, {bucketsNs}, checkTsBucketsNss, refresh);
         const auto& bucketsCri = bucketsRoutingCtx->getCollectionRoutingInfo(bucketsNs);
         if (bucketsCri.hasRoutingTable()) {
             _nss = bucketsNs;
@@ -221,7 +137,8 @@ std::unique_ptr<RoutingContext> CollectionRoutingInfoTargeter::_init(OperationCo
         // This can happen if a tracked time-series collection is dropped and re-created. Then we
         // need to reset the namespace to the original namespace.
         _nss = _nss.getTimeseriesViewNamespace();
-        auto newRoutingCtx = _createDatabaseAndGetRoutingCtx(opCtx, _nss, refresh);
+        auto newRoutingCtx = sharding::router::createDatabasesAndGetRoutingCtx(
+            opCtx, {_nss}, checkTsBucketsNss, refresh);
         const auto& newCm = newRoutingCtx->getCollectionRoutingInfo(_nss).getChunkManager();
         _nssConvertedToTimeseriesBuckets = false;
         checkStaleEpoch(newCm);
@@ -262,22 +179,6 @@ NSTargeter::TargetingResult CollectionRoutingInfoTargeter::targetDelete(
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetAllShards(
     OperationContext* opCtx) const {
     return mongo::targetAllShards(opCtx, _cri);
-}
-
-BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
-    const BSONObj& doc,
-    const ShardKeyPattern& pattern,
-    const TimeseriesOptions& timeseriesOptions) {
-    return mongo::extractBucketsShardKeyFromTimeseriesDoc(doc, pattern, timeseriesOptions);
-}
-
-bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const BSONObj& query,
-                                                   const BSONObj& collation,
-                                                   const ChunkManager& cm) {
-    return mongo::isExactIdQuery(
-        opCtx, nss, query, collation, cm.isSharded(), cm.getDefaultCollator());
 }
 
 void CollectionRoutingInfoTargeter::noteCouldNotTarget() {
@@ -379,7 +280,7 @@ bool CollectionRoutingInfoTargeter::createCollectionIfNeeded(OperationContext* o
 }
 
 int CollectionRoutingInfoTargeter::getAproxNShardsOwningChunks() const {
-    return mongo::getAproxNShardsOwningChunks(_cri);
+    return _cri.hasRoutingTable() ? _cri.getChunkManager().getAproxNShardsOwningChunks() : 0;
 }
 
 bool CollectionRoutingInfoTargeter::isTargetedCollectionSharded() const {
@@ -387,16 +288,25 @@ bool CollectionRoutingInfoTargeter::isTargetedCollectionSharded() const {
 }
 
 bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesBucketsNamespace() const {
-    return mongo::isTrackedTimeSeriesBucketsNamespace(_cri);
+    // Used for testing purposes to force that we always have a tracked timeseries bucket namespace.
+    if (MONGO_unlikely(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue.shouldFail())) {
+        return true;
+    }
+    return _cri.hasRoutingTable() && _cri.getChunkManager().isTimeseriesCollection() &&
+        !_cri.getChunkManager().isNewTimeseriesWithoutView();
 }
 
 bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesNamespace() const {
-    return mongo::isTrackedTimeSeriesNamespace(_cri);
+    // Used for testing purposes to force that we always have a tracked timeseries namespace.
+    if (MONGO_unlikely(isTrackedTimeSeriesNamespaceAlwaysTrue.shouldFail())) {
+        return true;
+    }
+    return _cri.hasRoutingTable() && _cri.getChunkManager().isTimeseriesCollection();
 }
 
 bool CollectionRoutingInfoTargeter::timeseriesNamespaceNeedsRewrite(
     const NamespaceString& nss) const {
-    return mongo::isTrackedTimeSeriesBucketsNamespace(_cri) && !nss.isTimeseriesBucketsCollection();
+    return isTrackedTimeSeriesBucketsNamespace() && !nss.isTimeseriesBucketsCollection();
 }
 
 RoutingContext& CollectionRoutingInfoTargeter::getRoutingCtx() const {

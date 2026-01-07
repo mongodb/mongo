@@ -67,6 +67,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/s/query/exec/target_write_op.h"
 #include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
@@ -239,7 +240,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     // _id in their queries, unless a document is being upserted. An exact _id match requires
     // default collation if the _id value is a collatable type.
     if (isUpdateOrDelete && query.hasField("_id") &&
-        CollectionRoutingInfoTargeter::isExactIdQuery(opCtx, nss, query, collation, cm) &&
+        isExactIdQuery(opCtx, nss, query, collation, cm.isSharded(), cm.getDefaultCollator()) &&
         !isUpsert && !isTimeseriesViewRequest) {
         return false;
     }

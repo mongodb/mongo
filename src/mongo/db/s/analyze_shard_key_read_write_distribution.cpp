@@ -44,6 +44,7 @@
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
+#include "mongo/s/query/exec/target_write_op.h"
 #include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -262,14 +263,12 @@ void WriteDistributionMetricsCalculator::_addUpdateQuery(
         // the filter.
         auto isReplacementUpdate =
             !upsert && updateMod.type() == write_ops::UpdateModification::Type::kReplacement;
-        auto isExactIdQuery = [&] {
-            return CollectionRoutingInfoTargeter::isExactIdQuery(
-                opCtx, ns, filter, collation, _getChunkManager());
-        };
+        const auto& cm = _getChunkManager();
 
         // Currently, targeting by replacement document is only done when the query targets an exact
         // id value.
-        if (isReplacementUpdate && isExactIdQuery()) {
+        if (isReplacementUpdate &&
+            isExactIdQuery(opCtx, ns, filter, collation, cm.isSharded(), cm.getDefaultCollator())) {
             auto filter =
                 _getShardKeyPattern().extractShardKeyFromDoc(updateMod.getUpdateReplacement());
             info = _getTargetingInfoForQuery(

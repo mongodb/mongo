@@ -241,6 +241,16 @@ public:
     }
 };
 
+/**
+ * Creates all of the databases referenced by 'nssList' (if they don't already exist), and then
+ * creates and returns a RoutingContext that can be used for targeting write ops.
+ */
+MONGO_MOD_PUBLIC std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtx(
+    OperationContext* opCtx,
+    const std::vector<NamespaceString>& nssList,
+    bool checkTimeseriesBucketsNss,
+    bool refresh);
+
 }  // namespace router
 }  // namespace sharding
 }  // namespace mongo

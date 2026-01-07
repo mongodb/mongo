@@ -70,9 +70,6 @@
 namespace mongo {
 
 namespace {
-MONGO_FAIL_POINT_DEFINE(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue);
-MONGO_FAIL_POINT_DEFINE(isTrackedTimeSeriesNamespaceAlwaysTrue);
-
 constexpr auto kIdFieldName = "_id"_sd;
 
 const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
@@ -142,6 +139,163 @@ ShardEndpoint targetUnshardedCollection(const NamespaceString& nss,
             nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNTRACKED(),
             nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : cri.getDbVersion());
     }
+}
+
+/**
+ * Returns a CanonicalQuery if parsing succeeds.
+ *
+ * Returns !OK with message if query could not be canonicalized.
+ *
+ * If 'collation' is empty, we use the collection default collation for targeting.
+ */
+StatusWith<std::unique_ptr<CanonicalQuery>> canonicalizeFindQuery(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<mongo::ExpressionContext> expCtx,
+    const NamespaceString& nss,
+    const BSONObj& query,
+    const BSONObj& collation,
+    const CollectionRoutingInfo& cri) {
+    // Parse query.
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setFilter(query);
+
+    const auto& cm = cri.getChunkManager();
+    expCtx->setUUID(cm.getUUID());
+
+    tassert(8557200,
+            "This function should not be invoked if we do not have a routing table",
+            cm.hasRoutingTable());
+    if (!collation.isEmpty()) {
+        findCommand->setCollation(collation.getOwned());
+    } else if (cm.getDefaultCollator()) {
+        auto defaultCollator = cm.getDefaultCollator();
+        expCtx->setCollator(defaultCollator->clone());
+    }
+
+    return CanonicalQuery::make({
+        .expCtx = expCtx,
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
+    });
+}
+
+/**
+ * Returns a vector of ShardEndpoints for a potentially multi-shard query.
+ *
+ * Uses the collation specified on the CanonicalQuery for targeting. If there is no query
+ * collation, uses the collection default. If 'bypassIsFieldHashedCheck' is true, it skips
+ * checking if the shard key was hashed and assumes that any non-collatable shard key was not
+ * hashed from a collatable type.
+ *
+ * Returns !OK with message if query could not be targeted.
+ */
+StatusWith<std::vector<ShardEndpoint>> targetQuery(const CollectionRoutingInfo& cri,
+                                                   const CanonicalQuery& query,
+                                                   bool bypassIsFieldHashedCheck) {
+
+    std::set<ShardId> shardIds;
+    try {
+        getShardIdsForCanonicalQuery(
+            query, cri.getChunkManager(), &shardIds, bypassIsFieldHashedCheck);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
+    std::vector<ShardEndpoint> endpoints;
+    for (auto&& shardId : shardIds) {
+        ShardVersion shardVersion = cri.getShardVersion(shardId);
+        endpoints.emplace_back(std::move(shardId), std::move(shardVersion), boost::none);
+    }
+
+    return endpoints;
+}
+
+/**
+ * Returns a vector of ShardEndpoints for a potentially multi-shard query.
+ *
+ * This method is an alternative to targetQuery() that is intended to be used for multi:true
+ * upsert queries only.
+ *
+ * This method attempts to extract a shard key from the CanonicalQuery and then attempts target
+ * a single shard using this shard key.
+ *
+ * Returns !OK with message if a shard key could not be extracted or a single shard could not
+ * be targeted due to collation.
+ */
+StatusWith<std::vector<ShardEndpoint>> targetQueryForMultiUpsert(const CollectionRoutingInfo& cri,
+                                                                 const CanonicalQuery& query) {
+    // Attempt to extract the shard key from the query.
+    const auto& shardKeyPattern = cri.getChunkManager().getShardKeyPattern();
+    BSONObj shardKey = extractShardKeyFromQuery(shardKeyPattern, query);
+
+    // If extracting the shard key failed, return a non-OK Status.
+    if (shardKey.isEmpty()) {
+        return Status{ErrorCodes::ShardKeyNotFound,
+                      "Failed to target upsert by query :: could not extract exact shard key"};
+    }
+
+    std::vector<ShardEndpoint> endpoints;
+
+    try {
+        // Store the result of findIntersectingChunk() into the vector.
+        const BSONObj& collation = query.getFindCommandRequest().getCollation();
+        auto chunk = cri.getChunkManager().findIntersectingChunk(shardKey, collation);
+        endpoints.emplace_back(ShardEndpoint(
+            chunk.getShardId(), cri.getShardVersion(chunk.getShardId()), boost::none));
+    } catch (const DBException& ex) {
+        // If there was an error, return the error with added context.
+        return ex.toStatus().withContext("Failed to target upsert by query");
+    }
+
+    // Return the vector.
+    return endpoints;
+}
+
+bool isRetryableWrite(OperationContext* opCtx) {
+    return opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction();
+}
+
+boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTargeter(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionRoutingInfo& cri,
+    const BSONObj& collation,
+    const boost::optional<ExplainOptions::Verbosity>& verbosity,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
+
+    const auto noCollationSpecified = collation.isEmpty();
+    auto&& cif = [&]() {
+        if (noCollationSpecified) {
+            return std::unique_ptr<CollatorInterface>{};
+        } else {
+            return uassertStatusOK(
+                CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
+        }
+    }();
+
+    ResolvedNamespaceMap resolvedNamespaces;
+    resolvedNamespaces.emplace(nss, ResolvedNamespace(nss, std::vector<BSONObj>{}));
+
+    auto expCtx = ExpressionContextBuilder{}
+                      .opCtx(opCtx)
+                      .collator(std::move(cif))
+                      .mongoProcessInterface(MongoProcessInterface::create(opCtx))
+                      .ns(nss)
+                      .resolvedNamespace(std::move(resolvedNamespaces))
+                      .fromRouter(true)
+                      .bypassDocumentValidation(true)
+                      .explain(verbosity)
+                      .runtimeConstants(runtimeConstants)
+                      .letParameters(letParameters)
+                      .build();
+
+    // Ignore the collator if the collection is untracked and the user did not specify a collator.
+    if (!cri.hasRoutingTable() && noCollationSpecified) {
+        expCtx->setIgnoreCollator();
+    }
+    return expCtx;
 }
 }  // namespace
 
@@ -278,56 +432,10 @@ ShardEndpoint targetInsert(OperationContext* opCtx,
     }();
 
     // Target the shard key
-    return uassertStatusOK(targetShardKey(cri, shardKey, CollationSpec::kSimpleSpec));
+    auto chunk = cri.getChunkManager().findIntersectingChunk(shardKey, CollationSpec::kSimpleSpec);
+
+    return ShardEndpoint(chunk.getShardId(), cri.getShardVersion(chunk.getShardId()), boost::none);
 }
-
-namespace {
-bool isRetryableWrite(OperationContext* opCtx) {
-    return opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction();
-}
-
-boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTargeter(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
-    const BSONObj& collation,
-    const boost::optional<ExplainOptions::Verbosity>& verbosity,
-    const boost::optional<BSONObj>& letParameters,
-    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
-
-    const auto noCollationSpecified = collation.isEmpty();
-    auto&& cif = [&]() {
-        if (noCollationSpecified) {
-            return std::unique_ptr<CollatorInterface>{};
-        } else {
-            return uassertStatusOK(
-                CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
-        }
-    }();
-
-    ResolvedNamespaceMap resolvedNamespaces;
-    resolvedNamespaces.emplace(nss, ResolvedNamespace(nss, std::vector<BSONObj>{}));
-
-    auto expCtx = ExpressionContextBuilder{}
-                      .opCtx(opCtx)
-                      .collator(std::move(cif))
-                      .mongoProcessInterface(MongoProcessInterface::create(opCtx))
-                      .ns(nss)
-                      .resolvedNamespace(std::move(resolvedNamespaces))
-                      .fromRouter(true)
-                      .bypassDocumentValidation(true)
-                      .explain(verbosity)
-                      .runtimeConstants(runtimeConstants)
-                      .letParameters(letParameters)
-                      .build();
-
-    // Ignore the collator if the collection is untracked and the user did not specify a collator.
-    if (!cri.hasRoutingTable() && noCollationSpecified) {
-        expCtx->setIgnoreCollator();
-    }
-    return expCtx;
-}
-}  // namespace
 
 TargetOpResult targetUpdate(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -606,98 +714,6 @@ TargetOpResult targetDelete(OperationContext* opCtx,
     return result;
 }
 
-StatusWith<std::unique_ptr<CanonicalQuery>> canonicalizeFindQuery(
-    OperationContext* opCtx,
-    boost::intrusive_ptr<mongo::ExpressionContext> expCtx,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& collation,
-    const CollectionRoutingInfo& cri) {
-    // Parse query.
-    auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setFilter(query);
-
-    const auto& cm = cri.getChunkManager();
-    expCtx->setUUID(cm.getUUID());
-
-    tassert(8557200,
-            "This function should not be invoked if we do not have a routing table",
-            cm.hasRoutingTable());
-    if (!collation.isEmpty()) {
-        findCommand->setCollation(collation.getOwned());
-    } else if (cm.getDefaultCollator()) {
-        auto defaultCollator = cm.getDefaultCollator();
-        expCtx->setCollator(defaultCollator->clone());
-    }
-
-    return CanonicalQuery::make({
-        .expCtx = expCtx,
-        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                              .allowedFeatures =
-                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
-    });
-}
-
-StatusWith<std::vector<ShardEndpoint>> targetQuery(const CollectionRoutingInfo& cri,
-                                                   const CanonicalQuery& query,
-                                                   bool bypassIsFieldHashedCheck) {
-
-    std::set<ShardId> shardIds;
-    try {
-        getShardIdsForCanonicalQuery(
-            query, cri.getChunkManager(), &shardIds, bypassIsFieldHashedCheck);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-
-    std::vector<ShardEndpoint> endpoints;
-    for (auto&& shardId : shardIds) {
-        ShardVersion shardVersion = cri.getShardVersion(shardId);
-        endpoints.emplace_back(std::move(shardId), std::move(shardVersion), boost::none);
-    }
-
-    return endpoints;
-}
-
-StatusWith<std::vector<ShardEndpoint>> targetQueryForMultiUpsert(const CollectionRoutingInfo& cri,
-                                                                 const CanonicalQuery& query) {
-    // Attempt to extract the shard key from the query.
-    const auto& shardKeyPattern = cri.getChunkManager().getShardKeyPattern();
-    BSONObj shardKey = extractShardKeyFromQuery(shardKeyPattern, query);
-
-    // If extracting the shard key failed, return a non-OK Status.
-    if (shardKey.isEmpty()) {
-        return Status{ErrorCodes::ShardKeyNotFound,
-                      "Failed to target upsert by query :: could not extract exact shard key"};
-    }
-
-    // Call targetShardKey() and throw an error if this fails.
-    const BSONObj& collation = query.getFindCommandRequest().getCollation();
-    auto swEndpoint = targetShardKey(cri, shardKey, collation);
-
-    // If targetShardKey() returned a non-OK Status, return that status with added context.
-    if (!swEndpoint.isOK()) {
-        return swEndpoint.getStatus().withContext("Failed to target upsert by query");
-    }
-
-    // Store the result of targetShardKey() into a vector and return the vector.
-    std::vector<ShardEndpoint> endpoints;
-    endpoints.emplace_back(std::move(swEndpoint.getValue()));
-    return endpoints;
-}
-
-StatusWith<ShardEndpoint> targetShardKey(const CollectionRoutingInfo& cri,
-                                         const BSONObj& shardKey,
-                                         const BSONObj& collation) {
-    try {
-        auto chunk = cri.getChunkManager().findIntersectingChunk(shardKey, collation);
-        return ShardEndpoint(
-            chunk.getShardId(), cri.getShardVersion(chunk.getShardId()), boost::none);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-}
-
 std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx,
                                            const CollectionRoutingInfo& cri) {
     // This function is only called if doing a multi write that targets more than one shard. This
@@ -713,27 +729,6 @@ std::vector<ShardEndpoint> targetAllShards(OperationContext* opCtx,
     }
 
     return endpoints;
-}
-
-int getAproxNShardsOwningChunks(const CollectionRoutingInfo& cri) {
-    return cri.hasRoutingTable() ? cri.getChunkManager().getAproxNShardsOwningChunks() : 0;
-}
-
-bool isTrackedTimeSeriesBucketsNamespace(const CollectionRoutingInfo& cri) {
-    // Used for testing purposes to force that we always have a tracked timeseries bucket namespace.
-    if (MONGO_unlikely(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue.shouldFail())) {
-        return true;
-    }
-    return cri.hasRoutingTable() && cri.getChunkManager().isTimeseriesCollection() &&
-        !cri.getChunkManager().isNewTimeseriesWithoutView();
-}
-
-bool isTrackedTimeSeriesNamespace(const CollectionRoutingInfo& cri) {
-    // Used for testing purposes to force that we always have a tracked timeseries namespace.
-    if (MONGO_unlikely(isTrackedTimeSeriesNamespaceAlwaysTrue.shouldFail())) {
-        return true;
-    }
-    return cri.hasRoutingTable() && cri.getChunkManager().isTimeseriesCollection();
 }
 
 }  // namespace mongo
