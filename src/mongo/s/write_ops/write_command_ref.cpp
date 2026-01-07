@@ -285,9 +285,10 @@ OptionalBool BatchWriteCommandRefImpl::getUpsertSupplied(int index) const {
     });
 }
 
-OptionalBool BatchWriteCommandRefImpl::getIncludeQueryStatsMetrics(int index) const {
+boost::optional<std::int32_t> BatchWriteCommandRefImpl::getIncludeQueryStatsMetricsForOpIndex(
+    int index) const {
     return visitUpdateOpData(index, [&](const write_ops::UpdateOpEntry& updateOp) {
-        return updateOp.getIncludeQueryStatsMetrics();
+        return updateOp.getIncludeQueryStatsMetricsForOpIndex();
     });
 }
 
@@ -482,8 +483,9 @@ OptionalBool BulkWriteCommandRefImpl::getUpsertSupplied(int index) const {
     });
 }
 
-OptionalBool BulkWriteCommandRefImpl::getIncludeQueryStatsMetrics(int index) const {
-    return OptionalBool{};
+boost::optional<std::int32_t> BulkWriteCommandRefImpl::getIncludeQueryStatsMetricsForOpIndex(
+    int index) const {
+    return boost::none;
 }
 
 OptionalBool BulkWriteCommandRefImpl::getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
@@ -652,8 +654,9 @@ OptionalBool FindAndModifyCommandRefImpl::getUpsertSupplied(int index) const {
     return OptionalBool{};
 }
 
-OptionalBool FindAndModifyCommandRefImpl::getIncludeQueryStatsMetrics(int index) const {
-    return OptionalBool{};
+boost::optional<std::int32_t> FindAndModifyCommandRefImpl::getIncludeQueryStatsMetricsForOpIndex(
+    int index) const {
+    return boost::none;
 }
 
 OptionalBool FindAndModifyCommandRefImpl::getAllowShardKeyUpdatesWithoutFullShardKeyInQuery(

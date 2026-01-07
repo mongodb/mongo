@@ -334,10 +334,10 @@ public:
     OptionalBool getUpsertSupplied(int index) const;
 
     /**
-     * Returns the specified write op's "includeQueryStatsMetrics" field if present, otherwise
-     * returns boost::none.
+     * Returns the specified write op's "includeQueryStatsMetricsForOpIndex" field if present,
+     * otherwise returns boost::none.
      */
-    OptionalBool getIncludeQueryStatsMetrics(int index) const;
+    boost::optional<std::int32_t> getIncludeQueryStatsMetricsForOpIndex(int index) const;
 
     /**
      * Returns the specified write op's "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery" field
@@ -661,10 +661,10 @@ public:
     OptionalBool getUpsertSupplied(int index) const;
 
     /**
-     * Returns the specified write op's "includeQueryStatsMetrics" field if present, otherwise
-     * returns boost::none.
+     * Returns the specified write op's "includeQueryStatsMetricsForOpIndex" field if present,
+     * otherwise returns boost::none.
      */
-    OptionalBool getIncludeQueryStatsMetrics(int index) const;
+    boost::optional<std::int32_t> getIncludeQueryStatsMetricsForOpIndex(int index) const;
 
     /**
      * Returns the specified write op's "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery" field
@@ -961,10 +961,10 @@ public:
     OptionalBool getUpsertSupplied(int index) const;
 
     /**
-     * Returns the specified write op's "includeQueryStatsMetrics" field if present, otherwise
-     * returns boost::none.
+     * Returns the specified write op's "includeQueryStatsMetricsForOpIndex" field if present,
+     * otherwise returns boost::none.
      */
-    OptionalBool getIncludeQueryStatsMetrics(int index) const;
+    boost::optional<std::int32_t> getIncludeQueryStatsMetricsForOpIndex(int index) const;
 
     /**
      * Returns the specified write op's "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery" field
@@ -1529,9 +1529,10 @@ public:
     decltype(auto) getUpsertSupplied() const {
         return visitImpl([&](auto&& r) -> decltype(auto) { return r.getUpsertSupplied(_index); });
     }
-    decltype(auto) getIncludeQueryStatsMetrics() const {
-        return visitImpl(
-            [&](auto&& r) -> decltype(auto) { return r.getIncludeQueryStatsMetrics(_index); });
+    decltype(auto) getIncludeQueryStatsMetricsForOpIndex() const {
+        return visitImpl([&](auto&& r) -> decltype(auto) {
+            return r.getIncludeQueryStatsMetricsForOpIndex(_index);
+        });
     }
     decltype(auto) getAllowShardKeyUpdatesWithoutFullShardKeyInQuery() const {
         return visitImpl([&](auto&& r) -> decltype(auto) {

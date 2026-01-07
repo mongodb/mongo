@@ -398,7 +398,10 @@ TEST_F(WriteOpsExecTest, UpdateAppendsMetricsWhenRequested) {
         auto mod = write_ops::UpdateModification::parseFromClassicUpdate(BSON("x" << (i * 10)));
         write_ops::UpdateOpEntry entry(BSON("x" << i), std::move(mod));
         if (i == 1 || i == 3) {
-            entry.setIncludeQueryStatsMetrics(true);
+            // Here we are saying that the i-th entry sent to a shard coorespondes to the
+            // (200 + i)th entry in the original batch that arrived at the router. The router sets
+            // this field when requesting metrics from update statements sent to shards.
+            entry.setIncludeQueryStatsMetricsForOpIndex(200 + i);
         }
         updateOps.push_back(std::move(entry));
     }
@@ -416,9 +419,9 @@ TEST_F(WriteOpsExecTest, UpdateAppendsMetricsWhenRequested) {
 
     // Verify that metrics are present only for indices 1 and 3.
     ASSERT_FALSE(updateResult.results[0].getValue().getQueryStatsMetrics().has_value());
-    ASSERT_TRUE(updateResult.results[1].getValue().getQueryStatsMetrics().has_value());
+    ASSERT_EQ(updateResult.results[1].getValue().getQueryStatsMetrics()->getOriginalOpIndex(), 201);
     ASSERT_FALSE(updateResult.results[2].getValue().getQueryStatsMetrics().has_value());
-    ASSERT_TRUE(updateResult.results[3].getValue().getQueryStatsMetrics().has_value());
+    ASSERT_EQ(updateResult.results[3].getValue().getQueryStatsMetrics()->getOriginalOpIndex(), 203);
     ASSERT_FALSE(updateResult.results[4].getValue().getQueryStatsMetrics().has_value());
 }
 

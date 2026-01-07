@@ -1,4 +1,4 @@
-# Copyright (C) 2018-present MongoDB, Inc.
+# Copyright (C) 2025-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -24,34 +24,24 @@
 # delete this exception statement from your version. If you delete this
 # exception statement from all source files in the program, then also delete
 # it in the license file.
-#
-
-# Write op single results IDL
 
 global:
-    cpp_namespace: "mongo"
+    cpp_namespace: "mongo::write_ops"
     mod_visibility: public
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/query/write_ops/query_stats_metrics.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
 
 structs:
-    singleWriteResult:
-        description: "A document that contains basic statistics for an executed write."
+    QueryStatsMetrics:
+        description: "Query stats metrics relevant to a single write."
         fields:
-            n:
-                type: long
-                description: "For insert: number of documents inserted.
-                    For update: number of documents that matched the query predicate.
-                    For delete: number of documents deleted."
-            nModified:
-                type: long
-                description: "The number of documents modified by an update operation."
-            upsertedId:
-                type: object
-                description: "The _id value of the object that was upserted."
-            queryStatsMetrics:
-                type: QueryStatsMetrics
-                optional: true
-                description: "Metrics if requested for this single write"
+            originalOpIndex:
+                type: int
+                description: "The index of the statement in the original client write command."
+                stability: internal
+            metrics:
+                description: "Metrics for a single write."
+                type: CursorMetrics
+                stability: internal

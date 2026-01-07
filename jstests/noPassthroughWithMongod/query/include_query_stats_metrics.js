@@ -332,14 +332,17 @@ function assertWriteMetricsEqual(
         }
 
         {
-            // Issue a command with 5 update statements, request metrics for indices 1 and 3 only.
+            // This command simulates a "child batch" that might be sent from a router to a shard.
+            // The field 'includeQueryStatsMetricsForOpIndex' indicates the index of the update
+            // statement in the original batch that arrived at the router, which is not simulated
+            // here.
             const result = testDB.runCommand({
                 update: updateColl.getName(),
                 updates: [
                     {q: {_id: 0}, u: {x: 100}},
-                    {q: {_id: 1}, u: {x: 101}, includeQueryStatsMetrics: true},
+                    {q: {_id: 1}, u: {x: 101}, includeQueryStatsMetricsForOpIndex: NumberInt(201)},
                     {q: {_id: 2}, u: {x: 102}},
-                    {q: {_id: 3}, u: {x: 103}, includeQueryStatsMetrics: true},
+                    {q: {_id: 3}, u: {x: 103}, includeQueryStatsMetricsForOpIndex: NumberInt(203)},
                     {q: {_id: 4}, u: {x: 104}},
                 ],
             });
@@ -357,9 +360,9 @@ function assertWriteMetricsEqual(
             assert.eq(metricsArray.length, 2, "expected 2 metrics entries: " + tojson(metricsArray));
 
             // Collect the indices that have metrics.
-            const metricsIndices = new Set(metricsArray.map((m) => m.index));
-            assert(metricsIndices.has(1), "expected metrics for index 1");
-            assert(metricsIndices.has(3), "expected metrics for index 3");
+            const metricsIndices = new Set(metricsArray.map((m) => m.originalOpIndex));
+            assert(metricsIndices.has(201), "expected metrics for index 201");
+            assert(metricsIndices.has(203), "expected metrics for index 203");
             assert.eq(metricsIndices.size, 2, "expected exactly 2 indices with metrics");
 
             // Verify each metrics entry has the expected structure using the helper.

@@ -66,11 +66,20 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "query_stats_metrics_gen",
+    src = "query_stats_metrics.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
+    ],
+)
+
+idl_generator(
     name = "single_write_result_gen",
     src = "single_write_result.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/query/client_cursor:cursor_response_gen",
+        "//src/mongo/db/query/write_ops:query_stats_metrics_gen",
     ],
 )
 
@@ -111,7 +120,7 @@ idl_generator(
         "//src/mongo/db/auth:action_type_gen",
         "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
         "//src/mongo/db/query:hint_gen",
-        "//src/mongo/db/query/client_cursor:cursor_response_gen",
+        "//src/mongo/db/query/write_ops:query_stats_metrics_gen",
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
@@ -121,6 +130,7 @@ mongo_cc_library(
     name = "write_ops_parsers",
     srcs = [
         "write_ops.cpp",
+        ":query_stats_metrics_gen",
         ":write_ops_gen",
     ],
     deps = [
