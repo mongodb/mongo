@@ -1418,7 +1418,10 @@ std::vector<std::pair<SockAddr, int>> AsioTransportLayer::getListenerSocketBackl
 }
 
 void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
-    bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
+    // We turn listenerProcessingTime into a bson here to preserve the prior format where the type
+    // was "Milliseconds"
+    bob->append("listenerProcessingTime",
+                BSON("durationMicros" << _listenerProcessingTotalMicros.load()));
     BSONArrayBuilder queueDepthsArrayBuilder(
         bob->subarrayStart("listenerSocketBacklogQueueDepths"));
     for (const auto& record : _listenerInterfaceMainPort->getAcceptorRecords()) {
@@ -1658,8 +1661,7 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
             LOGV2_WARNING(23023, "Error accepting new connection", "error"_attr = e);
         }
 
-        // TODO(SERVER-114929): Fix possible race condition on _listenerProcessingTime
-        _listenerProcessingTime.store(_listenerProcessingTime.load() + timer.elapsed());
+        _listenerProcessingTotalMicros.fetchAndAdd(timer.micros());
         _acceptConnection(acceptor);
     };
 
