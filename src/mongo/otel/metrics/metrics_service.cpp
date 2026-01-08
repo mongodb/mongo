@@ -284,8 +284,7 @@ Gauge<int64_t>* MetricsService::createInt64Gauge(MetricName name,
                                                  std::string description,
                                                  MetricUnit unit) {
     stdx::lock_guard lock(_mutex);
-    _metrics.push_back(std::make_unique<GaugeImpl<int64_t>>(
-        std::string(name.getName()), std::move(description), std::string(toString(unit))));
+    _metrics.push_back(std::make_unique<GaugeImpl<int64_t>>());
     auto ptr = dynamic_cast<Gauge<int64_t>*>(_metrics.back().get());
     invariant(ptr);
     return ptr;
