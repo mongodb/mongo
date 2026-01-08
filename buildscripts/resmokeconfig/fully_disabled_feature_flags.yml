@@ -18,8 +18,6 @@
 - featureFlagSearchInSbe
 - featureFlagEgressGrpcForSearch
 - featureFlagTSBucketingParametersUnchanged
-# TODO SERVER-99433: Delete featureFlagReplicaSetEndpoint.
-- featureFlagReplicaSetEndpoint
 - featureFlagGaplessFTDC
 # TODO SERVER-67034: re-enable 'featureFlagSbeFull'.
 - featureFlagSbeFull

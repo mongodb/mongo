@@ -45,9 +45,6 @@ enums:
             kJoinMigrationsAndCheckRangeDeletions: "joinMigrationsAndCheckRangeDeletions"
             kStopDDLsAndCleanupData: "stopDDLsAndCleanupData"
             kCommit: "commit"
-            # TODO (SERVER-99433): Remove this comment after RSEndpoint is fully removed.
-            # Until the RSEndpoint is fully removed, this phase is also responsible for updating the
-            # cluster cardinality parameter after remove shard.
             kResumeDDLs: "resumeDDLs"
 
 structs:
@@ -70,13 +67,11 @@ structs:
                 description: >-
                     True if the command being run is transitionToDedicated, false for normal remove
                     shard.
-            # TODO (SERVER-99433) Remove this argument when RSEndpoint is removed.
+            # TODO SERVER-116328 Remove this argument when 9.0 branches out
             shouldUpdateClusterCardinality:
-                type: bool
+                type: optionalBool
                 description: >-
-                    Tells whether the remove shard coordinator should update the cluster cardinality
-                    parameter after committing a remove shard which leaves only one shard in the
-                    cluster.
+                    Unused field only kept for backwards compatibility with old versions where it was required.
             phase:
                 type: RemoveShardCommitCoordinatorPhase
                 description: "Coordinator phase."

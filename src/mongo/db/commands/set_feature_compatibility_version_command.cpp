@@ -203,17 +203,6 @@ void abortAllReshardCollection(OperationContext* opCtx) {
     }
 }
 
-void _setShardedClusterCardinalityParameter(OperationContext* opCtx, const FCV requestedVersion) {
-    // If the replica set endpoint is not active, then it isn't safe to allow direct connections
-    // again after a second shard has been added. The replica set endpoint requires the cluster
-    // parameter to be correct (go back to false when the second shard is removed) so we will need
-    // to update the cluster parameter whenever replica set endpoint is enabled.
-    if (feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabledOnVersion(requestedVersion)) {
-        uassertStatusOK(
-            ShardingCatalogManager::get(opCtx)->updateClusterCardinalityParameterIfNeeded(opCtx));
-    }
-}
-
 void uassertStatusOKIgnoreNSNotFound(Status status) {
     if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
         return;
@@ -1234,10 +1223,6 @@ private:
             getTransitionFCVInfo(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
                 .from;
-
-        if (role && role->has(ClusterRole::ConfigServer)) {
-            _setShardedClusterCardinalityParameter(opCtx, requestedVersion);
-        }
 
         // TODO SERVER-103046: Remove once 9.0 becomes last lts.
         if (role && role->has(ClusterRole::ShardServer) &&

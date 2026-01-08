@@ -137,9 +137,6 @@ filters:
   - "record_id*":
     approvers:
       - 10gen/server-storage-engine-integration
-  - "replica_set_endpoint*":
-    approvers:
-      - 10gen/server-cluster-scalability
   - "repair*":
     approvers:
       - 10gen/server-storage-engine-integration

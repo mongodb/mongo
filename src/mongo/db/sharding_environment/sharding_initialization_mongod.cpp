@@ -68,8 +68,6 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/replica_set_endpoint_sharding_state.h"
-#include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/router_role/routing_cache/config_server_catalog_cache_loader.h"
@@ -917,22 +915,6 @@ void ShardingInitializationMongoD::onConsistentDataAvailable(OperationContext* o
 void initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
     // Initialise state which does not depend on persisted data.
     _initializeGlobalShardingStateForConfigServer(opCtx);
-
-    // Initialise state which does depend on persisted data.
-    if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // The feature flag check here needs to ignore the FCV since the
-        // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
-        // upgraded.
-        DBDirectClient client(opCtx);
-        FindCommandRequest request(NamespaceString::kConfigsvrShardsNamespace);
-        request.setFilter(BSON("_id" << ShardId::kConfigServerId));
-        auto cursor = client.find(request);
-        if (cursor->more()) {
-            replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(
-                true);
-        }
-    }
 }
 
 void ShardingInitializationMongoD::installReplicaSetChangeListener(ServiceContext* service) {

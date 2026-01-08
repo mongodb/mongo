@@ -201,10 +201,8 @@ if (!isMultiversion) {
 
     removeShardFp.off();
     jsTest.log("Checking the cluster parameter after hang");
-    // Even if the command is interrupted the coordinator removes the shard eventually.
-    // The removeShard command should set to cluster parameter to false if the replica set endpoint
-    // feature flag is enabled.
-    const expectedHasTwoOrMoreShards = !FeatureFlagUtil.isPresentAndEnabled(configPrimary, "ReplicaSetEndpoint");
+    // Even if the command is interrupted the coordinator removes the shard eventually. The cluster parameter value doesn't change if the cluster has ever had at least 2 shards.
+    const expectedHasTwoOrMoreShards = true;
     assert.soon(() => {
         let res = assert.commandWorked(
             st.configRS.getPrimary().adminCommand({getClusterParameter: "shardedClusterCardinalityForDirectConns"}),

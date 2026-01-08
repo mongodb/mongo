@@ -91,7 +91,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -4651,14 +4650,6 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
               "hostAndPort"_attr = _rsConfig.unsafePeek().getMemberAt(_selfIndex).getHostAndPort());
     } else {
         LOGV2(21394, "This node is not a member of the config");
-    }
-    if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // The feature flag check here needs to ignore the FCV since the
-        // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
-        // upgraded.
-        replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)->setIsReplicaSetMember(
-            _selfIndex >= 0);
     }
 
     // Wake up writeConcern waiters that are no longer satisfiable due to the rsConfig change.

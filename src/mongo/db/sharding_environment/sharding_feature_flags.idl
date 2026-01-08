@@ -87,13 +87,6 @@ feature_flags:
         version: 8.0
         fcv_gated: true
         check_against_fcv: legacy_fcv_snapshot_only
-    featureFlagReplicaSetEndpoint:
-        description:
-            When enabled, allows users to connect to a single-shard cluster with no dedicated config
-            server using a replica set connection string.
-        cpp_varname: feature_flags::gFeatureFlagReplicaSetEndpoint
-        default: false
-        fcv_gated: true
     featureFlagCreateDatabaseDDLCoordinator:
         description: >
             Feature flag for enabling the sharding DDL coordinator for database creation.

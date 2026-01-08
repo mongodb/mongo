@@ -2953,10 +2953,6 @@ export class ReplSetTest {
             options.setParameter.featureFlagAllMongodsAreSharded = true;
         }
 
-        if (typeof TestData !== "undefined" && TestData.replicaSetEndpointIncompatible) {
-            options.setParameter.featureFlagReplicaSetEndpoint = false;
-        }
-
         const olderThan73 =
             MongoRunner.compareBinVersions(
                 MongoRunner.getBinVersionFor("7.3"),
@@ -2964,7 +2960,6 @@ export class ReplSetTest {
             ) === 1;
         if (olderThan73) {
             delete options.setParameter.featureFlagClusteredConfigTransactions;
-            delete options.setParameter.featureFlagReplicaSetEndpoint;
         }
 
         const olderThan81 =
@@ -3272,19 +3267,7 @@ export class ReplSetTest {
                 return false;
             }
             return asCluster(this, node, () => {
-                const serverStatusRes = assert.commandWorked(node.adminCommand({serverStatus: 1}));
-                const olderThan73 =
-                    MongoRunner.compareBinVersions(
-                        MongoRunner.getBinVersionFor("7.3"),
-                        MongoRunner.getBinVersionFor(serverStatusRes.version),
-                    ) === 1;
-                if (olderThan73) {
-                    return false;
-                }
-                const getParameterRes = assert.commandWorked(
-                    node.adminCommand({getParameter: 1, featureFlagReplicaSetEndpoint: 1}),
-                );
-                return getParameterRes.featureFlagReplicaSetEndpoint.value;
+                return false;
             });
         }
         return false;

@@ -2,8 +2,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 export const getBackupCursorDB = function (mongo) {
-    const dbName = FeatureFlagUtil.isEnabled(mongo, "ReplicaSetEndpoint") ? "local" : "admin";
-    return mongo.getDB(dbName);
+    return mongo.getDB("admin");
 };
 
 export function backupData(mongo, destinationDirectory) {

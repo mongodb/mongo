@@ -32,7 +32,6 @@
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator_service.h"
-#include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/remove_shard_commit_coordinator.h"
 #include "mongo/db/topology/remove_shard_commit_coordinator_document_gen.h"
@@ -62,8 +61,6 @@ RemoveShardProgress runCoordinatorRemoveShard(
         // The Operation FCV is currently propagated only for DDL operations,
         // which cannot be nested. Therefore, the VersionContext shouldn't have an OFCV yet.
         invariant(!VersionContext::getDecoration(opCtx).hasOperationFCV());
-        coordinatorDoc.setShouldUpdateClusterCardinality(
-            replica_set_endpoint::isFeatureFlagEnabled(VersionContext::getDecoration(opCtx)));
         coordinatorDoc.setShardingDDLCoordinatorMetadata(
             {{NamespaceString::kConfigsvrShardsNamespace,
               DDLCoordinatorTypeEnum::kRemoveShardCommit}});

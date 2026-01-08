@@ -47,7 +47,6 @@ core:
     - src/mongo/db/request_execution_context.h
     - src/mongo/db/server_lifecycle_monitor[._]*
     - src/mongo/db/service_entry_point_bm_fixture.h
-    - src/mongo/db/service_entry_point_rs_endpoint.*
     - src/mongo/db/startup_warnings*
     - src/mongo/db/thread_client_test.cpp
     - src/mongo/db/throw_hook_impl[._]*
@@ -113,7 +112,6 @@ core.servers:
     - src/mongo/db/service_context_d_test_fixture.*
     - src/mongo/db/global_settings*
     - src/mongo/db/mongod_options_sharding*
-    - src/mongo/db/replica_set_endpoint*
     - src/mongo/s/mongos.cpp
     - src/mongo/s/mongos_main.*
     - src/mongo/s/mongos_options*
@@ -342,9 +340,6 @@ catalog_and_routing.topology:
     - src/mongo/s/commands/cluster_rwc_defaults_commands.cpp
     - src/mongo/s/commands/s_read_write_concern_defaults_server_status.cpp
     - src/mongo/s/read_write_concern_defaults_cache_lookup_mongos*
-
-    # replica_set_endpoint: will be deleted eventually
-    - src/mongo/db/s/replica_set_endpoint*
 
     # change streams:
     - src/mongo/s/change_streams*

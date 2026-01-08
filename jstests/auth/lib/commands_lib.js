@@ -7561,13 +7561,7 @@ export const authCommandsLib = {
         },
         {
             testname: "aggregate_$backupCursor",
-            setup: (db) => {
-                return {isReplicaSetEndpointEnabled: FeatureFlagUtil.isEnabled(db, "ReplicaSetEndpoint")};
-            },
-            runOnDb: (state) => {
-                const {isReplicaSetEndpointEnabled} = state;
-                return isReplicaSetEndpointEnabled ? "local" : adminDbName;
-            },
+            runOnDb: () => adminDbName,
             command: {aggregate: 1, cursor: {}, pipeline: [{$backupCursor: {}}]},
             skipSharded: true,
             // Only enterprise knows of this aggregation stage.
@@ -7588,13 +7582,7 @@ export const authCommandsLib = {
         },
         {
             testname: "aggregate_$backupCursorExtend",
-            setup: (db) => {
-                return {isReplicaSetEndpointEnabled: FeatureFlagUtil.isEnabled(db, "ReplicaSetEndpoint")};
-            },
-            runOnDb: (state) => {
-                const {isReplicaSetEndpointEnabled} = state;
-                return isReplicaSetEndpointEnabled ? "local" : adminDbName;
-            },
+            runOnDb: () => adminDbName,
             command: {
                 aggregate: 1,
                 pipeline: [

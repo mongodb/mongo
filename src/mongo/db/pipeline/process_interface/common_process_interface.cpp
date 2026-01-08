@@ -146,14 +146,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
         }
     };
 
-    if (opCtx->routedByReplicaSetEndpoint()) {
-        // On the replica set endpoint, currentOp should report both router and shard operations.
-        auto serviceContext = opCtx->getServiceContext();
-        reportCurrentOpForService(serviceContext->getService(ClusterRole::RouterServer));
-        reportCurrentOpForService(serviceContext->getService(ClusterRole::ShardServer));
-    } else {
-        reportCurrentOpForService(opCtx->getService());
-    }
+    reportCurrentOpForService(opCtx->getService());
 
     // If 'cursorMode' is set to include idle cursors, retrieve them and add them to ops.
     if (cursorMode == CurrentOpCursorMode::kIncludeCursors) {

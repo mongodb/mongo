@@ -99,7 +99,6 @@ private:
     // Allows ddl operations to resume in the cluster.
     void _resumeDDLOperations(OperationContext* opCtx);
 
-    // TODO (SERVER-99433) Remove once replica set endpoint is fully discontinued.
     // Updates the "hasTwoOrMoreShard" cluster cardinality parameter if this shard removal leaves
     // only one shard in the cluster and the coordinator was started with the parameter
     // `shouldUpdateClusterCardinality` set to true.
