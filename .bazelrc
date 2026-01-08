@@ -572,6 +572,7 @@ common:public-release --grpc_keepalive_time=0s
 common:public-release --legacy_important_outputs
 common:public-release --//bazel/config:release=True
 common:public-release --//bazel/config:extensions_signature_verification_secure=True
+common:public-release --stamp
 
 --config=fission
 common:fission --fission=yes

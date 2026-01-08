@@ -132,7 +132,7 @@ single_version_override(
     version = "1.7.1",
 )
 
-bazel_dep(name = "rules_pkg", version = "1.0.1")
+bazel_dep(name = "rules_pkg", version = "1.2.0")
 bazel_dep(name = "abseil-cpp", version = "20250512.1", repo_name = "com_google_absl")
 local_path_override(
     module_name = "abseil-cpp",
