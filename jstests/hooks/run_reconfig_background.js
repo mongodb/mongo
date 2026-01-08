@@ -38,9 +38,7 @@ function isShutdownError(error) {
 }
 
 /**
- * Runs the reconfig command against the primary of a replica set.
- *
- * The reconfig command randomly chooses a node to change it's votes and priority to 0 or 1
+ * This reconfig command randomly chooses a node to change it's votes and priority to 0 or 1
  * based on what the node's current votes and priority fields are. We always check to see that
  * there exists at least two voting nodes in the set, which ensures that we can always have a
  * primary in the case of stepdowns.
@@ -49,10 +47,103 @@ function isShutdownError(error) {
  *
  * The number of voting nodes in the replica set determines what the config majority is for both
  * reconfig config commitment and reconfig oplog commitment.
+ */
+function getVotingReconfig(config, primaryIndex, numNodes) {
+    // Calculate the total number of voting nodes in this set so that we make sure we
+    // always have at least two voting nodes. This is so that the primary can always
+    // safely step down because there is at least one other electable secondary.
+    const numVotingNodes = config.members.filter((member) => member.votes === 1).length;
+
+    // Randomly change the vote of a node to 1 or 0 depending on its current value. Do not
+    // change the primary's votes.
+    let indexToChange = primaryIndex;
+    while (indexToChange === primaryIndex) {
+        // randInt is exclusive of the upper bound.
+        indexToChange = Random.randInt(numNodes);
+    }
+
+    jsTestLog(`Running reconfig to change votes of node at index ${indexToChange}`);
+
+    // Change the priority to correspond to the votes. If the member's current votes field
+    // is 1, only change it to 0 if there are more than 3 voting members in this set.
+    // We want to ensure that there are at least 3 voting nodes so that killing the primary
+    // will not affect a majority.
+    config.version++;
+    config.members[indexToChange].votes = config.members[indexToChange].votes === 1 && numVotingNodes > 3 ? 0 : 1;
+    config.members[indexToChange].priority = config.members[indexToChange].votes;
+
+    return config;
+}
+
+/**
+ * This reconfig command randomly chooses to add or remove a maintenance port from a single node. If
+ * there are no nodes currently configured with a maintenance port, it will add one. If all nodes
+ * are currently configured with a maintenance port, we will remove one. Otherwise, we will randomly
+ * choose to add or remove.
+ *
+ * Changing this continuously in the background ensures that the replica set maintains connectivity
+ * during these changes.
+ */
+function getMaintenancePortReconfig(config, maintenancePorts) {
+    let memberIndexesWith = [];
+    let memberIndexesWithout = [];
+    for (let i = 0; i < config.members.length; i++) {
+        if ("maintenancePort" in config.members[i]) {
+            memberIndexesWith.push(i);
+        } else {
+            memberIndexesWithout.push(i);
+        }
+    }
+
+    let addMaintenancePortTo = (memberIndex, config, maintenancePorts) => {
+        jsTest.log.info(`Running reconfig to add maintenance port to node at index ${memberIndex}`);
+        config.members[memberIndex].maintenancePort = maintenancePorts[memberIndex];
+        config.version++;
+        return config;
+    };
+
+    let removeMaintenancePortFrom = (memberIndex, config) => {
+        jsTest.log.info(`Running reconfig to remove maintenance port from node at index ${memberIndex}`);
+        delete config.members[memberIndex].maintenancePort;
+        config.version++;
+        return config;
+    };
+
+    // If no members have the maintenance port, add it. If all nodes have the maintenance port,
+    // remove it. Otherwise, we choose randomly.
+    if (memberIndexesWith.length == 0) {
+        return addMaintenancePortTo(
+            memberIndexesWithout[Random.randInt(memberIndexesWithout.length)],
+            config,
+            maintenancePorts,
+        );
+    } else if (memberIndexesWithout.length == 0) {
+        return removeMaintenancePortFrom(memberIndexesWith[Random.randInt(memberIndexesWith.length)], config);
+    } else {
+        // Otherwise, choose randomly.
+        let shouldAdd = Random.rand() > 0.5;
+        if (shouldAdd) {
+            return addMaintenancePortTo(
+                memberIndexesWithout[Random.randInt(memberIndexesWithout.length)],
+                config,
+                maintenancePorts,
+            );
+        } else {
+            return removeMaintenancePortFrom(memberIndexesWith[Random.randInt(memberIndexesWith.length)], config);
+        }
+    }
+}
+
+/**
+ * Runs the reconfig command against the primary of a replica set.
+ *
+ * Gets the current config and then chooses which reconfig command to run based on the suite and
+ * calls the corresponding helper functions to get the new config. Then runs the actual reconfig
+ * against the primary node.
  *
  * This function should not throw if everything is working properly.
  */
-function reconfigBackground(primary, numNodes) {
+function reconfigBackground(primary, numNodes, maintenancePorts) {
     // Calls 'func' with the print() function overridden to be a no-op.
     Random.setRandomSeed();
     const quietly = (func) => {
@@ -92,34 +183,15 @@ function reconfigBackground(primary, numNodes) {
     jsTestLog(`primaryIndex is ${primaryIndex}`);
     jsTestLog(`primary's config: (configVersion: ${config.version}, configTerm: ${config.term})`);
 
-    // Calculate the total number of voting nodes in this set so that we make sure we
-    // always have at least two voting nodes. This is so that the primary can always
-    // safely step down because there is at least one other electable secondary.
-    const numVotingNodes = config.members.filter((member) => member.votes === 1).length;
+    let newConfig = maintenancePorts
+        ? getMaintenancePortReconfig(config, maintenancePorts)
+        : getVotingReconfig(config, primaryIndex, numNodes);
 
-    // Randomly change the vote of a node to 1 or 0 depending on its current value. Do not
-    // change the primary's votes.
-    let indexToChange = primaryIndex;
-    while (indexToChange === primaryIndex) {
-        // randInt is exclusive of the upper bound.
-        indexToChange = Random.randInt(numNodes);
-    }
-
-    jsTestLog(`Running reconfig to change votes of node at index ${indexToChange}`);
-
-    // Change the priority to correspond to the votes. If the member's current votes field
-    // is 1, only change it to 0 if there are more than 3 voting members in this set.
-    // We want to ensure that there are at least 3 voting nodes so that killing the primary
-    // will not affect a majority.
-    config.version++;
-    config.members[indexToChange].votes = config.members[indexToChange].votes === 1 && numVotingNodes > 3 ? 0 : 1;
-    config.members[indexToChange].priority = config.members[indexToChange].votes;
-
-    let votingRes = conn.getDB("admin").runCommand({replSetReconfig: config});
-    jsTestLog(`votingRes: ${tojson(votingRes)}`);
-    if (!votingRes.ok && !isIgnorableError(votingRes.codeName)) {
+    let reconfigRes = conn.getDB("admin").runCommand({replSetReconfig: newConfig});
+    jsTestLog(`reconfigRes: ${tojson(reconfigRes)}`);
+    if (!reconfigRes.ok && !isIgnorableError(reconfigRes.codeName)) {
         jsTestLog("Reconfig to change votes FAILED.");
-        return votingRes;
+        return reconfigRes;
     }
 
     return {ok: 1};
@@ -137,7 +209,7 @@ try {
     }
 
     const numNodes = topology.nodes.length;
-    res = reconfigBackground(topology.primary, numNodes);
+    res = reconfigBackground(topology.primary, numNodes, TestData.maintenancePorts);
 } catch (e) {
     // If the ReplicaSetMonitor cannot find a primary because it has stepped down or
     // been killed, it may take longer than 15 seconds for a new primary to step up.

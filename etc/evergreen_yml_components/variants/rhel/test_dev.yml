@@ -317,10 +317,18 @@ buildvariants:
       - name: .multiversion_sanity_check
       - name: replica_sets_api_version_jscore_passthrough_gen
       - name: replica_sets_reconfig_jscore_passthrough_gen
+      - name: replica_sets_reconfig_jscore_passthrough_maintenance_ports_gen
       - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+      - name: replica_sets_reconfig_jscore_stepdown_passthrough_maintenance_ports_gen
         distros:
           - rhel8.8-xlarge
       - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+        distros:
+          - rhel8.8-xlarge
+      - name: replica_sets_reconfig_kill_primary_jscore_passthrough_maintenance_ports_gen
+        distros:
+          - rhel8.8-xlarge
+      - name: replica_sets_reconfig_terminate_primary_jscore_passthrough_maintenance_ports_gen
         distros:
           - rhel8.8-xlarge
       - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
