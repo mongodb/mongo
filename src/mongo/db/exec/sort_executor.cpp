@@ -31,18 +31,24 @@
 #include "mongo/db/exec/sort_executor.h"
 
 #include "mongo/db/exec/classic/working_set.h"
+#include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
 
 namespace mongo {
 template <typename T>
 std::unique_ptr<Sorter<Value, T>> SortExecutor<T>::makeSorter() {
     auto opts = makeSortOptions();
-    return Sorter<Value, T>::template make<Comparator>(
-        opts,
-        Comparator(_sortPattern),
-        (opts.tempDir) ? std::make_unique<FileBasedSorterSpiller<Value, T, Comparator>>(
-                             *opts.tempDir, opts.sorterFileStats)
-                       : nullptr);
+    SortKeyComparator sortKeyComparator{_sortPattern};
+    std::function<int(const Value&, const Value&)> comparator =
+        [sortKeyComparator](const Value& lhs, const Value& rhs) -> int {
+        return sortKeyComparator(lhs, rhs);
+    };
+    return Sorter<Value, T>::make(opts,
+                                  comparator,
+                                  (opts.tempDir)
+                                      ? std::make_unique<FileBasedSorterSpiller<Value, T>>(
+                                            *opts.tempDir, opts.sorterFileStats)
+                                      : nullptr);
 }
 template class SortExecutor<Document>;
 template class SortExecutor<SortableWorkingSetMember>;

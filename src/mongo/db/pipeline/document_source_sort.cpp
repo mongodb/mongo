@@ -118,14 +118,10 @@ struct CompDesc {
     }
 };
 
-using TimeSorterAscMin =
-    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompAsc, BoundMakerMin>;
-using TimeSorterAscMax =
-    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompAsc, BoundMakerMax>;
-using TimeSorterDescMin =
-    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompDesc, BoundMakerMin>;
-using TimeSorterDescMax =
-    BoundedSorter<DocumentSourceSort::SortableDate, Document, CompDesc, BoundMakerMax>;
+using TimeSorterAscMin = BoundedSorter<DocumentSourceSort::SortableDate, Document, BoundMakerMin>;
+using TimeSorterAscMax = BoundedSorter<DocumentSourceSort::SortableDate, Document, BoundMakerMax>;
+using TimeSorterDescMin = BoundedSorter<DocumentSourceSort::SortableDate, Document, BoundMakerMin>;
+using TimeSorterDescMax = BoundedSorter<DocumentSourceSort::SortableDate, Document, BoundMakerMax>;
 }  // namespace
 
 const DocumentSourceSort::SortStageOptions DocumentSourceSort::kDefaultOptions = {};

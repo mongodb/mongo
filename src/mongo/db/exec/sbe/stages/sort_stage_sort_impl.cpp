@@ -205,29 +205,6 @@ public:
 private:
     using SorterIterator = sorter::Iterator<KeyRow, ValueRow>;
     using SorterData = std::pair<KeyRow, ValueRow>;
-    class Comparator {
-    public:
-        explicit Comparator(const std::vector<value::SortDirection>& sortDirections)
-            : _sortDirections(sortDirections) {}
-        int operator()(const KeyRow& lhs, const KeyRow& rhs) const {
-            auto size = lhs.size();
-            for (size_t idx = 0; idx < size; ++idx) {
-                auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
-                auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
-                auto [tag, val] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-                uassert(7086700, "Invalid comparison result", tag == value::TypeTags::NumberInt32);
-                auto result = value::bitcastTo<int32_t>(val);
-                if (result) {
-                    return _sortDirections[idx] == value::SortDirection::Descending ? -result
-                                                                                    : result;
-                }
-            }
-            return 0;
-        }
-
-    private:
-        std::vector<value::SortDirection> _sortDirections;
-    };
 
     int64_t _runLimitCode() {
         value::TagValueMaybeOwned res = vm::ByteCode{}.run(_limitCode.get());
@@ -256,10 +233,27 @@ private:
 
     void _makeSorter() {
         auto opts = _makeSortOptions();
-        _sorter = Sorter<KeyRow, ValueRow>::template make<Comparator>(
+        std::function<int(const KeyRow&, const KeyRow&)> comparator =
+            [this](const KeyRow& lhs, const KeyRow& rhs) -> int {
+            auto size = lhs.size();
+            for (size_t idx = 0; idx < size; ++idx) {
+                auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
+                auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
+                auto [tag, val] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+                uassert(7086700, "Invalid comparison result", tag == value::TypeTags::NumberInt32);
+                auto result = value::bitcastTo<int32_t>(val);
+                if (result) {
+                    return this->_stage._dirs[idx] == value::SortDirection::Descending ? -result
+                                                                                       : result;
+                }
+            }
+            return 0;
+        };
+
+        _sorter = Sorter<KeyRow, ValueRow>::make(
             opts,
-            Comparator(_stage._dirs),
-            (opts.tempDir) ? std::make_unique<FileBasedSorterSpiller<KeyRow, ValueRow, Comparator>>(
+            comparator,
+            (opts.tempDir) ? std::make_unique<FileBasedSorterSpiller<KeyRow, ValueRow>>(
                                  *opts.tempDir, opts.sorterFileStats)
                            : nullptr,
             {});

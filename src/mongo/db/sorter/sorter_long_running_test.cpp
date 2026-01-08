@@ -105,8 +105,7 @@ public:
         {  // test empty (no inputs)
             std::vector<std::shared_ptr<IWIterator>> vec;
             std::shared_ptr<IWIterator> mergeIter(
-                sorter::merge<IntWrapper, IntWrapper, IWComparator>(
-                    vec, SortOptions(), IWComparator()));
+                sorter::merge<IntWrapper, IntWrapper>(vec, SortOptions(), IWComparator()));
             ASSERT_ITERATORS_EQUIVALENT(mergeIter, std::make_shared<EmptyIterator>());
         }
         {  // test empty (only empty inputs)
@@ -329,13 +328,12 @@ public:
 private:
     // Make a new sorter with desired opts and comp. Opts may be ignored but not comp
     std::shared_ptr<IWSorter> makeSorter(SortOptions opts, IWComparator comp = IWComparator(ASC)) {
-        return std::shared_ptr<IWSorter>(IWSorter::template make<IWComparator>(
+        return std::shared_ptr<IWSorter>(IWSorter::make(
             adjustSortOptions(opts),
             comp,
-            opts.tempDir
-                ? std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper, IWComparator>>(
-                      *opts.tempDir, opts.sorterFileStats)
-                : nullptr));
+            opts.tempDir ? std::make_unique<FileBasedSorterSpiller<IntWrapper, IntWrapper>>(
+                               *opts.tempDir, opts.sorterFileStats)
+                         : nullptr));
     }
 
     void assertRangeInfo(const std::shared_ptr<IWSorter>& sorter, const SortOptions& opts) {
@@ -558,7 +556,7 @@ public:
             (NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT <
             std::max(static_cast<std::size_t>(
                          (MEM_LIMIT - DATA_MEM_LIMIT) /
-                         MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize),
+                         MergeableSorter<IntWrapper, IntWrapper>::kFileIteratorSize),
                      static_cast<std::size_t>(1)));
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT);
@@ -664,18 +662,17 @@ class LotsOfSpillsLittleMemory : public LotsOfDataLittleMemory<Random> {
             (Parent::NUM_ITEMS * sizeof(IWPair)) / DATA_MEM_LIMIT >
             std::max(static_cast<std::size_t>(
                          (MEM_LIMIT - DATA_MEM_LIMIT) /
-                         MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize),
+                         MergeableSorter<IntWrapper, IntWrapper>::kFileIteratorSize),
                      static_cast<std::size_t>(1)));
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT);
     }
 
     size_t correctSpilledRanges() const override {
-        std::size_t maximumNumberOfIterators =
-            std::max(static_cast<std::size_t>(
-                         (MEM_LIMIT - DATA_MEM_LIMIT) /
-                         MergeableSorter<IntWrapper, IntWrapper, IWComparator>::kFileIteratorSize),
-                     static_cast<std::size_t>(1));
+        std::size_t maximumNumberOfIterators = std::max(
+            static_cast<std::size_t>((MEM_LIMIT - DATA_MEM_LIMIT) /
+                                     MergeableSorter<IntWrapper, IntWrapper>::kFileIteratorSize),
+            static_cast<std::size_t>(1));
         // It spills when the data in memory is more than the maximum allowed memory.
         std::size_t recordsPerRange = DATA_MEM_LIMIT / sizeof(IWPair) + 1;
         std::size_t documentsToAdd = Parent::NUM_ITEMS;

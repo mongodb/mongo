@@ -34,7 +34,6 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
-#include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
@@ -63,16 +62,6 @@ template <typename T>
 class MONGO_MOD_NEEDS_REPLACEMENT SortExecutor {
 public:
     using DocumentSorter = Sorter<Value, T>;
-    class Comparator {
-    public:
-        Comparator(const SortPattern& sortPattern) : _sortKeyComparator(sortPattern) {}
-        int operator()(const Value& lhs, const Value& rhs) const {
-            return _sortKeyComparator(lhs, rhs);
-        }
-
-    private:
-        SortKeyComparator _sortKeyComparator;
-    };
 
     /**
      * If the passed in limit is 0, this is treated as no limit.
