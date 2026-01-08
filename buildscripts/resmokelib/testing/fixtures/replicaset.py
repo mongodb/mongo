@@ -475,23 +475,34 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def await_ready(self):
         """Wait for replica set to be ready."""
-        self._await_primary()
-        self._await_secondaries()
-        self._await_newly_added_removals()
-        self._await_stable_recovery_timestamp()
+        deadline = time.time() + interface.Fixture.AWAIT_READY_TIMEOUT_SECS
+        self._await_primary(deadline)
+        self._await_secondaries(deadline)
+        self._await_newly_added_removals(deadline)
+        self._await_stable_recovery_timestamp(deadline)
         self._setup_cwrwc_defaults()
         self._await_read_concern_available()
         if self.use_auto_bootstrap_procedure:
             # TODO: Remove this in SERVER-80010.
             self._await_auto_bootstrapped_config_shard()
 
-    def _await_primary(self):
+    def _await_primary(self, deadline=None):
         # Wait for the primary to be elected.
         # Since this method is called at startup we expect the first node to be primary even when
         # self.all_nodes_electable is True.
         primary = self.nodes[0]
         client = primary.mongo_client()
+
+        if deadline is None:
+            deadline = time.time() + interface.Fixture.AWAIT_READY_TIMEOUT_SECS
+
         while True:
+            if time.time() >= deadline:
+                raise self.fixturelib.ServerFailure(
+                    "Timed out after {} seconds waiting for primary on port {} to be elected.".format(
+                        interface.Fixture.AWAIT_READY_TIMEOUT_SECS, primary.port
+                    )
+                )
             self.logger.info("Waiting for primary on port %d to be elected.", primary.port)
             cmd_result = client.admin.command("isMaster")
             if cmd_result["ismaster"]:
@@ -499,7 +510,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             time.sleep(0.1)  # Wait a little bit before trying again.
         self.logger.info("Primary on port %d successfully elected.", primary.port)
 
-    def _await_secondaries(self):
+    def _await_secondaries(self, deadline):
         # Wait for the secondaries to become available.
         # Since this method is called at startup we expect the nodes 1 to n to be secondaries even
         # when self.all_nodes_electable is True.
@@ -510,6 +521,12 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         for secondary in secondaries:
             client = secondary.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
             while True:
+                if time.time() >= deadline:
+                    raise self.fixturelib.ServerFailure(
+                        "Timed out after {} seconds waiting on fixture to be ready. Currently waiting for secondary on port {} to become available.".format(
+                            interface.Fixture.AWAIT_READY_TIMEOUT_SECS, secondary.port
+                        )
+                    )
                 self.logger.info(
                     "Waiting for secondary on port %d to become available.", secondary.port
                 )
@@ -525,7 +542,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 time.sleep(0.1)  # Wait a little bit before trying again.
             self.logger.info("Secondary on port %d is now available.", secondary.port)
 
-    def _await_stable_recovery_timestamp(self):
+    def _await_stable_recovery_timestamp(self, deadline):
         """
         Awaits stable recovery timestamps on all nodes in the replica set.
 
@@ -563,6 +580,13 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             client_admin = client["admin"]
 
             while True:
+                if time.time() >= deadline:
+                    raise self.fixturelib.ServerFailure(
+                        "Timed out after {} seconds waiting on fixture to be ready. Currently waiting for node on port {} to have a stable recovery timestamp.".format(
+                            interface.Fixture.AWAIT_READY_TIMEOUT_SECS, node.port
+                        )
+                    )
+
                 status = client_admin.command("replSetGetStatus")
 
                 # The `lastStableRecoveryTimestamp` field contains a stable timestamp guaranteed to
@@ -611,7 +635,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         return False
 
-    def _await_newly_added_removals(self):
+    def _await_newly_added_removals(self, deadline):
         """
         Wait for all 'newlyAdded' fields to be removed from the replica set config.
 
@@ -623,6 +647,12 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         primary = self.get_primary()
         client = interface.build_client(primary, self.auth_options)
         while self._should_await_newly_added_removals_longer(client):
+            if time.time() >= deadline:
+                raise self.fixturelib.ServerFailure(
+                    "Timed out after {} seconds waiting on fixture to be ready. Currently waiting for 'newlyAdded' field removals.".format(
+                        interface.Fixture.AWAIT_READY_TIMEOUT_SECS
+                    )
+                )
             time.sleep(0.1)  # Wait a little bit before trying again.
         self.logger.info("All 'newlyAdded' fields removed")
 
