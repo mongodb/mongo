@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:a973a3fe-5abe-4432-91fa-cc30c1034545",
-  "version": 11,
+  "version": 12,
   "metadata": {
-    "timestamp": "2026-01-02T06:04:51Z",
+    "timestamp": "2026-01-07T21:03:18Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -1506,7 +1506,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/grpc/grpc@1.59.5",
+      "bom-ref": "pkg:github/grpc/grpc@v1.74.1",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -1516,7 +1516,7 @@
       "author": "gRPC authors",
       "group": "google.opensource",
       "name": "gRPC (C++)",
-      "version": "1.59.5",
+      "version": "1.74.1",
       "description": "gRPC is a modern, open source, high-performance remote procedure call (RPC) framework that can run anywhere. gRPC enables client and server applications to communicate transparently, and simplifies the building of connected systems.",
       "licenses": [
         {
@@ -1526,8 +1526,8 @@
         }
       ],
       "copyright": "Copyright 2015 gRPC authors",
-      "cpe": "cpe:2.3:a:grpc:grpc:1.59.5:*:*:*:*:*:*:*",
-      "purl": "pkg:github/grpc/grpc@1.59.5",
+      "cpe": "cpe:2.3:a:grpc:grpc:1.74.1:*:*:*:*:*:*:*",
+      "purl": "pkg:github/grpc/grpc@v1.74.1",
       "externalReferences": [
         {
           "url": "https://github.com/grpc/grpc.git",
@@ -2214,7 +2214,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/protocolbuffers/protobuf@v4.25.0",
+      "bom-ref": "pkg:github/protocolbuffers/protobuf@v6.31.1",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -2224,7 +2224,7 @@
       "author": "Google LLC",
       "group": "google.opensource",
       "name": "Protobuf",
-      "version": "4.25.0",
+      "version": "6.31.1",
       "description": "Protocol Buffers - Google's data interchange format",
       "licenses": [
         {
@@ -2234,8 +2234,8 @@
         }
       ],
       "copyright": "Copyright 2008 Google Inc. Copyright 2023 Google LLC. All rights reserved.",
-      "cpe": "cpe:2.3:a:google:protobuf-cpp:4.25.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/protocolbuffers/protobuf@v4.25.0",
+      "cpe": "cpe:2.3:a:google:protobuf-cpp:6.31.1:*:*:*:*:*:*:*",
+      "purl": "pkg:github/protocolbuffers/protobuf@v6.31.1",
       "externalReferences": [
         {
           "url": "https://github.com/protocolbuffers/protobuf.git",
@@ -2633,7 +2633,7 @@
         "pkg:github/google/snappy@1.1.10",
         "pkg:github/google/googletest@v1.17.0",
         "pkg:github/gperftools/gperftools@gperftools-2.9.1",
-        "pkg:github/grpc/grpc@1.59.5",
+        "pkg:github/grpc/grpc@v1.74.1",
         "pkg:github/unicode-org/icu@icu-release-57-1",
         "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
         "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
@@ -2649,7 +2649,7 @@
         "pkg:pypi/ocspbuilder@0.10.2",
         "pkg:pypi/ocspresponder@0.5.0",
         "pkg:github/pcre2project/pcre2@pcre2-10.40",
-        "pkg:github/protocolbuffers/protobuf@v4.25.0",
+        "pkg:github/protocolbuffers/protobuf@v6.31.1",
         "pkg:github/roaringbitmap/croaring@v3.0.1",
         "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
         "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
@@ -2668,19 +2668,31 @@
       ]
     },
     {
+      "ref": "pkg:deb/debian/firefox-esr@140.3.0esr-1?arch=source",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/unicode-org/unicode@8.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/abseil/abseil-cpp@20250512.1",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/arximboldi/immer@0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/chriskohlhoff/asio@asio-1-34-2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/aws/aws-sdk-cpp@1.11.471",
+      "ref": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
       "dependsOn": []
     },
     {
@@ -2688,7 +2700,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/benchmark@v1.5.2",
+      "ref": "pkg:github/arximboldi/immer@0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/aws/aws-sdk-cpp@1.11.471",
       "dependsOn": []
     },
     {
@@ -2700,7 +2716,19 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:github/chriskohlhoff/asio@asio-1-34-2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/confluentinc/librdkafka@v2.6.0",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/davea42/libdwarf-code@libdwarf-2.1.0",
       "dependsOn": []
     },
     {
@@ -2712,11 +2740,23 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:github/facebook/folly@v2023.12.25.00",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/facebook/zstd@v1.5.5",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/fmtlib/fmt@11.2.0",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/facebook/folly@v2023.12.25.00",
+      "ref": "pkg:github/google/benchmark@v1.5.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/google/googletest@v1.17.0",
       "dependsOn": []
     },
     {
@@ -2732,7 +2772,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/googletest@v1.17.0",
+      "ref": "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
       "dependsOn": []
     },
     {
@@ -2740,15 +2780,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/grpc/grpc@1.59.5",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/unicode-org/icu@icu-release-57-1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
+      "ref": "pkg:github/grpc/grpc@v1.74.1",
       "dependsOn": []
     },
     {
@@ -2756,15 +2788,11 @@
       "dependsOn": []
     },
     {
+      "ref": "pkg:github/jeremy-rifkin/cpptrace@v1.0.3",
+      "dependsOn": []
+    },
+    {
       "ref": "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/mongodb/libmongocrypt@1.15.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/confluentinc/librdkafka@v2.6.0",
       "dependsOn": []
     },
     {
@@ -2776,7 +2804,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
+      "ref": "pkg:github/madler/zlib@1.3.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/mongodb/libmongocrypt@1.15.0",
       "dependsOn": []
     },
     {
@@ -2784,63 +2816,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:deb/debian/firefox-esr@140.3.0esr-1?arch=source",
+      "ref": "pkg:github/nlohmann/json@v3.11.3",
       "dependsOn": []
     },
     {
       "ref": "pkg:github/nodejs/node@22.1.0?download_url=https%3A%2F%2Fgithub.com%2Fnodejs%2Fnode%2Fblob%2F8b45c5d26a829bcd3280401dbc1874bcd1302289%2Fsrc%2Fnode_i18n.cc%23L825%23src%2Fnode_i18n.cc%3AGetStringWidth#src/node_i18n.cc",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:pypi/ocspbuilder@0.10.2",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:pypi/ocspresponder@0.5.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/pcre2project/pcre2@pcre2-10.40",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/protocolbuffers/protobuf@v4.25.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/roaringbitmap/croaring@v3.0.1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/aappleby/smhasher@a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/snowballstem/snowball@1.0.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:generic/unicode-org/unicode@8.0.0",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:generic/valgrind/valgrind@093bef43d69236287ccc748591c9560a71181b0a",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/madler/zlib@1.3.1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/facebook/zstd@v1.5.5",
       "dependsOn": []
     },
     {
@@ -2852,7 +2832,27 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/nlohmann/json@v3.11.3",
+      "ref": "pkg:github/pcre2project/pcre2@pcre2-10.40",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/protocolbuffers/protobuf@v6.31.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/roaringbitmap/croaring@v3.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/snowballstem/snowball@1.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:github/unicode-org/icu@icu-release-57-1",
       "dependsOn": []
     },
     {
@@ -2860,11 +2860,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/davea42/libdwarf-code@libdwarf-2.1.0",
+      "ref": "pkg:pypi/ocspbuilder@0.10.2",
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/jeremy-rifkin/cpptrace@v1.0.3",
+      "ref": "pkg:pypi/ocspresponder@0.5.0",
       "dependsOn": []
     }
   ]

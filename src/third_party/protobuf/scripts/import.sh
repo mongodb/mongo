@@ -7,7 +7,12 @@ IFS=$'\n\t'
 set -vx
 
 NAME=protobuf
-VERSION="v31.1"
+# Protobuf uses language-specific major versions and minor/patch versions for protoc
+# Example: Protobuf C++ version 6.31.1 uses protobuf-cpp v6 and protoc version v31.1
+# Vulnerability databases use the full semver for tracking, so specify the full semver version here for the SBOM automation script
+# The protobuf repo (and our fork) contain tags for the semver that points to the protoc release
+# To determine the correct major version, see: https://protobuf.dev/support/version-support/#cpp
+VERSION="v6.31.1"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf
 PATCH_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf/patches

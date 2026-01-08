@@ -24,6 +24,7 @@ from config import (
     endor_components_rename,
     get_semver_from_release_version,
     process_component_special_cases,
+    third_party_folders_remove,
 )
 from endorctl_utils import EndorCtl
 from git import Commit, Repo
@@ -770,8 +771,9 @@ def main() -> None:
     # region Parse metadata SBOM components
 
     third_party_folders = get_subfolders_dict(git_info.repo_root.as_posix() + "/src/third_party")
-    # pre-exclude 'scripts' folder
-    del third_party_folders["scripts"]
+    # exclude folders specified in config.py
+    for folder in third_party_folders_remove:
+        del third_party_folders[folder]
 
     for component in meta_bom["components"]:
         versions = {
@@ -1022,7 +1024,7 @@ def main() -> None:
     print_banner("CONSOLIDATED WARNINGS")
     warnings = []
     for record in warning_handler.warnings:
-        warnings.append(record.getMessage())
+        warnings.append("- " + record.getMessage())
 
     print("\n".join(warnings))
 

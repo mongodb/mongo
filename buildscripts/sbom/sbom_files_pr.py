@@ -183,7 +183,7 @@ if __name__ == "__main__":
             print("pull_request: ", pull_request)
 
         if args.saved_warnings:
-            pr_comment = "The following warnings were output by the SBOM generation script:\n"
+            pr_comment = "### The following warnings were output by the SBOM generation script:\n"
             if os.path.isfile(args.saved_warnings):
                 pr_comment += read_text_file(args.saved_warnings)
             comment = pull_request.create_issue_comment(pr_comment)
