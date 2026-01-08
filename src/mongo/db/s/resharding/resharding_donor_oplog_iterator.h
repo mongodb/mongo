@@ -30,19 +30,16 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/s/resharding/resharding_donor_oplog_pipeline.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
-#include <memory>
 #include <vector>
 
 namespace mongo {
@@ -93,19 +90,16 @@ public:
  * Iterator for fetching batches of oplog entries from the oplog buffer collection for a particular
  * donor shard.
  *
+ * Supports auto-retry on retriable errors and waiting for new oplog entries to be inserted
+ * to the buffer collection.
+ *
  * Instances of this class are not thread-safe.
  */
 class ReshardingDonorOplogIterator : public ReshardingDonorOplogIteratorInterface {
 public:
-    ReshardingDonorOplogIterator(NamespaceString oplogBufferNss,
+    ReshardingDonorOplogIterator(std::unique_ptr<ReshardingDonorOplogPipelineInterface> pipeline,
                                  ReshardingDonorOplogId resumeToken,
                                  resharding::OnInsertAwaitable* insertNotifier);
-
-    /**
-     * Returns a pipeline for iterating the buffered copy of the donor's oplog.
-     */
-    std::unique_ptr<Pipeline> makePipeline(
-        OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
         std::shared_ptr<executor::TaskExecutor> executor,
@@ -117,8 +111,14 @@ public:
 private:
     std::vector<repl::OplogEntry> _fillBatch();
 
+    ExecutorFuture<std::vector<repl::OplogEntry>> _getNextBatch(
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken cancelToken,
+        CancelableOperationContextFactory factory);
+
     const NamespaceString _oplogBufferNss;
 
+    std::unique_ptr<ReshardingDonorOplogPipelineInterface> _pipeline;
     ReshardingDonorOplogId _resumeToken;
 
     // _insertNotifier is used to asynchronously wait for a document to be inserted into the oplog
@@ -126,8 +126,6 @@ private:
     // oplog entry hasn't been reached yet.
     resharding::OnInsertAwaitable* const _insertNotifier;
 
-    std::unique_ptr<Pipeline> _pipeline;
-    std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     bool _hasSeenFinalOplogEntry{false};
 };
 

@@ -13,6 +13,7 @@ mongo_cc_library(
     name = "mongo_process_interface",
     srcs = [
         "mongo_process_interface.cpp",
+        "mongo_process_interface_factory.cpp",
     ],
     deps = [
         "//src/mongo:base",
