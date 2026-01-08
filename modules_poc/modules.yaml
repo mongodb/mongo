@@ -834,6 +834,7 @@ storage_engine_api:
     - src/mongo/db/storage/record_store*
     - src/mongo/db/storage/recovery_unit*
     - src/mongo/db/storage/sorted_data_interface*
+    - src/mongo/db/storage/container*
     - src/mongo/db/startup_recovery*
     - src/mongo/db/modules/enterprise/src/inmemory
     - src/mongo/db/modules/enterprise/src/queryable
