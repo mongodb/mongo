@@ -3915,10 +3915,14 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncFailsWhenCollectionCreati
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kSecondary, false));
     std::vector<ApplierOperation> ops = {ApplierOperation{&op}};
+    unittest::LogCaptureGuard logs;
     const bool dataIsConsistent = true;
     ASSERT_EQUALS(
         ErrorCodes::InvalidOptions,
         oplogApplier.applyOplogBatchPerWorker(_opCtx.get(), &ops, nullptr, dataIsConsistent));
+    ASSERT_EQUALS(1,
+                  logs.countBSONContainingSubset(BSON(
+                      "attr" << BSON("opTime" << BSON("ts" << Timestamp(1, 0) << "t" << 1LL)))));
 }
 
 TEST_F(OplogApplierImplTest,
@@ -3971,7 +3975,11 @@ TEST_F(
     NamespaceString nss = makeNamespace("local");
     // Delete operation without _id in 'o' field.
     auto op = makeDeleteDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, {});
+    unittest::LogCaptureGuard logs;
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, runOpSteadyState(op));
+    ASSERT_EQUALS(1,
+                  logs.countBSONContainingSubset(BSON(
+                      "attr" << BSON("opTime" << BSON("ts" << Timestamp(1, 0) << "t" << 1LL)))));
 }
 
 TEST_F(OplogApplierImplTest,
@@ -3986,7 +3994,11 @@ TEST_F(OplogApplierImplTest,
         };
     createCollectionWithUuid(_opCtx.get(), nss);
     auto op = makeInsertDocumentOplogEntry({Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0));
+    unittest::LogCaptureGuard logs;
     ASSERT_EQUALS(ErrorCodes::OperationFailed, runOpSteadyState(op));
+    ASSERT_EQUALS(1,
+                  logs.countBSONContainingSubset(BSON(
+                      "attr" << BSON("opTime" << BSON("ts" << Timestamp(1, 0) << "t" << 1LL)))));
     ASSERT(onInsertsCalled);
 }
 
