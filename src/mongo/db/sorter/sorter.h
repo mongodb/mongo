@@ -576,8 +576,6 @@ template <typename Key, typename Value>
 class SorterSpiller {
 public:
     typedef sorter::Iterator<Key, Value> Iterator;
-    // TODO(SERVER-115336): Settings is a file-specific type that should be added to
-    // FileBasedSorterStorage.
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
@@ -605,9 +603,6 @@ public:
     typedef sorter::Iterator<Key, Value> Iterator;
     typedef std::pair<Key, Value> Data;
     using Comparator = std::function<int(const Key&, const Key&)>;
-
-    // TODO(SERVER-115336): Settings is a file-specific type that should be added to
-    // FileBasedSorterStorage.
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
