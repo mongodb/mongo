@@ -112,8 +112,32 @@ else
     echo "[INFO] Swap setup skipped (SKIP_SWAP=1)." >&2
 fi
 
-if command -v systemd-run >/dev/null 2>&1; then
-    exec systemd-run --user --quiet --collect --pipe \
+maybe_fix_user_bus_env() {
+    # If VS Code didn't give us a session env, try the conventional systemd user bus path.
+    local uid xdg bus
+    uid="$(id -u)"
+    xdg="${XDG_RUNTIME_DIR:-/run/user/$uid}"
+    bus="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$xdg/bus}"
+
+    # Only export if the bus socket actually exists.
+    if [[ -d "$xdg" && -S "$xdg/bus" ]]; then
+        export XDG_RUNTIME_DIR="$xdg"
+        export DBUS_SESSION_BUS_ADDRESS="$bus"
+        return 0
+    fi
+    return 1
+}
+
+can_use_systemd_user() {
+    command -v systemd-run >/dev/null 2>&1 || return 1
+    maybe_fix_user_bus_env >/dev/null 2>&1 || true
+
+    # Quick non-hanging probe: if this can't connect, don't use systemd-run.
+    timeout 1s systemd-run --user --quiet --scope true >/dev/null 2>&1
+}
+
+if can_use_systemd_user; then
+    if systemd-run --user --quiet --collect --pipe \
         --unit="$UNIT" \
         -p MemoryHigh=4G \
         -p MemoryMax=8G \
@@ -121,7 +145,11 @@ if command -v systemd-run >/dev/null 2>&1; then
         -p IOWeight=10 \
         -p IOSchedulingClass=idle \
         -p IOSchedulingPriority=7 \
-        -- "$CLANGD" "${FINAL_ARGS[@]}"
+        -- "$CLANGD" "${FINAL_ARGS[@]}"; then
+        exit 0
+    else
+        echo "[WARN] systemd-run --user failed; falling back to direct clangd." >&2
+    fi
 else
     echo "[WARN] systemd-run not available (common in containers). Running clangd without systemd limits." >&2
 
