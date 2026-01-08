@@ -181,4 +181,31 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic() {
     return logic;
 }
 
+boost::intrusive_ptr<DocumentSourceExtensionOptimizable> DocumentSourceExtensionOptimizable::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const AggStageParseNodeHandle& parseNodeHandle) {
+    auto expanded = parseNodeHandle->expand();
+
+    tassert(
+        11623000, "Expected parseNode to only expand into a single node.", expanded.size() == 1);
+
+    boost::intrusive_ptr<DocumentSourceExtensionOptimizable> optimizable = nullptr;
+    helper::visitExpandedNodes(
+        expanded,
+        [&](const HostAggStageParseNode& host) {
+            tasserted(11623001, "Expected extension AST node, got host parse node.");
+        },
+        [&](const AggStageParseNodeHandle& handle) {
+            tasserted(11623002, "Expected extension AST node, got extension parse node.");
+        },
+        [&](const HostAggStageAstNode& hostAst) {
+            tasserted(11623003, "Expected extension AST node, got host AST node.");
+        },
+        [&](AggStageAstNodeHandle handle) {
+            optimizable = DocumentSourceExtensionOptimizable::create(expCtx, std::move(handle));
+        });
+
+    return optimizable;
+}
+
 }  // namespace mongo::extension::host

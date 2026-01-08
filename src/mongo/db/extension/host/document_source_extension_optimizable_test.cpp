@@ -98,6 +98,42 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
         optimizable->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions);
 }
 
+DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
+             createFromParseNodeHandleWithMultipleNodesFails,
+             "11623000") {
+    // Create a parse node that expands to multiple nodes.
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::MidAParseNode>());
+    AggStageParseNodeHandle parseNodeHandle{parseNode};
+
+    [[maybe_unused]] auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(parseNodeHandle));
+}
+
+DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
+             createFromParseNodeHandleWithHostParseNodeFails,
+             "11623001") {
+    // Create a parse node that expands to a host parse node.
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToHostParseParseNode>());
+    auto parseNodeHandle = AggStageParseNodeHandle(parseNode);
+
+    [[maybe_unused]] auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(parseNodeHandle));
+}
+
+DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
+             createFromParseNodeHandleWithExtensionParseNodeFails,
+             "11623002") {
+    // Create a parse node that expands to an extension parse node handle.
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToExtParseParseNode>());
+    auto parseNodeHandle = AggStageParseNodeHandle(parseNode);
+
+    [[maybe_unused]] auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(parseNodeHandle));
+}
+
 TEST_F(DocumentSourceExtensionOptimizableTest, stageWithDefaultStaticProperties) {
     // These should also be the default static properties for Transform stages.
     auto astNode = new sdk::ExtensionAggStageAstNode(
@@ -358,4 +394,20 @@ TEST_F(DocumentSourceExtensionOptimizableTest, distributedPlanLogicWithMergeOnly
     // Verify sort pattern is empty.
     ASSERT_FALSE(logic.mergeSortPattern.has_value());
 }
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       createFromParseNodeHandleWithSingleExtensionAstNode) {
+    // Create a parse node that expands to a single extension AST node.
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToExtAstParseNode>());
+    auto parseNodeHandle = AggStageParseNodeHandle(parseNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(parseNodeHandle));
+
+    ASSERT_TRUE(optimizable);
+    ASSERT_EQ(std::string(optimizable->getSourceName()),
+              sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
+}
+
 }  // namespace mongo::extension
