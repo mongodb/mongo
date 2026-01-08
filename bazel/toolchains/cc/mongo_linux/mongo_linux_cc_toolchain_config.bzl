@@ -1758,6 +1758,23 @@ def _impl(ctx):
         ],
     )
 
+    trivial_auto_var_init_pattern_feature = feature(
+        name = "trivial_auto_var_init_pattern",
+        # TODO SERVER-116228 Remove the aarch64-only restriction once we have gdb 17.1.
+        # gdb < 17.1 has a bug where breakpoints on certain x86-64 SIMD instructions (that appear
+        # frequently with this flag) cause the breakpointed instruction to execute incorrectly.
+        # Only enabled for clang as it produces some bogus warnings in the v5 toolchain's gcc.
+        enabled = ctx.attr.dbg and ctx.attr.is_aarch64 and ctx.attr.compiler == COMPILERS.CLANG,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-ftrivial-auto-var-init=pattern",
+                ])],
+            ),
+        ],
+    )
+
     disable_warnings_for_third_party_libraries_clang_feature = feature(
         name = "disable_warnings_for_third_party_libraries_clang",
         enabled = ctx.attr.compiler == COMPILERS.CLANG,
@@ -1897,6 +1914,7 @@ def _impl(ctx):
         warnings_as_errors_link_feature,
         first_party_gcc_or_clang_warnings_feature,
         first_party_gcc_warnings_feature,
+        trivial_auto_var_init_pattern_feature,
     ] + get_common_features(ctx) + [
         # These flags are at the bottom so they get applied after anything else.
         # These are things like the flags people apply directly on cc_library through copts/linkopts
@@ -1940,6 +1958,7 @@ mongo_linux_cc_toolchain_config = rule(
         "cxx_builtin_include_directories": attr.string_list(mandatory = True),
         "cpu": attr.string(mandatory = True),
         "compiler": attr.string(mandatory = True),
+        "dbg": attr.bool(mandatory = True),
         "linker": attr.string(mandatory = True),
         "distro": attr.string(mandatory = False),
         "extra_cflags": attr.string_list(mandatory = False),
