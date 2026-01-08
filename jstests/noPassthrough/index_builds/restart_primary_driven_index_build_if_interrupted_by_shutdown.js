@@ -29,7 +29,7 @@ let primaryDB = primary.getDB(dbName);
 let coll = primaryDB.getCollection(collName);
 let collNss = coll.getFullName();
 
-// TODO(SERVER-109349): Remove this check when the feature flag is removed.
+// TODO(SERVER-109578): Remove this check when the feature flag is removed.
 if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
     jsTestLog(
         "Skipping restart_primary_driven_index_build_if_interrupted.js because featureFlagPrimaryDrivenIndexBuilds is disabled",

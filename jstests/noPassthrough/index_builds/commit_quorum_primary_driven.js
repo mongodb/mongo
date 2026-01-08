@@ -33,7 +33,7 @@ const primaryDB = primary.getDB("test");
 const collName = "primaryDrivenIndexBuild";
 const coll = primaryDB.primaryDrivenIndexBuild;
 
-// TODO(SERVER-109349): Remove this check when the feature flag is removed.
+// TODO(SERVER-109578): Remove this check when the feature flag is removed.
 if (!FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds")) {
     jsTestLog("Skipping commit_quorum_primary_driven.js because featureFlagPrimaryDrivenIndexBuilds is disabled");
     rst.stopSet();

@@ -19,7 +19,7 @@ const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB.getCollection(collName);
 const secondary = rst.getSecondary();
 
-// TODO(SERVER-109349): Remove this check when the feature flag is removed.
+// TODO(SERVER-109578): Remove this check when the feature flag is removed.
 // TODO(SERVER-105853): Remove this check when the feature flag is removed.
 if (
     !FeatureFlagUtil.isPresentAndEnabled(primaryDB, "PrimaryDrivenIndexBuilds") ||
