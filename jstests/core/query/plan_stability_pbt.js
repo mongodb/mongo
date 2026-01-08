@@ -38,14 +38,12 @@ const numQueriesPerRun = 50;
 
 const experimentColl = db.plan_stability_pbt;
 
-// TODO SERVER-106983, re-enable $match once planner is deterministic.
-const aggModel = getQueryAndOptionsModel().filter((q) => !JSON.stringify(q).includes("$match"));
+const aggModel = getQueryAndOptionsModel();
 
 testProperty(
     createPlanStabilityProperty(experimentColl),
     {experimentColl},
     makeWorkloadModel({collModel: getCollectionModel(), aggModel, numQueriesPerRun}),
     numRuns,
-    // TODO SERVER-106983 re-enable counterexample runs.
-    //  planStabilityCounterexamples
+    planStabilityCounterexamples,
 );
