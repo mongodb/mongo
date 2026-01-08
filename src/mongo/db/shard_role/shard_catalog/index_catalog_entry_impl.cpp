@@ -341,7 +341,7 @@ void IndexCatalogEntryImpl::forceSetMultikey(OperationContext* const opCtx,
     auto& collectionQueryInfo = CollectionQueryInfo::get(coll);
     collectionQueryInfo.clearQueryCacheForSetMultikey(coll);
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
-        collectionQueryInfo.updatePathArraynessForSetMultikey(opCtx, coll.get());
+        collectionQueryInfo.updatePathArraynessForSetMultikey(_descriptor, multikeyPaths);
     }
 }
 
@@ -802,7 +802,7 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
         auto& collectionQueryInfo = CollectionQueryInfo::get(collection);
         collectionQueryInfo.clearQueryCacheForSetMultikey(collection);
         if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
-            collectionQueryInfo.updatePathArraynessForSetMultikey(opCtx, collection.get());
+            collectionQueryInfo.updatePathArraynessForSetMultikey(_descriptor, multikeyPaths);
         }
     }
 }

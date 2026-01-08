@@ -31,6 +31,7 @@
 
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
@@ -61,6 +62,13 @@ public:
     void addPath(const FieldPath& path, const MultikeyComponents& multikeyPath);
 
     /**
+     * Insert all paths from an index into the trie. This method assumes 'multikeyPaths' is not
+     * empty.
+     */
+    void addPathsFromIndexKeyPattern(const BSONObj& indexKeyPattern,
+                                     const MultikeyPaths& multikeyPaths);
+
+    /**
      * Given a path return whether any component of it is an array.
      * For field paths that are not included in any index, assumes that the path has an array.
      */
@@ -78,6 +86,16 @@ public:
      * specifies whether or not that field path prefix is an array component.
      */
     stdx::unordered_map<std::string, bool> exportToMap_forTest();
+
+    /**
+     * Static helper to determine if an index is suitable for tracking array pathness.
+     * We generally skip:
+     * 1. Wildcard indexes: Unbounded size of multikey paths. We read later once we have
+     * materialized 'CanonicalQuery'. (TODO: SERVER-113445)
+     * 2. Partial indexes: Don't cover the full document set.
+     * 3. Hidden indexes: Intended to be invisible to the query optimizer.
+     */
+    static bool isIndexEligibleToAddToPathArrayness(const IndexDescriptor& descriptor);
 
 private:
     /**
