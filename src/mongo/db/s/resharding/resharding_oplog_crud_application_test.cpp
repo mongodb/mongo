@@ -300,33 +300,51 @@ public:
         }
     }
 
-    struct SlimApplyOpsInfo {
+    struct OplogEntryInfo {
         BSONObj rawCommand;
         std::vector<repl::DurableReplOperation> operations;
     };
 
-    std::vector<SlimApplyOpsInfo> findApplyOpsNewerThan(OperationContext* opCtx, Timestamp ts) {
-        std::vector<SlimApplyOpsInfo> result;
+    std::vector<OplogEntryInfo> findOpsNewerThan(OperationContext* opCtx, Timestamp ts) {
+        std::vector<OplogEntryInfo> result;
+
 
         PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
+
+        store.forEach(
+            opCtx,
+            // A "d" or "i" op.
+            BSON("$or" << BSON_ARRAY(BSON("op" << "d") << BSON("op" << "i")) << "ts"
+                       << BSON("$gt" << ts)),
+            [&](const auto& oplogEntry) {
+                // applyOps might be elided if there's only one oplog entry.
+                auto op = oplogEntry.getDurableReplOperation();
+                auto cmd = oplogEntry.toBSON().copy();
+                result.emplace_back(OplogEntryInfo{
+                    std::move(cmd), {repl::DurableReplOperation::parseOwned(op.toBSON())}});
+                return true;
+            });
+
+        // A command op w/applyOps.
         store.forEach(opCtx,
                       BSON("op" << "c"
                                 << "o.applyOps" << BSON("$exists" << true) << "ts"
-                                << BSON("$gt" << ts)),
+                                << BSON("$gt" << ts)) /*))*/,
                       [&](const auto& oplogEntry) {
-                          auto applyOpsCmd = oplogEntry.getObject().getOwned();
-                          auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(applyOpsCmd);
+                          auto cmd = oplogEntry.getObject().getOwned();
+                          std::cout << ">>> " << oplogEntry.toBSON().toString() << "\n";
+                          auto applyOpsInfo = repl::ApplyOpsCommandInfo::parse(cmd);
 
                           std::vector<repl::DurableReplOperation> operations;
                           operations.reserve(applyOpsInfo.getOperations().size());
 
                           for (const auto& innerOp : applyOpsInfo.getOperations()) {
                               operations.emplace_back(repl::DurableReplOperation::parse(
-                                  innerOp, IDLParserContext{"findApplyOpsNewerThan"}));
+                                  innerOp, IDLParserContext{"findOpsNewerThan"_sd}));
                           }
 
                           result.emplace_back(
-                              SlimApplyOpsInfo{std::move(applyOpsCmd), std::move(operations)});
+                              OplogEntryInfo{std::move(cmd), std::move(operations)});
                           return true;
                       });
 
@@ -763,7 +781,7 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpRemovesFromOutputCollection) 
     // oplog for an applyOps entry with a "d" op on the output collection.
     {
         auto opCtx = makeOperationContext();
-        auto applyOpsInfo = findApplyOpsNewerThan(opCtx.get(), beforeDeleteOpTime.getTimestamp());
+        auto applyOpsInfo = findOpsNewerThan(opCtx.get(), beforeDeleteOpTime.getTimestamp());
         ASSERT_EQ(applyOpsInfo.size(), 2U);
         for (size_t i = 0; i < applyOpsInfo.size(); ++i) {
             ASSERT_EQ(applyOpsInfo[i].operations.size(), 1U);
@@ -827,7 +845,7 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpAtomicallyMovesFromOtherStash
     //   (3) op="i" on the output collection.
     {
         auto opCtx = makeOperationContext();
-        auto applyOpsInfo = findApplyOpsNewerThan(opCtx.get(), beforeDeleteOpTime.getTimestamp());
+        auto applyOpsInfo = findOpsNewerThan(opCtx.get(), beforeDeleteOpTime.getTimestamp());
         ASSERT_EQ(applyOpsInfo.size(), 1U);
         ASSERT_EQ(applyOpsInfo[0].operations.size(), 3U);
 

@@ -3,7 +3,7 @@
  * - the resharding source collection and copied to the resharding temporary collection.
  * - the resharded collection after resharding is complete.
  * @tags: [
- *    requires_fcv_80,
+ *    requires_fcv_83,
  * ]
  */
 
@@ -119,24 +119,22 @@ reshardingTest.withReshardingInBackground(
     },
 );
 
-// Verify that donor has delete oplog entry and recipient has a corresponding applyOps entry.
+// Verify that donor has delete oplog entry and recipient has a corresponding oplog entry.
 const ttlDeleteEntryDonor = donor0
     .getCollection("local.oplog.rs")
     .find({"op": "d", "ns": getTimeseriesCollForDDLOps(db, coll).getFullName()})
     .toArray();
 assert.eq(1, ttlDeleteEntryDonor.length, ttlDeleteEntryDonor);
 
-const ttlDeleteApplyOpsEntryRecipient = recipient0
+const ttlDeleteEntryRecipient = recipient0
     .getCollection("local.oplog.rs")
-    .find({"o.applyOps.op": "d"})
+    .find({"op": "d", "ns": {"$regex": "^" + db.getName()}})
     .toArray();
-assert.eq(1, ttlDeleteApplyOpsEntryRecipient.length, ttlDeleteApplyOpsEntryRecipient);
-assert.eq("c", ttlDeleteApplyOpsEntryRecipient[0].op, ttlDeleteApplyOpsEntryRecipient[0]);
-const applyOps = ttlDeleteApplyOpsEntryRecipient[0].o.applyOps[0];
+assert.eq(1, ttlDeleteEntryRecipient.length, ttlDeleteEntryRecipient);
 if (areViewlessTimeseriesEnabled(db)) {
-    assert(applyOps.ns.includes(`${db.getName()}.system.resharding`));
+    assert(ttlDeleteEntryRecipient[0].ns.includes(`${db.getName()}.system.resharding`));
 } else {
-    assert(applyOps.ns.includes(`${db.getName()}.${getTimeseriesBucketsColl("resharding")}`));
+    assert(ttlDeleteEntryRecipient[0].ns.includes(`${db.getName()}.${getTimeseriesBucketsColl("resharding")}`));
 }
 // Ensure TTL deletes works on the resharded collection.
 const pauseTTLMonitor = configureFailPoint(recipient0, "hangTTLMonitorBetweenPasses", {}, "alwaysOn");
