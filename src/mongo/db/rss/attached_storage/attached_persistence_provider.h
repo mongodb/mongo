@@ -103,6 +103,8 @@ public:
      */
     bool shouldForceUpdateWithFullDocument() const override;
 
+    bool supportsCursorReuseForExpressPathQueries() const override;
+
     /**
      * We can support local, fully unreplicated collections.
      */

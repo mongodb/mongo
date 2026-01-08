@@ -134,6 +134,14 @@ public:
     virtual bool shouldForceUpdateWithFullDocument() const = 0;
 
     /**
+     * If true, the storage provider supports the reuse of cursors in express path queries. Used to
+     * disable this optimization for disaggregated storage for now.
+     *
+     * TODO SERVER-116261: re-enable the optimization for disaggregated storage.
+     */
+    virtual bool supportsCursorReuseForExpressPathQueries() const = 0;
+
+    /**
      * If true, the storage provider supports the use of local, unreplicated collections.
      */
     virtual bool supportsLocalCollections() const = 0;

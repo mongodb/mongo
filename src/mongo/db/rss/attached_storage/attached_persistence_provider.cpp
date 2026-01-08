@@ -99,6 +99,10 @@ bool AttachedPersistenceProvider::shouldForceUpdateWithFullDocument() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::supportsCursorReuseForExpressPathQueries() const {
+    return true;
+}
+
 bool AttachedPersistenceProvider::supportsLocalCollections() const {
     return true;
 }
