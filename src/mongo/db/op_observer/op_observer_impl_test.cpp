@@ -4560,8 +4560,29 @@ TEST_F(BatchedWriteOutputsTest, TestSingleDeleteIsNotInApplyOps) {
                 opCtx, *autoColl, kUninitializedStmtId, doc, getDocumentKey(*autoColl, doc), {});
         });
 
-    // TODO SERVER-114338: Update test to check single retryable insert oplog entries. We can do the
+    // TODO SERVER-114338: Update test to check single retryable delete oplog entries. We can do the
     // same thing above using a statement id StmtId(0).
+}
+
+TEST_F(BatchedWriteOutputsTest, TestSingleUpdateIsNotInApplyOps) {
+    testBatchedWriteSingleOplogEntryIsNotWrappedInApplyOps(
+        [&](const AutoGetCollection& autoColl, OperationContext* opCtx) {
+            const auto criteria = BSON("_id" << 0);
+            // Create a fake preImageDoc; the tested code path does not care about this value.
+            const auto preImageDoc = criteria;
+            CollectionUpdateArgs updateArgs{preImageDoc};
+            updateArgs.criteria = criteria;
+            updateArgs.updatedDoc = BSON("_id" << 0 << "data"
+                                               << "x");
+            updateArgs.update = BSON("$set" << BSON("data" << "x"));
+            updateArgs.mustCheckExistenceForInsertOperations = true;
+            OplogUpdateEntryArgs update(&updateArgs, *autoColl);
+
+            opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, update);
+        });
+
+    // TODO SERVER-114338: Update test to check single retryable update oplog entries. We can do the
+    // same thing above but also setting updateArgs.stmtIds to StmtId(0).
 }
 
 class OnDeleteOutputsTest : public OpObserverTest {
