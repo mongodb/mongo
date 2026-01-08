@@ -511,5 +511,92 @@ TEST(MessageCompressorManager, RuntMessage) {
     ASSERT_NOT_OK(status);
 }
 
+class ZlibDecompressTest : public unittest::Test {
+public:
+    Status doDecompress(const std::vector<char>& in, std::vector<char>& out) {
+        ConstDataRange inRange(in.data(), in.size());
+        DataRange outRange(out.data(), out.size());
+        auto swSize = compressor->decompressData(inRange, outRange);
+        if (swSize.isOK())
+            out.resize(swSize.getValue());
+        return swSize.getStatus();
+    }
+
+    Status doDecompress(const std::vector<char>& in) {
+        std::vector<char> out(1024);
+        return doDecompress(in, out);
+    }
+
+    std::vector<char> doCompress(const std::vector<char>& in) {
+        std::vector<char> out(compressor->getMaxCompressedSize(in.size()));
+        DataRange outRange(out.data(), out.size());
+        auto swSz = compressor->compressData(in, outRange);
+        ASSERT_OK(swSz);
+        out.resize(swSz.getValue());
+        return out;
+    }
+
+    static std::vector<char> strVec(StringData s) {
+        return std::vector<char>{s.begin(), s.end()};
+    }
+
+    std::unique_ptr<ZlibMessageCompressor> compressor{std::make_unique<ZlibMessageCompressor>()};
+};
+
+TEST_F(ZlibDecompressTest, RejectsEmptyPayload) {
+    ASSERT_EQ(doDecompress({}), ErrorCodes::BadValue);
+}
+
+TEST_F(ZlibDecompressTest, RejectsUndersizedPayload) {
+    ASSERT_EQ(doDecompress({0x78, 0x9c, 0x03, 0x00}), ErrorCodes::BadValue);
+}
+
+TEST_F(ZlibDecompressTest, RejectsBadCompressionMethod) {
+    const char cm = 0;  // Expected to be 8.
+    const char cmf = 0x70 | (cm & 0xf);
+    ASSERT_EQ(doDecompress({cmf, 0x9c, 0x63, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00}),
+              ErrorCodes::BadValue);
+}
+
+TEST_F(ZlibDecompressTest, RoundTripLongerData) {
+    const auto data = strVec("Hello, MongoDB! Compression hardening test.");
+    std::vector<char> out(data.size() + 100);
+    ASSERT_OK(doDecompress(doCompress(data), out));
+    ASSERT_EQ(out, data);
+}
+
+TEST_F(ZlibDecompressTest, RoundTripShortData) {
+    const auto data = strVec("Short");
+    std::vector<char> out(10000);
+    ASSERT_OK(doDecompress(doCompress(data), out));
+    ASSERT_EQ(out, data);
+}
+
+TEST_F(ZlibDecompressTest, ByteCounts) {
+    const auto data = strVec("Hello, MongoDB! Compression hardening test.");
+    uint64_t compressIn = 0;
+    uint64_t compressOut = 0;
+    uint64_t decompressIn = 0;
+    uint64_t decompressOut = 0;
+    for (int i = 0;; ++i) {
+        ASSERT_EQ(compressor->getCompressorBytesIn(), compressIn);
+        ASSERT_EQ(compressor->getCompressorBytesOut(), compressOut);
+        ASSERT_EQ(compressor->getDecompressorBytesIn(), decompressIn);
+        ASSERT_EQ(compressor->getDecompressorBytesOut(), decompressOut);
+        if (i >= 5)
+            break;
+
+        std::vector<char> compressed = doCompress(data);
+        compressIn += data.size();
+        compressOut += compressed.size();
+
+        std::vector<char> out(data.size() + 100);
+        ASSERT_OK(doDecompress(compressed, out));
+        ASSERT_EQ(out, data);
+        decompressIn += compressed.size();
+        decompressOut += data.size();
+    }
+}
+
 }  // namespace
 }  // namespace mongo
