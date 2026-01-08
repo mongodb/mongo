@@ -4436,7 +4436,10 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
+    auto updateOp2 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                doc_diff::kUpdateSectionFieldName << fromjson("{loc: 'hi'}"))));
+    auto status = runOpInitialSync(updateOp2);
     ASSERT_EQ(status.code(), 16755);
 }
 
@@ -4467,7 +4470,10 @@ TEST_F(IdempotencyTest, Geo2dIndex) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
+    auto updateOp2 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(
+                                BSON(doc_diff::kUpdateSectionFieldName << fromjson("{loc: [1]}"))));
+    auto status = runOpInitialSync(updateOp2);
     ASSERT_EQ(status.code(), 13068);
 }
 
@@ -4486,7 +4492,10 @@ TEST_F(IdempotencyTest, UniqueKeyIndex) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
+    auto updateOp2 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(
+                                BSON(doc_diff::kUpdateSectionFieldName << fromjson("{x: 5}"))));
+    auto status = runOpInitialSync(updateOp2);
     ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
 }
 
@@ -4550,7 +4559,10 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
+    auto updateOp2 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(BSON(
+                                doc_diff::kUpdateSectionFieldName << fromjson("{language: 1}"))));
+    auto status = runOpInitialSync(updateOp2);
     ASSERT_EQ(status.code(), 17261);
 }
 
@@ -4582,7 +4594,10 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
+    auto updateOp2 = update(1,
+                            update_oplog_entry::makeDeltaOplogEntry(
+                                BSON(doc_diff::kUpdateSectionFieldName << fromjson("{y: 1}"))));
+    auto status = runOpInitialSync(updateOp2);
     ASSERT_EQ(status.code(), 17261);
 }
 
@@ -4615,7 +4630,11 @@ TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
     testOpsAreIdempotent(ops);
 
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
+    auto updateOp2 =
+        update(1,
+               update_oplog_entry::makeDeltaOplogEntry(
+                   BSON(doc_diff::kUpdateSectionFieldName << fromjson("{language: 'bad'}"))));
+    auto status = runOpInitialSync(updateOp2);
     ASSERT_EQ(status.code(), 17262);
 }
 

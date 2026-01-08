@@ -46,7 +46,8 @@ class RecordStoreHarnessHelper : public HarnessHelper {
 public:
     enum class Options { Standalone, ReplicationEnabled };
 
-    virtual std::unique_ptr<RecordStore> newRecordStore() = 0;
+    virtual std::unique_ptr<RecordStore> newRecordStore(
+        const RecordStore::Options& rsOptions = RecordStore::Options{}) = 0;
 
     std::unique_ptr<RecordStore> newRecordStore(const std::string& ns) {
         return newRecordStore(ns, RecordStore::Options{});

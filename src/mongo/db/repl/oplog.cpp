@@ -1934,12 +1934,18 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             repl::OplogApplication::checkOnOplogFailureForRecovery(
                                 opCtx, op.getNss(), redact(op.toBSONForLogging()), redact(status));
                         } else if (mode == OplogApplication::Mode::kInitialSync) {
-                            // TODO (SERVER-87994): Revisit the verbosity of the logging.
-                            LOGV2_DEBUG(8776800,
-                                        1,
-                                        "INFO: Error applying operation while initialSync.",
-                                        "oplogEntry"_attr = redact(op.toBSONForLogging()),
-                                        "error"_attr = redact(status));
+                            LOGV2_DEBUG(
+                                8776800,
+                                1,
+                                "INFO: Skipping insert with duplicate key during initial sync.",
+                                "oplogEntry"_attr = redact(op.toBSONForLogging()));
+
+                            // Upon encountering a DuplicateKey error during the initial sync we
+                            // skip the record. Skipping an insert oplog does not produce any
+                            // unintended consequences as it is equivalent to having the
+                            // beginApplyingTimestamp set after it. That is a valid state we could
+                            // have received on the initial sync.
+                            return Status::OK();
                         }
                         // Continue to the next block to retry the operation as an upsert.
                         needToDoUpsert = true;
