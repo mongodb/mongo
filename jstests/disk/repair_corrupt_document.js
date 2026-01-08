@@ -40,13 +40,7 @@ let createCollWithDoc = function (coll) {
 // Insert corrupt document for testing via failpoint.
 let corruptDocumentOnInsert = function (db, coll) {
     jsTestLog("Corrupt document BSON on insert.");
-    assert.commandWorked(
-        db.adminCommand({
-            configureFailPoint: "corruptDocumentOnInsert",
-            data: {"collectionName": coll.getName()},
-            mode: "alwaysOn",
-        }),
-    );
+    assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "alwaysOn"}));
     assert.commandWorked(coll.insert(doc2));
     assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}));
 };

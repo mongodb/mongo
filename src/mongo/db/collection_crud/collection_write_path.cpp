@@ -105,8 +105,6 @@ MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
 MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
 
 // This fail point introduces corruption to documents during insert.
-// The caller must specify the name of the collection to trigger data corruption upon to prevent
-// undesired behavior that may occur if background inserts are corrupted as well.
 MONGO_FAIL_POINT_DEFINE(corruptDocumentOnInsert);
 
 // This fail point manually forces the RecordId to be of a given value during insert.
@@ -288,19 +286,12 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             recordId = it->replicatedRecordId;
         }
 
-        if (auto scoped = corruptDocumentOnInsert.scoped(); MONGO_unlikely(scoped.isActive())) {
-            const auto fpCollectionName = scoped.getData().getStringField("collectionName");
-            if (collection->ns().coll() == fpCollectionName) {
-                //  Insert a truncated record that is half the expected size of the source document.
-                records.emplace_back(
-                    Record{std::move(recordId), RecordData(doc.objdata(), doc.objsize() / 2)});
-                timestamps.emplace_back(it->oplogSlot.getTimestamp());
-                LOGV2_WARNING(11627300,
-                              "Corrupted document intentionally inserted due to failpoint",
-                              "failpoint"_attr = corruptDocumentOnInsert.getName(),
-                              "collection"_attr = collection->ns().coll());
-                continue;
-            }
+        if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
+            // Insert a truncated record that is half the expected size of the source document.
+            records.emplace_back(
+                Record{std::move(recordId), RecordData(doc.objdata(), doc.objsize() / 2)});
+            timestamps.emplace_back(it->oplogSlot.getTimestamp());
+            continue;
         }
 
         explicitlySetRecordIdOnInsert.execute([&](const BSONObj& data) {
