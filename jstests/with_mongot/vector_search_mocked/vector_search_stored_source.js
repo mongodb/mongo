@@ -243,10 +243,6 @@ function testShardedVectorSearchStoredSourceParameterOff(stWithMock, testDB, col
         {_id: 3, title: "burger king"},
     ]);
 
-    // Enable cluster parameter.
-    assert.commandWorked(
-        testDB.adminCommand({setClusterParameter: {internalVectorSearchStoredSource: {enabled: true}}}),
-    );
     testStandaloneVectorSearchStoredSourceParameterOn(mongotMock, testDB, collectionUUID);
 
     // Disable the cluster parameter and run tests again.
