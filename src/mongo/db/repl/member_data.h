@@ -189,6 +189,18 @@ public:
         return _hostAndPort;
     }
 
+    HostAndPort getHostAndPortMaintenance() const {
+        if (getMaintenancePort()) {
+            return HostAndPort(getHostAndPort().host(), *getMaintenancePort());
+        } else {
+            return getHostAndPort();
+        }
+    }
+
+    boost::optional<int> getMaintenancePort() const {
+        return _maintenancePort;
+    }
+
     /*
      * Returns true if the last heartbeat data explicilty stated that the node is not electable.
      */
@@ -298,6 +310,10 @@ public:
         _hostAndPort = hostAndPort;
     }
 
+    void setMaintenancePort(boost::optional<int> maintenancePort) {
+        _maintenancePort = maintenancePort;
+    }
+
     void setMemberId(MemberId memberId) {
         _memberId = memberId;
     }
@@ -374,6 +390,9 @@ private:
 
     // Client address of this member.
     HostAndPort _hostAndPort;
+
+    // Optional maintenance port for this member.
+    boost::optional<int> _maintenancePort;
 };
 
 }  // namespace repl

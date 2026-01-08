@@ -340,7 +340,9 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
 
         // Arbiters are always expected to report null durable optimes (and wall times).
         // If that is not the case here, make sure to correct these times before ingesting them.
-        auto memberInConfig = _rsConfig.unsafePeek().findMemberByHostAndPort(target);
+        // Use the strict version of findMemberByHostAndPort since heartbeats should always happen
+        // via the maintenance port.
+        auto memberInConfig = _rsConfig.unsafePeek().findMemberByHostAndPort(target, true);
         if ((hbResponse.hasState() && hbResponse.getState().arbiter()) ||
             (_rsConfig.unsafePeek().isInitialized() && memberInConfig &&
              memberInConfig->isArbiter())) {
@@ -414,7 +416,9 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         auto remoteState = hbStatusResponse.getValue().getState();
         if (remoteState == MemberState::RS_SECONDARY || remoteState == MemberState::RS_RECOVERING ||
             remoteState == MemberState::RS_ROLLBACK) {
-            const auto mem = _rsConfig.unsafePeek().findMemberByHostAndPort(target);
+            // Use the strict version of findMemberByHostAndPort since heartbeats should always
+            // happen via the maintenance port.
+            const auto mem = _rsConfig.unsafePeek().findMemberByHostAndPort(target, true);
             if (mem && mem->isNewlyAdded()) {
                 const auto memId = mem->getId();
                 const auto configVersion = _rsConfig.unsafePeek().getConfigVersionAndTerm();

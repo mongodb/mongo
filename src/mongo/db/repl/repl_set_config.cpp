@@ -561,12 +561,12 @@ const MemberConfig* ReplSetConfig::findMemberByID(int id) const {
     return nullptr;
 }
 
-int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
+int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap, bool strict) const {
     int x = 0;
     for (std::vector<MemberConfig>::const_iterator it = getMembers().begin();
          it != getMembers().end();
          ++it) {
-        if (it->getHostAndPort() == hap || it->getHostAndPortMaintenance() == hap) {
+        if (it->getHostAndPortMaintenance() == hap || (!strict && it->getHostAndPort() == hap)) {
             return x;
         }
         ++x;
@@ -574,8 +574,9 @@ int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     return -1;
 }
 
-const MemberConfig* ReplSetConfig::findMemberByHostAndPort(const HostAndPort& hap) const {
-    int idx = findMemberIndexByHostAndPort(hap);
+const MemberConfig* ReplSetConfig::findMemberByHostAndPort(const HostAndPort& hap,
+                                                           bool strict) const {
+    int idx = findMemberIndexByHostAndPort(hap, strict);
     return idx != -1 ? &getMemberAt(idx) : nullptr;
 }
 

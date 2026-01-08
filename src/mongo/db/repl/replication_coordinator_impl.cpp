@@ -2145,6 +2145,8 @@ bool ReplicationCoordinatorImpl::isCommitQuorumSatisfied(
 bool ReplicationCoordinatorImpl::_haveNumNodesSatisfiedCommitQuorum(
     WithLock lk, int numNodes, const std::vector<mongo::HostAndPort>& members) const {
     for (auto&& member : members) {
+        // Use lenient version of findMemberByHostAndPort since a node can still be part of a quorum
+        // via its main port (not just its maintenance port).
         auto memberConfig = _rsConfig.unsafePeek().findMemberByHostAndPort(member);
         // We do not count arbiters and members that aren't part of replica set config,
         // towards the commit quorum.
@@ -2167,6 +2169,8 @@ bool ReplicationCoordinatorImpl::_haveTaggedNodesSatisfiedCommitQuorum(
     ReplSetTagMatch matcher(tagPattern);
 
     for (auto&& member : members) {
+        // Use lenient version of findMemberByHostAndPort since a node can still be part of a quorum
+        // via its main port (not just its maintenance port).
         auto memberConfig = _rsConfig.unsafePeek().findMemberByHostAndPort(member);
         // We do not count arbiters and members that aren't part of replica set config,
         // towards the commit quorum.
@@ -3193,6 +3197,9 @@ ConfigVersionAndTerm ReplicationCoordinatorImpl::getConfigVersionAndTerm() const
     return _getReplSetConfig().getConfigVersionAndTerm();
 }
 
+// This is only used by the index build coordinator and is deprecated so we do not support strict
+// and lenient versions. We only include the lenient version since index builds do not use the
+// maintenance port.
 boost::optional<MemberConfig> ReplicationCoordinatorImpl::findConfigMemberByHostAndPort_deprecated(
     const HostAndPort& hap) const {
     const MemberConfig* result = _getReplSetConfig().findMemberByHostAndPort(hap);
@@ -4875,7 +4882,8 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     // If read preference is SecondaryOnly, we should never choose the primary. If the sync source
     // was forced through unsupportedSyncSource, we may sync from any node, so skip this check.
     invariant(readPreference != ReadPreference::SecondaryOnly || !primary ||
-              primary->getHostAndPort() != newSyncSource || !repl::unsupportedSyncSource.empty());
+              primary->getHostAndPortMaintenance() != newSyncSource ||
+              !repl::unsupportedSyncSource.empty());
 
     // If we lost our sync source, schedule new heartbeats immediately to update our knowledge
     // of other members's state, allowing us to make informed sync source decisions.
