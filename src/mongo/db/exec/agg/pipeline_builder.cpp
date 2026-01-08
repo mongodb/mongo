@@ -55,8 +55,7 @@ std::unique_ptr<exec::agg::Pipeline> buildPipeline(const mongo::Pipeline& pipeli
         }
     } catch (...) {
         // Dispose the stages already created if an exception occurs.
-        // TODO SERVER-109935: Not needed once each stage auto-disposes itself in the destructor
-        // unless dismissDisposal() is called.
+        // TODO SERVER-109935: Not needed once each stage auto-disposes itself in the destructor.
         if (!stages.empty()) {
             stages.back()->dispose();
         }
