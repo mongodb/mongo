@@ -30,7 +30,7 @@ assert.commandWorked(s0Coll.insert({_id: 2}));
 assert.commandWorked(s1.adminCommand({moveChunk: kNsColl, find: {_id: 2}, to: st.shard1.shardName}));
 
 // Insert corrupted document
-configureFailPoint(st.shard1, "corruptDocumentOnInsert", {}, "alwaysOn");
+configureFailPoint(st.shard1, "corruptDocumentOnInsert", {data: {collectionName: kCollName}}, "alwaysOn");
 assert.commandWorked(s1Coll.insert({_id: 1}));
 configureFailPoint(st.shard1, "corruptDocumentOnInsert", {}, "off");
 
