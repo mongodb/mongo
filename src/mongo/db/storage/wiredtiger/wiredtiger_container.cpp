@@ -35,6 +35,22 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 namespace mongo {
+namespace {
+
+boost::optional<std::span<const char>> _find(WiredTigerCursor& cursor) {
+    auto ret = cursor->search(cursor.get());
+    if (ret == WT_NOTFOUND) {
+        return boost::none;
+    }
+    invariantWTOK(ret, cursor->session);
+
+    WT_ITEM value;
+    invariantWTOK(cursor->get_value(cursor.get(), &value), cursor->session);
+
+    return std::span<const char>{static_cast<const char*>(value.data), value.size};
+}
+
+}  // namespace
 
 WiredTigerContainer::WiredTigerContainer(std::string uri, uint64_t tableId)
     : _uri(std::move(uri)), _tableId(tableId) {}
@@ -98,6 +114,26 @@ int WiredTigerIntegerKeyedContainer::remove(WiredTigerRecoveryUnit& ru,
     return WT_OP_CHECK(wiredTigerCursorRemove(ru, &cursor));
 }
 
+std::unique_ptr<IntegerKeyedContainer::Cursor> WiredTigerIntegerKeyedContainer::getCursor(
+    RecoveryUnit& ru) const {
+    return std::make_unique<Cursor>(ru, tableId(), uri());
+}
+
+std::shared_ptr<IntegerKeyedContainer::Cursor> WiredTigerIntegerKeyedContainer::getSharedCursor(
+    RecoveryUnit& ru) const {
+    return std::make_shared<Cursor>(ru, tableId(), uri());
+}
+
+WiredTigerIntegerKeyedContainer::Cursor::Cursor(RecoveryUnit& ru, uint64_t tableId, StringData uri)
+    : _cursor(getWiredTigerCursorParams(WiredTigerRecoveryUnit::get(ru), tableId),
+              uri,
+              *WiredTigerRecoveryUnit::get(ru).getSession()) {}
+
+boost::optional<std::span<const char>> WiredTigerIntegerKeyedContainer::Cursor::find(int64_t key) {
+    _cursor->set_key(_cursor.get(), key);
+    return _find(_cursor);
+}
+
 WiredTigerStringKeyedContainer::WiredTigerStringKeyedContainer(std::shared_ptr<Ident> ident,
                                                                std::string uri,
                                                                uint64_t tableId)
@@ -147,6 +183,27 @@ int WiredTigerStringKeyedContainer::remove(WiredTigerRecoveryUnit& ru,
                                            std::span<const char> key) {
     cursor.set_key(&cursor, WiredTigerItem{key}.get());
     return WT_OP_CHECK(wiredTigerCursorRemove(ru, &cursor));
+}
+
+std::unique_ptr<StringKeyedContainer::Cursor> WiredTigerStringKeyedContainer::getCursor(
+    RecoveryUnit& ru) const {
+    return std::make_unique<Cursor>(ru, tableId(), uri());
+}
+
+std::shared_ptr<StringKeyedContainer::Cursor> WiredTigerStringKeyedContainer::getSharedCursor(
+    RecoveryUnit& ru) const {
+    return std::make_shared<Cursor>(ru, tableId(), uri());
+}
+
+WiredTigerStringKeyedContainer::Cursor::Cursor(RecoveryUnit& ru, uint64_t tableId, StringData uri)
+    : _cursor(getWiredTigerCursorParams(WiredTigerRecoveryUnit::get(ru), tableId),
+              uri,
+              *WiredTigerRecoveryUnit::get(ru).getSession()) {}
+
+boost::optional<std::span<const char>> WiredTigerStringKeyedContainer::Cursor::find(
+    std::span<const char> key) {
+    _cursor->set_key(_cursor.get(), WiredTigerItem{key}.get());
+    return _find(_cursor);
 }
 
 }  // namespace mongo
