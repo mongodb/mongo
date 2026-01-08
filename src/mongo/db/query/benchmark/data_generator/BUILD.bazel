@@ -4,3 +4,8 @@ py_library(
     name = "driver",
     srcs = ["driver.py"],
 )
+
+py_library(
+    name = "extract_schema",
+    srcs = ["extract_schema.py"],
+)

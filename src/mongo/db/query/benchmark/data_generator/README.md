@@ -477,3 +477,21 @@ produces the following `.schema` fragment:
     }
 },
 ```
+
+# Extracting a .schema files from an existing dataset
+
+```
+python extract_schema.py --db tpch --uri "mongodb://localhost:20000" > out/tpch.schema
+```
+
+This will extract the schema from one or more collections in the database and dump the extracted metadata to stdout in `.schema` format.
+
+As `.schema` files do not natively support multiple collections, so if no collection is specified via `--collection`, the metadata from
+all the collections will be joined together in a single schema specification.
+
+Each collection will be sampled using `{"$sample": {"size": 10000}}` unless a different value is specified using `--sample-size`. Note that
+the use of sample size that is smaller than the collection size has the following side effects:
+
+- The `missing_count` and `unique` sections of the schema will reflect just the sample, and not the entire collection.
+- The `min` and the `max` are based on the values from the sample and are not the global min and max for the collection.
+- Tf a given field was not present in the sample at all, it will also not be present in the output schema.
