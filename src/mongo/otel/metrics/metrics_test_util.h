@@ -33,6 +33,7 @@
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/util/modules.h"
 
+#ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/exporters/memory/in_memory_data.h>
 #include <opentelemetry/exporters/memory/in_memory_metric_data.h>
 #include <opentelemetry/exporters/memory/in_memory_metric_exporter_factory.h>
@@ -44,9 +45,10 @@
 #include <opentelemetry/sdk/metrics/meter_provider.h>
 #include <opentelemetry/sdk/metrics/meter_provider_factory.h>
 #include <opentelemetry/sdk/metrics/metric_reader.h>
+#endif  // MONGO_CONFIG_OTEL
 
 namespace mongo::otel::metrics {
-
+#ifdef MONGO_CONFIG_OTEL
 namespace test_util_detail {
 /**
  * The MetricReader is the OTel component that connects the exporter with each registered
@@ -90,6 +92,7 @@ inline bool isNoopMeter(opentelemetry::metrics::Meter* provider) {
 inline bool isNoopMeterProvider(opentelemetry::metrics::MeterProvider* provider) {
     return !!dynamic_cast<opentelemetry::metrics::NoopMeterProvider*>(provider);
 }
+#endif  // MONGO_CONFIG_OTEL
 
 /**
  * Class used for reading the data of an OpenTelemtry histogram.
@@ -97,7 +100,9 @@ inline bool isNoopMeterProvider(opentelemetry::metrics::MeterProvider* provider)
 template <typename T>
 class HistogramData {
 public:
+#ifdef MONGO_CONFIG_OTEL
     HistogramData(opentelemetry::sdk::metrics::HistogramPointData data);
+#endif  // MONGO_CONFIG_OTEL
 
     /**
      * These values denote the upper and lower bounds for the histogram buckets.
@@ -122,6 +127,7 @@ public:
     std::vector<uint64_t> counts;
     uint64_t count;
 
+#ifdef MONGO_CONFIG_OTEL
 private:
     /**
      * Gets the underlying value of the provided ValueType, either int64_t or double.
@@ -132,8 +138,9 @@ private:
                 std::holds_alternative<T>(valueType));
         return std::get<T>(valueType);
     }
+#endif  // MONGO_CONFIG_OTEL
 };
-
+#ifdef MONGO_CONFIG_OTEL
 template <typename T>
 HistogramData<T>::HistogramData(opentelemetry::sdk::metrics::HistogramPointData data)
     : boundaries(data.boundaries_), counts(data.counts_), count(data.count_) {
@@ -141,21 +148,26 @@ HistogramData<T>::HistogramData(opentelemetry::sdk::metrics::HistogramPointData 
     min = getValue(data.min_);
     max = getValue(data.max_);
 };
+#endif  // MONGO_CONFIG_OTEL
 
 /**
  * Sets up a MetricProvider with an in-memory exporter so tests can create and inspect metrics.
  * This must be constructed before creating any metrics in order to capture them.
+ *
+ * Note that not all environments support exporting otel metrics (e.g., Windows) so in those
+ * environments it's not possible to read the metrics in tests. `canReadMetrics` can be used in
+ * tests to condition making expectations based on whether the environment supports otel metrics.
  */
 class MONGO_MOD_PUBLIC OtelMetricsCapturer {
 public:
     OtelMetricsCapturer();
-
+#if MONGO_CONFIG_OTEL
     ~OtelMetricsCapturer() {
         opentelemetry::metrics::Provider::SetMeterProvider(
             opentelemetry::nostd::shared_ptr<opentelemetry::metrics::MeterProvider>(
                 new opentelemetry::metrics::NoopMeterProvider()));
     }
-
+#endif  // MONGO_CONFIG_OTEL
     /**
      * Gets the value of an int64_t counter and throws an exception if it is not found.
      */
@@ -181,7 +193,15 @@ public:
      */
     HistogramData<double> readDoubleHistogram(MetricName name);
 
+    /**
+     * Returns whether it is safe to use the above "read" methods in the current environment. This
+     * is required for tests that should also run on Windows because metrics can be recorded but
+     * cannot be exported or read on Windows, and attempting to read them will crash.
+     */
+    static bool canReadMetrics();
+
 private:
+#if MONGO_CONFIG_OTEL
     // Gets a specific opentelemetry Instrument type based on the instrument's name. The MetricType
     // must be a PointType as defined here in the opentelemetry library:
     // https://github.com/open-telemetry/opentelemetry-cpp/blob/f0a1da286f3b130df1eb3db79ffc1ae427c9532b/sdk/include/opentelemetry/sdk/metrics/data/metric_data.h#L21
@@ -212,6 +232,7 @@ private:
     // This is the in-memory data structure that holds the collected metrics. The exporter writes to
     // this DS, and the get() function will read from it.
     opentelemetry::exporter::memory::SimpleAggregateInMemoryMetricData* _metrics;
+#endif  // MONGO_CONFIG_OTEL
 };
 
 }  // namespace mongo::otel::metrics

@@ -31,12 +31,14 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/otel/metrics/metrics_service.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::otel::metrics {
 
 class OtelMetricsCapturerTest : public ServiceContextTest {};
 
+#if MONGO_CONFIG_OTEL
 TEST_F(OtelMetricsCapturerTest, ReadThrowsExceptionIfMetricNotFound) {
     OtelMetricsCapturer metricsCapturer;
     ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest1),
@@ -85,4 +87,66 @@ TEST_F(OtelMetricsCapturerTest, CounterWrongValueTypeThrowsException) {
                        DBException,
                        ErrorCodes::TypeMismatch);
 }
+
+TEST_F(OtelMetricsCapturerTest, CanReadMetricsIsTrue) {
+    EXPECT_TRUE(OtelMetricsCapturer::canReadMetrics());
+}
+
+#else
+
+TEST_F(OtelMetricsCapturerTest, CanReadMetricsIsFalse) {
+    EXPECT_FALSE(OtelMetricsCapturer::canReadMetrics());
+}
+
+using OtelMetricsCapturerDeathTest = OtelMetricsCapturerTest;
+
+DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Counter, "doesn't have otel enabled") {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Counter<int64_t>* int64Counter = metricsService.createInt64Counter(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    int64Counter->add(3);
+    metricsCapturer.readInt64Counter(MetricNames::kTest1);
+}
+
+DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingDoubleCounter, "doesn't have otel enabled") {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Counter<double>* doubleCounter = metricsService.createDoubleCounter(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    doubleCounter->add(3);
+    metricsCapturer.readInt64Counter(MetricNames::kTest1);
+}
+
+DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Gauge, "doesn't have otel enabled") {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Gauge<int64_t>* int64Gauge =
+        metricsService.createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    int64Gauge->set(3);
+    metricsCapturer.readInt64Gauge(MetricNames::kTest1);
+}
+
+DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Histogram, "doesn't have otel enabled") {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Histogram<int64_t>* int64Histogram = metricsService.createInt64Histogram(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    int64Histogram->record(3);
+    metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+}
+
+DEATH_TEST_F(OtelMetricsCapturerDeathTest,
+             DiesReadingDoubleHistogram,
+             "doesn't have otel enabled") {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Histogram<double>* doubleHistogram = metricsService.createDoubleHistogram(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    doubleHistogram->record(3);
+    metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+}
+
+#endif  // MONGO_CONFIG_OTEL
+
 }  // namespace mongo::otel::metrics

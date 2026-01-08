@@ -161,10 +161,16 @@ mongo_cc_library(
         "metrics_test_util.cpp",
     ],
     deps = [
-        ":in_memory_metrics_exporter",
         "//src/mongo:base",
         "//src/mongo/db:server_base",
-    ],
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                ":in_memory_metrics_exporter",
+            ],
+            "//conditions:default": [],
+        },
+    ),
 )
 
 mongo_cc_unit_test(
