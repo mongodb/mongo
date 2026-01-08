@@ -293,8 +293,6 @@ conn_stats = [
     BlockStat('block_read', 'blocks read'),
     BlockStat('block_remap_file_resize', 'number of times the file was remapped because it changed size via fallocate or truncate'),
     BlockStat('block_remap_file_write', 'number of times the region was remapped via write'),
-    BlockStat('block_reusable_over_50', 'number of files checkpointed with reusable space over 50 percent'),
-    BlockStat('block_reusable_over_90', 'number of files checkpointed with reusable space over 90 percent'),
     BlockStat('block_write', 'blocks written'),
 
     ##########################################
@@ -1229,8 +1227,6 @@ conn_dsrc_stats = [
     CacheStat('cache_read_deleted', 'pages read into cache after truncate'),
     CacheStat('cache_read_deleted_prepared', 'pages read into cache after truncate in prepare state'),
     CacheStat('cache_read_delta_updates', 'size of delta updates reconstructed on the base page'),
-    CacheStat('cache_read_flatten_leaf_delta', 'number of leaf pages flattened that had deltas attached'),
-    CacheStat('cache_read_flatten_leaf_delta_fail', 'number of leaf pages not flattened that had deltas attached due to failure'),
     CacheStat('cache_read_internal_delta', 'number of internal pages read that had deltas attached'),
     CacheStat('cache_read_leaf_delta', 'number of leaf pages read that had deltas attached'),
     CacheStat('cache_read_overflow', 'overflow pages read into cache'),

@@ -177,9 +177,8 @@ struct __wt_page_delta_config {
     u_int delta_pct;             /* Delta page percent (of full page size) */
     u_int max_consecutive_delta; /* Max number of consecutive deltas */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_FLATTEN_LEAF_PAGE_DELTA 0x1u
-#define WT_INTERNAL_PAGE_DELTA 0x2u
-#define WT_LEAF_PAGE_DELTA 0x4u
+#define WT_INTERNAL_PAGE_DELTA 0x1u
+#define WT_LEAF_PAGE_DELTA 0x2u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 };

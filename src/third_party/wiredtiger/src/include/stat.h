@@ -502,8 +502,6 @@ struct __wt_connection_stats {
     int64_t block_byte_write_syscall;
     int64_t block_map_read;
     int64_t block_byte_map_read;
-    int64_t block_reusable_over_50;
-    int64_t block_reusable_over_90;
     int64_t block_byte_write_intl_delta_lt20;
     int64_t block_byte_write_intl_delta_lt40;
     int64_t block_byte_write_intl_delta_lt60;
@@ -688,8 +686,6 @@ struct __wt_connection_stats {
     int64_t cache_eviction_blocked_multi_block_reconciliation_during_checkpoint;
     int64_t npos_read_walk_max;
     int64_t cache_read_internal_delta;
-    int64_t cache_read_flatten_leaf_delta;
-    int64_t cache_read_flatten_leaf_delta_fail;
     int64_t cache_read_leaf_delta;
     int64_t cache_eviction_trigger_dirty_reached;
     int64_t cache_eviction_trigger_reached;
@@ -1505,8 +1501,6 @@ struct __wt_dsrc_stats {
     int64_t cache_eviction_dirty;
     int64_t cache_eviction_blocked_multi_block_reconciliation_during_checkpoint;
     int64_t cache_read_internal_delta;
-    int64_t cache_read_flatten_leaf_delta;
-    int64_t cache_read_flatten_leaf_delta_fail;
     int64_t cache_read_leaf_delta;
     int64_t cache_eviction_trigger_dirty_reached;
     int64_t cache_eviction_trigger_reached;

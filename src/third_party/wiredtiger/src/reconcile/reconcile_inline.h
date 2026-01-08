@@ -178,10 +178,6 @@ __wti_rec_need_split(WTI_RECONCILE *r, size_t len)
 {
     uint32_t page_items;
 
-    /* We cannot split a page that is restored from deltas. */
-    if (F_ISSET(r, WT_REC_REWRITE_DELTA))
-        return (false);
-
     page_items = r->entries + r->supd_onpage_or_restore;
 
     /*

@@ -1033,12 +1033,8 @@ int
 __wti_page_reconstruct_deltas(
   WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *deltas, size_t delta_size)
 {
-    WT_DECL_RET;
-    WT_MULTI multi;
-    WT_PAGE_MODIFY *mod;
     uint64_t time_start, time_stop;
     int i;
-    void *tmp;
 
     WT_ASSERT(session, delta_size != 0);
 
@@ -1053,49 +1049,6 @@ __wti_page_reconstruct_deltas(
         for (i = (int)delta_size - 1; i >= 0; --i)
             WT_RET(__page_reconstruct_leaf_delta(session, ref, &deltas[i]));
 
-        /*
-         * We may be in a reconciliation already. Don't rewrite in this case as reconciliation is
-         * not reentrant.
-         *
-         * FIXME-WT-16211: this should go away when we use an algorithm to directly rewrite delta.
-         */
-        if (F_ISSET(&S2C(session)->page_delta, WT_FLATTEN_LEAF_PAGE_DELTA) &&
-          !__wt_rec_in_progress(session)) {
-            ret = __wt_reconcile(session, ref, false, WT_REC_REWRITE_DELTA);
-            mod = ref->page->modify;
-            /*
-             * We may generate an empty page if the keys all have a globally visible tombstone. Give
-             * up the rewrite in this case.
-             */
-            if (ret == 0 && mod->mod_disk_image != NULL) {
-                WT_ASSERT(session, mod->mod_replace.block_cookie == NULL);
-
-                /* The split code works with WT_MULTI structures, build one for the disk image. */
-                memset(&multi, 0, sizeof(multi));
-                multi.disk_image = mod->mod_disk_image;
-                WT_RET(__wt_calloc_one(session, &multi.block_meta));
-                *multi.block_meta = ref->page->disagg_info->block_meta;
-
-                /*
-                 * Store the disk image to a temporary pointer in case we fail to rewrite the page
-                 * and we need to link the new disk image back to the old disk image.
-                 */
-                tmp = mod->mod_disk_image;
-                mod->mod_disk_image = NULL;
-                ret = __wt_split_rewrite(session, ref, &multi, false);
-                __wt_free(session, multi.block_meta);
-                if (ret != 0) {
-                    mod->mod_disk_image = tmp;
-                    WT_STAT_CONN_DSRC_INCR(session, cache_read_flatten_leaf_delta_fail);
-                    WT_RET(ret);
-                }
-
-                WT_STAT_CONN_DSRC_INCR(session, cache_read_flatten_leaf_delta);
-            } else if (ret != 0) {
-                WT_STAT_CONN_DSRC_INCR(session, cache_read_flatten_leaf_delta_fail);
-                WT_RET(ret);
-            }
-        }
         time_stop = __wt_clock(session);
         __wt_stat_usecs_hist_incr_leaf_reconstruct(session, WT_CLOCKDIFF_US(time_stop, time_start));
         WT_STAT_CONN_DSRC_INCR(session, cache_read_leaf_delta);
@@ -1488,7 +1441,7 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
               "Should never read an overflow removed value for a prepared update");
             first_upd = WT_ROW_UPDATE(page, rip);
             /*
-             * FIXME-WT-16211: This key must have been overwritten by a delta. Don't instantiate it.
+             * FIXME-WT-16207: This key must have been overwritten by a delta. Don't instantiate it.
              */
             if (first_upd == NULL) {
                 WT_ERR(__wt_page_inmem_update(session, value, &unpack, &upd, &size));

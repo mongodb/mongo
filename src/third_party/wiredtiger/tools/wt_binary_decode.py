@@ -484,7 +484,8 @@ def block_decode(p, b, nbytes, opts):
     if have_crc32c:
         savepos = b.tell()
         b.seek(disk_pos)
-        if blockhead.flags & btree_format.BlockFlags.WT_BLOCK_DATA_CKSUM != 0:
+        if (opts.disagg and blockhead.flags & btree_format.BlockDisaggFlags.WT_BLOCK_DISAGG_DATA_CKSUM) \
+            or (not opts.disagg and blockhead.flags & btree_format.BlockFlags.WT_BLOCK_DATA_CKSUM):
             check_size = disk_size
         else:
             check_size = 64
@@ -859,7 +860,9 @@ def extract_mongodb_log_hex(f):
                             print(f'Complete block collected: {len(current_chunks)} chunks')
                         return b''.join(current_chunks)
         except json.JSONDecodeError:
-            # If we don't have a JSON log line, then this isn't a MongoDB log.
+            # If we don't have a JSON log line, then this isn't a MongoDB log. Reset the file 
+            # pointer to the start to read all the bytes again.
+            f.seek(0)
             return encode_bytes(f)
         except Exception as e:
             if opts.debug:

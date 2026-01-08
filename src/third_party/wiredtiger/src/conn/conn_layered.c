@@ -729,13 +729,6 @@ __disagg_fetch_shared_meta(
         }
     }
 
-    /* !!!
-     * FIXME-WT-16386 Config parser reads beyond config length limit
-     * Add a zero terminator to the metadata buffer for safe parsing.
-     */
-    WT_ERR(__wt_buf_grow(session, item, item->size + 1));
-    ((char *)item->data)[item->size] = '\0';
-
 err:
     return (ret);
 }
@@ -1975,10 +1968,6 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
             WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_begin_checkpoint(session));
             WT_ERR_MSG_CHK(session, ret, "Failed to begin a new checkpoint");
         }
-
-        WT_ERR(__wt_config_gets(session, cfg, "page_delta.flatten_leaf_page_delta", &cval));
-        if (cval.val != 0)
-            F_SET(&conn->page_delta, WT_FLATTEN_LEAF_PAGE_DELTA);
 
         WT_ERR(__wt_config_gets(session, cfg, "page_delta.internal_page_delta", &cval));
         if (cval.val != 0)

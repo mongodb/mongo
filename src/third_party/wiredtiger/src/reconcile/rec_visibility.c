@@ -384,9 +384,6 @@ __rec_need_save_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_UPDATE_SELEC
     WT_UPDATE *upd;
     bool visible_all;
 
-    if (F_ISSET(r, WT_REC_REWRITE_DELTA))
-        return (false);
-
     if (WT_TIME_WINDOW_HAS_PREPARE(&(upd_select->tw)))
         return (true);
 
@@ -1660,16 +1657,4 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
       session, upd_select->tw.stop_txn != WT_TXN_MAX || upd_select->tw.stop_ts == WT_TS_MAX);
 
     return (0);
-}
-
-/*
- * __wt_rec_in_progress --
- *     Whether we're currently reconciling.
- */
-bool
-__wt_rec_in_progress(WT_SESSION_IMPL *session)
-{
-    WTI_RECONCILE *rec = session->reconcile;
-
-    return (rec != NULL && rec->ref != NULL);
 }
