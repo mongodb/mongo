@@ -2834,20 +2834,6 @@ export const pipelines = [
         {"$sort": {"c_idx": -1}},
         {"$skip": 3},
     ],
-    /* clusterSize: 205, queryRank: 15.02 */ [
-        {
-            "$match": {
-                "$nor": [
-                    {"a_compound": {"$all": [2, 10, 8, 5]}},
-                    {"a_noidx": {"$eq": 15}},
-                    {"k_compound": {"$in": [16, 14]}},
-                    {"a_compound": {"$ne": 9}},
-                ],
-                "a_idx": {"$in": [12, 9, 10]},
-            },
-        },
-        {"$limit": 81},
-    ],
     /* clusterSize: 204, queryRank: 8.02 */ [
         {
             "$match": {

@@ -6942,21 +6942,6 @@ Features remaining without representation:
     /* clusterSize: 172, queryRank: 15.02 */ [
         {
             "$match": {
-                "field35_int_idx": {"$ne": 8511},
-                "field34_str_idx": {"$ne": "C"},
-                "field2_Timestamp_idx": {"$gte": Timestamp(1764181167, 0)},
-                "field32_dict_idx": {"$ne": {"b": 1, "c": 3}},
-                "field8_int_idx": {"$gt": 7},
-                "field31_list_idx": {"$in": [16, 13, 18, 17, 39, 60, 48, 74, 5]},
-            },
-        },
-        {"$sort": {"field16_str_idx": -1}},
-        {"$limit": 19},
-        {"$project": {"field6_mixed_idx": 1, "field24_mixed_idx": 1}},
-    ],
-    /* clusterSize: 172, queryRank: 15.02 */ [
-        {
-            "$match": {
                 "$or": [
                     {"field44_int": {"$eq": 63}, "field31_list_idx": {"$size": 8}, "field25_str_idx": {"$eq": "AP"}},
                     {"field23_dict_idx": {"$gte": {"g": 2}}, "field44_int": {"$lte": 28}},
@@ -37976,41 +37961,6 @@ Features remaining without representation:
         {"$sort": {"field15_mixed_idx": 1}},
         {"$project": {"field46_datetime": 1, "_id": 0}},
     ],
-    /* clusterSize: 18, queryRank: 12.02 */ [
-        {
-            "$match": {
-                "$or": [
-                    {
-                        "$and": [
-                            {"field40_list": {"$regex": new RegExp("l")}, "field46_datetime": {"$type": "date"}},
-                            {
-                                "field24_mixed_idx": [Timestamp(1767139200, 0)],
-                                "field16_str_idx": {"$gte": "Hn"},
-                                "field15_mixed_idx": {"$gte": 458},
-                            },
-                            {
-                                "field2_Timestamp_idx": {"$gte": Timestamp(1764189883, 0)},
-                                "field31_list_idx": {"$size": 13},
-                            },
-                            {
-                                "field22_list_idx": [42, 65, 90, 104, 731, 206, 120, 187],
-                                "field20_Timestamp_idx": {"$ne": Timestamp(1737830138, 0)},
-                            },
-                        ],
-                    },
-                    {
-                        "field39_Decimal128": {"$lt": new NumberDecimal("2.9")},
-                        "field37_datetime": {"$lte": new ISODate("2024-03-09T00:00:00")},
-                        "field38_Timestamp": {"$ne": Timestamp(1767139200, 0)},
-                        "field13_list_idx": {"$ne": 109},
-                    },
-                ],
-            },
-        },
-        {"$sort": {"field5_dict_idx": 1}},
-        {"$project": {"field45_bool": 1, "field24_mixed_idx": 1}},
-    ],
-
     /*
 Starting featuresets: 193
 Desired clusters: 18
