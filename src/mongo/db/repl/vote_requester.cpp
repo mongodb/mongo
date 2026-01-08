@@ -82,10 +82,10 @@ VoteRequester::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
     long long index = 0;
     for (auto member = _rsConfig.membersBegin(); member != _rsConfig.membersEnd(); member++) {
         if (member->isVoter() && index != candidateIndex) {
-            _targets.push_back(member->getHostAndPort());
+            _targets.push_back(member->getHostAndPortMaintenance());
         }
         if (index == primaryIndex) {
-            _primaryHost = member->getHostAndPort();
+            _primaryHost = member->getHostAndPortMaintenance();
         }
         index++;
     }

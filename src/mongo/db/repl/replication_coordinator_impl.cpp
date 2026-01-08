@@ -2791,10 +2791,14 @@ void ReplicationCoordinatorImpl::_performElectionHandoff() {
         return;
     }
 
-    auto target = _rsConfig.unsafePeek().getMemberAt(candidateIndex).getHostAndPort();
+    const auto& targetConfig = _rsConfig.unsafePeek().getMemberAt(candidateIndex);
+    auto target = targetConfig.getHostAndPortMaintenance();
     executor::RemoteCommandRequest request(
         target, DatabaseName::kAdmin, BSON("replSetStepUp" << 1 << "skipDryRun" << true), nullptr);
-    LOGV2(21347, "Handing off election", "target"_attr = target);
+    LOGV2(21347,
+          "Handing off election",
+          "target"_attr = target,
+          "usingMaintenancePort"_attr = targetConfig.isUsingMaintenancePort(target));
 
     auto callbackHandleSW = _replExecutor->scheduleRemoteCommand(
         request, [target](const executor::TaskExecutor::RemoteCommandCallbackArgs& callbackData) {
@@ -4627,9 +4631,11 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     LOGV2(21392, "New replica set config in use", "config"_attr = _rsConfig.unsafePeek().toBSON());
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
+        const auto& selfMember = _rsConfig.unsafePeek().getMemberAt(_selfIndex);
         LOGV2(21393,
               "Found self in config",
-              "hostAndPort"_attr = _rsConfig.unsafePeek().getMemberAt(_selfIndex).getHostAndPort());
+              "hostAndPort"_attr = selfMember.getHostAndPort(),
+              "maintenancePort"_attr = selfMember.getMaintenancePort());
     } else {
         LOGV2(21394, "This node is not a member of the config");
     }

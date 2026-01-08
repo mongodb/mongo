@@ -1143,7 +1143,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats(WithLock lk) {
         if (i == _selfIndex) {
             continue;
         }
-        auto target = rsc.getMemberAt(i).getHostAndPort();
+        auto target = rsc.getMemberAt(i).getHostAndPortMaintenance();
         _scheduleHeartbeatToTarget(lk, target, now, std::string{rsc.getReplSetName()});
         _topCoord->restartHeartbeat(now, target);
     }
