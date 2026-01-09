@@ -10,8 +10,8 @@ bazel_features_deps = module_extension(
     implementation = _bazel_features_deps_impl,
 )
 
-def _setup_mongo_python_toolchains_impl(_ctx):
-    _setup_mongo_python_toolchains()
+def _setup_mongo_python_toolchains_impl(ctx):
+    _setup_mongo_python_toolchains(ctx)
 
 setup_mongo_python_toolchains = module_extension(
     implementation = _setup_mongo_python_toolchains_impl,

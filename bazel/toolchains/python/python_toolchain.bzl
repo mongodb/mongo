@@ -63,6 +63,53 @@ def _py_download(ctx):
     else:
         arch = ctx.os.arch
 
+    # Platform-conditional download: only download if this toolchain matches the host OS
+    # This prevents downloading all 7 platform toolchains (saves ~630MB per build)
+    host_os_name = ctx.os.name.lower()
+    is_host_windows = "win" in host_os_name
+    is_host_macos = "mac" in host_os_name or "darwin" in host_os_name
+    is_host_linux = not is_host_windows and not is_host_macos
+
+    is_toolchain_windows = os == "windows"
+    is_toolchain_macos = os == "macos"
+    is_toolchain_linux = os == "linux"
+
+    # Check if OS matches
+    os_matches = (
+        (is_host_windows and is_toolchain_windows) or
+        (is_host_macos and is_toolchain_macos) or
+        (is_host_linux and is_toolchain_linux)
+    )
+
+    # If OS doesn't match, create a minimal stub BUILD file and skip download
+    if not os_matches:
+        os_constraint = OS_TO_PLATFORM_MAP[os]
+        arch_constraint = ARCH_TO_PLATFORM_MAP[arch]
+        constraints = [os_constraint, arch_constraint]
+        constraints_str = ",\n        ".join(['"%s"' % c for c in constraints])
+
+        ctx.file("BUILD.bazel", """
+# Stub toolchain - platform doesn't match host, not downloaded
+load("@bazel_tools//tools/python:toolchain.bzl", "py_runtime_pair")
+
+py_runtime_pair(
+    name = "runtime_pair",
+    py2_runtime = None,
+    py3_runtime = None,
+)
+
+toolchain(
+    name = "python_toolchain",
+    toolchain_type = "@bazel_tools//tools/python:toolchain_type",
+    toolchain = ":runtime_pair",
+    exec_compatible_with = [
+        {constraints}
+    ],
+    visibility = ["//visibility:public"],
+)
+""".format(constraints = constraints_str))
+        return None
+
     if ctx.attr.urls:
         urls = ctx.attr.urls
         sha = ctx.attr.sha256
@@ -191,15 +238,24 @@ py_download = repository_rule(
     },
 )
 
-def setup_mongo_python_toolchains():
-    # This will autoselect a toolchain that matches the host environment
-    # this toolchain is intended be used only for local repository exectutions,
-    # and will not be registered as a bazel toolchain by omitting from the return
-    # value below.
-    py_download(
-        name = "py_host",
-    )
+def setup_mongo_python_toolchains(ctx):
+    """Setup Python toolchains for all platforms.
 
+    Creates py_download repos for all platforms. The py_download repository rule
+    detects if the toolchain OS matches the host OS and only downloads if there's
+    a match. Non-matching platforms get stub BUILD files without downloading.
+
+    This ensures MODULE.bazel.lock is platform-agnostic since all platforms see the
+    same repository definitions.
+
+    Args:
+        ctx: Module extension context (unused, required by signature).
+    """
+
+    # Always create py_host for local repository operations
+    py_download(name = "py_host")
+
+    # Create all platform toolchains - downloads are conditional inside py_download
     py_download(
         name = "py_linux_arm64",
         arch = "aarch64",
@@ -257,6 +313,7 @@ def setup_mongo_python_toolchains():
         urls = [URLS_MAP["macos_x86_64"]["url"]],
     )
 
+    # Return value is not used since toolchains are registered in MODULE.bazel
     return (
         "@py_linux_arm64//:python_toolchain",
         "@py_linux_x86_64//:python_toolchain",
