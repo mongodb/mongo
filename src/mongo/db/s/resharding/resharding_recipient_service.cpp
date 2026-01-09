@@ -2054,16 +2054,18 @@ void ReshardingRecipientService::RecipientStateMachine::_updateContextMetrics(
 
     if (coll.exists()) {
         auto totalDocumentCount = [&]() -> long long {
-            if (_metadata.getPerformVerification() && _changeStreamsMonitorCtx) {
-                uassert(9858303,
-                        "Donor failed to record total number of documents copied "
-                        "despite performVerification being enabled",
-                        _recipientCtx.getTotalNumDocuments() != boost::none);
-                return *_recipientCtx.getTotalNumDocuments() +
-                    _changeStreamsMonitorCtx->getDocumentsDelta();
-            } else {
-                return coll.getCollectionPtr()->numRecords(opCtx);
+            if (_metadata.getPerformVerification()) {
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                if (_changeStreamsMonitorCtx) {
+                    uassert(9858303,
+                            "Donor failed to record total number of documents copied "
+                            "despite performVerification being enabled",
+                            _recipientCtx.getTotalNumDocuments() != boost::none);
+                    return *_recipientCtx.getTotalNumDocuments() +
+                        _changeStreamsMonitorCtx->getDocumentsDelta();
+                }
             }
+            return coll.getCollectionPtr()->numRecords(opCtx);
         }();
         _recipientCtx.setTotalNumDocuments(totalDocumentCount);
         _recipientCtx.setTotalDocumentSize(coll.getCollectionPtr()->dataSize(opCtx));
