@@ -17,9 +17,21 @@ if [ "$(uname)" != "Linux" ]; then
 fi
 
 EXTRACT_DIR="bazel-bin/install"
+# EXTRACT_DIR is typically a Bazel symlink tree; dereference to the real path up front.
+if command -v realpath >/dev/null 2>&1; then
+    EXTRACT_DIR="$(realpath "$EXTRACT_DIR")" || {
+        echo "Error: can not resolve real path for extract dir: $EXTRACT_DIR"
+        exit 1
+    }
+else
+    EXTRACT_DIR="$(readlink -f "$EXTRACT_DIR")" || {
+        echo "Error: can not resolve real path for extract dir: $EXTRACT_DIR"
+        exit 1
+    }
+fi
+
 SOPATH="${EXTRACT_DIR}/lib/mongo_crypt_v1.so"
 UNITTEST_PATH="${EXTRACT_DIR}/bin/mongo_crypt_shlib_test"
-GDB_PATH="/opt/mongodbtoolchain/v5/bin/gdb"
 
 # dump the contents of the extract dir to log
 find $EXTRACT_DIR
@@ -72,11 +84,6 @@ echo "Running Mongo Crypt Shared Library unit test"
 $UNITTEST_PATH
 echo "Mongo Crypt Shared Library unit test succeeded!"
 
-if [ ! -f "$GDB_PATH" ]; then
-    echo "Skipping Mongo Crypt Shared Library debuggability test. No gdb found at $GDB_PATH"
-    exit 0
-fi
-
 echo "Running Mongo Crypt Shared Library debuggability test"
-$GDB_PATH "$UNITTEST_PATH" --batch -ex "source ${EXTRACT_DIR}/crypt_debuggability_test.py"
+MONGO_WRAPPER_OUTPUT_ALL=1 bazel run gdb -- "$UNITTEST_PATH" --batch -ex "source ${EXTRACT_DIR}/crypt_debuggability_test.py"
 echo "Mongo Crypt Shared Library shared library debuggability test succeeded!"

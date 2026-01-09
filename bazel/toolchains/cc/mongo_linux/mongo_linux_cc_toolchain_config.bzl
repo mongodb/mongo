@@ -1760,11 +1760,8 @@ def _impl(ctx):
 
     trivial_auto_var_init_pattern_feature = feature(
         name = "trivial_auto_var_init_pattern",
-        # TODO SERVER-116228 Remove the aarch64-only restriction once we have gdb 17.1.
-        # gdb < 17.1 has a bug where breakpoints on certain x86-64 SIMD instructions (that appear
-        # frequently with this flag) cause the breakpointed instruction to execute incorrectly.
         # Only enabled for clang as it produces some bogus warnings in the v5 toolchain's gcc.
-        enabled = ctx.attr.dbg and ctx.attr.is_aarch64 and ctx.attr.compiler == COMPILERS.CLANG,
+        enabled = ctx.attr.dbg and ctx.attr.compiler == COMPILERS.CLANG,
         flag_sets = [
             flag_set(
                 actions = all_compile_actions,
