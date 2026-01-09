@@ -118,7 +118,7 @@ class MonitorBuildStatusOrchestrator:
     def _get_issue_counts_status(
         self, scope_name: str, issue_report: IssueReport, notification_config: NotificationsConfig
     ) -> Tuple[str, Dict[str, List[float]]]:
-        now = datetime.utcnow().replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
         percentages: Dict[str, List[float]] = {}
 
         headers = [scope_name, "Hot Issues", "Cold Issues"]

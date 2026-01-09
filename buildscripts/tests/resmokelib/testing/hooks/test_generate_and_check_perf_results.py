@@ -212,8 +212,12 @@ class GenerateAndCheckPerfResultsFixture(unittest.TestCase):
 
         self.cbr_hook = cbr.GenerateAndCheckPerfResults(None, None)
 
-        self.cbr_hook.create_time = datetime.datetime.utcfromtimestamp(_START_TIME)
-        self.cbr_hook.end_time = datetime.datetime.utcfromtimestamp(_END_TIME)
+        self.cbr_hook.create_time = datetime.datetime.fromtimestamp(
+            _START_TIME, tz=datetime.timezone.utc
+        ).replace(tzinfo=None)
+        self.cbr_hook.end_time = datetime.datetime.fromtimestamp(
+            _END_TIME, tz=datetime.timezone.utc
+        ).replace(tzinfo=None)
         self.cbr_hook._parse_report(_BM_FULL_REPORT)
 
 

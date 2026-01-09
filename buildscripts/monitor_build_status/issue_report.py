@@ -89,7 +89,7 @@ class IssueReport(NamedTuple):
         total_issue_count = 0
 
         if include_items_older_than_time is None:
-            include_items_older_than_time = datetime.utcnow().replace(tzinfo=timezone.utc)
+            include_items_older_than_time = datetime.now(timezone.utc)
 
         team_reports = self.team_reports.values()
         if assigned_teams is not None:

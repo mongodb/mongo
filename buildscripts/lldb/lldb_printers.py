@@ -199,7 +199,7 @@ def Date_tPrinter(valobj, *_args):
     if millis == 0:
         return "Date_t::min()"
 
-    dt = datetime.datetime.utcfromtimestamp(millis)
+    dt = datetime.datetime.fromtimestamp(millis, tz=datetime.timezone.utc).replace(tzinfo=None)
 
     return dt.isoformat()
 
