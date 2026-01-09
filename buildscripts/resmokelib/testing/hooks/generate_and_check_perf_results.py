@@ -25,7 +25,6 @@ SEP_BENCHMARKS_TASK_NAME = "benchmarks_sep"
 GET_TIMESERIES_URL = (
     "https://performance-monitoring-api.corp.mongodb.com/time_series/?summarized_executions=false"
 )
-MAINLINE_REQUESTERS = frozenset(["git_tag_request", "gitter_request"])
 OVERRIDE_APPROVERS = frozenset(
     [
         "brad-devlugt",  # Brad de Vlugt
@@ -129,15 +128,14 @@ class GenerateAndCheckPerfResults(interface.Hook):
             )
             return
 
-        # For mainline builds, Evergreen does not make the base commit available in the expansions
-        # we retrieve it by looking for the previous commit in the Git log
-        if _config.EVERGREEN_REQUESTER in MAINLINE_REQUESTERS:
-            base_commit_hash = subprocess.check_output(
-                ["git", "log", "-1", "--pretty=format:%H", "HEAD~1"], cwd=".", text=True
-            ).strip()
-        # For patch builds the evergreen revision is set to the base commit
-        else:
-            base_commit_hash = _config.EVERGREEN_REVISION
+        # Retrieve the base commit by computing the merge-base between HEAD and origin/master.
+        # This correctly handles all build types including merge commits.
+        base_commit_hash = subprocess.check_output(
+            ["git", "merge-base", "HEAD", "origin/master"], cwd=".", text=True
+        ).strip()
+        self.logger.info(
+            f"Using base commit {base_commit_hash} for performance threshold comparison"
+        )
 
         for test_name in benchmark_reports.keys():
             variant_thresholds = self.performance_thresholds.get(test_name, None)
