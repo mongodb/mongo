@@ -33,7 +33,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
@@ -41,7 +40,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/generic_argument_util.h"
-#include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/ddl/notify_sharding_event_gen.h"
 #include "mongo/db/global_catalog/ddl/sharded_ddl_commands_gen.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
@@ -50,21 +48,14 @@
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/type_chunk.h"
 #include "mongo/db/global_catalog/type_collection.h"
-#include "mongo/db/global_catalog/type_collection_gen.h"
-#include "mongo/db/global_catalog/type_namespace_placement_gen.h"
 #include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/persistent_task_store.h"
-#include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
-#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/router_role/router_role.h"
-#include "mongo/db/router_role/routing_cache/catalog_cache.h"
-#include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_role/ddl/list_collections_gen.h"
@@ -80,7 +71,6 @@
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -89,7 +79,6 @@
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
@@ -104,7 +93,6 @@
 
 #include <algorithm>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -295,59 +283,6 @@ bool supportsPreciseChangeStreamTargeter(OperationContext* opCtx) {
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 
-void upsertPlacementHistoryDocStatement(const txn_api::TransactionClient& txnClient,
-                                        const NamespaceString& nss,
-                                        const boost::optional<UUID>& uuid,
-                                        const Timestamp& timeAtPlacementChange,
-                                        const std::vector<ShardId>&& shards,
-                                        int stmtId) {
-    write_ops::UpdateCommandRequest upsertPlacementChangeRequest(
-        NamespaceString::kConfigsvrPlacementHistoryNamespace);
-    upsertPlacementChangeRequest.setUpdates({[&] {
-        NamespacePlacementType placementInfo(nss, timeAtPlacementChange, std::move(shards));
-        placementInfo.setUuid(uuid);
-
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON(NamespacePlacementType::kNssFieldName
-                        << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
-                        << NamespacePlacementType::kTimestampFieldName << timeAtPlacementChange));
-        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(placementInfo.toBSON()));
-        entry.setUpsert(true);
-        entry.setMulti(false);
-        return entry;
-    }()});
-
-    auto upsertPlacementEntryResponse =
-        txnClient.runCRUDOpSync(upsertPlacementChangeRequest, {stmtId});
-
-    uassertStatusOK(upsertPlacementEntryResponse.toStatus());
-}
-
-std::vector<ShardId> getCurrentCollPlacement(OperationContext* opCtx, const UUID& collUuid) {
-    // Use the content of config.chunks to obtain the placement of the collection being
-    // renamed. The request is equivalent to 'configDb.chunks.distinct("shard",
-    // {uuid:collectionUuid})'.
-    DistinctCommandRequest distinctRequest(NamespaceString::kConfigsvrChunksNamespace);
-    distinctRequest.setKey(ChunkType::shard.name());
-    distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << collUuid));
-    distinctRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
-
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto reply = uassertStatusOK(
-        configShard->runCommand(opCtx,
-                                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-                                DatabaseName::kConfig,
-                                distinctRequest.toBSON(),
-                                Shard::RetryPolicy::kIdempotent));
-
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
-    std::vector<ShardId> shardIds;
-    for (const auto& valueElement : reply.response.getField("values").Array()) {
-        shardIds.emplace_back(valueElement.String());
-    }
-    return shardIds;
-}
-
 void persistPlacementChangeForCollectionBeingRenamed(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -356,11 +291,12 @@ void persistPlacementChangeForCollectionBeingRenamed(
     const Timestamp& clusterTimeUponRename,
     const std::shared_ptr<executor::TaskExecutor>& executor,
     const OperationSessionInfo& osi) {
-    auto shardIds = getCurrentCollPlacement(opCtx, originalUUID);
+    auto shardIds =
+        sharding_ddl_util::getListOfShardsOwningChunksForCollection(opCtx, originalUUID);
 
     auto transactionChain = [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
         constexpr auto stmtId = 1;
-        upsertPlacementHistoryDocStatement(
+        sharding_ddl_util::upsertPlacementHistoryDocInTransaction(
             txnClient, nss, uuidUponRename, clusterTimeUponRename, std::move(shardIds), stmtId);
 
         return SemiFuture<void>::makeReady();
@@ -368,36 +304,6 @@ void persistPlacementChangeForCollectionBeingRenamed(
 
     sharding_ddl_util::runTransactionOnShardingCatalog(
         opCtx, std::move(transactionChain), defaultMajorityWriteConcernDoNotUse(), osi, executor);
-}
-
-// Removes the namespace from config.collections. Query by 'ns' AND 'uuid' so that the operation can
-// be resolved with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to the
-// 'uuid').
-// Returns whether the deletion was actually executed - or resolved into a no-op.
-bool deleteTrackedCollectionStatement(const txn_api::TransactionClient& txnClient,
-                                      const NamespaceString& nss,
-                                      const boost::optional<UUID>& uuid,
-                                      int stmtId) {
-    if (!uuid) {
-        return false;
-    }
-
-    const auto deleteCollectionQuery =
-        BSON(CollectionType::kNssFieldName
-             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
-             << CollectionType::kUuidFieldName << *uuid);
-
-    write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
-    deleteOp.setDeletes({[&]() {
-        write_ops::DeleteOpEntry entry;
-        entry.setMulti(false);
-        entry.setQ(deleteCollectionQuery);
-        return entry;
-    }()});
-
-    const auto deleteResponse = txnClient.runCRUDOpSync(deleteOp, {stmtId});
-    uassertStatusOK(deleteResponse.toStatus());
-    return deleteResponse.getN() != 0;
 }
 
 void renameTrackedCollectionStatement(const txn_api::TransactionClient& txnClient,
@@ -416,20 +322,7 @@ void renameTrackedCollectionStatement(const txn_api::TransactionClient& txnClien
     }
 
     // Implemented as an upsert to be idempotent
-    auto query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
-                          newNss, SerializationContext::stateDefault()));
-    write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
-    updateOp.setUpdates({[&] {
-        write_ops::UpdateOpEntry entry;
-        entry.setQ(query);
-        entry.setU(
-            write_ops::UpdateModification::parseFromClassicUpdate(newCollectionType.toBSON()));
-        entry.setUpsert(true);
-        entry.setMulti(false);
-        return entry;
-    }()});
-
-    uassertStatusOK(txnClient.runCRUDOpSync(updateOp, {stmtId} /*stmtIds*/).toStatus());
+    sharding_ddl_util::upsertTrackedCollectionInTransaction(txnClient, newCollectionType, stmtId);
 }
 
 void updateUnsplittableCollChunkStmt(const txn_api::TransactionClient& txnClient,
@@ -468,31 +361,6 @@ void updateUnsplittableCollChunkStmt(const txn_api::TransactionClient& txnClient
     // stepdown).
     tassert(
         10488804, "Unexpectedly found collection with more than one chunk", response.getN() <= 1);
-}
-
-void updateZonesStatement(const txn_api::TransactionClient& txnClient,
-                          const NamespaceString& oldNss,
-                          const NamespaceString& newNss) {
-
-    const auto query = BSON(
-        TagsType::ns(NamespaceStringUtil::serialize(oldNss, SerializationContext::stateDefault())));
-    const auto update = BSON("$set" << BSON(TagsType::ns(NamespaceStringUtil::serialize(
-                                 newNss, SerializationContext::stateDefault()))));
-
-    BatchedCommandRequest request([&] {
-        write_ops::UpdateCommandRequest updateOp(TagsType::ConfigNS);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-            entry.setUpsert(false);
-            entry.setMulti(true);
-            return entry;
-        }()});
-        return updateOp;
-    }());
-
-    uassertStatusOK(txnClient.runCRUDOpSync(request, {-1} /*stmtIds*/).toStatus());
 }
 
 void deleteZonesStatement(const txn_api::TransactionClient& txnClient, const NamespaceString& nss) {
@@ -535,22 +403,25 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
         if (isFromCollTracked) {
             auto fromUUID = optFromCollType->getUuid();
             // Delete TO collection (if it is also tracked).
-            deleteTrackedCollectionStatement(txnClient, toNss, droppedTargetUUID, stmtId++);
+            sharding_ddl_util::deleteTrackedCollectionInTransaction(
+                txnClient, toNss, droppedTargetUUID, stmtId++);
             // Log the placement change for TO through an upsert statement
             // (Note: a first copy may have been already committed during the
             // kSetupChangeStreamsPreconditions phase, but then deleted as a consequence of a
             // concurrent resetPlacementHistory command).
-            auto shardIds = getCurrentCollPlacement(opCtx, fromUUID);
+            auto shardIds =
+                sharding_ddl_util::getListOfShardsOwningChunksForCollection(opCtx, fromUUID);
             if (!shardIds.empty()) {
-                upsertPlacementHistoryDocStatement(txnClient,
-                                                   toNss,
-                                                   newTargetCollectionUuid,
-                                                   commitTime,
-                                                   std::move(shardIds),
-                                                   stmtId++);
+                sharding_ddl_util::upsertPlacementHistoryDocInTransaction(txnClient,
+                                                                          toNss,
+                                                                          newTargetCollectionUuid,
+                                                                          commitTime,
+                                                                          std::move(shardIds),
+                                                                          stmtId++);
             }
             // Delete FROM collection.
-            deleteTrackedCollectionStatement(txnClient, fromNss, fromUUID, stmtId++);
+            sharding_ddl_util::deleteTrackedCollectionInTransaction(
+                txnClient, fromNss, fromUUID, stmtId++);
             // Persist the entry for the renamed collection
             renameTrackedCollectionStatement(txnClient,
                                              *optFromCollType,
@@ -560,10 +431,10 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                              renamedCollectionEpoch,
                                              stmtId++);
             // Log the placement change of FROM.
-            upsertPlacementHistoryDocStatement(
+            sharding_ddl_util::upsertPlacementHistoryDocInTransaction(
                 txnClient, fromNss, fromUUID, commitTime, {} /*shards*/, stmtId++);
             // Reassign original zones to the renamed collection entry.
-            updateZonesStatement(txnClient, fromNss, toNss);
+            sharding_ddl_util::updateZonesInTransaction(txnClient, fromNss, toNss);
             // A rename request across databases (only allowed when FROM is unsharded or
             // unsplittable) causes a change of the collection UUID; config.chunks needs to be
             // updated accordingly.
@@ -574,14 +445,15 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             // kSetupChangeStreamsPreconditions phase, but then deleted as a consequence of a
             // concurrent resetPlacementHistory command).
             const auto targetMetadataDeleted =
-                deleteTrackedCollectionStatement(txnClient, toNss, droppedTargetUUID, stmtId++);
+                sharding_ddl_util::deleteTrackedCollectionInTransaction(
+                    txnClient, toNss, droppedTargetUUID, stmtId++);
             if (targetMetadataDeleted) {
-                upsertPlacementHistoryDocStatement(txnClient,
-                                                   toNss,
-                                                   newTargetCollectionUuid,
-                                                   commitTime,
-                                                   {} /*shards=*/,
-                                                   stmtId++);
+                sharding_ddl_util::upsertPlacementHistoryDocInTransaction(txnClient,
+                                                                          toNss,
+                                                                          newTargetCollectionUuid,
+                                                                          commitTime,
+                                                                          {} /*shards=*/,
+                                                                          stmtId++);
             }
             deleteZonesStatement(txnClient, toNss);
         }

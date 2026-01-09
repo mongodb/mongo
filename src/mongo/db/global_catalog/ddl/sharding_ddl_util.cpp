@@ -32,7 +32,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
@@ -53,9 +52,11 @@
 #include "mongo/db/global_catalog/type_collection.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
 #include "mongo/db/global_catalog/type_namespace_placement_gen.h"
+#include "mongo/db/global_catalog/type_tags.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
@@ -84,7 +85,6 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
@@ -931,6 +931,128 @@ boost::optional<ShardId> pickShardOwningCollectionChunks(OperationContext* opCtx
         dummyTimestamp,
         repl::ReadConcernLevelEnum::kMajorityReadConcern));
     return chunks.empty() ? boost::none : boost::optional<ShardId>(chunks[0].getShard());
+}
+
+std::vector<ShardId> getListOfShardsOwningChunksForCollection(OperationContext* opCtx,
+                                                              const UUID& collUuid) {
+    // Use the content of config.chunks to obtain the placement of the collection.
+    // The request is equivalent to 'configDb.chunks.distinct("shard", {uuid:collectionUuid})'.
+    DistinctCommandRequest distinctRequest(NamespaceString::kConfigsvrChunksNamespace);
+    distinctRequest.setKey(ChunkType::shard.name());
+    distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << collUuid));
+    distinctRequest.setReadConcern(repl::ReadConcernArgs::kLocal);
+
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto reply = uassertStatusOK(
+        configShard->runCommand(opCtx,
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
+                                DatabaseName::kConfig,
+                                distinctRequest.toBSON(),
+                                Shard::RetryPolicy::kIdempotent));
+
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
+    std::vector<ShardId> shardIds;
+    for (const auto& valueElement : reply.response.getField("values").Array()) {
+        shardIds.emplace_back(valueElement.String());
+    }
+    return shardIds;
+}
+
+void upsertPlacementHistoryDocInTransaction(const txn_api::TransactionClient& txnClient,
+                                            const NamespaceString& nss,
+                                            const boost::optional<UUID>& uuid,
+                                            const Timestamp& timestamp,
+                                            std::vector<ShardId>&& shards,
+                                            int stmtId) {
+    write_ops::UpdateCommandRequest upsertPlacementChangeRequest(
+        NamespaceString::kConfigsvrPlacementHistoryNamespace);
+    upsertPlacementChangeRequest.setUpdates({[&] {
+        NamespacePlacementType placementInfo(nss, timestamp, std::move(shards));
+        placementInfo.setUuid(uuid);
+
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON(NamespacePlacementType::kNssFieldName
+                        << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                        << NamespacePlacementType::kTimestampFieldName << timestamp));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(placementInfo.toBSON()));
+        entry.setUpsert(true);
+        entry.setMulti(false);
+        return entry;
+    }()});
+
+    auto upsertPlacementEntryResponse =
+        txnClient.runCRUDOpSync(upsertPlacementChangeRequest, {stmtId});
+
+    uassertStatusOK(upsertPlacementEntryResponse.toStatus());
+}
+
+bool deleteTrackedCollectionInTransaction(const txn_api::TransactionClient& txnClient,
+                                          const NamespaceString& nss,
+                                          const boost::optional<UUID>& uuid,
+                                          int stmtId) {
+    if (!uuid) {
+        return false;
+    }
+
+    const auto deleteCollectionQuery =
+        BSON(CollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+             << CollectionType::kUuidFieldName << *uuid);
+
+    write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
+    deleteOp.setDeletes({[&]() {
+        write_ops::DeleteOpEntry entry;
+        entry.setMulti(false);
+        entry.setQ(deleteCollectionQuery);
+        return entry;
+    }()});
+
+    const auto deleteResponse = txnClient.runCRUDOpSync(deleteOp, {stmtId});
+    uassertStatusOK(deleteResponse.toStatus());
+    return deleteResponse.getN() != 0;
+}
+
+void updateZonesInTransaction(const txn_api::TransactionClient& txnClient,
+                              const NamespaceString& oldNss,
+                              const NamespaceString& newNss) {
+    const auto query = BSON(
+        TagsType::ns(NamespaceStringUtil::serialize(oldNss, SerializationContext::stateDefault())));
+    const auto update = BSON("$set" << BSON(TagsType::ns(NamespaceStringUtil::serialize(
+                                 newNss, SerializationContext::stateDefault()))));
+
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(TagsType::ConfigNS);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            entry.setUpsert(false);
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return updateOp;
+    }());
+
+    uassertStatusOK(txnClient.runCRUDOpSync(request, {-1} /*stmtIds*/).toStatus());
+}
+
+void upsertTrackedCollectionInTransaction(const txn_api::TransactionClient& txnClient,
+                                          const CollectionType& collType,
+                                          int stmtId) {
+    auto query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                          collType.getNss(), SerializationContext::stateDefault()));
+
+    write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
+    updateOp.setUpdates({[&] {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(query);
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(collType.toBSON()));
+        entry.setUpsert(true);
+        entry.setMulti(false);
+        return entry;
+    }()});
+
+    uassertStatusOK(txnClient.runCRUDOpSync(updateOp, {stmtId}).toStatus());
 }
 
 void generatePlacementChangeNotificationOnShard(
