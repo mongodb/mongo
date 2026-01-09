@@ -80,25 +80,6 @@ export function getSortArb(maxNumSortComponents = 1) {
 export const limitArb = fc.record({$limit: fc.integer({min: 1, max: 5})});
 export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
 
-export const unwindArb = fc
-    .record({
-        path: dollarFieldArb,
-        preserveNullAndEmptyArrays: fc.boolean(),
-        includeArrayIndex: fc.boolean(),
-        indexFieldName: assignableFieldArb,
-    })
-    .map(({path, preserveNullAndEmptyArrays, includeArrayIndex, indexFieldName}) => {
-        const unwindSpec = {path: path};
-        if (preserveNullAndEmptyArrays) {
-            unwindSpec.preserveNullAndEmptyArrays = true;
-        }
-        if (includeArrayIndex) {
-            // includeArrayIndex specifies the field name to store the array index.
-            unwindSpec.includeArrayIndex = indexFieldName;
-        }
-        return {$unwind: unwindSpec};
-    });
-
 /*
  * Return the arbitraries for agg stages that are allowed given:
  *    - `allowOrs` for whether we allow $or in $match
@@ -117,7 +98,6 @@ function getAllowedStages(allowOrs, deterministicBag, isTS) {
             addFieldsConstArb,
             computedProjectArb,
             addFieldsVarArb,
-            unwindArb,
             getSortArb(),
         ];
     } else {
@@ -130,7 +110,6 @@ function getAllowedStages(allowOrs, deterministicBag, isTS) {
             addFieldsConstArb,
             computedProjectArb,
             addFieldsVarArb,
-            unwindArb,
             getSortArb(),
         ];
     }
