@@ -226,6 +226,7 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         BSONObjBuilder bob(indexDetails.subobjStart(indexName));
         bob.appendBool("valid", ivr.isValid());
         bob.append("spec", ivr.getSpec());
+        bob.appendBool("isMultikey", ivr.isMultikey());
 
         if (!ivr.getWarnings().empty()) {
             buildFixedSizedArray(bob, "warnings", ivr.getWarnings(), maxSizePerEntry);

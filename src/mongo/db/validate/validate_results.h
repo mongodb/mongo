@@ -139,11 +139,20 @@ public:
         _spec = std::move(spec);
     }
 
+    bool isMultikey() const {
+        return _isMultikey;
+    }
+
+    void setIsMultikey(bool isMultikey) {
+        _isMultikey = isMultikey;
+    }
+
 private:
     int64_t _keysTraversed = 0;
     int64_t _keysRemovedFromRecordStore = 0;
     BSONObj _spec = {};
     bool _hasStructuralDamage = false;
+    bool _isMultikey = false;
 };
 
 using ValidateResultsMap = std::map<std::string, IndexValidateResults>;

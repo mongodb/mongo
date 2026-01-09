@@ -191,6 +191,12 @@ void _validateIndexes(OperationContext* opCtx,
                               ->descriptor()
                               ->infoObj();
         curIndexResults.setSpec(std::move(infoObj));
+
+        const bool isMultiKey = validateState->getCollection()
+                                    ->getIndexCatalog()
+                                    ->findIndexByIdent(opCtx, indexIdent)
+                                    ->isMultikey(opCtx, validateState->getCollection());
+        curIndexResults.setIsMultikey(isMultiKey);
     }
 }
 
