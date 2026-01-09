@@ -88,7 +88,13 @@ assert.commandWorked(
 
 // Insert corrupt document for testing via failpoint.
 const insertCorruptDocument = function (db, collName) {
-    assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "alwaysOn"}));
+    assert.commandWorked(
+        db.adminCommand({
+            configureFailPoint: "corruptDocumentOnInsert",
+            data: {"ns": `${db.getCollection(collName).getFullName()}`},
+            mode: "alwaysOn",
+        }),
+    );
     // Use godinsert to insert into the node directly.
     assert.commandWorked(db.runCommand({godinsert: collName, obj: doc1}));
     assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}));

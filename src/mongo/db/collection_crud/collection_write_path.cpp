@@ -287,11 +287,19 @@ Status insertDocumentsImpl(OperationContext* opCtx,
         }
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
-            // Insert a truncated record that is half the expected size of the source document.
-            records.emplace_back(
-                Record{std::move(recordId), RecordData(doc.objdata(), doc.objsize() / 2)});
-            timestamps.emplace_back(it->oplogSlot.getTimestamp());
-            continue;
+            auto scoped = corruptDocumentOnInsert.scoped();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(scoped.getData(), "ns"_sd);
+            if (collection->ns() == fpNss) {
+                //  Insert a truncated record that is half the expected size of the source document.
+                records.emplace_back(
+                    Record{std::move(recordId), RecordData(doc.objdata(), doc.objsize() / 2)});
+                timestamps.emplace_back(it->oplogSlot.getTimestamp());
+                LOGV2_WARNING(11627300,
+                              "Corrupted document intentionally inserted due to failpoint",
+                              "failpoint"_attr = corruptDocumentOnInsert.getName(),
+                              "namespace"_attr = collection->ns());
+                continue;
+            }
         }
 
         explicitlySetRecordIdOnInsert.execute([&](const BSONObj& data) {

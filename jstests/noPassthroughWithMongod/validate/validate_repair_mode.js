@@ -7,7 +7,13 @@ const coll = db.getCollection(jsTestName());
 coll.drop();
 
 // Corrupt document during insert for testing via failpoint.
-assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "alwaysOn"}));
+assert.commandWorked(
+    db.adminCommand({
+        configureFailPoint: "corruptDocumentOnInsert",
+        data: {"ns": coll.getFullName()},
+        mode: "alwaysOn",
+    }),
+);
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(db.adminCommand({configureFailPoint: "corruptDocumentOnInsert", mode: "off"}));
 
