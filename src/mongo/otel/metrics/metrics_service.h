@@ -87,7 +87,14 @@ public:
      */
     Gauge<int64_t>* createInt64Gauge(MetricName name, std::string description, MetricUnit unit);
 
-    // TODO SERVER-114955 Implement MetricsService::createDoubleGauge
+    /**
+     * Creates or returns an existing gauge with the provided parameters. The result is never null
+     * but will throw an exception if the gauge would collide with an different metric (i.e., same
+     * name but different type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    Gauge<double>* createDoubleGauge(MetricName name, std::string description, MetricUnit unit);
 
     /**
      * Creates an int64_t histogram with the provided parameters. The result is never null but will
@@ -169,9 +176,13 @@ private:
     template <typename T>
     Counter<T>* createCounter(MetricName name, std::string description, MetricUnit unit);
 
+    template <typename T>
+    Gauge<T>* createGauge(MetricName name, std::string description, MetricUnit unit);
+
     using OwnedMetric = std::variant<std::unique_ptr<Counter<int64_t>>,
                                      std::unique_ptr<Counter<double>>,
                                      std::unique_ptr<Gauge<int64_t>>,
+                                     std::unique_ptr<Gauge<double>>,
                                      std::unique_ptr<Histogram<double>>,
                                      std::unique_ptr<Histogram<int64_t>>>;
 
@@ -205,6 +216,8 @@ public:
     Counter<double>* createDoubleCounter(MetricName name, std::string description, MetricUnit unit);
 
     Gauge<int64_t>* createInt64Gauge(MetricName name, std::string description, MetricUnit unit);
+
+    Gauge<double>* createDoubleGauge(MetricName name, std::string description, MetricUnit unit);
 
     Histogram<int64_t>* createInt64Histogram(MetricName name,
                                              std::string description,

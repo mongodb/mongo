@@ -88,6 +88,21 @@ TEST_F(OtelMetricsCapturerTest, CounterWrongValueTypeThrowsException) {
                        ErrorCodes::TypeMismatch);
 }
 
+TEST_F(OtelMetricsCapturerTest, GaugeWrongValueTypeThrowsException) {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    metricsService.createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    metricsService.createDoubleGauge(MetricNames::kTest2, "description2", MetricUnit::kSeconds);
+
+    // Reading an int64 gauge as a double gauge should throw TypeMismatch.
+    ASSERT_THROWS_CODE(metricsCapturer.readDoubleGauge(MetricNames::kTest1),
+                       DBException,
+                       ErrorCodes::TypeMismatch);
+    // Reading a double gauge as an int64 gauge should throw TypeMismatch.
+    ASSERT_THROWS_CODE(
+        metricsCapturer.readInt64Gauge(MetricNames::kTest2), DBException, ErrorCodes::TypeMismatch);
+}
+
 TEST_F(OtelMetricsCapturerTest, CanReadMetricsIsTrue) {
     EXPECT_TRUE(OtelMetricsCapturer::canReadMetrics());
 }
@@ -127,6 +142,15 @@ DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Gauge, "doesn't have 
     metricsCapturer.readInt64Gauge(MetricNames::kTest1);
 }
 
+DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingDoubleGauge, "doesn't have otel enabled") {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Gauge<double>* doubleGauge =
+        metricsService.createDoubleGauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    doubleGauge->set(3);
+    metricsCapturer.readDoubleGauge(MetricNames::kTest1);
+}
+
 DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Histogram, "doesn't have otel enabled") {
     OtelMetricsCapturer metricsCapturer;
     auto& metricsService = MetricsService::get(getServiceContext());
@@ -148,5 +172,4 @@ DEATH_TEST_F(OtelMetricsCapturerDeathTest,
 }
 
 #endif  // MONGO_CONFIG_OTEL
-
 }  // namespace mongo::otel::metrics

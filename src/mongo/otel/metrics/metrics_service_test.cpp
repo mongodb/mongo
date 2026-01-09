@@ -82,6 +82,16 @@ struct MetricCreator<Gauge<int64_t>> {
 };
 
 template <>
+struct MetricCreator<Gauge<double>> {
+    static Gauge<double>* create(MetricsService& svc,
+                                 MetricName name,
+                                 std::string desc,
+                                 MetricUnit unit) {
+        return svc.createDoubleGauge(name, std::move(desc), unit);
+    }
+};
+
+template <>
 struct MetricCreator<Histogram<int64_t>> {
     static Histogram<int64_t>* create(MetricsService& svc,
                                       MetricName name,
@@ -109,8 +119,12 @@ template <typename T>
 class MetricCreationTest : public ServiceContextTest {};
 
 using testing::ElementsAre;
-using MetricTypes = testing::
-    Types<Counter<int64_t>, Counter<double>, Gauge<int64_t>, Histogram<int64_t>, Histogram<double>>;
+using MetricTypes = testing::Types<Counter<int64_t>,
+                                   Counter<double>,
+                                   Gauge<int64_t>,
+                                   Gauge<double>,
+                                   Histogram<int64_t>,
+                                   Histogram<double>>;
 TYPED_TEST_SUITE(MetricCreationTest, MetricTypes);
 
 TYPED_TEST(MetricCreationTest, SameMetricReturnedOnSameCreate) {
@@ -260,6 +274,29 @@ TEST_F(CreateInt64GaugeTest, RecordsValues) {
 
     gauge_1->set(20);
     ASSERT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 20);
+}
+
+using CreateDoubleGaugeTest = MetricsServiceTest;
+
+TEST_F(CreateDoubleGaugeTest, RecordsValues) {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Gauge<double>* gauge_1 =
+        metricsService.createDoubleGauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    Gauge<double>* gauge_2 =
+        metricsService.createDoubleGauge(MetricNames::kTest2, "description2", MetricUnit::kBytes);
+
+    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 0.0);
+    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 0.0);
+
+    gauge_1->set(10.5);
+    gauge_2->set(3.5);
+
+    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 10.5);
+    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 3.5);
+
+    gauge_1->set(20.8);
+    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 20.8);
 }
 
 using CreateHistogramTest = MetricsServiceTest;

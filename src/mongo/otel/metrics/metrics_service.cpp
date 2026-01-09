@@ -64,13 +64,14 @@ void observableCounterCallback(opentelemetry::metrics::ObserverResult observer_r
 }
 
 // Static callback function for observable gauges.
+template <typename T>
 void observableGaugeCallback(opentelemetry::metrics::ObserverResult observer_result, void* state) {
     invariant(state != nullptr);
-    auto* const gauge = static_cast<Gauge<int64_t>*>(state);
-    int64_t value = gauge->value();
+    auto* const gauge = static_cast<Gauge<T>*>(state);
+    T value = gauge->value();
 
-    auto observer = std::get_if<std::shared_ptr<opentelemetry::metrics::ObserverResultT<int64_t>>>(
-        &observer_result);
+    auto observer =
+        std::get_if<std::shared_ptr<opentelemetry::metrics::ObserverResultT<T>>>(&observer_result);
     invariant(observer != nullptr && *observer != nullptr);
     (*observer)->Observe(value);
 }
@@ -134,26 +135,54 @@ T* MetricsService::getDuplicateMetric(WithLock,
 
 template <typename T>
 std::shared_ptr<opentelemetry::metrics::ObservableInstrument> makeObservableInstrument(
-    std::string nameStr, std::string description, MetricUnit unit);
+    std::string name, std::string description, MetricUnit unit);
 
 template <>
-std::shared_ptr<opentelemetry::metrics::ObservableInstrument> makeObservableInstrument<int64_t>(
-    std::string nameStr, std::string description, MetricUnit unit) {
+std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<Counter<int64_t>>(std::string name,
+                                           std::string description,
+                                           MetricUnit unit) {
     return opentelemetry::metrics::Provider::GetMeterProvider()
         ->GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateInt64ObservableCounter(toStdStringViewForInterop(nameStr),
+        ->CreateInt64ObservableCounter(toStdStringViewForInterop(name),
                                        description,
                                        toStdStringViewForInterop(toString(unit)));
 }
 
 template <>
-std::shared_ptr<opentelemetry::metrics::ObservableInstrument> makeObservableInstrument<double>(
-    std::string nameStr, std::string description, MetricUnit unit) {
+std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<Counter<double>>(std::string name,
+                                          std::string description,
+                                          MetricUnit unit) {
     return opentelemetry::metrics::Provider::GetMeterProvider()
         ->GetMeter(std::string{MetricsService::kMeterName})
-        ->CreateDoubleObservableCounter(toStdStringViewForInterop(nameStr),
+        ->CreateDoubleObservableCounter(toStdStringViewForInterop(name),
                                         description,
                                         toStdStringViewForInterop(toString(unit)));
+}
+
+template <>
+std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<Gauge<int64_t>>(std::string name,
+                                         std::string description,
+                                         MetricUnit unit) {
+    return opentelemetry::metrics::Provider::GetMeterProvider()
+        ->GetMeter(std::string{MetricsService::kMeterName})
+        ->CreateInt64ObservableGauge(toStdStringViewForInterop(name),
+                                     description,
+                                     toStdStringViewForInterop(toString(unit)));
+}
+
+template <>
+std::shared_ptr<opentelemetry::metrics::ObservableInstrument>
+makeObservableInstrument<Gauge<double>>(std::string name,
+                                        std::string description,
+                                        MetricUnit unit) {
+    return opentelemetry::metrics::Provider::GetMeterProvider()
+        ->GetMeter(std::string{MetricsService::kMeterName})
+        ->CreateDoubleObservableGauge(toStdStringViewForInterop(name),
+                                      description,
+                                      toStdStringViewForInterop(toString(unit)));
 }
 
 template <typename T>
@@ -176,7 +205,7 @@ Counter<T>* MetricsService::createCounter(MetricName name,
 
     // Observe the raw counter.
     std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableCounter =
-        makeObservableInstrument<T>(nameStr, description, unit);
+        makeObservableInstrument<Counter<T>>(nameStr, description, unit);
 
     tassert(ErrorCodes::InternalError,
             fmt::format("Could not create observable counter for metric: {}", nameStr),
@@ -199,36 +228,43 @@ Counter<double>* MetricsService::createDoubleCounter(MetricName name,
     return createCounter<double>(name, description, unit);
 }
 
-Gauge<int64_t>* MetricsService::createInt64Gauge(MetricName name,
-                                                 std::string description,
-                                                 MetricUnit unit) {
-    const std::string nameStr(name.getName());
+template <typename T>
+Gauge<T>* MetricsService::createGauge(MetricName name, std::string description, MetricUnit unit) {
+    std::string nameStr(name.getName());
     MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
-    auto duplicate = getDuplicateMetric<Gauge<int64_t>>(lock, nameStr, identifier);
+    auto duplicate = getDuplicateMetric<Gauge<T>>(lock, nameStr, identifier);
     if (duplicate) {
         return duplicate;
     }
 
     // Make the raw gauge.
-    auto gauge = std::make_unique<GaugeImpl<int64_t>>();
-    Gauge<int64_t>* const gauge_ptr = gauge.get();
+    auto gauge = std::make_unique<GaugeImpl<T>>();
+    Gauge<T>* const gauge_ptr = gauge.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(gauge)};
 
     // Observe the raw gauge.
     std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableGauge =
-        opentelemetry::metrics::Provider::GetMeterProvider()
-            ->GetMeter(std::string{kMeterName})
-            ->CreateInt64ObservableGauge(toStdStringViewForInterop(nameStr),
-                                         description,
-                                         toStdStringViewForInterop(toString(unit)));
+        makeObservableInstrument<Gauge<T>>(nameStr, description, unit);
     tassert(ErrorCodes::InternalError,
             fmt::format("Could not create observable gauge for metric: {}", nameStr),
             observableGauge != nullptr);
-    observableGauge->AddCallback(observableGaugeCallback, gauge_ptr);
+    observableGauge->AddCallback(observableGaugeCallback<T>, gauge_ptr);
     _observableInstruments.push_back(std::move(observableGauge));
 
     return gauge_ptr;
+}
+
+Gauge<int64_t>* MetricsService::createInt64Gauge(MetricName name,
+                                                 std::string description,
+                                                 MetricUnit unit) {
+    return createGauge<int64_t>(name, description, unit);
+}
+
+Gauge<double>* MetricsService::createDoubleGauge(MetricName name,
+                                                 std::string description,
+                                                 MetricUnit unit) {
+    return createGauge<double>(name, description, unit);
 }
 
 Histogram<double>* MetricsService::createDoubleHistogram(
@@ -236,7 +272,7 @@ Histogram<double>* MetricsService::createDoubleHistogram(
     std::string description,
     MetricUnit unit,
     boost::optional<std::vector<double>> explicitBucketBoundaries) {
-    const std::string nameStr(name.getName());
+    std::string nameStr(name.getName());
     MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Histogram<double>>(lock, nameStr, identifier);
@@ -344,6 +380,16 @@ Gauge<int64_t>* MetricsService::createInt64Gauge(MetricName name,
     stdx::lock_guard lock(_mutex);
     _metrics.push_back(std::make_unique<GaugeImpl<int64_t>>());
     auto ptr = dynamic_cast<Gauge<int64_t>*>(_metrics.back().get());
+    invariant(ptr);
+    return ptr;
+}
+
+Gauge<double>* MetricsService::createDoubleGauge(MetricName name,
+                                                 std::string description,
+                                                 MetricUnit unit) {
+    stdx::lock_guard lock(_mutex);
+    _metrics.push_back(std::make_unique<GaugeImpl<double>>());
+    auto ptr = dynamic_cast<Gauge<double>*>(_metrics.back().get());
     invariant(ptr);
     return ptr;
 }

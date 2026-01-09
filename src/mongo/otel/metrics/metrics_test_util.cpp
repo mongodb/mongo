@@ -106,6 +106,21 @@ int64_t OtelMetricsCapturer::readInt64Gauge(MetricName name) {
 #endif  // MONGO_CONFIG_OTEL
 }
 
+double OtelMetricsCapturer::readDoubleGauge(MetricName name) {
+#ifdef MONGO_CONFIG_OTEL
+    auto data = getMetricData<opentelemetry::sdk::metrics::LastValuePointData>(name);
+
+    massert(ErrorCodes::TypeMismatch,
+            fmt::format("Metric {} does not have matching value type", name.getName()),
+            std::holds_alternative<double>(data.value_));
+
+    return std::get<double>(data.value_);
+#else
+    invariant(false, kUsingOtelOnWindows);
+    return {};
+#endif  // MONGO_CONFIG_OTEL
+}
+
 HistogramData<int64_t> OtelMetricsCapturer::readInt64Histogram(MetricName name) {
 #ifdef MONGO_CONFIG_OTEL
     return getMetricData<opentelemetry::sdk::metrics::HistogramPointData>(name);

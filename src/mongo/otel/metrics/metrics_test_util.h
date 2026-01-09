@@ -160,14 +160,19 @@ public:
     int64_t readInt64Counter(MetricName name);
 
     /**
-     * Gets the value of an double counter and throws an exception if it is not found.
+     * Gets the value of a double counter and throws an exception if it is not found.
      */
     double readDoubleCounter(MetricName name);
 
     /**
-     * Gets the value of an Int64 gauge and throws an exception if it is not found.
+     * Gets the value of an int64_t gauge and throws an exception if it is not found.
      */
     int64_t readInt64Gauge(MetricName name);
+
+    /**
+     * Gets the value of a double gauge and throws an exception if it is not found.
+     */
+    double readDoubleGauge(MetricName name);
 
     /**
      * Gets the data of an int64_t histogram and throws an exception if it is not found.
@@ -175,7 +180,7 @@ public:
     HistogramData<int64_t> readInt64Histogram(MetricName name);
 
     /**
-     * Gets the data of an double histogram and throws an exception if it is not found.
+     * Gets the data of a double histogram and throws an exception if it is not found.
      */
     HistogramData<double> readDoubleHistogram(MetricName name);
 
