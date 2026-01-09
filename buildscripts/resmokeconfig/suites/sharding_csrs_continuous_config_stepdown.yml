@@ -193,6 +193,7 @@ selector:
     - jstests/sharding/read_write_concern_defaults_propagation.js
     - jstests/sharding/live_shard_startup_recovery_config_server.js
     - jstests/sharding/live_shard_logical_initial_sync_config_server.js
+    - jstests/sharding/read_pref_cmd.js
 
     # On stepdown there is not gurantee that changelog entries have been inserted [SERVER-45655]
     - jstests/sharding/refine_collection_shard_key_changelog.js
@@ -299,6 +300,17 @@ selector:
 
     # TODO (SERVER-115616): Enable after retrying addShard cmd on retriable network errors.
     - jstests/sharding/add_shard_4.js
+
+    # These tests shutdown shard or kill shard and expect FailedToSatisfyReadPreference errors
+    # implicitly or explicitly. We have a retry override for this error in
+    # implicitly_retry_on_config_stepdowns.js and it fails to reach the test control flow.
+    - jstests/sharding/index_and_collection_option_propagation.js
+    - jstests/sharding/mongos_rs_shard_failure_tolerance.js
+    - jstests/sharding/mongos_shard_failure_tolerance.js
+    - jstests/sharding/read_pref.js
+    - jstests/sharding/query/change_streams/config_server_data_shard_error_handling.js
+    - jstests/sharding/query/count/count_secondaryok.js
+    - jstests/sharding/query/allow_partial_results.js
 
   exclude_with_any_tags:
     - does_not_support_stepdowns

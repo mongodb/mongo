@@ -1,6 +1,19 @@
 import {ContinuousStepdown} from "jstests/libs/override_methods/continuous_stepdown.js";
+import "jstests/libs/override_methods/implicitly_retry_on_config_stepdowns.js";
 import {kOverrideConstructor as kOverrideConstructorForRST, ReplSetTest} from "jstests/libs/replsettest.js";
 import {kOverrideConstructor as kOverrideConstructorForST, ShardingTest} from "jstests/libs/shardingtest.js";
+
+function isSlowBuildFromTestOptions() {
+    const testOptions = jsTestOptions();
+    return (
+        testOptions.isAddressSanitizerActive ||
+        testOptions.isThreadSanitizerActive ||
+        testOptions.isDebug ||
+        _isWindows()
+    );
+}
+
+const stepdownIntervalMS = isSlowBuildFromTestOptions() ? 15 * 1000 : 8 * 1000;
 
 const {ReplSetTestWithContinuousPrimaryStepdown, ShardingTestWithContinuousPrimaryStepdown} =
     ContinuousStepdown.configure(
@@ -9,7 +22,7 @@ const {ReplSetTestWithContinuousPrimaryStepdown, ShardingTestWithContinuousPrima
             electionTimeoutMS: 5 * 1000,
             shardStepdown: false,
             stepdownDurationSecs: 10,
-            stepdownIntervalMS: 8 * 1000,
+            stepdownIntervalMS: stepdownIntervalMS,
         },
         {
             verbositySetting: {

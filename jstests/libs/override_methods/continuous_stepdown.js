@@ -110,7 +110,11 @@ const StepdownThread = function () {
                 // stepping down.
                 assert.commandWorkedOrFailedWithCode(
                     primary.adminCommand({replSetStepDown: options.stepdownDurationSecs, force: true}),
-                    [ErrorCodes.NotWritablePrimary, ErrorCodes.ConflictingOperationInProgress],
+                    [
+                        ErrorCodes.NotWritablePrimary,
+                        ErrorCodes.ConflictingOperationInProgress,
+                        ErrorCodes.ExceededTimeLimit,
+                    ],
                 );
 
                 // Wait for primary to get elected and allow the test to make some progress

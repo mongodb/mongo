@@ -54,3 +54,10 @@ filters:
   - "implicit_change_stream_v2.js":
     approvers:
       - 10gen/query-execution-change-streams
+  - "implicitly_retry_on_config_stepdowns.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+      - 10gen/server-cluster-scalability
+  - "sharding_csrs_continuous_config_stepdown.js":
+    approvers:
+      - 10gen/server-cluster-scalability
