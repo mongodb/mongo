@@ -688,24 +688,59 @@ export const ResumableIndexBuildTest = class {
     }
 
     /**
+     * Asserts that given indexes are ready on all nodes in the replica set, then calls checkIndexes to test
+     * post-build inserts, perform validation, and ultimately drop the indexes.
+     */
+    static assertIndexesReadyAndValidate(
+        test,
+        dbName,
+        collName,
+        indexNames,
+        postIndexBuildWrites,
+        skipDropping = false,
+    ) {
+        var expectedIndexes = ["_id_"];
+        for (const name of indexNames) {
+            expectedIndexes.push(name);
+        }
+
+        test.awaitReplication();
+        for (const node of test.nodes ? test.nodes : test.getTestFixture().nodes) {
+            IndexBuildTest.assertIndexes(
+                node.getDB(dbName).getCollection(collName),
+                expectedIndexes.length,
+                expectedIndexes,
+            );
+        }
+
+        ResumableIndexBuildTest.checkIndexes(test, dbName, collName, indexNames, postIndexBuildWrites, skipDropping);
+    }
+
+    /**
      * Makes sure that inserting into a collection outside of an index build works properly,
      * validates indexes on all nodes in the replica set, and drops the index at the end.
      */
-    static checkIndexes(test, dbName, collName, indexNames, postIndexBuildInserts) {
+    static checkIndexes(test, dbName, collName, indexNames, postIndexBuildWrites, skipDropping = false) {
         const primary = test.getPrimary();
         const coll = primary.getDB(dbName).getCollection(collName);
 
         test.awaitReplication();
 
-        assert.commandWorked(coll.insert(postIndexBuildInserts));
+        if (Array.isArray(postIndexBuildWrites)) {
+            assert.commandWorked(coll.insert(postIndexBuildWrites));
+        } else {
+            postIndexBuildWrites(coll);
+        }
 
         for (const node of test.nodes ? test.nodes : test.getTestFixture().nodes) {
             const res = node.getDB(dbName).getCollection(collName).validate();
             assert(res.valid, "Index validation failed: " + tojson(res));
         }
 
-        for (const names of indexNames) {
-            assert.commandWorked(coll.dropIndexes(names));
+        if (!skipDropping) {
+            for (const names of indexNames) {
+                assert.commandWorked(coll.dropIndexes(names));
+            }
         }
     }
 
@@ -942,6 +977,137 @@ export const ResumableIndexBuildTest = class {
         awaitCreateIndex();
 
         ResumableIndexBuildTest.checkIndexes(rst, dbName, collName, [indexName], postIndexBuildInserts);
+    }
+
+    /**
+     * Runs a test attempting to resume an index build after an unclean shutdown.
+     * The test does by configuring the targeted crash node to hang at a particular index build
+     * failpoint, starting the index build and concurrently inserting side writes,
+     * killing/restarting the targeted node, and then validating that the index build resumed and
+     * completed successfully.
+     *
+     * @param {ReplSetTest} rst
+     * @param {string} dbName
+     * @param {string} collName
+     * @param {Object} indexSpec
+     * @param {Mongo} nodeToCrash
+     * @param {string} failpointToHang
+     * @param {boolean} expectResume
+     * @param {string} expectedResumePhase
+     * @param {Object[] | Function} sideWrites
+     * @param {Object[] | Function} postIndexBuildWrites
+     */
+    static runWithCrash(
+        rst,
+        dbName,
+        collName,
+        indexSpec,
+        nodeToCrash,
+        failpointToHang,
+        expectResume,
+        expectedResumePhase,
+        sideWrites = [],
+        postIndexBuildWrites = [],
+    ) {
+        const primary = rst.getPrimary();
+        const coll = primary.getDB(dbName).getCollection(collName);
+        const indexName = "resumable_index_build";
+        const hostType = nodeToCrash.host == primary.host ? "primary" : "secondary";
+
+        const crashNodeFp = configureFailPoint(nodeToCrash, failpointToHang);
+        jsTest.log.info(`configured failpoint ${failpointToHang} on node ${hostType} (${nodeToCrash.host})`);
+
+        jsTest.log.info("kicking off index build and side writes");
+        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
+            rst,
+            function (collName, indexSpec, indexName) {
+                // If the secondary is shutdown for too long, the primary will step down until it
+                // can reach the secondary again. In this case, the index build will continue in the
+                // background.
+                assert.commandWorkedOrFailedWithCode(
+                    db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
+                    ErrorCodes.InterruptedDueToReplStateChange,
+                );
+            },
+            coll,
+            indexSpec,
+            indexName,
+            sideWrites,
+        );
+
+        crashNodeFp.wait();
+
+        // Ensure that all nodes are ready to vote except the one designated to crash and hanging at the given failpoint.
+        const buildUUID = IndexBuildTest.assertIndexesIdHelper(coll, 1, [], [indexName], {includeBuildUUIDs: true})[
+            indexName
+        ].buildUUID;
+        const buildUUIDStr = extractUUIDFromObject(buildUUID);
+        assert.soon(() => {
+            const buildInfo = primary.getCollection("config.system.indexBuilds").findOne({_id: buildUUID});
+            if (!buildInfo || !buildInfo.commitReadyMembers) {
+                return false;
+            }
+
+            for (const node of rst.nodes ? rst.nodes : rst.getTestFixture().nodes) {
+                if (node.host != nodeToCrash.host && !buildInfo.commitReadyMembers.includes(node.host)) {
+                    return false;
+                }
+
+                if (node.host == nodeToCrash.host && buildInfo.commitReadyMembers.includes(node.host)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        jsTest.log.info(
+            `index build ${buildUUIDStr} ready to commit on all nodes except for ${hostType} (${nodeToCrash.host})`,
+        );
+
+        jsTest.log.info(`forcing checkpoint with fsync command on ${hostType} (${nodeToCrash.host})`);
+        nodeToCrash.adminCommand({fsync: 1});
+
+        jsTest.log.info(`crashing ${hostType} (${nodeToCrash.host})`);
+        rst.stop(nodeToCrash, /*signal*/ 9, /*opts*/ {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
+
+        jsTest.log.info(`restarting ${hostType} (${nodeToCrash.host})`);
+        rst.start(nodeToCrash, {noCleanData: true}, /*restart*/ true);
+        reconnect(nodeToCrash);
+
+        // Ensure that we resume or restart the index build as expected after node crash/restart.
+        const restartingLog = {type: "restart", logID: 20660};
+        const resumingLog = {type: "resume", logID: 4841700};
+        const checkLogAfterRestart = (tgtNode, monitoringFor, buildUUIDStr, expectedResumePhase) => {
+            jsTest.log.info(
+                `monitoring logs for ${monitoringFor.type} (${monitoringFor.logID}) of ${buildUUIDStr} in phase "${expectedResumePhase}"`,
+            );
+            let attrsDict = {};
+            if (buildUUIDStr) {
+                attrsDict.buildUUID = function (uuid) {
+                    return uuid && uuid["uuid"]["$uuid"] === buildUUIDStr;
+                };
+            }
+            if (expectedResumePhase && monitoringFor.type === "resume") {
+                attrsDict.details = function (details) {
+                    return details.phase === expectedResumePhase;
+                };
+            }
+            checkLog.containsJson(tgtNode, monitoringFor.logID, attrsDict, /*timeoutMillis*/ 30 * 1000);
+        };
+        let monitoredLog = expectResume ? resumingLog : restartingLog;
+        checkLogAfterRestart(nodeToCrash, monitoredLog, buildUUIDStr, expectedResumePhase);
+
+        jsTest.log.info("performing final index validation");
+        awaitCreateIndex();
+        ResumableIndexBuildTest.assertIndexesReadyAndValidate(
+            rst,
+            dbName,
+            collName,
+            [indexName],
+            postIndexBuildWrites,
+            /*skipDropping*/ true,
+        );
     }
 
     /**
