@@ -86,9 +86,9 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
         fieldNames.push_back(elem.fieldName());
     }
 
-    constexpr bool isSparse = false;
+    constexpr bool isSetSparseByUser = false;
     _indexKeyGen = std::make_unique<BtreeKeyGenerator>(
-        fieldNames, fixed, isSparse, key_string::Version::kLatestVersion, _ordering);
+        fieldNames, fixed, isSetSparseByUser, key_string::Version::kLatestVersion, _ordering);
 
     if (!_sortHasMeta) {
         size_t i = 0;

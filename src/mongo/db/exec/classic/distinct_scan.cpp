@@ -80,7 +80,7 @@ DistinctScan::DistinctScan(ExpressionContext* expCtx,
     _specificStats.isMultiKey = params.isMultiKey;
     _specificStats.multiKeyPaths = params.multikeyPaths;
     _specificStats.isUnique = indexDescriptor()->unique();
-    _specificStats.isSparse = indexDescriptor()->isSparse();
+    _specificStats.isSetSparseByUser = indexDescriptor()->isSetSparseByUser();
     _specificStats.isPartial = indexDescriptor()->isPartial();
     _specificStats.direction = _scanDirection;
     _specificStats.collation = indexDescriptor()

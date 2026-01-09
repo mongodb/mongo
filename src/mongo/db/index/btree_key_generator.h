@@ -67,7 +67,7 @@ public:
      */
     BtreeKeyGenerator(std::vector<const char*> fieldNames,
                       std::vector<BSONElement> fixed,
-                      bool isSparse,
+                      bool isSetSparseByUser,
                       key_string::Version keyStringVersion,
                       Ordering ordering);
 
@@ -257,7 +257,7 @@ private:
     const key_string::Version _keyStringVersion;
 
     const bool _isIdIndex;
-    const bool _isSparse;
+    const bool _isSetSparseByUser;
     // True if any of the indexed paths contains a positional path component. This prohibits the key
     // generator from using the non-multikey fast path.
     bool _pathsContainPositionalComponent{false};

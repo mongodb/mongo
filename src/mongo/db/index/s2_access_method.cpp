@@ -90,7 +90,7 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
             "Expect at least one geo field, spec=" + descriptor->keyPattern().toString(),
             geoFields >= 1);
 
-    if (descriptor->isSparse()) {
+    if (descriptor->isSetSparseByUser()) {
         LOGV2_WARNING(23742,
                       "Sparse option ignored for index spec",
                       "indexSpec"_attr = descriptor->keyPattern());

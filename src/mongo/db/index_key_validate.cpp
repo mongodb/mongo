@@ -1071,7 +1071,7 @@ Status validateIndexSpecTTL(const BSONObj& indexSpec) {
 bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc) {
     const auto indexName = IndexNames::findPluginName(indexDesc.keyPattern());
     return indexName != IndexNames::TEXT && indexName != IndexNames::GEO_HAYSTACK &&
-        !indexDesc.isSparse();
+        !indexDesc.isSetSparseByUser();
 }
 
 BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj) {

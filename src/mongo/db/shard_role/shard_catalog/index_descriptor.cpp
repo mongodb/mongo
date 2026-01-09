@@ -250,7 +250,7 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
         return Comparison::kDifferent;
     }
 
-    if (isSparse() != existingIndexDesc->isSparse()) {
+    if (isSetSparseByUser() != existingIndexDesc->isSetSparseByUser()) {
         return Comparison::kDifferent;
     }
 

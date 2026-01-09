@@ -1009,7 +1009,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
         }
     }
 
-    const bool isSparse = spec["sparse"].trueValue();
+    const bool isSetSparseByUser = spec["sparse"].trueValue();
 
     if (pluginName == IndexNames::WILDCARD) {
         if (auto wildcardSpecStatus = validateWildcardSpec(spec, indexVersion);
@@ -1027,7 +1027,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     // Ensure if there is a filter, its valid.
     BSONElement filterElement = spec.getField("partialFilterExpression");
     if (filterElement) {
-        if (isSparse) {
+        if (isSetSparseByUser) {
             return Status(ErrorCodes::CannotCreateIndex,
                           "cannot mix \"partialFilterExpression\" and \"sparse\" options");
         }
@@ -1082,7 +1082,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
             return Status(ErrorCodes::CannotCreateIndex, "_id index cannot be a partial index");
         }
 
-        if (isSparse) {
+        if (isSetSparseByUser) {
             return Status(ErrorCodes::CannotCreateIndex, "_id index cannot be sparse");
         }
 

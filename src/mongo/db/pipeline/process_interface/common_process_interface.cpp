@@ -271,8 +271,9 @@ MongoProcessInterface::SupportingUniqueIndex CommonProcessInterface::supportsUni
     if (!supports) {
         return MongoProcessInterface::SupportingUniqueIndex::None;
     }
-    return indexDescriptor->isSparse() ? MongoProcessInterface::SupportingUniqueIndex::NotNullish
-                                       : MongoProcessInterface::SupportingUniqueIndex::Full;
+    return indexDescriptor->isSetSparseByUser()
+        ? MongoProcessInterface::SupportingUniqueIndex::NotNullish
+        : MongoProcessInterface::SupportingUniqueIndex::Full;
 }
 
 std::vector<FieldPath> CommonProcessInterface::shardKeyToDocumentKeyFields(

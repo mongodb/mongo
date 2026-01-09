@@ -223,14 +223,22 @@ public:
         return _shared->_hidden;
     }
 
-    // Is this index sparse?
-    bool isSparse() const {
+    // Is this index set as sparse by the user?
+    bool isSetSparseByUser() const {
         return _shared->_sparse;
     }
 
-    // Is this a partial index?
+    // Is this index set as partial by the user?
     bool isPartial() const {
         return _shared->_partial;
+    }
+
+    // Whether this index behaves as sparse, independent of the user settings. Sphere2d and
+    // wildcard indexes are inherently sparse.
+    bool behavesAsSparse() const {
+        return _shared->_sparse || _shared->_indexType == IndexType::INDEX_WILDCARD ||
+            (_shared->_indexType == IndexType::INDEX_2DSPHERE &&
+             _shared->_version >= IndexVersion::kV2);
     }
 
     bool isIdIndex() const {

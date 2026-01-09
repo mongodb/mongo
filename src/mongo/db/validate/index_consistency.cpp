@@ -559,8 +559,8 @@ void KeyStringIndexConsistency::validateIndexKeyCount(OperationContext* opCtx,
 
     // Ignore any indexes with a special access method. If an access method name is given, the
     // index may be a full text, geo or special index plugin with different semantics.
-    if (results.isValid() && !desc->isSparse() && !desc->isPartial() && !desc->isIdIndex() &&
-        desc->getAccessMethodName() == "" && numTotalKeys < (*numRecords)) {
+    if (results.isValid() && !desc->isSetSparseByUser() && !desc->isPartial() &&
+        !desc->isIdIndex() && desc->getAccessMethodName() == "" && numTotalKeys < (*numRecords)) {
         const std::string msg = str::stream()
             << "index " << desc->indexName() << " is not sparse or partial, but has fewer entries ("
             << numTotalKeys << ") than documents in the index (" << (*numRecords) << ")";

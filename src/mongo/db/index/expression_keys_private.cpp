@@ -127,7 +127,7 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
                                         const BSONObj& obj,
                                         const BSONObj& keyPattern,
                                         int hashVersion,
-                                        bool isSparse,
+                                        bool isSetSparseByUser,
                                         const CollatorInterface* collator,
                                         KeyStringSet* keys,
                                         key_string::Version keyStringVersion,
@@ -183,7 +183,7 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
             keyString.appendNumberLong(makeSingleHashKey(fieldVal, hashVersion));
         }
     }
-    if (isSparse && !hasFieldValue) {
+    if (isSetSparseByUser && !hasFieldValue) {
         return;
     }
     if (id) {

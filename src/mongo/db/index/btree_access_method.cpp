@@ -61,7 +61,7 @@ BtreeAccessMethod::BtreeAccessMethod(IndexCatalogEntry* btreeState,
     _keyGenerator =
         std::make_unique<BtreeKeyGenerator>(fieldNames,
                                             fixed,
-                                            btreeState->descriptor()->isSparse(),
+                                            btreeState->descriptor()->isSetSparseByUser(),
                                             getSortedDataInterface()->getKeyStringVersion(),
                                             getSortedDataInterface()->getOrdering());
 }

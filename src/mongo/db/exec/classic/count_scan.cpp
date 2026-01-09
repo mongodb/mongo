@@ -103,7 +103,7 @@ CountScan::CountScan(ExpressionContext* expCtx,
     _specificStats.isMultiKey = params.isMultiKey;
     _specificStats.multiKeyPaths = params.multikeyPaths;
     _specificStats.isUnique = indexDescriptor()->unique();
-    _specificStats.isSparse = indexDescriptor()->isSparse();
+    _specificStats.isSetSparseByUser = indexDescriptor()->isSetSparseByUser();
     _specificStats.isPartial = indexDescriptor()->isPartial();
     _specificStats.indexVersion = static_cast<int>(indexDescriptor()->version());
     _specificStats.collation = indexDescriptor()

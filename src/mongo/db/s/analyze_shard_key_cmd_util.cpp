@@ -460,7 +460,7 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
         if (indexEntry->isMultikey(opCtx, collection)) {
             continue;
         }
-        if (indexDesc->isSparse() || indexDesc->isPartial()) {
+        if (indexDesc->isSetSparseByUser() || indexDesc->isPartial()) {
             continue;
         }
         if (!indexDesc->collation().isEmpty()) {

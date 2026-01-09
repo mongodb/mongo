@@ -379,7 +379,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             appendMultikeyPaths(spec->keyPattern, spec->multiKeyPaths, bob);
         }
         bob->appendBool("isUnique", spec->isUnique);
-        bob->appendBool("isSparse", spec->isSparse);
+        bob->appendBool("isSparse", spec->isSetSparseByUser);
         bob->appendBool("isPartial", spec->isPartial);
         bob->append("indexVersion", spec->indexVersion);
 
@@ -407,7 +407,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             appendMultikeyPaths(spec->keyPattern, spec->multiKeyPaths, bob);
         }
         bob->appendBool("isUnique", spec->isUnique);
-        bob->appendBool("isSparse", spec->isSparse);
+        bob->appendBool("isSparse", spec->isSetSparseByUser);
         bob->appendBool("isPartial", spec->isPartial);
         if (spec->isShardFilteringDistinctScanEnabled) {
             bob->appendBool("isShardFiltering", spec->isShardFiltering);
@@ -512,7 +512,7 @@ void statsToBSON(const stage_builder::PlanStageToQsnMap& planStageQsnMap,
             appendMultikeyPaths(spec->keyPattern, spec->multiKeyPaths, bob);
         }
         bob->appendBool("isUnique", spec->isUnique);
-        bob->appendBool("isSparse", spec->isSparse);
+        bob->appendBool("isSparse", spec->isSetSparseByUser);
         bob->appendBool("isPartial", spec->isPartial);
         bob->append("indexVersion", spec->indexVersion);
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");

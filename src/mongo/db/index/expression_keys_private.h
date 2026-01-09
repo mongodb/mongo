@@ -98,7 +98,7 @@ public:
                             const BSONObj& obj,
                             const BSONObj& keyPattern,
                             int hashVersion,
-                            bool isSparse,
+                            bool isSetSparseByUser,
                             const CollatorInterface* collator,
                             KeyStringSet* keys,
                             key_string::Version keyStringVersion,

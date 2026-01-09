@@ -82,7 +82,7 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(std::shared_ptr<const IndexCatalogE
 
     return {desc->keyPattern(),
             desc->getIndexType(),
-            desc->isSparse(),
+            desc->isSetSparseByUser(),
             IndexEntry::Identifier{desc->indexName()},
             projExec,
             std::move(ice)};

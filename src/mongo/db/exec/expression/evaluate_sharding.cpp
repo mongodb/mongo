@@ -228,8 +228,12 @@ private:
      */
     void _generateBtreeIndexKeys(KeyStringSet* keyStrings) const {
         std::vector<BSONElement> keysElements{_fieldNames.size(), BSONElement{}};
-        auto bTreeKeyGenerator = std::make_unique<BtreeKeyGenerator>(
-            _fieldNames, keysElements, _indexDescriptor->isSparse(), _keyStringVersion, _ordering);
+        auto bTreeKeyGenerator =
+            std::make_unique<BtreeKeyGenerator>(_fieldNames,
+                                                keysElements,
+                                                _indexDescriptor->isSetSparseByUser(),
+                                                _keyStringVersion,
+                                                _ordering);
 
         constexpr bool skipMultikey = false;
         const boost::optional<RecordId> recordId = boost::none;
@@ -261,7 +265,7 @@ private:
                                            _docObj,
                                            keyPattern,
                                            hashVersion,
-                                           _indexDescriptor->isSparse(),
+                                           _indexDescriptor->isSetSparseByUser(),
                                            _collatorInterface.get(),
                                            keyStrings,
                                            _keyStringVersion,

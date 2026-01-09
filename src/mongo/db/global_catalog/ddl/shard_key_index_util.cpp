@@ -140,16 +140,15 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
         reasons |= kErrorPartial;
     }
 
-    if (desc->isSparse()) {
+    if (desc->behavesAsSparse()) {
         reasons |= kErrorSparse;
+        if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
+            reasons |= kErrorWildcard;
+        }
     }
 
     if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance)) {
         reasons |= kErrorNotPrefix;
-    }
-
-    if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-        reasons |= kErrorWildcard;
     }
 
     if (reasons == 0) {  // that is, not partial index, not sparse, and not prefix, then:

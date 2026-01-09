@@ -101,12 +101,12 @@ std::pair<BSONElement, bool> extractNonArrayElementAtPath(const BSONObj& obj, St
 
 BtreeKeyGenerator::BtreeKeyGenerator(std::vector<const char*> fieldNames,
                                      std::vector<BSONElement> fixed,
-                                     bool isSparse,
+                                     bool isSetSparseByUser,
                                      key_string::Version keyStringVersion,
                                      Ordering ordering)
     : _keyStringVersion(keyStringVersion),
       _isIdIndex(fieldNames.size() == 1 && std::string("_id") == fieldNames[0]),
-      _isSparse(isSparse),
+      _isSetSparseByUser(isSetSparseByUser),
       _ordering(ordering),
       _fieldNames(std::move(fieldNames)),
       _nullKeyString(_buildNullKeyString()),
@@ -286,7 +286,7 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
         keys->adopt_sequence(std::move(seq));
     }
 
-    if (keys->empty() && !_isSparse) {
+    if (keys->empty() && !_isSetSparseByUser) {
         keys->insert(_nullKeyString);
     }
 }
@@ -345,7 +345,7 @@ void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooled
         }
     }
 
-    if (_isSparse && numNotFound == _fieldNames.size()) {
+    if (_isSetSparseByUser && numNotFound == _fieldNames.size()) {
         return;
     }
 
@@ -442,7 +442,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
 
     if (arrElt.eoo()) {
         // No array, so generate a single key.
-        if (_isSparse && numNotFound == fieldNames->size()) {
+        if (_isSetSparseByUser && numNotFound == fieldNames->size()) {
             return;
         }
         key_string::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);

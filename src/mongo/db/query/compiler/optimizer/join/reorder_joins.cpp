@@ -90,7 +90,7 @@ std::unique_ptr<QuerySolutionNode> createIndexProbeQSN(
                                                     false /*isMultikey*/,
                                                     {} /*multikeyPaths*/,
                                                     {} /*multikeySet*/,
-                                                    desc->isSparse(),
+                                                    desc->isSetSparseByUser(),
                                                     desc->unique(),
                                                     IndexEntry::Identifier{desc->indexName()},
                                                     desc->infoObj(),

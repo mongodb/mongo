@@ -80,7 +80,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                 false, /* isMultikey */
                 {},    /* MultikeyPaths */
                 {},    /* multikey Pathset */
-                desc->isSparse(),
+                desc->isSetSparseByUser(),
                 desc->unique(),
                 IndexEntry::Identifier{desc->indexName()},
                 desc->infoObj(),
@@ -136,7 +136,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             // metadata in the index catalog. Depending on the index type, an index uses one of
             // these mechanisms (or neither), but not both.
             std::move(multikeyPathSet),
-            desc->isSparse(),
+            desc->isSetSparseByUser(),
             desc->unique(),
             IndexEntry::Identifier{desc->indexName()},
             desc->infoObj(),
@@ -157,7 +157,7 @@ void fillOutIndexEntries(OperationContext* opCtx,
         auto indexType = ice->descriptor()->getIndexType();
         if (apiStrict &&
             (indexType == IndexType::INDEX_HAYSTACK || indexType == IndexType::INDEX_TEXT ||
-             ice->descriptor()->isSparse())) {
+             ice->descriptor()->isSetSparseByUser())) {
             continue;
         }
 
@@ -607,7 +607,7 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
         if (isIndexSuitableForDistinct(desc->keyPattern(),
                                        ice->isMultikey(opCtx, collectionPtr),
                                        ice->getMultikeyPaths(opCtx, collectionPtr),
-                                       desc->isSparse(),
+                                       desc->isSetSparseByUser(),
                                        getWildcardProjectionExecutor(*desc, *ice),
                                        key,
                                        query,

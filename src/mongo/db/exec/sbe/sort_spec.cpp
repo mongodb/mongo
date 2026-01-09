@@ -147,11 +147,11 @@ BtreeKeyGenerator SortSpec::initKeyGen() const {
         fixed.emplace_back();
     }
 
-    const bool isSparse = false;
+    const bool isSetSparseByUser = false;
     auto version = key_string::Version::kLatestVersion;
     auto ordering = Ordering::make(_sortPatternBson);
 
-    return {std::move(fields), std::move(fixed), isSparse, version, ordering};
+    return {std::move(fields), std::move(fixed), isSetSparseByUser, version, ordering};
 }
 
 size_t SortSpec::getApproximateSize() const {

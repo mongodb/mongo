@@ -1461,8 +1461,8 @@ TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsMultikey) 
 TEST_F(QueryPlannerTest, EmptyQueryWithProjectionUsesCollscanIfIndexIsSparse) {
     params.mainCollectionInfo.options = QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     constexpr bool isMultikey = false;
-    constexpr bool isSparse = true;
-    addIndex(BSON("a" << 1), isMultikey, isSparse);
+    constexpr bool isSetSparseByUser = true;
+    addIndex(BSON("a" << 1), isMultikey, isSetSparseByUser);
     runQueryAsCommand(fromjson("{find: 'testns', projection: {_id: 0, a: 1, b: 1}}"));
     assertNumSolutions(1);
     assertSolutionExists(
