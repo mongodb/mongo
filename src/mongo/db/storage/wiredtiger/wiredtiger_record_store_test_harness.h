@@ -64,9 +64,8 @@ public:
         _engine->cleanShutdown(memLeakAllowed);
     }
 
-    std::unique_ptr<RecordStore> newRecordStore(
-        const RecordStore::Options& rsOptions = RecordStore::Options{}) override {
-        return newRecordStore("a.b", rsOptions);
+    std::unique_ptr<RecordStore> newRecordStore() override {
+        return newRecordStore("a.b");
     }
 
     virtual std::unique_ptr<RecordStore> newRecordStore(const std::string& ns) {
