@@ -434,7 +434,7 @@ tasks:
     commands:
       - func: "execute resmoke tests via bazel"
         vars:
-          targets: //buildscripts/...
+          targets: ${resmoke_test_targets}
           compiling_for_test: true
           bazel_args: >-
             --test_tag_filters=${resmoke_tests_tag_filter},-incompatible_with_bazel_remote_test

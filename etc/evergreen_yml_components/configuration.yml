@@ -59,6 +59,10 @@ parameters:
       Automatically schedules your antithesis tasks to run in antithesis.
       Please only schedule one or two antithesis tasks when specifying this parameter.
 
+  - key: resmoke_test_targets
+    description: "Bazel targets to test in the resmoke_tests task. Subject to further filtering based on tags."
+    value: "//..."
+
   ## Cron parameters.
   - key: project_required_suggested_cron
     value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
