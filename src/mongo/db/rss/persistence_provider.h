@@ -167,13 +167,6 @@ public:
     virtual bool supportsOplogSampling() const = 0;
 
     /**
-     * If true, the provider supports table verify.
-     *
-     * TODO SERVER-113061: remove this workaround.
-     */
-    virtual bool supportsTableVerify() const = 0;
-
-    /**
      * If true, we disable transaction update coalescing on secondaries.
      */
     virtual bool shouldDisableTransactionUpdateCoalescing() const = 0;

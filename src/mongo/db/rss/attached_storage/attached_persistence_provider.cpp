@@ -123,9 +123,6 @@ bool AttachedPersistenceProvider::supportsOplogSampling() const {
     return true;
 }
 
-bool AttachedPersistenceProvider::supportsTableVerify() const {
-    return true;
-}
 
 bool AttachedPersistenceProvider::shouldDisableTransactionUpdateCoalescing() const {
     // This is only used for testing purposes.
