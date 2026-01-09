@@ -131,6 +131,11 @@ public:
     bool supportsOplogSampling() const override;
 
     /**
+     * We can support table verify.
+     */
+    bool supportsTableVerify() const override;
+
+    /**
      * We can enable it only for testing purposes.
      */
     bool shouldDisableTransactionUpdateCoalescing() const override;
