@@ -140,5 +140,107 @@ TEST(RetryOnTest, OnErrorInvokedForEachRetryWithState) {
     // onError should have seen the state after the last throw.
     ASSERT_EQ(lastObservedThrowsRemaining, 0);
 }
+
+TEST(RetryOnWithStateMultiTest, MultipleErrorCodesRetryWithState) {
+    constexpr auto kMaxRetries = 5;
+    auto numCalls = 0;
+    struct State {
+        int badValueCount = 0;
+        int namespaceNotFoundCount = 0;
+    };
+    State initialState{};
+    auto throwsRemaining = 3;
+    int finalBadValueCount = 0;
+    int finalNamespaceNotFoundCount = 0;
+
+    auto fn = [&](State& state) {
+        ++numCalls;
+        if (throwsRemaining > 0) {
+            if (--throwsRemaining % 2 == 0) {
+                uasserted(ErrorCodes::BadValue, "BadValue error");
+            } else {
+                uasserted(ErrorCodes::NamespaceNotFound, "NamespaceNotFound error");
+            }
+        }
+        // Capture final state values from inside the function, because the retryOn logic passes
+        // state by value, not by reference.
+        finalBadValueCount = state.badValueCount;
+        finalNamespaceNotFoundCount = state.namespaceNotFoundCount;
+        return 42;
+    };
+
+    auto onError1 = [&](ExceptionFor<ErrorCodes::BadValue>& ex, State& state) {
+        ++state.badValueCount;
+    };
+    auto onError2 = [&](ExceptionFor<ErrorCodes::NamespaceNotFound>& ex, State& state) {
+        ++state.namespaceNotFoundCount;
+    };
+
+    auto result = retryOnWithState("StateUpdateTest"_sd,
+                                   initialState,
+                                   kMaxRetries,
+                                   fn,
+                                   makeErrorHandler<ErrorCodes::BadValue>(onError1),
+                                   makeErrorHandler<ErrorCodes::NamespaceNotFound>(onError2));
+    ASSERT_EQ(result, 42);
+    // We expect the function to run 4 times - once for each of the 3 errors, and once for success.
+    ASSERT_EQ(numCalls, 4);
+    ASSERT_EQ(finalBadValueCount, 2);
+    ASSERT_EQ(finalNamespaceNotFoundCount, 1);
+}
+
+TEST(RetryOnWithStateMultiTest, ThrowsAfterExhaustingMaxRetries) {
+    constexpr auto kMaxRetries = 2;
+    auto numCalls = 0;
+
+    auto fn = [&](int& state) {
+        ++numCalls;
+        uasserted(ErrorCodes::BadValue, "mocking bad value error");
+        return 42;
+    };
+
+    auto onError1 = [&](ExceptionFor<ErrorCodes::BadValue>& ex, int& state) {
+    };
+
+    ASSERT_THROWS_CODE(retryOnWithState("ExhaustRetriesTest"_sd,
+                                        0,
+                                        kMaxRetries,
+                                        fn,
+                                        makeErrorHandler<ErrorCodes::BadValue>(onError1)),
+                       DBException,
+                       ErrorCodes::BadValue);
+    ASSERT_EQ(numCalls, kMaxRetries + 1);
+}
+
+TEST(RetryOnWithStateMultiTest, HandlersAreNotCalledForMismatchedErrorCode) {
+    constexpr auto kMaxRetries = 5;
+    auto numCalls = 0;
+    auto handlerCalls = 0;
+
+    auto fn = [&](int& state) {
+        ++numCalls;
+        uasserted(ErrorCodes::InternalError, "unhandled error code");
+        return 42;
+    };
+
+    auto onError1 = [&](ExceptionFor<ErrorCodes::BadValue>& ex, int& state) {
+        ++handlerCalls;
+    };
+    auto onError2 = [&](ExceptionFor<ErrorCodes::NamespaceNotFound>& ex, int& state) {
+        ++handlerCalls;
+    };
+
+    ASSERT_THROWS_CODE(retryOnWithState("UnhandledErrorTest"_sd,
+                                        0,
+                                        kMaxRetries,
+                                        fn,
+                                        makeErrorHandler<ErrorCodes::BadValue>(onError1),
+                                        makeErrorHandler<ErrorCodes::NamespaceNotFound>(onError2)),
+                       DBException,
+                       ErrorCodes::InternalError);
+    ASSERT_EQ(numCalls, 1);
+    ASSERT_EQ(handlerCalls, 0);
+}
+
 }  // namespace
 }  // namespace mongo
