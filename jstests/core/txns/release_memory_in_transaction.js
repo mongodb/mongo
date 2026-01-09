@@ -13,6 +13,10 @@
 
 import {assertReleaseMemoryWorked} from "jstests/libs/release_memory_util.js";
 
+// releaseMemory on multi-cursors is unsupported when queries are dispatched to multiple mongoses.
+// pinToSingleMongos due to releaseMemory command.
+TestData.pinToSingleMongos = true;
+
 function setupCollection(coll) {
     const docs = [];
     for (let i = 0; i < 200; ++i) {
