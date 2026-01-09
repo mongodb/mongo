@@ -30,6 +30,7 @@
 
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 
+#include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/idl/idl_parser.h"
@@ -67,6 +68,32 @@ void ReshardingDonorOplogIterator::dispose(OperationContext* opCtx) {
 }
 
 ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getNextBatch(
+    std::shared_ptr<executor::TaskExecutor> executor,
+    CancellationToken cancelToken,
+    CancelableOperationContextFactory factory) {
+    return resharding::WithAutomaticRetry([this, executor, cancelToken, factory]() mutable {
+               return _getNextBatch(executor, cancelToken, factory);
+           })
+        .onTransientError([this](const Status& status) {
+            LOGV2_WARNING(11399601,
+                          "Transient error while getting next batch from oplog buffer",
+                          logAttrs(_oplogBufferNss),
+                          "error"_attr = redact(status));
+        })
+        .onUnrecoverableError([this](const Status& status) {
+            LOGV2(11399602,
+                  "Unrecoverable error while getting next batch from oplog buffer",
+                  logAttrs(_oplogBufferNss),
+                  "error"_attr = redact(status));
+        })
+        .until<StatusWith<std::vector<repl::OplogEntry>>>(
+            [](const StatusWith<std::vector<repl::OplogEntry>>& retryStatus) {
+                return retryStatus.isOK();
+            })
+        .on(executor, cancelToken);
+}
+
+ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::_getNextBatch(
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
     CancelableOperationContextFactory factory) {
