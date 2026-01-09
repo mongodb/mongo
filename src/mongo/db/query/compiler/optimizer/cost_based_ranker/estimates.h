@@ -80,8 +80,8 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(EstimationUnit, ESTIMATION_UNITS_NAMES);
  * Heuristics  - the estimate is computed via heuristic CE
  * Mixed  - the estimate is a result of some computation that mixes estimates of different types
  * Metadata - the estimate comes from database metadata like collection cardinality
- * Code - the estimate is computed directly in C++, for instance a constant, or expression.
- *         Most often used for internal testing.
+ * Code - the estimate is computed directly in C++, for instance a constant, expression, or
+ *         computation via exactCE. Most often used for internal testing.
  */
 #define ESTIMATION_SOURCE_NAMES(F) \
     F(Histogram)                   \

@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
 
 
@@ -40,20 +41,25 @@ CEResult ExactCardinalityImpl::populateCardinalities(
     const auto commonStats = execStage->getCommonStats();
     cost_based_ranker::QSNEstimate card{
         .outCE = CardinalityEstimate{CardinalityType{(double)commonStats->advanced},
-                                     EstimationSource::Sampling}};
+                                     EstimationSource::Code}};
     // If we are at a leaf node, we must record inCE as well. We get this from the SpecificStats.
     if (execStage->getChildren().empty()) {
         switch (execStage->stageType()) {
             case STAGE_COLLSCAN: {
                 auto stats = static_cast<const CollectionScanStats*>(execStage->getSpecificStats());
                 card.inCE = CardinalityEstimate{CardinalityType{(double)stats->docsTested},
-                                                EstimationSource::Sampling};
+                                                EstimationSource::Code};
                 break;
             }
             case STAGE_IXSCAN: {
                 auto stats = static_cast<const IndexScanStats*>(execStage->getSpecificStats());
                 card.inCE = CardinalityEstimate{CardinalityType{(double)stats->keysExamined},
-                                                EstimationSource::Sampling};
+                                                EstimationSource::Code};
+                break;
+            }
+            case STAGE_EOF: {
+                // The in CE for the EOF stage is always 0.
+                card.inCE = cost_based_ranker::zeroCE;
                 break;
             }
             default:

@@ -244,6 +244,26 @@ function testCoveredPlans() {
     });
 }
 
+function testEof() {
+    assert(coll.drop());
+    for (let i = 0; i < 10; i++) {
+        assert.commandWorked(coll.insert({a: i, b: i}));
+    }
+    let tests = [
+        {query: {a: {$all: []}}, project: {_id: 0, a: 1}},
+        {query: {a: {$in: []}}, sort: {a: 1}},
+        {query: {a: {$nin: []}, b: 4}},
+    ];
+    assert.commandWorked(coll.createIndex({a: 1}));
+    tests.forEach((test) => {
+        assertCorrectCardinality(test);
+    });
+    assert.commandWorked(coll.dropIndex({a: 1}));
+    tests.forEach((test) => {
+        assertCorrectCardinality(test);
+    });
+}
+
 try {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "exactCE"}));
     // Ensure we calculate the correct cardinality for collection/index scans.
@@ -267,6 +287,8 @@ try {
     testProjections();
     // Ensure covered plans are correctly calculated.
     testCoveredPlans();
+    // Ensure that eof plans are correctly calculated.
+    testEof();
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
