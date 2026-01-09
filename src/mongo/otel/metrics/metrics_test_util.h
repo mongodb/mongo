@@ -104,22 +104,8 @@ public:
     HistogramData(opentelemetry::sdk::metrics::HistogramPointData data);
 #endif  // MONGO_CONFIG_OTEL
 
-    /**
-     * These values denote the upper and lower bounds for the histogram buckets.
-     *
-     * Bucket upper-bounds are inclusive (except when the upper-bound is +inf), and bucket
-     * lower-bounds are exclusive. The implicit first boundary is -inf and the implicit last
-     * boundary is +inf. Given a list of n boundaries, there are n + 1 buckets. For example,
-     *
-     * boundaries = {2, 4}
-     * buckets = (-inf, 2], (2, 4], (4, +inf)
-     *
-     * If, for example, the value 2 is recorded, the corresponding `counts` vector is as follows:
-     * {1, 0, 0}.
-     *
-     * See https://opentelemetry.io/docs/specs/otel/metrics/data-model/#histogram for more
-     * information.
-     */
+    // See the documentation for MetricsService::createInt64Histogram in metrics_service.h for an
+    // explanation of this boundaries member variable.
     std::vector<double> boundaries;
     T sum;
     T min;

@@ -27,12 +27,18 @@
  *    it in the license file.
  */
 
-
 #include "mongo/otel/metrics/metrics_service.h"
 
 #include "mongo/util/assert_util.h"
 
 #include <fmt/format.h>
+#ifdef MONGO_CONFIG_OTEL
+#include <opentelemetry/metrics/provider.h>
+#include <opentelemetry/sdk/metrics/meter_provider.h>
+#include <opentelemetry/sdk/metrics/view/instrument_selector.h>
+#include <opentelemetry/sdk/metrics/view/meter_selector.h>
+#include <opentelemetry/sdk/metrics/view/view.h>
+#endif
 
 namespace mongo::otel::metrics {
 
@@ -67,6 +73,42 @@ void observableGaugeCallback(opentelemetry::metrics::ObserverResult observer_res
         &observer_result);
     invariant(observer != nullptr && *observer != nullptr);
     (*observer)->Observe(value);
+}
+
+// Creates a view with the provided aggregation type and aggregation configuration.
+void createView(WithLock,
+                const std::string& metricName,
+                const std::string& description,
+                const std::string& unit,
+                opentelemetry::sdk::metrics::AggregationType aggregationType,
+                std::unique_ptr<opentelemetry::sdk::metrics::AggregationConfig> aggregationConfig) {
+    auto instrumentSelector = std::make_unique<opentelemetry::sdk::metrics::InstrumentSelector>(
+        opentelemetry::sdk::metrics::InstrumentType::kHistogram, metricName, unit);
+    auto meterSelector = std::make_unique<opentelemetry::sdk::metrics::MeterSelector>(
+        std::string(MetricsService::kMeterName), "", "");
+    auto view = std::make_unique<opentelemetry::sdk::metrics::View>(
+        metricName, description, aggregationType, std::move(aggregationConfig));
+    auto provider = opentelemetry::metrics::Provider::GetMeterProvider();
+    // WARNING: This AddView function call is not thread safe, hence the WithLock parameter.
+    std::static_pointer_cast<opentelemetry::sdk::metrics::MeterProvider>(provider)->AddView(
+        std::move(instrumentSelector), std::move(meterSelector), std::move(view));
+}
+
+// Creates a view for a histogram with explicit bucket boundaries.
+void createHistogramView(WithLock lock,
+                         const std::string& metricName,
+                         const std::string& description,
+                         const std::string& unit,
+                         std::vector<double> explicitBucketBoundaries) {
+    auto aggregationConfig =
+        std::make_unique<opentelemetry::sdk::metrics::HistogramAggregationConfig>();
+    aggregationConfig->boundaries_ = std::move(explicitBucketBoundaries);
+    createView(lock,
+               metricName,
+               description,
+               unit,
+               opentelemetry::sdk::metrics::AggregationType::kHistogram,
+               std::move(aggregationConfig));
 }
 }  // namespace
 
@@ -118,7 +160,7 @@ template <typename T>
 Counter<T>* MetricsService::createCounter(MetricName name,
                                           std::string description,
                                           MetricUnit unit) {
-    std::string nameStr(name.getName());
+    const std::string nameStr(name.getName());
     MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Counter<T>>(lock, nameStr, identifier);
@@ -160,7 +202,7 @@ Counter<double>* MetricsService::createDoubleCounter(MetricName name,
 Gauge<int64_t>* MetricsService::createInt64Gauge(MetricName name,
                                                  std::string description,
                                                  MetricUnit unit) {
-    std::string nameStr(name.getName());
+    const std::string nameStr(name.getName());
     MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Gauge<int64_t>>(lock, nameStr, identifier);
@@ -189,15 +231,23 @@ Gauge<int64_t>* MetricsService::createInt64Gauge(MetricName name,
     return gauge_ptr;
 }
 
-Histogram<double>* MetricsService::createDoubleHistogram(MetricName name,
-                                                         std::string description,
-                                                         MetricUnit unit) {
-    std::string nameStr(name.getName());
+Histogram<double>* MetricsService::createDoubleHistogram(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    boost::optional<std::vector<double>> explicitBucketBoundaries) {
+    const std::string nameStr(name.getName());
     MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Histogram<double>>(lock, nameStr, identifier);
     if (duplicate) {
         return duplicate;
+    }
+
+    const std::string unitStr(toString(unit));
+    if (explicitBucketBoundaries.has_value()) {
+        createHistogramView(
+            lock, nameStr, description, unitStr, std::move(explicitBucketBoundaries.value()));
     }
 
     auto histogram =
@@ -206,22 +256,30 @@ Histogram<double>* MetricsService::createDoubleHistogram(MetricName name,
                                                     .get(),
                                                 nameStr,
                                                 description,
-                                                std::string(toString(unit)));
+                                                unitStr);
     Histogram<double>* const histogram_ptr = histogram.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
 
     return histogram_ptr;
 }
 
-Histogram<int64_t>* MetricsService::createInt64Histogram(MetricName name,
-                                                         std::string description,
-                                                         MetricUnit unit) {
-    std::string nameStr(name.getName());
+Histogram<int64_t>* MetricsService::createInt64Histogram(
+    MetricName name,
+    std::string description,
+    MetricUnit unit,
+    boost::optional<std::vector<double>> explicitBucketBoundaries) {
+    const std::string nameStr(name.getName());
     MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Histogram<int64_t>>(lock, nameStr, identifier);
     if (duplicate) {
         return duplicate;
+    }
+
+    const std::string unitStr(toString(unit));
+    if (explicitBucketBoundaries.has_value()) {
+        createHistogramView(
+            lock, nameStr, description, unitStr, std::move(explicitBucketBoundaries.value()));
     }
 
     auto histogram = std::make_unique<HistogramImpl<int64_t>>(
@@ -230,7 +288,7 @@ Histogram<int64_t>* MetricsService::createInt64Histogram(MetricName name,
             .get(),
         nameStr,
         description,
-        std::string(toString(unit)));
+        unitStr);
     Histogram<int64_t>* const histogram_ptr = histogram.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
 

@@ -71,6 +71,7 @@ mongo_cc_library(
         {
             "@//bazel/config:build_otel_enabled": [
                 "//src/third_party/opentelemetry-cpp/api",
+                "//src/third_party/opentelemetry-cpp/sdk/src/metrics",
             ],
             "//conditions:default": [],
         },

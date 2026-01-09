@@ -108,6 +108,7 @@ struct MetricCreator<Histogram<double>> {
 template <typename T>
 class MetricCreationTest : public ServiceContextTest {};
 
+using testing::ElementsAre;
 using MetricTypes = testing::
     Types<Counter<int64_t>, Counter<double>, Gauge<int64_t>, Histogram<int64_t>, Histogram<double>>;
 TYPED_TEST_SUITE(MetricCreationTest, MetricTypes);
@@ -313,8 +314,33 @@ TEST_F(CreateHistogramTest, RecordsValues) {
     ASSERT_EQ(data4.counts,
               std::vector<uint64_t>({0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0}));
     ASSERT_EQ(data4.count, 2);
+}
 
-    // TODO(SERVER-114951): Test custom boundaries and associated counts.
+TEST_F(CreateHistogramTest, RecordsValuesExplicitBoundaries) {
+    OtelMetricsCapturer metricsCapturer;
+    auto& metricsService = MetricsService::get(getServiceContext());
+    Histogram<int64_t>* int64Histogram = metricsService.createInt64Histogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, std::vector<double>({2, 4}));
+    Histogram<double>* doubleHistogram = metricsService.createDoubleHistogram(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds, std::vector<double>({10, 100}));
+
+    int64Histogram->record(15);
+    const auto data1 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+    EXPECT_THAT(data1.boundaries, ElementsAre(2, 4));
+    EXPECT_EQ(data1.sum, 15);
+    EXPECT_EQ(data1.min, 15);
+    EXPECT_EQ(data1.max, 15);
+    EXPECT_THAT(data1.counts, ElementsAre(0, 0, 1));
+    EXPECT_EQ(data1.count, 1);
+
+    doubleHistogram->record(2);
+    const auto data2 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
+    EXPECT_THAT(data2.boundaries, ElementsAre(10, 100));
+    EXPECT_DOUBLE_EQ(data2.sum, 2);
+    EXPECT_DOUBLE_EQ(data2.min, 2);
+    EXPECT_DOUBLE_EQ(data2.max, 2);
+    EXPECT_THAT(data2.counts, ElementsAre(1, 0, 0));
+    EXPECT_EQ(data2.count, 1);
 }
 
 TEST_F(CreateHistogramTest, ExceptionWhenSameNameButDifferentType) {

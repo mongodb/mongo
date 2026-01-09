@@ -96,10 +96,31 @@ public:
      * taking a lock on the global list of metrics in performance-sensitive codepaths.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     *
+     * The optional explicit bucket boundaries parameter allows users to specify custom buckets. The
+     * vector elements denote the upper and lower bounds for the histogram buckets.
+     *
+     * Bucket upper-bounds are inclusive (except when the upper-bound is +inf), and bucket
+     * lower-bounds are exclusive. The implicit first boundary is -inf and the implicit last
+     * boundary is +inf. Given a list of n boundaries, there are n + 1 buckets. For example,
+     *
+     * boundaries = {2, 4}
+     * buckets = (-inf, 2], (2, 4], (4, +inf)
+     *
+     * If, for example, the value 2 is recorded, the corresponding counts for each bucket would be
+     * {1, 0, 0}.
+     *
+     * If a value is not provided, the default bucket boundaries will be used: {0, 5, 10, 25, 50,
+     * 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000}.
+     *
+     * See https://opentelemetry.io/docs/specs/otel/metrics/data-model/#histogram for more
+     * information.
      */
-    Histogram<int64_t>* createInt64Histogram(MetricName name,
-                                             std::string description,
-                                             MetricUnit unit);
+    Histogram<int64_t>* createInt64Histogram(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        boost::optional<std::vector<double>> explicitBucketBoundaries = boost::none);
 
     /**
      * Creates a double histogram with the provided parameters. The result is never null but will
@@ -108,10 +129,15 @@ public:
      * taking a lock on the global list of metrics in performance-sensitive codepaths.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     *
+     * See the documentation for createInt64Histogram for an explanation of the explict bucket
+     * boundaries parameter.
      */
-    Histogram<double>* createDoubleHistogram(MetricName name,
-                                             std::string description,
-                                             MetricUnit unit);
+    Histogram<double>* createDoubleHistogram(
+        MetricName name,
+        std::string description,
+        MetricUnit unit,
+        boost::optional<std::vector<double>> explicitBucketBoundaries = boost::none);
 
     /**
      * Serializes the created metrics to BSON for server status reporting.

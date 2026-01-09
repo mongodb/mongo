@@ -105,6 +105,12 @@ counter->add(10); // Increment by 10
 - Operation latencies
 - Request sizes
 
+#### Explicit Bucket Boundaries
+
+Histograms can optionally be created with a list of explicit bucket boundaries. See the
+documentation for `createInt64Histogram` in [`metrics_service.h`](metrics_service.h) for more
+information.
+
 ## Testing Metrics
 
 The [`metrics_test_util.h`](https://github.com/mongodb/mongo/blob/a013280e0e5dc374f78adbc4cb68b4d190c1d9ed/src/mongo/otel/metrics/metrics_test_util.h) header provides utilities for testing that your code correctly records metrics.
