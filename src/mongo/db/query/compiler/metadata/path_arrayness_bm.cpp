@@ -151,6 +151,10 @@ void BM_PathArraynessLookup(benchmark::State& state) {
     }
 }
 
+// Set to true for local runs that need to collect more data points.
+// We want to run a smaller matrix of test cases on evergreen.
+#define LOCAL_TEST false
+
 BENCHMARK(BM_PathArraynessBuild)
     ->ArgNames({
         "numberOfPaths",
@@ -160,6 +164,7 @@ BENCHMARK(BM_PathArraynessBuild)
         "trieDepth",
     })
     ->ArgsProduct({
+#if LOCAL_TEST
         /*numberOfPaths*/
         {64, 512, 1024, 2048},
         /*maxLength*/
@@ -170,6 +175,18 @@ BENCHMARK(BM_PathArraynessBuild)
         {TrieWidth::kNarrow, TrieWidth::kMediumWidth, TrieWidth::kWide},
         /*trieDepth*/
         {TrieDepth::kShallow, TrieDepth::kMediumDepth, TrieDepth::kDeep},
+#else
+        /*numberOfPaths*/
+        {64, 2048},
+        /*maxLength*/
+        {10, 100},
+        /*maxFieldNameLength: */
+        {5, 250},
+        /*trieWidth*/
+        {TrieWidth::kNarrow, TrieWidth::kWide},
+        /*trieDepth*/
+        {TrieDepth::kShallow, TrieDepth::kDeep},
+#endif
     })
     ->Unit(benchmark::kMillisecond)
     ->Iterations(1);  // Restrict number of iterations to avoid time out.
@@ -185,6 +202,7 @@ BENCHMARK(BM_PathArraynessLookup)
         "maxLengthQuery",
     })
     ->ArgsProduct({
+#if LOCAL_TEST
         /*numberOfPaths*/
         {64, 512, 1024, 2048},
         /*maxLength*/
@@ -199,6 +217,22 @@ BENCHMARK(BM_PathArraynessLookup)
         {50, 100, 200},
         /*maxLengthQuery*/
         {10, 50, 100},
+#else
+        /*numberOfPaths*/
+        {64, 2048},
+        /*maxLength*/
+        {10, 100},
+        /*maxFieldNameLength: */
+        {5, 250},
+        /*trieWidth*/
+        {TrieWidth::kNarrow, TrieWidth::kWide},
+        /*trieDepth*/
+        {TrieDepth::kShallow, TrieDepth::kDeep},
+        /*numberOfPathsQuery*/
+        {50, 200},
+        /*maxLengthQuery*/
+        {10, 100}
+#endif
     })
     ->Unit(benchmark::kMillisecond)
     ->Iterations(1);  // Restrict number of iterations to avoid time out.
