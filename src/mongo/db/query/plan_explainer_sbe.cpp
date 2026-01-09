@@ -751,6 +751,11 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
               ? plan_explainer_factory::make(_classicRuntimePlannerStage.get(), cachedPlanHash)
               : nullptr} {
     if (_classicRuntimePlannerExplainer) {
+        // 'solution' is always non-null when 'classicRuntimePlannerStage' is non-null
+        // (MultiPlanner::makeExecutor() invariant).
+        tassert(11619100,
+                "Expected non-null QuerySolution when classic runtime planner explainer exists",
+                _solution);
         _classicRuntimePlannerExplainer->updateEnumeratorExplainInfo(
             _solution->_enumeratorExplainInfo);
     }
