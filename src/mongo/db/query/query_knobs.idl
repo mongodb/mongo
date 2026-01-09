@@ -136,7 +136,7 @@ structs:
             enabled:
                 description: "Whether $vectorSearch supports 'returnStoredSource: true' or not."
                 type: bool
-                default: true
+                default: false
 
 server_parameters:
     #
