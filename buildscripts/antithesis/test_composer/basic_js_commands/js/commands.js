@@ -23,9 +23,11 @@ function retryOnFailure(func) {
                 err.name === "MongoNetworkTimeoutError" ||
                 err.name === "MongoPoolClearedError" ||
                 err.name === "PoolClearedOnNetworkError" ||
+                err.name === "InterruptedDueToReplStateChange" ||
                 err.message === "read ECONNRESET" ||
                 err.message === "read ETIMEDOUT" ||
-                err.message === "Shutting down"
+                err.message === "Shutting down" ||
+                err.message.startsWith("network error while attempting to run command")
             ) {
                 print(`Attempt ${retries} failed due to ${err.name}, retrying in 1 second...`);
                 sleep(1000);
@@ -129,7 +131,7 @@ function pitRead() {
 
     // Assert that the snapshot read actually returned the version of the
     // doc at the older value (1), not the newer one (2).
-    assert(EJSON.stringify(snapshotReadResult.cursor.firstBatch) == EJSON.stringify([{_id, value: 1}]));
+    assert(JSON.stringify(snapshotReadResult.cursor.firstBatch) == JSON.stringify([{_id, value: 1}]));
 }
 
 function validateCollections() {

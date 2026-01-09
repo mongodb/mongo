@@ -379,6 +379,8 @@ class DockerComposeImageBuilder:
                     "setup-repro-env",
                     "--variant",
                     "ubuntu2204",
+                    "-p",
+                    "ubuntu2204",
                     "--linkDir",
                     mongodb_binaries_destination,
                     "--installLastContinuous",

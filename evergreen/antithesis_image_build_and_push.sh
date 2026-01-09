@@ -126,7 +126,7 @@ params=$(jq -n \
     '{
     params: {
       "antithesis.description": $description,
-      "custom.duration": "1",
+      "custom.duration": ".5",
       "antithesis.config_image": $config_image,
       "antithesis.images": $images,
       "antithesis.report.recipients": $author_email,
