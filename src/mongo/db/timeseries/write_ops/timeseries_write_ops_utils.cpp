@@ -51,7 +51,9 @@ mongo::write_ops::UpdateCommandRequest buildSingleUpdateOp(
 void assertTimeseriesBucketsCollectionNotFound(const mongo::NamespaceString& ns) {
     uasserted(ErrorCodes::NamespaceNotFound,
               str::stream() << "Buckets collection not found for time-series collection "
-                            << ns.getTimeseriesViewNamespace().toStringForErrorMsg());
+                            << (ns.isTimeseriesBucketsCollection()
+                                    ? ns.getTimeseriesViewNamespace().toStringForErrorMsg()
+                                    : ns.toStringForErrorMsg()));
 }
 
 BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,

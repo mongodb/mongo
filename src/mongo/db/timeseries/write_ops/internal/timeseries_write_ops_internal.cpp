@@ -217,6 +217,7 @@ void filterOutExecutedMeasurements(OperationContext* opCtx,
 TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    const CollectionPreConditions& preConditions,
     const mongo::write_ops::InsertCommandRequest& request,
     std::shared_ptr<bucket_catalog::WriteBatch> batch) {
     if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(batch->bucketKey.metadata)) {
@@ -226,7 +227,7 @@ TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
         write_ops_exec::performInserts(
             opCtx,
             write_ops_utils::makeTimeseriesInsertOpFromBatch(opCtx, batch, nss),
-            /*preConditions=*/boost::none,
+            preConditions,
             OperationSource::kTimeseriesInsert),
         request);
 }
@@ -236,6 +237,7 @@ TimeseriesSingleWriteResult performTimeseriesInsertFromBatch(
  */
 TimeseriesSingleWriteResult performTimeseriesUpdate(
     OperationContext* opCtx,
+    const CollectionPreConditions& preConditions,
     const bucket_catalog::BucketMetadata& metadata,
     const mongo::write_ops::UpdateCommandRequest& op,
     const mongo::write_ops::InsertCommandRequest& request) {
@@ -245,15 +247,17 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
 
     return getTimeseriesSingleWriteResult(
         write_ops_exec::performUpdates(
-            opCtx, op, /* preConditions=*/boost::none, OperationSource::kTimeseriesInsert),
+            opCtx, op, preConditions, OperationSource::kTimeseriesInsert),
         request);
 }
 
 CollectionAcquisition acquireAndValidateBucketsCollection(
-    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionReq, LockMode mode) {
+    OperationContext* opCtx,
+    const CollectionPreConditions& preConditions,
+    CollectionAcquisitionRequest acquisitionReq,
+    LockMode lockMode) {
 
-    auto [bucketsAcq, _] =
-        timeseries::acquireCollectionWithBucketsLookup(opCtx, acquisitionReq, mode);
+    auto bucketsAcq = preConditions.acquireCollectionAndCheck(opCtx, acquisitionReq, lockMode);
     timeseries::assertTimeseriesBucketsCollection(bucketsAcq.getCollectionPtr().get());
     return bucketsAcq;
 }
@@ -351,6 +355,7 @@ void sortBatchesToCommit(bucket_catalog::TimeseriesWriteBatches& batches) {
 
 Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
                                          const mongo::write_ops::InsertCommandRequest& request,
+                                         const CollectionPreConditions& preConditions,
                                          bucket_catalog::TimeseriesWriteBatches& batches,
                                          boost::optional<repl::OpTime>* opTime,
                                          boost::optional<OID>* electionId) {
@@ -391,6 +396,7 @@ Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
             const auto bucketsAq = acquireAndValidateBucketsCollection(
                 opCtx,
+                preConditions,
                 CollectionAcquisitionRequest::fromOpCtx(
                     opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
                 MODE_IS);
@@ -428,7 +434,8 @@ Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
         hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
-        auto result = internal::performAtomicTimeseriesWrites(opCtx, insertOps, updateOps);
+        auto result =
+            internal::performAtomicTimeseriesWrites(opCtx, preConditions, insertOps, updateOps);
 
         if (!result.isOK()) {
             if (result.code() == ErrorCodes::DuplicateKey) {
@@ -626,13 +633,10 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
         // ShardVersion mismatch can be detected, before checking for other errors.
         const auto bucketsAcq = acquireAndValidateBucketsCollection(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx,
-                                                    internal::ns(request),
-                                                    AcquisitionPrerequisites::kRead,
-                                                    preConditions.expectedUUID()),
+            preConditions,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
-        CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-            opCtx, preConditions, bucketsAcq);
 
         // We want to ensure that the catalog instance after the scope of the acquisition is the
         // same as before the acquisition. Acquiring the collection involves stashing the
@@ -758,7 +762,8 @@ Status performOrderedTimeseriesWritesAtomically(
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
-    return commitTimeseriesBucketsAtomically(opCtx, request, batches, opTime, electionId);
+    return commitTimeseriesBucketsAtomically(
+        opCtx, request, preConditions, batches, opTime, electionId);
 }
 
 /**
@@ -832,8 +837,15 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     for (size_t i = 0; i < batches.size() && canContinue; ++i) {
         auto& batch = batches[i];
         try {
-            commit_result::Result result = internal::commitTimeseriesBucketForBatch(
-                opCtx, batch, request, *errors, *opTime, *electionId, retryAttemptsForDup);
+            commit_result::Result result =
+                internal::commitTimeseriesBucketForBatch(opCtx,
+                                                         batch,
+                                                         request,
+                                                         preConditions,
+                                                         *errors,
+                                                         *opTime,
+                                                         *electionId,
+                                                         retryAttemptsForDup);
 
             processUnorderedCommitResult(opCtx,
                                          result,
@@ -884,31 +896,30 @@ NamespaceString ns(const mongo::write_ops::InsertCommandRequest& request) {
 
 Status performAtomicTimeseriesWrites(
     OperationContext* opCtx,
+    const CollectionPreConditions& preConditions,
     const std::vector<mongo::write_ops::InsertCommandRequest>& insertOps,
     const std::vector<mongo::write_ops::UpdateCommandRequest>& updateOps) try {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
     invariant(!opCtx->inMultiDocumentTransaction());
     invariant(!insertOps.empty() || !updateOps.empty());
-    auto expectedUUID = !insertOps.empty() ? insertOps.front().getCollectionUUID()
-                                           : updateOps.front().getCollectionUUID();
-    invariant(expectedUUID.has_value());
-
-    auto ns =
+    auto originalNss =
         !insertOps.empty() ? insertOps.front().getNamespace() : updateOps.front().getNamespace();
 
     DisableDocumentValidation disableDocumentValidation{opCtx};
 
     write_ops_exec::LastOpFixer lastOpFixer(opCtx);
-    lastOpFixer.startingOp(ns);
+    lastOpFixer.startingOp(originalNss);
 
-    const auto coll =
-        acquireCollection(opCtx,
-                          CollectionAcquisitionRequest::fromOpCtx(
-                              opCtx, ns, AcquisitionPrerequisites::kWrite, expectedUUID),
-                          MODE_IX);
+    const auto coll = preConditions.acquireCollectionAndCheck(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, originalNss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+
     if (!coll.exists()) {
-        write_ops::assertTimeseriesBucketsCollectionNotFound(ns);
+        write_ops::assertTimeseriesBucketsCollectionNotFound(originalNss);
     }
+    auto ns = coll.nss();
     auto curOp = CurOp::get(opCtx);
     curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                    .getDatabaseProfileLevel(ns.dbName()));
@@ -1072,11 +1083,6 @@ Status performAtomicTimeseriesWrites(
     // If we encounter a TimeseriesBucketCompressionFailure, we should throw to
     // a higher level (write_ops_exec::performUpdates) so that we can freeze the corrupt bucket.
     throw;
-} catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
-    // This particular CollectionUUIDMismatch is re-thrown differently because there is already a
-    // check for this error higher up, which means this error must come from the guards installed to
-    // enforce that time-series operations are prepared and committed on the same collection.
-    uasserted(9748800, "Collection was changed during insert");
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
@@ -1085,6 +1091,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
     OperationContext* opCtx,
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
     std::vector<mongo::write_ops::WriteError>& errors,
     boost::optional<repl::OpTime>& opTime,
     boost::optional<OID>& electionId,
@@ -1107,6 +1114,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
         // collectionAcquisition is necessary to prevent deadlocks due to ticket exhaustion.
         const auto bucketsAcq = acquireAndValidateBucketsCollection(
             opCtx,
+            preConditions,
             CollectionAcquisitionRequest::fromOpCtx(
                 opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
@@ -1140,7 +1148,8 @@ commit_result::Result commitTimeseriesBucketForBatch(
     const auto docId = batch->bucketId.oid;
     const bool performInsert = batch->numPreviouslyCommittedMeasurements == 0;
     if (performInsert) {
-        const auto output = performTimeseriesInsertFromBatch(opCtx, nss, request, batch);
+        const auto output =
+            performTimeseriesInsertFromBatch(opCtx, nss, preConditions, request, batch);
         auto insertStatus = output.result.getStatus();
 
         if (!insertStatus.isOK()) {
@@ -1169,7 +1178,8 @@ commit_result::Result commitTimeseriesBucketForBatch(
     } else {
         auto op = write_ops_utils::makeTimeseriesCompressedDiffUpdateOpFromBatch(opCtx, batch, nss);
 
-        auto const output = performTimeseriesUpdate(opCtx, batch->bucketKey.metadata, op, request);
+        auto const output =
+            performTimeseriesUpdate(opCtx, preConditions, batch->bucketKey.metadata, op, request);
         auto updateStatus = output.result.getStatus();
 
         if ((updateStatus.isOK() && output.result.getValue().getNModified() != 1) ||
@@ -1337,14 +1347,10 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
         // ShardVersion mismatch can be detected, before checking for other errors.
         const auto bucketsAcq = acquireAndValidateBucketsCollection(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx,
-                                                    internal::ns(request),
-                                                    AcquisitionPrerequisites::kRead,
-                                                    preConditions.expectedUUID()),
+            preConditions,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
-
-        CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-            opCtx, preConditions, bucketsAcq);
 
         // We want to ensure that the catalog instance after the scope of the acquisition is the
         // same as before the acquisition. Acquiring the collection involves stashing the
@@ -1454,14 +1460,10 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
         // ShardVersion mismatch can be detected, before checking for other errors.
         const auto bucketsAcq = acquireAndValidateBucketsCollection(
             opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx,
-                                                    internal::ns(request),
-                                                    AcquisitionPrerequisites::kRead,
-                                                    preConditions.expectedUUID()),
+            preConditions,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, internal::ns(request), AcquisitionPrerequisites::kRead),
             MODE_IS);
-
-        CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-            opCtx, preConditions, bucketsAcq);
 
         // We want to ensure that the catalog instance after the scope of the acquisition is the
         // same as before the acquisition. Acquiring the collection involves stashing the

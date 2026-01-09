@@ -149,6 +149,15 @@ public:
                                                      const CollectionPreConditions& preConditions,
                                                      const CollectionAcquisition& acquisition);
 
+    /**
+     * Acquires the collection described by this precondition instance and verifies
+     * that its current state is still compatible with the CollectionPreConditions
+     * captured at the start of the operation, uasserting on any mismatch.
+     */
+    CollectionAcquisition acquireCollectionAndCheck(OperationContext* opCtx,
+                                                    CollectionAcquisitionRequest acquisitionReq,
+                                                    LockMode mode) const;
+
 private:
     boost::optional<UUID> _uuid;
     bool _isTimeseriesCollection = false;

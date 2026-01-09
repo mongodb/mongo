@@ -105,6 +105,7 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
  */
 Status performAtomicTimeseriesWrites(
     OperationContext* opCtx,
+    const CollectionPreConditions& preConditions,
     const std::vector<mongo::write_ops::InsertCommandRequest>& insertOps,
     const std::vector<mongo::write_ops::UpdateCommandRequest>& updateOps);
 
@@ -119,6 +120,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
     OperationContext* opCtx,
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     const mongo::write_ops::InsertCommandRequest& request,
+    const CollectionPreConditions& preConditions,
     std::vector<mongo::write_ops::WriteError>& errors,
     boost::optional<repl::OpTime>& opTime,
     boost::optional<OID>& electionId,

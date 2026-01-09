@@ -71,6 +71,7 @@ export const $config = (function () {
                     // during our insert.
                     10685101,
                     // Collection UUID changed during insert 974880*
+                    // TODO SERVER-101784 remove the 974880* error codes
                     9748800,
                     9748801,
                     9748802,

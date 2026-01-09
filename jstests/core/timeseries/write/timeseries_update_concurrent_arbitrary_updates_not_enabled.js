@@ -30,6 +30,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {isFCVgte} from "jstests/libs/feature_compatibility_version.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
@@ -112,11 +113,13 @@ const docs = [
 // Attempt to update a document in a collection that has been replaced with a new time-series
 // collection with a different metaField.
 if (!TimeseriesTest.arbitraryUpdatesEnabled(db)) {
+    // TODO SERVER-101784 remove the legacy error code once 9.0 becomes last LTS
+    const expectedErrorCodes = isFCVgte(db, "8.3") ? [10685101] : [10685101, ErrorCodes.InvalidOptions /* legacy */];
     validateUpdateIndex(
         docs,
         [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
         testCases.REPLACE_METAFIELD,
-        ErrorCodes.InvalidOptions,
+        expectedErrorCodes,
         "meta",
     );
 }

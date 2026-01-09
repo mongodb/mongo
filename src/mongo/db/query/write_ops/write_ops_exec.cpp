@@ -567,13 +567,11 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     boost::optional<CollectionAcquisition> collection;
     auto acquireCollection = [&] {
         while (true) {
-            collection.emplace(mongo::acquireCollection(
+            collection.emplace(preConditions.acquireCollectionAndCheck(
                 opCtx,
                 CollectionAcquisitionRequest::fromOpCtx(
-                    opCtx, nss, AcquisitionPrerequisites::kWrite, preConditions.expectedUUID()),
+                    opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
                 fixLockModeForSystemDotViewsChanges(nss, MODE_IX)));
-            timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-                opCtx, preConditions, *collection);
             if (collection->exists()) {
                 break;
             }
@@ -594,7 +592,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
         curOp.raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
                                       .getDatabaseProfileLevel(nss.dbName()));
-        assertCanWrite_inlock(opCtx, nss);
+        assertCanWrite_inlock(opCtx, collection->nss());
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert");
@@ -624,15 +622,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         if (ex.code() == ErrorCodes::Unauthorized) {
             throw;
         }
-        // In a time-series context, this particular CollectionUUIDMismatch is re-thrown differently
-        // because there is already a check for this error higher up, which means this error must
-        // come from the guards installed to enforce that time-series operations are prepared
-        // and committed on the same collection.
-        if (ex.code() == ErrorCodes::CollectionUUIDMismatch &&
-            source == OperationSource::kTimeseriesInsert) {
-            uasserted(9748801, "Collection was changed during insert");
-        }
-
         // We want to fail a write in the scenario where:
         // 1) a collection with the ns that we are inserting to doesn't exist, so we choose to
         // insert into it as normal collection and create it implicitly
@@ -750,13 +739,10 @@ UpdateResult performUpdate(OperationContext* opCtx,
                            bool inTransaction,
                            bool remove,
                            bool upsert,
-                           const boost::optional<mongo::UUID>& collectionUUID,
                            boost::optional<BSONObj>& docFound,
                            UpdateRequest* updateRequest,
                            const timeseries::CollectionPreConditions& preConditions,
                            bool isTimeseriesLogicalRequest) {
-    auto nsString = preConditions.getTargetNs(nss);
-
     // TODO SERVER-76583: Remove this check.
     uassert(7314600,
             "Retryable findAndModify on a timeseries is not supported",
@@ -776,13 +762,12 @@ UpdateResult performUpdate(OperationContext* opCtx,
         nss);
 
 
-    auto collection =
-        acquireCollection(opCtx,
-                          CollectionAcquisitionRequest::fromOpCtx(
-                              opCtx, nsString, AcquisitionPrerequisites::kWrite, collectionUUID),
-                          MODE_IX);
-    timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-        opCtx, preConditions, collection);
+    auto collection = preConditions.acquireCollectionAndCheck(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+
+    auto nsString = collection.nss();
     auto dbName = nsString.dbName();
     Database* db = [&]() {
         AutoGetDb autoDb(opCtx, dbName, MODE_IX);
@@ -942,12 +927,9 @@ long long performDelete(OperationContext* opCtx,
                         DeleteRequest* deleteRequest,
                         CurOp* curOp,
                         bool inTransaction,
-                        const boost::optional<mongo::UUID>& collectionUUID,
                         boost::optional<BSONObj>& docFound,
                         const timeseries::CollectionPreConditions& preConditions,
                         bool isTimeseriesLogicalRequest) {
-    auto nsString = preConditions.getTargetNs(nss);
-
     // TODO SERVER-76583: Remove this check.
     uassert(7308305,
             "Retryable findAndModify on a timeseries is not supported",
@@ -961,13 +943,14 @@ long long performDelete(OperationContext* opCtx,
                   "point is disabled");
         });
 
-    const auto collection =
-        acquireCollection(opCtx,
-                          CollectionAcquisitionRequest::fromOpCtx(
-                              opCtx, nsString, AcquisitionPrerequisites::kWrite, collectionUUID),
-                          MODE_IX);
-    timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-        opCtx, preConditions, collection);
+    const auto collection = preConditions.acquireCollectionAndCheck(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
+        MODE_IX);
+
+    auto nsString = collection.nss();
+
     // Create an RAII object that prints the collection's shard key in the case of a tassert
     // or crash.
     ScopedDebugInfo shardKeyDiagnostics(
@@ -1517,14 +1500,13 @@ static SingleWriteResult performSingleUpdateOp(
         },
         ns);
     const CollectionAcquisition collection = [&]() {
-        const auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, ns, AcquisitionPrerequisites::kWrite, preConditions.expectedUUID());
         while (true) {
             {
-                auto acquisition = acquireCollection(
-                    opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
-                timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-                    opCtx, preConditions, acquisition);
+                auto acquisition = preConditions.acquireCollectionAndCheck(
+                    opCtx,
+                    CollectionAcquisitionRequest::fromOpCtx(
+                        opCtx, ns, AcquisitionPrerequisites::kWrite),
+                    fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
                 if (acquisition.exists()) {
                     return acquisition;
                 }
@@ -1628,7 +1610,7 @@ static SingleWriteResult performSingleUpdateOp(
                                       .getDatabaseProfileLevel(ns.dbName()));
     }
 
-    assertCanWrite_inlock(opCtx, ns);
+    assertCanWrite_inlock(opCtx, collection.nss());
 
     // No need to call writeConflictRetry() since it does not retry if in a transaction,
     // but calling it can cause WCE to be double counted.
@@ -1750,15 +1732,6 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                           retryAttempts,
                           "Caught DuplicateKey exception during upsert",
                           logAttrs(ns));
-        } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>&) {
-            // In a time-series context, this particular CollectionUUIDMismatch is re-thrown
-            // differently because there is already a check for this error higher up, which means
-            // this error must come from the guards installed to enforce that time-series operations
-            // are prepared and committed on the same collection.
-            uassert(9748802,
-                    "Collection was changed during insert",
-                    source != OperationSource::kTimeseriesInsert);
-            throw;
         }
     }
 
@@ -2085,12 +2058,10 @@ static SingleWriteResult performSingleDeleteOp(
                   "point is disabled");
         });
 
-    auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
-        opCtx, ns, AcquisitionPrerequisites::kWrite, preConditions.expectedUUID());
-    const auto collection = acquireCollection(
-        opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
-    timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-        opCtx, preConditions, collection);
+    const auto collection = preConditions.acquireCollectionAndCheck(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
+        fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
     // Create an RAII object that prints the collection's shard key in the case of a tassert
     // or crash.
@@ -2133,7 +2104,7 @@ static SingleWriteResult performSingleDeleteOp(
                                       .getDatabaseProfileLevel(ns.dbName()));
     }
 
-    assertCanWrite_inlock(opCtx, ns);
+    assertCanWrite_inlock(opCtx, collection.nss());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
@@ -2466,16 +2437,12 @@ void explainUpdate(OperationContext* opCtx,
 
     // Explains of write commands are read-only, but we take write locks so that timing
     // info is more accurate.
-    const auto collection = acquireCollection(
+    const auto collection = preConditions.acquireCollectionAndCheck(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(opCtx,
                                                 updateRequest.getNamespaceString(),
-                                                AcquisitionPrerequisites::kWrite,
-                                                preConditions.expectedUUID()),
+                                                AcquisitionPrerequisites::OperationType::kWrite),
         MODE_IX);
-
-    timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-        opCtx, preConditions, collection);
 
     if (isTimeseriesViewRequest) {
         timeseries::timeseriesRequestChecks<UpdateRequest>(VersionContext::getDecoration(opCtx),
@@ -2544,13 +2511,11 @@ void explainDelete(OperationContext* opCtx,
                    rpc::ReplyBuilderInterface* result) {
     // Explains of write commands are read-only, but we take write locks so that timing
     // info is more accurate.
-    const auto collection =
-        acquireCollection(opCtx,
-                          CollectionAcquisitionRequest::fromOpCtx(opCtx,
-                                                                  deleteRequest.getNsString(),
-                                                                  AcquisitionPrerequisites::kWrite,
-                                                                  preConditions.expectedUUID()),
-                          MODE_IX);
+    const auto collection = preConditions.acquireCollectionAndCheck(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, deleteRequest.getNsString(), AcquisitionPrerequisites::OperationType::kWrite),
+        MODE_IX);
 
     if (isTimeseriesViewRequest) {
         timeseries::timeseriesRequestChecks<DeleteRequest>(VersionContext::getDecoration(opCtx),

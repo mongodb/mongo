@@ -31,9 +31,11 @@
 
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch.h"
+#include "mongo/db/shard_role/shard_catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 
+#include <fmt/format.h>
 
 namespace mongo::timeseries {
 
@@ -106,24 +108,17 @@ void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
 
     const auto& nss = acquisition.nss();
 
-    // We expect the collection acquisition to be the primary place where we check the acquired uuid
-    // against the expectedUUID. For viewful time-series collections where an expectedUUID is passed
+    // For viewful time-series collections where an expectedUUID is passed
     // in while performing a request on the view namespace, we have the additional expected behavior
     // that we will unconditionally return a CollectionUUIDMismatch error, since a view cannot have
     // a collection UUID. TODO SERVER-101784: Remove this check once 9.0 is LTS and viewful
     // time-series collections are no longer around.
-    //
-    // We also have an additional safeguard against a scenario where an expectedUUID was passed in
-    // for our request, but the expectedUUID was not passed into the acquisition.
     if (preConditions.getIsTimeseriesLogicalRequest() &&
         preConditions.isLegacyTimeseriesCollection()) {
         checkCollectionUUIDMismatch(opCtx, nss, nullptr, preConditions.expectedUUID());
-    } else if (preConditions.expectedUUID()) {
-        tassert(10811400,
-                str::stream() << "Collection UUID does not match that specified for collection "
-                              << nss.toStringForErrorMsg() << ", expected "
-                              << *preConditions.expectedUUID(),
-                acquisition.exists() && preConditions.expectedUUID() == acquisition.uuid());
+    } else {
+        checkCollectionUUIDMismatch(
+            opCtx, nss, acquisition.getCollectionPtr(), preConditions.expectedUUID());
     }
 
     if (!preConditions.exists()) {
@@ -134,17 +129,13 @@ void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
     } else {
         if (!acquisition.exists()) {
             if (preConditions.isTimeseriesCollection() && !isRawDataOperation(opCtx)) {
-                if (preConditions.isViewlessTimeseriesCollection()) {
-                    uasserted(ErrorCodes::NamespaceNotFound,
-                              str::stream()
-                                  << "Timeseries collection " << nss.toStringForErrorMsg()
-                                  << " got dropped during the executing of the operation.");
-                } else {
-                    uasserted(ErrorCodes::NamespaceNotFound,
-                              str::stream()
-                                  << "Buckets collection not found for time-series collection "
-                                  << nss.getTimeseriesViewNamespace().toStringForErrorMsg());
-                }
+                uasserted(ErrorCodes::NamespaceNotFound,
+                          fmt::format("Timeseries collection '{}' got dropped during the executing "
+                                      "of the operation.",
+                                      (nss.isTimeseriesBucketsCollection()
+                                           ? nss.getTimeseriesViewNamespace()
+                                           : nss)
+                                          .toStringForErrorMsg()));
             }
             return;
         }
@@ -154,10 +145,31 @@ void CollectionPreConditions::checkAcquisitionAgainstPreConditions(
                             "beginning of the operation",
                             nss.toStringForErrorMsg()),
                 preConditions.uuid() == acquisition.uuid() ||
-                    (preConditions.isTimeseriesCollection() ==
-                         acquisition.getCollectionPtr()->isTimeseriesCollection() &&
-                     preConditions.isViewlessTimeseriesCollection() ==
-                         acquisition.getCollectionPtr()->isNewTimeseriesWithoutView()));
+                    (!preConditions.isTimeseriesCollection() &&
+                     !acquisition.getCollectionPtr()->isTimeseriesCollection()));
     }
+}
+
+CollectionAcquisition CollectionPreConditions::acquireCollectionAndCheck(
+    OperationContext* opCtx, CollectionAcquisitionRequest acquisitionReq, LockMode mode) const {
+
+    tassert(11564800,
+            fmt::format("Mismatching expected UUID between CollectionPreConditions `{}` and "
+                        "CollectionAcquisitionRequest `{}`",
+                        acquisitionReq.expectedUUID->toString(),
+                        _expectedUUID->toString()),
+            !acquisitionReq.expectedUUID.has_value() || !_expectedUUID.has_value() ||
+                acquisitionReq.expectedUUID == _expectedUUID);
+
+    if (!acquisitionReq.expectedUUID) {
+        acquisitionReq.expectedUUID = _expectedUUID;
+    }
+
+    auto [collAcq, _] = acquireCollectionWithBucketsLookup(opCtx, std::move(acquisitionReq), mode);
+
+    timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
+        opCtx, *this, collAcq);
+
+    return collAcq;
 }
 }  // namespace mongo::timeseries

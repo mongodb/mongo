@@ -387,30 +387,34 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         timeseries::getCollectionPreConditionsAndIsTimeseriesLogicalRequest(
             opCtx, nss, request, /*expectedUUID=*/boost::none);
 
-    nss = preConditions.getTargetNs(nss);
+    // Explain calls of the findAndModify command are read-only, but we take write
+    // locks so that the timing information is more accurate.
+    const auto collection = preConditions.acquireCollectionAndCheck(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
+        MODE_IX);
+
+    // In case of timeseries collection make sure that from now on we refer to the translated
+    // namespace
+    nss = collection.nss();
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "database " << nss.dbName().toStringForErrorMsg() << " does not exist",
+            DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
     uassertStatusOK(userAllowedWriteNS(opCtx, nss));
+
+    CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
+        ->checkShardVersionOrThrow(opCtx);
+
     OpDebug* const opDebug = &curOp->debug();
-    auto const dbName = request.getDbName();
 
     if (request.getRemove().value_or(false)) {
         auto deleteRequest = DeleteRequest{};
         deleteRequest.setNsString(nss);
         const bool isExplain = true;
         makeDeleteRequest(opCtx, request, isExplain, &deleteRequest);
-
-        // Explain calls of the findAndModify command are read-only, but we take write
-        // locks so that the timing information is more accurate.
-        const auto collection =
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest::fromOpCtx(
-                                  opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
-                              MODE_IX);
-        timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-            opCtx, preConditions, collection);
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
-                DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
         if (isTimeseriesLogicalRequest) {
             timeseries::timeseriesRequestChecks<DeleteRequest>(
@@ -425,9 +429,6 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         ParsedDelete parsedDelete(
             opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesLogicalRequest);
         uassertStatusOK(parsedDelete.parseRequest());
-
-        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-            ->checkShardVersionOrThrow(opCtx);
 
         const auto exec =
             uassertStatusOK(getExecutorDelete(opDebug, collection, &parsedDelete, verbosity));
@@ -446,18 +447,6 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         updateRequest.setNamespaceString(nss);
         update::makeUpdateRequest(opCtx, request, verbosity, &updateRequest);
 
-        // Explain calls of the findAndModify command are read-only, but we take write
-        // locks so that the timing information is more accurate.
-        const auto collection =
-            acquireCollection(opCtx,
-                              CollectionAcquisitionRequest::fromOpCtx(
-                                  opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
-                              MODE_IX);
-        timeseries::CollectionPreConditions::checkAcquisitionAgainstPreConditions(
-            opCtx, preConditions, collection);
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
-                DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
         if (isTimeseriesLogicalRequest) {
             timeseries::timeseriesRequestChecks<UpdateRequest>(
                 VersionContext::getDecoration(opCtx),
@@ -482,17 +471,12 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 .build();
 
         auto parsedUpdate = uassertStatusOK(parsed_update_command::parse(
-            expCtx,
-            &updateRequest,
-            makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &updateRequest.getNsString())));
+            expCtx, &updateRequest, makeExtensionsCallback<ExtensionsCallbackReal>(opCtx, &nss)));
 
         auto canonicalUpdate = uassertStatusOK(CanonicalUpdate::make(expCtx,
                                                                      std::move(parsedUpdate),
                                                                      collection.getCollectionPtr(),
                                                                      isTimeseriesLogicalRequest));
-
-        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-            ->checkShardVersionOrThrow(opCtx);
 
         const auto exec = uassertStatusOK(
             getExecutorUpdate(opDebug, collection, canonicalUpdate.get(), verbosity));
@@ -621,7 +605,6 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                           &deleteRequest,
                                           &curOp,
                                           inTransaction,
-                                          boost::none,
                                           docFound,
                                           preConditions,
                                           isTimeseriesLogicalRequest);
@@ -661,7 +644,6 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                                       inTransaction,
                                                       req.getRemove().value_or(false),
                                                       req.getUpsert().value_or(false),
-                                                      boost::none,
                                                       docFound,
                                                       &updateRequest,
                                                       preConditions,

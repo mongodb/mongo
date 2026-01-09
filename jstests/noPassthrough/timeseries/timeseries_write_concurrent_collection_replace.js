@@ -8,6 +8,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {isFCVlt} from "jstests/libs/feature_compatibility_version.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
 const conn = MongoRunner.runMongod();
@@ -16,7 +17,7 @@ const db = conn.getDB(jsTestName());
 const timeField = "t";
 const coll = db.coll;
 
-function runInsertTest(ordered, updateBucket, expectedErrorCode) {
+function runInsertTest(ordered, updateBucket, expectedErrorCodes) {
     assert.commandWorked(db.dropDatabase());
     assert.commandWorked(
         db.createCollection(coll.getName(), {
@@ -33,19 +34,19 @@ function runInsertTest(ordered, updateBucket, expectedErrorCode) {
 
     const insertShell = startParallelShell(
         funWithArgs(
-            (dbName, collName, ordered, errorCode) => {
+            (dbName, collName, ordered, errorCodes) => {
                 assert.commandFailedWithCode(
                     db
                         .getSiblingDB(dbName)
                         .getCollection(collName)
                         .insert([{t: new Date(), value: "test2"}], {ordered: ordered}),
-                    errorCode,
+                    errorCodes,
                 );
             },
             db.getName(),
             coll.getName(),
             ordered,
-            expectedErrorCode,
+            expectedErrorCodes,
         ),
         conn.port,
     );
@@ -64,10 +65,12 @@ function runInsertTest(ordered, updateBucket, expectedErrorCode) {
 
     assert(coll.drop());
 }
+// TODO SERVER-101784 remove the legacy error code once 9.0 becomes last LTS
+const canThrowLegacyCodes = isFCVlt(db, "8.3");
 
-runInsertTest(false, false, 9748801);
-runInsertTest(false, true, 9748802);
-runInsertTest(true, false, 9748800);
-runInsertTest(true, true, 9748800);
+runInsertTest(false, false, canThrowLegacyCodes ? [9748801, 10685101] : [10685101]);
+runInsertTest(false, true, canThrowLegacyCodes ? [9748802, 10685101] : [10685101]);
+runInsertTest(true, false, canThrowLegacyCodes ? [9748800, 10685101] : [10685101]);
+runInsertTest(true, true, canThrowLegacyCodes ? [9748800, 10685101] : [10685101]);
 
 MongoRunner.stopMongod(conn);
