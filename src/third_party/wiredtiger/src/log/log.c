@@ -276,7 +276,7 @@ __log_fsync_file(WT_SESSION_IMPL *session, WT_LSN *min_lsn, const char *method, 
         if (use_own_fh)
             WT_ERR(__log_openfile(session, min_lsn->l.file, 0, &log_fh));
         else
-            log_fh = log->log_fh;
+            log_fh = __wt_tsan_suppress_load_wt_fh_ptr(&log->log_fh);
         __wt_verbose(session, WT_VERB_LOG, "%s: sync %s to LSN %" PRIu32 "/%" PRIu32, method,
           log_fh->name, min_lsn->l.file, __wt_lsn_offset(min_lsn));
         time_start = __wt_clock(session);
@@ -2269,6 +2269,15 @@ advance:
 #ifdef WORDS_BIGENDIAN
         reclen = __wt_bswap32(reclen);
 #endif
+        /*
+         * If the record length is larger than the remaining bytes to EOF from the records offset,
+         * flag log file corruption.
+         */
+        if (reclen > log_size - __wt_lsn_offset(&rd_lsn)) {
+            need_salvage = true;
+            WT_ERR(__log_salvage_message(
+              session, log_fh->name, " record length oversize", __wt_lsn_offset(&rd_lsn)));
+        }
         /*
          * Log files are pre-allocated. We need to detect the difference between a hole in the file
          * (where this location would be considered the end of log) and the last record in the log

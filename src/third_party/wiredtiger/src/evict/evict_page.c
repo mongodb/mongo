@@ -486,25 +486,26 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
         break;
     case WT_PM_REC_REPLACE:
         /*
-         * 1-for-1 page swap: Update the parent to reference the replacement page.
-         *
-         * It's possible to see an empty disk address if the previous reconciliation skipped writing
-         * the page.
-         */
-        if (mod->mod_replace.block_cookie != NULL) {
-            WT_RET(__wt_calloc_one(session, &addr));
-            *addr = mod->mod_replace;
-            mod->mod_replace.block_cookie = NULL;
-            mod->mod_replace.block_cookie_size = 0;
-            __wt_tsan_suppress_store_wt_addr_ptr(&ref->addr, addr);
-        } else
-            WT_ASSERT(session, F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) && ref->addr != NULL);
-
-        /*
          * Eviction wants to keep this page if we have a disk image, re-instantiate the page in
          * memory, else discard the page.
          */
         if (mod->mod_disk_image == NULL) {
+            /*
+             * 1-for-1 page swap: Update the parent to reference the replacement page.
+             *
+             * It's possible to see an empty disk address if the previous reconciliation skipped
+             * writing the page.
+             */
+            if (mod->mod_replace.block_cookie != NULL) {
+                WT_ASSERT(session, ref->addr == NULL);
+                WT_RET(__wt_calloc_one(session, &addr));
+                *addr = mod->mod_replace;
+                mod->mod_replace.block_cookie = NULL;
+                mod->mod_replace.block_cookie_size = 0;
+                ref->addr = addr;
+            } else
+                WT_ASSERT(
+                  session, F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED) && ref->addr != NULL);
             __wt_page_modify_clear(session, ref->page);
             __wt_ref_out(session, ref);
             WT_REF_SET_STATE(ref, WT_REF_DISK);
@@ -512,11 +513,11 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
             /* The split code works with WT_MULTI structures, build one for the disk image. */
             memset(&multi, 0, sizeof(multi));
             multi.disk_image = mod->mod_disk_image;
+            multi.addr = mod->mod_replace;
             if (ref->page->disagg_info != NULL) {
                 WT_RET(__wt_calloc_one(session, &multi.block_meta));
                 *multi.block_meta = ref->page->disagg_info->block_meta;
             }
-            WT_ASSERT(session, mod->mod_replace.block_cookie == NULL);
             /*
              * Store the disk image to a temporary pointer in case we fail to rewrite the page and
              * we need to link the new disk image back to the old disk image.

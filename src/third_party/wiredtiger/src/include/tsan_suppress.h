@@ -262,6 +262,16 @@ __wt_tsan_suppress_memset(void *ptr, int val, size_t size)
 }
 
 /*
+ * __wt_tsan_suppress_load_wt_fh_ptr --
+ *     TSAN warnings suppression for WT_FH pointer load.
+ */
+static WT_INLINE WT_FH *
+__wt_tsan_suppress_load_wt_fh_ptr(WT_FH **vp)
+{
+    return (WT_FH *)(__wt_atomic_load_ptr_relaxed(vp));
+}
+
+/*
  * __wt_tsan_suppress_store_wt_page_ptr_v --
  *     TSAN warnings suppression for WT_PAGE pointer store.
  */

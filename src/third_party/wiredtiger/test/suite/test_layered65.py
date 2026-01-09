@@ -110,6 +110,9 @@ class test_layered65(wttest.WiredTigerTestCase):
         # Only the committed update can be garbage collected.
         self.assertEqual(garbage_collected, 1)
 
+        self.session.rollback_transaction(f"rollback_timestamp={self.timestamp_str(30)}")
+        self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(30)}")
+
     def test_prepared_insert_rollback(self):
         uri = self.prefix + self.table_name
         self.create_follower()
@@ -202,6 +205,8 @@ class test_layered65(wttest.WiredTigerTestCase):
         self.assertEqual(garbage_collected, 2)
         stat_cursor.close()
 
+        self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(40)}")
+
     def test_prepared_update(self):
         uri = self.prefix + self.table_name
         self.create_follower()
@@ -280,6 +285,9 @@ class test_layered65(wttest.WiredTigerTestCase):
         # The update before the prepared update should be garbage collected from the disk image.
         garbage_collected_disk_image = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_disk_image][2]
         self.assertEqual(garbage_collected_disk_image, 2)
+
+        self.session.rollback_transaction(f"rollback_timestamp={self.timestamp_str(30)}")
+        self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(30)}")
 
     def test_prepared_update_rollback(self):
         uri = self.prefix + self.table_name
@@ -401,3 +409,5 @@ class test_layered65(wttest.WiredTigerTestCase):
         garbage_collected_disk_image = stat_cursor[stat.dsrc.rec_ingest_garbage_collection_keys_disk_image][2]
         self.assertEqual(garbage_collected_disk_image, 2)
         stat_cursor.close()
+
+        self.conn.set_timestamp(f"stable_timestamp={self.timestamp_str(40)}")
