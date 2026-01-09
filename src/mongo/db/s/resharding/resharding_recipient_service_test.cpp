@@ -1817,15 +1817,13 @@ DEATH_TEST_REGEX_F(ReshardingRecipientServiceTestDeathTest, CommitFn, "4457001.*
 
 TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort) {
     for (const auto& testOptions : makeBasicTestOptions()) {
-        LOGV2(5551107,
+        LOGV2(11543200,
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
 
-        auto recipientStates = std::vector<RecipientStateEnum>{RecipientStateEnum::kCloning,
-                                                               RecipientStateEnum::kDone};
         boost::optional<PauseDuringStateTransitions> stateTransitionsGuard;
-        stateTransitionsGuard.emplace(controller(), recipientStates);
+        stateTransitionsGuard.emplace(controller(), RecipientStateEnum::kCloning);
 
         auto doc = makeRecipientDocument(testOptions);
         auto instanceId =
@@ -1834,8 +1832,6 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         auto opCtx = makeOperationContext();
 
         if (testOptions.isAlsoDonor) {
-            // If the recipient is also a donor, the original collection should already exist on
-            // this shard.
             createSourceCollection(opCtx.get(), doc);
         }
 
@@ -1843,17 +1839,91 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartCloning(opCtx.get(), *recipient, doc);
-        // TODO (SERVER-115139): Don't wait for the recipient to be "cloning" state after making
-        // the recipient able to reliably handle the case where abort request comes in before the
-        // cancellation source is initialized.
+
+        // Wait until cloning starts to ensure temp collection exists.
         stateTransitionsGuard->wait(RecipientStateEnum::kCloning);
         recipient->abort(false);
 
-        stateTransitionsGuard->wait(RecipientStateEnum::kDone);
+        stateTransitionsGuard.reset();
+
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        checkRecipientDocumentRemoved(opCtx.get());
+
+        if (testOptions.isAlsoDonor) {
+            // Verify original collection still exists after aborting.
+            auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      doc.getSourceNss(),
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            ASSERT_TRUE(coll.exists());
+            ASSERT_EQ(coll.uuid(), doc.getSourceUUID());
+        }
+
+        // Verify the temporary collection no longer exists.
+        {
+            auto coll =
+                acquireCollection(opCtx.get(),
+                                  CollectionAcquisitionRequest(
+                                      doc.getTempReshardingNss(),
+                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
+                                      repl::ReadConcernArgs::get(opCtx.get()),
+                                      AcquisitionPrerequisites::kRead),
+                                  MODE_IS);
+            ASSERT_FALSE(coll.exists());
+        }
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbortWithFailover) {
+    for (const auto& testOptions : makeBasicTestOptions()) {
+        LOGV2(5551107,
+              "Running case",
+              "test"_attr = unittest::getTestName(),
+              "testOptions"_attr = testOptions);
+
+        auto cleanupFp = globalFailPointRegistry().find("reshardingPauseRecipientBeforeCleanup");
+        auto cleanupFpTimesEntered = cleanupFp->setMode(FailPoint::alwaysOn);
+
+        boost::optional<PauseDuringStateTransitions> stateTransitionsGuard;
+        stateTransitionsGuard.emplace(controller(), RecipientStateEnum::kCloning);
+
+        auto doc = makeRecipientDocument(testOptions);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+
+        if (testOptions.isAlsoDonor) {
+            createSourceCollection(opCtx.get(), doc);
+        }
+
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+
+        // Wait until cloning starts to ensure temp collection exists.
+        stateTransitionsGuard->wait(RecipientStateEnum::kCloning);
+        recipient->abort(false);
+        stateTransitionsGuard.reset();
+
+        cleanupFp->waitForTimesEntered(cleanupFpTimesEntered + 1);
         stepDown();
+        cleanupFp->setMode(FailPoint::off);
 
         ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
                   ErrorCodes::InterruptedDueToReplStateChange);
+
+        // TODO (SERVER-115139): Remove this failpoint after making the recipient able to reliably
+        // handle the case where abort request comes in before the cancellation source is
+        // initialized.
+        auto InitCancelStateFp =
+            globalFailPointRegistry().find("reshardingPauseRecipientAfterInitCancelState");
+        auto initCancelStateFpTimesEntered = InitCancelStateFp->setMode(FailPoint::alwaysOn);
 
         recipient.reset();
         stepUp(opCtx.get());
@@ -1864,7 +1934,9 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
         ASSERT_FALSE(isPausedOrShutdown);
         recipient = *maybeRecipient;
 
-        stateTransitionsGuard.reset();
+        InitCancelStateFp->waitForTimesEntered(initCancelStateFpTimesEntered + 1);
+        InitCancelStateFp->setMode(FailPoint::off);
+
         recipient->abort(false);
 
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());

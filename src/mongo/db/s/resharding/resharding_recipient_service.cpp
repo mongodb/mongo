@@ -135,6 +135,8 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeWaitingForCriticalSection)
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeEnteringStrictConsistency);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeTransitionToCreateCollection);
 MONGO_FAIL_POINT_DEFINE(reshardingRecipientFailInPhase);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeCleanup);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientAfterInitCancelState);
 
 namespace {
 
@@ -1463,6 +1465,8 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
 
 void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollections(
     const CancelableOperationContextFactory& factory) {
+    reshardingPauseRecipientBeforeCleanup.pauseWhileSet();
+
     auto opCtx = factory.makeOperationContext(&cc());
     resharding::data_copy::ensureOplogCollectionsDropped(
         opCtx.get(), _metadata.getReshardingUUID(), _metadata.getSourceUUID(), _donorShards);
@@ -2101,6 +2105,8 @@ void ReshardingRecipientService::RecipientStateMachine::_initCancelState(
             _cancelState->abort();
         }
     }
+
+    reshardingPauseRecipientAfterInitCancelState.pauseWhileSet();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_tryFetchBuildIndexMetrics(
