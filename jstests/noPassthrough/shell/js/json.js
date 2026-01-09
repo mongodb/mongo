@@ -1,6 +1,40 @@
-import {describe, it} from "jstests/libs/mochalite.js";
+import {after, before, describe, it} from "jstests/libs/mochalite.js";
 
 globalThis.TestData ??= {};
+
+describe("Array.tojson", () => {
+    it("should indent and lint arrays properly", () => {
+        const arr = ["foo", "bar"];
+        let json;
+
+        json = Array.tojson(arr);
+        assert.eq(
+            // this is a bizarre latent bug!
+            json,
+            `\
+[
+undefined	"foo",
+undefined	"bar"
+ndefined	]`,
+        );
+
+        json = Array.tojson(arr, "", false);
+        assert.eq(
+            json,
+            `\
+[
+	"foo",
+	"bar"
+]`,
+        );
+
+        json = Array.tojson(arr, "", true);
+        assert.eq(json, '[ "foo", "bar" ]');
+
+        json = Array.tojson(arr, " ", true);
+        assert.eq(json, '[ "foo", "bar" ]');
+    });
+});
 
 describe("tojson", function () {
     it("should indent and lint arrays properly", function () {
@@ -97,6 +131,9 @@ BC	]`,
         json = tojson(obj, "", true); // explicitly a oneliner
         assert.eq(json, '{ "x" : 1, "y" : 2 }');
 
+        json = tojson(obj, " ", true); // matches tojsononeline calls
+        assert.eq(json, '{  "x" : 1,  "y" : 2 }');
+
         json = tojson(obj, "", false); // force pretty print
         assert.eq(
             json,
@@ -143,8 +180,10 @@ BC	]`,
             assert.eq(json, '{ "x" : [ ], "y" : { } }');
 
             json = tojson(obj, "", true);
-            jsTest.log.info(json);
             assert.eq(json, '{ "x" : [ ], "y" : {  } }');
+
+            json = tojson(obj, " ", true);
+            assert.eq(json, '{  "x" : [ ],  "y" : {   } }');
 
             json = toJsonForLog(obj);
             assert.eq(json, '{"x":[],"y":{}}');
@@ -160,6 +199,11 @@ BC	]`,
 	}
 }`,
             );
+
+            let x = {"a": {"x": "foobar"}};
+
+            json = tojson(x, " ", true);
+            assert.eq(json, '{  "a" : {  "x" : "foobar" } }');
         });
 
         it("deep", function () {
@@ -170,6 +214,12 @@ BC	]`,
             assert.eq(
                 json,
                 '{ "x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ], "y" : null }',
+            );
+
+            json = tojson(obj, " ", true); // matches tojsononeline calls
+            assert.eq(
+                json,
+                '{  "x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ],  "y" : null }',
             );
 
             json = toJsonForLog(obj);
@@ -274,6 +324,12 @@ BC		],
 ABC	"y" : null
 BC	}`,
             );
+
+            json = tojson(obj, "ABC", true); // indents should be ignored completely (but aren't!)
+            assert.eq(
+                json,
+                '{ ABC"x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ], ABC"y" : null BC}',
+            );
         });
     });
 
@@ -355,17 +411,6 @@ BC	}`,
             assert.eq(json, '{"$binary":"VG8gYmUgb3Igbm90IHRvIGJlLi4uIFRoYXQgaXMgdGhlIHF1ZXN0aW9uLg==","$type":"00"}');
         });
 
-        it("timestamp", function () {
-            const x = Timestamp(987654321, 0);
-            let json;
-
-            json = JSON.stringify(x);
-            assert.eq(json, '{"$timestamp":{"t":987654321,"i":0}}');
-
-            json = toJsonForLog(x);
-            assert.eq(json, '{"$timestamp":{"t":987654321,"i":0}}');
-        });
-
         it("regex", function () {
             const x = /^acme/i;
             let json;
@@ -414,6 +459,9 @@ BC	}`,
             const x = undefined;
             let json;
 
+            json = tojson(x);
+            assert.eq(json, "undefined");
+
             json = JSON.stringify(x);
             assert.eq(json, undefined);
 
@@ -424,6 +472,9 @@ BC	}`,
         it("minkey", function () {
             const x = MinKey;
             let json;
+
+            json = tojson(x);
+            assert.eq(json, '{ "$minKey" : 1 }');
 
             json = JSON.stringify(x);
             assert.eq(json, '{"$minKey":1}');
@@ -436,6 +487,9 @@ BC	}`,
             const x = MaxKey;
             let json;
 
+            json = tojson(x);
+            assert.eq(json, '{ "$maxKey" : 1 }');
+
             json = JSON.stringify(x);
             assert.eq(json, '{"$maxKey":1}');
 
@@ -446,6 +500,9 @@ BC	}`,
         it("numberlong", function () {
             const x = NumberLong("12345");
             let json;
+
+            json = tojson(x);
+            assert.eq(json, "NumberLong(12345)");
 
             json = JSON.stringify(x);
             assert.eq(json, '{"$numberLong":"12345"}');
@@ -458,6 +515,9 @@ BC	}`,
             const x = NumberInt(5);
             let json;
 
+            json = tojson(x);
+            assert.eq(json, "NumberInt(5)");
+
             json = JSON.stringify(x);
             assert.eq(json, "5");
 
@@ -469,22 +529,14 @@ BC	}`,
             const x = NumberDecimal(3.14);
             let json;
 
+            json = tojson(x);
+            assert.eq(json, 'NumberDecimal("3.14000000000000")');
+
             json = JSON.stringify(x);
             assert.eq(json, '{"$numberDecimal":"3.14000000000000"}');
 
             json = toJsonForLog(x);
             assert.eq(json, '{"$numberDecimal":"3.14000000000000"}');
-        });
-
-        it("date", function () {
-            const x = new Date(Date.UTC(1970, 0, 1, 23, 59, 59, 999));
-            let json;
-
-            json = JSON.stringify(x);
-            assert.eq(json, '"1970-01-01T23:59:59.999Z"');
-
-            json = toJsonForLog(x);
-            assert.eq(json, '{"$date":"1970-01-01T23:59:59.999+00:00"}');
         });
     });
 
@@ -509,9 +561,45 @@ BC	}`,
                 [2, {y: [3, 4]}],
             ]);
 
+            let json = tojson(x);
+            assert.eq(
+                json,
+                `\
+{
+	"array" : [
+		1,
+		"two",
+		[
+			3,
+			false
+		]
+	],
+	"set" : new Set([
+		1,
+		"two",
+		true
+	]),
+	"map" : new Map([
+		[
+			"one",
+			1
+		],
+		[
+			2,
+			{
+				"y" : [
+					3,
+					4
+				]
+			}
+		]
+	])
+}`,
+            );
+
             assert.docEq(x, eval("(" + tojson(x) + ")"));
 
-            let json = toJsonForLog(x);
+            json = toJsonForLog(x);
             assert.eq(
                 json,
                 '{"array":[1,"two",[3,false]],"set":{"$set":[1,"two",true]},"map":{"$map":[["one",1],[2,{"y":[3,4]}]]}}',
@@ -545,24 +633,24 @@ BC	}`,
     });
 
     describe("logformat json", function () {
-        it("should override indent", function () {
-            const oldLogFormat = TestData.logFormat;
+        const oldLogFormat = TestData.logFormat;
+        before(() => {
             TestData.logFormat = "json";
+        });
+        after(() => {
+            TestData.logFormat = oldLogFormat;
+        });
 
+        it("should override indent", function () {
             const x = {a: 1, b: [2, 3]};
             let json = tojson(x, "\t");
-            TestData.logFormat = oldLogFormat;
 
             assert.eq(json, '{ "a" : 1, "b" : [ 2, 3 ] }');
         });
 
         it("should not override if nolint is specified", function () {
-            const oldLogFormat = TestData.logFormat;
-            TestData.logFormat = "json";
-
             const x = {a: 1, b: [2, 3]};
             let json = tojson(x, "\t", false);
-            TestData.logFormat = oldLogFormat;
 
             assert.eq(
                 json,
@@ -660,5 +748,114 @@ describe("tojsonObject", () => {
 			}
 		}`,
         );
+    });
+});
+
+// The "depth" is not really a user-facing value to tune; it is more for tracking internal recursion limits.
+// It doesn't help truncate the depth itself, but adjusting the tojson.MAX_DEPTH does.
+describe("depth", () => {
+    const obj = {a: {b: {c: {d: {e: 5}}}}};
+    let json;
+
+    it("does not truncate", () => {
+        // does not truncate because we still have MAX_DEPTH-2 stacks to go,
+        // but it does indent an extra 2 levels
+        json = tojson(obj, "", false, 2);
+        assert.eq(
+            json,
+            `\
+{
+	"a" : {
+		"b" : {
+			"c" : {
+				"d" : {
+					"e" : 5
+				}
+			}
+		}
+	}
+}`,
+        );
+
+        json = tojson(obj, " ", false, 2);
+        assert.eq(
+            json,
+            `\
+{
+ 	"a" : {
+ 		"b" : {
+ 			"c" : {
+ 				"d" : {
+ 					"e" : 5
+					}
+				}
+			}
+		}
+	}`,
+        );
+    });
+
+    describe("MAX_DEPTH", () => {
+        const oldDepth = tojson.MAX_DEPTH;
+        before(() => {
+            tojson.MAX_DEPTH = 2;
+        });
+        after(() => {
+            tojson.MAX_DEPTH = oldDepth;
+        });
+
+        it("truncates", () => {
+            json = tojson(obj, "", false);
+            assert.eq(
+                json,
+                `\
+{
+	"a" : {
+		"b" : {
+			"c" : [Object]
+		}
+	}
+}`,
+            );
+
+            json = tojson(obj, " ", false);
+            assert.eq(
+                json,
+                `\
+{
+ 	"a" : {
+ 		"b" : {
+ 			"c" : [Object]
+			}
+		}
+	}`,
+            );
+
+            json = tojson(obj, "", false);
+            assert.eq(
+                json,
+                `\
+{
+	"a" : {
+		"b" : {
+			"c" : [Object]
+		}
+	}
+}`,
+            );
+
+            json = tojson(obj, " ", false);
+            assert.eq(
+                json,
+                `\
+{
+ 	"a" : {
+ 		"b" : {
+ 			"c" : [Object]
+			}
+		}
+	}`,
+            );
+        });
     });
 });

@@ -26,13 +26,28 @@ describe("Date shims and polyfills", function () {
     });
 
     it("tojson", function () {
-        let d;
+        let d, json;
 
         d = new Date(0);
-        assert.eq(d.tojson(), 'ISODate("1970-01-01T00:00:00Z")');
+        json = d.tojson();
+        assert.eq(json, 'ISODate("1970-01-01T00:00:00Z")');
 
         d = new Date(1, 2, 3, 4, 5, 6, 7);
-        assert.eq(d.tojson(), 'ISODate("1901-03-03T04:05:06.007Z")');
+        json = d.tojson();
+        assert.eq(json, 'ISODate("1901-03-03T04:05:06.007Z")');
+
+        d = new Date(Date.UTC(1970, 0, 1, 23, 59, 59, 999));
+        json = d.tojson();
+        assert.eq(json, 'ISODate("1970-01-01T23:59:59.999Z")');
+
+        json = tojson(d);
+        assert.eq(json, 'ISODate("1970-01-01T23:59:59.999Z")');
+
+        json = JSON.stringify(d);
+        assert.eq(json, '"1970-01-01T23:59:59.999Z"');
+
+        json = toJsonForLog(d);
+        assert.eq(json, '{"$date":"1970-01-01T23:59:59.999+00:00"}');
     });
 
     it("tojson on incomplete dates", function () {
