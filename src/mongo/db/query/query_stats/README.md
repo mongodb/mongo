@@ -233,6 +233,8 @@ following way:
 - `metrics.fromPlanCache`: Aggregate counts of the number of query executions that did and did
   not use the plan cache, respectively. A query is considered to have not used the plan cache if
   any internal query generated as part of its execution did not use the plan cache.
+- `metrics.planningTimeMicros`: The wall-clock time in microseconds from the moment a planning
+  request is received to the moment the winning plan is finalized. This metric is expected to be positive regardless of whether the plan came from (e.g. multi-planner, cost-based ranker, plan cache).
 - `metrics.bytesRead`: Various broken down statistics for the number of bytes read from disk while
   executing this query, including getMores.
 - `metrics.readingTime`: Various broken down statistics for the amount of time spent reading from disk

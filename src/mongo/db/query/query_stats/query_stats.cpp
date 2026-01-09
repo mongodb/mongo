@@ -291,6 +291,7 @@ void updateQueryPlannerStatistics(QueryPlannerEntry& queryPlannerEntryToUpdate,
     queryPlannerEntryToUpdate.usedDisk.aggregate(snapshot.usedDisk);
     queryPlannerEntryToUpdate.fromMultiPlanner.aggregate(snapshot.fromMultiPlanner);
     queryPlannerEntryToUpdate.fromPlanCache.aggregate(snapshot.fromPlanCache);
+    queryPlannerEntryToUpdate.planningTimeMicros.aggregate(snapshot.planningTimeMicros);
 }
 
 void updateWriteStatistics(WritesEntry& writeEntryToUpdate, const QueryStatsSnapshot& snapshot) {
@@ -503,6 +504,7 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         metrics.usedDisk,
         metrics.fromMultiPlanner,
         metrics.fromPlanCache.value_or(false),
+        metrics.planningTime.value_or(Microseconds(0)).count(),
         static_cast<uint64_t>(metrics.nMatched.value_or(0)),
         static_cast<uint64_t>(metrics.nUpserted.value_or(0)),
         static_cast<uint64_t>(metrics.nModified.value_or(0)),

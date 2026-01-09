@@ -133,9 +133,11 @@ void generatePlannerInfo(PlanExecutor* exec,
     }
 
     if (exec->getOpCtx() != nullptr) {
+        const auto planningTime =
+            CurOp::get(exec->getOpCtx())->debug().getAdditiveMetrics().planningTime;
         plannerBob.appendNumber(
             "optimizationTimeMillis",
-            durationCount<Milliseconds>(CurOp::get(exec->getOpCtx())->debug().planningTime));
+            durationCount<Milliseconds>(planningTime.value_or(Microseconds{0})));
     }
 
     if (!extraInfo.isEmpty()) {

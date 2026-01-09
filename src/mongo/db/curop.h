@@ -479,9 +479,10 @@ public:
         // marked (as inner executors are prepared outside of the codepath that begins the planning
         // timer).
         auto start = _queryPlanningStart.load();
-        if (debug().planningTime == Microseconds{0} && start != 0) {
+        auto& planningTime = debug().getAdditiveMetrics().planningTime;
+        if (!planningTime && start != 0) {
             _queryPlanningEnd = _tickSource->getTicks();
-            debug().planningTime = computeElapsedTimeTotal(start, _queryPlanningEnd.load());
+            planningTime = computeElapsedTimeTotal(start, _queryPlanningEnd.load());
         }
     }
 

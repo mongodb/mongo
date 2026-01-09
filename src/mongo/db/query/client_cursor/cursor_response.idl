@@ -87,6 +87,10 @@ structs:
                 description: "Boolean value that is true if the plan came from the plan cache."
                 type: bool
                 stability: unstable
+            planningTimeMicros:
+                description: "Time from the moment a planning request is received to the moment the winning plan is finalized"
+                type: long
+                stability: unstable
             cpuNanos:
                 description: "Amount of CPU time spent by a query operation."
                 type: long

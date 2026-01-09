@@ -3578,6 +3578,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                               true /* usedDisk */,
                               true /* fromMultiPlanner */,
                               true /* fromPlanCache */,
+                              100 /* planningTimeMicros */,
                               37 /*cpuNanos */,
                               3 /* numInterruptChecks */,
                               1 /* nMatched */,
@@ -3629,6 +3630,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.nModified, 1);
         ASSERT_EQ(remoteMetrics.nDeleted, 0);
         ASSERT_EQ(remoteMetrics.nInserted, 0);
+        ASSERT_EQ(remoteMetrics.planningTime, Microseconds(100));
     }
 
     // Schedule a second response.
@@ -3642,6 +3644,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                               true /* usedDisk */,
                               true /* fromMultiPlanner */,
                               false /* fromPlanCache */,
+                              150 /* planningTimeMicros */,
                               121 /*cpuNanos */,
                               2 /* numInterruptChecks */,
                               2 /* nMatched */,
@@ -3691,6 +3694,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.nModified, 3);
         ASSERT_EQ(remoteMetrics.nDeleted, 1);
         ASSERT_EQ(remoteMetrics.nInserted, 1);
+        ASSERT_EQ(remoteMetrics.planningTime, Microseconds(250));
     }
 
     {
@@ -3718,6 +3722,7 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.nModified, 0);
         ASSERT_EQ(remoteMetrics.nDeleted, 0);
         ASSERT_EQ(remoteMetrics.nInserted, 0);
+        ASSERT_EQ(remoteMetrics.planningTime, Microseconds(0));
     }
 
     // Read the EOF

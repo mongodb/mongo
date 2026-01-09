@@ -120,6 +120,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.numInterruptChecks = 2;
     currentAdditiveMetrics.overdueInterruptApproxMax = Milliseconds{100};
     additiveMetricsToAdd.overdueInterruptApproxMax = Milliseconds{300};
+    currentAdditiveMetrics.planningTime = Microseconds{100};
+    additiveMetricsToAdd.planningTime = Microseconds{50};
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -180,6 +182,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     ASSERT_EQ(*currentAdditiveMetrics.overdueInterruptApproxMax,
               std::max(*additiveMetricsBeforeAdd.overdueInterruptApproxMax,
                        *additiveMetricsToAdd.overdueInterruptApproxMax));
+    ASSERT_EQ(*currentAdditiveMetrics.planningTime,
+              *additiveMetricsBeforeAdd.planningTime + *additiveMetricsToAdd.planningTime);
 }
 
 TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
@@ -208,6 +212,7 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.maxAcquisitionDelinquency = Milliseconds(100);
     additiveMetricsToAdd.numInterruptChecks = 1;
     additiveMetricsToAdd.overdueInterruptApproxMax = Milliseconds(100);
+    additiveMetricsToAdd.planningTime = Microseconds(100);
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -272,6 +277,10 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     ASSERT_EQ(*currentAdditiveMetrics.totalAdmissions, *additiveMetricsToAdd.totalAdmissions);
     ASSERT_EQ(*currentAdditiveMetrics.wasLoadShed, *additiveMetricsToAdd.wasLoadShed);
     ASSERT_EQ(*currentAdditiveMetrics.wasDeprioritized, *additiveMetricsToAdd.wasDeprioritized);
+
+    // The 'planningTime' field for the current AdditiveMetrics object was not initialized, so it
+    // should be treated as zero.
+    ASSERT_EQ(*currentAdditiveMetrics.planningTime, *additiveMetricsToAdd.planningTime);
 }
 
 TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
@@ -322,6 +331,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     additiveMetrics.nModified = 1;
     additiveMetrics.ndeleted = 0;
     additiveMetrics.ninserted = 0;
+    additiveMetrics.planningTime = Microseconds(100);
 
     CursorMetrics cursorMetrics(3 /* keysExamined */,
                                 4 /* docsExamined */,
@@ -332,6 +342,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
+                                150 /* planningTimeMicros */,
                                 9 /* cpuNanos */,
                                 3 /* numInterruptChecks */,
                                 1 /* nMatched */,
@@ -372,6 +383,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.totalAdmissions, 7);
     ASSERT_EQ(*additiveMetrics.wasLoadShed, true);
     ASSERT_EQ(*additiveMetrics.wasDeprioritized, true);
+    ASSERT_EQ(*additiveMetrics.planningTime, Microseconds(250));
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
@@ -389,6 +401,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateNegativeCpuNanos) {
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
+                                12 /* planningTimeMicros */,
                                 -1 /* cpuNanos */,
                                 3 /* numInterruptChecks */,
                                 1 /* nMatched */,
@@ -407,6 +420,7 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
     additiveMetrics.keysExamined = boost::none;
     additiveMetrics.docsExamined = boost::none;
     additiveMetrics.bytesRead = boost::none;
+    additiveMetrics.planningTime = boost::none;
 
     CursorMetrics cursorMetrics(1 /* keysExamined */,
                                 2 /* docsExamined */,
@@ -417,6 +431,7 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
                                 false /* usedDisk */,
                                 true /* fromMultiPlanner */,
                                 false /* fromPlanCache */,
+                                100 /* planningTimeMicros */,
                                 10 /* cpuNanos */,
                                 3 /* numInterruptChecks */,
                                 1 /* nMatched */,
@@ -430,6 +445,7 @@ TEST(CurOpTest, AdditiveMetricsAggregateCursorMetricsTreatsNoneAsZero) {
     ASSERT_EQ(*additiveMetrics.keysExamined, 1);
     ASSERT_EQ(*additiveMetrics.docsExamined, 2);
     ASSERT_EQ(*additiveMetrics.bytesRead, 3);
+    ASSERT_EQ(*additiveMetrics.planningTime, Microseconds(100));
 }
 
 TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
@@ -450,6 +466,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.wasDeprioritized = true;
     additiveMetrics.numInterruptChecks = 2;
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
+    additiveMetrics.planningTime = Microseconds(100);
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
     remoteMetrics.keysExamined = 3;
@@ -467,6 +484,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.wasDeprioritized = false;
     remoteMetrics.numInterruptChecks = 1;
     remoteMetrics.overdueInterruptApproxMax = Milliseconds(300);
+    remoteMetrics.planningTime = Microseconds(150);
 
     additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
 
@@ -485,6 +503,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(*additiveMetrics.wasDeprioritized, true);
     ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
     ASSERT_EQ(*additiveMetrics.overdueInterruptApproxMax, Milliseconds(300));
+    ASSERT_EQ(*additiveMetrics.planningTime, Microseconds(250));
 }
 
 TEST(CurOpTest, AdditiveMetricsAggregateDataBearingNodeMetricsTreatsNoneAsZero) {

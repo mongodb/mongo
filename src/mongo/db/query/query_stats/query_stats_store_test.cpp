@@ -1535,12 +1535,14 @@ TEST_F(QueryStatsStoreTest, SumOfSquaresOverflowDoubleTest) {
 struct QueryStatsBSONParams {
     bool useSubsections = false;
     bool includeWriteMetrics = false;
+    bool includeCBRMetrics = false;
     long long lastExecutionMicros = 0LL;
     long long execCount = 0LL;
     BSONObj hasSortStage = boolMetricBson(0, 0);
     BSONObj usedDisk = boolMetricBson(0, 0);
     BSONObj nMatched = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj nModified = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+    BSONObj planningTimeMicros = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
 };
 
 void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& params = {}) {
@@ -1592,6 +1594,10 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
         .append("fromMultiPlanner", boolMetricBson(0, 0))
         .append("fromPlanCache", boolMetricBson(0, 0));
 
+    if (params.includeCBRMetrics) {
+        subsectionBuilder->append("planningTimeMicros", params.planningTimeMicros);
+    }
+
     if (params.useSubsections) {
         testBuilder.append("queryPlanner", subsectionBuilder->obj());
     }
@@ -1612,8 +1618,9 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
     testBuilder.append("firstSeenTimestamp", qse.firstSeenTimestamp)
         .append("latestSeenTimestamp", Date_t());
 
-    ASSERT_BSONOBJ_EQ(qse.toBSON(params.useSubsections, params.includeWriteMetrics),
-                      testBuilder.obj());
+    ASSERT_BSONOBJ_EQ(
+        qse.toBSON(params.useSubsections, params.includeWriteMetrics, params.includeCBRMetrics),
+        testBuilder.obj());
 }
 
 TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
@@ -1685,6 +1692,33 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
                                      .usedDisk = boolMetricBson(1, 0),
                                      .nMatched = intMetricBson(1, 1, 1, 1),
                                      .nModified = intMetricBson(1, 1, 1, 1),
+                                 });
+        }
+
+        // Collect some metrics again but with CBR metrics.
+        {
+            auto metrics = collectMetricsBase(query1);
+            metrics->execCount += 1;
+            metrics->lastExecutionMicros += 100;
+            metrics->queryPlannerStats.planningTimeMicros.aggregate(500);
+        }
+
+        // With CBR metrics.
+        // TODO SERVER-115607 and SERVER-SERVER-115606 Add cases for nDocsSampled and CE method.
+        {
+            auto qse3 = getMetrics(query1);
+            verifyQueryStatsBSON(qse3,
+                                 {
+                                     .useSubsections = useSubsections,
+                                     .includeWriteMetrics = true,
+                                     .includeCBRMetrics = true,
+                                     .lastExecutionMicros = 247012LL,
+                                     .execCount = 3LL,
+                                     .hasSortStage = boolMetricBson(0, 1),
+                                     .usedDisk = boolMetricBson(1, 0),
+                                     .nMatched = intMetricBson(1, 1, 1, 1),
+                                     .nModified = intMetricBson(1, 1, 1, 1),
+                                     .planningTimeMicros = intMetricBson(500, 500, 500, 250000),
                                  });
         }
     }

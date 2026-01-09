@@ -37,7 +37,9 @@ namespace mongo::query_stats {
 // Estimated overhead for BSON document header, EOO, and potential subobject field names.
 const size_t kBSONOverhead = 100;
 
-BSONObj QueryStatsEntry::toBSON(bool buildSubsections, bool includeWriteMetrics) const {
+BSONObj QueryStatsEntry::toBSON(bool buildSubsections,
+                                bool includeWriteMetrics,
+                                bool includeCBRMetrics) const {
     // Pad not only for the overhead of the BSON structure itself, but also for the
     // sub-structures it contains. We have 4 sub-structures at the top level:
     // cursorStats, queryExecStats, queryPlannerStats, and writesStats.
@@ -51,7 +53,7 @@ BSONObj QueryStatsEntry::toBSON(bool buildSubsections, bool includeWriteMetrics)
 
     cursorStats.toBSON(builder, buildSubsections);
     queryExecStats.toBSON(builder, buildSubsections);
-    queryPlannerStats.toBSON(builder, buildSubsections);
+    queryPlannerStats.toBSON(builder, buildSubsections, includeCBRMetrics);
 
     if (includeWriteMetrics) {
         writesStats.toBSON(builder);
@@ -106,7 +108,9 @@ void QueryExecEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubse
     }
 }
 
-void QueryPlannerEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubsection) const {
+void QueryPlannerEntry::toBSON(BSONObjBuilder& queryStatsBuilder,
+                               bool buildAsSubsection,
+                               bool includeCBRMetrics) const {
     BSONObjBuilder* builder = &queryStatsBuilder;
     BSONObjBuilder queryPlannerBuilder{sizeof(QueryPlannerEntry) + kBSONOverhead};
     if (buildAsSubsection) {
@@ -117,6 +121,10 @@ void QueryPlannerEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSu
     usedDisk.appendTo(*builder, "usedDisk");
     fromMultiPlanner.appendTo(*builder, "fromMultiPlanner");
     fromPlanCache.appendTo(*builder, "fromPlanCache");
+
+    if (includeCBRMetrics) {
+        planningTimeMicros.appendTo(*builder, "planningTimeMicros");
+    }
 
     if (buildAsSubsection) {
         queryStatsBuilder.append("queryPlanner", builder->obj());

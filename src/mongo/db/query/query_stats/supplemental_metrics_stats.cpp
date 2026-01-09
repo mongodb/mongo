@@ -60,16 +60,18 @@ void maybeAddOptimizerMetrics(
         }
 
         if (metricType != SupplementalMetricType::Unknown) {
+            const auto& planningTimeMicros =
+                opDebug.getAdditiveMetrics().planningTime.value_or(Microseconds{0}).count();
             if (opDebug.estimatedCost && opDebug.estimatedCardinality) {
                 supplementalMetrics.emplace_back(std::make_unique<OptimizerMetricsBonsaiStatsEntry>(
-                    opDebug.planningTime.count(),
+                    planningTimeMicros,
                     *opDebug.estimatedCost,
                     *opDebug.estimatedCardinality,
                     metricType));
             } else {
                 supplementalMetrics.emplace_back(
-                    std::make_unique<OptimizerMetricsClassicStatsEntry>(
-                        opDebug.planningTime.count(), metricType));
+                    std::make_unique<OptimizerMetricsClassicStatsEntry>(planningTimeMicros,
+                                                                        metricType));
             }
         }
     }

@@ -484,12 +484,17 @@ export function getQueryPlannerMetrics(metrics) {
         return metrics[queryPlannerSectionName];
     }
 
-    return {
+    // Include planningTimeMicros if present (when CBR feature flag is on).
+    const result = {
         hasSortStage: metrics.hasSortStage,
         usedDisk: metrics.usedDisk,
         fromMultiPlanner: metrics.fromMultiPlanner,
         fromPlanCache: metrics.fromPlanCache,
     };
+    if (metrics.hasOwnProperty("planningTimeMicros")) {
+        result.planningTimeMicros = metrics.planningTimeMicros;
+    }
+    return result;
 }
 
 export function getWriteMetrics(metrics) {

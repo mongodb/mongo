@@ -195,15 +195,20 @@ boost::optional<Document> QueryStatsStage::toDocument(
                 .isEnabledUseLastLTSFCVWhenUninitialized(
                     VersionContext::getDecoration(pExpCtx->getOperationContext()),
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+        bool includeCBRMetrics =
+            feature_flags::gFeatureFlagQueryStatsCBRMetrics.isEnabledUseLastLTSFCVWhenUninitialized(
+                VersionContext::getDecoration(pExpCtx->getOperationContext()),
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
         bool useQueryStatsWithSubsectionsFormat =
             feature_flags::gFeatureFlagQueryStatsMetricsSubsections.isEnabled();
-        return Document{
-            {"key", std::move(queryStatsKey)},
-            {"keyHash", keyHash},
-            {"queryShapeHash", queryShapeHash},
-            {"metrics",
-             queryStatsEntry.toBSON(useQueryStatsWithSubsectionsFormat, includeWriteMetrics)},
-            {"asOf", partitionReadTime}};
+        return Document{{"key", std::move(queryStatsKey)},
+                        {"keyHash", keyHash},
+                        {"queryShapeHash", queryShapeHash},
+                        {"metrics",
+                         queryStatsEntry.toBSON(useQueryStatsWithSubsectionsFormat,
+                                                includeWriteMetrics,
+                                                includeCBRMetrics)},
+                        {"asOf", partitionReadTime}};
     } catch (const DBException& ex) {
         queryStatsHmacApplicationErrors.increment();
         const auto& hash = absl::HashOf(key);

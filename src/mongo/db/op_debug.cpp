@@ -246,9 +246,10 @@ void OpDebug::report(OperationContext* opCtx,
     if (!curop.getPlanSummary().empty()) {
         pAttrs->addDeepCopy("planSummary", std::string{curop.getPlanSummary()});
     }
-
-    if (planningTime > Microseconds::zero()) {
-        pAttrs->add("planningTimeMicros", durationCount<Microseconds>(planningTime));
+    const AdditiveMetrics& additiveMetrics = getAdditiveMetrics();
+    if (additiveMetrics.planningTime.value_or(Microseconds{0}) > Microseconds::zero()) {
+        pAttrs->add("planningTimeMicros",
+                    durationCount<Microseconds>(getAdditiveMetrics().planningTime.value()));
     }
 
     if (estimatedCost) {
@@ -313,7 +314,6 @@ void OpDebug::report(OperationContext* opCtx,
 
     OPDEBUG_TOATTR_HELP_BOOL(exhaust);
 
-    const AdditiveMetrics& additiveMetrics = getAdditiveMetrics();
     OPDEBUG_TOATTR_HELP_OPTIONAL("keysExamined", additiveMetrics.keysExamined);
     OPDEBUG_TOATTR_HELP_OPTIONAL("docsExamined", additiveMetrics.docsExamined);
 
@@ -771,8 +771,9 @@ void OpDebug::append(OperationContext* opCtx,
         b.append("planSummary", curop.getPlanSummary());
     }
 
-    if (planningTime > Microseconds::zero()) {
-        b.appendNumber("planningTimeMicros", durationCount<Microseconds>(planningTime));
+    if (additiveMetrics.planningTime.value_or(Microseconds{0}) > Microseconds::zero()) {
+        b.appendNumber("planningTimeMicros",
+                       durationCount<Microseconds>(additiveMetrics.planningTime.value()));
     }
 
     OPDEBUG_APPEND_OPTIONAL(b, "estimatedCost", estimatedCost);
@@ -1184,7 +1185,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
     });
 
     addIfNeeded("planningTimeMicros", [](auto field, auto args, auto& b) {
-        b.appendNumber(field, durationCount<Microseconds>(args.op.planningTime));
+        auto planningTime = args.op.getAdditiveMetrics().planningTime;
+        if (planningTime) {
+            b.appendNumber(field, durationCount<Microseconds>(*planningTime));
+        }
     });
 
     addIfNeeded("estimatedCost", [](auto field, auto args, auto& b) {
@@ -1374,6 +1378,8 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     metrics.setNInserted(additiveMetrics.ninserted.value_or(0));
     metrics.setNDeleted(additiveMetrics.ndeleted.value_or(0));
     metrics.setNUpserted(additiveMetrics.nUpserted.value_or(0));
+
+    metrics.setPlanningTimeMicros(additiveMetrics.planningTime.value_or(Microseconds(0)).count());
     return metrics;
 }
 
@@ -1521,6 +1527,8 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
         fromPlanCache = true;
     }
     *fromPlanCache = *fromPlanCache && otherMetrics.fromPlanCache.value_or(true);
+
+    planningTime = addOptionals(planningTime, otherMetrics.planningTime);
 }
 
 void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
@@ -1563,6 +1571,8 @@ void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
         fromPlanCache = true;
     }
     *fromPlanCache = *fromPlanCache && metrics.fromPlanCache;
+
+    planningTime = planningTime.value_or(Microseconds(0)) + metrics.planningTime;
 }
 
 void OpDebug::AdditiveMetrics::aggregateDataBearingNodeMetrics(
@@ -1597,7 +1607,8 @@ void OpDebug::AdditiveMetrics::aggregateCursorMetrics(const CursorMetrics& metri
         Microseconds(metrics.getTotalTimeQueuedMicros()),
         static_cast<uint64_t>(metrics.getTotalAdmissions()),
         metrics.getWasLoadShed(),
-        metrics.getWasDeprioritized()});
+        metrics.getWasDeprioritized(),
+        Microseconds(metrics.getPlanningTimeMicros())});
 }
 
 void OpDebug::AdditiveMetrics::aggregateStorageStats(const StorageStats& stats) {

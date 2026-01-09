@@ -241,6 +241,11 @@ public:
         boost::optional<uint64_t> totalAdmissions;
         boost::optional<bool> wasLoadShed;
         boost::optional<bool> wasDeprioritized;
+
+        // Amount of time spent planning the query. Begins after parsing and ends
+        // after optimizations. This metric is expected to be positive regardless of whether the
+        // plan came from (e.g. multi-planner, cost-based ranker, plan cache).
+        boost::optional<Microseconds> planningTime;
     };
 
     MONGO_MOD_PRIVATE OpDebug() = default;
@@ -526,10 +531,6 @@ public:
 
     // Details of any error (whether from an exception or a command returning failure).
     Status errInfo = Status::OK();
-
-    // Amount of time spent planning the query. Begins after parsing and ends
-    // after optimizations.
-    Microseconds planningTime{0};
 
     // Cost computed by the cost-based optimizer.
     boost::optional<double> estimatedCost;

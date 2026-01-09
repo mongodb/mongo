@@ -74,6 +74,8 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
     bool wasLoadShed = false;
     bool wasDeprioritized = false;
 
+    Microseconds planningTime{0};
+
     /**
      * Adds the fields from the given object into the fields of this object using addition (in the
      * case of numeric metrics) or conjunction/disjunction (in the case of boolean metrics).
@@ -105,6 +107,7 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         totalAdmissions += other.totalAdmissions;
         wasLoadShed = wasLoadShed || other.wasLoadShed;
         wasDeprioritized = wasDeprioritized || other.wasDeprioritized;
+        planningTime += other.planningTime;
     }
 
     void add(const boost::optional<DataBearingNodeMetrics>& other) {
@@ -144,6 +147,7 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         totalAdmissions += metrics.getTotalAdmissions();
         wasLoadShed = wasLoadShed || metrics.getWasLoadShed();
         wasDeprioritized = wasDeprioritized || metrics.getWasDeprioritized();
+        planningTime += Microseconds(metrics.getPlanningTimeMicros());
     }
 };
 

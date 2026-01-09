@@ -41,7 +41,7 @@ function addApprox2MBOfStatsData(testDB, coll) {
 
     const kEstimatedEntrySizeBytes = (() => {
         // Metrics stored per shape.
-        const kNumCountersAndDates = 4 /* top-level */ + 4 * 3; /* those with sum, min, max, sumOfSquares */
+        const kNumCountersAndDates = 4 /* top-level */ + 4 * 15; /* those with sum, min, max, sumOfSquares */
 
         // Just a sample, will change based on where the test is run - shouldn't be off by too much
         // though.
@@ -55,12 +55,12 @@ function addApprox2MBOfStatsData(testDB, coll) {
 
         // Rough estimate of space needed for just the query stats 'Key' class members assuming
         // everything is 8 bytes.
-        const kCxxOverhead = 96;
+        const kCxxOverhead = 1100;
 
         // This is likely not to be exact - we are probably forgetting something. But we don't need
         // to be exact, just "good enough."
         return align(
-            kNumCountersAndDates * 4 +
+            kNumCountersAndDates * 8 +
                 Object.bsonsize(cmdObjTemplate) +
                 Object.bsonsize(kClientMetadataEst) +
                 Object.bsonsize(kCmdNsObj) +
