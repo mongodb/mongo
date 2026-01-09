@@ -198,6 +198,8 @@ if [[ "$SLOW_PATH" == "1" ]] && [[ -z "${MONGO_WRAPPER_OUTPUT_ALL}" ]]; then
     }
   
     trap 'print_summary' EXIT      
+else
+    cleanup_logfile() { :; }
 fi 
 
 # find existing python installs
