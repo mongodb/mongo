@@ -198,14 +198,11 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
                        [](const MultikeyComponents& components) { return !components.empty(); });
 }
 
-SortOptions makeSortOptions(size_t maxMemoryUsageBytes,
-                            const DatabaseName& dbName,
-                            SorterFileStats* stats) {
+SortOptions makeSortOptions(size_t maxMemoryUsageBytes, const DatabaseName& dbName) {
     return SortOptions()
         .TempDir(storageGlobalParams.dbpath + "/_tmp")
         .MaxMemoryUsageBytes(maxMemoryUsageBytes)
         .UseMemoryPool(true)
-        .FileStats(stats)
         .Tracker(&indexBulkBuilderSSS.sorterTracker)
         .DBName(dbName);
 }
@@ -1553,17 +1550,17 @@ std::unique_ptr<HybridBulkBuilder::Sorter> HybridBulkBuilder::_makeSorter(
         ? Sorter::makeFromExistingRanges(
               std::string{*fileName},
               *ranges,
-              makeSortOptions(maxMemoryUsageBytes, dbName, fileStats),
+              makeSortOptions(maxMemoryUsageBytes, dbName),
               comparator,
-              std::make_unique<FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
+              std::make_shared<FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
                   std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, fileStats),
                   tmpPath,
                   dbName),
               _makeSorterSettings())
         : Sorter::make(
-              makeSortOptions(maxMemoryUsageBytes, dbName, fileStats),
+              makeSortOptions(maxMemoryUsageBytes, dbName),
               comparator,
-              std::make_unique<FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
+              std::make_shared<FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
                   tmpPath, fileStats, dbName),
               _makeSorterSettings());
 }

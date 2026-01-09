@@ -390,29 +390,29 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
         loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes);
     if (expCtx->getAllowDiskUse()) {
         opts.TempDir(expCtx->getTempDir());
-        opts.FileStats(ds->_sortExecutor->getSorterFileStats());
     }
 
     if (limit) {
         opts.Limit(limit.value());
     }
 
+    auto fileStats = expCtx->getAllowDiskUse() ? ds->_sortExecutor->getSorterFileStats() : nullptr;
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
-            ds->_timeSorter =
-                std::make_shared<TimeSorterAscMin>(opts, CompAsc{}, BoundMakerMin{boundOffset});
+            ds->_timeSorter = std::make_shared<TimeSorterAscMin>(
+                opts, fileStats, CompAsc{}, BoundMakerMin{boundOffset});
         } else {
-            ds->_timeSorter =
-                std::make_shared<TimeSorterDescMin>(opts, CompDesc{}, BoundMakerMin{boundOffset});
+            ds->_timeSorter = std::make_shared<TimeSorterDescMin>(
+                opts, fileStats, CompDesc{}, BoundMakerMin{boundOffset});
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
     } else if (boundBase == kMax) {
         if (pat.back().isAscending) {
-            ds->_timeSorter =
-                std::make_shared<TimeSorterAscMax>(opts, CompAsc{}, BoundMakerMax{boundOffset});
+            ds->_timeSorter = std::make_shared<TimeSorterAscMax>(
+                opts, fileStats, CompAsc{}, BoundMakerMax{boundOffset});
         } else {
-            ds->_timeSorter =
-                std::make_shared<TimeSorterDescMax>(opts, CompDesc{}, BoundMakerMax{boundOffset});
+            ds->_timeSorter = std::make_shared<TimeSorterDescMax>(
+                opts, fileStats, CompDesc{}, BoundMakerMax{boundOffset});
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime);
     } else {
@@ -489,7 +489,6 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
         loadMemoryLimit(StageMemoryLimit::QueryMaxBlockingSortMemoryUsageBytes));
     if (expCtx->getAllowDiskUse()) {
         opts.TempDir(expCtx->getTempDir());
-        opts.FileStats(ds->_sortExecutor->getSorterFileStats());
     }
     if (BSONElement limitElem = args["limit"]) {
         uassert(6588100,
@@ -498,22 +497,23 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
         opts.Limit(limitElem.numberLong());
     }
 
+    auto fileStats = expCtx->getAllowDiskUse() ? ds->_sortExecutor->getSorterFileStats() : nullptr;
     if (boundBase == kMin) {
         if (pat.back().isAscending) {
-            ds->_timeSorter =
-                std::make_shared<TimeSorterAscMin>(opts, CompAsc{}, BoundMakerMin{boundOffset});
+            ds->_timeSorter = std::make_shared<TimeSorterAscMin>(
+                opts, fileStats, CompAsc{}, BoundMakerMin{boundOffset});
         } else {
-            ds->_timeSorter =
-                std::make_shared<TimeSorterDescMin>(opts, CompDesc{}, BoundMakerMin{boundOffset});
+            ds->_timeSorter = std::make_shared<TimeSorterDescMin>(
+                opts, fileStats, CompDesc{}, BoundMakerMin{boundOffset});
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMinTime);
     } else if (boundBase == kMax) {
         if (pat.back().isAscending) {
-            ds->_timeSorter =
-                std::make_shared<TimeSorterAscMax>(opts, CompAsc{}, BoundMakerMax{boundOffset});
+            ds->_timeSorter = std::make_shared<TimeSorterAscMax>(
+                opts, fileStats, CompAsc{}, BoundMakerMax{boundOffset});
         } else {
-            ds->_timeSorter =
-                std::make_shared<TimeSorterDescMax>(opts, CompDesc{}, BoundMakerMax{boundOffset});
+            ds->_timeSorter = std::make_shared<TimeSorterDescMax>(
+                opts, fileStats, CompDesc{}, BoundMakerMax{boundOffset});
         }
         ds->_requiredMetadata.set(DocumentMetadataFields::MetaType::kTimeseriesBucketMaxTime);
     } else {

@@ -107,9 +107,6 @@ struct SortOptions {
     // allowing external sorting.
     boost::optional<boost::filesystem::path> tempDir;
 
-    // If set, allows us to observe Sorter file handle usage.
-    SorterFileStats* sorterFileStats;
-
     // If set, allows us to observe aggregate Sorter behaviors. The lifetime of this object must
     // exceed that of the Sorter instance; otherwise, it will lead to a user-after-free error.
     SorterTracker* sorterTracker;
@@ -130,7 +127,6 @@ struct SortOptions {
         : limit(0),
           maxMemoryUsageBytes(DefaultMaxMemoryUsageBytes),
           tempDir(boost::none),
-          sorterFileStats(nullptr),
           sorterTracker(nullptr),
           useMemPool(false),
           moveSortedDataIntoIterator(false) {}
@@ -154,11 +150,6 @@ struct SortOptions {
 
     SortOptions& DBName(DatabaseName newDbName) {
         dbName = std::move(newDbName);
-        return *this;
-    }
-
-    SortOptions& FileStats(SorterFileStats* newSorterFileStats) {
-        sorterFileStats = newSorterFileStats;
         return *this;
     }
 
@@ -374,6 +365,11 @@ public:
      */
     std::streamoff currentOffset();
 
+    /**
+     * Returns the fileStats ptr for the current file.
+     */
+    SorterFileStats* getFileStats();
+
 private:
     void _open();
 
@@ -449,8 +445,14 @@ public:
      */
     virtual void keep() = 0;
 
+    /**
+     * Gets the dbName. Relevant for encryption during index builds.
+     */
     virtual boost::optional<DatabaseName> getDbName() = 0;
 
+    /**
+     * Gets the checksum version used for serialization/deserialization.
+     */
     virtual SorterChecksumVersion getChecksumVersion() = 0;
 };
 
@@ -485,11 +487,10 @@ public:
         Settings;
     using Comparator = std::function<int(const Key&, const Key&)>;
 
-    explicit FileBasedSorterStorage(
-        std::shared_ptr<SorterFile> file,
-        boost::filesystem::path pathToSpillDir,
-        boost::optional<DatabaseName> dbName = boost::none,
-        SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2);
+    FileBasedSorterStorage(std::shared_ptr<SorterFile> file,
+                           boost::filesystem::path pathToSpillDir,
+                           boost::optional<DatabaseName> dbName = boost::none,
+                           SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2);
 
     std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(
         const SortOptions& opts, const Settings& settings = Settings()) override;
@@ -685,9 +686,6 @@ public:
         Settings;
     using Comparator = std::function<int(const Key&, const Key&)>;
 
-    explicit FileBasedSorterSpiller(std::unique_ptr<FileBasedSorterStorage<Key, Value>> storage)
-        : SorterSpillerBase<Key, Value>(std::move(storage)) {}
-
     FileBasedSorterSpiller(boost::filesystem::path tempDir,
                            SorterFileStats* fileStats,
                            boost::optional<DatabaseName> dbName = boost::none,
@@ -696,14 +694,16 @@ public:
               std::make_shared<SorterFile>(sorter::nextFileName(tempDir), fileStats),
               tempDir,
               dbName,
-              checksumVersion)) {}
+              checksumVersion)),
+          _fileStats(fileStats) {}
 
     FileBasedSorterSpiller(std::shared_ptr<SorterFile> file,
                            boost::filesystem::path tempDir,
                            boost::optional<DatabaseName> dbName = boost::none,
                            SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
         : SorterSpillerBase<Key, Value>(std::make_unique<FileBasedSorterStorage<Key, Value>>(
-              file, tempDir, dbName, checksumVersion)) {}
+              file, tempDir, dbName, checksumVersion)),
+          _fileStats(file->getFileStats()) {}
 
     std::unique_ptr<SorterStorage<Key, Value>> mergeSpills(
         const SortOptions& opts,
@@ -713,6 +713,9 @@ public:
         Comparator comp,
         std::size_t numTargetedSpills,
         std::size_t numParallelSpills) override;
+
+private:
+    SorterFileStats* _fileStats;
 };
 
 /**
@@ -753,7 +756,7 @@ public:
 
     static std::unique_ptr<Sorter> make(const SortOptions& opts,
                                         const Comparator& comp,
-                                        std::unique_ptr<SorterSpiller<Key, Value>> spiller,
+                                        std::shared_ptr<SorterSpiller<Key, Value>> spiller,
                                         const Settings& settings = Settings());
 
     static std::unique_ptr<Sorter> makeFromExistingRanges(
@@ -761,7 +764,7 @@ public:
         const std::vector<SorterRange>& ranges,
         const SortOptions& opts,
         const Comparator& comp,
-        std::unique_ptr<SorterSpiller<Key, Value>> spiller,
+        std::shared_ptr<SorterSpiller<Key, Value>> spiller,
         const Settings& settings = Settings());
 
     virtual void add(const Key&, const Value&) = 0;
@@ -902,6 +905,7 @@ public:
     using Comparator = std::function<int(const Key&, const Key&)>;
 
     BoundedSorter(const SortOptions& opts,
+                  SorterFileStats* fileStats,
                   Comparator comp,
                   BoundMaker makeBound,
                   bool checkInput = true);

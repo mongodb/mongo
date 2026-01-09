@@ -52,8 +52,8 @@ NearStage::NearStage(ExpressionContext* expCtx,
       _searchState(SearchState::Initializing),
       _seenDocuments(expCtx),
       _nextIntervalStats(nullptr),
-      _sorterFileStats(nullptr /*sorterTracker*/),
-      _resultBuffer(makeSortOptions(), SorterKeyComparator{}, NoOpBound{}),
+      _sorterFileStats(/*sorterTracker=*/nullptr),
+      _resultBuffer(makeSortOptions(), &_sorterFileStats, SorterKeyComparator{}, NoOpBound{}),
       _stageType(type),
       _nextInterval(nullptr) {}
 
@@ -240,9 +240,7 @@ PlanStage::StageState NearStage::advanceNext(WorkingSetID* toReturn) {
 
 SortOptions NearStage::makeSortOptions() {
     if (feature_flags::gFeatureFlagExtendedAutoSpilling.isEnabled()) {
-        return SortOptions{}
-            .FileStats(&_sorterFileStats)
-            // Spilling will handled externally by NearStage::spill method
+        return SortOptions{}  // Spilling will handled externally by NearStage::spill method
             .MaxMemoryUsageBytes(std::numeric_limits<int64_t>::max())
             .TempDir(expCtx()->getTempDir());
     } else {

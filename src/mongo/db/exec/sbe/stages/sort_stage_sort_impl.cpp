@@ -226,7 +226,6 @@ private:
             if (!_sorterFileStats) {
                 _sorterFileStats = std::make_unique<SorterFileStats>(nullptr);
             }
-            opts.FileStats(_sorterFileStats.get());
         }
         return opts;
     }
@@ -253,8 +252,8 @@ private:
         _sorter = Sorter<KeyRow, ValueRow>::make(
             opts,
             comparator,
-            (opts.tempDir) ? std::make_unique<FileBasedSorterSpiller<KeyRow, ValueRow>>(
-                                 *opts.tempDir, opts.sorterFileStats)
+            (opts.tempDir) ? std::make_shared<FileBasedSorterSpiller<KeyRow, ValueRow>>(
+                                 *opts.tempDir, _sorterFileStats.get())
                            : nullptr,
             {});
         _outputIt.reset();

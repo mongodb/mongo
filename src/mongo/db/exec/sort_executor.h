@@ -269,7 +269,6 @@ private:
         opts.MaxMemoryUsageBytes(_stats.maxMemoryUsageBytes);
         if (_diskUseAllowed) {
             opts.TempDir(_tempDir);
-            opts.FileStats(_sorterFileStats.get());
         }
 
         return opts;

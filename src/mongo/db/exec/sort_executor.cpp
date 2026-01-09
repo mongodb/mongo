@@ -46,8 +46,8 @@ std::unique_ptr<Sorter<Value, T>> SortExecutor<T>::makeSorter() {
     return Sorter<Value, T>::make(opts,
                                   comparator,
                                   (opts.tempDir)
-                                      ? std::make_unique<FileBasedSorterSpiller<Value, T>>(
-                                            *opts.tempDir, opts.sorterFileStats)
+                                      ? std::make_shared<FileBasedSorterSpiller<Value, T>>(
+                                            *opts.tempDir, _sorterFileStats.get())
                                       : nullptr);
 }
 template class SortExecutor<Document>;

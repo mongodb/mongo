@@ -170,16 +170,23 @@ public:
     typedef std::pair<Key, Value> Data;
 
     /// No data to iterate
-    InMemIterator() {}
+    explicit InMemIterator(std::shared_ptr<SorterSpiller<Key, Value>> spiller = nullptr)
+        : _spillHelper(spiller) {}
 
     /// Only a single value
-    InMemIterator(const Data& singleValue) : _data(1, singleValue) {}
+    explicit InMemIterator(const Data& singleValue,
+                           std::shared_ptr<SorterSpiller<Key, Value>> spiller = nullptr)
+        : _data(1, singleValue), _spillHelper(spiller) {}
 
     /// Any number of values
     template <typename Container>
-    InMemIterator(const Container& input) : _data(input.begin(), input.end()) {}
+    explicit InMemIterator(const Container& input,
+                           std::shared_ptr<SorterSpiller<Key, Value>> spiller = nullptr)
+        : _data(input.begin(), input.end()), _spillHelper(spiller) {}
 
-    InMemIterator(std::vector<Data> data) : _data(std::move(data)) {}
+    explicit InMemIterator(std::vector<Data> data,
+                           std::shared_ptr<SorterSpiller<Key, Value>> spiller = nullptr)
+        : _data(std::move(data)), _spillHelper(spiller) {}
 
     bool more() override {
         return _index < _data.size();
@@ -213,12 +220,14 @@ public:
         uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                 "Requested to spill InMemIterator but did not opt in to external sorting",
                 opts.tempDir);
+        uassert(11539600,
+                "Requested to spill InMemIterator but did not provide a SorterSpiller",
+                _spillHelper != nullptr);
 
         uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
             *opts.tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
-        FileBasedSorterSpiller<Key, Value> spillHelper(*opts.tempDir, opts.sorterFileStats);
-        auto iterator = spillHelper.spillUnique(opts, settings, _data, _index);
+        auto iterator = _spillHelper->spillUnique(opts, settings, _data, _index);
 
         if (opts.sorterTracker) {
             opts.sorterTracker->spilledRanges.addAndFetch(1);
@@ -234,6 +243,7 @@ public:
 
 private:
     std::vector<Data> _data;
+    std::shared_ptr<SorterSpiller<Key, Value>> _spillHelper;
     uint32_t _index{0};
 };
 
@@ -627,7 +637,7 @@ public:
 
     MergeableSorter(const SortOptions& opts,
                     const Comparator& comp,
-                    std::unique_ptr<SorterSpiller<Key, Value>> spiller,
+                    std::shared_ptr<SorterSpiller<Key, Value>> spiller,
                     const Settings& settings)
         : Sorter<Key, Value>(opts),
           _comp(comp),
@@ -639,7 +649,7 @@ public:
     MergeableSorter(const SortOptions& opts,
                     const std::string& storageIdentifier,
                     const Comparator& comp,
-                    std::unique_ptr<SorterSpiller<Key, Value>> spiller,
+                    std::shared_ptr<SorterSpiller<Key, Value>> spiller,
                     const Settings& settings)
         : Sorter<Key, Value>(opts, storageIdentifier),
           _comp(comp),
@@ -697,7 +707,7 @@ protected:
     const Comparator _comp;
     const Settings _settings;
 
-    std::unique_ptr<SorterSpiller<Key, Value>> _spillHelper;
+    std::shared_ptr<SorterSpiller<Key, Value>> _spillHelper;
 
     size_t fileIteratorsMaxBytesSize =
         1 * 1024 * 1024;  // Memory Iterators for spilled data area allowed to use.
@@ -739,7 +749,7 @@ public:
 
     NoLimitSorter(const SortOptions& opts,
                   const Comparator& comp,
-                  std::unique_ptr<SorterSpiller<Key, Value>> spiller,
+                  std::shared_ptr<SorterSpiller<Key, Value>> spiller,
                   const Settings& settings = Settings())
         : MergeableSorter<Key, Value>(opts, comp, std::move(spiller), settings) {
         invariant(opts.limit == 0);
@@ -749,7 +759,7 @@ public:
                   const std::vector<SorterRange>& ranges,
                   const SortOptions& opts,
                   const Comparator& comp,
-                  std::unique_ptr<SorterSpiller<Key, Value>> spiller,
+                  std::shared_ptr<SorterSpiller<Key, Value>> spiller,
                   const Settings& settings = Settings())
         : MergeableSorter<Key, Value>(opts, storageIdentifier, comp, std::move(spiller), settings) {
         invariant(opts.tempDir);
@@ -811,9 +821,10 @@ public:
         if (this->_iters.empty()) {
             sort();
             if (this->_opts.moveSortedDataIntoIterator) {
-                return std::make_unique<InMemIterator<Key, Value>>(std::move(_data));
+                return std::make_unique<InMemIterator<Key, Value>>(std::move(_data),
+                                                                   this->_spillHelper);
             }
-            return std::make_unique<InMemIterator<Key, Value>>(_data);
+            return std::make_unique<InMemIterator<Key, Value>>(_data, this->_spillHelper);
         }
 
         spill();
@@ -1019,7 +1030,7 @@ public:
 
     TopKSorter(const SortOptions& opts,
                const Comparator& comp,
-               std::unique_ptr<SorterSpiller<Key, Value>> spiller,
+               std::shared_ptr<SorterSpiller<Key, Value>> spiller,
                const Settings& settings = Settings())
         : MergeableSorter<Key, Value>(opts, comp, std::move(spiller), settings),
           _haveCutoff(false),
@@ -1108,9 +1119,10 @@ public:
         if (this->_iters.empty()) {
             sort();
             if (this->_opts.moveSortedDataIntoIterator) {
-                return std::make_unique<InMemIterator<Key, Value>>(std::move(_data));
+                return std::make_unique<InMemIterator<Key, Value>>(std::move(_data),
+                                                                   this->_spillHelper);
             }
-            return std::make_unique<InMemIterator<Key, Value>>(_data);
+            return std::make_unique<InMemIterator<Key, Value>>(_data, this->_spillHelper);
         }
 
         spill();
@@ -1400,15 +1412,14 @@ std::unique_ptr<SorterStorage<Key, Value>> FileBasedSorterSpiller<Key, Value>::m
                "parallelNumSpills"_attr = numParallelSpills);
 
     std::shared_ptr<File> newSpillsFile =
-        std::make_shared<File>(sorter::nextFileName(*opts.tempDir), opts.sorterFileStats);
+        std::make_shared<File>(sorter::nextFileName(*opts.tempDir), _fileStats);
     FileBasedSorterStorage<Key, Value> sorterStorage(newSpillsFile, *opts.tempDir);
 
     std::vector<std::shared_ptr<Iterator>> iterators;
     while (iters.size() > numTargetedSpills) {
         iterators.swap(iters);
 
-        newSpillsFile =
-            std::make_shared<File>(sorter::nextFileName(*opts.tempDir), opts.sorterFileStats);
+        newSpillsFile = std::make_shared<File>(sorter::nextFileName(*opts.tempDir), _fileStats);
         LOGV2_DEBUG(6033103,
                     1,
                     "Created new intermediate file for merged spills",
@@ -1580,6 +1591,10 @@ inline std::streamoff SorterFile::currentOffset() {
     return _offset;
 }
 
+inline SorterFileStats* SorterFile::getFileStats() {
+    return _stats;
+}
+
 inline void SorterFile::_open() {
     invariant(!_file.is_open());
 
@@ -1668,8 +1683,8 @@ void SortedFileWriter<Key, Value>::writeChunk() {
 
     this->_checksumCalculator.addData(outBuffer, size);
 
-    if (this->_opts.sorterFileStats) {
-        this->_opts.sorterFileStats->addSpilledDataSizeUncompressed(size);
+    if (this->_file->getFileStats()) {
+        this->_file->getFileStats()->addSpilledDataSizeUncompressed(size);
     }
 
     std::string compressed;
@@ -1743,6 +1758,7 @@ std::unique_ptr<sorter::Iterator<Key, Value>> SortedFileWriter<Key, Value>::done
 
 template <typename Key, typename Value, typename BoundMaker>
 BoundedSorter<Key, Value, BoundMaker>::BoundedSorter(const SortOptions& opts,
+                                                     SorterFileStats* fileStats,
                                                      Comparator comp,
                                                      BoundMaker makeBound,
                                                      bool checkInput)
@@ -1752,9 +1768,9 @@ BoundedSorter<Key, Value, BoundMaker>::BoundedSorter(const SortOptions& opts,
       _checkInput(checkInput),
       _opts(opts),
       _heap(Greater<Key, Value>{&compare}),
-      _file(opts.tempDir ? std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)),
-                                                        opts.sorterFileStats)
-                         : nullptr) {}
+      _file(opts.tempDir
+                ? std::make_shared<SorterFile>(sorter::nextFileName(*(opts.tempDir)), fileStats)
+                : nullptr) {}
 
 template <typename Key, typename Value, typename BoundMaker>
 void BoundedSorter<Key, Value, BoundMaker>::add(Key key, Value value) {
@@ -1946,7 +1962,7 @@ template <typename Key, typename Value>
 std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make(
     const SortOptions& opts,
     const Comparator& comp,
-    std::unique_ptr<SorterSpiller<Key, Value>> spiller,
+    std::shared_ptr<SorterSpiller<Key, Value>> spiller,
     const Settings& settings) {
     sorter::checkNoExternalSortOnMongos(opts);
     switch (opts.limit) {
@@ -1967,7 +1983,7 @@ std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::makeFromExistingRanges(
     const std::vector<SorterRange>& ranges,
     const SortOptions& opts,
     const Comparator& comp,
-    std::unique_ptr<SorterSpiller<Key, Value>> spiller,
+    std::shared_ptr<SorterSpiller<Key, Value>> spiller,
     const Settings& settings) {
     sorter::checkNoExternalSortOnMongos(opts);
 

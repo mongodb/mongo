@@ -457,10 +457,8 @@ void TextOrStage::initSorter() {
     static constexpr size_t kMaxMemoryUsageForSorter = std::numeric_limits<size_t>::max();
 
     _sorterStats = std::make_unique<SorterFileStats>(/*sorterTracker=*/nullptr);
-    auto opts = SortOptions{}
-                    .FileStats(_sorterStats.get())
-                    .MaxMemoryUsageBytes(kMaxMemoryUsageForSorter)
-                    .TempDir(expCtx()->getTempDir());
+    auto opts =
+        SortOptions{}.MaxMemoryUsageBytes(kMaxMemoryUsageForSorter).TempDir(expCtx()->getTempDir());
     std::function<int(const RecordId&, const RecordId&)> comparator =
         [](const RecordId& lhs, const RecordId& rhs) -> int {
         return lhs.compare(rhs);
@@ -468,8 +466,8 @@ void TextOrStage::initSorter() {
     _sorter = Sorter<RecordId, TextRecordDataForSorter>::make(
         opts,
         comparator,
-        std::make_unique<FileBasedSorterSpiller<RecordId, TextRecordDataForSorter>>(
-            *opts.tempDir, opts.sorterFileStats));
+        std::make_shared<FileBasedSorterSpiller<RecordId, TextRecordDataForSorter>>(
+            *opts.tempDir, _sorterStats.get()));
 }
 
 }  // namespace mongo
