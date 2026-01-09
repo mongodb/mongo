@@ -1263,7 +1263,7 @@ public:
     /**
      * Returns true if the node undergoes initial sync or rollback.
      */
-    bool isInInitialSyncOrRollback() const;
+    virtual bool isInInitialSyncOrRollback() const;
 
     /**
      * Returns whether the provided client last committed opTime is older than our view of
