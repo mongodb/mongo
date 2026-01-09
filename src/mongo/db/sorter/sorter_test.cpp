@@ -351,7 +351,6 @@ DEATH_TEST_F(SorterMakeFromExistingRangesTestDeathTest,
 
     // On restart, reconstruct sorter from persisted state.
     // We should fail because we are using a nullptr as the SorterSpiller.
-    // TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
     IWSorter::makeFromExistingRanges(
         state.storageIdentifier,
         state.ranges,

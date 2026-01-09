@@ -579,6 +579,7 @@ public:
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
         Settings;
+    using Comparator = std::function<int(const Key&, const Key&)>;
 
     virtual std::shared_ptr<Iterator> spill(const SortOptions& opts,
                                             const Settings& settings,
@@ -589,6 +590,15 @@ public:
                                                   const Settings& settings,
                                                   std::span<std::pair<Key, Value>> data,
                                                   uint32_t idx) = 0;
+
+    virtual std::unique_ptr<SorterStorage<Key, Value>> mergeSpills(
+        const SortOptions& opts,
+        const Settings& settings,
+        SorterStats& stats,
+        std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
+        Comparator comp,
+        std::size_t numTargetedSpills,
+        std::size_t numParallelSpills) = 0;
 
     virtual void setStorage(std::unique_ptr<SorterStorage<Key, Value>> newStorage) = 0;
 
@@ -613,7 +623,7 @@ public:
     std::shared_ptr<Iterator> spill(const SortOptions& opts,
                                     const Settings& settings,
                                     std::span<std::pair<Key, Value>> data,
-                                    uint32_t idx = 0) override {
+                                    uint32_t idx) override {
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer = _spill(opts, settings, data, idx);
         return _storage->makeIterator(std::move(writer));
     }
@@ -621,7 +631,7 @@ public:
     std::unique_ptr<Iterator> spillUnique(const SortOptions& opts,
                                           const Settings& settings,
                                           std::span<std::pair<Key, Value>> data,
-                                          uint32_t idx = 0) override {
+                                          uint32_t idx) override {
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer = _spill(opts, settings, data, idx);
         return _storage->makeIteratorUnique(std::move(writer));
     }
@@ -636,15 +646,6 @@ public:
         }
         return _storage->makeIterator(std::move(writer));
     }
-
-    virtual std::unique_ptr<SorterStorage<Key, Value>> mergeSpills(
-        const SortOptions& opts,
-        const Settings& settings,
-        SorterStats& stats,
-        std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
-        Comparator comp,
-        std::size_t numTargetedSpills,
-        std::size_t numParallelSpills) = 0;
 
     void setStorage(std::unique_ptr<SorterStorage<Key, Value>> newStorage) override {
         _storage = std::move(newStorage);
@@ -750,10 +751,9 @@ public:
      */
     Sorter(const SortOptions& opts, std::string storageIdentifier);
 
-    // TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
     static std::unique_ptr<Sorter> make(const SortOptions& opts,
                                         const Comparator& comp,
-                                        std::unique_ptr<SorterSpillerBase<Key, Value>> spiller,
+                                        std::unique_ptr<SorterSpiller<Key, Value>> spiller,
                                         const Settings& settings = Settings());
 
     static std::unique_ptr<Sorter> makeFromExistingRanges(
@@ -761,7 +761,7 @@ public:
         const std::vector<SorterRange>& ranges,
         const SortOptions& opts,
         const Comparator& comp,
-        std::unique_ptr<SorterSpillerBase<Key, Value>> spiller,
+        std::unique_ptr<SorterSpiller<Key, Value>> spiller,
         const Settings& settings = Settings());
 
     virtual void add(const Key&, const Value&) = 0;

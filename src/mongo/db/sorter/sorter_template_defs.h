@@ -625,10 +625,9 @@ public:
     typedef sorter::Iterator<Key, Value> Iterator;
     using Comparator = std::function<int(const Key&, const Key&)>;
 
-    // TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
     MergeableSorter(const SortOptions& opts,
                     const Comparator& comp,
-                    std::unique_ptr<SorterSpillerBase<Key, Value>> spiller,
+                    std::unique_ptr<SorterSpiller<Key, Value>> spiller,
                     const Settings& settings)
         : Sorter<Key, Value>(opts),
           _comp(comp),
@@ -637,11 +636,10 @@ public:
         setMaxMemoryUsageBytes();
     }
 
-    // TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
     MergeableSorter(const SortOptions& opts,
                     const std::string& storageIdentifier,
                     const Comparator& comp,
-                    std::unique_ptr<SorterSpillerBase<Key, Value>> spiller,
+                    std::unique_ptr<SorterSpiller<Key, Value>> spiller,
                     const Settings& settings)
         : Sorter<Key, Value>(opts, storageIdentifier),
           _comp(comp),
@@ -699,8 +697,7 @@ protected:
     const Comparator _comp;
     const Settings _settings;
 
-    // TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
-    std::unique_ptr<SorterSpillerBase<Key, Value>> _spillHelper;
+    std::unique_ptr<SorterSpiller<Key, Value>> _spillHelper;
 
     size_t fileIteratorsMaxBytesSize =
         1 * 1024 * 1024;  // Memory Iterators for spilled data area allowed to use.
@@ -740,21 +737,19 @@ public:
     using Settings = typename MergeableSorter<Key, Value>::Settings;
     using Comparator = std::function<int(const Key&, const Key&)>;
 
-    // TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
     NoLimitSorter(const SortOptions& opts,
                   const Comparator& comp,
-                  std::unique_ptr<SorterSpillerBase<Key, Value>> spiller,
+                  std::unique_ptr<SorterSpiller<Key, Value>> spiller,
                   const Settings& settings = Settings())
         : MergeableSorter<Key, Value>(opts, comp, std::move(spiller), settings) {
         invariant(opts.limit == 0);
     }
 
-    // TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
     NoLimitSorter(const std::string& storageIdentifier,
                   const std::vector<SorterRange>& ranges,
                   const SortOptions& opts,
                   const Comparator& comp,
-                  std::unique_ptr<SorterSpillerBase<Key, Value>> spiller,
+                  std::unique_ptr<SorterSpiller<Key, Value>> spiller,
                   const Settings& settings = Settings())
         : MergeableSorter<Key, Value>(opts, storageIdentifier, comp, std::move(spiller), settings) {
         invariant(opts.tempDir);
@@ -905,7 +900,7 @@ private:
 
         sort();
 
-        auto iterator = this->_spillHelper->spill(this->_opts, this->_settings, _data);
+        auto iterator = this->_spillHelper->spill(this->_opts, this->_settings, _data, /*idx=*/0);
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
@@ -1021,10 +1016,10 @@ public:
     using Settings = typename MergeableSorter<Key, Value>::Settings;
     using Comparator = std::function<int(const Key&, const Key&)>;
 
-    // TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
+
     TopKSorter(const SortOptions& opts,
                const Comparator& comp,
-               std::unique_ptr<SorterSpillerBase<Key, Value>> spiller,
+               std::unique_ptr<SorterSpiller<Key, Value>> spiller,
                const Settings& settings = Settings())
         : MergeableSorter<Key, Value>(opts, comp, std::move(spiller), settings),
           _haveCutoff(false),
@@ -1262,7 +1257,7 @@ private:
         sort();
         updateCutoff();
 
-        auto iters = this->_spillHelper->spill(this->_opts, this->_settings, _data);
+        auto iters = this->_spillHelper->spill(this->_opts, this->_settings, _data, /*idx=*/0);
 
         this->_stats.incrementSpilledKeyValuePairs(_data.size());
         _data.clear();
@@ -1947,12 +1942,11 @@ std::unique_ptr<Iterator<Key, Value>> merge(
 }
 }  // namespace sorter
 
-// TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
 template <typename Key, typename Value>
 std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make(
     const SortOptions& opts,
     const Comparator& comp,
-    std::unique_ptr<SorterSpillerBase<Key, Value>> spiller,
+    std::unique_ptr<SorterSpiller<Key, Value>> spiller,
     const Settings& settings) {
     sorter::checkNoExternalSortOnMongos(opts);
     switch (opts.limit) {
@@ -1967,14 +1961,13 @@ std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::make(
     }
 }
 
-// TODO(SERVER-116114): Change to SorterSpiller after removing templating on Comparator.
 template <typename Key, typename Value>
 std::unique_ptr<Sorter<Key, Value>> Sorter<Key, Value>::makeFromExistingRanges(
     std::string storageIdentifier,
     const std::vector<SorterRange>& ranges,
     const SortOptions& opts,
     const Comparator& comp,
-    std::unique_ptr<SorterSpillerBase<Key, Value>> spiller,
+    std::unique_ptr<SorterSpiller<Key, Value>> spiller,
     const Settings& settings) {
     sorter::checkNoExternalSortOnMongos(opts);
 
