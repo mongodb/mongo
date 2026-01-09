@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <deque>
 
