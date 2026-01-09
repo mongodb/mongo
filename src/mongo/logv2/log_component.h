@@ -87,6 +87,7 @@ namespace MONGO_MOD_PUBLIC logv2 {
     X(kWiredTigerBackup,       , "wtBackup"              , "WTBACKUP"        , kWiredTiger) \
     X(kWiredTigerCheckpoint,   , "wtCheckpoint"          , "WTCHKPT"         , kWiredTiger) \
     X(kWiredTigerCompact,      , "wtCompact"             , "WTCMPCT"         , kWiredTiger) \
+    X(kWiredTigerDisaggregatedStorage,      , "wtDisagg"             , "WTDISAGG"         , kWiredTiger) \
     X(kWiredTigerEviction,     , "wtEviction"            , "WTEVICT"         , kWiredTiger) \
     X(kWiredTigerFileOps,      , "wtFileOps"             , "WTFILEOPS"       , kWiredTiger) \
     X(kWiredTigerHS,           , "wtHS"                  , "WTHS"            , kWiredTiger) \

@@ -168,6 +168,7 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
 
 void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
                                        LastShutdownState lastShutdownState) {
+    LOGV2(11503101, "Loading MDB catalog");
     dassert(!_catalog);
     dassert(!_catalogRecordStore);
 
@@ -196,6 +197,7 @@ void StorageEngineImpl::loadMDBCatalog(OperationContext* opCtx,
         WriteUnitOfWork uow(opCtx);
 
         auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        LOGV2(11503104, "Creating MDB catalog as it did not already exist");
         auto status = _engine->createRecordStore(
             provider, ru, kCatalogInfoNamespace, ident::kMdbCatalog, catalogRecordStoreOpts);
 

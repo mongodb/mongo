@@ -117,6 +117,7 @@ void initializeCollectionCatalog(OperationContext* opCtx, StorageEngine* engine)
 void initializeCollectionCatalog(OperationContext* opCtx,
                                  StorageEngine* engine,
                                  boost::optional<Timestamp> stableTs) {
+    LOGV2(11503103, "Initializing collection catalog");
     // Use the stable timestamp as minValid. We know for a fact that the collection exist at
     // this point and is in sync. If we use an earlier timestamp than replication rollback we
     // may be out-of-order for the collection catalog managing this namespace.

@@ -560,6 +560,8 @@ logv2::LogComponent getWTLogComponent(const BSONObj& obj) {
         case WT_VERB_COMPACT:
         case WT_VERB_COMPACT_PROGRESS:
             return logv2::LogComponent::kWiredTigerCompact;
+        case WT_VERB_DISAGGREGATED_STORAGE:
+            return logv2::LogComponent::kWiredTigerDisaggregatedStorage;
         case WT_VERB_EVICTION:
             return logv2::LogComponent::kWiredTigerEviction;
         case WT_VERB_FILEOPS:
@@ -1305,6 +1307,7 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
         {logv2::LogComponent::kWiredTigerBackup, "backup"},
         {logv2::LogComponent::kWiredTigerCheckpoint, "checkpoint"},
         {logv2::LogComponent::kWiredTigerCompact, "compact"},
+        {logv2::LogComponent::kWiredTigerDisaggregatedStorage, "disaggregated_storage"},
         {logv2::LogComponent::kWiredTigerEviction, "eviction"},
         {logv2::LogComponent::kWiredTigerFileOps, "fileops"},
         {logv2::LogComponent::kWiredTigerHS, "history_store"},
