@@ -304,6 +304,7 @@ mongo_install(
     },
     try_zstd = True,
     deps = [
+        "//src/mongo/db/modules/atlas:dist-test",
         "//src/mongo/db/modules/enterprise:dist-test",
     ],
 )
