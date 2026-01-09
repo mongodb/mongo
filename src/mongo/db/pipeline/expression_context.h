@@ -1014,10 +1014,20 @@ public:
         // e.g. if running on a 'mongos'. In this case, we return an empty instance of
         // 'PathArrayness' that denotes all paths as arrays.
         if (!_params.mainCollPathArrayness) {
-            static const auto kEmptyPathArrayness = PathArrayness();
-            return kEmptyPathArrayness;
+            return PathArrayness::emptyPathArrayness();
         }
         return *_params.mainCollPathArrayness;
+    }
+
+    const PathArrayness& getSecondaryCollPathArrayness(const NamespaceString& nss) const {
+        auto it = _params.secondaryCollsPathArrayness.find(nss);
+        // If we do not find a PathArrayness mapped to the secondary namespace we return a
+        // conservative guarantee. This could happen if running on a 'mongos'.
+        if (it == _params.secondaryCollsPathArrayness.end()) {
+            return PathArrayness::emptyPathArrayness();
+        }
+        tassert(11344300, "PathArrayness should not be a nullptr", it->second);
+        return *it->second;
     }
 
 protected:
@@ -1168,6 +1178,8 @@ protected:
         // The PathArrayness information for the main collection. This may remain unset if a
         // collection acquisition is not possible, e.g. when running on mongos.
         std::shared_ptr<const PathArrayness> mainCollPathArrayness = nullptr;
+        stdx::unordered_map<NamespaceString, std::shared_ptr<const PathArrayness>>
+            secondaryCollsPathArrayness;
     };
 
     ExpressionContextParams _params;

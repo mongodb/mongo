@@ -56,16 +56,6 @@ variables:
     private_key_file: src/powercycle.pem
     private_key_remote: ${__project_aws_ssh_key_value}
 
-  - &sbom_upload_config_vars
-    CONTAINER_COMMAND: podman # podman or docker
-    CONTAINER_IMAGE: 901841024863.dkr.ecr.us-east-1.amazonaws.com/release-infrastructure/silkbomb:2.0
-    CONTAINER_OPTIONS: --pull=always --platform="linux/amd64" -it --rm
-    CONTAINER_ENV_FILES: ${workdir}/kondukto_credentials.env
-    CONTAINER_VOLUMES: ${workdir}:/workdir
-    KODUKTO_ROLE_ARN: arn:aws:iam::119629040606:role/kondukto
-    SBOM_FILE_PATH: ${workdir}/sbom.json
-    LOCAL_REPO_PATH: ${workdir}/src
-
 ################################################
 #                    Tasks                     #
 ################################################
@@ -1730,7 +1720,7 @@ tasks:
         timeout_secs: 1800 # 30 minute timeout for no output
 
   - name: push_mongod_to_ecr
-    tags: ["assigned_to_jira_team_disag_mongod"]
+    tags: ["assigned_to_jira_team_server_disagg", "auxiliary"]
     depends_on:
       - name: package
     commands:
@@ -1962,7 +1952,7 @@ tasks:
             GITHUB_TOKEN: ${github_token}
 
   - name: update_sbom
-    tags: []
+    tags: ["auxiliary", "assigned_to_jira_team_platsec_server"]
     exec_timeout_secs: 3600 # 60 minute timeout
     commands:
       - command: manifest.load
@@ -1970,6 +1960,7 @@ tasks:
         params:
           directory: src
           clone_depth: 1
+      - func: "f_expansions_write"
       - func: "restore git history and tags"
       - func: "add git tag"
       - func: "f_expansions_write"
@@ -1980,28 +1971,18 @@ tasks:
         display_name: Assume Silkbomb IAM role (access to Endor Labs API key)
         params:
           role_arn: arn:aws:iam::119629040606:role/silkbomb
-      - command: shell.exec
+      - command: subprocess.exec
         display_name: Write Endor Labs API credentials to config.yml
         params:
+          binary: bash
           silent: true
-          shell: bash
           include_expansions_in_env:
             [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
           env:
             ENDOR_CONFIG_PATH: "${workdir}/.endorctl"
-          script: |
-            set -e
-            # use AWS CLI to get the Endor Labs API credentials from AWS Secrets Manager
-            ENDOR_API_CREDENTIALS_KEY=$(aws secretsmanager get-secret-value --secret-id silkbomb-environment --region us-east-1 --query SecretString --output text | jq -r '.ENDOR_API_CREDENTIALS_KEY')
-            ENDOR_API_CREDENTIALS_SECRET=$(aws secretsmanager get-secret-value --secret-id silkbomb-environment --region us-east-1 --query SecretString --output text | jq -r '.ENDOR_API_CREDENTIALS_SECRET')
-            # save credentials to config file
-            mkdir -p ${workdir}/.endorctl
-            cat << EOF > $ENDOR_CONFIG_PATH/config.yaml
-            ENDOR_API: https://api.endorlabs.com
-            ENDOR_API_CREDENTIALS_KEY: $ENDOR_API_CREDENTIALS_KEY
-            ENDOR_API_CREDENTIALS_SECRET: $ENDOR_API_CREDENTIALS_SECRET
             ENDOR_NAMESPACE: ${ENDOR_NAMESPACE}
-            EOF
+          args:
+            - "src/evergreen/write_endor_credentials.sh"
       - command: subprocess.exec
         display_name: Install endorctl
         params:
@@ -2051,7 +2032,7 @@ tasks:
 
   - name: upload_sbom_via_silkbomb_if_changed
     allowed_requesters: ["commit"]
-    tags: []
+    tags: ["auxiliary", "assigned_to_jira_team_platsec_server"]
     exec_timeout_secs: 600 # 10 minute timeout
     commands:
       - command: manifest.load
@@ -2065,19 +2046,17 @@ tasks:
         display_name: Assume Silkbomb IAM role
         params:
           role_arn: arn:aws:iam::119629040606:role/silkbomb
-      - command: shell.exec
+      - command: subprocess.exec
         display_name: Write temporary AWS credentials to Silkbomb environment file
         params:
+          binary: bash
           silent: true
-          shell: bash
           include_expansions_in_env:
             [AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN]
-          script: |
-            cat << EOF > ${workdir}/silkbomb.env
-            AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-            AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
-            EOF
+          env:
+            SILKBOMB_ENV_FILE: "${workdir}/silkbomb.env"
+          args:
+            - "src/evergreen/write_silkbomb_env.sh"
       - command: ec2.assume_role
         display_name: Assume DevProd Platforms ECR readonly IAM role
         params:
@@ -2303,7 +2282,7 @@ tasks:
 
   - name: create_todo_tickets
     patchable: false
-    tags: []
+    tags: ["auxiliary", "assigned_to_jira_team_devprod_build"]
     exec_timeout_secs: 600 # 10 minute timeout
     commands:
       - command: manifest.load

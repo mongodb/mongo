@@ -193,16 +193,17 @@ Value Variables::getValue(Id id, const Document& root) const {
             case Variables::kJsScopeId:
             case Variables::kIsMapReduceId:
             case Variables::kUserRolesId: {
-                if (auto it = _definitions.find(id); it != _definitions.end()) {
+                if (auto it = _queryConstantDefinitions->find(id);
+                    it != _queryConstantDefinitions->end()) {
                     return it->second.value;
                 }
-                std::stringstream message;
+                str::stream message;
                 message << "Builtin variable '$$" << getBuiltinVariableName(id)
                         << "' is not available";
                 if (id == Variables::kUserRolesId && !enableAccessToUserRoles.load()) {
                     message << " as the server is not configured to accept it";
                 }
-                uasserted(51144, message.str());
+                uasserted(51144, message);
             }
             case Variables::kSearchMetaId: {
                 auto metaIt = _definitions.find(id);
@@ -230,23 +231,22 @@ Document Variables::getDocument(Id id, const Document& root) const {
 }
 
 void Variables::setLegacyRuntimeConstants(const LegacyRuntimeConstants& constants) {
-    const bool constant = true;
-    _definitions[kNowId] = {Value(constants.getLocalNow()), constant};
+    setQueryConstantValue(kNowId, Value(constants.getLocalNow()));
     // We use a null Timestamp to indicate that the clusterTime is not available; this can happen if
     // the logical clock is not running. We do not use boost::optional because this would allow the
     // IDL to serialize a RuntimConstants without clusterTime, which should always be an error.
     if (!constants.getClusterTime().isNull()) {
-        _definitions[kClusterTimeId] = {Value(constants.getClusterTime()), constant};
+        setQueryConstantValue(kClusterTimeId, Value(constants.getClusterTime()));
     }
 
     if (constants.getJsScope()) {
-        _definitions[kJsScopeId] = {Value(*constants.getJsScope()), constant};
+        setQueryConstantValue(kJsScopeId, Value(*constants.getJsScope()));
     }
     if (constants.getIsMapReduce()) {
-        _definitions[kIsMapReduceId] = {Value(*constants.getIsMapReduce()), constant};
+        setQueryConstantValue(kIsMapReduceId, Value(*constants.getIsMapReduce()));
     }
     if (constants.getUserRoles()) {
-        _definitions[kUserRolesId] = {Value(constants.getUserRoles().value()), constant};
+        setQueryConstantValue(kUserRolesId, Value(constants.getUserRoles().value()));
     }
 }
 
@@ -315,7 +315,16 @@ void Variables::seedVariablesWithLetParameters(
             (*maybeSystemVarValidator)(value);
             if (!(fieldName == kClusterTimeName && value.getTimestamp().isNull())) {
                 // Avoid populating a value for CLUSTER_TIME if the value is null.
-                _definitions[kBuiltinVarNameToId.at(fieldName)] = {value, true};
+                Id id = kBuiltinVarNameToId.at(fieldName);
+                if (id <= kMaxQueryConstantId) {
+                    // For backward compatibility we must allow let parameters to override
+                    // query-constant variables.
+                    (*_queryConstantDefinitions)[id] = ValueAndState{
+                        std::move(value), true /*isConst*/
+                    };
+                } else {
+                    _definitions[id] = {std::move(value), true};
+                }
             }
         } else {
             setConstantValue(expCtx->variablesParseState.defineVariable(fieldName), value);
@@ -351,7 +360,7 @@ LegacyRuntimeConstants Variables::generateRuntimeConstants(OperationContext* opC
 }
 
 void Variables::defineLocalNow() {
-    _definitions[kNowId] = {Value(Date_t::now()), true};
+    setQueryConstantValue(kNowId, Value(Date_t::now()));
 }
 
 void Variables::defineClusterTime(OperationContext* opCtx) {
@@ -359,7 +368,7 @@ void Variables::defineClusterTime(OperationContext* opCtx) {
     // they try to access it in context where it doesn't exist (i.e. standalone).
     auto ts = generateClusterTimestamp(opCtx);
     if (!ts.isNull()) {
-        _definitions[kClusterTimeId] = {Value(generateClusterTimestamp(opCtx)), true};
+        setQueryConstantValue(kClusterTimeId, Value(ts));
     }
 }
 
@@ -374,7 +383,8 @@ LegacyRuntimeConstants Variables::transitionalExtractRuntimeConstants() const {
     LegacyRuntimeConstants extracted({}, {});
     for (auto&& [builtinName, ignoredValidator] : kSystemVarValidators) {
         const auto builtinId = kBuiltinVarNameToId.at(builtinName);
-        if (auto it = _definitions.find(builtinId); it != _definitions.end()) {
+        if (auto it = _queryConstantDefinitions->find(builtinId);
+            it != _queryConstantDefinitions->end()) {
             const auto& [value, unusedIsConstant] = it->second;
             switch (builtinId) {
                 case kNowId: {
@@ -429,7 +439,18 @@ void Variables::defineUserRoles(OperationContext* opCtx) {
         }
     }
 
-    _definitions[kUserRolesId] = {Value(builder.arr()), true /* isConst */};
+    setQueryConstantValue(kUserRolesId, Value(builder.arr()));
+}
+
+void Variables::setQueryConstantValue(Variables::Id id, Value value) {
+    tassert(11438401,
+            "setQueryConstantValue must only be used with ids below kMaxQueryConstantId",
+            id <= Variables::kMaxQueryConstantId);
+    tassert(11438400,
+            str::stream() << "Query-constant variable " << kIdToBuiltinVarName.at(id)
+                          << " is redefined",
+            !_queryConstantDefinitions->contains(id));
+    _queryConstantDefinitions->emplace(id, ValueAndState{std::move(value), true /*isConst*/});
 }
 
 LetVariable::LetVariable(std::string attributeName,

@@ -61,6 +61,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/drop_collection.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/shard_role/shard_catalog/rename_collection.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/sharding_state.h"
@@ -194,7 +195,12 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
             fleCompactHangBeforeECOCCreateUnsharded.pauseWhileSet();
         }
 
-        // create ECOC
+        // Create ECOC collection locally. This local collection creation is safe here because we
+        // instantiate a ScopedReplicaSetDDL object prior to this call. This object registers this
+        // DDL operation with the DDL tracker, ensuring proper metadata synchronization when the
+        // replica set gets promoted to a shard server.
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE allowCreate(
+            opCtx, namespaces.ecocNss);
         CreateCommand createCmd(namespaces.ecocNss);
         mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
         CreateCollectionRequest request;

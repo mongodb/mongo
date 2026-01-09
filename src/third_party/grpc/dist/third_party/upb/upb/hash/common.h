@@ -1,29 +1,9 @@
-/*
- * Copyright (c) 2009-2021, Google LLC
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Google LLC nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL Google LLC BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// Protocol Buffers - Google's data interchange format
+// Copyright 2023 Google LLC.  All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 /*
  * upb_table
@@ -47,10 +27,10 @@
 #ifndef UPB_HASH_COMMON_H_
 #define UPB_HASH_COMMON_H_
 
+#include <stdint.h>
 #include <string.h>
 
 #include "upb/base/string_view.h"
-#include "upb/mem/arena.h"
 
 // Must be last.
 #include "upb/port/def.inc"
@@ -65,12 +45,6 @@ typedef struct {
   uint64_t val;
 } upb_value;
 
-/* Variant that works with a length-delimited rather than NULL-delimited string,
- * as supported by strtable. */
-char* upb_strdup2(const char* s, size_t len, upb_Arena* a);
-
-UPB_INLINE void _upb_value_setval(upb_value* v, uint64_t val) { v->val = val; }
-
 /* For each value ctype, define the following set of functions:
  *
  * // Get/set an int32 from a upb_value.
@@ -79,9 +53,9 @@ UPB_INLINE void _upb_value_setval(upb_value* v, uint64_t val) { v->val = val; }
  *
  * // Construct a new upb_value from an int32.
  * upb_value upb_value_int32(int32_t val); */
-#define FUNCS(name, membername, type_t, converter, proto_type)       \
+#define FUNCS(name, membername, type_t, converter)                   \
   UPB_INLINE void upb_value_set##name(upb_value* val, type_t cval) { \
-    val->val = (converter)cval;                                      \
+    val->val = (uint64_t)cval;                                       \
   }                                                                  \
   UPB_INLINE upb_value upb_value_##name(type_t val) {                \
     upb_value ret;                                                   \
@@ -92,15 +66,15 @@ UPB_INLINE void _upb_value_setval(upb_value* v, uint64_t val) { v->val = val; }
     return (type_t)(converter)val.val;                               \
   }
 
-FUNCS(int32, int32, int32_t, int32_t, UPB_CTYPE_INT32)
-FUNCS(int64, int64, int64_t, int64_t, UPB_CTYPE_INT64)
-FUNCS(uint32, uint32, uint32_t, uint32_t, UPB_CTYPE_UINT32)
-FUNCS(uint64, uint64, uint64_t, uint64_t, UPB_CTYPE_UINT64)
-FUNCS(bool, _bool, bool, bool, UPB_CTYPE_BOOL)
-FUNCS(cstr, cstr, char*, uintptr_t, UPB_CTYPE_CSTR)
-FUNCS(uintptr, uptr, uintptr_t, uintptr_t, UPB_CTYPE_UPTR)
-FUNCS(ptr, ptr, void*, uintptr_t, UPB_CTYPE_PTR)
-FUNCS(constptr, constptr, const void*, uintptr_t, UPB_CTYPE_CONSTPTR)
+FUNCS(int32, int32, int32_t, int32_t)
+FUNCS(int64, int64, int64_t, int64_t)
+FUNCS(uint32, uint32, uint32_t, uint32_t)
+FUNCS(uint64, uint64, uint64_t, uint64_t)
+FUNCS(bool, _bool, bool, bool)
+FUNCS(cstr, cstr, char*, uintptr_t)
+FUNCS(uintptr, uptr, uintptr_t, uintptr_t)
+FUNCS(ptr, ptr, void*, uintptr_t)
+FUNCS(constptr, constptr, const void*, uintptr_t)
 
 #undef FUNCS
 
@@ -124,47 +98,33 @@ UPB_INLINE upb_value upb_value_double(double cval) {
   return ret;
 }
 
-#undef SET_TYPE
+/* upb_key *****************************************************************/
 
-/* upb_tabkey *****************************************************************/
+// A uint32 size followed by that number of bytes stored contiguously.
+typedef struct {
+  uint32_t size;
+  const char data[];
+} upb_SizePrefixString;
 
 /* Either:
- *   1. an actual integer key, or
- *   2. a pointer to a string prefixed by its uint32_t length, owned by us.
+ *   1. an actual integer key
+ *   2. a SizePrefixString*, owned by us.
  *
- * ...depending on whether this is a string table or an int table.  We would
- * make this a union of those two types, but C89 doesn't support statically
- * initializing a non-first union member. */
-typedef uintptr_t upb_tabkey;
+ * ...depending on whether this is a string table or an int table. */
+typedef union {
+  uintptr_t num;
+  const upb_SizePrefixString* str;
+} upb_key;
 
-UPB_INLINE char* upb_tabstr(upb_tabkey key, uint32_t* len) {
-  char* mem = (char*)key;
-  if (len) memcpy(len, mem, sizeof(*len));
-  return mem + sizeof(*len);
+UPB_INLINE upb_StringView upb_key_strview(upb_key key) {
+  return upb_StringView_FromDataAndSize(key.str->data, key.str->size);
 }
-
-UPB_INLINE upb_StringView upb_tabstrview(upb_tabkey key) {
-  upb_StringView ret;
-  uint32_t len;
-  ret.data = upb_tabstr(key, &len);
-  ret.size = len;
-  return ret;
-}
-
-/* upb_tabval *****************************************************************/
-
-typedef struct upb_tabval {
-  uint64_t val;
-} upb_tabval;
-
-#define UPB_TABVALUE_EMPTY_INIT \
-  { -1 }
 
 /* upb_table ******************************************************************/
 
 typedef struct _upb_tabent {
-  upb_tabkey key;
-  upb_tabval val;
+  upb_value val;
+  upb_key key;
 
   /* Internal chaining.  This is const so we can create static initializers for
    * tables.  We cast away const sometimes, but *only* when the containing
@@ -174,20 +134,35 @@ typedef struct _upb_tabent {
 } upb_tabent;
 
 typedef struct {
-  size_t count;       /* Number of entries in the hash part. */
-  uint32_t mask;      /* Mask to turn hash value -> bucket. */
-  uint32_t max_count; /* Max count before we hit our load limit. */
-  uint8_t size_lg2;   /* Size of the hashtable part is 2^size_lg2 entries. */
   upb_tabent* entries;
+  /* Number of entries in the hash part. */
+  uint32_t count;
+
+  /* Mask to turn hash value -> bucket. The map's allocated size is mask + 1.*/
+  uint32_t mask;
 } upb_table;
 
-UPB_INLINE size_t upb_table_size(const upb_table* t) {
-  return t->size_lg2 ? 1 << t->size_lg2 : 0;
-}
+UPB_INLINE size_t upb_table_size(const upb_table* t) { return t->mask + 1; }
 
 // Internal-only functions, in .h file only out of necessity.
 
-UPB_INLINE bool upb_tabent_isempty(const upb_tabent* e) { return e->key == 0; }
+UPB_INLINE upb_key upb_key_empty(void) {
+  upb_key ret;
+  memset(&ret, 0, sizeof(upb_key));
+  return ret;
+}
+
+UPB_INLINE bool upb_tabent_isempty(const upb_tabent* e) {
+  upb_key key = e->key;
+  UPB_ASSERT(sizeof(key.num) == sizeof(key.str));
+  uintptr_t val;
+  memcpy(&val, &key, sizeof(val));
+  // Note: for upb_inttables a tab_key is a true integer key value, but the
+  // inttable maintains the invariant that 0 value is always stored in the
+  // compact table and never as a upb_tabent* so we can always use the 0
+  // key value to identify an empty tabent.
+  return val == 0;
+}
 
 uint32_t _upb_Hash(const void* p, size_t n, uint64_t seed);
 

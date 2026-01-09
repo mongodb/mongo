@@ -25,7 +25,8 @@ rules:
   # # We completed a project to completely eject all shell scripts from the
   # # YAML, and now require this of all shell scripts. Add your scripts to the
   # # evergreen/ directory, and make use of subprocess.exec.
-  - rule: "no-shell-exec"
+  # TODO(SERVER-116120): Re-enable once artifact extract is moved to shell script
+  # - rule: "no-shell-exec"
 
   # Historically, expansions.update has been used to inject shell scripts
   # into expansions, which were then used to inject commonly used snippets
@@ -54,7 +55,7 @@ rules:
   - rule: "enforce-tasks-distro-with-special-tag"
     tags:
       - task_tag_name: "requires_large_host"
-        allowed_distro_regex: "(.*-x*large|.*-medium|macos-.*|ubi.*)"
+        allowed_distro_regex: "(.*large|.*-medium|macos-.*|ubi.*)"
 
   - rule: "enforce-tags-for-tasks"
     tag_groups:
@@ -95,6 +96,10 @@ rules:
 
           # https://github.com/10gen/mothra/blob/main/mothra/teams/et.yaml
           - assigned_to_jira_team_streams
+
+          # TODO (SERVER-116119): This team currently does not exist, delete this comment and link to the
+          # mothra config file the team is defined in once it's created.
+          - assigned_to_jira_team_platsec_server
         min_num_of_tags: 1
         max_num_of_tags: 1
       # Every task should have required selection tag
@@ -139,6 +144,7 @@ rules:
           - requires_large_host_commit_queue
           - requires_all_feature_flags
           - requires_execution_on_windows_patch_build
+          - requires_extra_system_deps
 
   - rule: "enforce-tags-for-variants"
     tags:

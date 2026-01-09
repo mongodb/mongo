@@ -99,6 +99,10 @@ bool AttachedPersistenceProvider::shouldForceUpdateWithFullDocument() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::supportsCursorReuseForExpressPathQueries() const {
+    return true;
+}
+
 bool AttachedPersistenceProvider::supportsLocalCollections() const {
     return true;
 }
@@ -119,9 +123,6 @@ bool AttachedPersistenceProvider::supportsOplogSampling() const {
     return true;
 }
 
-bool AttachedPersistenceProvider::supportsTableVerify() const {
-    return true;
-}
 
 bool AttachedPersistenceProvider::shouldDisableTransactionUpdateCoalescing() const {
     // This is only used for testing purposes.

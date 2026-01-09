@@ -49,7 +49,7 @@ def mongo_cc_proto_lib(
         cc_deps = [":" + proto_cc_name],
         copts = OTEL_COPTS,
         deps = [
-            "//src/third_party/protobuf",
+            "@com_google_protobuf//:protobuf",
         ],
         no_undefined_ref_DO_NOT_USE = False,
     )

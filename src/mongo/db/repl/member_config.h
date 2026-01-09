@@ -119,6 +119,10 @@ public:
         }
     }
 
+    bool isUsingMaintenancePort(const HostAndPort& hap) const {
+        return getMaintenancePort() == hap.port();
+    }
+
     /**
      * Gets the mapping of horizon names to `HostAndPort` for this replica set member.
      */

@@ -78,10 +78,6 @@ class AggExState {
 public:
     /**
      * Upon construction, the context always references the initial request it is constructed with.
-     *
-     * Creates a new IFRContext for the aggregation, which will be shared among the root
-     * ExpressionContext and any child ExpressionContexts that are created, for example, as part
-     * of sub-pipeline execution.
      */
     AggExState(OperationContext* opCtx,
                AggregateCommandRequest& request,
@@ -90,13 +86,14 @@ public:
                const PrivilegeVector& privileges,
                const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
                    usedExternalDataSources,
-               const boost::optional<ExplainOptions::Verbosity>& verbosity)
+               const boost::optional<ExplainOptions::Verbosity>& verbosity,
+               std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext)
         : _aggReqDerivatives(new AggregateRequestDerivatives(request, liteParsedPipeline, cmdObj)),
           _opCtx(opCtx),
           _executionNss(request.getNamespace()),
           _privileges(privileges),
           _verbosity(verbosity),
-          _ifrContext(std::make_shared<IncrementalFeatureRolloutContext>()) {
+          _ifrContext(std::move(ifrContext)) {
         // Create virtual collections and drop them when aggregate command is done.
         // If a cursor is registered, the ExternalDataSourceScopeGuard will be stored in the cursor;
         // when the cursor is later destroyed, the scope guard will also be destroyed, and any

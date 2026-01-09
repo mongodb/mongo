@@ -46,7 +46,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <variant>
 
 namespace mongo {
 

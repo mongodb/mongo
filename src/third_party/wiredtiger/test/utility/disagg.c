@@ -36,12 +36,20 @@ testutil_disagg_storage_configuration(TEST_OPTS *opts, const char *home, char *d
   size_t disagg_cfg_size, char *ext_cfg, size_t ext_cfg_size)
 {
     (void)home;
+    char key_provider_ext_cfg[256];
 
     if (opts->disagg_storage) {
         testutil_snprintf(ext_cfg, ext_cfg_size, TESTUTIL_ENV_CONFIG_DISAGG_EXT, opts->build_dir,
           opts->disagg_page_log, opts->disagg_page_log, opts->disagg_page_log_home, opts->delay_ms,
           opts->error_ms, opts->force_delay, opts->force_error, opts->palm_map_size_mb,
           opts->page_log_verbose);
+
+        if (opts->disagg_key_provider) {
+            testutil_snprintf(key_provider_ext_cfg, sizeof(key_provider_ext_cfg),
+              TESTUTIL_ENV_CONFIG_KEY_PROVIDER_EXT, opts->build_dir);
+            testutil_strcat(
+              ext_cfg, ext_cfg_size + sizeof(key_provider_ext_cfg), key_provider_ext_cfg);
+        }
 
         testutil_snprintf(disagg_cfg, disagg_cfg_size, TESTUTIL_ENV_CONFIG_DISAGG,
           opts->disagg_mode, opts->disagg_page_log, (opts->internal_page_delta ? "true" : "false"),

@@ -29,9 +29,8 @@
 
 #include "mongo/db/validate/index_consistency.h"
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/validate/collection_validation.h"
 #include "mongo/db/validate/validate_gen.h"
@@ -115,8 +114,7 @@ TEST_F(IndexConsistencyTest, ExtraIndexEntriesLimitedByMemoryBounds) {
 
         for (int i = 0; i < 10; ++i) {
             BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), *coll, InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), *coll, doc));
         }
 
         clearCollection(operationContext(), *coll);
@@ -152,8 +150,7 @@ TEST_F(IndexConsistencyTest, MissingIndexEntriesLimitedByMemoryBounds) {
 
         for (int i = 0; i < 10; ++i) {
             BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), writer.get(), InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), writer.get(), doc));
         }
 
         IndexCatalog* indexCatalog =
@@ -201,8 +198,7 @@ TEST_F(IndexConsistencyTest, ExtraEntryPartialFindingsWithNonzeroMemoryLimit) {
                         << BSON("a" << 1))));
         for (int i = 0; i < 10; ++i) {
             BSONObj doc = BSON("_id" << i << "a" << std::string(600 * 1024, 'a' + i));
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), writer.get(), InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), writer.get(), doc));
         }
 
         clearCollection(operationContext(), writer.get());
@@ -256,8 +252,7 @@ TEST_F(IndexConsistencyTest, MissingEntryPartialFindingsWithNonzeroMemoryLimit) 
                         << BSON("a" << 1))));
         for (int i = 0; i < 10; ++i) {
             BSONObj doc = BSON("_id" << i << "a" << std::string(600 * 1024, 'a' + i));
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), writer.get(), InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), writer.get(), doc));
         }
 
         IndexCatalog* indexCatalog =
@@ -308,16 +303,14 @@ TEST_F(IndexConsistencyTest, MemoryLimitSharedBetweenMissingAndExtra) {
         // The first 10 entries appear in the index and not the collection.
         for (int i = 0; i < 10; ++i) {
             BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), writer.get(), InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), writer.get(), doc));
         }
         clearCollection(operationContext(), writer.get());
 
         // The second 10 entries are collection-only.
         for (int i = 10; i < 20; ++i) {
             BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), writer.get(), InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), writer.get(), doc));
         }
         IndexCatalog* indexCatalog =
             writer.getWritableCollection(operationContext())->getIndexCatalog();
@@ -372,8 +365,7 @@ TEST_F(IndexConsistencyTest, FailedKeygen) {
         ASSERT_OK(collWriter->getIndexCatalog()->createIndexOnEmptyCollection(
             opCtx, collWriter, indexSpec));
 
-        ASSERT_OK(collection_internal::insertDocument(
-            opCtx, writer.get(), InsertStatement(BSON("_id" << 1 << "x" << "y")), nullptr));
+        ASSERT_OK(Helpers::insert(opCtx, writer.get(), BSON("_id" << 1 << "x" << "y")));
         wuow.commit();
     }
 

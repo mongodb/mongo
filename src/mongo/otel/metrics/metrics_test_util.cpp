@@ -32,10 +32,16 @@
 #include "mongo/otel/metrics/metrics_service.h"
 
 namespace mongo::otel::metrics {
-using opentelemetry::exporter::memory::SimpleAggregateInMemoryMetricData;
-using opentelemetry::sdk::metrics::SumPointData;
+#ifndef MONGO_CONFIG_OTEL
+namespace {
+constexpr StringData kUsingOtelOnWindows =
+    "You're trying to read metrics in an environment that doesn't have otel enabled (likely "
+    "Windows). In tests this can be avoided by checking OtelMetricsCapturer::canReadMetrics()";
+}
+#endif  // not MONGO_CONFIG_OTEL
 
 OtelMetricsCapturer::OtelMetricsCapturer() {
+#ifdef MONGO_CONFIG_OTEL
     invariant(isNoopMeterProvider(opentelemetry::metrics::Provider::GetMeterProvider().get()));
 
     auto metrics =
@@ -52,29 +58,78 @@ OtelMetricsCapturer::OtelMetricsCapturer() {
         opentelemetry::sdk::metrics::MeterProviderFactory::Create();
     provider->AddMetricReader(std::move(reader));
     opentelemetry::metrics::Provider::SetMeterProvider(std::move(provider));
+#endif  // MONGO_CONFIG_OTEL
 }
 
 int64_t OtelMetricsCapturer::readInt64Counter(MetricName name) {
-    _metrics->Clear();
-    _reader->triggerMetricExport();
-
-    const SimpleAggregateInMemoryMetricData::AttributeToPoint& attributeToPoint =
-        _metrics->Get(std::string(toStdStringViewForInterop(MetricsService::kMeterName)),
-                      std::string(toStdStringViewForInterop(name.getName())));
-    auto it = attributeToPoint.find({});
-    massert(ErrorCodes::KeyNotFound,
-            fmt::format("No metric with name {} exists", name.getName()),
-            it != attributeToPoint.end());
+#ifdef MONGO_CONFIG_OTEL
+    auto data = getMetricData<opentelemetry::sdk::metrics::SumPointData>(name);
 
     massert(ErrorCodes::TypeMismatch,
-            fmt::format("Metric {} does not have counter values", name.getName()),
-            std::holds_alternative<SumPointData>(it->second));
+            fmt::format("Metric {} does not have matching value type", name.getName()),
+            std::holds_alternative<int64_t>(data.value_));
 
-    const SumPointData& sumPointData = std::get<SumPointData>(it->second);
-    massert(ErrorCodes::TypeMismatch,
-            fmt::format("Metric {} has non-int64_t value", name.getName()),
-            std::holds_alternative<int64_t>(sumPointData.value_));
-
-    return std::get<int64_t>(sumPointData.value_);
+    return std::get<int64_t>(data.value_);
+#else
+    invariant(false, kUsingOtelOnWindows);
+    return {};
+#endif  // MONGO_CONFIG_OTEL
 }
+
+double OtelMetricsCapturer::readDoubleCounter(MetricName name) {
+#ifdef MONGO_CONFIG_OTEL
+    auto data = getMetricData<opentelemetry::sdk::metrics::SumPointData>(name);
+
+    massert(ErrorCodes::TypeMismatch,
+            fmt::format("Metric {} does not have matching value type", name.getName()),
+            std::holds_alternative<double>(data.value_));
+
+    return std::get<double>(data.value_);
+#else
+    invariant(false, kUsingOtelOnWindows);
+    return {};
+#endif  // MONGO_CONFIG_OTEL
+}
+
+int64_t OtelMetricsCapturer::readInt64Gauge(MetricName name) {
+#ifdef MONGO_CONFIG_OTEL
+    auto data = getMetricData<opentelemetry::sdk::metrics::LastValuePointData>(name);
+
+    massert(ErrorCodes::TypeMismatch,
+            fmt::format("Metric {} does not have matching value type", name.getName()),
+            std::holds_alternative<int64_t>(data.value_));
+
+    return std::get<int64_t>(data.value_);
+#else
+    invariant(false, kUsingOtelOnWindows);
+    return {};
+#endif  // MONGO_CONFIG_OTEL
+}
+
+HistogramData<int64_t> OtelMetricsCapturer::readInt64Histogram(MetricName name) {
+#ifdef MONGO_CONFIG_OTEL
+    return getMetricData<opentelemetry::sdk::metrics::HistogramPointData>(name);
+#else
+    invariant(false, kUsingOtelOnWindows);
+    return {};
+#endif  // MONGO_CONFIG_OTEL
+}
+
+HistogramData<double> OtelMetricsCapturer::readDoubleHistogram(MetricName name) {
+#ifdef MONGO_CONFIG_OTEL
+    return getMetricData<opentelemetry::sdk::metrics::HistogramPointData>(name);
+#else
+    invariant(false, kUsingOtelOnWindows);
+    return {};
+#endif  // MONGO_CONFIG_OTEL
+}
+
+bool OtelMetricsCapturer::canReadMetrics() {
+#ifdef MONGO_CONFIG_OTEL
+    return true;
+#else
+    return false;
+#endif
+}
+
 }  // namespace mongo::otel::metrics

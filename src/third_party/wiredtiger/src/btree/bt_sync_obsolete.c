@@ -327,7 +327,7 @@ __sync_obsolete_cleanup_one(WT_SESSION_IMPL *session, WT_REF *ref)
                 new_state = WT_REF_DELETED;
         }
         /*
-         * For deleted and on-disk pages, increment ref_changes if there has been a change in the
+         * For deleted and on-disk pages, mark the ref as dirty if there has been a change in the
          * ref's state. There's nothing to do for in-memory pages as we don't change those.
          */
         if (WT_DELTA_INT_ENABLED(S2BT(session), S2C(session)) && previous_state != new_state)

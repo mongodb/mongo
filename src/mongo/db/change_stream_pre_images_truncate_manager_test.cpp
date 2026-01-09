@@ -31,7 +31,7 @@
 
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -100,22 +100,18 @@ protected:
         WriteUnitOfWork wuow(opCtx);
         auto opTimes = repl::getNextOpTimes(opCtx, numPreImages);
 
-        std::vector<InsertStatement> preImageInsertStatements;
+        std::vector<BSONObj> preImageDocs;
         for (const auto& opTime : opTimes) {
             ChangeStreamPreImageId preImageId(nsUUID, opTime.getTimestamp(), 0);
             const auto operationTime = Date_t() + Seconds(opTime.getSecs());
             ChangeStreamPreImage preImage(std::move(preImageId),
                                           operationTime,
                                           BSON("padding" << std::string(docPaddingBytes, 'a')));
-            preImageInsertStatements.push_back(InsertStatement{preImage.toBSON()});
-        }
+            preImageDocs.push_back(preImage.toBSON());
+        };
 
         auto& changeStreamPreImagesCollection = *preImagesCollectionRaii;
-        ASSERT_OK(collection_internal::insertDocuments(opCtx,
-                                                       changeStreamPreImagesCollection,
-                                                       preImageInsertStatements.begin(),
-                                                       preImageInsertStatements.end(),
-                                                       nullptr));
+        ASSERT_OK(Helpers::insert(opCtx, changeStreamPreImagesCollection, preImageDocs));
         wuow.commit();
     }
 

@@ -31,18 +31,16 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -75,7 +73,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -507,8 +504,7 @@ TEST_F(CreateCollectionTest, ValidationDisabledForTemporaryReshardingCollection)
     // Ensure a document that violates validator criteria can be inserted into the temporary
     // resharding collection.
     auto insertObj = fromjson("{'_id':2, a:1}");
-    auto status = collection_internal::insertDocument(
-        opCtx.get(), collection.getCollectionPtr(), InsertStatement(insertObj), nullptr, false);
+    auto status = Helpers::insert(opCtx.get(), collection.getCollectionPtr(), insertObj);
     ASSERT_OK(status);
 }
 

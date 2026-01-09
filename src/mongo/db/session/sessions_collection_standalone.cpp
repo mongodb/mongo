@@ -114,13 +114,13 @@ void SessionsCollectionStandalone::checkSessionsCollectionExists(OperationContex
                     (localLogicalSessionTimeoutMinutes * 60));
 }
 
-void SessionsCollectionStandalone::refreshSessions(OperationContext* opCtx,
-                                                   const LogicalSessionRecordSet& sessions) {
+SessionsCollection::RefreshSessionsResult SessionsCollectionStandalone::refreshSessions(
+    OperationContext* opCtx, const LogicalSessionRecordSet& sessions) {
     const std::vector<LogicalSessionRecord> sessionsVector(sessions.begin(), sessions.end());
     DBDirectClient client(opCtx);
-    _doRefresh(NamespaceString::kLogicalSessionsNamespace,
-               sessionsVector,
-               makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
+    return _doRefresh(NamespaceString::kLogicalSessionsNamespace,
+                      sessionsVector,
+                      makeSendFnForBatchWrite(NamespaceString::kLogicalSessionsNamespace, &client));
 }
 
 void SessionsCollectionStandalone::removeRecords(OperationContext* opCtx,

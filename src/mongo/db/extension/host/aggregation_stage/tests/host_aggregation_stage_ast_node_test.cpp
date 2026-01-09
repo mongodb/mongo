@@ -55,6 +55,11 @@ public:
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         MONGO_UNIMPLEMENTED;
     }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<NoOpExtensionAstNode>();
     }
@@ -141,6 +146,93 @@ DEATH_TEST(HostAstNodeTestDeathTest, HostBindUnimplemented, "11133600") {
 
     ::MongoExtensionLogicalAggStage** bind = nullptr;
     handle->vtable().bind(noOpAstNode, bind);
+}
+
+TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodePreservesSpec) {
+    auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
+
+    auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
+            spec.firstElement(), spec.getOwned())));
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    // Clone the AST node.
+    auto clonedHandle = handle->clone();
+
+    // Verify the clone has the same spec and name.
+    ASSERT_TRUE(host::HostAggStageAstNode::isHostAllocated(*clonedHandle.get()));
+    ASSERT_TRUE(static_cast<host::HostAggStageAstNode*>(clonedHandle.get())
+                    ->getIdLookupSpec()
+                    .binaryEqual(spec));
+    ASSERT_EQ(handle->getName(), clonedHandle->getName());
+}
+
+TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodeIsIndependent) {
+    auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
+
+    auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
+            spec.firstElement(), spec.getOwned())));
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    // Clone the AST node.
+    auto clonedHandle = handle->clone();
+
+    // Verify they are different objects (different pointers).
+    ASSERT_NE(handle.get(), clonedHandle.get());
+
+    // Both should be valid handles.
+    ASSERT_TRUE(handle.isValid());
+    ASSERT_TRUE(clonedHandle.isValid());
+}
+
+TEST(HostAstNodeCloneTest, ClonedAstNodeSurvivesOriginalDestruction) {
+    auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
+    AggStageAstNodeHandle clonedHandle{nullptr};
+
+    {
+        auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+            std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
+                spec.firstElement(), spec.getOwned())));
+        auto handle = AggStageAstNodeHandle{astNode};
+
+        // Clone before original goes out of scope.
+        clonedHandle = handle->clone();
+    }
+
+    // Cloned handle should still be valid and contain the correct spec.
+    ASSERT_TRUE(clonedHandle.isValid());
+    ASSERT_TRUE(host::HostAggStageAstNode::isHostAllocated(*clonedHandle.get()));
+    ASSERT_TRUE(static_cast<host::HostAggStageAstNode*>(clonedHandle.get())
+                    ->getIdLookupSpec()
+                    .binaryEqual(spec));
+}
+
+TEST(HostAstNodeCloneTest, MultipleCloneAreIndependent) {
+    auto spec = BSON("$_internalSearchIdLookup" << BSONObj());
+
+    auto astNode = new host::HostAggStageAstNode(NoOpHostAstNode::make(
+        std::make_unique<mongo::DocumentSourceInternalSearchIdLookUp::LiteParsed>(
+            spec.firstElement(), spec.getOwned())));
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    // Create multiple clones.
+    auto clone1 = handle->clone();
+    auto clone2 = handle->clone();
+    auto clone3 = clone1->clone();
+
+    // All four should be different objects.
+    ASSERT_NE(handle.get(), clone1.get());
+    ASSERT_NE(handle.get(), clone2.get());
+    ASSERT_NE(handle.get(), clone3.get());
+    ASSERT_NE(clone1.get(), clone2.get());
+    ASSERT_NE(clone1.get(), clone3.get());
+    ASSERT_NE(clone2.get(), clone3.get());
+
+    // All should have same name.
+    ASSERT_EQ(handle->getName(), clone1->getName());
+    ASSERT_EQ(handle->getName(), clone2->getName());
+    ASSERT_EQ(handle->getName(), clone3->getName());
 }
 
 }  // namespace

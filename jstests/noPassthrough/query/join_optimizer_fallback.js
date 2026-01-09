@@ -31,16 +31,19 @@ const db3 = "test3";
 
 const coll1 = conn.getDB(db1)[jsTestName() + "_coll1"];
 const coll12 = conn.getDB(db1)[jsTestName() + "_coll2"];
+const coll13 = conn.getDB(db1)[jsTestName() + "_coll3"];
 const coll2 = conn.getDB(db2)[jsTestName() + "_coll2"];
 const coll3 = conn.getDB(db3)[jsTestName() + "_coll3"];
 
 coll1.drop();
 coll12.drop();
+coll13.drop();
 coll2.drop();
 coll3.drop();
 
 assert.commandWorked(coll1.insertOne({a: 1}));
 assert.commandWorked(coll12.insertOne({a: 1}));
+assert.commandWorked(coll13.insertOne({a: 1}));
 assert.commandWorked(coll2.insertOne({a: 1}));
 assert.commandWorked(coll3.insertOne({a: 1}));
 
@@ -118,6 +121,47 @@ runTestCase({
     ],
     expectedCount: 1,
     expectedJoinOptimizer: false,
+});
+
+// Query involving only a cross-product is not accepted by the join optimizer.
+runTestCase({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll2.getName(),
+                pipeline: [{$match: {a: {$lt: 0}}}],
+                as: "coll2",
+            },
+        },
+        {$unwind: "$coll2"},
+    ],
+    expectedCount: 0,
+    expectedJoinOptimizer: false,
+});
+
+// Prefix eligible and suffix is cross-product $lookup
+runTestCase({
+    pipeline: [
+        {
+            $lookup: {
+                from: coll12.getName(),
+                localField: "a",
+                foreignField: "a",
+                as: "coll12",
+            },
+        },
+        {$unwind: "$coll12"},
+        {
+            $lookup: {
+                from: coll13.getName(),
+                pipeline: [{$match: {a: {$gt: 0}}}],
+                as: "coll13",
+            },
+        },
+        {$unwind: "$coll13"},
+    ],
+    expectedCount: 1,
+    expectedJoinOptimizer: true,
 });
 
 MongoRunner.stopMongod(conn);

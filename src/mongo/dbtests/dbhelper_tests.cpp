@@ -164,10 +164,7 @@ public:
             collection1 = CollectionPtr::CollectionPtr_UNSAFE(
                 db->createCollection(opCtx1.get(), nss, CollectionOptions(), true));
             ASSERT_TRUE(collection1);
-            ASSERT_TRUE(
-                collection_internal::insertDocument(
-                    opCtx1.get(), collection1, InsertStatement(doc), nullptr /* opDebug */, false)
-                    .isOK());
+            ASSERT_OK(Helpers::insert(opCtx1.get(), collection1, doc));
             wuow.commit();
         }
 

@@ -201,7 +201,7 @@ public:
 
     /** Executes the builder; returns a reference to the built + registered section. */
     Section& operator*() && {
-        // Every section must be for eitehr the shard service, router service, or both:
+        // Every section must be for either the shard service, router service, or both:
         // invariant(_roles.has(ClusterRole::RouterServer) || _roles.has(ClusterRole::ShardServer));
         std::unique_ptr<Section> section;
         if (_construct) {

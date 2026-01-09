@@ -39,10 +39,7 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/modules.h"
 
-#include <map>
 #include <memory>
-#include <string>
-#include <utility>
 #include <vector>
 
 #include <boost/none.hpp>

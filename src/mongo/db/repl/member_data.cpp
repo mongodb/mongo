@@ -79,6 +79,7 @@ MemberData::HeartbeatChanges MemberData::setUpValues(Date_t now,
         LOGV2(21215,
               "Member is in new state",
               "hostAndPort"_attr = _hostAndPort.toString(),
+              "maintenancePort"_attr = _maintenancePort,
               "newState"_attr = hbResponse.getState().toString());
     }
 

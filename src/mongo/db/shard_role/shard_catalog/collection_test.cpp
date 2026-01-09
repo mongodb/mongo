@@ -38,6 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
@@ -334,8 +335,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
     auto oldDoc = BSON("_id" << 1 << "a" << 1);
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(
-            collection_internal::insertDocument(opCtx, coll, InsertStatement(oldDoc), nullptr));
+        ASSERT_OK(Helpers::insert(opCtx, coll, oldDoc));
         wuow.commit();
     }
     auto idxCatalog = coll->getIndexCatalog();
@@ -391,8 +391,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
                              << "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(
-            collection_internal::insertDocument(opCtx, coll, InsertStatement(oldDoc), nullptr));
+        ASSERT_OK(Helpers::insert(opCtx, coll, oldDoc));
         wuow.commit();
     }
     auto idxCatalog = coll->getIndexCatalog();
@@ -805,8 +804,7 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll, InsertStatement(firstDoc), &opDebug));
+        ASSERT_OK(Helpers::insert(operationContext(), coll, firstDoc));
         wuow.commit();
     }
 
@@ -816,8 +814,7 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
     // Inserting the second document will remove the first one.
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll, InsertStatement(secondDoc), &opDebug));
+        ASSERT_OK(Helpers::insert(operationContext(), coll, secondDoc));
         wuow.commit();
     }
     auto globalDeletesAfterInsert = serviceOpCounters(ClusterRole::ShardServer).getDelete()->load();
@@ -858,8 +855,7 @@ TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
         WriteUnitOfWork wuow(operationContext());
         for (int i = 0; i < nToInsertFirst; i++) {
             BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), coll, InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), coll, doc));
         }
         wuow.commit();
     }
@@ -870,8 +866,7 @@ TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
         WriteUnitOfWork wuow(operationContext());
         for (int i = nToInsertFirst; i < nToInsertFirst + nToInsertSecond; i++) {
             BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), coll, InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), coll, doc));
         }
         wuow.commit();
     }
@@ -1201,8 +1196,7 @@ TEST_F(CollectionTest, CappedCursorRollover) {
         WriteUnitOfWork wuow(operationContext());
         for (int i = 0; i < numToInsertFirst; ++i) {
             const BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), coll, InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), coll, doc));
         }
         wuow.commit();
     }
@@ -1221,9 +1215,7 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     {
         WriteUnitOfWork wuow(operationContext());
         for (int i = numToInsertFirst; i < numToInsertFirst + 10; ++i) {
-            const BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(collection_internal::insertDocument(
-                operationContext(), coll, InsertStatement(doc), nullptr));
+            ASSERT_OK(Helpers::insert(operationContext(), coll, BSON("_id" << i)));
         }
         wuow.commit();
     }

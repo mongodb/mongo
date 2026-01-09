@@ -1,7 +1,7 @@
 /**
  * Generic tree-printer for golden tests.
  */
-import {code} from "jstests/libs/pretty_md.js";
+import {code} from "jstests/libs/query/pretty_md.js";
 
 function defaultNodeToString(node) {
     return tojsononeline(node);

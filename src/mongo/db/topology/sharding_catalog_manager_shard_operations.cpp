@@ -91,7 +91,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
@@ -299,34 +298,6 @@ Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterAddShardIf
     auto numShards = Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx);
     if (numShards == 2) {
         // Only need to update the parameter when adding the second shard.
-        try {
-            topology_change_helpers::updateClusterCardinalityParameter(
-                clusterCardinalityParameterLock, opCtx);
-            return Status::OK();
-        } catch (const DBException& ex) {
-            return ex.toStatus();
-        }
-    }
-    return Status::OK();
-}
-
-Status ShardingCatalogManager::_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
-    const Lock::ExclusiveLock& clusterCardinalityParameterLock, OperationContext* opCtx) {
-    if (MONGO_unlikely(skipUpdatingClusterCardinalityParameterAfterRemoveShard.shouldFail())) {
-        return Status::OK();
-    }
-
-    // If the replica set endpoint is not active, then it isn't safe to allow direct connections
-    // again after a second shard has been added. Unsharded collections are allowed to be tracked
-    // and moved as soon as a second shard is added to the cluster, and these collections will not
-    // handle direct connections properly.
-    if (!replica_set_endpoint::isFeatureFlagEnabled(VersionContext::getDecoration(opCtx))) {
-        return Status::OK();
-    }
-
-    auto numShards = Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx);
-    if (numShards == 1) {
-        // Only need to update the parameter when removing the second shard.
         try {
             topology_change_helpers::updateClusterCardinalityParameter(
                 clusterCardinalityParameterLock, opCtx);
@@ -637,12 +608,11 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Unblock ShardingDDLCoordinators on the cluster.
 
-    // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
-    // alongside the RSEndpoint. Some paths of add/remove shard take the
-    // _kClusterCardinalityParameterLock before the FixedFCVRegion and others take the
-    // FixedFCVRegion before the _kClusterCardinalityParameterLock lock. However, all paths take the
-    // kConfigsvrShardsNamespace ddl lock before either, so we do not actually have a lock ordering
-    // problem. See SERVER-99708 for more information.
+    // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before the
+    // FixedFCVRegion and others take the FixedFCVRegion before the
+    // _kClusterCardinalityParameterLock lock. However, all paths take the kConfigsvrShardsNamespace
+    // ddl lock before either, so we do not actually have a lock ordering problem. See SERVER-99708
+    // for more information.
     DisableLockerRuntimeOrderingChecks disableChecks{opCtx};
     topology_change_helpers::unblockDDLCoordinators(opCtx);
     unblockDDLCoordinatorsGuard.dismiss();
@@ -699,9 +669,6 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
         // requires taking this lock.
         shardMembershipLock.unlock();
 
-        auto updateStatus = _updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
-            clusterCardinalityParameterLock, opCtx);
-        uassertStatusOK(updateStatus);
         return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
     }
 
@@ -1003,10 +970,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Unset the addOrRemoveShardInProgress cluster parameter. Note that
     // _removeShardInTransaction has already waited for the commit to be majority-acknowledged.
 
-    // TODO (SERVER-99433) remove this once the _kClusterCardinalityParameterLock is removed
-    // alongside the RSEndpoint.
-    // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before
-    // the FixedFCVRegion and others take the FixedFCVRegion before the
+    // Some paths of add/remove shard take the _kClusterCardinalityParameterLock before  the
+    // FixedFCVRegion and others take the FixedFCVRegion before the
     // _kClusterCardinalityParameterLock lock. However, all paths take the kConfigsvrShardsNamespace
     // ddl lock, so we do not actually have a lock ordering problem. See SERVER-99708 for more
     // information.
@@ -1034,9 +999,6 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
         _localCatalogClient.get());
 
     hangRemoveShardBeforeUpdatingClusterCardinalityParameter.pauseWhileSet(opCtx);
-
-    uassertStatusOK(_updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
-        clusterCardinalityParameterLock, opCtx));
 
     return RemoveShardProgress(ShardDrainingStateEnum::kCompleted);
 }

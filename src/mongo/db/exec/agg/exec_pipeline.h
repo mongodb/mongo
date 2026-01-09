@@ -138,13 +138,6 @@ public:
         return _disposed;
     }
 
-    /**
-     * Deactivates disposing the pipeline in the destructor.
-     */
-    void dismissDisposal() {
-        _disposeInDestructor = false;
-    }
-
 private:
     // The '_stages' container is guaranteed to be non-empty after the constructor successfully
     // executed.
@@ -152,8 +145,5 @@ private:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
     bool _disposed{false};
-
-    // Call 'dispose()' in destructor.
-    bool _disposeInDestructor{true};
 };
 }  // namespace mongo::exec::agg

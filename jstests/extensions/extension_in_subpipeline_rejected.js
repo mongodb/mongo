@@ -1,7 +1,11 @@
 /**
  * Tests that using an extension stage in a sub-pipeline is rejected, for now.
  *
- * @tags: [featureFlagExtensionsAPI]
+ * @tags: [
+ *  featureFlagExtensionsAPI,
+ *  # TODO SERVER-115918 Re-enable this test.
+ *  __TEMPORARILY_DISABLED__
+ * ]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
@@ -13,10 +17,45 @@ other.drop();
 assert.commandWorked(coll.insert({_id: 1}));
 assert.commandWorked(other.insert({_id: 1}));
 
+const kNotAllowedInLookupErrorCode = 51047;
+const kNotAllowedInUnionWithErrorCode = 31441;
+const kNotAllowedInFacetErrorCode = 40600;
+
 // Test $lookup pipeline rejects extension stage.
 {
     const lookupPipeline = [{$lookup: {from: other.getName(), as: "joined", pipeline: [{$testFoo: {}}]}}];
-    assertErrorCode(coll, lookupPipeline, 51047, "Using $lookup with $testFoo in sub-pipeline should be rejected");
+    assertErrorCode(
+        coll,
+        lookupPipeline,
+        kNotAllowedInLookupErrorCode,
+        "Using $lookup with $testFoo in sub-pipeline should be rejected",
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {from: other.getName(), pipeline: lookupPipeline, as: "joined"}}],
+        kNotAllowedInLookupErrorCode,
+        "Using $lookup with $testFoo in sub-pipeline should be rejected",
+    );
+    assertErrorCode(
+        coll,
+        [{$unionWith: {coll: other.getName(), pipeline: lookupPipeline}}],
+        kNotAllowedInLookupErrorCode,
+        "Using $lookup with $testFoo in sub-pipeline should be rejected",
+    );
+    assertErrorCode(
+        coll,
+        [{$facet: {facetPipe: lookupPipeline}}],
+        kNotAllowedInLookupErrorCode,
+        "Using $lookup with $testFoo in sub-pipeline should be rejected",
+    );
+    assert.commandFailedWithCode(
+        db.runCommand({
+            create: jsTestName() + "_view",
+            viewOn: coll.getName(),
+            pipeline: lookupPipeline,
+        }),
+        kNotAllowedInLookupErrorCode,
+    );
 }
 
 // Test $unionWith pipeline rejects extension stage.
@@ -25,13 +64,70 @@ assert.commandWorked(other.insert({_id: 1}));
     assertErrorCode(
         coll,
         unionWithPipeline,
-        31441,
+        kNotAllowedInUnionWithErrorCode,
         "Using $unionWith with $testFoo in sub-pipeline should be rejected",
+    );
+    assertErrorCode(
+        coll,
+        [{$unionWith: {coll: other.getName(), pipeline: unionWithPipeline}}],
+        kNotAllowedInUnionWithErrorCode,
+        "Using $unionWith with $testFoo in sub-pipeline should be rejected",
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {from: other.getName(), pipeline: unionWithPipeline, as: "joined"}}],
+        kNotAllowedInUnionWithErrorCode,
+        "Using $unionWith with $testFoo in sub-pipeline should be rejected",
+    );
+    assertErrorCode(
+        coll,
+        [{$facet: {facetPipe: unionWithPipeline}}],
+        kNotAllowedInUnionWithErrorCode,
+        "Using $unionWith with $testFoo in sub-pipeline should be rejected",
+    );
+    assert.commandFailedWithCode(
+        db.runCommand({
+            create: jsTestName() + "_view",
+            viewOn: coll.getName(),
+            pipeline: unionWithPipeline,
+        }),
+        kNotAllowedInUnionWithErrorCode,
     );
 }
 
 // Test $facet pipeline rejects extension stage.
 {
     const facetPipeline = [{$facet: {facetPipe: [{$testFoo: {}}]}}];
-    assertErrorCode(coll, facetPipeline, 40600, "Using $facet with $testFoo in sub-pipeline should be rejected");
+    assertErrorCode(
+        coll,
+        facetPipeline,
+        kNotAllowedInFacetErrorCode,
+        "Using $facet with $testFoo in sub-pipeline should be rejected",
+    );
+    assertErrorCode(
+        coll,
+        [{$facet: {facetPipe: facetPipeline}}],
+        kNotAllowedInFacetErrorCode,
+        "Using $facet with $testFoo in sub-pipeline should be rejected",
+    );
+    assertErrorCode(
+        coll,
+        [{$unionWith: {coll: other.getName(), pipeline: facetPipeline}}],
+        kNotAllowedInFacetErrorCode,
+        "Using $facet with $testFoo in sub-pipeline should be rejected",
+    );
+    assertErrorCode(
+        coll,
+        [{$lookup: {from: other.getName(), pipeline: facetPipeline, as: "joined"}}],
+        kNotAllowedInFacetErrorCode,
+        "Using $facet with $testFoo in sub-pipeline should be rejected",
+    );
+    assert.commandFailedWithCode(
+        db.runCommand({
+            create: jsTestName() + "_view",
+            viewOn: coll.getName(),
+            pipeline: facetPipeline,
+        }),
+        kNotAllowedInFacetErrorCode,
+    );
 }

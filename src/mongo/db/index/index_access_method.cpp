@@ -235,12 +235,6 @@ Status allowedToWriteIfIndexBuildInProgress(OperationContext* opCtx,
     }
     return Status::OK();
 }
-struct BtreeExternalSortComparison {
-    int operator()(const key_string::Value& l, const key_string::Value& r) const {
-        return l.compare(r);
-    }
-};
-
 }  // namespace
 
 auto& insertFailedDueToDuplicateKeyError =
@@ -936,7 +930,7 @@ namespace {
 class BaseBulkBuilder : public IndexAccessMethod::BulkBuilder {
 public:
     using Data = std::pair<key_string::Value, mongo::NullValue>;
-    using Iterator = SortIteratorInterface<key_string::Value, mongo::NullValue>;
+    using Iterator = sorter::Iterator<key_string::Value, mongo::NullValue>;
     using KeyHandlerFn = IndexAccessMethod::KeyHandlerFn;
     using OnSuppressedErrorFn = IndexAccessMethod::OnSuppressedErrorFn;
     using RecordIdHandlerFn = IndexAccessMethod::RecordIdHandlerFn;
@@ -1551,25 +1545,25 @@ std::unique_ptr<HybridBulkBuilder::Sorter> HybridBulkBuilder::_makeSorter(
     const boost::optional<std::vector<SorterRange>>& ranges) const {
     auto fileStats = bulkBuilderFileStats();
     boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
+    std::function<int(const key_string::Value&, const key_string::Value&)> comparator =
+        [](const key_string::Value& lhs, const key_string::Value& rhs) -> int {
+        return lhs.compare(rhs);
+    };
     return fileName
-        ? Sorter::template makeFromExistingRanges<BtreeExternalSortComparison>(
+        ? Sorter::makeFromExistingRanges(
               std::string{*fileName},
               *ranges,
               makeSortOptions(maxMemoryUsageBytes, dbName, fileStats),
-              BtreeExternalSortComparison(),
-              std::make_unique<FileBasedSorterSpiller<key_string::Value,
-                                                      mongo::NullValue,
-                                                      BtreeExternalSortComparison>>(
+              comparator,
+              std::make_unique<FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
                   std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, fileStats),
                   tmpPath,
                   dbName),
               _makeSorterSettings())
-        : Sorter::template make<BtreeExternalSortComparison>(
+        : Sorter::make(
               makeSortOptions(maxMemoryUsageBytes, dbName, fileStats),
-              BtreeExternalSortComparison(),
-              std::make_unique<FileBasedSorterSpiller<key_string::Value,
-                                                      mongo::NullValue,
-                                                      BtreeExternalSortComparison>>(
+              comparator,
+              std::make_unique<FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
                   tmpPath, fileStats, dbName),
               _makeSorterSettings());
 }

@@ -15,6 +15,10 @@
 //   exclude_from_timeseries_crud_passthrough,
 // ]
 
+// killCursors on multi-cursors is unsupported when queries are dispatched to multiple mongoses.
+// pinToSingleMongos due to killCursors command.
+TestData.pinToSingleMongos = true;
+
 let cmdRes;
 let cursor;
 let cursorId;

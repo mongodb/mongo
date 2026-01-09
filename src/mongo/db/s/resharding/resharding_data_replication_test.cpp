@@ -36,6 +36,7 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/global_catalog/type_chunk.h"
@@ -384,10 +385,8 @@ TEST_F(ReshardingDataReplicationTest, GetOplogFetcherResumeId) {
                                          AcquisitionPrerequisites::kWrite},
             MODE_IX);
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(collection_internal::insertDocument(opCtx.get(),
-                                                      oplogBufferColl.getCollectionPtr(),
-                                                      InsertStatement{oplogEntry.toBSON()},
-                                                      nullptr));
+        ASSERT_OK(
+            Helpers::insert(opCtx.get(), oplogBufferColl.getCollectionPtr(), oplogEntry.toBSON()));
         wuow.commit();
     };
 

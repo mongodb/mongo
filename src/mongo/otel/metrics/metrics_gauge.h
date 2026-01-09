@@ -29,16 +29,16 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::otel::metrics {
 
 template <typename T>
-class MONGO_MOD_PUBLIC Gauge {
+class MONGO_MOD_PUBLIC Gauge : public Metric {
 public:
-    virtual ~Gauge() = default;
-
     // T must be nonnegative.
     virtual void set(T value) = 0;
 
@@ -55,6 +55,8 @@ public:
         return _value.load();
     }
 
+    BSONObj serializeToBson(const std::string& key) const override;
+
 private:
     Atomic<T> _value;
 };
@@ -66,6 +68,11 @@ private:
 template <typename T>
 void GaugeImpl<T>::set(T value) {
     _value.storeRelaxed(value);
+}
+
+template <typename T>
+BSONObj GaugeImpl<T>::serializeToBson(const std::string& key) const {
+    return BSON(key << value());
 }
 
 }  // namespace mongo::otel::metrics

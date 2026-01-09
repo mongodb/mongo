@@ -31,6 +31,7 @@
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace plan_ranking {

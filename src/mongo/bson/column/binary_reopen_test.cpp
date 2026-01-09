@@ -416,8 +416,9 @@ TEST_F(BinaryReopenTest, FindLastNonRLE) {
 
 TEST_F(BinaryReopenTest, Overflow) {
     // Helper to run the overflow detection on the OverflowState class
-    auto overflowHelper = [](std::vector<const char*> controls) -> OverflowPoint<uint64_t> {
-        ControlBlockContainer cbs;
+    ControlBlockContainer cbs;
+    auto overflowHelper = [&cbs](std::vector<const char*> controls) -> OverflowPoint<uint64_t> {
+        cbs.clear();
         // Generate the control block container. We can ignore the data used for the double type
         // (checked in OverflowScaled below)
         for (auto&& c : controls) {
@@ -676,9 +677,10 @@ TEST_F(BinaryReopenTest, Overflow) {
 
 TEST_F(BinaryReopenTest, OverflowScaled) {
     // Helper to run the overflow detection for doubles
-    auto overflowHelper = [](double base,
-                             std::vector<const char*> controls) -> OverflowPoint<uint64_t> {
-        ControlBlockContainer cbs;
+    ControlBlockContainer cbs;
+    auto overflowHelper = [&cbs](double base,
+                                 std::vector<const char*> controls) -> OverflowPoint<uint64_t> {
+        cbs.clear();
 
         // Every control block needs to set lastAtEndOfBlock. We calculate this based on 'base' and
         // the control blocks provided.

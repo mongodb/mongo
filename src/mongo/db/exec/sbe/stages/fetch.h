@@ -45,6 +45,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_listset.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"

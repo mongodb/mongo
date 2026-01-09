@@ -305,7 +305,6 @@ public:
      */
     NodeSet getNeighbors(NodeId nodeIndex) const;
 
-
     const JoinNode& getNode(NodeId nodeId) const {
         if constexpr (kDebugBuild) {
             return _nodes.at(nodeId);

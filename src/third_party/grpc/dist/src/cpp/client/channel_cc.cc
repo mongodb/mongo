@@ -16,18 +16,10 @@
 //
 //
 
-#include <atomic>
-#include <cstring>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include <grpc/grpc.h>
 #include <grpc/impl/connectivity_state.h>
 #include <grpc/slice.h>
 #include <grpc/support/alloc.h>
-#include <grpc/support/log.h>
 #include <grpc/support/time.h>
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>
@@ -40,7 +32,16 @@
 #include <grpcpp/support/client_interceptor.h>
 #include <grpcpp/support/slice.h>
 
+#include <atomic>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "absl/log/check.h"
 #include "src/core/lib/iomgr/iomgr.h"
+#include "src/core/lib/surface/channel.h"
 
 namespace grpc {
 
@@ -103,6 +104,12 @@ namespace experimental {
 
 void ChannelResetConnectionBackoff(Channel* channel) {
   grpc_channel_reset_connect_backoff(channel->c_channel_);
+}
+
+int64_t ChannelGetChannelzUuid(Channel* channel) {
+  auto* node = grpc_channel_get_channelz_node(channel->c_channel_);
+  if (node == nullptr) return 0;
+  return node->uuid();
 }
 
 }  // namespace experimental
@@ -207,7 +214,7 @@ bool Channel::WaitForStateChangeImpl(grpc_connectivity_state last_observed,
   void* tag = nullptr;
   NotifyOnStateChangeImpl(last_observed, deadline, &cq, nullptr);
   cq.Next(&tag, &ok);
-  GPR_ASSERT(tag == nullptr);
+  CHECK_EQ(tag, nullptr);
   return ok;
 }
 
@@ -217,9 +224,9 @@ class ShutdownCallback : public grpc_completion_queue_functor {
   ShutdownCallback() {
     functor_run = &ShutdownCallback::Run;
     // Set inlineable to true since this callback is trivial and thus does not
-    // need to be run from the executor (triggering a thread hop). This should
-    // only be used by internal callbacks like this and not by user application
-    // code.
+    // need to be run from the EventEngine (potentially triggering a thread
+    // hop). This should only be used by internal callbacks like this and not by
+    // user application code.
     inlineable = true;
   }
   // TakeCQ takes ownership of the cq into the shutdown callback

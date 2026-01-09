@@ -1197,23 +1197,13 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         if (auto interceptor = indexCatalogEntry->indexBuildInterceptor()) {
             auto multikeyPaths = interceptor->getMultikeyPaths();
             if (multikeyPaths) {
-                // TODO(SERVER-103400): Investigate usage validity of
-                // CollectionPtr::CollectionPtr_UNSAFE
-                indexCatalogEntry->setMultikey(opCtx,
-                                               CollectionPtr::CollectionPtr_UNSAFE(collection),
-                                               {},
-                                               multikeyPaths.value());
+                indexCatalogEntry->setMultikey(opCtx, collection, {}, multikeyPaths.value());
                 paths = std::move(multikeyPaths);
             }
 
             multikeyPaths = interceptor->getSkippedRecordTracker().getMultikeyPaths();
             if (multikeyPaths) {
-                // TODO(SERVER-103400): Investigate usage validity of
-                // CollectionPtr::CollectionPtr_UNSAFE
-                indexCatalogEntry->setMultikey(opCtx,
-                                               CollectionPtr::CollectionPtr_UNSAFE(collection),
-                                               {},
-                                               multikeyPaths.value());
+                indexCatalogEntry->setMultikey(opCtx, collection, {}, multikeyPaths.value());
                 if (!paths) {
                     paths = std::move(multikeyPaths);
                 } else {
@@ -1229,12 +1219,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         // MultikeyPaths into IndexCatalogEntry::setMultikey here.
         const auto& bulkBuilder = index.bulk;
         if (bulkBuilder && bulkBuilder->isMultikey()) {
-            // TODO(SERVER-103400): Investigate usage validity of
-            // CollectionPtr::CollectionPtr_UNSAFE
-            indexCatalogEntry->setMultikey(opCtx,
-                                           CollectionPtr::CollectionPtr_UNSAFE(collection),
-                                           {},
-                                           bulkBuilder->getMultikeyPaths());
+            indexCatalogEntry->setMultikey(opCtx, collection, {}, bulkBuilder->getMultikeyPaths());
             if (!paths) {
                 paths = bulkBuilder->getMultikeyPaths();
             } else {
@@ -1265,8 +1250,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
     }
 
     auto& collectionQueryInfo = CollectionQueryInfo::get(collection);
-    // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
-    collectionQueryInfo.clearQueryCache(opCtx, CollectionPtr::CollectionPtr_UNSAFE(collection));
+    collectionQueryInfo.clearQueryCache(opCtx, collection);
     if (feature_flags::gFeatureFlagPathArrayness.isEnabled()) {
         collectionQueryInfo.rebuildPathArrayness(opCtx, collection);
     }

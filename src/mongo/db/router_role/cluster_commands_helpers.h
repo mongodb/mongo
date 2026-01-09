@@ -51,6 +51,7 @@
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/query/shard_key_pattern_query_util.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/modules.h"
 
@@ -144,6 +145,45 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequests(OperationContex
                                                                  const std::set<ShardId>& shardIds,
                                                                  const BSONObj& cmdObj,
                                                                  bool eligibleForSampling = false);
+
+/**
+ * Builds commands for each shard, taking the shard list from the local routing table cache.
+ * This is a typed method intended as a bridge for APIs using AsyncRPC.
+ */
+template <typename CommandType>
+std::vector<std::pair<ShardId, CommandType>> buildVersionedCommandsByRoutingTable(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const RoutingContext& routingCtx,
+    const CommandType& cmd,
+    const BSONObj& query = {},
+    const BSONObj& collation = {},
+    const boost::optional<BSONObj>& letParameters = {},
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants = {}) {
+    std::vector<std::pair<ShardId, CommandType>> requests;
+    const auto& cri = routingCtx.getCollectionRoutingInfo(nss);
+    if (cri.hasRoutingTable()) {
+        auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+            opCtx, nss, cri, collation, boost::none, letParameters, runtimeConstants);
+        std::set<ShardId> shardIds;
+        getShardIdsForQuery(expCtx, query, collation, cri.getChunkManager(), &shardIds);
+        for (const auto& shardId : shardIds) {
+            CommandType versionedCmd = cmd;
+            versionedCmd.setShardVersion(cri.getShardVersion(shardId));
+            requests.emplace_back(shardId, std::move(versionedCmd));
+        }
+    } else if (cri.getDbVersion().isFixed()) {
+        // In case the database is fixed (e.g. 'admin' or 'config'), ignore the routing
+        // information and create a request to the given targetted shard.
+        requests.emplace_back(cri.getDbPrimaryShardId(), cmd);
+    } else {
+        CommandType versionedCmd = cmd;
+        versionedCmd.setShardVersion(ShardVersion::UNTRACKED());
+        versionedCmd.setDatabaseVersion(cri.getDbVersion());
+        requests.emplace_back(cri.getDbPrimaryShardId(), std::move(versionedCmd));
+    }
+    return requests;
+}
 
 /**
  * Dispatches all the specified requests in parallel and waits until all complete, returning a

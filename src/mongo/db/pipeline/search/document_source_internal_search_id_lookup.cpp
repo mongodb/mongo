@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup_gen.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
+#include "mongo/db/pipeline/skip_and_limit.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -146,17 +147,9 @@ void DocumentSourceInternalSearchIdLookUp::bindCatalogInfo(
 
 DocumentSourceContainer::iterator DocumentSourceInternalSearchIdLookUp::optimizeAt(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
-    for (auto optItr = std::next(itr); optItr != container->end(); ++optItr) {
-        auto limitStage = dynamic_cast<DocumentSourceLimit*>(optItr->get());
-        if (limitStage) {
-            _limit = limitStage->getLimit();
-            break;
-        }
-        if (!optItr->get()->constraints().canSwapWithSkippingOrLimitingStage) {
-            break;
-        }
-    }
-    return std::next(itr);
+    auto stageItr = std::next(itr);
+    _limit = getUserLimit(stageItr, container).value_or(_limit);
+    return stageItr;
 }
 
 }  // namespace mongo

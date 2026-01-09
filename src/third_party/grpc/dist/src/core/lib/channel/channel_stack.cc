@@ -16,24 +16,30 @@
 //
 //
 
-#include <grpc/support/port_platform.h>
-
 #include "src/core/lib/channel/channel_stack.h"
 
+#include <grpc/support/port_platform.h>
 #include <stdint.h>
 
 #include <memory>
 #include <utility>
 
-#include <grpc/support/log.h>
-
+#include "absl/log/check.h"
+#include "absl/log/log.h"
+#include "src/core/channelz/property_list.h"
 #include "src/core/lib/channel/channel_args.h"
-#include "src/core/lib/gpr/alloc.h"
+#include "src/core/lib/channel/channel_fwd.h"
+#include "src/core/lib/surface/channel_init.h"
+#include "src/core/util/alloc.h"
 
 using grpc_event_engine::experimental::EventEngine;
 
-grpc_core::TraceFlag grpc_trace_channel(false, "channel");
-grpc_core::TraceFlag grpc_trace_channel_stack(false, "channel_stack");
+static int register_get_name_fn = []() {
+  grpc_core::NameFromChannelFilter = [](const grpc_channel_filter* filter) {
+    return filter->name;
+  };
+  return 0;
+}();
 
 // Memory layouts.
 
@@ -59,8 +65,8 @@ size_t grpc_channel_stack_size(const grpc_channel_filter** filters,
                                                sizeof(grpc_channel_element));
   size_t i;
 
-  GPR_ASSERT((GPR_MAX_ALIGNMENT & (GPR_MAX_ALIGNMENT - 1)) == 0 &&
-             "GPR_MAX_ALIGNMENT must be a power of two");
+  CHECK((GPR_MAX_ALIGNMENT & (GPR_MAX_ALIGNMENT - 1)) == 0)
+      << "GPR_MAX_ALIGNMENT must be a power of two";
 
   // add the size for each filter
   for (i = 0; i < filter_count; i++) {
@@ -109,17 +115,17 @@ grpc_error_handle grpc_channel_stack_init(
     int initial_refs, grpc_iomgr_cb_func destroy, void* destroy_arg,
     const grpc_channel_filter** filters, size_t filter_count,
     const grpc_core::ChannelArgs& channel_args, const char* name,
-    grpc_channel_stack* stack) {
-  if (grpc_trace_channel_stack.enabled()) {
-    gpr_log(GPR_INFO, "CHANNEL_STACK: init %s", name);
+    grpc_channel_stack* stack, const grpc_core::Blackboard* blackboard) {
+  if (GRPC_TRACE_FLAG_ENABLED(channel_stack)) {
+    LOG(INFO) << "CHANNEL_STACK: init " << name;
     for (size_t i = 0; i < filter_count; i++) {
-      gpr_log(GPR_INFO, "CHANNEL_STACK:   filter %s%s", filters[i]->name,
-              filters[i]->make_call_promise ? " [promise-capable]" : "");
+      LOG(INFO) << "CHANNEL_STACK:   filter " << filters[i]->name;
     }
   }
 
   stack->on_destroy.Init([]() {});
   stack->event_engine.Init(channel_args.GetObjectRef<EventEngine>());
+  stack->stats_plugin_group.Init();
 
   size_t call_size =
       GPR_ROUND_UP_TO_ALIGNMENT_SIZE(sizeof(grpc_call_stack)) +
@@ -138,6 +144,7 @@ grpc_error_handle grpc_channel_stack_init(
                                              sizeof(grpc_channel_element));
 
   // init per-filter data
+  args.blackboard = blackboard;
   grpc_error_handle first_error;
   for (i = 0; i < filter_count; i++) {
     args.channel_stack = stack;
@@ -158,18 +165,47 @@ grpc_error_handle grpc_channel_stack_init(
     call_size += GPR_ROUND_UP_TO_ALIGNMENT_SIZE(filters[i]->sizeof_call_data);
   }
 
-  GPR_ASSERT(user_data > (char*)stack);
-  GPR_ASSERT((uintptr_t)(user_data - (char*)stack) ==
-             grpc_channel_stack_size(filters, filter_count));
+  CHECK(user_data > (char*)stack);
+  CHECK((uintptr_t)(user_data - (char*)stack) ==
+        grpc_channel_stack_size(filters, filter_count));
 
   stack->call_stack_size = call_size;
+  stack->channelz_data_source.Init(
+      channel_args.GetObjectRef<grpc_core::channelz::BaseNode>());
   return first_error;
+}
+
+void grpc_channel_stack::ChannelStackDataSource::AddData(
+    grpc_core::channelz::DataSink sink) {
+  grpc_channel_stack* channel_stack = reinterpret_cast<grpc_channel_stack*>(
+      reinterpret_cast<char*>(this) -
+      offsetof(grpc_channel_stack, channelz_data_source));
+  sink.AddData(
+      "channel_stack",
+      grpc_core::channelz::PropertyList()
+          .Set("type", "v1")
+          .Set("elements", [channel_stack]() {
+            grpc_core::channelz::PropertyTable elements;
+            grpc_channel_element* elems =
+                CHANNEL_ELEMS_FROM_STACK(channel_stack);
+            for (size_t i = 0; i < channel_stack->count; i++) {
+              grpc_channel_element& e = elems[i];
+              elements.AppendRow(
+                  grpc_core::channelz::PropertyList()
+                      .Set("type", e.filter->name.name())
+                      .Set("call_data_size", e.filter->sizeof_call_data)
+                      .Set("channel_data_size", e.filter->sizeof_channel_data));
+            }
+            return elements;
+          }()));
 }
 
 void grpc_channel_stack_destroy(grpc_channel_stack* stack) {
   grpc_channel_element* channel_elems = CHANNEL_ELEMS_FROM_STACK(stack);
   size_t count = stack->count;
   size_t i;
+
+  stack->channelz_data_source.Destroy();
 
   // destroy per-filter data
   for (i = 0; i < count; i++) {
@@ -179,6 +215,7 @@ void grpc_channel_stack_destroy(grpc_channel_stack* stack) {
   (*stack->on_destroy)();
   stack->on_destroy.Destroy();
   stack->event_engine.Destroy();
+  stack->stats_plugin_group.Destroy();
 }
 
 grpc_error_handle grpc_call_stack_init(
@@ -253,7 +290,9 @@ void grpc_call_stack_destroy(grpc_call_stack* stack,
 void grpc_call_next_op(grpc_call_element* elem,
                        grpc_transport_stream_op_batch* op) {
   grpc_call_element* next_elem = elem + 1;
-  GRPC_CALL_LOG_OP(GPR_INFO, next_elem, op);
+  GRPC_TRACE_LOG(channel, INFO)
+      << "OP[" << elem->filter->name << ":" << elem
+      << "]: " << grpc_transport_stream_op_batch_string(op, false);
   next_elem->filter->start_transport_stream_op_batch(next_elem, op);
 }
 
@@ -283,32 +322,3 @@ grpc_call_stack* grpc_call_stack_from_top_element(grpc_call_element* elem) {
 
 void grpc_channel_stack_no_post_init(grpc_channel_stack*,
                                      grpc_channel_element*) {}
-
-namespace {
-
-grpc_core::NextPromiseFactory ClientNext(grpc_channel_element* elem) {
-  return [elem](grpc_core::CallArgs args) {
-    return elem->filter->make_call_promise(elem, std::move(args),
-                                           ClientNext(elem + 1));
-  };
-}
-
-grpc_core::NextPromiseFactory ServerNext(grpc_channel_element* elem) {
-  return [elem](grpc_core::CallArgs args) {
-    return elem->filter->make_call_promise(elem, std::move(args),
-                                           ServerNext(elem - 1));
-  };
-}
-
-}  // namespace
-
-grpc_core::ArenaPromise<grpc_core::ServerMetadataHandle>
-grpc_channel_stack::MakeClientCallPromise(grpc_core::CallArgs call_args) {
-  return ClientNext(grpc_channel_stack_element(this, 0))(std::move(call_args));
-}
-
-grpc_core::ArenaPromise<grpc_core::ServerMetadataHandle>
-grpc_channel_stack::MakeServerCallPromise(grpc_core::CallArgs call_args) {
-  return ServerNext(grpc_channel_stack_element(this, this->count - 1))(
-      std::move(call_args));
-}

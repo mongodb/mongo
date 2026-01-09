@@ -77,6 +77,22 @@ protected:
         ASSERT_EQ(parserInfo.allowedWithClientType, AllowedWithClientType::kInternal);
     }
 
+    std::pair<LiteParsedDocumentSource::LiteParserRegistration, LiteParserOptions>
+    makeRegistrationWithOptions(IncrementalRolloutFeatureFlag& mockFlag,
+                                const boost::optional<bool> ifrFlagValue = boost::none) {
+        LiteParsedDocumentSource::LiteParserRegistration registration;
+        mockFlag.registerFlag();
+        registration.setFallbackParser(std::move(fallbackParser), &mockFlag);
+        registration.setPrimaryParser(std::move(primaryParser));
+        LiteParserOptions options;
+        if (ifrFlagValue) {
+            std::vector<BSONObj> flagValues{
+                BSON("name" << mockFlag.getName() << "value" << *ifrFlagValue)};
+            options.ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+        }
+        return {std::move(registration), std::move(options)};
+    }
+
     LiteParsedDocumentSource::LiteParserInfo primaryParser;
     LiteParsedDocumentSource::LiteParserInfo fallbackParser;
 };
@@ -151,6 +167,36 @@ TEST_F(LiteParserRegistrationTest, GetParserWithChangingFeatureFlag) {
     // Disable it and check that the fallback parser is chosen.
     mockFlag.setForServerParameter(false);
     assertParserIsFallback(registration.getParserInfo());
+}
+
+TEST_F(LiteParserRegistrationTest, GetParserWithIfrContextFlagEnabled) {
+    static IncrementalRolloutFeatureFlag mockFlag(
+        "testFlag1"_sd, RolloutPhase::inDevelopment, false);
+    const auto& [registration, options] = makeRegistrationWithOptions(mockFlag, true);
+
+    // Should return primary parser because ifrContext overrides to enabled.
+    const auto& parserInfo = registration.getParserInfo(options);
+    assertParserIsPrimary(parserInfo);
+}
+
+TEST_F(LiteParserRegistrationTest, GetParserWithIfrContextFlagDisabled) {
+    static IncrementalRolloutFeatureFlag mockFlag(
+        "testFlag2"_sd, RolloutPhase::inDevelopment, true);
+    const auto& [registration, options] = makeRegistrationWithOptions(mockFlag, false);
+
+    // Should return fallback parser because ifrContext overrides to disabled.
+    const auto& parserInfo = registration.getParserInfo(options);
+    assertParserIsFallback(parserInfo);
+}
+
+TEST_F(LiteParserRegistrationTest, GetParserWithEmptyIfrContextFlag) {
+    static IncrementalRolloutFeatureFlag mockFlag(
+        "testFlag3"_sd, RolloutPhase::inDevelopment, true);
+    const auto& [registration, options] = makeRegistrationWithOptions(mockFlag);
+
+    // Should use checkEnabled() and return fallback parser.
+    const auto& parserInfo = registration.getParserInfo(options);
+    assertParserIsPrimary(parserInfo);
 }
 
 class LiteParsedDocumentSourceParseTest : public unittest::Test {
@@ -270,10 +316,10 @@ ALLOCATE_STAGE_PARAMS_ID(test, TestStageParams::id);
  * A dummy LiteParsedDocumentSource that implements just enough functionality to test select
  * functionality.
  */
-class TestLiteParsed final : public LiteParsedDocumentSource {
+class TestLiteParsed final : public LiteParsedDocumentSourceDefault<TestLiteParsed> {
 public:
     TestLiteParsed(const BSONElement& originalBson, ViewPolicy viewPolicy = DefaultViewPolicy{})
-        : LiteParsedDocumentSource(originalBson), _viewPolicy(viewPolicy) {}
+        : LiteParsedDocumentSourceDefault(originalBson), _viewPolicy(viewPolicy) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return stdx::unordered_set<NamespaceString>();
@@ -370,6 +416,207 @@ TEST(ViewPolicy, CanSpecifyDisallowViewPolicyCustomValues) {
 
     ASSERT_THROWS_CODE_AND_WHAT(
         viewPolicy.callback({}, "$test"), DBException, kCustomErrorCode, kCustomErrorMsg);
+}
+
+TEST(LiteParsedPipelineClone, CloneCreatesDeepCopy) {
+    // Create a pipeline with a simple stage.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$match" << BSON("x" << 1)),
+        BSON("$project" << BSON("y" << 1)),
+    };
+    LiteParsedPipeline original(kTestNss, pipelineStages);
+
+    // Clone the pipeline.
+    LiteParsedPipeline cloned = original.clone();
+
+    // Verify both pipelines have the same number of stages.
+    ASSERT_EQ(original.getStages().size(), cloned.getStages().size());
+    ASSERT_EQ(original.getStages().size(), 2);
+
+    // Verify the stages are different objects (deep copy).
+    for (size_t i = 0; i < original.getStages().size(); ++i) {
+        ASSERT_NE(original.getStages()[i].get(), cloned.getStages()[i].get());
+    }
+
+    // Verify that the stages have the same parse time names.
+    for (size_t i = 0; i < original.getStages().size(); ++i) {
+        ASSERT_EQ(original.getStages()[i]->getParseTimeName(),
+                  cloned.getStages()[i]->getParseTimeName());
+    }
+}
+
+TEST(LiteParsedPipelineClone, ClonedPipelineIsIndependent) {
+    // Create a pipeline with stages.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$match" << BSON("x" << 1)),
+    };
+    LiteParsedPipeline original(kTestNss, pipelineStages);
+
+    // Clone the pipeline.
+    LiteParsedPipeline cloned = original.clone();
+
+    // Verify they have the same properties before any modification.
+    ASSERT_EQ(original.getStages().size(), cloned.getStages().size());
+
+    // The original and cloned pipelines should be completely independent.
+    // After cloning, the two vectors should have different underlying storage.
+    ASSERT_NE(&original.getStages(), &cloned.getStages());
+}
+
+TEST(LiteParsedPipelineClone, CloneClonesSubpipelinesForNestedStages) {
+    // Create a pipeline with a $lookup stage that has a subpipeline.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "otherCollection"
+                                      << "let" << BSONObj() << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("a" << 1))) << "as"
+                                      << "joined")),
+    };
+    LiteParsedPipeline original(kTestNss, pipelineStages);
+
+    // Clone the pipeline.
+    LiteParsedPipeline cloned = original.clone();
+
+    // Verify both have the $lookup stage.
+    ASSERT_EQ(original.getStages().size(), 1);
+    ASSERT_EQ(cloned.getStages().size(), 1);
+
+    // Verify the stages are different objects.
+    ASSERT_NE(original.getStages()[0].get(), cloned.getStages()[0].get());
+
+    // Verify both stages have subpipelines.
+    const auto& originalSubPipelines = original.getStages()[0]->getSubPipelines();
+    const auto& clonedSubPipelines = cloned.getStages()[0]->getSubPipelines();
+
+    ASSERT_EQ(originalSubPipelines.size(), 1);
+    ASSERT_EQ(clonedSubPipelines.size(), 1);
+
+    // Verify the subpipelines are different objects (deep copy).
+    ASSERT_NE(&originalSubPipelines[0], &clonedSubPipelines[0]);
+
+    // Verify the subpipeline stages are also cloned (different pointers).
+    ASSERT_EQ(originalSubPipelines[0].getStages().size(), 1);
+    ASSERT_EQ(clonedSubPipelines[0].getStages().size(), 1);
+    ASSERT_NE(originalSubPipelines[0].getStages()[0].get(),
+              clonedSubPipelines[0].getStages()[0].get());
+}
+
+TEST(LiteParsedPipelineClone, DeferredCachesAreResetInClonedPipeline) {
+    // Create a pipeline that involves a foreign namespace to populate the deferred cache.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "foreignCollection"
+                                      << "localField"
+                                      << "x"
+                                      << "foreignField"
+                                      << "y"
+                                      << "as"
+                                      << "joined")),
+    };
+    LiteParsedPipeline original(kTestNss, pipelineStages);
+
+    // Access the involved namespaces to populate the deferred cache in the original.
+    const auto& originalNamespaces = original.getInvolvedNamespaces();
+    ASSERT_EQ(originalNamespaces.size(), 1);
+
+    // Clone the pipeline.
+    LiteParsedPipeline cloned = original.clone();
+
+    // Access the involved namespaces in the clone.
+    const auto& clonedNamespaces = cloned.getInvolvedNamespaces();
+    ASSERT_EQ(clonedNamespaces.size(), 1);
+
+    // Both should contain the same namespace.
+    NamespaceString expectedNss =
+        NamespaceString::createNamespaceString_forTest(kTestNss.dbName(), "foreignCollection");
+    ASSERT_TRUE(originalNamespaces.count(expectedNss) > 0);
+    ASSERT_TRUE(clonedNamespaces.count(expectedNss) > 0);
+
+    // The cache results should be at different memory locations (independent caches).
+    ASSERT_NE(&originalNamespaces, &clonedNamespaces);
+}
+
+TEST(LiteParsedPipelineClone, ClonedPipelineHasChangeStreamCacheReset) {
+    // Create a pipeline without change stream.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$match" << BSON("x" << 1)),
+    };
+    LiteParsedPipeline original(kTestNss, pipelineStages);
+
+    // Access hasChangeStream to populate the deferred cache.
+    ASSERT_FALSE(original.hasChangeStream());
+
+    // Clone the pipeline.
+    LiteParsedPipeline cloned = original.clone();
+
+    // The clone should correctly report no change stream (cache was reset and recomputed).
+    ASSERT_FALSE(cloned.hasChangeStream());
+}
+
+TEST(LiteParsedPipelineClone, CloneRemainsValidAfterOriginalIsDestroyed) {
+    // Create a pipeline with a $lookup stage that has a subpipeline.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "otherCollection"
+                                      << "let" << BSONObj() << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("a" << 1))) << "as"
+                                      << "joined")),
+    };
+
+    std::unique_ptr<LiteParsedPipeline> cloned;
+    {
+        // Create original in an inner scope.
+        LiteParsedPipeline original(kTestNss, pipelineStages);
+
+        // Clone the pipeline.
+        cloned = std::make_unique<LiteParsedPipeline>(original.clone());
+
+        // Verify clone was created successfully while original exists.
+        ASSERT_EQ(cloned->getStages().size(), 1);
+    }
+    // Original is now destroyed.
+
+    // Verify the clone is still fully valid after the original is destroyed.
+    ASSERT_EQ(cloned->getStages().size(), 1);
+
+    // Verify the stage data is still accessible.
+    const auto& clonedSubPipelines = cloned->getStages()[0]->getSubPipelines();
+    ASSERT_EQ(clonedSubPipelines.size(), 1);
+    ASSERT_EQ(clonedSubPipelines[0].getStages().size(), 1);
+
+    // Verify we can access computed properties (exercises the deferred caches).
+    const auto& involvedNamespaces = cloned->getInvolvedNamespaces();
+    ASSERT_EQ(involvedNamespaces.size(), 1);
+}
+
+TEST(LiteParsedPipelineClone, OriginalRemainsValidAfterCloneIsDestroyed) {
+    // Create a pipeline with a $lookup stage that has a subpipeline.
+    std::vector<BSONObj> pipelineStages = {
+        BSON("$lookup" << BSON("from" << "otherCollection"
+                                      << "let" << BSONObj() << "pipeline"
+                                      << BSON_ARRAY(BSON("$match" << BSON("a" << 1))) << "as"
+                                      << "joined")),
+    };
+
+    LiteParsedPipeline original(kTestNss, pipelineStages);
+
+    {
+        // Clone the pipeline in an inner scope.
+        LiteParsedPipeline cloned = original.clone();
+
+        // Verify clone was created successfully.
+        ASSERT_EQ(cloned.getStages().size(), 1);
+    }
+    // Clone is now destroyed.
+
+    // Verify the original is still fully valid after the clone is destroyed.
+    ASSERT_EQ(original.getStages().size(), 1);
+
+    // Verify the stage data is still accessible.
+    const auto& originalSubPipelines = original.getStages()[0]->getSubPipelines();
+    ASSERT_EQ(originalSubPipelines.size(), 1);
+    ASSERT_EQ(originalSubPipelines[0].getStages().size(), 1);
+
+    // Verify we can access computed properties (exercises the deferred caches).
+    const auto& involvedNamespaces = original.getInvolvedNamespaces();
+    ASSERT_EQ(involvedNamespaces.size(), 1);
 }
 
 }  // namespace mongo

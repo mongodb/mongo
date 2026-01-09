@@ -4,7 +4,7 @@
  * testcase for SERVER-102825 and SERVER-106023.
  */
 
-import {code, line, section, subSection} from "jstests/libs/pretty_md.js";
+import {code, line, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 import {outputPlanCacheStats} from "jstests/libs/query/golden_test_utils.js";
 

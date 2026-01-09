@@ -54,7 +54,7 @@ existing example in the source code and copy it.
   * Not reference variable names where possible
   * Not reference closed ticket numbers in Jira
   * Not reference pull request numbers
-  * Use a keyword of the form ``FIXME-WT-12345`` when describing a deficiency or opportunity
+  * Use a keyword of the form ``FIXME-WT-XXXX`` when describing a deficiency or opportunity
     for improvement that has an open WiredTiger Jira ticket
   * Be fully formed sentences
   * Use C-style with ``/* ... */`` and not C++ style double-slash comments

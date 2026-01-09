@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <boost/cstdint.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include "mongo/db/timeseries/timeseries_write_util.h"
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -46,8 +46,6 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
-#include "mongo/db/timeseries/timeseries_write_util.h"
-#include "mongo/db/timeseries/write_ops/measurement.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils_internal.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
@@ -57,7 +55,6 @@
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/time_parsers.hpp>
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -459,8 +456,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
         _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *bucketsColl, InsertStatement{bucketDoc}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
         wunit.commit();
     }
 
@@ -514,8 +510,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
         _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *bucketsColl, InsertStatement{bucketDoc}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
         wunit.commit();
     }
 
@@ -581,8 +576,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDeleteAndInsert) {
         _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *bucketsColl, InsertStatement{bucketDoc1}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc1));
         wunit.commit();
     }
 
@@ -659,8 +653,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdateAndInserts) {
         _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *bucketsColl, InsertStatement{bucketDoc1}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc1));
         wunit.commit();
     }
 
@@ -777,8 +770,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserDelete) {
         _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *bucketsColl, InsertStatement{bucketDoc}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
         wunit.commit();
     }
 
@@ -875,8 +867,7 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
         _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *bucketsColl, InsertStatement{bucketDoc}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
         wunit.commit();
     }
 
@@ -943,8 +934,7 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
         _opCtx, _nsNoMeta.makeTimeseriesBucketsNamespace(), LockMode::MODE_IX);
     {
         WriteUnitOfWork wunit{_opCtx};
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *bucketsColl, InsertStatement{bucketDoc}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *bucketsColl, bucketDoc));
         wunit.commit();
     }
 

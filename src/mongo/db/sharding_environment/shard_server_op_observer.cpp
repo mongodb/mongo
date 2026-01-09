@@ -41,7 +41,6 @@
 #include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
@@ -225,21 +224,6 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                             }
                         });
                 }
-            }
-        }
-
-        if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
-            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-            nss == NamespaceString::kConfigsvrShardsNamespace) {
-            // The feature flag check here needs to ignore the FCV since the
-            // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
-            // upgraded.
-            if (auto shardId = insertedDoc["_id"].str(); shardId == ShardId::kConfigServerId) {
-                shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                    [](OperationContext* opCtx, boost::optional<Timestamp>) {
-                        replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)
-                            ->setIsConfigShard(true);
-                    });
             }
         }
 
@@ -551,21 +535,6 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     ShardIdentityRollbackNotifier::get(opCtx)->recordThatRollbackHappened();
                 }
             }
-        }
-    }
-
-    if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-        nss == NamespaceString::kConfigsvrShardsNamespace) {
-        // The feature flag check here needs to ignore the FCV since the
-        // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
-        // upgraded.
-        if (auto shardId = documentId["_id"].str(); shardId == ShardId::kConfigServerId) {
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit([](OperationContext* opCtx,
-                                                                    boost::optional<Timestamp>) {
-                replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(
-                    false);
-            });
         }
     }
 

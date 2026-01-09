@@ -62,7 +62,10 @@ TEST_F(WriteCommandsTest, UpdateReplyContainsMetricsOnlyWhenRequested) {
         updateEntry.append("q", BSON("x" << i));
         updateEntry.append("u", BSON("x" << (i * 10)));
         if (i == 1 || i == 3) {
-            updateEntry.append("includeQueryStatsMetrics", true);
+            // Here we are saying that the i-th entry sent to a shard coorespondes to the
+            // (200 + i)th entry in the original batch that arrived at the router. The router sets
+            // this field when requesting metrics from update statements sent to shards.
+            updateEntry.append("includeQueryStatsMetricsForOpIndex", 200 + i);
         }
         updatesBuilder.append(updateEntry.obj());
     }
@@ -90,9 +93,9 @@ TEST_F(WriteCommandsTest, UpdateReplyContainsMetricsOnlyWhenRequested) {
     std::set<int> metricsIndices;
     for (const auto& elem : metricsArray) {
         auto metricsObj = elem.Obj();
-        ASSERT_TRUE(metricsObj.hasField("index"));
+        ASSERT_TRUE(metricsObj.hasField("originalOpIndex"));
         ASSERT_TRUE(metricsObj.hasField("metrics"));
-        metricsIndices.insert(metricsObj["index"].Int());
+        metricsIndices.insert(metricsObj["originalOpIndex"].Int());
 
         // Verify metrics object has expected fields.
         auto metrics = metricsObj["metrics"].Obj();
@@ -100,9 +103,9 @@ TEST_F(WriteCommandsTest, UpdateReplyContainsMetricsOnlyWhenRequested) {
         ASSERT_TRUE(metrics.hasField("docsExamined"));
     }
 
-    // Verify we got metrics for exactly indices 1 and 3.
-    ASSERT_EQ(metricsIndices.count(1), 1u);
-    ASSERT_EQ(metricsIndices.count(3), 1u);
+    // Verify we got metrics for exactly indices 201 and 203.
+    ASSERT_EQ(metricsIndices.count(201), 1u);
+    ASSERT_EQ(metricsIndices.count(203), 1u);
     ASSERT_EQ(metricsIndices.size(), 2u);
 }
 

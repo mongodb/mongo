@@ -356,6 +356,6 @@ mongo_cc_library(
     deps = [
         "//src/third_party/fmt",
         "//src/third_party/icu4c-57.1/source:icu_i18n",
-        "//src/third_party/zlib",
+        "@zlib",
     ],
 )

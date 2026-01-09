@@ -4,6 +4,11 @@
  *   multi_clients_incompatible,
  ]
  */
+
+// Testing oidReset requires hitting the same node
+// pinToSingleMongos due to oidReset.
+TestData.pinToSingleMongos = true;
+
 let t = db.objid5;
 t.drop();
 

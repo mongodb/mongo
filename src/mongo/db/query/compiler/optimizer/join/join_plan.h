@@ -72,6 +72,7 @@ struct JoinSubset {
     }
 
     inline JoinPlanNodeId bestPlan() const {
+        tassert(11566600, "Failed to find a plan", !plans.empty());
         tassert(11336908, "Expected bestPlanIndex < plans.size()", bestPlanIndex < plans.size());
         return plans[bestPlanIndex];
     }

@@ -817,6 +817,17 @@ it("assertCallsHangAnalyzer", function () {
     runAssertTest(() => assert.time(() => sleep(5), "assert message", 1 /* we certainly take less than this */));
 });
 
+function assertThrowsError(assertFailureTriggerFn, msg) {
+    try {
+        assertFailureTriggerFn();
+    } catch (e) {
+        assert.eq(msg, e.message, "unexpected error message");
+        return;
+    }
+    // Call the 'assertFailureTriggerFn' second time to make sure it actually throws.
+    assert.throws(assertFailureTriggerFn, [], "assertFailureTriggerFn");
+}
+
 function assertThrowsErrorWithJson(assertFailureTriggerFn, {msg, attr}) {
     const oldLogFormat = TestData.logFormat;
     try {
@@ -844,6 +855,70 @@ it("assertJsonFormat", function () {
             assert(false, "lorem ipsum", kAttr);
         },
         {msg: "assert failed : lorem ipsum", attr: {...kAttr}},
+    );
+});
+
+it("assertEqMessage", function () {
+    assertThrowsError(
+        () => {
+            assert.eq(5, 2 + 2, "lorem ipsum");
+        },
+        `\
+expected 5 to equal 4
+\u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
+
+\u001b[31m-5\u001b[0m
+\u001b[32m+4\u001b[0m
+ : lorem ipsum`,
+    );
+
+    assertThrowsError(
+        () => {
+            assert.eq(5, 2 + 2, "lorem ipsum", kAttr);
+        },
+        `\
+expected 5 to equal 4
+\u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
+
+\u001b[31m-5\u001b[0m
+\u001b[32m+4\u001b[0m
+ : lorem ipsum`,
+    );
+
+    assertThrowsError(
+        () => {
+            assert.eq([["a", "c"]], [["a", "b", "c"]]);
+        },
+        `\
+expected [ [Array] ] to equal [ [Array] ]
+\u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
+
+ [
+  	[
+  		"a",
+\u001b[32m+ 		"b",\u001b[0m
+  		"c"
+ 		]
+ 	]
+`,
+    );
+
+    assertThrowsError(
+        () => {
+            assert.eq([{a: 1, c: 3}], [{a: 1, b: 2, c: 3}]);
+        },
+        `\
+expected [ [Object] ] to equal [ [Object] ]
+\u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
+
+ [
+  	{
+  		"a" : 1,
+\u001b[32m+ 		"b" : 2,\u001b[0m
+  		"c" : 3
+ 		}
+ 	]
+`,
     );
 });
 
@@ -894,6 +969,7 @@ expected [ [Array] ] to equal [ [Array] ]
             attr: {},
         },
     );
+
     assertThrowsErrorWithJson(
         () => {
             assert.eq([{a: 1, c: 3}], [{a: 1, b: 2, c: 3}]);

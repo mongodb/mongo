@@ -20,11 +20,9 @@
 #include <cstdint>
 
 #include "absl/status/status.h"
-
 #include "src/core/lib/event_engine/posix_engine/posix_engine_closure.h"
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 class Scheduler;
 
@@ -67,7 +65,6 @@ class LockfreeEvent {
   Scheduler* scheduler_;
 };
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental
 
 #endif  // GRPC_SRC_CORE_LIB_EVENT_ENGINE_POSIX_ENGINE_LOCKFREE_EVENT_H

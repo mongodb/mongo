@@ -55,10 +55,11 @@ ALLOCATE_STAGE_PARAMS_ID(unregisteredTest, UnregisteredTestStageParams::id);
  * A test-only LiteParsedDocumentSource that is intentionally NOT registered
  * in the StageParams to DocumentSource registry.
  */
-class UnregisteredTestLiteParsed final : public LiteParsedDocumentSource {
+class UnregisteredTestLiteParsed final
+    : public LiteParsedDocumentSourceDefault<UnregisteredTestLiteParsed> {
 public:
     UnregisteredTestLiteParsed(const BSONElement& originalBson)
-        : LiteParsedDocumentSource(originalBson) {}
+        : LiteParsedDocumentSourceDefault(originalBson) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return stdx::unordered_set<NamespaceString>();

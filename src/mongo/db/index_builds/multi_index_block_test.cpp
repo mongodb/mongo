@@ -30,8 +30,7 @@
 #include "mongo/db/index_builds/multi_index_block.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -51,7 +50,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -611,8 +609,7 @@ TEST_F(MultiIndexBlockTest, AddDocumentBetweenInitAndInsertAll) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), *autoColl, InsertStatement(BSON("_id" << 0 << "a" << 1)), nullptr));
+        ASSERT_OK(Helpers::insert(operationContext(), *autoColl, BSON("_id" << 0 << "a" << 1)));
         wuow.commit();
     }
 

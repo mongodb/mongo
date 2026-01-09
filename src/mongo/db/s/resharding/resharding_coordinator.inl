@@ -1987,15 +1987,13 @@ void ReshardingCoordinator::_tellAllRecipientsToClone(
 
 void ReshardingCoordinator::_tellAllRecipientsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    NamespaceString nssToRefresh;
     // Refresh the temporary namespace if the coordinator is in a state prior to 'kCommitting'.
     // A refresh of recipients while in 'kCommitting' should be accompanied by a refresh of
     // all participants for the original namespace to ensure correctness.
-    if (_coordinatorDoc.getState() < CoordinatorStateEnum::kCommitting) {
-        nssToRefresh = _coordinatorDoc.getTempReshardingNss();
-    } else {
-        nssToRefresh = _coordinatorDoc.getSourceNss();
-    }
+    const bool isCommitting = _coordinatorDoc.getState() >= CoordinatorStateEnum::kCommitting;
+    const auto nssToRefresh =
+        isCommitting ? _coordinatorDoc.getSourceNss() : _coordinatorDoc.getTempReshardingNss();
+    auto token = isCommitting ? _ctHolder->getStepdownToken() : _ctHolder->getAbortToken();
 
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     _reshardingCoordinatorExternalState->tellAllRecipientsToRefresh(
@@ -2004,7 +2002,7 @@ void ReshardingCoordinator::_tellAllRecipientsToRefresh(
         _coordinatorDoc.getReshardingUUID(),
         _coordinatorDoc.getRecipientShards(),
         **executor,
-        _ctHolder->getAbortToken());
+        std::move(token));
 }
 
 void ReshardingCoordinator::_tellAllDonorsToRefresh(

@@ -35,7 +35,6 @@
 #include "mongo/db/commands/server_status/histogram_server_status_metric.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/exec/classic/multi_plan_rate_limiter.h"
-#include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/compiler/ce/ce_common.h"
@@ -276,7 +275,8 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy) {
     return runTrials(yieldPolicy, getTrialPhaseConfig());
 }
 
-Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig) {
+Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
+                                 trial_period::TrialPhaseConfig trialConfig) {
     tassert(11521900,
             "Running trials for multi-plan stage when we already have a solution.",
             !bestPlanChosen());
@@ -357,7 +357,7 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig 
     return Status::OK();
 }
 
-MultiPlanStage::TrialPhaseConfig MultiPlanStage::getTrialPhaseConfig() const {
+trial_period::TrialPhaseConfig MultiPlanStage::getTrialPhaseConfig() const {
     const double collFraction =
         trial_period::getCollFractionPerCandidatePlan(*_query, _candidates.size());
 

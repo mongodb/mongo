@@ -516,7 +516,18 @@ std::string SerializationOptions::serializeFieldPathFromString(StringData path) 
 }
 
 std::string SerializationOptions::serializeFieldRef(const FieldRef& fieldRef) const {
-    return serializeFieldPathFromString(fieldRef.dottedField());
+    if (transformIdentifiers) {
+        std::stringstream hmaced;
+        for (size_t i = 0; i < fieldRef.numParts(); ++i) {
+            if (i > 0) {
+                hmaced << ".";
+            }
+            StringData part = fieldRef.getPart(i);
+            hmaced << transformIdentifier(part);
+        }
+        return hmaced.str();
+    }
+    return std::string{fieldRef.dottedField()};
 }
 
 bool SerializationOptions::isDefaultSerialization() const {

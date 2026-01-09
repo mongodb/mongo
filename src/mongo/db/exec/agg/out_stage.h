@@ -43,7 +43,6 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
-#include <list>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

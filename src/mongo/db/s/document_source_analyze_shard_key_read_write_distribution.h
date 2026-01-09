@@ -66,7 +66,7 @@ class DocumentSourceAnalyzeShardKeyReadWriteDistribution final : public Document
 public:
     static constexpr StringData kStageName = "$_analyzeShardKeyReadWriteDistribution"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& specElem,
@@ -75,7 +75,7 @@ public:
         explicit LiteParsed(const BSONElement& specElem,
                             NamespaceString nss,
                             DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec spec)
-            : LiteParsedDocumentSource(specElem), _nss(std::move(nss)) {}
+            : LiteParsedDocumentSourceDefault(specElem), _nss(std::move(nss)) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {

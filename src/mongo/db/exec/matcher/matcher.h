@@ -53,8 +53,10 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+// TODO SERVER-113198: Remove external dependencies on this header.
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 
 namespace exec::matcher {
 
@@ -500,4 +502,4 @@ BSONElement findFirstDuplicateValue(const InternalSchemaUniqueItemsMatchExpressi
 bool matchesBSONObj(const InternalSchemaAllowedPropertiesMatchExpression* expr, const BSONObj& obj);
 
 }  // namespace exec::matcher
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

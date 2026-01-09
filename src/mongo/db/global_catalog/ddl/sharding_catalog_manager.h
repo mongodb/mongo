@@ -866,8 +866,6 @@ private:
      */
     MONGO_MOD_UNFORTUNATELY_OPEN Status _updateClusterCardinalityParameterAfterAddShardIfNeeded(
         const Lock::ExclusiveLock&, OperationContext* opCtx);
-    MONGO_MOD_UNFORTUNATELY_OPEN Status _updateClusterCardinalityParameterAfterRemoveShardIfNeeded(
-        const Lock::ExclusiveLock&, OperationContext* opCtx);
 
     // The owning service context
     ServiceContext* const _serviceContext;

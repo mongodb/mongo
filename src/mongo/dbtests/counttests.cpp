@@ -35,9 +35,9 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -109,7 +109,6 @@ protected:
     void insert(const char* s) {
         WriteUnitOfWork wunit(&_opCtx);
         const BSONObj o = fromjson(s);
-        OpDebug* const nullOpDebug = nullptr;
 
         if (o["_id"].eoo()) {
             BSONObjBuilder b;
@@ -117,16 +116,10 @@ protected:
             oid.init();
             b.appendOID("_id", &oid);
             b.appendElements(o);
-            collection_internal::insertDocument(&_opCtx,
-                                                _collection->getCollectionPtr(),
-                                                InsertStatement(b.obj()),
-                                                nullOpDebug,
-                                                false)
+            Helpers::insert(&_opCtx, _collection->getCollectionPtr(), b.obj())
                 .transitional_ignore();
         } else {
-            collection_internal::insertDocument(
-                &_opCtx, _collection->getCollectionPtr(), InsertStatement(o), nullOpDebug, false)
-                .transitional_ignore();
+            Helpers::insert(&_opCtx, _collection->getCollectionPtr(), o).transitional_ignore();
         }
         wunit.commit();
     }

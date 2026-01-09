@@ -273,6 +273,9 @@ private:
         }
     }
 
+    // Performs any waiting that's needed after locks and resources are released during yield.
+    void doWaitDuringYield();
+
     std::unique_ptr<insert_listener::Notifier> makeNotifier();
 
     // The OperationContext that we're executing within. This can be updated if necessary by using
@@ -334,6 +337,9 @@ private:
     // Function used to wait for oplog visibility in between snapshot abandonment and restoring the
     // snapshot.
     std::function<void()> _afterSnapshotAbandonFn{nullptr};
+
+    // When set, indicates that we should log and back off during yield.
+    boost::optional<size_t> _writeConflictsInARowToLog;
 };
 
 }  // namespace mongo

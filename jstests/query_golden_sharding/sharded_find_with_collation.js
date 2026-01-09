@@ -4,7 +4,8 @@
  * TODO SERVER-94611: Extend testing once sharding may have non-simple collation.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {code, outputShardedFindSummaryAndResults, section, subSection} from "jstests/libs/pretty_md.js";
+import {outputShardedFindSummaryAndResults} from "jstests/libs/query/golden_test_utils.js";
+import {section} from "jstests/libs/query/pretty_md.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});

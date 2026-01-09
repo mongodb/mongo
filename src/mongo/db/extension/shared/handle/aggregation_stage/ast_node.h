@@ -41,13 +41,15 @@ namespace mongo::extension {
 
 class AggStageAstNodeAPI;
 
+using AggStageAstNodeHandle = OwnedHandle<::MongoExtensionAggStageAstNode>;
+
 template <>
 struct c_api_to_cpp_api<::MongoExtensionAggStageAstNode> {
     using CppApi_t = AggStageAstNodeAPI;
 };
 
 /**
- * AggStageAstNodeHandle is a wrapper around a MongoExtensionAggStageAstNode vtable API.
+ * AggStageAstNodeAPI is a wrapper around a MongoExtensionAggStageAstNode vtable API.
  */
 class AggStageAstNodeAPI : public VTableAPI<::MongoExtensionAggStageAstNode> {
 public:
@@ -74,13 +76,24 @@ public:
      */
     LogicalAggStageHandle bind() const;
 
+    /**
+     * Clones this AST node into an identical AST node.
+     *
+     * On success, the ownership of the returned AST node is transferred to the caller.
+     *
+     * On failure, the call triggers an assertion and no ownership is transferred.
+     *
+     * The caller is responsible for managing the lifetime of the returned handle.
+     */
+    AggStageAstNodeHandle clone() const;
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(11217601, "AggStageAstNode 'get_name' is null", vtable.get_name != nullptr);
         tassert(
             11347800, "AggStageAstNode 'get_properties' is null", vtable.get_properties != nullptr);
         tassert(11113700, "AggStageAstNode 'bind' is null", vtable.bind != nullptr);
+        tassert(11565501, "AggStageAstNode 'clone' is null", vtable.clone != nullptr);
     }
 };
 
-using AggStageAstNodeHandle = OwnedHandle<::MongoExtensionAggStageAstNode>;
 }  // namespace mongo::extension

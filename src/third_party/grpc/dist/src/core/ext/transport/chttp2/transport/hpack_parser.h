@@ -19,33 +19,30 @@
 #ifndef GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_HPACK_PARSER_H
 #define GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_HPACK_PARSER_H
 
+#include <grpc/slice.h>
 #include <grpc/support/port_platform.h>
-
 #include <stddef.h>
 #include <stdint.h>
 
+#include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "absl/random/bit_gen_ref.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "absl/types/variant.h"
-
-#include <grpc/slice.h>
-
+#include "src/core/call/metadata_batch.h"
 #include "src/core/ext/transport/chttp2/transport/hpack_parse_result.h"
 #include "src/core/ext/transport/chttp2/transport/hpack_parser_table.h"
 #include "src/core/ext/transport/chttp2/transport/legacy_frame.h"
-#include "src/core/lib/backoff/random_early_detection.h"
-#include "src/core/lib/channel/call_tracer.h"
 #include "src/core/lib/iomgr/error.h"
 #include "src/core/lib/slice/slice.h"
 #include "src/core/lib/slice/slice_refcount.h"
-#include "src/core/lib/transport/metadata_batch.h"
+#include "src/core/telemetry/call_tracer.h"
+#include "src/core/util/random_early_detection.h"
 
 // IWYU pragma: no_include <type_traits>
 
@@ -88,9 +85,11 @@ class HPackParser {
   HPackParser();
   ~HPackParser();
 
-  // Non-copyable/movable
+  // Non-copyable
   HPackParser(const HPackParser&) = delete;
   HPackParser& operator=(const HPackParser&) = delete;
+  HPackParser(HPackParser&&) = default;
+  HPackParser& operator=(HPackParser&&) = default;
 
   // Begin parsing a new frame
   // Sink receives each parsed header,
@@ -121,8 +120,6 @@ class HPackParser {
   // Helper classes: see implementation
   class Parser;
   class Input;
-  class MetadataSizeEncoder;
-  class MetadataSizesAnnotation;
 
   // Helper to parse a string and turn it into a slice with appropriate memory
   // management characteristics
@@ -176,11 +173,10 @@ class HPackParser {
     static StringResult Unbase64(String s);
 
     // Main loop for Unbase64
-    static absl::optional<std::vector<uint8_t>> Unbase64Loop(
-        const uint8_t* cur, const uint8_t* end);
+    static std::optional<std::vector<uint8_t>> Unbase64Loop(const uint8_t* cur,
+                                                            const uint8_t* end);
 
-    absl::variant<Slice, absl::Span<const uint8_t>, std::vector<uint8_t>>
-        value_;
+    std::variant<Slice, absl::Span<const uint8_t>, std::vector<uint8_t>> value_;
   };
 
   // Prefix for a string
@@ -242,10 +238,6 @@ class HPackParser {
     uint32_t frame_length = 0;
     // Length of the string being parsed
     uint32_t string_length;
-    // How many more dynamic table updates are allowed
-    uint8_t dynamic_table_updates_allowed;
-    // Current parse state
-    ParseState parse_state = ParseState::kTop;
     // RED for overly large metadata sets
     RandomEarlyDetection metadata_early_detection;
     // Should the current header be added to the hpack table?
@@ -254,7 +246,11 @@ class HPackParser {
     bool is_string_huff_compressed;
     // Is the value being parsed binary?
     bool is_binary_header;
-    absl::variant<const HPackTable::Memento*, Slice> key;
+    // How many more dynamic table updates are allowed
+    uint8_t dynamic_table_updates_allowed;
+    // Current parse state
+    ParseState parse_state = ParseState::kTop;
+    std::variant<const HPackTable::Memento*, Slice> key;
   };
 
   grpc_error_handle ParseInput(Input input, bool is_last,

@@ -15,5 +15,9 @@ export function runTest({description, coll, pipeline, expectedResults, expectedU
     const explain = coll.explain().aggregate(pipeline);
     print(`Explain: ${tojson(explain)}`);
     const winningPlan = getQueryPlanner(explain).winningPlan;
-    assert.eq(expectedUsedJoinOptimization, winningPlan.usedJoinOptimization, winningPlan);
+
+    const usedJoinOptimization = winningPlan.hasOwnProperty("usedJoinOptimization")
+        ? winningPlan.usedJoinOptimization
+        : false;
+    assert.eq(expectedUsedJoinOptimization, usedJoinOptimization, winningPlan);
 }

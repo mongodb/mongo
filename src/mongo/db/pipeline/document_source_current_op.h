@@ -83,7 +83,7 @@ public:
     static constexpr TruncationMode kDefaultTruncationMode = TruncationMode::kNoTruncation;
     static constexpr CursorMode kDefaultCursorMode = CursorMode::kExcludeCursors;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -93,7 +93,7 @@ public:
                    const boost::optional<TenantId>& tenantId,
                    UserMode allUsers,
                    LocalOpsMode localOps)
-            : LiteParsedDocumentSource(spec),
+            : LiteParsedDocumentSourceDefault(spec),
               _allUsers(allUsers),
               _localOps(localOps),
               _privileges(

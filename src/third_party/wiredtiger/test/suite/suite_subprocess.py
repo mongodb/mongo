@@ -194,17 +194,8 @@ class suite_subprocess:
         procargs = [ sys.executable, runscript, '-p', '--dir', directory,
             funcname]
 
-        # scenario_number is only set if we are running in a scenario
-        try:
-            scennum = self.scenario_number
-            procargs.append('-s')
-            procargs.append(str(scennum))
-        except:
-            scennum = 0
-
         returncode = -1
         os.makedirs(directory)
-
         # We cannot put the output/error files in the subdirectory, as
         # that will be cleared by the run.py script.
         with open("subprocess.err", "w") as wterr:
@@ -219,8 +210,9 @@ class suite_subprocess:
                         " returned error code " + str(returncode),
                         [ "subprocess.out", "subprocess.err" ])
 
+        # Running a scenario will default create directory starting with 0.
         new_home_dir = os.path.join(directory,
-            testparts[1] + '.' + str(scennum))
+            testparts[1] + '.0')
         return [ returncode, new_home_dir ]
 
     # Run the wt utility.

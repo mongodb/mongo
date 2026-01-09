@@ -327,6 +327,10 @@ public:
         return Timestamp();
     }
 
+    Timestamp getOldestTimestamp(ServiceContext* serviceCtx) override {
+        return Timestamp();
+    }
+
     StatusWith<StorageInterface::CollectionSize> getCollectionSize(
         OperationContext* opCtx, const NamespaceString& nss) override {
         return 0;

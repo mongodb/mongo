@@ -41,7 +41,6 @@
 #include "mongo/util/uuid.h"
 
 #include <cstdint>
-#include <memory>
 
 namespace mongo {
 

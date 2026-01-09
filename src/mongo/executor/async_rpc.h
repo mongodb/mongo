@@ -101,13 +101,14 @@ struct AsyncRPCResponse {
 };
 
 /**
- * 'void'.
  * The response type used by `sendCommand(...)` functions if the return type of the command is
+ * 'void'.
  */
 template <>
 struct AsyncRPCResponse<void> {
     HostAndPort targetUsed;
     Microseconds elapsed;
+    GenericReplyFields genericReplyFields;
 };
 
 template <typename CommandType>
@@ -294,11 +295,15 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
 
     return std::move(resFuture)
         .then([](detail::AsyncRPCInternalResponse r) -> ReplyType {
-            auto res = CommandType::Reply::parseSharingOwnership(
-                r.response, IDLParserContext("AsyncRPCRunner"));
             auto genericReplyFields = GenericReplyFields::parseSharingOwnership(
                 r.response, IDLParserContext("AsyncRPCRunner"));
-            return {res, r.targetUsed, r.elapsed, std::move(genericReplyFields)};
+            if constexpr (std::is_void_v<typename CommandType::Reply>) {
+                return {r.targetUsed, r.elapsed, std::move(genericReplyFields)};
+            } else {
+                auto res = CommandType::Reply::parseSharingOwnership(
+                    r.response, IDLParserContext("AsyncRPCRunner"));
+                return {res, r.targetUsed, r.elapsed, std::move(genericReplyFields)};
+            }
         })
         .unsafeToInlineFuture()
         .onError(

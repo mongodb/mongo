@@ -191,6 +191,7 @@ public:
 
     Timestamp getEarliestOplogTimestamp(OperationContext* opCtx) override;
     Timestamp getLatestOplogTimestamp(OperationContext* opCtx) override;
+    Timestamp getOldestTimestamp(ServiceContext* serviceCtx) override;
 
     StatusWith<StorageInterface::CollectionSize> getCollectionSize(
         OperationContext* opCtx, const NamespaceString& nss) override;

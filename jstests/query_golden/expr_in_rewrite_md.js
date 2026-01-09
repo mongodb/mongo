@@ -2,7 +2,7 @@
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {tojsonMultiLineSortKeys, tojsonOnelineSortKeys} from "jstests/libs/golden_test.js";
-import {code, line, linebreak, section, subSection} from "jstests/libs/pretty_md.js";
+import {code, line, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {formatExplainRoot} from "jstests/libs/query/analyze_plan.js";
 
 const paramName = "internalQueryExtraPredicateForReversedIn";

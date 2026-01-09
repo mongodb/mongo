@@ -262,7 +262,7 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
                     return (log_print_err("cursor.modify", ret, 1));
                 }
                 return (0);
-            } else if (ret != 0 && ret != WT_NOTFOUND) {
+            } else if (ret != WT_NOTFOUND) {
                 if (ret == WT_ROLLBACK || ret == WT_PREPARE_CONFLICT)
                     return (WT_ROLLBACK);
                 return (log_print_err("cursor.search", ret, 1));

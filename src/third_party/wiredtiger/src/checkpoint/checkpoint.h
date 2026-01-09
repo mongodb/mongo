@@ -29,6 +29,16 @@ struct __wt_ckpt_session {
         CKPT_CRASH_ENUM_END
     } ckpt_crash_state;
 
+    /* Key provider crash. */
+    int key_provider_crash_point; /* Crash points during key provider process */
+    enum {
+        KEY_PROVIDER_CRASH_NONE = 0,
+        KEY_PROVIDER_CRASH_BEFORE_KEY_ROTATION,
+        KEY_PROVIDER_CRASH_DURING_KEY_ROTATION,
+        KEY_PROVIDER_CRASH_AFTER_KEY_ROTATION,
+        KEY_PROVIDER_CRASH_ENUM_END
+    } key_provider_crash_state;
+
     /* Named checkpoint drop list, during a checkpoint */
     WT_ITEM *drop_list;
 

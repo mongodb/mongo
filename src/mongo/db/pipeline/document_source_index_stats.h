@@ -49,10 +49,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
-#include <set>
-#include <string>
 #include <utility>
-#include <vector>
 
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -69,7 +66,7 @@ class DocumentSourceIndexStats final {
 public:
     static constexpr StringData kStageName = "$indexStats"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -78,7 +75,7 @@ public:
         }
 
         LiteParsed(const BSONElement& spec, NamespaceString nss)
-            : LiteParsedDocumentSource(spec), _nss(std::move(nss)) {}
+            : LiteParsedDocumentSourceDefault(spec), _nss(std::move(nss)) {}
 
         bool isIndexStats() const final {
             return true;

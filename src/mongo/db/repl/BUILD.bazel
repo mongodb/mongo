@@ -1739,7 +1739,6 @@ mongo_cc_unit_test(
         "isself_test.cpp",
         "member_config_test.cpp",
         "optime_extract_test.cpp",
-        "optime_test.cpp",
         "primary_only_service_test.cpp",
         "primary_only_service_util_test.cpp",
         "read_concern_args_test.cpp",
@@ -1860,14 +1859,6 @@ mongo_cc_unit_test(
 )
 
 mongo_cc_unit_test(
-    name = "data_with_lock_free_reads_test",
-    srcs = [
-        "data_with_lock_free_reads_test.cpp",
-    ],
-    tags = ["mongo_unittest_seventh_group"],
-)
-
-mongo_cc_unit_test(
     name = "oplog_application_test",
     srcs = [
         "apply_container_ops_test.cpp",
@@ -1878,6 +1869,7 @@ mongo_cc_unit_test(
         "oplog_buffer_blocking_queue_test.cpp",
         "oplog_buffer_collection_test.cpp",
         "oplog_buffer_proxy_test.cpp",
+        "oplog_delete_record_id_test.cpp",
         "oplog_entry_test.cpp",
         "oplog_fetcher_test.cpp",
         "oplog_test.cpp",
@@ -2198,14 +2190,6 @@ mongo_cc_benchmark(
         ":repl_coordinator_test_fixture",
         "//src/mongo/unittest",
     ],
-)
-
-mongo_cc_benchmark(
-    name = "data_with_lock_free_reads_bm",
-    srcs = [
-        "data_with_lock_free_reads_bm.cpp",
-    ],
-    tags = ["repl_bm"],
 )
 
 # Auto-generated exports for moved files

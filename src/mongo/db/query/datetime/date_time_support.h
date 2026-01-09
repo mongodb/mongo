@@ -43,9 +43,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
-#include <ostream>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include <boost/none.hpp>

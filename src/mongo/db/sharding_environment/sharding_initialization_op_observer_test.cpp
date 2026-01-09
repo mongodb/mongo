@@ -37,6 +37,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_catalog/type_shard_identity.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -122,9 +123,8 @@ TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetCalledIfWriteAbo
             MODE_IX);
 
         WriteUnitOfWork wuow(operationContext());
-        InsertStatement stmt(shardIdentity.toShardIdentityDocument());
-        ASSERT_OK(
-            collection_internal::insertDocument(operationContext(), *autoColl, stmt, nullptr));
+        ASSERT_OK(Helpers::insert(
+            operationContext(), *autoColl, shardIdentity.toShardIdentityDocument()));
         ASSERT_EQ(0, getInitCallCount());
     }
 

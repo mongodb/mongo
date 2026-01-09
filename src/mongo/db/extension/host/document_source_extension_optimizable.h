@@ -47,6 +47,16 @@ public:
             new DocumentSourceExtensionOptimizable(expCtx, std::move(astNode)));
     }
 
+    /**
+     * Construct directly from a parse node handle.
+     *
+     * NOTE: This should only be used when the parse node handle expands into a *single
+     * extension-allocated AST node* (e.g. when parsing on a shard after the router has already
+     * expanded and serialized the parse node).
+     */
+    static boost::intrusive_ptr<DocumentSourceExtensionOptimizable> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const AggStageParseNodeHandle& parseNodeHandle);
 
     /**
      * Construct a DocumentSourceExtensionOptimizable from a logical stage handle.

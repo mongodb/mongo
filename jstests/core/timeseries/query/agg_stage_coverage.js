@@ -10,7 +10,10 @@
  *   requires_getmore,
  *   requires_fcv_83,
  *   # TODO SERVER-109838: Remove 'incompatible_with_extensions' tag.
- *   incompatible_with_extensions
+ *   incompatible_with_extensions,
+ *   # Timeseries data can transition from QUEUED_DATA to UNPACK_BUCKET between the two
+ *   # explain calls in PQS fallback passthroughs, causing plan comparison failures.
+ *   does_not_support_repeated_reads
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";

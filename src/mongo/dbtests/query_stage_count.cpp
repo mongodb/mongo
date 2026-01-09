@@ -37,6 +37,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/classic/collection_scan.h"
 #include "mongo/db/exec/classic/count.h"
 #include "mongo/db/exec/classic/index_scan.h"
@@ -148,18 +149,13 @@ public:
 
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
-        OpDebug* const nullOpDebug = nullptr;
-        collection_internal::insertDocument(
-            &_opCtx, _coll->getCollectionPtr(), InsertStatement(doc), nullOpDebug)
-            .transitional_ignore();
+        Helpers::insert(&_opCtx, _coll->getCollectionPtr(), doc).transitional_ignore();
         wunit.commit();
     }
 
     void remove(const RecordId& recordId) {
         WriteUnitOfWork wunit(&_opCtx);
-        OpDebug* const nullOpDebug = nullptr;
-        collection_internal::deleteDocument(
-            &_opCtx, _coll->getCollectionPtr(), kUninitializedStmtId, recordId, nullOpDebug);
+        Helpers::deleteByRid(&_opCtx, *_coll, recordId);
         wunit.commit();
     }
 

@@ -134,7 +134,6 @@ variables:
     #   variant: rhel8-debug-aubsan-compile
 
   # THIS HAS COPIES IN:
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_debug_aubsan_compile_variant_dependency
@@ -846,6 +845,8 @@ buildvariants:
         distros:
           - rhel8.8-large
       - name: noPassthrough_gen
+        distros:
+          - rhel8.8-large
       - name: sharding_gen
 
   - name: &rhel8-debug-ubsan-roll-back-incremental-feature-flags rhel8-debug-ubsan-roll-back-incremental-feature-flags

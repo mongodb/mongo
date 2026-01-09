@@ -233,6 +233,16 @@ protected:
         return _selfIndex;
     }
 
+    std::vector<HostAndPort> getMemberHostAndPorts(bool maintenance) {
+        std::vector<HostAndPort> res;
+        for (auto i = 0; i < getCurrentConfig().getNumMembers(); i++) {
+            res.push_back(maintenance
+                              ? getCurrentConfig().getMemberAt(i).getHostAndPortMaintenance()
+                              : getCurrentConfig().getMemberAt(i).getHostAndPort());
+        }
+        return res;
+    }
+
     BSONObj addProtocolVersion(const BSONObj& configDoc) {
         if (configDoc.hasField("protocolVersion")) {
             return configDoc;
@@ -366,6 +376,48 @@ protected:
                                                       HostAndPort());
     }
 
+    void testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(BSONObj config,
+                                                                int selfIndex,
+                                                                bool expectMaintenance);
+    void testNodeReturnsClosestValidSyncSource(BSONObj config,
+                                               int selfIndex,
+                                               bool expectMaintenance);
+    void testNodeWontChooseSyncSourceFromOlderTerm(BSONObj config,
+                                                   int selfIndex,
+                                                   bool expectMaintenance);
+    void testChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter(BSONObj config,
+                                                          int selfIndex,
+                                                          bool expectMaintenance);
+    void testChooseSameSyncSourceEvenWhenPrimary(BSONObj config,
+                                                 int selfIndex,
+                                                 bool expectMaintenance);
+    void testChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet(
+        BSONObj config, int selfIndex, bool expectMaintenance);
+    void testNodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires(BSONObj config,
+                                                                          int selfIndex,
+                                                                          bool expectMaintenance);
+    void testChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly(
+        BSONObj config, int selfIndex, bool expectMaintenance);
+
+    void testChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly(BSONObj config,
+                                                                          int selfIndex,
+                                                                          bool expectMaintenance);
+    void testChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly(
+        BSONObj config, int selfIndex, bool expectMaintenance);
+    void testPreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred(BSONObj config,
+                                                                           int selfIndex,
+                                                                           bool expectMaintenance);
+    void testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(
+        BSONObj config, int selfIndex, bool expectMaintenance);
+    void testNodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp(BSONObj config,
+                                                                   int selfIndex,
+                                                                   bool expectMaintenance);
+    void testReplSetGetStatus(BSONObj config, bool expectMaintenance);
+    void testMemberReplicationProgressAfterReconfig(BSONObj initialConfig,
+                                                    BSONObj changedConfig,
+                                                    int selfIndex,
+                                                    bool expectMaintenance);
+
 private:
     HeartbeatResponseAction _receiveHeartbeatHelper(Status responseStatus,
                                                     const HostAndPort& member,
@@ -442,23 +494,28 @@ TEST_F(TopoCoordTest, TopologyVersionInitializedAtStartup) {
     ASSERT_EQ(0, getTopoCoord().getTopologyVersion().getCounter());
 }
 
-TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
+void TopoCoordTest::testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(BSONObj config,
+                                                                           int selfIndex,
+                                                                           bool expectMaintenance) {
     // if we do not have an index in the config, we should get an empty syncsource
     HostAndPort newSyncSource =
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
     ASSERT_TRUE(newSyncSource.empty());
 
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+    updateConfig(config, selfIndex);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    // member h2 is the furthest ahead
-    heartbeatFromMember(
-        HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(1, 0), 0));
-    heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime());
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto& hp1 = expectMaintenance
+        ? getCurrentConfig().getMemberAt(1).getHostAndPortMaintenance()
+        : getCurrentConfig().getMemberAt(1).getHostAndPort();
+    const auto& hp2 = expectMaintenance
+        ? getCurrentConfig().getMemberAt(2).getHostAndPortMaintenance()
+        : getCurrentConfig().getMemberAt(2).getHostAndPort();
+
+    // member at index 1 is the furthest ahead
+    heartbeatFromMember(hp1, setName, MemberState::RS_SECONDARY, OpTime(Timestamp(1, 0), 0));
+    heartbeatFromMember(hp2, setName, MemberState::RS_SECONDARY, OpTime());
 
     // We start with no sync source
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
@@ -469,47 +526,165 @@ TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
     // Record 2nd round of pings to allow choosing a new sync source; all members equidistant
-    heartbeatFromMember(
-        HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(1, 0), 0));
-    heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime());
+    heartbeatFromMember(hp1, setName, MemberState::RS_SECONDARY, OpTime(Timestamp(1, 0), 0));
+    heartbeatFromMember(hp2, setName, MemberState::RS_SECONDARY, OpTime());
 
     // Should choose h2, since it is furthest ahead
     newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
     ASSERT_EQUALS(getTopoCoord().getSyncSourceAddress(), newSyncSource);
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(hp1, getTopoCoord().getSyncSourceAddress());
 
     // h3 becomes further ahead, so it should be chosen
-    heartbeatFromMember(
-        HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(2, 0), 0));
+    heartbeatFromMember(hp2, setName, MemberState::RS_SECONDARY, OpTime(Timestamp(2, 0), 0));
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(hp2, getTopoCoord().getSyncSourceAddress());
 
     // h3 becomes an invalid candidate for sync source; should choose h2 again
-    heartbeatFromMember(
-        HostAndPort("h3"), "rs0", MemberState::RS_RECOVERING, OpTime(Timestamp(2, 0), 0));
+    heartbeatFromMember(hp2, setName, MemberState::RS_RECOVERING, OpTime(Timestamp(2, 0), 0));
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(hp1, getTopoCoord().getSyncSourceAddress());
 
     // h3 back in SECONDARY and ahead
-    heartbeatFromMember(
-        HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(2, 0), 0));
+    heartbeatFromMember(hp2, setName, MemberState::RS_SECONDARY, OpTime(Timestamp(2, 0), 0));
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(hp2, getTopoCoord().getSyncSourceAddress());
 
     // h3 goes down
-    receiveDownHeartbeat(HostAndPort("h3"), "rs0");
+    receiveDownHeartbeat(hp2, setName);
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(hp1, getTopoCoord().getSyncSourceAddress());
 
     // h3 back up and ahead
-    heartbeatFromMember(
-        HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(2, 0), 0));
+    heartbeatFromMember(hp2, setName, MemberState::RS_SECONDARY, OpTime(Timestamp(2, 0), 0));
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(hp2, getTopoCoord().getSyncSourceAddress());
+}
+
+TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
+    testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h2")
+                                 << BSON("_id" << 30 << "host" << "h3"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, MostRecentDataWithMaintenancePortSpecified) {
+    testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 2)
+                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 3)
+                                 << BSON("_id" << 30 << "host" << "h3" << "maintenancePort" << 4))),
+        0,
+        true);
+}
+
+void TopoCoordTest::testNodeReturnsClosestValidSyncSource(BSONObj config,
+                                                          int selfIndex,
+                                                          bool expectMaintenance) {
+    updateConfig(config, selfIndex);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    OpTime lastOpTimeWeApplied = OpTime(Timestamp(100, 0), 0);
+
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto& primaryMember =
+        getCurrentConfig().getMemberAt(getCurrentConfig().getNumMembers() - 1);
+
+    auto runHeartbeats = [&](bool checkPrimary) {
+        int roundTripTime = 700;
+        for (auto i = 1; i < getCurrentConfig().getNumMembers() - 2; i++) {
+            heartbeatFromMember(expectMaintenance
+                                    ? getCurrentConfig().getMemberAt(i).getHostAndPortMaintenance()
+                                    : getCurrentConfig().getMemberAt(i).getHostAndPort(),
+                                setName,
+                                MemberState::RS_SECONDARY,
+                                OpTime(Timestamp(501, 0), 0),
+                                Milliseconds(roundTripTime));
+            roundTripTime -= 100;
+        }
+        heartbeatFromMember(expectMaintenance
+                                ? getCurrentConfig()
+                                      .getMemberAt(getCurrentConfig().getNumMembers() - 2)
+                                      .getHostAndPortMaintenance()
+                                : getCurrentConfig()
+                                      .getMemberAt(getCurrentConfig().getNumMembers() - 2)
+                                      .getHostAndPort(),
+                            setName,
+                            MemberState::RS_SECONDARY,
+                            OpTime(Timestamp(499, 0), 0),
+                            Milliseconds(roundTripTime));
+        roundTripTime -= 100;
+
+        if (checkPrimary) {
+            ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        }
+        heartbeatFromMember(expectMaintenance ? primaryMember.getHostAndPortMaintenance()
+                                              : primaryMember.getHostAndPort(),
+                            setName,
+                            MemberState::RS_PRIMARY,
+                            OpTime(Timestamp(600, 0), 0),
+                            Milliseconds(roundTripTime));
+        if (checkPrimary) {
+            ASSERT_EQUALS(7, getCurrentPrimaryIndex());
+        }
+    };
+
+    runHeartbeats(true);
+    // Record 2nd round of pings to allow choosing a new sync source
+    runHeartbeats(false);
+
+    // Should choose primary first; it's closest
+    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
+    ASSERT_EQUALS(expectMaintenance ? primaryMember.getHostAndPortMaintenance()
+                                    : primaryMember.getHostAndPort(),
+                  getTopoCoord().getSyncSourceAddress());
+
+    // Primary goes far far away
+    heartbeatFromMember(expectMaintenance ? primaryMember.getHostAndPortMaintenance()
+                                          : primaryMember.getHostAndPort(),
+                        setName,
+                        MemberState::RS_PRIMARY,
+                        OpTime(Timestamp(600, 0), 0),
+                        Milliseconds(100000000));
+
+    // Should choose h4.  (if an arbiter has an oplog, it's a valid sync source)
+    // h6 is not considered because it is outside the maxSyncLagSeconds window.
+    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
+    ASSERT_EQUALS(members[4], getTopoCoord().getSyncSourceAddress());
+
+    // h4 goes down; should choose h1
+    receiveDownHeartbeat(members[4], setName);
+    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
+
+    // Primary (7) and h1 go down; should choose h6
+    receiveDownHeartbeat(members[1], setName);
+    receiveDownHeartbeat(members[7], setName);
+    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
+    ASSERT_EQUALS(members[6], getTopoCoord().getSyncSourceAddress());
+
+    // h6 goes down; should choose h5
+    receiveDownHeartbeat(members[6], setName);
+    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
+    ASSERT_EQUALS(members[5], getTopoCoord().getSyncSourceAddress());
+
+    // h5 goes down; should choose h3
+    receiveDownHeartbeat(members[5], setName);
+    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
+    ASSERT_EQUALS(members[3], getTopoCoord().getSyncSourceAddress());
+
+    // h3 goes down; no sync source candidates remain
+    receiveDownHeartbeat(members[3], setName);
+    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
+    ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }
 
 TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSource) {
-    updateConfig(
+    testNodeReturnsClosestValidSyncSource(
         BSON("_id" << "rs0" << "version" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 1 << "host" << "hself")
                                  << BSON("_id" << 10 << "host" << "h1")
@@ -522,200 +697,136 @@ TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSource) {
                                                << "priority" << 0)
                                  << BSON("_id" << 60 << "host" << "h6")
                                  << BSON("_id" << 70 << "host" << "hprimary"))),
-        0);
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSourceMaintenanceDisabledButUsed) {
+    // When no maintenance ports are specified, the maintenance port responses and the
+    // non-maintenance port responses should be the same.
+    testNodeReturnsClosestValidSyncSource(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 1 << "host" << "hself")
+                                 << BSON("_id" << 10 << "host" << "h1")
+                                 << BSON("_id" << 20 << "host" << "h2" << "buildIndexes" << false
+                                               << "priority" << 0)
+                                 << BSON("_id" << 30 << "host" << "h3" << "hidden" << true
+                                               << "priority" << 0 << "votes" << 0)
+                                 << BSON("_id" << 40 << "host" << "h4" << "arbiterOnly" << true)
+                                 << BSON("_id" << 50 << "host" << "h5" << "secondaryDelaySecs" << 1
+                                               << "priority" << 0)
+                                 << BSON("_id" << 60 << "host" << "h6")
+                                 << BSON("_id" << 70 << "host" << "hprimary"))),
+        0,
+        true);
+}
+
+TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSourceWithMaintenance) {
+    testNodeReturnsClosestValidSyncSource(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(
+                          BSON("_id" << 1 << "host" << "hself" << "maintenancePort" << 2)
+                          << BSON("_id" << 10 << "host" << "h1" << "maintenancePort" << 3)
+                          << BSON("_id" << 20 << "host" << "h2" << "buildIndexes" << false
+                                        << "priority" << 0 << "maintenancePort" << 4)
+                          << BSON("_id" << 30 << "host" << "h3" << "hidden" << true << "priority"
+                                        << 0 << "votes" << 0 << "maintenancePort" << 2)
+                          << BSON("_id" << 40 << "host" << "h4" << "arbiterOnly" << true
+                                        << "maintenancePort" << 1)
+                          << BSON("_id" << 50 << "host" << "h5" << "secondaryDelaySecs" << 1
+                                        << "priority" << 0 << "maintenancePort" << 3)
+                          << BSON("_id" << 60 << "host" << "h6" << "maintenancePort" << 4)
+                          << BSON("_id" << 70 << "host" << "hprimary" << "maintenancePort" << 2))),
+        0,
+        true);
+}
+
+void TopoCoordTest::testNodeWontChooseSyncSourceFromOlderTerm(BSONObj config,
+                                                              int selfIndex,
+                                                              bool expectMaintenance) {
+    updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
-    OpTime lastOpTimeWeApplied = OpTime(Timestamp(100, 0), 0);
+    OpTime lastOpTimeWeApplied = OpTime(Timestamp(100, 0), 3);
 
-    heartbeatFromMember(HostAndPort("h1"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(700));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(600));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(500));
-    heartbeatFromMember(HostAndPort("h4"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(400));
-    heartbeatFromMember(HostAndPort("h5"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(300));
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    auto members = getMemberHostAndPorts(expectMaintenance);
 
-    // This node is lagged further than maxSyncSourceLagSeconds.
-    heartbeatFromMember(HostAndPort("h6"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(499, 0), 0),
+                        OpTime(Timestamp(200, 0), 3),
                         Milliseconds(200));
-
-    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    heartbeatFromMember(HostAndPort("hprimary"),
-                        "rs0",
-                        MemberState::RS_PRIMARY,
-                        OpTime(Timestamp(600, 0), 0),
+    heartbeatFromMember(members[2],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(300, 0), 2),  // old term
                         Milliseconds(100));
-    ASSERT_EQUALS(7, getCurrentPrimaryIndex());
 
     // Record 2nd round of pings to allow choosing a new sync source
-    heartbeatFromMember(HostAndPort("h1"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(700));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(600));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(500));
-    heartbeatFromMember(HostAndPort("h4"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(400));
-    heartbeatFromMember(HostAndPort("h5"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(501, 0), 0),
-                        Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h6"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(499, 0), 0),
+                        OpTime(Timestamp(200, 0), 3),
                         Milliseconds(200));
-    heartbeatFromMember(HostAndPort("hprimary"),
-                        "rs0",
-                        MemberState::RS_PRIMARY,
-                        OpTime(Timestamp(600, 0), 0),
+    heartbeatFromMember(members[2],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(300, 0), 2),  // old term
                         Milliseconds(100));
 
-    // Should choose primary first; it's closest
     getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("hprimary"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
-    // Primary goes far far away
-    heartbeatFromMember(HostAndPort("hprimary"),
-                        "rs0",
-                        MemberState::RS_PRIMARY,
-                        OpTime(Timestamp(600, 0), 0),
-                        Milliseconds(100000000));
-
-    // Should choose h4.  (if an arbiter has an oplog, it's a valid sync source)
-    // h6 is not considered because it is outside the maxSyncLagSeconds window.
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h4"), getTopoCoord().getSyncSourceAddress());
-
-    // h4 goes down; should choose h1
-    receiveDownHeartbeat(HostAndPort("h4"), "rs0");
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h1"), getTopoCoord().getSyncSourceAddress());
-
-    // Primary and h1 go down; should choose h6
-    receiveDownHeartbeat(HostAndPort("h1"), "rs0");
-    receiveDownHeartbeat(HostAndPort("hprimary"), "rs0");
-    ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h6"), getTopoCoord().getSyncSourceAddress());
-
-    // h6 goes down; should choose h5
-    receiveDownHeartbeat(HostAndPort("h6"), "rs0");
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h5"), getTopoCoord().getSyncSourceAddress());
-
-    // h5 goes down; should choose h3
-    receiveDownHeartbeat(HostAndPort("h5"), "rs0");
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
-
-    // h3 goes down; no sync source candidates remain
-    receiveDownHeartbeat(HostAndPort("h3"), "rs0");
+    // h1 goes down; no sync source candidates remain
+    receiveDownHeartbeat(members[1], setName);
     getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }
 
 TEST_F(TopoCoordTest, NodeWontChooseSyncSourceFromOlderTerm) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host" << "hself")
-                                          << BSON("_id" << 10 << "host" << "h1")
-                                          << BSON("_id" << 20 << "host" << "h2"))),
-                 0);
-
-    setSelfMemberState(MemberState::RS_SECONDARY);
-    OpTime lastOpTimeWeApplied = OpTime(Timestamp(100, 0), 3);
-
-    heartbeatFromMember(HostAndPort("h1"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(200, 0), 3),
-                        Milliseconds(200));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(300, 0), 2),  // old term
-                        Milliseconds(100));
-
-    // Record 2nd round of pings to allow choosing a new sync source
-    heartbeatFromMember(HostAndPort("h1"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(200, 0), 3),
-                        Milliseconds(200));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
-                        MemberState::RS_SECONDARY,
-                        OpTime(Timestamp(300, 0), 2),  // old term
-                        Milliseconds(100));
-
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h1"), getTopoCoord().getSyncSourceAddress());
-
-    // h1 goes down; no sync source candidates remain
-    receiveDownHeartbeat(HostAndPort("h1"), "rs0");
-    getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
-    ASSERT(getTopoCoord().getSyncSourceAddress().empty());
+    testNodeWontChooseSyncSourceFromOlderTerm(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 1 << "host" << "hself")
+                                 << BSON("_id" << 10 << "host" << "h1")
+                                 << BSON("_id" << 20 << "host" << "h2"))),
+        0,
+        false);
 }
 
-TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter) {
-    updateConfig(fromjson("{_id:'rs0', version:1, members:["
-                          "{_id:10, host:'hself'}, "
-                          "{_id:20, host:'h2', votes:0, priority:0}, "
-                          "{_id:30, host:'h3'} "
-                          "]}"),
-                 0);
+TEST_F(TopoCoordTest, NodeWontChooseSyncSourceFromOlderTermMaintenancePort) {
+    testNodeWontChooseSyncSourceFromOlderTerm(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 1 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 10 << "host" << "h1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 3))),
+        0,
+        true);
+}
+
+void TopoCoordTest::testChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter(BSONObj config,
+                                                                     int selfIndex,
+                                                                     bool expectMaintenance) {
+    updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    HostAndPort h2("h2"), h3("h3");
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(expectMaintenance);
     Timestamp t1(1, 0), t5(5, 0), t10(10, 0);
     OpTime ot1(t1, 0), ot5(t5, 0), ot10(t10, 0);
     Milliseconds hbRTT100(100), hbRTT300(300);
 
     // Two rounds of heartbeat pings from each member.
-    heartbeatFromMember(h2, "rs0", MemberState::RS_SECONDARY, ot5, hbRTT100);
-    heartbeatFromMember(h2, "rs0", MemberState::RS_SECONDARY, ot5, hbRTT100);
-    heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot1, hbRTT300);
-    heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot1, hbRTT300);
+    heartbeatFromMember(members[1], setName, MemberState::RS_SECONDARY, ot5, hbRTT100);
+    heartbeatFromMember(members[1], setName, MemberState::RS_SECONDARY, ot5, hbRTT100);
+    heartbeatFromMember(members[2], setName, MemberState::RS_SECONDARY, ot1, hbRTT300);
+    heartbeatFromMember(members[2], setName, MemberState::RS_SECONDARY, ot1, hbRTT300);
 
     // Should choose h3 as it is a voter
     auto first = now()++;
     auto newSource = getTopoCoord().chooseNewSyncSource(first, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(h3, newSource);
+    ASSERT_EQUALS(members[2], newSource);
 
     // Since a new sync source was chosen, recentSyncSourceChanges should be updated
     auto recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
@@ -731,220 +842,410 @@ TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter) {
     ASSERT(std::queue<Date_t>({first}) == recentSyncSourceChanges->getChanges_forTest());
 
     // Should choose h3 as it is a voter, and ahead
-    heartbeatFromMember(h3, "rs0", MemberState::RS_SECONDARY, ot5, hbRTT300);
+    heartbeatFromMember(members[2], setName, MemberState::RS_SECONDARY, ot5, hbRTT300);
     newSource = getTopoCoord().chooseNewSyncSource(now()++, ot1, ReadPreference::Nearest);
-    ASSERT_EQUALS(h3, newSource);
+    ASSERT_EQUALS(members[2], newSource);
 }
 
-TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimary) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter) {
+    testChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter(
+        fromjson("{_id:'rs0', version:1, members:["
+                 "{_id:10, host:'hself'}, "
+                 "{_id:20, host:'h1', votes:0, priority:0}, "
+                 "{_id:30, host:'h2'} "
+                 "]}"),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoterMaintenance) {
+    testChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter(
+        fromjson("{_id:'rs0', version:1, members:["
+                 "{_id:10, host:'hself', maintenancePort: 1}, "
+                 "{_id:20, host:'h1', maintenancePort: 2, votes:0, priority:0}, "
+                 "{_id:30, host:'h2', maintenancePort: 3} "
+                 "]}"),
+        0,
+        true);
+}
+
+void TopoCoordTest::testChooseSameSyncSourceEvenWhenPrimary(BSONObj config,
+                                                            int selfIndex,
+                                                            bool expectMaintenance) {
+    updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
 
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(expectMaintenance);
+
     // Two rounds of heartbeat pings from each member.
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(1, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(1, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
 
     // No primary situation: should choose h2 sync source.
-    ASSERT_EQUALS(HostAndPort("h2"),
+    ASSERT_EQUALS(members[1],
                   getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest));
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
     // Become primary
     makeSelfPrimary(Timestamp(3.0));
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
     // Choose same sync source even when primary.
-    ASSERT_EQUALS(HostAndPort("h2"),
+    ASSERT_EQUALS(members[1],
                   getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest));
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 }
 
-TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimary) {
+    testChooseSameSyncSourceEvenWhenPrimary(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h1")
+                                 << BSON("_id" << 30 << "host" << "h2"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimaryMaintenance) {
+    testChooseSameSyncSourceEvenWhenPrimary(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 2)
+                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 3)
+                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 4))),
+        0,
+        true);
+}
+
+void TopoCoordTest::testChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet(
+    BSONObj config, int selfIndex, bool expectMaintenance) {
+    updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
     OpTime oldOpTime = OpTime(Timestamp(1, 0), 0);
     OpTime newOpTime = OpTime(Timestamp(2, 0), 0);
 
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(expectMaintenance);
+
     // two rounds of heartbeat pings from each member
     heartbeatFromMember(
-        HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, oldOpTime, Milliseconds(300));
+        members[1], setName, MemberState::RS_SECONDARY, oldOpTime, Milliseconds(300));
     heartbeatFromMember(
-        HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, oldOpTime, Milliseconds(300));
+        members[1], setName, MemberState::RS_SECONDARY, oldOpTime, Milliseconds(300));
     heartbeatFromMember(
-        HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, newOpTime, Milliseconds(100));
+        members[2], setName, MemberState::RS_SECONDARY, newOpTime, Milliseconds(100));
     heartbeatFromMember(
-        HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, newOpTime, Milliseconds(100));
+        members[2], setName, MemberState::RS_SECONDARY, newOpTime, Milliseconds(100));
 
     // force should overrule other defaults
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
     getTopoCoord().setForceSyncSourceIndex(1);
-    // force should cause shouldChangeSyncSource() to return true
-    // even if the currentSource is the force target
-    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("h2"),
-                                                      makeReplSetMetadata(),
-                                                      makeOplogQueryMetadata(oldOpTime),
-                                                      newOpTime,
-                                                      now()));
-    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("h3"),
-                                                      makeReplSetMetadata(),
-                                                      makeOplogQueryMetadata(newOpTime),
-                                                      newOpTime,
-                                                      now()));
+    // force should cause shouldChangeSyncSource() to return true even if the currentSource is the
+    // force target
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
+        members[1], makeReplSetMetadata(), makeOplogQueryMetadata(oldOpTime), newOpTime, now()));
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
+        members[2], makeReplSetMetadata(), makeOplogQueryMetadata(newOpTime), newOpTime, now()));
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
     // force should only work for one call to chooseNewSyncSource
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 }
 
-TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet) {
+    testChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h1")
+                                 << BSON("_id" << 30 << "host" << "h2"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest,
+       ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySetMaintenance) {
+    testChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+        0,
+        true);
+}
+
+TEST_F(TopoCoordTest, DownedHeartbeatOnMainPortDoesNotAffectMaintenancePortSelection) {
+    updateConfig(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+        0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(true);
 
     // Two rounds of heartbeat pings from each member.
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(1, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(1, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
 
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
+
+    // Receive a down hearbeat on members[2] but on the main port, not the maintenance port
+    receiveDownHeartbeat(HostAndPort("h2"), setName, ErrorCodes::NetworkTimeout);
+
+    // members[2] should still be valid since we received no down heartbeat on the maintenance port
+    getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
+}
+
+void TopoCoordTest::testNodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires(
+    BSONObj config, int selfIndex, bool expectMaintenance) {
+    updateConfig(config, selfIndex);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(expectMaintenance);
+
+    // Two rounds of heartbeat pings from each member.
+    heartbeatFromMember(members[1],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(1, 0), 0),
+                        Milliseconds(300));
+    heartbeatFromMember(members[1],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(1, 0), 0),
+                        Milliseconds(300));
+    heartbeatFromMember(members[2],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(2, 0), 0),
+                        Milliseconds(100));
+    heartbeatFromMember(members[2],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(2, 0), 0),
+                        Milliseconds(100));
+
+    getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 
     Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
-    getTopoCoord().denylistSyncSource(HostAndPort("h3"), expireTime);
+    getTopoCoord().denylistSyncSource(members[2], expireTime);
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
     // Should choose second best choice now that h3 is denylisted.
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
     // After time has passed, should go back to original sync source
     getTopoCoord().chooseNewSyncSource(expireTime, OpTime(), ReadPreference::Nearest);
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 }
 
-TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires) {
+    testNodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h1")
+                                 << BSON("_id" << 30 << "host" << "h2"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpiresMaintenance) {
+    testNodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+        0,
+        true);
+}
+
+TEST_F(TopoCoordTest,
+       NodeDoesNotChooseDenylistedSyncSourceOnMaintenancePortIfMainPortWasDenylisted) {
+    updateConfig(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+        0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(true);
 
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    // Two rounds of heartbeat pings from each member.
+    heartbeatFromMember(members[1],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(1, 0), 0),
+                        Milliseconds(300));
+    heartbeatFromMember(members[1],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(1, 0), 0),
+                        Milliseconds(300));
+    heartbeatFromMember(members[2],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(2, 0), 0),
+                        Milliseconds(100));
+    heartbeatFromMember(members[2],
+                        setName,
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(2, 0), 0),
+                        Milliseconds(100));
+
+    getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
+
+    Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
+    // Denylist using main port, not maintenance port
+    getTopoCoord().denylistSyncSource(HostAndPort("h2"), expireTime);
+    getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    // Should choose second best choice now that h3 is denylisted.
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
+
+    // After time has passed, should go back to original sync source
+    getTopoCoord().chooseNewSyncSource(expireTime, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
+}
+
+void TopoCoordTest::testChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly(
+    BSONObj config, int selfIndex, bool expectMaintenance) {
+    updateConfig(config, selfIndex);
+
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(expectMaintenance);
+
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
 
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
 
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::PrimaryOnly);
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
     Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
-    getTopoCoord().denylistSyncSource(HostAndPort("h2"), expireTime);
+    getTopoCoord().denylistSyncSource(members[1], expireTime);
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::PrimaryOnly);
     // Can't choose any sync source now.
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
     // After time has passed, should go back to the primary
     getTopoCoord().chooseNewSyncSource(expireTime, OpTime(), ReadPreference::PrimaryOnly);
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 }
 
-TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly) {
+    testChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h1")
+                                 << BSON("_id" << 30 << "host" << "h2"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnlyMaintenance) {
+    testChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+        0,
+        true);
+}
+
+void TopoCoordTest::testChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly(
+    BSONObj config, int selfIndex, bool expectMaintenance) {
+    updateConfig(config, selfIndex);
 
     // We use readPreference nearest only when in initialSync
     setSelfMemberState(MemberState::RS_STARTUP2);
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(expectMaintenance);
 
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
@@ -961,8 +1262,8 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOn
 
     // Add primary
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
@@ -980,8 +1281,8 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOn
     ASSERT(recentSyncSourceChanges->getChanges_forTest().empty());
 
     // Update the primary's position.
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(10, 0), 0),
                         Milliseconds(300));
@@ -989,18 +1290,18 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOn
     // h3 is primary and should be chosen as the sync source, despite being further away than h2
     // and the primary (h3) being at our most recently applied optime.
     auto changeTime = now()++;
-    ASSERT_EQUALS(HostAndPort("h3"),
+    ASSERT_EQUALS(members[2],
                   getTopoCoord().chooseNewSyncSource(
                       changeTime, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryOnly));
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 
     // Since a new sync source was chosen, recentSyncSourceChanges should be updated.
     recentSyncSourceChanges = getTopoCoord().getRecentSyncSourceChanges_forTest();
     ASSERT(std::queue<Date_t>({changeTime}) == recentSyncSourceChanges->getChanges_forTest());
 
     // Become primary: should not choose self as sync source.
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
@@ -1012,33 +1313,52 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOn
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 }
 
-TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly) {
+    testChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h1")
+                                 << BSON("_id" << 30 << "host" << "h2"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnlyMaintenance) {
+    testChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 1))),
+        0,
+        true);
+}
+
+void TopoCoordTest::testChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly(
+    BSONObj config, int selfIndex, bool expectMaintenance) {
+    updateConfig(config, selfIndex);
 
     // We use readPreference nearest only when in initialSync
     setSelfMemberState(MemberState::RS_STARTUP2);
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(expectMaintenance);
 
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_RECOVERING,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_RECOVERING,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
@@ -1050,8 +1370,8 @@ TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSeconda
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
     // Add secondary
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(10, 0), 0),
                         Milliseconds(300));
@@ -1064,70 +1384,89 @@ TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSeconda
     ASSERT_EQUALS(HostAndPort(), getTopoCoord().getSyncSourceAddress());
 
     // Update h2's position.
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(300));
 
     // h2 is a secondary and should be chosen as the sync source despite being further away than the
     // primary (h3).
-    ASSERT_EQUALS(HostAndPort("h2"),
+    ASSERT_EQUALS(members[1],
                   getTopoCoord().chooseNewSyncSource(
                       now()++, OpTime(Timestamp(10, 0), 0), ReadPreference::SecondaryOnly));
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
     // Become primary: should choose nearest valid secondary as sync source.
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
     makeSelfPrimary(Timestamp(3.0));
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
     ASSERT_EQUALS(
-        HostAndPort("h3"),
+        members[2],
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::SecondaryOnly));
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 }
 
-TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly) {
+    testChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h1")
+                                 << BSON("_id" << 30 << "host" << "h2"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnlyMaintenance) {
+    testChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 1))),
+        0,
+        true);
+}
+
+void TopoCoordTest::testPreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred(
+    BSONObj config, int selfIndex, bool expectMaintenance) {
+    updateConfig(config, selfIndex);
 
     // We use readPreference nearest only when in initialSync
     setSelfMemberState(MemberState::RS_STARTUP2);
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members = getMemberHostAndPorts(expectMaintenance);
 
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
 
-    // No primary situation: should choose h2.
+    // No primary situation: should choose members[1] (h2).
     auto first = now()++;
     ASSERT_EQUALS(
-        HostAndPort("h2"),
+        members[1],
         getTopoCoord().chooseNewSyncSource(first, OpTime(), ReadPreference::PrimaryPreferred));
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
     // Make sure that recentSyncSourceChanges is updated even though the primary is not chosen as
     // the next sync source.
@@ -1136,20 +1475,20 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
 
     // Add primary
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
     ASSERT_EQUALS(2, getCurrentPrimaryIndex());
 
-    // h3 is primary, but its last applied isn't as up-to-date as ours, so it cannot be chosen
-    // as the sync source.
+    // members[2] (h3) is primary, but its last applied isn't as up-to-date as ours, so it cannot be
+    // chosen as the sync source.
     auto second = now()++;
-    ASSERT_EQUALS(HostAndPort("h2"),
+    ASSERT_EQUALS(members[1],
                   getTopoCoord().chooseNewSyncSource(
                       second, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryPreferred));
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
     // Make sure that recentSyncSourceChanges is updated even though the primary is not chosen as
     // the next sync source.
@@ -1157,19 +1496,19 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
     ASSERT(std::queue<Date_t>({first, second}) == recentSyncSourceChanges->getChanges_forTest());
 
     // Update the primary's position.
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(10, 0), 0),
                         Milliseconds(300));
 
-    // h3 is primary and should be chosen as the sync source, despite being further away than h2
-    // and the primary (h3) being at our most recently applied optime.
+    // members[2] (h3) is primary and should be chosen as the sync source, despite being further
+    // away than members[1] (h2) and the primary being at our most recently applied optime.
     auto third = now()++;
-    ASSERT_EQUALS(HostAndPort("h3"),
+    ASSERT_EQUALS(members[2],
                   getTopoCoord().chooseNewSyncSource(
                       third, OpTime(Timestamp(10, 0), 0), ReadPreference::PrimaryPreferred));
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 
     // Make sure that recentSyncSourceChanges is updated when the primary is chosen as the next
     // sync source.
@@ -1177,171 +1516,243 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
     ASSERT(std::queue<Date_t>({first, second, third}) ==
            recentSyncSourceChanges->getChanges_forTest());
 
-    // Sanity check: the same test as above should return the secondary "h2" if primary is not
-    // preferred.
-    ASSERT_EQUALS(HostAndPort("h2"),
+    // Sanity check: the same test as above should return the secondary members[1] (h2) if primary
+    // is not preferred.
+    ASSERT_EQUALS(members[1],
                   getTopoCoord().chooseNewSyncSource(
                       now()++, OpTime(Timestamp(10, 0), 0), ReadPreference::Nearest));
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
-    // Become primary: should choose closest secondary (h2).
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    // Become primary: should choose closest secondary members[1] (h2).
+    heartbeatFromMember(members[2],
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(300));
     makeSelfPrimary(Timestamp(3.0));
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
     ASSERT_EQUALS(
-        HostAndPort("h2"),
+        members[1],
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::PrimaryPreferred));
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 }
 
-TEST_F(TopoCoordTest, PreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred) {
+    testPreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h2")
+                                 << BSON("_id" << 30 << "host" << "h3"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferredMaintenance) {
+    testPreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h3" << "maintenancePort" << 1))),
+        0,
+        true);
+}
+
+void TopoCoordTest::testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(
+    BSONObj config, int selfIndex, bool expectMaintenance) {
+    updateConfig(config, selfIndex);
 
     // We use readPreference nearest only when in initialSync
     setSelfMemberState(MemberState::RS_STARTUP2);
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members =
+        getMemberHostAndPorts(expectMaintenance);  // members[1] is h2, members[2] is h3
 
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+
+    heartbeatFromMember(members[1],  // h2
+                        setName,
                         MemberState::RS_RECOVERING,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],  // h2
+                        setName,
                         MemberState::RS_RECOVERING,
                         OpTime(Timestamp(0, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],  // h3
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],  // h3
+                        setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
 
-    // No secondary situation: should choose primary as sync source
+
+    // No secondary situation: should choose primary (members[2]) as sync source
     ASSERT_EQUALS(
-        HostAndPort("h3"),
+        members[2],
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::SecondaryPreferred));
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
+
 
     // Add secondary
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],  // h2
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(10, 0), 0),
                         Milliseconds(300));
 
+
     // h2 is a secondary, but its last applied isn't more up-to-date than ours, so it cannot be
-    // chosen as the sync source.
-    ASSERT_EQUALS(HostAndPort("h3"),
+    // chosen as the sync source. Primary (members[2]) is chosen.
+    ASSERT_EQUALS(members[2],
                   getTopoCoord().chooseNewSyncSource(
                       now()++, OpTime(Timestamp(10, 0), 0), ReadPreference::SecondaryPreferred));
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
+
 
     // Update h2's position.
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],  // h2
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(300));
 
-    // h2 is a secondary and should be chosen as the sync source despite being further away than the
-    // primary (h3).
-    ASSERT_EQUALS(HostAndPort("h2"),
+
+    // h2 is a secondary and should be chosen as the sync source (preferred) despite being
+    // further away than the primary (members[2]).
+    ASSERT_EQUALS(members[1],
                   getTopoCoord().chooseNewSyncSource(
                       now()++, OpTime(Timestamp(10, 0), 0), ReadPreference::SecondaryPreferred));
-    ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[1], getTopoCoord().getSyncSourceAddress());
 
-    // Sanity check: If we weren't preferring the secondary, we'd choose the primary in this
-    // situation.
-    ASSERT_EQUALS(HostAndPort("h3"),
+
+    // Sanity check: If we weren't preferring the secondary, we'd choose the primary (members[2])
+    // in this situation.
+    ASSERT_EQUALS(members[2],
                   getTopoCoord().chooseNewSyncSource(
                       now()++, OpTime(Timestamp(10, 0), 0), ReadPreference::Nearest));
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
+
 
     // Become primary: should choose nearest valid secondary as sync source.
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],  // h3
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(11, 0), 0),
                         Milliseconds(100));
     makeSelfPrimary(Timestamp(3.0));
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
     ASSERT_EQUALS(
-        HostAndPort("h3"),
+        members[2],
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::SecondaryPreferred));
-    ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+    ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 }
 
-TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp) {
-    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
-                                          << BSON("_id" << 20 << "host" << "h2")
-                                          << BSON("_id" << 30 << "host" << "h3"))),
-                 0);
+TEST_F(TopoCoordTest, PreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred) {
+    testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h2")
+                                 << BSON("_id" << 30 << "host" << "h3"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest,
+       PreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferredMaintenance) {
+    testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h3" << "maintenancePort" << 1))),
+        0,
+        true);
+}
+
+void TopoCoordTest::testNodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp(
+    BSONObj config, int selfIndex, bool expectMaintenance) {
+    updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto members =
+        getMemberHostAndPorts(expectMaintenance);  // members[1] is h2, members[2] is h3
 
     // Generate enough heartbeats to select a sync source below
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],  // h2
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(1, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h2"),
-                        "rs0",
+    heartbeatFromMember(members[1],  // h2
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(1, 0), 0),
                         Milliseconds(300));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],  // h3
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
-    heartbeatFromMember(HostAndPort("h3"),
-                        "rs0",
+    heartbeatFromMember(members[2],  // h3
+                        setName,
                         MemberState::RS_SECONDARY,
                         OpTime(Timestamp(2, 0), 0),
                         Milliseconds(100));
 
-    ASSERT_EQUALS(HostAndPort("h3"),
+    ASSERT_EQUALS(members[2],  // h3
                   getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest));
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
     // Good state setup done
 
     // Mark nodes down, ensure that we have no source and are secondary
-    receiveDownHeartbeat(HostAndPort("h2"), "rs0", ErrorCodes::NetworkTimeout);
-    receiveDownHeartbeat(HostAndPort("h3"), "rs0", ErrorCodes::NetworkTimeout);
+    receiveDownHeartbeat(members[1], setName, ErrorCodes::NetworkTimeout);  // h2
+    receiveDownHeartbeat(members[2], setName, ErrorCodes::NetworkTimeout);  // h3
     ASSERT_TRUE(
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest).empty());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 
-    // Mark nodes down + unauth, ensure that we have no source and are secondary
-    receiveDownHeartbeat(HostAndPort("h2"), "rs0", ErrorCodes::Unauthorized);
-    receiveDownHeartbeat(HostAndPort("h3"), "rs0", ErrorCodes::Unauthorized);
+    // Mark nodes down + unauth, ensure that we have no source and change to recovering
+    receiveDownHeartbeat(members[1], setName, ErrorCodes::Unauthorized);  // h2
+    receiveDownHeartbeat(members[2], setName, ErrorCodes::Unauthorized);  // h3
     ASSERT_TRUE(
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest).empty());
     ASSERT_EQUALS(MemberState::RS_RECOVERING, getTopoCoord().getMemberState().s);
 
     // Having an auth error but with another node up should bring us out of RECOVERING
     topoCoordSetMyLastAppliedOpTime(OpTime(Timestamp(2, 0), 0), Date_t(), false);
-    HeartbeatResponseAction action = receiveUpHeartbeat(
-        HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(), OpTime(Timestamp(2, 0), 0));
+    HeartbeatResponseAction action = receiveUpHeartbeat(members[1],
+                                                        setName,
+                                                        MemberState::RS_SECONDARY,
+                                                        OpTime(),
+                                                        OpTime(Timestamp(2, 0), 0));  // h2
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
     // Test that the heartbeat that brings us from RECOVERING to SECONDARY doesn't initiate
     // an election (SERVER-17164)
     ASSERT_NO_ACTION(action.getAction());
+}
+
+TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp) {
+    testNodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself")
+                                 << BSON("_id" << 20 << "host" << "h2")
+                                 << BSON("_id" << 30 << "host" << "h3"))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUpMaintenance) {
+    testNodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h3" << "maintenancePort" << 1))),
+        0,
+        true);
 }
 
 TEST_F(TopoCoordTest, NodeRetriesReconfigWhenAbsentFromConfig) {
@@ -1458,6 +1869,29 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsSelf) {
     ASSERT_EQUALS("I cannot sync from myself", result.reason());
 }
 
+TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsSelfMaintenance) {
+    Status result = Status::OK();
+    BSONObjBuilder response;
+
+    updateConfig(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself" << "maintenancePort" << 1)
+                                 << BSON("_id" << 1 << "host" << "h1" << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host" << "h2" << "priority" << 0
+                                               << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host" << "h3")
+                                 << BSON("_id" << 4 << "host" << "h4")
+                                 << BSON("_id" << 5 << "host" << "h5")
+                                 << BSON("_id" << 6 << "host" << "h6"))),
+        0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    // Try to sync from self via maintenance port
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("hself", 1), &response, &result);
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+    ASSERT_EQUALS("I cannot sync from myself", result.reason());
+}
+
 TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsArbiter) {
     Status result = Status::OK();
     BSONObjBuilder response;
@@ -1480,6 +1914,29 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsArbiter) {
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h1"), &response, &result);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
     ASSERT_EQUALS("Cannot sync from \"h1:27017\" because it is an arbiter", result.reason());
+}
+
+TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsArbiterMaintenace) {
+    Status result = Status::OK();
+    BSONObjBuilder response;
+
+    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
+                                          << BSON("_id" << 1 << "host" << "h1" << "maintenancePort"
+                                                        << 1 << "arbiterOnly" << true)
+                                          << BSON("_id" << 2 << "host" << "h2" << "priority" << 0
+                                                        << "buildIndexes" << false)
+                                          << BSON("_id" << 3 << "host" << "h3")
+                                          << BSON("_id" << 4 << "host" << "h4")
+                                          << BSON("_id" << 5 << "host" << "h5")
+                                          << BSON("_id" << 6 << "host" << "h6"))),
+                 0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    // Try to sync from an arbiter via maintenance port
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h1", 1), &response, &result);
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+    ASSERT_EQUALS("Cannot sync from \"h1:1\" because it is an arbiter", result.reason());
 }
 
 TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbuilder) {
@@ -1506,6 +1963,52 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbui
                   result.reason());
 }
 
+TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbuilderMaintenance) {
+    Status result = Status::OK();
+    BSONObjBuilder response;
+
+    updateConfig(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
+                                 << BSON("_id" << 1 << "host" << "h1" << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host" << "h2" << "maintenancePort" << 1
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host" << "h3")
+                                 << BSON("_id" << 4 << "host" << "h4")
+                                 << BSON("_id" << 5 << "host" << "h5")
+                                 << BSON("_id" << 6 << "host" << "h6"))),
+        0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    // Try to sync from a node that doesn't build indexes via maintenance port
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h2", 1), &response, &result);
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+    ASSERT_EQUALS("Cannot sync from \"h2:1\" because it does not build indexes", result.reason());
+}
+
+TEST_F(TopoCoordTest, NodeReturnsNodeNotFoundWhenSyncFromRequestsMainPortAndMaintenancePortExists) {
+    Status result = Status::OK();
+    BSONObjBuilder response;
+
+    updateConfig(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
+                                 << BSON("_id" << 1 << "host" << "h1" << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host" << "h2" << "maintenancePort" << 1
+                                               << "priority" << 0 << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host" << "h3")
+                                 << BSON("_id" << 4 << "host" << "h4")
+                                 << BSON("_id" << 5 << "host" << "h5")
+                                 << BSON("_id" << 6 << "host" << "h6"))),
+        0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    // Try to sync from a node that doesn't build indexes via maintenance port
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h2"), &response, &result);
+    ASSERT_EQUALS(ErrorCodes::NodeNotFound, result);
+    ASSERT_EQUALS("Could not find member \"h2:27017\" in replica set", result.reason());
+}
+
 TEST_F(TopoCoordTest, NodeReturnsHostUnreachableWhenSyncFromRequestsADownNode) {
     Status result = Status::OK();
     BSONObjBuilder response;
@@ -1529,6 +2032,31 @@ TEST_F(TopoCoordTest, NodeReturnsHostUnreachableWhenSyncFromRequestsADownNode) {
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h4"), &response, &result);
     ASSERT_EQUALS(ErrorCodes::HostUnreachable, result);
     ASSERT_EQUALS("I cannot reach the requested member: h4:27017", result.reason());
+}
+
+TEST_F(TopoCoordTest, NodeReturnsHostUnreachableWhenSyncFromRequestsADownNodeMaintenance) {
+    Status result = Status::OK();
+    BSONObjBuilder response;
+
+    updateConfig(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
+                                 << BSON("_id" << 1 << "host" << "h1" << "arbiterOnly" << true)
+                                 << BSON("_id" << 2 << "host" << "h2" << "priority" << 0
+                                               << "buildIndexes" << false)
+                                 << BSON("_id" << 3 << "host" << "h3")
+                                 << BSON("_id" << 4 << "host" << "h4" << "maintenancePort" << 1)
+                                 << BSON("_id" << 5 << "host" << "h5")
+                                 << BSON("_id" << 6 << "host" << "h6"))),
+        0);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    // Try to sync from a member that is down
+    receiveDownHeartbeat(HostAndPort("h4", 1), "rs0");
+
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("h4", 1), &response, &result);
+    ASSERT_EQUALS(ErrorCodes::HostUnreachable, result);
+    ASSERT_EQUALS("I cannot reach the requested member: h4:1", result.reason());
 }
 
 TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAStaleNode) {
@@ -1728,7 +2256,7 @@ TEST_F(TopoCoordTest,
     ASSERT_EQUALS(HostAndPort("h5").toString(), response2Obj["prevSyncTarget"].String());
 }
 
-TEST_F(TopoCoordTest, ReplSetGetStatus) {
+void TopoCoordTest::testReplSetGetStatus(BSONObj config, bool expectMaintenance) {
     // This test starts by configuring a TopologyCoordinator as a member of a 4 node replica
     // set, with each node in a different state.
     // The first node is DOWN, as if we tried heartbeating them and it failed in some way.
@@ -1772,16 +2300,11 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     hb.setWrittenOpTimeAndWallTime({oplogWritten, writtenWallTime});
     StatusWith<ReplSetHeartbeatResponse> hbResponseGood = StatusWith<ReplSetHeartbeatResponse>(hb);
 
-    updateConfig(BSON("_id" << setName << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 0 << "host" << "test0:1234")
-                                          << BSON("_id" << 1 << "host" << "test1:1234")
-                                          << BSON("_id" << 2 << "host" << "test2:1234")
-                                          << BSON("_id" << 3 << "host" << "test3:1234"))),
-                 3,
-                 startupTime + Milliseconds(1));
+    updateConfig(config, 3, startupTime + Milliseconds(1));
+    auto members = getMemberHostAndPorts(expectMaintenance);
 
     // Now that the replica set is setup, put the members into the states we want them in.
-    HostAndPort member = HostAndPort("test0:1234");
+    HostAndPort member = members[0];
     getTopoCoord().prepareHeartbeatRequestV1(startupTime + Milliseconds(1), setName, member);
     getTopoCoord().processHeartbeatResponse(
         startupTime + Milliseconds(2), Milliseconds(1), member, hbResponseGood);
@@ -1795,7 +2318,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     getTopoCoord().processHeartbeatResponse(
         timeoutTime, Milliseconds(5000), member, hbResponseDown);
 
-    member = HostAndPort("test1:1234");
+    member = members[1];
     getTopoCoord().prepareHeartbeatRequestV1(startupTime + Milliseconds(2), setName, member);
     getTopoCoord().processHeartbeatResponse(
         heartbeatTime, Milliseconds(4000), member, hbResponseGood);
@@ -1967,6 +2490,29 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_FALSE(rsStatus.hasField("lastStableRecoveryTimestamp"));
     ASSERT_FALSE(rsStatus.hasField("electionCandidateMetrics"));
     ASSERT_FALSE(rsStatus.hasField("electionParticipantMetrics"));
+}
+
+TEST_F(TopoCoordTest, ReplSetGetStatus) {
+    testReplSetGetStatus(BSON("_id" << "mySet" << "version" << 1 << "members"
+                                    << BSON_ARRAY(BSON("_id" << 0 << "host" << "test0:1234")
+                                                  << BSON("_id" << 1 << "host" << "test1:1234")
+                                                  << BSON("_id" << 2 << "host" << "test2:1234")
+                                                  << BSON("_id" << 3 << "host" << "test3:1234"))),
+                         false);
+}
+
+TEST_F(TopoCoordTest, ReplSetGetStatusMaintenance) {
+    // Tests that we do NOT report the name of the member with the maintenenance port but with the
+    // main port even when the maintenance port is present.
+    testReplSetGetStatus(
+        BSON("_id" << "mySet" << "version" << 1 << "members"
+                   << BSON_ARRAY(
+                          BSON("_id" << 0 << "host" << "test0:1234" << "maintenancePort" << 5678)
+                          << BSON("_id" << 1 << "host" << "test1:1234" << "maintenancePort" << 5678)
+                          << BSON("_id" << 2 << "host" << "test2:1234" << "maintenancePort" << 5678)
+                          << BSON("_id" << 3 << "host" << "test3:1234" << "maintenancePort"
+                                        << 5678))),
+        true);
 }
 
 TEST_F(TopoCoordTest, ReplSetGetStatusWriteMajorityDifferentFromMajorityVoteCount) {
@@ -2606,6 +3152,105 @@ TEST_F(TopoCoordTest, RespondToHeartbeatsWithNullLastAppliedAndLastDurableWhileI
     ASSERT_EQUALS(OpTime(), response.getDurableOpTime());
 }
 
+void TopoCoordTest::testMemberReplicationProgressAfterReconfig(BSONObj initialConfig,
+                                                               BSONObj changedConfig,
+                                                               int selfIndex,
+                                                               bool expectMaintenance) {
+    updateConfig(initialConfig, selfIndex);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+
+    const auto& setName = std::string(getCurrentConfig().getReplSetName());
+    const auto& hp1 = expectMaintenance
+        ? getCurrentConfig().getMemberAt(1).getHostAndPortMaintenance()
+        : getCurrentConfig().getMemberAt(1).getHostAndPort();
+    const auto& hp2 = expectMaintenance
+        ? getCurrentConfig().getMemberAt(2).getHostAndPortMaintenance()
+        : getCurrentConfig().getMemberAt(2).getHostAndPort();
+    const auto term = getTopoCoord().getTerm();
+
+    std::vector<std::tuple<OpTime, OpTime, OpTime>> times = {{OpTime(Timestamp(50, 1), term),
+                                                              OpTime(Timestamp(60, 2), term),
+                                                              OpTime(Timestamp(40, 3), term)},
+                                                             {OpTime(Timestamp(10, 1), term),
+                                                              OpTime(Timestamp(8, 0), term),
+                                                              OpTime(Timestamp(9, 0), term)},
+                                                             {OpTime(Timestamp(20, 0), term),
+                                                              OpTime(Timestamp(12, 2), term),
+                                                              OpTime(Timestamp(13, 12), term)}};
+
+    topoCoordSetMyLastDurableOpTime(get<0>(times[0]), Date_t(), false /* isRollbackAllowed */);
+    topoCoordSetMyLastAppliedOpTime(get<1>(times[0]), Date_t(), false /* isRollbackAllowed */);
+    topoCoordSetMyLastWrittenOpTime(get<2>(times[0]), Date_t(), false /* isRollbackAllowed */);
+
+    heartbeatFromMemberWithMultiOptime(hp1,
+                                       setName,
+                                       MemberState::RS_SECONDARY,
+                                       get<0>(times[1]),
+                                       get<1>(times[1]),
+                                       get<2>(times[1]));
+    heartbeatFromMemberWithMultiOptime(hp2,
+                                       setName,
+                                       MemberState::RS_SECONDARY,
+                                       get<0>(times[2]),
+                                       get<1>(times[2]),
+                                       get<2>(times[2]));
+
+    auto assertCorrectData = [&]() {
+        // Get ReplSetUpdatePosition command which includes our node's knowledge of all other nodes'
+        // replication progress.
+        auto swResponse = getTopoCoord().prepareReplSetUpdatePositionCommand(OpTime());
+        ASSERT_OK(swResponse);
+        UpdatePositionArgs parsedResp;
+        ASSERT_OK(parsedResp.initialize(swResponse.getValue()));
+        auto count = 0;
+        for (UpdatePositionArgs::UpdateIterator update = parsedResp.updatesBegin();
+             update != parsedResp.updatesEnd();
+             ++update) {
+            ASSERT(update->memberId == 0 || update->memberId == 1 || update->memberId == 2);
+            count++;
+            ASSERT_EQ(update->durableOpTime, get<0>(times[update->memberId]));
+            ASSERT_EQ(update->appliedOpTime, get<1>(times[update->memberId]));
+            ASSERT_EQ(update->writtenOpTime, get<2>(times[update->memberId]));
+        }
+        ASSERT_EQ(count, 3);
+    };
+
+    assertCorrectData();
+
+    // Reconfig adding mainenance ports
+    updateConfig(changedConfig, 0);
+
+    assertCorrectData();
+}
+
+TEST_F(TopoCoordTest, ReconfigAddingMaintenancePortsDoesNotAffectReplicationProgressMetrics) {
+    testMemberReplicationProgressAfterReconfig(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
+                                 << BSON("_id" << 1 << "host" << "h2")
+                                 << BSON("_id" << 2 << "host" << "h3"))),
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself" << "maintenancePort" << 2)
+                                 << BSON("_id" << 1 << "host" << "h2" << "maintenancePort" << 2)
+                                 << BSON("_id" << 2 << "host" << "h3" << "maintenancePort" << 2))),
+        0,
+        false);
+}
+
+TEST_F(TopoCoordTest, ReconfigRemovingMaintenancePortsDoesNotAffectReplicationProgressMetrics) {
+    testMemberReplicationProgressAfterReconfig(
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself" << "maintenancePort" << 2)
+                                 << BSON("_id" << 1 << "host" << "h2" << "maintenancePort" << 2)
+                                 << BSON("_id" << 2 << "host" << "h3" << "maintenancePort" << 2))),
+        BSON("_id" << "rs0" << "version" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
+                                 << BSON("_id" << 1 << "host" << "h2")
+                                 << BSON("_id" << 2 << "host" << "h3"))),
+        0,
+        true);
+}
+
 TEST_F(TopoCoordTest, DoNotBecomeCandidateWhenBecomingSecondaryInSingleNodeSetIfInMaintenanceMode) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
@@ -2815,6 +3460,39 @@ TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigIfNodeRemainsElecta
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 }
 
+TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigWhenAddingMaintenancePort) {
+    ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
+    ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host" << "host1:27017"))),
+                 0);
+
+    ASSERT_FALSE(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
+    ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
+    setMyOpTime({Timestamp(1, 1), 0});
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(Date_t(),
+                                                        StartElectionReasonEnum::kElectionTimeout));
+
+    // win election and primary
+    getTopoCoord().processWinElection(Timestamp());
+    ASSERT_TRUE(TopologyCoordinator::Role::kLeader == getTopoCoord().getRole());
+    ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+
+    // Now reconfig in ways that leave us electable and ensure we are still the primary.
+    // Add hosts
+    updateConfig(
+        BSON("_id" << "rs0" << "version" << 2 << "members"
+                   << BSON_ARRAY(
+                          BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
+                          << BSON("_id" << 1 << "host" << "host2:27017")
+                          << BSON("_id" << 2 << "host" << "host3:27017"))),
+        0,
+        Date_t::fromMillisSinceEpoch(-1));
+    ASSERT_TRUE(TopologyCoordinator::Role::kLeader == getTopoCoord().getRole());
+    ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+}
+
 TEST_F(TopoCoordTest, NodeMaintainsSecondaryStateAcrossReconfig) {
     updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host" << "host1:27017")
@@ -2831,6 +3509,28 @@ TEST_F(TopoCoordTest, NodeMaintainsSecondaryStateAcrossReconfig) {
                                           << BSON("_id" << 1 << "host" << "host2:27017")
                                           << BSON("_id" << 2 << "host" << "host3:27017"))),
                  0);
+    ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
+    ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+}
+
+TEST_F(TopoCoordTest, NodeMaintainsSecondaryStateAcrossReconfigWhenAddingMaintenenacePort) {
+    updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 1 << "host" << "host1:27017")
+                                          << BSON("_id" << 2 << "host" << "host2:27017"))),
+                 0);
+    ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
+    ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+
+    // reconfig and stay secondary
+    updateConfig(
+        BSON("_id" << "rs0" << "version" << 2 << "members"
+                   << BSON_ARRAY(
+                          BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
+                          << BSON("_id" << 1 << "host" << "host2:27017")
+                          << BSON("_id" << 2 << "host" << "host3:27017"))),
+        0);
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 }
@@ -3551,13 +4251,32 @@ class HeartbeatResponseTestV1 : public TopoCoordTest {
 public:
     void setUp() override {
         TopoCoordTest::setUp();
-        updateConfig(BSON("_id" << "rs0" << "version" << 5 << "term" << 1 << "members"
-                                << BSON_ARRAY(BSON("_id" << 0 << "host" << "host1:27017")
-                                              << BSON("_id" << 1 << "host" << "host2:27017")
-                                              << BSON("_id" << 2 << "host" << "host3:27017"))
-                                << "protocolVersion" << 1 << "settings"
-                                << BSON("heartbeatTimeoutSecs" << 5)),
-                     0);
+        updateConfig(_config, 0);
+    }
+
+protected:
+    void testShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary();
+    BSONObj _config =
+        BSON("_id" << "rs0" << "version" << 5 << "term" << 1 << "members"
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "host1:27017")
+                                 << BSON("_id" << 1 << "host" << "host2:27017")
+                                 << BSON("_id" << 2 << "host" << "host3:27017"))
+                   << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5));
+    bool _expectsMaintenance = false;
+};
+
+class HeartbeatResponseTestV1Maintenance : public HeartbeatResponseTestV1 {
+    void setUp() override {
+        _config = BSON(
+            "_id"
+            << "rs0" << "version" << 5 << "term" << 1 << "members"
+            << BSON_ARRAY(
+                   BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
+                   << BSON("_id" << 1 << "host" << "host2:27017" << "maintenancePort" << 27018)
+                   << BSON("_id" << 2 << "host" << "host3:27017" << "maintenancePort" << 27018))
+            << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5));
+        _expectsMaintenance = true;
+        HeartbeatResponseTestV1::setUp();
     }
 };
 
@@ -3648,7 +4367,7 @@ TEST_F(HeartbeatResponseTestV1,
                                                        now()));
 }
 
-TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary) {
+void HeartbeatResponseTestV1::testShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary() {
     // In this test, the TopologyCoordinator will tell us change our sync source away from "host2"
     // when it is not ahead of us and it selects us to be its sync source, forming a sync source
     // cycle and we are currently in primary catchup.
@@ -3661,36 +4380,38 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAn
     // Set lastOpTimeFetched to be same as the sync source's OpTime.
     OpTime lastOpTimeFetched = OpTime(Timestamp(400, 0), 0);
 
+    auto members = getMemberHostAndPorts(_expectsMaintenance);
+
     // Show we like host2 while it is not syncing from us.
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
-        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+        members[1], "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"),
+        members[1],
         makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
         makeOplogQueryMetadata(syncSourceOpTime,
                                syncSourceOpTime,
                                -1 /* primaryIndex */,
                                2 /* syncSourceIndex */,
-                               "host3:27017" /* syncSourceHost */),
+                               members[2].toString() /* syncSourceHost */),
         lastOpTimeFetched,
         now()));
 
     // Show that we also like host2 while we are not primary.
     nextAction = receiveUpHeartbeat(
-        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+        members[1], "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
     setSelfMemberState(MemberState::RS_SECONDARY);
     getTopoCoord().setPrimaryIndex(2);
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"),
+        members[1],
         makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
         // Sync source is also syncing from us.
         makeOplogQueryMetadata(syncSourceOpTime,
                                syncSourceOpTime,
                                -1 /* primaryIndex */,
                                0 /* syncSourceIndex */,
-                               "host1:27017" /* syncSourceHost */),
+                               members[0].toString() /* syncSourceHost */),
         lastOpTimeFetched,
         now()));
 
@@ -3699,36 +4420,45 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAn
     getTopoCoord().setPrimaryIndex(0);
     OpTime olderThanSyncSourceOpTime = OpTime(Timestamp(300, 0), 0);
     nextAction = receiveUpHeartbeat(
-        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+        members[1], "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"),
+        members[1],
         makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
         // Sync source is also syncing from us.
         makeOplogQueryMetadata(syncSourceOpTime,
                                syncSourceOpTime,
                                -1 /* primaryIndex */,
                                0 /* syncSourceIndex */,
-                               "host1:27017" /* syncSourceHost */),
+                               members[0].toString() /* syncSourceHost */),
         olderThanSyncSourceOpTime,
         now()));
 
     // Show that we do not like host2 it forms a sync source selection cycle with us and we
     // are primary and it lacks progress beyond our own.
     nextAction = receiveUpHeartbeat(
-        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+        members[1], "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"),
+        members[1],
         makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
         // Sync source is also syncing from us.
         makeOplogQueryMetadata(syncSourceOpTime,
                                syncSourceOpTime,
                                -1 /* primaryIndex */,
                                0 /* syncSourceIndex */,
-                               "host1:27017" /* syncSourceHost */),
+                               members[0].toString() /* syncSourceHost */),
         lastOpTimeFetched,
         now()));
+}
+
+TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary) {
+    testShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary();
+}
+
+TEST_F(HeartbeatResponseTestV1Maintenance,
+       ShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary) {
+    testShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary();
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsDown) {
@@ -4241,6 +4971,30 @@ TEST_F(HeartbeatResponseTestV1,
         now()));
 }
 
+TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenAddingMaintenancePorts) {
+    // Same config as before just add maintenance ports for each node
+    updateConfig(
+        BSON("_id"
+             << "rs0" << "version" << 6 << "term" << 1 << "members"
+             << BSON_ARRAY(
+                    BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
+                    << BSON("_id" << 1 << "host" << "host2:27017" << "maintenancePort" << 27018)
+                    << BSON("_id" << 2 << "host" << "host3:27017" << "maintenancePort" << 27018))
+             << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+        0);
+
+    OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
+    OpTime freshOpTime = OpTime(Timestamp(5, 0), 0);
+
+    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
+        HostAndPort("host2"),
+        makeReplSetMetadata(),
+        makeOplogQueryMetadata(
+            freshOpTime, freshOpTime, -1 /* primaryIndex */, 2 /* syncSourceIndex */),
+        staleOpTime,  // lastOpTimeFetched so that we are behind host2
+        now()));
+}
+
 class ReevalSyncSourceTest : public TopoCoordTest {
 public:
     void setUp() override {
@@ -4463,6 +5217,40 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenPrimaryPrefAndNotCurrentlySyncingFromPrim
                                                            now(),
                                                            ReadPreference::PrimaryPreferred));
     ASSERT_TRUE(syncSrcChangeMetricInitial + 1 ==
+                numSyncSourceChangesDueToSignificantlyCloserNode.get());
+}
+
+TEST_F(TopoCoordTest, ChangeDueToPingTimeEvenIfWeNowHaveMaintenancePorts) {
+    const Milliseconds pingTime = Milliseconds(7);
+    const Milliseconds significantlyCloserPingTime = Milliseconds(1);
+
+    auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
+    updateConfig(
+        BSON("_id"
+             << "rs0" << "version" << 5 << "term" << 1 << "members"
+             << BSON_ARRAY(
+                    BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
+                    << BSON("_id" << 1 << "host" << "host2:27017" << "maintenancePort" << 27018)
+                    << BSON("_id" << 2 << "host" << "host3:27017" << "maintenancePort" << 27018))
+             << "protocolVersion" << 1),
+        0);
+
+    // Set 'changeSyncSourceThresholdMillis' to a non-zero value to allow evaluating if the node
+    // should change sync sources due to ping time.
+    changeSyncSourceThresholdMillis.store(5LL);
+
+    auto lastFetched = OpTime(Timestamp(3, 0), 0);
+
+    // Set pings but on the main port, not the maintenance port.
+    getTopoCoord().setPing_forTest(HostAndPort("host2", 27017), pingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host3", 27017), significantlyCloserPingTime);
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
+                                                                    MemberState::RS_SECONDARY,
+                                                                    lastFetched,
+                                                                    now(),
+                                                                    ReadPreference::Nearest));
+    ASSERT_TRUE(syncSrcChangeMetricInitial ==
                 numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 

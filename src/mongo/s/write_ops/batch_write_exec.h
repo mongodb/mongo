@@ -43,7 +43,6 @@
 
 #include <map>
 #include <set>
-#include <string>
 
 #include <boost/optional/optional.hpp>
 

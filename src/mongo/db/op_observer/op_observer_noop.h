@@ -290,7 +290,8 @@ public:
 
     void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                               const NamespaceString& nss,
-                                              const UUID& uuid) override {}
+                                              const UUID& uuid,
+                                              bool skipViewCreation = false) override {}
 };
 
 }  // namespace mongo

@@ -67,7 +67,7 @@ mongo_cc_library(
         "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/util:varint",
         "//src/mongo/util/concurrency:spin_lock",
-        "//src/third_party/zlib",
+        "@zlib",
     ],
 )
 

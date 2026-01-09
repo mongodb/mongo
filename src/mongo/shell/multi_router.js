@@ -130,6 +130,95 @@ class CursorTracker {
     }
 }
 
+function throwCommandNotSupportedError(cmdName, reason, cmd) {
+    throw Error(
+        `Command ${tojson(cmdName)} is not supported with random mongos dispatching. ${reason}. ` +
+            "Please disable mongos dispatching for this test: TestData.pinToSingleMongos = true. Command: " +
+            tojson(cmd),
+    );
+}
+
+function assertIsSupportedCommand(cmd) {
+    if (!cmd) return;
+    if (cmd.releaseMemory) {
+        if (cmd.releaseMemory.length > 1) {
+            throwCommandNotSupportedError(
+                "releaseMemory with multiple cursors",
+                "Cursors may reside on different mongos instances and we currently don't support driver-side merging of results",
+                cmd,
+            );
+        }
+    }
+    if (cmd.killCursors) {
+        if (cmd.cursors && cmd.cursors.length > 1) {
+            throwCommandNotSupportedError(
+                "killCursors with multiple cursors",
+                "Cursors may reside on different mongos instances and we currently don't support driver-side merging of results",
+                cmd,
+            );
+        }
+    }
+    if (cmd.aggregate && Array.isArray(cmd.pipeline)) {
+        for (const stage of cmd.pipeline) {
+            if (stage.$currentOp && stage.$currentOp.localOps === true) {
+                throwCommandNotSupportedError(
+                    "'$currentOp' with 'localOps: true'",
+                    "It targets local operations on a specific mongos instance",
+                    cmd,
+                );
+            }
+            if (stage.$listLocalSessions) {
+                throwCommandNotSupportedError(
+                    "'$listLocalSessions'",
+                    "It targets local sessions on a specific mongos instance",
+                    cmd,
+                );
+            }
+        }
+    }
+    if (cmd.getShardVersion) {
+        throwCommandNotSupportedError("getShardVersion", "It targets a specific mongos instance", cmd);
+    }
+    if (cmd.getDatabaseVersion) {
+        throwCommandNotSupportedError("getDatabaseVersion", "It targets a specific mongos instance", cmd);
+    }
+}
+
+// Returns whether the command either set or remove a query settings commands.
+function isQuerySettingsCommand(cmd) {
+    return cmd.setQuerySettings || cmd.removeQuerySettings;
+}
+
+// Returns whether the command must be broadcasted to all mongoses instead of just one.
+function requiresBroadcast(cmd) {
+    if (cmd.refreshLogicalSessionCacheNow) {
+        return true;
+    }
+    // setParameter is node-specific and in every core test the command sets the parameter on a mongos.
+    // To run setParameter against a shard there are specific helpers to do so.
+    // In production, a user must choose the node that requires that server parameter.
+    // For the jscore tests, broadcasting  makes sense because it allows to retrieve its value
+    // or sets a specific mongos behaviour indipendently on the mongos chosen.
+    if (cmd.setParameter) {
+        return true;
+    }
+    return false;
+}
+
+function extractCursorID(cmd) {
+    if (!cmd) return undefined;
+    if (cmd.getMore) {
+        return cmd.getMore;
+    }
+    if (cmd.releaseMemory) {
+        return cmd.releaseMemory[0];
+    }
+    if (cmd.killCursors && cmd.cursors) {
+        return cmd.cursors[0];
+    }
+    return undefined;
+}
+
 /**
  * Converts a MongoDB URI object into an array of individual URIs, one for each server.
  *
@@ -183,10 +272,20 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
     // Connection pool and primary connection
     // ============================================================================
 
+    this.log("Establishing Multi-Router Mongo connector... uri: " + uri);
     const individualURIs = toConnectionsList(mongoURI);
     this._mongoConnections = individualURIs.map((uri) => {
         return new Mongo(uri, encryptedDBClientCallback, apiParameters);
     });
+
+    for (const mongo of this._mongoConnections) {
+        const res = assert.commandWorked(mongo._getDefaultSession().getClient().adminCommand("ismaster"));
+        if ("isdbgrid" !== res.msg) {
+            throw new Error(
+                "Multi-Router Mongo connector failed. Connection against " + mongo.host + "is not a mongos",
+            );
+        }
+    }
 
     // The primary mongo is a pinned connection that the proxy falls back on when
     // the workload should not be distributed. This is useful for:
@@ -195,9 +294,8 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
     // - Executing getters or setters on the cluster logicalTime
     // The primary mongo acts as the holder of shared state among the connection pool.
     this.primaryMongo = this._mongoConnections[0];
-    this.defaultDB = this.primaryMongo.defaultDB;
     this.isMultiRouter = true;
-    this.host = mongoURI.servers.map((s) => s.server).join(",");
+    this.hosts = mongoURI.servers.map((s) => s.server).join(",");
 
     this.log("Established a Multi-Router Mongo connector. Mongos connections list: " + individualURIs);
 
@@ -214,34 +312,34 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
 
     this.setAutoEncryption = function (fleOptions) {
         let res;
-        this._mongoConnections.forEach((mongo) => {
+        for (const mongo of this._mongoConnections) {
             res = mongo.setAutoEncryption(fleOptions);
             if (!res) {
                 return res;
             }
-        });
+        }
         return res;
     };
 
     this.toggleAutoEncryption = function (flag) {
         let res;
-        this._mongoConnections.forEach((mongo) => {
+        for (const mongo of this._mongoConnections) {
             res = mongo.toggleAutoEncryption(flag);
             if (!res) {
                 return res;
             }
-        });
+        }
         return res;
     };
 
     this.unsetAutoEncryption = function () {
         let res;
-        this._mongoConnections.forEach((mongo) => {
+        for (const mongo of this._mongoConnections) {
             res = mongo.unsetAutoEncryption();
             if (!res) {
                 return res;
             }
-        });
+        }
         return res;
     };
 
@@ -256,7 +354,44 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         return this._mongoConnections[randomIndex];
     };
 
+    // Broadcast the command to all mongoses and returns error if any returns error.
+    this.broadcast = function (dbName, cmd) {
+        let res;
+        for (const mongo of this._mongoConnections) {
+            res = mongo.getDB(dbName).runCommand(cmd);
+            if (!res.ok) {
+                return res;
+            }
+        }
+        return res;
+    };
+
+    this.refreshClusterParameters = function () {
+        // This will force the refresh of all the cluster parameters
+        return this.broadcast("admin", {getClusterParameter: "*"});
+    };
+
+    this.setLogLevel = function (logLevel, component, session) {
+        let result;
+        for (const mongo of this._mongoConnections) {
+            result = mongo.setLogLevel(logLevel, component, session);
+            if (!result.ok) {
+                return result;
+            }
+        }
+        return result;
+    };
+
     this.runCommand = function (dbname, cmd, options) {
+        // Ensure we call this overriden runCommand if pinToSingleMongos is undefined or disabled.
+        assert.neq(TestData.pinToSingleMongos, true);
+
+        assertIsSupportedCommand(cmd);
+
+        if (requiresBroadcast(cmd)) {
+            return this.broadcast(dbname, cmd);
+        }
+
         let mongo;
 
         // Multi-document transactions must use the same mongos
@@ -272,11 +407,14 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
             }
         }
 
-        // getMore commands must use the same mongos that initiated the cursor
-        if (cmd && cmd.getMore) {
-            mongo = this._cursorTracker.getConnectionUsedForCursor(cmd.getMore);
+        // some query commands must use the same mongos that initiated the cursor
+        const cursorID = extractCursorID(cmd);
+        if (cursorID) {
+            mongo = this._cursorTracker.getConnectionUsedForCursor(cursorID);
             if (!mongo) {
-                throw new Error("Found no mongo for getMore, but we should");
+                // While a mongo is expected to be found, there are tests that specifically run getMore on non-existent cursors.
+                // For this case any mongo is equivalent because the command is only expecting to fail.
+                mongo = this.primaryMongo;
             }
         }
 
@@ -293,6 +431,16 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
             this._cursorTracker.setConnectionUsedForCursor(result.cursor.id, mongo);
         }
 
+        if (isQuerySettingsCommand(cmd) && result && result.ok) {
+            // Refresh the cluster parameters on all connections to propagate query settings changes
+            this.refreshClusterParameters();
+        }
+
+        if (this.shouldDisableMultiRouter_TEMPORARY_WORKAROUND(cmd)) {
+            // Self disable the multi-router.
+            // Starting from the next runCommand, any command will run against the primary mongo until the end of the test.
+            TestData.pinToSingleMongos = true;
+        }
         return result;
     };
 
@@ -346,11 +494,14 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
     // ============================================================================
 
     this.getDB = function (name, proxy) {
-        return new DB(proxy, name);
+        // Note this implementations allows to capture any overridden implementation of Mongo.prototype.getDB from custom hooks (e.g. enable_sessions.js)
+        let newDb = this.primaryMongo.getDB(name);
+        newDb._mongo = proxy;
+        return newDb;
     };
 
     this.adminCommand = function (cmd, proxy) {
-        return new DB(proxy, "admin").runCommand(cmd);
+        return this.getDB("admin", proxy).runCommand(cmd);
     };
 
     // ============================================================================
@@ -389,14 +540,39 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
         return "isdbgrid" === res.msg;
     };
 
+    // For every logic within this function there must be associated a TODO ticket.
+    // Check if the current command is currently unsupported due to a necesserary fix.
+    this.shouldDisableMultiRouter_TEMPORARY_WORKAROUND = function (cmd) {
+        // TODO (SERVER-115554) remove this check once the described issue is solved in v8.0
+        // Timeseries in v8.0 might fail to insert if the routing cache is stale.
+        // We currently don't support timeseries insertions in multi-version on multi-router.
+        let disable = false;
+        if (cmd && cmd.create && cmd.timeseries && TestData.mongosBinVersion) {
+            chatty("Disabling Multi-Router connector - the command is temporarily unsupported" + tojson(cmd));
+            disable = true;
+        }
+        return disable;
+    };
+
+    // TODO SERVER-116289 Remove this helper
+    this.hasPrimaryMongoRefreshed = false;
+    this.refreshPrimaryMongoIfNeeded = function () {
+        if (!this.hasPrimaryMongoRefreshed) {
+            assert.commandWorked(this.primaryMongo.adminCommand({flushRouterConfig: 1}));
+            this.hasPrimaryMongoRefreshed = true;
+        }
+    };
+
     // ============================================================================
     // Proxy handler
     // ============================================================================
-
     return new Proxy(this, {
         get(target, prop, proxy) {
-            // If the proxy is disabled by the test, always run the command on the pinned mongos (primary mongo)
-            if (jsTest.options().skipMultiRouterRotation) {
+            // If the proxy is disabled by the test, always run the command on the pinned mongos (primary mongo).
+            // TODO (SERVER-116289) This refresh is required because some tests keep failing in spite all commands being routed to a single mongos.
+            // Remove this refresh (if possible) once the underling reason is solved.
+            if (jsTest.options().pinToSingleMongos) {
+                target.refreshPrimaryMongoIfNeeded();
                 const value = target.primaryMongo[prop];
                 if (typeof value === "function") {
                     return value.bind(target.primaryMongo);
@@ -420,6 +596,18 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
                 };
             }
 
+            if (prop === "defaultDB") {
+                return target.getDB("test", proxy);
+            }
+
+            // TODO (SERVER-115564) Investigate how the key-vault should interact with the multi-router.
+            if (prop === "getKeyVault") {
+                return function () {
+                    let kv = target.primaryMongo.getKeyVault();
+                    return kv;
+                };
+            }
+
             if (prop === "getDB") {
                 return function (name) {
                     return target.getDB(name, proxy);
@@ -436,6 +624,12 @@ function MultiRouterMongo(uri, encryptedDBClientCallback, apiParameters) {
                 return function (options) {
                     return target.startSession(options, proxy);
                 };
+            }
+
+            if (prop === "host") {
+                // return a random host
+                // TODO (SERVER-115639) return target.hosts once the properties are unified.
+                return target._getNextMongo().host;
             }
 
             if (target.hasOwnProperty(prop)) {

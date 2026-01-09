@@ -132,30 +132,58 @@ single_version_override(
     version = "1.7.1",
 )
 
-bazel_dep(name = "rules_pkg", version = "1.0.1")
-bazel_dep(name = "zlib", version = "1.3.1")
-single_version_override(
-    module_name = "zlib",
-    version = "1.3.1",
-)
-
+bazel_dep(name = "rules_pkg", version = "1.2.0")
 bazel_dep(name = "abseil-cpp", version = "20250512.1", repo_name = "com_google_absl")
 local_path_override(
     module_name = "abseil-cpp",
     path = "src/third_party/abseil-cpp/dist",
 )
 
-bazel_dep(name = "protobuf", version = "", repo_name = "com_google_protobuf")
+bazel_dep(name = "protobuf", version = "31.1", repo_name = "com_google_protobuf")
 local_path_override(
     module_name = "protobuf",
     path = "src/third_party/protobuf/dist",
 )
 
-bazel_dep(name = "grpc", version = "", repo_name = "com_github_grpc_grpc")
+bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
+local_path_override(
+    module_name = "googletest",
+    path = "src/third_party/googletest",
+)
+
+bazel_dep(name = "grpc", version = "1.74.1", repo_name = "com_github_grpc_grpc")
 local_path_override(
     module_name = "grpc",
     path = "src/third_party/grpc/dist",
 )
+
+bazel_dep(name = "boringssl", version = "")
+local_path_override(
+    module_name = "boringssl",
+    path = "src/third_party/boringssl_replacement",
+)
+
+bazel_dep(name = "c-ares", version = "1.27.0")
+local_path_override(
+    module_name = "c-ares",
+    path = "src/third_party/cares",
+)
+
+bazel_dep(name = "re2", version = "2025-08-12")
+local_path_override(
+    module_name = "re2",
+    path = "src/third_party/re2/dist",
+)
+
+bazel_dep(name = "zlib", version = "1.3.1")
+local_path_override(
+    module_name = "zlib",
+    path = "src/third_party/zlib",
+)
+
+# This is just here because 1.5.1 has a bug in it and our current version of re2 will pull in 1.5.1
+# If re2 is ever upgraded past 2025-08-12 this can be unpinned
+bazel_dep(name = "rules_python", version = "1.5.2")
 
 bazel_dep(name = "buildifier_prebuilt", version = "6.4.0", dev_dependency = True)
 single_version_override(

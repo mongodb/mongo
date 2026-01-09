@@ -42,7 +42,6 @@ using PipelineAnalyzerTest = AggJoinModelFixture;
 
 TEST_F(PipelineAnalyzerTest,
        PipelineEligibleForJoinReorderingNoLocalForeignFieldsSimpleSingleTablePredicate) {
-    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
     const auto query = R"([
             {$lookup: {from: "B", as: "fromB", pipeline: [{$match: {a: 1}}]}},
             {$unwind: "$fromB"}
@@ -50,13 +49,11 @@ TEST_F(PipelineAnalyzerTest,
 
     auto pipeline = makePipeline(query, {"A", "B"});
 
-    // TODO SERVER-115666: Bail out in the case of cross-products.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
+    // TODO SERVER-116034: Support cross-products.
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
-    ASSERT_OK(swJoinModel);
-    auto& joinModel = swJoinModel.getValue();
-    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+    ASSERT_NOT_OK(swJoinModel);
 }
 
 TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForeignFields) {
@@ -73,6 +70,7 @@ TEST_F(PipelineAnalyzerTest, PipelinePrefixEligibleForJoinReorderingNoLocalForei
     // This pipeline's prefix is eligible for reordering.
     ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
 
+    // TODO SERVER-116034: Support cross-products.
     auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
     ASSERT_OK(swJoinModel);
 

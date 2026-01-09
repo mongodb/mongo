@@ -55,10 +55,10 @@ def test_exec_properties(tags):
 
     return select({
         "@platforms//cpu:x86_64": {
-            "Pool": pool_x86,
+            "test.Pool": pool_x86,
         },
         "@platforms//cpu:aarch64": {
-            "Pool": pool_arm,
+            "test.Pool": pool_arm,
         },
         "//conditions:default": {},
     })

@@ -32,7 +32,6 @@
 #include "mongo/util/background.h"
 #include "mongo/util/modules.h"
 
-#include <atomic>
 #include <string>
 
 namespace MONGO_MOD_PUBLIC mongo {

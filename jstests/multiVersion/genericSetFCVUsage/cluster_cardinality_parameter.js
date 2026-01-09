@@ -10,10 +10,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkClusterParameter} from "jstests/sharding/libs/cluster_cardinality_parameter_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
-function isRSEndpointEnabled(conn) {
-    return FeatureFlagUtil.isPresentAndEnabled(conn, "ReplicaSetEndpoint");
-}
-
 function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
     for (let oldVersion of ["last-lts", "last-continuous"]) {
         jsTest.log("Running test for " + tojsononeline({oldVersion, hasTwoOrMoreShardsPriorToUpgrade}));
@@ -72,8 +68,7 @@ function runTest(hasTwoOrMoreShardsPriorToUpgrade) {
 
         // The cluster parameter will only be updated on upgrade if the RSEndpoint feature flag is
         // enabled. The parameter will also have the updated value if the old version is 7.3.
-        let expectedValue =
-            isRSEndpointEnabled(st.configRS.getPrimary()) || oldVersionIs73 ? hasTwoOrMoreShardsPriorToUpgrade : true;
+        let expectedValue = oldVersionIs73 ? hasTwoOrMoreShardsPriorToUpgrade : true;
         checkClusterParameter(st.configRS, expectedValue);
         checkClusterParameter(st.rs0, expectedValue);
         if (hasTwoOrMoreShardsPriorToUpgrade) {

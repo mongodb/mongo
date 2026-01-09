@@ -1,0 +1,68 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_reconfig_jscore_passthrough_maintenance_ports.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        globalThis.testingReplication = true; await import("jstests/libs/override_methods/network_error_and_txn_override.js");
+        await import("jstests/libs/override_methods/enable_sessions.js");
+      global_vars:
+        TestData:
+          networkErrorAndTxnOverrideConfig:
+            backgroundReconfigs: true
+          sessionOptions:
+            readPreference:
+              mode: primary
+  fixture:
+    all_nodes_electable: true
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          replication:
+            heartbeats: 2
+    num_nodes: 5
+    use_maintenance_ports: true
+  hooks:
+    - class: DoReconfigInBackground
+      shell_options:
+        global_vars:
+          TestData:
+            usingMaintenancePorts: true
+        nodb: ""
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/txns/**/*.js
+    - jstests/core/**/set_param1.js
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
+    - jstests/core/**/batch_write_command_w0.js
+    - jstests/core/**/crud_api.js
+    - src/mongo/db/modules/*/jstests/fle2/query/*getMore*.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - assumes_read_preference_unchanged
+    - requires_sharding
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

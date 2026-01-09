@@ -30,7 +30,7 @@
 #include "mongo/db/query/compiler/stats/stats_cache_loader.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
@@ -130,8 +130,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
         MODE_IX);
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll.getCollectionPtr(), InsertStatement(serialized), nullptr));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.getCollectionPtr(), serialized));
         wuow.commit();
     }
 
@@ -205,8 +204,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
         MODE_IX);
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll.getCollectionPtr(), InsertStatement(serialized), nullptr));
+        ASSERT_OK(Helpers::insert(operationContext(), coll.getCollectionPtr(), serialized));
         wuow.commit();
     }
 

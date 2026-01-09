@@ -64,11 +64,6 @@ Status CurrentDateNode::init(BSONElement modExpr,
                              const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     invariant(modExpr.ok());
 
-    // TODO (SERVER-114765): Fix inconsistent behaviors with $currentDate type handling. Consider
-    // re-using the logic in matcher_type_set_parser to handle type checking here. Specifically,
-    // this would allow us to share the alias map used to map string types to BSONType values.
-    // Calling operatorValue should also return the numerical type code when serializing. This will
-    // align $currentDate serialization with other parts of the codebase that deal with BSON types.
     if (modExpr.type() == BSONType::boolean) {
         _typeIsDate = true;
     } else if (modExpr.type() == BSONType::object) {

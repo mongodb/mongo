@@ -237,7 +237,7 @@ mongo_cc_library(
     }),
     deps = [
         "@com_google_absl//absl/strings:strings",
-        "//src/third_party/grpc:grpc++",
+        "@com_github_grpc_grpc//:grpc++",
         "//src/third_party/nlohmann-json:json",
         "//src/third_party/opentelemetry-cpp/api",
         "//src/third_party/opentelemetry-cpp/ext/src/http/client/curl:http_client_curl",

@@ -31,8 +31,9 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * A CommandInvocation hooks to track commands directly targeting system.buckets collections.
@@ -50,4 +51,4 @@ public:
         Hours{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

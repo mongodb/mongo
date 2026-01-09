@@ -68,7 +68,7 @@ StatusWith<QueryPlanner::PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans
     // Cap the number of works per plan during this first trials phase so that the total works
     // across all plans does not exceed internalQueryPlanEvaluationWorks.
     auto trialsConfig = _multiPlanner->getTrialPhaseConfig();
-    auto cappedTrialsConfig = MultiPlanStage::TrialPhaseConfig{
+    auto cappedTrialsConfig = trial_period::TrialPhaseConfig{
         .maxNumWorksPerPlan = internalQueryPlanEvaluationWorks.load() / solutionsSize,
         .targetNumResults = trialsConfig.targetNumResults};
     auto mpTrialsStatus = _multiPlanner->runTrials(cappedTrialsConfig);

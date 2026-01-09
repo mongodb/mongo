@@ -60,8 +60,6 @@
 
 #include <map>
 #include <memory>
-#include <string>
-#include <vector>
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>

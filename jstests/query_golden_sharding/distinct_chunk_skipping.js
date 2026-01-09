@@ -1,17 +1,24 @@
 /**
  * Tests the results and explain output for multiplanning DISTINCT_SCANs in cases where the extra
  * work of embedded chunk skipping is evaluated during plan enumeration.
+ *
+ * TODO SERVER-101494: replace resource_intensive label and replace with a smaller burn_in job count.
+ *
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
- *   requires_fcv_82
+ *   requires_fcv_82,
+ *   resource_intensive,
  * ]
  */
 
-import {section} from "jstests/libs/pretty_md.js";
+import {section} from "jstests/libs/query/pretty_md.js";
 import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const shardingTest = new ShardingTest({shards: 2});
+TestData.skipCheckOrphans = true; // Deliberately inserts orphans.
+
+// Disable range deletion to ensure predictable plan choice/ that orphans are where we think they should be.
+const shardingTest = new ShardingTest({shards: 2, rs: {setParameter: {disableResumableRangeDeleter: true}}});
 const db = shardingTest.getDB("test");
 
 // Enable sharding.
@@ -62,5 +69,10 @@ outputAggregationPlanAndResults(coll, [{$match: {a: {$gte: "shard0"}, c: {$lte: 
 coll.createIndex({c: 1});
 section("No DISTINCT_SCAN on 'a', shard filtering + FETCH + filter");
 outputAggregationPlanAndResults(coll, [{$match: {a: {$gte: "shard0"}, c: {$eq: 1}}}, {$group: {_id: "$a"}}]);
+
+// Re-enable the range deleter to drain during teardown.
+[shardingTest.shard0, shardingTest.shard1].forEach((shard) => {
+    assert.commandWorked(shard.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}));
+});
 
 shardingTest.stop();

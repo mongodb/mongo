@@ -35,6 +35,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/util/modules.h"
 
 
 namespace mongo {

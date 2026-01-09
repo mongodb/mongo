@@ -1701,10 +1701,6 @@ retry:
              */
             if (!have_stop_tw) {
                 WT_VISIBLE_TYPE visible_type = __wt_txn_tw_stop_visible(session, &tw);
-                /*
-                 * FIXME-WT-15465: handle cursor walks for prepared updates on the stable table for
-                 * standby.
-                 */
                 if (visible_type == WT_VISIBLE_PREPARE) {
                     if (!F_ISSET(session->txn, WT_TXN_IGNORE_PREPARE))
                         return (WT_PREPARE_CONFLICT);
@@ -1739,10 +1735,6 @@ retry:
             }
 
             WT_VISIBLE_TYPE visible_type = __wt_txn_tw_start_visible(session, &tw);
-            /*
-             * FIXME-WT-15465: handle cursor walks for prepared updates on the stable table for
-             * standby.
-             */
             if (visible_type == WT_VISIBLE_PREPARE) {
                 if (!F_ISSET(session->txn, WT_TXN_IGNORE_PREPARE))
                     return (WT_PREPARE_CONFLICT);

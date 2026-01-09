@@ -152,7 +152,6 @@
 #include "mongo/db/server_lifecycle_monitor.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_entry_point_rs_endpoint.h"
 #include "mongo/db/service_entry_point_shard_role.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/kill_sessions_remote.h"
@@ -534,20 +533,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     ProfileFilterImpl::initializeDefaults(serviceContext);
 
-    {
-        // (Ignore FCV check): The ReplicaSetEndpoint service entry point needs to be set even
-        // before the FCV is fully upgraded.
-        const bool useRSEndpoint =
-            feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabledAndIgnoreFCVUnsafe();
-        auto shardRoleSEP = std::make_unique<ServiceEntryPointShardRole>();
-        auto shardService = serviceContext->getService(ClusterRole::ShardServer);
-        if (useRSEndpoint) {
-            shardService->setServiceEntryPoint(
-                std::make_unique<ServiceEntryPointRSEndpoint>(std::move(shardRoleSEP)));
-        } else {
-            shardService->setServiceEntryPoint(std::move(shardRoleSEP));
-        }
-    }
+    serviceContext->getService(ClusterRole::ShardServer)
+        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
 
     {
         // Set up the periodic runner for background job execution. This is required to be running

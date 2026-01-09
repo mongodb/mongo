@@ -190,12 +190,10 @@ void UnionWithStage::prepareSubPipeline(const std::vector<BSONObj>& serializedPi
 
     _sharedState->_executionState = UnionWithSharedState::ExecutionProgress::kIteratingSubPipeline;
 
-    _sharedState->_execPipeline = exec::agg::buildPipeline(_sharedState->_pipeline->freeze());
-
     // The $unionWith stage takes responsibility for disposing of its Pipeline. When the outer
     // Pipeline that contains the $unionWith is disposed of, it will propagate dispose() to its
     // subpipeline.
-    _sharedState->_execPipeline->dismissDisposal();
+    _sharedState->_execPipeline = exec::agg::buildPipeline(_sharedState->_pipeline->freeze());
 }
 
 bool UnionWithStage::usedDisk() const {

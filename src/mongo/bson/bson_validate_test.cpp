@@ -63,15 +63,14 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <tuple>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
-using std::unique_ptr;
 
 void appendInvalidStringElement(const char* fieldName, BufBuilder* bb) {
     // like a BSONObj string, but without a NUL terminator.
@@ -211,8 +210,7 @@ TEST(BSONValidate, Fuzz) {
         int32_t fuzzFrequency = fuzzFrequencies[i];
 
         // Copy the 'original' BSONObj to 'buffer'.
-        unique_ptr<char[]> buffer(new char[original.objsize()]);
-        memcpy(buffer.get(), original.objdata(), original.objsize());
+        std::vector<char> buffer(original.objdata(), original.objdata() + original.objsize());
 
         // Randomly flip bits in 'buffer', with probability determined by 'fuzzFrequency'. The
         // first four bytes, representing the size of the object, are excluded from bit
@@ -224,7 +222,7 @@ TEST(BSONValidate, Fuzz) {
                 }
             }
         }
-        BSONObj fuzzed(buffer.get());
+        BSONObj fuzzed(buffer.data());
 
         // There is no assert here because there is no other BSON validator oracle
         // to compare outputs against (BSONObj::valid() is a wrapper for validateBSON()).
@@ -250,126 +248,220 @@ TEST(BSONValidateExtended, MD5Size) {
     ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
 }
 
-TEST(BSONValidateExtended, BSONArrayIndexes) {
-    // Valid arrays
-    for (const auto mode : {BSONValidateModeEnum::kDefault,
-                            BSONValidateModeEnum::kExtended,
-                            BSONValidateModeEnum::kFull}) {
-        {
-            const auto arr = BSON("0" << "a"
-                                      << "1"
-                                      << "b");
-            const auto x1 = BSON("arr" << BSONArray(arr));
-            ASSERT_OK(validateBSON(x1, mode));
-        }
+struct BSONValidateArrayIndexingParam {
+    std::string name;
+    BSONObj obj;
+    BSONValidateModeEnum mode;
+    ErrorCodes::Error code;
 
-        {
-            const auto x1 = BSON("longArray" << BSONArray(BSON("0" << "a"
-                                                                   << "1"
-                                                                   << "b"
-                                                                   << "2"
-                                                                   << "c"
-                                                                   << "3"
-                                                                   << "d"
-                                                                   << "4"
-                                                                   << "e"
-                                                                   << "5"
-                                                                   << "f"
-                                                                   << "6"
-                                                                   << "g"
-                                                                   << "7"
-                                                                   << "h"
-                                                                   << "8"
-                                                                   << "i"
-                                                                   << "9"
-                                                                   << "j"
-                                                                   << "10"
-                                                                   << "k")));
-            ASSERT_OK(validateBSON(x1, mode));
-        }
-        {
-            const auto x1 =
-                BSON("validNestedArraysAndObjects"
-                     << BSON("arr" << BSONArray(BSON("0" << BSON("2" << 1 << "1" << 0 << "3"
-                                                                     << BSONArray(BSON("0" << "a"
-                                                                                           << "1"
-                                                                                           << "b"))
-                                                                     << "4"
-                                                                     << "b")))));
-            ASSERT_OK(validateBSON(x1, mode));
-        }
+    friend std::ostream& operator<<(std::ostream& os, const BSONValidateArrayIndexingParam& param) {
+        os << "{name: " << param.name                                //
+           << ", obj: " << param.obj                                 //
+           << ", mode: " << BSONValidateMode_serializer(param.mode)  //
+           << ", code: " << param.code                               //
+           << "}";
+        return os;
+    }
+};
+
+class BSONValidateArrayIndexing : public testing::TestWithParam<BSONValidateArrayIndexingParam> {
+public:
+    using AnyValue = std::variant<std::string, int, BSONObj, BSONArray>;
+
+    struct NamedObj {
+        std::string name;
+        BSONObj obj;
+    };
+
+    struct ModeAndCode {
+        BSONValidateModeEnum mode;
+        ErrorCodes::Error code;
+    };
+
+private:
+    static auto _combine(const std::vector<NamedObj>& namedObjs,
+                         const std::vector<ModeAndCode>& modesAndCodes) {
+        return testing::ConvertGenerator(
+            testing::Combine(testing::ValuesIn(namedObjs), testing::ValuesIn(modesAndCodes)),
+            [](const std::tuple<NamedObj, ModeAndCode>& proto) {
+                const auto& [namedObj, modeAndCode] = proto;
+                return BSONValidateArrayIndexingParam{
+                    namedObj.name, namedObj.obj, modeAndCode.mode, modeAndCode.code};
+            });
     }
 
-    // Invalid Arrays, only Full Validation generates an error
-    for (const auto& [mode, result] :
-         {std::pair{BSONValidateModeEnum::kDefault, ErrorCodes::OK},
-          std::pair{BSONValidateModeEnum::kExtended, ErrorCodes::OK},
-          std::pair{BSONValidateModeEnum::kFull, ErrorCodes::NonConformantBSON}}) {
-        {
-            const auto arr = BSON("a" << 1 << "b" << 2);
-            const auto x1 = BSON("nonNumericalArray" << BSONArray(arr));
-            const auto status = validateBSON(x1, mode);
-            ASSERT_EQ(status, result);
+    class O {
+    public:
+        explicit(false) O(std::initializer_list<std::pair<StringData, AnyValue>> fields) {
+            BSONObjBuilder bob;
+            for (auto&& [k, v] : fields)
+                visit([&](auto&& alt) { bob.append(k, alt); }, v);
+            _obj = bob.obj();
         }
-        {
-            const auto arr = BSON("1" << "a"
-                                      << "2"
-                                      << "b");
-            const auto x1 = BSON("nonSequentialArray" << BSONArray(arr));
-            const auto status = validateBSON(x1, mode);
-            ASSERT_EQ(status, result);
+
+        operator BSONObj() const {
+            return _obj;
         }
-        {
-            const auto x1 =
-                BSON("nestedArraysAndObjects" << BSONArray(BSON("0" << "a"
-                                                                    << "1"
-                                                                    << BSONArray(BSON("0" << "a"
-                                                                                          << "2"
-                                                                                          << "b"))
-                                                                    << "2"
-                                                                    << "b")));
-            const auto status = validateBSON(x1, mode);
-            ASSERT_EQ(status, result);
+
+    private:
+        BSONObj _obj;
+    };
+
+    class A : private O {
+    public:
+        using O::O;
+
+        operator BSONArray() const {
+            return BSONArray{BSONObj{*this}};
         }
-        {
-            const auto x1 = BSON("longNonSequentialArray" << BSONArray(BSON("0" << "a"
-                                                                                << "1"
-                                                                                << "b"
-                                                                                << "2"
-                                                                                << "c"
-                                                                                << "3"
-                                                                                << "d"
-                                                                                << "4"
-                                                                                << "e"
-                                                                                << "5"
-                                                                                << "f"
-                                                                                << "6"
-                                                                                << "g"
-                                                                                << "7"
-                                                                                << "h"
-                                                                                << "8"
-                                                                                << "i"
-                                                                                << "9"
-                                                                                << "j"
-                                                                                << "11"
-                                                                                << "k")));
-            const auto status = validateBSON(x1, mode);
-            ASSERT_EQ(status, result);
-        }
-        {
-            const auto x1 =
-                BSON("invalidNestedArraysAndObjects"
-                     << BSON("arr" << BSONArray(BSON("0" << BSON("2" << 1 << "3" << 0 << "4"
-                                                                     << BSONArray(BSON("0" << "a"
-                                                                                           << "2"
-                                                                                           << "b"))
-                                                                     << "5"
-                                                                     << "b")))));
-            const auto status = validateBSON(x1, mode);
-            ASSERT_EQ(status, result);
-        }
+    };
+
+public:
+    static auto validTestValues() {
+        return _combine(
+            {
+                {
+                    "arr",
+                    O{{"obj",
+                       A{
+                           {"0", "1"},
+                           {"1", "b"},
+                       }}},
+                },
+                {
+                    "longArray",
+                    O{{"obj",
+                       A{
+                           {"0", "a"},
+                           {"1", "b"},
+                           {"2", "c"},
+                           {"3", "d"},
+                           {"4", "e"},
+                           {"5", "f"},
+                           {"6", "g"},
+                           {"7", "h"},
+                           {"8", "i"},
+                           {"9", "j"},
+                           {"10", "k"},
+                       }}},
+                },
+                {
+                    "validNestedArraysAndObjects",
+                    O{{"obj",
+                       O{{"arr",
+                          A{{"0",
+                             O{
+                                 {"2", 1},
+                                 {"1", 0},
+                                 {"3",
+                                  A{
+                                      {"0", "a"},
+                                      {"1", "b"},
+                                  }},
+                                 {"4", "b"},
+                             }}}}}}},
+                },
+            },
+            {
+                {BSONValidateModeEnum::kDefault, ErrorCodes::OK},
+                {BSONValidateModeEnum::kExtended, ErrorCodes::OK},
+                {BSONValidateModeEnum::kFull, ErrorCodes::OK},
+            });
     }
-}  // namespace
+
+    static auto invalidTestValues() {
+        return _combine(
+            {
+                {
+                    "nonNumericalArray",
+                    O{{"obj",
+                       A{
+                           {"a", 1},
+                           {"b", 2},
+                       }}},
+                },
+                {
+                    "nonSequentialArray",
+                    O{{"obj",
+                       A{
+                           {"1", "a"},
+                           {"2", "b"},
+                       }}},
+                },
+                {
+                    "nestedArraysAndObjects",
+                    O{{"obj",
+                       A{
+                           {"0", "a"},
+                           {"1",
+                            A{
+                                {"0", "a"},
+                                {"2", "b"},
+                            }},
+                           {"2", "b"},
+                       }}},
+                },
+                {
+                    "longNonSequentialArray",
+                    O{{"obj",
+                       A{
+                           {"0", "a"},
+                           {"1", "b"},
+                           {"2", "c"},
+                           {"3", "d"},
+                           {"4", "e"},
+                           {"5", "f"},
+                           {"6", "g"},
+                           {"7", "h"},
+                           {"8", "i"},
+                           {"9", "j"},
+                           {"11", "k"},
+                       }}},
+                },
+                {
+                    "invalidNestedArraysAndObjects",
+                    O{{"obj",
+                       O{{"arr",
+                          A{{"0",
+                             O{
+                                 {"2", 1},
+                                 {"3", 0},
+                                 {"4",
+                                  A{
+                                      {"0", "a"},
+                                      {"2", "b"},
+                                  }},
+                                 {"5", "b"},
+                             }}}}}}},
+                },
+            },
+            {
+                {BSONValidateModeEnum::kDefault, ErrorCodes::OK},
+                {BSONValidateModeEnum::kExtended, ErrorCodes::OK},
+                {BSONValidateModeEnum::kFull, ErrorCodes::NonConformantBSON},
+            });
+    }
+
+    static std::string generateName(const testing::TestParamInfo<ParamType>& info) {
+        return fmt::format("{}_{}", info.param.name, BSONValidateMode_serializer(info.param.mode));
+    }
+};
+
+INSTANTIATE_TEST_SUITE_P(BSONArrayIndexesValid,
+                         BSONValidateArrayIndexing,
+                         BSONValidateArrayIndexing::validTestValues(),
+                         BSONValidateArrayIndexing::generateName);
+
+INSTANTIATE_TEST_SUITE_P(BSONArrayIndexesInvalid,
+                         BSONValidateArrayIndexing,
+                         BSONValidateArrayIndexing::invalidTestValues(),
+                         BSONValidateArrayIndexing::generateName);
+
+TEST_P(BSONValidateArrayIndexing, BSONArrayIndexes) {
+    namespace m = unittest::match;
+    const auto& p = GetParam();
+    ASSERT_THAT(validateBSON(p.obj, p.mode), m::StatusIs(m::Eq(p.code), m::Any()));
+}
 
 TEST(BSONValidateExtended, BSONUTF8) {
     auto x1 = BSON("ValidString" << "\x00"
@@ -1374,3 +1466,4 @@ TEST(BSONValidateColumn, BSONColumnWithObjectNestedCodeWScope) {
 }
 
 }  // namespace
+}  // namespace mongo

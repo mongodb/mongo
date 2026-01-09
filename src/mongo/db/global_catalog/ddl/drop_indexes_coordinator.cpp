@@ -29,13 +29,9 @@
 
 #include "mongo/db/global_catalog/ddl/drop_indexes_coordinator.h"
 
-#include "mongo/db/global_catalog/ddl/sharding_ddl_util_detail.h"
 #include "mongo/db/router_role/cluster_commands_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/db/timeseries/catalog_helper.h"
-#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
-#include "mongo/db/topology/sharding_state.h"
-#include "mongo/db/versioning_protocol/shard_version_factory.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -82,52 +78,39 @@ void DropIndexesCoordinator::_dropIndexes(OperationContext* opCtx,
     }
 
     sharding::router::CollectionRouter router(opCtx, targetNss);
-    router.route(
+    router.routeWithRoutingContext(
         "DropIndexesCoordinator::_dropIndexesPhase",
-        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-            const auto chunkManager = cri.getCurrentChunkManager();
-            std::map<ShardId, ShardVersion> shardIdsToShardVersions;
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+            auto opts = [&] {
+                ShardsvrDropIndexesParticipant dropIndexesParticipantRequest(targetNss);
+                dropIndexesParticipantRequest.setDropIndexesRequest(dropIndexesRequest);
 
-            if (chunkManager.hasRoutingTable()) {
-                std::set<ShardId> shardIds;
-                chunkManager.getAllShardIds(&shardIds);
-                for (const auto& shardId : shardIds) {
-                    shardIdsToShardVersions[shardId] =
-                        ShardVersionFactory::make(chunkManager, shardId);
-                }
-            } else {
-                shardIdsToShardVersions[ShardingState::get(opCtx)->shardId()] =
-                    ShardVersion::UNTRACKED();
-            }
+                // TODO SERVER-107766 Remove once it is completed
+                dropIndexesParticipantRequest.setRawData(isRawDataOperation(opCtx));
 
-            const auto session = getNewSession(opCtx);
+                generic_argument_util::setMajorityWriteConcern(dropIndexesParticipantRequest);
+                generic_argument_util::setOperationSessionInfo(dropIndexesParticipantRequest,
+                                                               getNewSession(opCtx));
 
-            ShardsvrDropIndexesParticipant dropIndexesParticipantRequest(targetNss);
-            dropIndexesParticipantRequest.setDropIndexesRequest(dropIndexesRequest);
+                return std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropIndexesParticipant>>(
+                    **executor, token, std::move(dropIndexesParticipantRequest));
+            }();
 
-            // TODO SERVER-107766 Remove once it is completed
-            dropIndexesParticipantRequest.setRawData(isRawDataOperation(opCtx));
-
-            generic_argument_util::setMajorityWriteConcern(dropIndexesParticipantRequest);
-            generic_argument_util::setOperationSessionInfo(dropIndexesParticipantRequest, session);
-
-            auto opts =
-                std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrDropIndexesParticipant>>(
-                    **executor, token, dropIndexesParticipantRequest);
-
-            auto responses = sharding_ddl_util::sendAuthenticatedCommandToShards(
-                opCtx,
-                opts,
-                shardIdsToShardVersions,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                false);
+            const auto responses =
+                sharding_ddl_util::sendAuthenticatedVersionedCommandTargetedByRoutingTable(
+                    opCtx,
+                    opts,
+                    routingCtx,
+                    targetNss,
+                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                    false);
 
             BSONObjBuilder result;
             std::string errmsg;
 
             auto ok = appendRawResponses(opCtx, &errmsg, &result, responses).responseOK;
 
-            if (ok && !cri.isSharded()) {
+            if (ok && !routingCtx.getCollectionRoutingInfo(targetNss).isSharded()) {
                 CommandHelpers::filterCommandReplyForPassthrough(
                     responses[0].swResponse.getValue().data, &result);
             }

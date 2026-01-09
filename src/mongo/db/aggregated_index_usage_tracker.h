@@ -34,7 +34,6 @@
 #include "mongo/util/modules.h"
 
 #include <functional>
-#include <map>
 #include <string>
 
 namespace MONGO_MOD_PUB mongo {

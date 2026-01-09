@@ -635,6 +635,26 @@ __wti_conn_remove_page_log(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wti_conn_remove_key_provider --
+ *     Remove key_provider added by WT_CONNECTION->set_key_provider.
+ */
+int
+__wti_conn_remove_key_provider(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+
+    conn = S2C(session);
+    /* Terminate the key provider. */
+    if (conn->key_provider != NULL) {
+        if (conn->key_provider->terminate != NULL)
+            WT_TRET(conn->key_provider->terminate(conn->key_provider, (WT_SESSION *)session));
+        conn->key_provider = NULL;
+    }
+    return (ret);
+}
+
+/*
  * __conn_add_storage_source --
  *     WT_CONNECTION->add_storage_source method.
  */

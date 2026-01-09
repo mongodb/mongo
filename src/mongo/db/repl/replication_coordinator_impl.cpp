@@ -61,7 +61,6 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
-#include "mongo/db/repl/clang_checked/mutex.h"
 #include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
@@ -91,7 +90,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -454,6 +452,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _rsConfigState(kConfigPreStart),
       _rsConfig(std::make_shared<ReplSetConfig>()),  // Initialize with empty configuration.
       _selfIndex(-1),
+      _sleptLastElection(false),
       _readWriteAbility(std::make_unique<ReadWriteAbility>(!settings.isReplSet())),
       _replicationProcess(replicationProcess),
       _storage(storage),
@@ -477,21 +476,6 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     _electionIdTermShadow.store(_topCoord->getElectionIdTerm());
 
     invariant(_service);
-
-    {
-        clang_checked::lock_guard lk(_mutex);
-
-        auto o0 = OpTimeAndWallTime(OpTime(), Date_t::min());
-        _myLastAppliedOpTimeAndWallTimeCached.store(lk, o0);
-        auto o1 = OpTimeAndWallTime(OpTime(), Date_t::min());
-        _myLastCommittedOpTimeAndWallTimeCached.store(lk, o1);
-        auto o2 = OpTimeAndWallTime(OpTime(), Date_t::min());
-        _myLastDurableOpTimeAndWallTimeCached.store(lk, o2);
-        auto o3 = OpTimeAndWallTime(OpTime(), Date_t::min());
-        _myLastWrittenOpTimeAndWallTimeCached.store(lk, o3);
-
-        _currentCommittedSnapshotCached.store(lk, OpTime());
-    }
 
     if (!_settings.isReplSet()) {
         return;
@@ -563,7 +547,8 @@ int64_t ReplicationCoordinatorImpl::getLastHorizonChange_forTest() const {
 }
 
 OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() const {
-    return _currentCommittedSnapshotCached.load();
+    stdx::lock_guard lk(_mutex);
+    return _getCurrentCommittedSnapshotOpTime(lk);
 }
 
 OpTime ReplicationCoordinatorImpl::_getCurrentCommittedSnapshotOpTime(WithLock) const {
@@ -1679,7 +1664,6 @@ void ReplicationCoordinatorImpl::_setMyLastWrittenOpTimeAndWallTime(
 
     _topCoord->setMyLastWrittenOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
-    _myLastWrittenOpTimeAndWallTimeCached.store(lk, opTimeAndWallTime);
 
     // Signal anyone waiting on optime changes.
     _lastWrittenOpTimeWaiterList.setValueIf(
@@ -1703,7 +1687,6 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTime(
     // transaction, which may be delayed, but this should be fine.
     _topCoord->setMyLastDurableOpTimeAndWallTime(
         opTimeAndWallTime, _replExecutor->now(), isRollbackAllowed);
-    _myLastDurableOpTimeAndWallTimeCached.store(lk, opTimeAndWallTime);
     // If we are using durable times to calculate the commit level, update it now.
     if (_rsConfig.unsafePeek().getWriteConcernMajorityShouldJournal()) {
         _updateLastCommittedOpTimeAndWallTime(lk);
@@ -1753,18 +1736,12 @@ bool ReplicationCoordinatorImpl::_setMyLastDurableOpTimeAndWallTimeForward(
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastWrittenOpTime() const {
-    return _myLastWrittenOpTimeAndWallTimeCached.load().opTime;
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastWrittenOpTime(lock);
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime(
     bool rollbackSafe) const {
-    // If !rollbackSafe, then we access only 1 member, so we don't need the
-    // lock.
-    if (!rollbackSafe) {
-        return _myLastWrittenOpTimeAndWallTimeCached.load();
-    }
-    // Otherwise, we must take the lock since we might touch both _memberState
-    // and _lastWritten.
     stdx::lock_guard lock(_mutex);
     if (rollbackSafe && _getMemberState(lock).rollback()) {
         return {};
@@ -1773,19 +1750,23 @@ OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime(
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastAppliedOpTime() const {
-    return getMyLastAppliedOpTimeAndWallTime().opTime;
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastAppliedOpTime(lock);
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastAppliedOpTimeAndWallTime() const {
-    return _myLastAppliedOpTimeAndWallTimeCached.load();
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastAppliedOpTimeAndWallTime(lock);
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastDurableOpTimeAndWallTime() const {
-    return _myLastDurableOpTimeAndWallTimeCached.load();
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastDurableOpTimeAndWallTime(lock);
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastDurableOpTime() const {
-    return getMyLastDurableOpTimeAndWallTime().opTime;
+    stdx::lock_guard lock(_mutex);
+    return _getMyLastDurableOpTime(lock);
 }
 
 Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
@@ -2164,6 +2145,8 @@ bool ReplicationCoordinatorImpl::isCommitQuorumSatisfied(
 bool ReplicationCoordinatorImpl::_haveNumNodesSatisfiedCommitQuorum(
     WithLock lk, int numNodes, const std::vector<mongo::HostAndPort>& members) const {
     for (auto&& member : members) {
+        // Use lenient version of findMemberByHostAndPort since a node can still be part of a quorum
+        // via its main port (not just its maintenance port).
         auto memberConfig = _rsConfig.unsafePeek().findMemberByHostAndPort(member);
         // We do not count arbiters and members that aren't part of replica set config,
         // towards the commit quorum.
@@ -2186,6 +2169,8 @@ bool ReplicationCoordinatorImpl::_haveTaggedNodesSatisfiedCommitQuorum(
     ReplSetTagMatch matcher(tagPattern);
 
     for (auto&& member : members) {
+        // Use lenient version of findMemberByHostAndPort since a node can still be part of a quorum
+        // via its main port (not just its maintenance port).
         auto memberConfig = _rsConfig.unsafePeek().findMemberByHostAndPort(member);
         // We do not count arbiters and members that aren't part of replica set config,
         // towards the commit quorum.
@@ -2810,10 +2795,14 @@ void ReplicationCoordinatorImpl::_performElectionHandoff() {
         return;
     }
 
-    auto target = _rsConfig.unsafePeek().getMemberAt(candidateIndex).getHostAndPort();
+    const auto& targetConfig = _rsConfig.unsafePeek().getMemberAt(candidateIndex);
+    auto target = targetConfig.getHostAndPortMaintenance();
     executor::RemoteCommandRequest request(
         target, DatabaseName::kAdmin, BSON("replSetStepUp" << 1 << "skipDryRun" << true), nullptr);
-    LOGV2(21347, "Handing off election", "target"_attr = target);
+    LOGV2(21347,
+          "Handing off election",
+          "target"_attr = target,
+          "usingMaintenancePort"_attr = targetConfig.isUsingMaintenancePort(target));
 
     auto callbackHandleSW = _replExecutor->scheduleRemoteCommand(
         request, [target](const executor::TaskExecutor::RemoteCommandCallbackArgs& callbackData) {
@@ -3208,6 +3197,9 @@ ConfigVersionAndTerm ReplicationCoordinatorImpl::getConfigVersionAndTerm() const
     return _getReplSetConfig().getConfigVersionAndTerm();
 }
 
+// This is only used by the index build coordinator and is deprecated so we do not support strict
+// and lenient versions. We only include the lenient version since index builds do not use the
+// maintenance port.
 boost::optional<MemberConfig> ReplicationCoordinatorImpl::findConfigMemberByHostAndPort_deprecated(
     const HostAndPort& hap) const {
     const MemberConfig* result = _getReplSetConfig().findMemberByHostAndPort(hap);
@@ -4646,19 +4638,13 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     LOGV2(21392, "New replica set config in use", "config"_attr = _rsConfig.unsafePeek().toBSON());
     _selfIndex = myIndex;
     if (_selfIndex >= 0) {
+        const auto& selfMember = _rsConfig.unsafePeek().getMemberAt(_selfIndex);
         LOGV2(21393,
               "Found self in config",
-              "hostAndPort"_attr = _rsConfig.unsafePeek().getMemberAt(_selfIndex).getHostAndPort());
+              "hostAndPort"_attr = selfMember.getHostAndPort(),
+              "maintenancePort"_attr = selfMember.getMaintenancePort());
     } else {
         LOGV2(21394, "This node is not a member of the config");
-    }
-    if (replica_set_endpoint::isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // The feature flag check here needs to ignore the FCV since the
-        // ReplicaSetEndpointShardingState needs to be maintained even before the FCV is fully
-        // upgraded.
-        replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)->setIsReplicaSetMember(
-            _selfIndex >= 0);
     }
 
     // Wake up writeConcern waiters that are no longer satisfiable due to the rsConfig change.
@@ -4896,7 +4882,8 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     // If read preference is SecondaryOnly, we should never choose the primary. If the sync source
     // was forced through unsupportedSyncSource, we may sync from any node, so skip this check.
     invariant(readPreference != ReadPreference::SecondaryOnly || !primary ||
-              primary->getHostAndPort() != newSyncSource || !repl::unsupportedSyncSource.empty());
+              primary->getHostAndPortMaintenance() != newSyncSource ||
+              !repl::unsupportedSyncSource.empty());
 
     // If we lost our sync source, schedule new heartbeats immediately to update our knowledge
     // of other members's state, allowing us to make informed sync source decisions.
@@ -4998,8 +4985,6 @@ ChangeSyncSourceAction ReplicationCoordinatorImpl::shouldChangeSyncSourceOnError
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTimeAndWallTime(WithLock lk) {
     if (_topCoord->updateLastCommittedOpTimeAndWallTime()) {
         _setStableTimestampForStorage(lk);
-        auto lastCommittedOpTimeAndWallTime = _topCoord->getLastCommittedOpTimeAndWallTime();
-        _myLastCommittedOpTimeAndWallTimeCached.store(lk, lastCommittedOpTimeAndWallTime);
     }
 }
 
@@ -5139,6 +5124,9 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
     if (_updateCommittedSnapshot(lk, stableOpTime)) {
         // Update the stable timestamp for the storage engine.
         _storage->setStableTimestamp(getServiceContext(), stableOpTime.getTimestamp(), force);
+
+        // Update our understanding of the oldest available snapshot timestamp.
+        setOldestTimestampMetric(_storage->getOldestTimestamp(getServiceContext()));
     }
 }
 
@@ -5212,8 +5200,6 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
     bool forInitiate) {
     if (_topCoord->advanceLastCommittedOpTimeAndWallTime(
             committedOpTimeAndWallTime, fromSyncSource, forInitiate)) {
-        auto lastCommittedOpTimeAndWallTime = _topCoord->getLastCommittedOpTimeAndWallTime();
-        _myLastCommittedOpTimeAndWallTimeCached.store(lk, lastCommittedOpTimeAndWallTime);
         if (_getMemberState(lk).arbiter()) {
             // Arbiters do not store replicated data, so we consider their data trivially
             // consistent.
@@ -5228,11 +5214,13 @@ void ReplicationCoordinatorImpl::_advanceCommitPoint(
 }
 
 OpTime ReplicationCoordinatorImpl::getLastCommittedOpTime() const {
-    return getLastCommittedOpTimeAndWallTime().opTime;
+    stdx::unique_lock lk(_mutex);
+    return _topCoord->getLastCommittedOpTime();
 }
 
 OpTimeAndWallTime ReplicationCoordinatorImpl::getLastCommittedOpTimeAndWallTime() const {
-    return _myLastCommittedOpTimeAndWallTimeCached.load();
+    stdx::unique_lock lk(_mutex);
+    return _topCoord->getLastCommittedOpTimeAndWallTime();
 }
 
 Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
@@ -5356,8 +5344,12 @@ void ReplicationCoordinatorImpl::prepareReplMetadata(const GenericArguments& gen
         invariantStatusOK(oplogQueryMetadata->writeToMetadata(builder));
 }
 
-void ReplicationCoordinatorImpl::setOldestTimestamp(const Timestamp& timestamp) {
+void ReplicationCoordinatorImpl::setOldestTimestampMetric(const Timestamp& timestamp) {
     oldestTimestampMetric = timestamp;
+}
+
+void ReplicationCoordinatorImpl::setOldestTimestamp(const Timestamp& timestamp) {
+    setOldestTimestampMetric(timestamp);
     return ReplicationCoordinator::setOldestTimestamp(timestamp);
 }
 
@@ -5641,7 +5633,6 @@ bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(WithLock lk,
     if (MONGO_unlikely(disableSnapshotting.shouldFail()))
         return false;
     _currentCommittedSnapshot = newCommittedSnapshot;
-    _currentCommittedSnapshotCached.store(lk, newCommittedSnapshot);
     _currentCommittedSnapshotCond.notify_all();
 
     _externalState->updateCommittedSnapshot(newCommittedSnapshot);
@@ -5658,9 +5649,8 @@ void ReplicationCoordinatorImpl::clearCommittedSnapshot() {
     _clearCommittedSnapshot(lock);
 }
 
-void ReplicationCoordinatorImpl::_clearCommittedSnapshot(WithLock lk) {
+void ReplicationCoordinatorImpl::_clearCommittedSnapshot(WithLock) {
     _currentCommittedSnapshot = boost::none;
-    _currentCommittedSnapshotCached.store(lk, OpTime());
     _externalState->clearCommittedSnapshot();
 }
 

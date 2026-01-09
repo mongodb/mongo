@@ -48,7 +48,6 @@
 #include "mongo/util/str.h"
 
 #include <cstddef>
-#include <functional>
 #include <iterator>
 #include <utility>
 #include <vector>

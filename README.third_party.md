@@ -37,7 +37,7 @@ a notice will be included in
 | [folly]                                              | Apache-2.0                                     | 2023.12.25.00                            |                      | ✗                               |
 | [googletest]                                         | BSD-3-Clause                                   | 1.17.0                                   |                      |                                 |
 | [gperftools]                                         | BSD-3-Clause                                   | 2.9.1                                    |                      | ✗                               |
-| [gRPC (C++)]                                         | Apache-2.0                                     | 1.59.5                                   |                      | ✗                               |
+| [gRPC (C++)]                                         | Apache-2.0                                     | 1.74.1                                   |                      | ✗                               |
 | [ICU4C - International Components for Unicode C/C++] | Unicode-3.0                                    | 57.1                                     | ✗                    | ✗                               |
 | [immer]                                              | BSL-1.0                                        | 0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3 |                      | ✗                               |
 | [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                                   | 2.0.1                                    |                      | ✗                               |
@@ -57,7 +57,7 @@ a notice will be included in
 | [opentelemetry-cpp]                                  | Apache-2.0                                     | 1.24.0                                   | ✗                    |                                 |
 | [opentelemetry-proto]                                | Apache-2.0                                     | 1.3.2                                    | ✗                    |                                 |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception              | 10.40                                    |                      | ✗                               |
-| [Protobuf]                                           | BSD-3-Clause                                   | 4.25.0                                   |                      | ✗                               |
+| [Protobuf]                                           | BSD-3-Clause                                   | 6.31.1                                   |                      | ✗                               |
 | [pypi/ocspbuilder]                                   | MIT                                            | 0.10.2                                   |                      |                                 |
 | [pypi/ocspresponder]                                 | Apache-2.0                                     | 0.5.0                                    |                      |                                 |
 | [re2]                                                | BSD-3-Clause                                   | 2025-08-05                               |                      | ✗                               |

@@ -6,6 +6,7 @@
  *  ]
  */
 
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 
 export const $config = (function () {
@@ -20,8 +21,8 @@ export const $config = (function () {
         getRandomCollection: function (db) {
             return db[this.collPrefix + Random.randInt(this.collCount)];
         },
-        getRandomShard: function (connCache) {
-            const shards = Object.keys(connCache.shards);
+        getRandomShard: function (conn) {
+            const shards = ShardingTopologyHelpers.getShardNames(conn);
             return shards[Random.randInt(shards.length)];
         },
         kMovePrimaryAllowedErrorCodes: [
@@ -71,7 +72,7 @@ export const $config = (function () {
         },
         movePrimary: function (db, collName, connCache) {
             db = this.getRandomDb(db);
-            const shardId = this.getRandomShard(connCache);
+            const shardId = this.getRandomShard(db);
 
             jsTestLog("Executing movePrimary state: " + db.getName() + " to " + shardId);
             const res = db.adminCommand({movePrimary: db.getName(), to: shardId});

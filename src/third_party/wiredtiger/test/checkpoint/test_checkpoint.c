@@ -241,8 +241,8 @@ main(int argc, char *argv[])
         return (EXIT_FAILURE);
     }
     if (g.precise_checkpoint && !g.use_timestamps) {
-        fprintf(stderr, "precise checkpoint (-e) is only valid if specified along with -x.\n");
-        return (EXIT_FAILURE);
+        WARN("%s", "Timestamps automatically enabled for precise checkpoint (-e).");
+        g.use_timestamps = true;
     }
 
     /*
@@ -259,9 +259,15 @@ main(int argc, char *argv[])
             return (usage());
 
         if (!g.use_timestamps) {
-            fprintf(stderr, "disaggregated storage feature requires usage of timestamps (-x/-X)");
-            return (EXIT_FAILURE);
+            WARN("%s", "Timestamps automatically enabled for disaggregated storage (-x/-X).");
+            g.use_timestamps = true;
         }
+
+        if (!g.precise_checkpoint) {
+            WARN("%s", "Precise checkpoint automatically enabled for disaggregated storage (-e).");
+            g.precise_checkpoint = true;
+        }
+
         if (ttype != ROW) {
             fprintf(
               stderr, "disaggregated storage feature only supports row store table types (-r)");

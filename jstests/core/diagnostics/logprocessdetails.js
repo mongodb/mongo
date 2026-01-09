@@ -15,6 +15,11 @@
  * Checks an array for match against regex.
  * Returns true if regex matches a string in the array
  */
+
+// logRotate and getLog are node-local commands and assume to consistently hit the same node.
+// pinToSingleMongos due to logRotate/getLog
+TestData.pinToSingleMongos = true;
+
 let doesLogMatchRegex = function (logArray, regex) {
     for (let i = logArray.length - 1; i >= 0; i--) {
         let regexInLine = regex.exec(logArray[i]);

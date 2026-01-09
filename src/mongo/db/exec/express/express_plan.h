@@ -49,6 +49,7 @@
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role/lock_manager/exception_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
@@ -377,10 +378,13 @@ public:
         // in higher variance for YCSB throughput, making it difficult to measure incremental
         // performance improvements. For now, disable cursor reuse to unblock progress on
         // disaggregated storage performance.
-        // TODO SERVER-115972 investigate re-enabling for attached storage.
-        cursor = nullptr;
 
-        auto progress = continuation(collection, std::move(rid), std::move(obj), nullptr);
+        auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+        if (!provider.supportsCursorReuseForExpressPathQueries()) {
+            cursor = nullptr;
+        }
+
+        auto progress = continuation(collection, std::move(rid), std::move(obj), cursor.get());
 
         // Only advance the iterator if the continuation completely processed its item, as indicated
         // by its return value.

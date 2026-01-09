@@ -1523,14 +1523,6 @@
     "plans":     10,
     "rows" :  84997},
 
-{">>>pipeline": [{"$match":{"$nor":[{"a_compound":{"$all":[2,10,8,5]}},{"a_noidx":{"$eq":15}},{"k_compound":{"$in":[16,14]}},{"a_compound":{"$ne":9}}],"a_idx":{"$in":[12,9,10]}}},{"$limit":81}],
-    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_compound_1","indexBounds":{"a_compound":["[9.0, 9.0]"]}}}},
-    "keys" :     81,
-    "docs" :     81,
-    "sorts":      0,
-    "plans":     15,
-    "rows" :     81},
-
 {">>>pipeline": [{"$match":{"$and":[{"a_compound":{"$nin":[18,4,10]}},{"a_idx":{"$elemMatch":{"$lte":1}}},{"h_idx":{"$nin":[9,11]}}],"a_compound":{"$gt":18},"a_idx":{"$in":[5,5]}}},{"$sort":{"a_idx":-1}},{"$limit":36},{"$project":{"k_compound":1,"k_idx":1}}],
     "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"a_idx_1","indexBounds":{"a_idx":["[MaxKey, MinKey]"]}}}}},
     "keys" :    895,
@@ -8388,7 +8380,7 @@
     "rows" :  20000}
 
 ],
-">>>totals": {"pipelines": 1044, "plans": 9652, "keys": 126259408, "docs": 60712245, "sorts": 69071145, "rows": 38020103, "errors":      0},
+">>>totals": {"pipelines": 1043, "plans": 9637, "keys": 126259327, "docs": 60712164, "sorts": 69071145, "rows": 38020022, "errors":      0},
 ">>>parameters": {"planRankerMode":"multiPlanning","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":false}}
 
 

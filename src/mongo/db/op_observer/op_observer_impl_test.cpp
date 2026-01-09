@@ -3463,6 +3463,10 @@ protected:
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
     const NamespaceString _nssWithTid =
         NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), "test", "coll");
+
+    // Reusable test for asserting batched writes with a single operation are not wrapped in
+    // applyOps
+    void testBatchedWriteSingleOplogEntryIsNotWrappedInApplyOps(auto opLoggingFn);
 };
 
 // Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction replicates its writes
@@ -4500,54 +4504,85 @@ TEST_F(BatchedWriteOutputsTest, TestNonRetryableVectoredInsertMultiApplyOpsGroup
     }
 }
 
+// Test that oplog entry is not wrapped in applyOps when grouping is enabled. Provide a function
+// which will create an oplog entry.
+void BatchedWriteOutputsTest::testBatchedWriteSingleOplogEntryIsNotWrappedInApplyOps(
+    auto opLoggingFn) {
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    // Execution operation without grouping to get the expected oplog entry.
+    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    WriteUnitOfWork wuow(opCtx);
+    opLoggingFn(autoColl, opCtx);
+    wuow.commit();
+
+    // Execute same operation but grouped.
+    WriteUnitOfWork wuowGrouped(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+    opLoggingFn(autoColl, opCtx);
+    wuowGrouped.commit();
+
+    // Retrieve the oplog entries. Implicitly asserts that there are two oplog entries: one
+    // for each call to "opLoggingFn".
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 2);
+    auto oplogEntry = oplogs[0].removeFields({"ts", "wall"});
+    auto oplogEntry1 = oplogs[1].removeFields({"ts", "wall"});
+    // Check that both oplog entries other than the timestamp and wall clock time are identical.
+    ASSERT_BSONOBJ_EQ(oplogEntry, oplogEntry1);
+}
+
 TEST_F(BatchedWriteOutputsTest, TestSingleInsertIsNotInApplyOps) {
-    auto testGroupedSingleOperationIsNotBatched = [&](StmtId stmtId) {
-        // Setup and clear any state.
-        auto opCtxRaii = cc().makeOperationContext();
-        OperationContext* opCtx = opCtxRaii.get();
-        reset(opCtx, nss);
-        reset(opCtx, NamespaceString::kRsOplogNamespace);
+    testBatchedWriteSingleOplogEntryIsNotWrappedInApplyOps(
+        [&](const AutoGetCollection& autoColl, OperationContext* opCtx) {
+            std::vector<InsertStatement> inserts;
+            inserts.emplace_back(kUninitializedStmtId, BSON("_id" << 0 << "a" << 10));
+            opCtx->getServiceContext()->getOpObserver()->onInserts(
+                opCtx,
+                *autoColl,
+                inserts.begin(),
+                inserts.end(),
+                /*recordIds=*/{},
+                /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                /*defaultFromMigrate=*/false);
+        });
 
-        std::vector<InsertStatement> inserts;
-        inserts.emplace_back(stmtId, BSON("_id" << 0 << "a" << 10));
+    // TODO SERVER-114338: Update test to check single retryable insert oplog entries. We can do the
+    // same thing above using a statement id StmtId(0).
+}
 
-        // Do an insert without grouping to get the expected oplog entry.
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        WriteUnitOfWork wuow(opCtx);
-        opCtx->getServiceContext()->getOpObserver()->onInserts(
-            opCtx,
-            *autoColl,
-            inserts.begin(),
-            inserts.end(),
-            /*recordIds=*/{},
-            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
-            /*defaultFromMigrate=*/false);
-        wuow.commit();
+TEST_F(BatchedWriteOutputsTest, TestSingleDeleteIsNotInApplyOps) {
+    testBatchedWriteSingleOplogEntryIsNotWrappedInApplyOps(
+        [&](const AutoGetCollection& autoColl, OperationContext* opCtx) {
+            auto doc = BSON("_id" << 0 << "a" << 10);
+            opCtx->getServiceContext()->getOpObserver()->onDelete(
+                opCtx, *autoColl, kUninitializedStmtId, doc, getDocumentKey(*autoColl, doc), {});
+        });
 
-        // Insert same document but grouped.
-        WriteUnitOfWork wuowGrouped(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
-        opCtx->getServiceContext()->getOpObserver()->onInserts(
-            opCtx,
-            *autoColl,
-            inserts.begin(),
-            inserts.end(),
-            /*recordIds=*/{},
-            /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
-            /*defaultFromMigrate=*/false);
-        wuowGrouped.commit();
+    // TODO SERVER-114338: Update test to check single retryable delete oplog entries. We can do the
+    // same thing above using a statement id StmtId(0).
+}
 
-        // Retrieve the oplog entries. Implicitly asserts that there are three oplog entries: one
-        // implicit changestream collection creation and two insert oplog entries.
-        std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 2);
-        auto oplogEntry = oplogs[0].removeFields({"ts", "wall"});
-        auto oplogEntry1 = oplogs[1].removeFields({"ts", "wall"});
-        // Check that both oplog entries other than the timestamp and wall clock time are identical.
-        ASSERT_BSONOBJ_EQ(oplogEntry, oplogEntry1);
-    };
+TEST_F(BatchedWriteOutputsTest, TestSingleUpdateIsNotInApplyOps) {
+    testBatchedWriteSingleOplogEntryIsNotWrappedInApplyOps(
+        [&](const AutoGetCollection& autoColl, OperationContext* opCtx) {
+            const auto criteria = BSON("_id" << 0);
+            // Create a fake preImageDoc; the tested code path does not care about this value.
+            const auto preImageDoc = criteria;
+            CollectionUpdateArgs updateArgs{preImageDoc};
+            updateArgs.criteria = criteria;
+            updateArgs.updatedDoc = BSON("_id" << 0 << "data"
+                                               << "x");
+            updateArgs.update = BSON("$set" << BSON("data" << "x"));
+            updateArgs.mustCheckExistenceForInsertOperations = true;
+            OplogUpdateEntryArgs update(&updateArgs, *autoColl);
 
-    testGroupedSingleOperationIsNotBatched(kUninitializedStmtId);
-    // TODO SERVER-114338: Update test to check single retryable insert oplog entries
-    // testGroupedSingleOperationIsNotBatched(StmtId(0));
+            opCtx->getServiceContext()->getOpObserver()->onUpdate(opCtx, update);
+        });
+
+    // TODO SERVER-114338: Update test to check single retryable update oplog entries. We can do the
+    // same thing above but also setting updateArgs.stmtIds to StmtId(0).
 }
 
 class OnDeleteOutputsTest : public OpObserverTest {

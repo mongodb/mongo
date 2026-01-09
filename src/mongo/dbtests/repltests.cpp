@@ -38,9 +38,9 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
 #include "mongo/db/index_builds/index_build_test_helpers.h"
@@ -389,12 +389,9 @@ protected:
         // timestamp of the lastApplied to be safe. In the case where there is no oplog entries in
         // the oplog collection, we will use a non-zero timestamp (Timestamp(1, 1)) for the insert.
         auto nextTimestamp = std::max(lastApplied + 1, Timestamp(1, 1));
-        OpDebug* const nullOpDebug = nullptr;
         if (o.hasField("_id")) {
             repl::UnreplicatedWritesBlock uwb(&_opCtx);
-            collection_internal::insertDocument(
-                &_opCtx, coll, InsertStatement(o), nullOpDebug, true)
-                .transitional_ignore();
+            Helpers::insert(&_opCtx, coll, o).transitional_ignore();
             ASSERT_OK(shard_role_details::getRecoveryUnit(&_opCtx)->setTimestamp(nextTimestamp));
             wunit.commit();
             return;
@@ -406,9 +403,7 @@ protected:
         b.appendOID("_id", &id);
         b.appendElements(o);
         repl::UnreplicatedWritesBlock uwb(&_opCtx);
-        collection_internal::insertDocument(
-            &_opCtx, coll, InsertStatement(b.obj()), nullOpDebug, true)
-            .transitional_ignore();
+        Helpers::insert(&_opCtx, coll, b.obj()).transitional_ignore();
         ASSERT_OK(shard_role_details::getRecoveryUnit(&_opCtx)->setTimestamp(nextTimestamp));
         wunit.commit();
     }

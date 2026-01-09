@@ -28,8 +28,8 @@ mongo_cc_library(
         "//src/mongo/util:pcre_util",
         "//src/mongo/util:pcre_wrapper",
         "//src/mongo/util/options_parser",
-        "//src/third_party/googletest:gtest",
         "//src/third_party/yaml-cpp:yaml",
+        "@com_google_googletest//:gtest",
     ],
 )
 

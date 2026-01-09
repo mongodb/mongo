@@ -12,6 +12,12 @@
 //   requires_non_retryable_commands,
 // ]
 
+// Running this test against multiple mongoses has high chance of authentication failures.
+// Every mongos proactively discovers new passwords for users by refreshing its cache via polling against the config servers.
+// The authentication might happen too early, before the refresh occurs.
+// pinToSingleMongos due to updateUser command.
+TestData.pinToSingleMongos = true;
+
 function assertHasRole(rolesArray, roleName, roleDB) {
     for (let i in rolesArray) {
         const curRole = rolesArray[i];

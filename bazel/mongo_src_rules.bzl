@@ -1246,14 +1246,10 @@ def mongo_cc_grpc_library(
     generate_cc(
         name = codegen_grpc_target,
         srcs = srcs,
-        plugin = "//src/third_party/grpc:grpc_cpp_plugin",
+        plugin = "@com_github_grpc_grpc//src/compiler:grpc_cpp_plugin",
         well_known_protos = well_known_protos,
         generate_mocks = generate_mocks,
         tags = tags + ["gen_source"],
-        disable_sandbox = select({
-            "//bazel/config:tsan_enabled": True,
-            "//conditions:default": False,
-        }),
         **kwargs
     )
 
@@ -1271,7 +1267,7 @@ def mongo_cc_grpc_library(
         srcs = [":" + codegen_grpc_target],
         hdrs = [":" + codegen_grpc_target],
         deps = deps +
-               ["//src/third_party/grpc:grpc++_codegen_proto"],
+               ["@com_github_grpc_grpc//:grpc++_codegen_proto"],
         cc_deps = [":" + cc_proto_target],
         no_undefined_ref_DO_NOT_USE = no_undefined_ref_DO_NOT_USE,
         **kwargs

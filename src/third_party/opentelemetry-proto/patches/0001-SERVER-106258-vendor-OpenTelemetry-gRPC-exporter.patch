@@ -116,8 +116,8 @@ index e516cfbb494..decf9afaab3 100644
 +        ":logs_proto_cc",
 +        ":logs_service_cc_grpc",
 +        ":resource_proto_cc",
-+        "//src/third_party/grpc:grpc++_reflection",
-+        "//src/third_party/protobuf",
++        "@com_github_grpc_grpc//:grpc++_reflection",
++        "@com_google_protobuf//:protobuf",
 +    ],
 +)
 +
@@ -146,8 +146,8 @@ index e516cfbb494..decf9afaab3 100644
 +        ":metrics_proto_cc",
 +        ":metrics_service_cc_grpc",
 +        ":resource_proto_cc",
-+        "//src/third_party/grpc:grpc++_reflection",
-+        "//src/third_party/protobuf",
++        "@com_github_grpc_grpc//:grpc++_reflection",
++        "@com_google_protobuf//:protobuf",
 +    ],
 +)
 +
@@ -199,8 +199,8 @@ index e516cfbb494..decf9afaab3 100644
 +        ":resource_proto_cc",
 +        ":trace_proto_cc",
 +        ":trace_service_cc_grpc",
-+        "//src/third_party/grpc:grpc++_reflection",
-+        "//src/third_party/protobuf",
++        "@com_github_grpc_grpc//:grpc++_reflection",
++        "@com_google_protobuf//:protobuf",
 +    ],
 +)
 +

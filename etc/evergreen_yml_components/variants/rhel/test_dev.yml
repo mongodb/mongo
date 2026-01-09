@@ -199,10 +199,16 @@ buildvariants:
       - name: sharding_multiversion_gen
       - name: sharding_jscore_multiversion_gen
       - name: sharding_jscore_kill_primary_multiversion_gen
-      - name: .sharding .txns
+      - name: .sharding .txns !.requires_large_host
+      - name: .sharding .txns .requires_large_host
+        distros:
+          - rhel8.8-large
       # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
       - name: .sharding .common !.csrs !.feature_flag_guarded
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
+        distros:
+          - rhel8.8-large
       - name: .concurrency .sharded !.large
       - name: .concurrency .sharded .large
       - name: .unsplittable_collections
@@ -275,8 +281,14 @@ buildvariants:
           - rhel8.8-xlarge
       - name: .rollbackfuzzer
       - name: .sharding .common !.feature_flag_guarded
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
-      - name: .sharding .txns
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
+      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
+        distros:
+          - rhel8.8-medium
+      - name: .sharding .txns !.requires_large_host
+      - name: .sharding .txns .requires_large_host
+        distros:
+          - rhel8.8-medium
       - name: .updatefuzzer
       - name: aggregation_repeat_queries_multiplan_single_solutions
       - name: audit
@@ -346,19 +358,27 @@ buildvariants:
       - name: aggregation_mongos_pqs_hints_gen
       - name: aggregation_pqs_fallback_gen
       - name: aggregation_pqs_hints
+        distros:
+          - rhel8.8-medium
       - name: aggregation_sharded_collections_pqs_fallback_gen
       - name: aggregation_sharded_collections_pqs_hints_gen
       - name: aggregation_sharded_collections_query_shape_hash_stability_gen
       - name: replica_sets_jscore_pqs_fallback_gen
       - name: replica_sets_jscore_pqs_hints_gen
       - name: replica_sets_jscore_pqs_index_filters
+        distros:
+          - rhel8.8-medium
       - name: sharded_collections_pqs_fallback_gen
       - name: sharded_collections_pqs_hints_gen
       - name: sharded_collections_pqs_index_filters
+        distros:
+          - rhel8.8-medium
       - name: sharded_collections_query_shape_hash_stability_gen
       - name: sharding_pqs_fallback_gen
       - name: sharding_pqs_hints_gen
       - name: sharding_pqs_index_filters
+        distros:
+          - rhel8.8-medium
 
   - name: upload-sbom-if-changed
     display_name: "Upload SBOM if changed"

@@ -340,7 +340,6 @@ Status WiredTigerRecordStore::wtInsertRecord(OperationContext* opCtx,
 
     if (ret == WT_DUPLICATE_KEY) {
         invariant(!_overwrite);
-        invariant(keyFormat() == KeyFormat::String);
 
         BSONObj foundValueObj;
         if (TestingProctor::instance().isEnabled()) {
@@ -352,7 +351,7 @@ Status WiredTigerRecordStore::wtInsertRecord(OperationContext* opCtx,
         return Status{
             DuplicateKeyErrorInfo{
                 BSONObj(), BSONObj(), BSONObj(), std::move(foundValueObj), std::move(record.id)},
-            "Duplicate cluster key found"};
+            "Duplicate key found"};
     }
 
     if (ret)
@@ -512,7 +511,13 @@ StatusWith<int64_t> WiredTigerRecordStore::wtCompact(OperationContext* opCtx,
         return Status(ErrorCodes::Interrupted,
                       str::stream() << "Compaction interrupted on " << getURI());
     }
-    invariantWTOK(ret, *s);
+
+    if (ret == ENOENT) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Can't compact missing URI " << uri);
+    }
+
+    invariantWTOK(ret, *s, uri);
 
     return options.dryRun ? WiredTigerUtil::getIdentCompactRewrittenExpectedSize(*s, uri) : 0;
 }

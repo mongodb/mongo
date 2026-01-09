@@ -45,13 +45,13 @@
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
+#include "mongo/db/query/compiler/metadata/path_arrayness.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
-#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -164,28 +164,68 @@ const PlanCacheIndexabilityState& CollectionQueryInfo::getPlanCacheIndexabilityS
     return _planCacheState->planCacheIndexabilityState;
 }
 
-CollectionQueryInfo::PathArraynessState::PathArraynessState()
+CollectionQueryInfo::PathArraynessCollectionState::PathArraynessCollectionState()
     : pathArrayness{std::make_shared<PathArrayness>()} {}
 
-void CollectionQueryInfo::updatePathArraynessForSetMultikey(OperationContext* opCtx,
-                                                            const Collection* coll) const {
-    // TODO: SERVER-114809: Create a PathArrayness that reflects a more precise arrayness state.
+CollectionQueryInfo::PathArraynessCollectionState::PathArraynessCollectionState(
+    const CollectionQueryInfo::PathArraynessCollectionState& other) {
+    auto readLock = other.rwMutex.readLock();
+    // Copy other's PathArrayness ptr initially.
+    pathArrayness = other.pathArrayness;
+    // 'rwMutex' for this instance is default-constructed (not copied).
+}
+
+CollectionQueryInfo::PathArraynessCollectionState&
+CollectionQueryInfo::PathArraynessCollectionState::operator=(
+    const CollectionQueryInfo::PathArraynessCollectionState& other) {
+    if (this == &other) {
+        return *this;
+    }
+
+    // Take snapshot of other's PathArrayness pointer under other's read lock. This protects against
+    // any modifications made to other's PathArrayness ptr during this copy constructor.
+    // We only copy the shared_ptr reference.
+    std::shared_ptr<const PathArrayness> otherPathArrayness;
+    {
+        auto readLock = other.rwMutex.readLock();
+        otherPathArrayness = other.pathArrayness;
+    }
+    {
+        // Copy the other's PathArrayness shared_ptr into "this" PathArrayness under writeLock to
+        // prevent concurrent modifications.
+        auto writeLock = rwMutex.writeLock();
+        pathArrayness = std::move(otherPathArrayness);
+    }
+    return *this;
+}
+
+void CollectionQueryInfo::updatePathArraynessForSetMultikey(
+    const IndexDescriptor& descriptor, const MultikeyPaths& multikeyPaths) const {
+    if (PathArrayness::isIndexEligibleToAddToPathArrayness(descriptor) && !multikeyPaths.empty()) {
+        // Acquire a write lock to serialize updates to PathArrayness. This prevents any other
+        // operation from concurrently merging new paths into the tree. Within this critical
+        // section we deep-copy the existing PathArrayness structure and update it with the
+        // new multikey paths. These steps must be performed under the lock because we may
+        // need to merge index metadata from two separate document write transactions when
+        // multiple indexes are being marked multikey at the same time.
+        auto writeLock = _pathArraynessState.rwMutex.writeLock();
+        // Create local copy that we modify with new multikey paths.
+        auto newPathArrayness =
+            std::make_shared<PathArrayness>(*_pathArraynessState.pathArrayness.get());
+        newPathArrayness->addPathsFromIndexKeyPattern(descriptor.keyPattern(), multikeyPaths);
+        // Re-assign PathArrayness pointer.
+        _pathArraynessState.pathArrayness = std::move(newPathArrayness);
+    }
 }
 
 void CollectionQueryInfo::rebuildPathArrayness(OperationContext* opCtx, const Collection* coll) {
-    // Create temporary pathArrayness that we populate before unseating the shared_ptr.
-    PathArrayness tmpPathArrayness;
-    // Acquire write lock to ensure atomic reads from index catalog and atomic writes to
-    // PathArrayness.
+    // Create a new pathArrayness that we populate before unseating the shared_ptr.
+    auto newPathArrayness = std::make_shared<PathArrayness>();
     auto ii = coll->getIndexCatalog()->getIndexIterator(IndexCatalog::InclusionPolicy::kReady);
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
         const auto desc = ice->descriptor();
-        // We skip over indexes that do not provide a full view of the arrayness of data over the
-        // whole collection.
-        // We will read wildcard indexes later during query planning once we have a
-        // 'CanonicalQuery'.
-        if (desc->isPartial() || desc->getIndexType() == INDEX_WILDCARD || desc->hidden()) {
+        if (!PathArrayness::isIndexEligibleToAddToPathArrayness(*desc)) {
             continue;
         }
 
@@ -195,20 +235,16 @@ void CollectionQueryInfo::rebuildPathArrayness(OperationContext* opCtx, const Co
         // tracking. At that point there is no reason to append this path onto the trie
         // since we should just assume this path is an array.
         if (!multikeyPaths.empty()) {
-            size_t indexCounter = 0;
-            for (const auto& key : desc->keyPattern()) {
-                FieldPath path(key.fieldNameStringData());
-                tmpPathArrayness.addPath(path, multikeyPaths[indexCounter]);
-                ++indexCounter;
-            }
+            newPathArrayness->addPathsFromIndexKeyPattern(desc->keyPattern(), multikeyPaths);
         }
     }
     // We assume that this method will be called in a thread-safe manner and thus, can safely do
     // this re-assignment without a mutex (see method header comment for more details).
-    _pathArraynessState.pathArrayness = std::make_shared<PathArrayness>(tmpPathArrayness);
+    _pathArraynessState.pathArrayness = std::move(newPathArrayness);
 }
 
 std::shared_ptr<const PathArrayness> CollectionQueryInfo::getPathArrayness() const {
+    auto readLock = _pathArraynessState.rwMutex.readLock();
     return _pathArraynessState.pathArrayness;
 }
 

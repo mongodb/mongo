@@ -24,6 +24,9 @@ cc_binary(
     deps = [
         "//:grpc++",
         "//examples/protos:keyvaluestore",
+        "@com_google_absl//absl/flags:parse",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/log:initialize",
     ],
 )
 
@@ -34,5 +37,7 @@ cc_binary(
     deps = [
         "//:grpc++",
         "//examples/protos:keyvaluestore",
+        "@com_google_absl//absl/flags:parse",
+        "@com_google_absl//absl/log:initialize",
     ],
 )

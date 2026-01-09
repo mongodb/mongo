@@ -77,7 +77,7 @@ class DocumentSourceListLocalSessions final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$listLocalSessions"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -92,7 +92,7 @@ public:
         LiteParsed(const BSONElement& specElem,
                    const boost::optional<TenantId>& tenantId,
                    const ListSessionsSpec& spec)
-            : LiteParsedDocumentSource(specElem),
+            : LiteParsedDocumentSourceDefault(specElem),
               _spec(spec),
               _privileges(listSessionsRequiredPrivileges(_spec, tenantId)) {}
 

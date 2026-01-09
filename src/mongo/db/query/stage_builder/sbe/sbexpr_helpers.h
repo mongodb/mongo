@@ -37,7 +37,7 @@
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
-
+#include "mongo/util/modules.h"
 
 namespace mongo::stage_builder {
 inline void makeSbExprOptSbSlotVecHelper(SbExprOptSlotVector& result) {}

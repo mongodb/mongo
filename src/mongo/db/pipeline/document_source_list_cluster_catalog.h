@@ -61,7 +61,7 @@ namespace DocumentSourceListClusterCatalog {
 
 static constexpr StringData kStageName = "$listClusterCatalog"_sd;
 
-class LiteParsed final : public LiteParsedDocumentSource {
+class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
 public:
     static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                              const BSONElement& spec,
@@ -70,7 +70,7 @@ public:
     }
 
     LiteParsed(const BSONElement& spec, const NamespaceString& nss)
-        : LiteParsedDocumentSource(spec) {
+        : LiteParsedDocumentSourceDefault(spec) {
 
         if (nss.dbName() != DatabaseName::kAdmin) {
             if (nss.isCollectionlessAggregateNS()) {

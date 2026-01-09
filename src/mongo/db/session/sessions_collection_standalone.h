@@ -58,7 +58,8 @@ public:
      * Updates the last-use times on the given sessions to be greater than
      * or equal to the current time.
      */
-    void refreshSessions(OperationContext* opCtx, const LogicalSessionRecordSet& sessions) override;
+    RefreshSessionsResult refreshSessions(OperationContext* opCtx,
+                                          const LogicalSessionRecordSet& sessions) override;
 
     /**
      * Removes the authoritative records for the specified sessions.

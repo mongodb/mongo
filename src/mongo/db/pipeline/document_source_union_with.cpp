@@ -113,6 +113,19 @@ void validateUnionWithCollectionlessPipeline(
 }
 }  // namespace
 
+UnionWithSharedState::UnionWithSharedState(std::unique_ptr<Pipeline> pipeline,
+                                           std::unique_ptr<exec::agg::Pipeline> execPipeline,
+                                           ExecutionProgress executionState)
+    : _pipeline(std::move(pipeline)),
+      _execPipeline(std::move(execPipeline)),
+      _executionState(executionState),
+      // We must use variables from the sub-pipeline's ExpressionContext, because some extra
+      // varialbes might have been defined in makeCopyForSubPipelineFromExpressionContext
+      _variables(_pipeline->getContext()->variables),
+      _variablesParseState(
+          _pipeline->getContext()->variablesParseState.copyWith(_variables.useIdGenerator())) {}
+
+
 DocumentSourceUnionWith::DocumentSourceUnionWith(
     const DocumentSourceUnionWith& original,
     const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
@@ -125,12 +138,9 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
                               newExpCtx->getResolvedNamespace(original._userNss).uuid)
                         : nullptr),
           nullptr,
-          UnionWithSharedState::ExecutionProgress::kIteratingSource,
-          original._sharedState->_variables,
-          original._sharedState->_variablesParseState)),
+          UnionWithSharedState::ExecutionProgress::kIteratingSource)),
       _userNss(original._userNss),
       _userPipeline(original._userPipeline) {
-
     _sharedState->_pipeline->getContext()->setInUnionWith(true);
 
     tassert(10577700,
@@ -141,16 +151,8 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
 DocumentSourceUnionWith::DocumentSourceUnionWith(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, std::unique_ptr<Pipeline> pipeline)
     : DocumentSource(kStageName, expCtx) {
-
-    auto variables = Variables();
-    auto variablesParseState = VariablesParseState(variables.useIdGenerator());
-
     _sharedState = std::make_shared<UnionWithSharedState>(
-        std::move(pipeline),
-        nullptr,
-        UnionWithSharedState::ExecutionProgress::kIteratingSource,
-        std::move(variables),
-        std::move(variablesParseState));
+        std::move(pipeline), nullptr, UnionWithSharedState::ExecutionProgress::kIteratingSource);
 
     if (!_sharedState->_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {
         serviceOpCounters(getExpCtx()->getOperationContext()).gotNestedAggregate();
@@ -178,9 +180,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
             _sharedState = std::make_shared<UnionWithSharedState>(
                 parsePipelineWithMaybeViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
                 nullptr,
-                UnionWithSharedState::ExecutionProgress::kIteratingSource,
-                Variables(),
-                VariablesParseState(Variables().useIdGenerator()));
+                UnionWithSharedState::ExecutionProgress::kIteratingSource);
         } else {
             // This case only occurs in a sharded context where the database name is the same
             // as the current namespace, and will be resolved in the catch below.
@@ -191,9 +191,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
             _sharedState = std::make_shared<UnionWithSharedState>(
                 std::move(shared_pipeline),
                 nullptr,
-                UnionWithSharedState::ExecutionProgress::kIteratingSource,
-                Variables(),
-                VariablesParseState(Variables().useIdGenerator()));
+                UnionWithSharedState::ExecutionProgress::kIteratingSource);
         }
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
         logShardedViewFound(e, pipeline);
@@ -204,9 +202,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
         _sharedState = std::make_shared<UnionWithSharedState>(
             parsePipelineWithMaybeViewDefinition(expCtx, *resolvedUnionNs, pipeline, unionNss),
             nullptr,
-            UnionWithSharedState::ExecutionProgress::kIteratingSource,
-            Variables(),
-            VariablesParseState(Variables().useIdGenerator()));
+            UnionWithSharedState::ExecutionProgress::kIteratingSource);
     }
 
     if (!_sharedState->_pipeline->getContext()->getNamespaceString().isOnInternalDb()) {

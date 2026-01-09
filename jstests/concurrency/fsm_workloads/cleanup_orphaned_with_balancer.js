@@ -10,6 +10,7 @@
 
 import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 
 export const $config = (function () {
     let data = {
@@ -23,28 +24,30 @@ export const $config = (function () {
         cleanupOrphans: function (db, collName, connCache) {
             const ns = db[collName].getFullName();
 
-            // Get index of random shard.
-            const shardNames = Object.keys(connCache.shards);
-            const randomIndex = Math.floor(Math.random() * shardNames.length);
+            ShardingTopologyHelpers.executeWithShardInfo(db, this.tid, (shardInfo) => {
+                // Get index of random shard.
+                const shardNames = Object.keys(shardInfo.shards);
+                const randomIndex = Math.floor(Math.random() * shardNames.length);
 
-            const shardConn = connCache.rsConns.shards[shardNames[randomIndex]];
+                const shardConn = shardInfo.rsConns[shardNames[randomIndex]];
 
-            // Disable balancing so that waiting for orphan cleanup can converge quickly.
-            BalancerHelper.disableBalancerForCollection(db, ns);
+                // Disable balancing so that waiting for orphan cleanup can converge quickly.
+                BalancerHelper.disableBalancerForCollection(db, ns);
 
-            // Ensure the cleanup of all chunk orphans of the primary shard
-            assert.soonNoExcept(
-                () => {
-                    assert.commandWorked(shardConn.adminCommand({cleanupOrphaned: ns}));
-                    return true;
-                },
-                undefined,
-                10 * 1000,
-                100,
-            );
+                // Ensure the cleanup of all chunk orphans of the primary shard
+                assert.soonNoExcept(
+                    () => {
+                        assert.commandWorked(shardConn.adminCommand({cleanupOrphaned: ns}));
+                        return true;
+                    },
+                    undefined,
+                    10 * 1000,
+                    100,
+                );
 
-            // Reenable balancing.
-            BalancerHelper.enableBalancerForCollection(db, ns);
+                // Reenable balancing.
+                BalancerHelper.enableBalancerForCollection(db, ns);
+            });
         },
 
         // Verify that counts are stable.

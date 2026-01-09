@@ -19,13 +19,13 @@
 
 #include <cstdint>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
-#include "absl/types/variant.h"
-
+#include "src/core/ext/transport/chttp2/transport/http2_status.h"
 #include "src/core/lib/slice/slice.h"
 #include "src/core/lib/slice/slice_buffer.h"
 
@@ -50,6 +50,19 @@ namespace grpc_core {
 // declare a bool per flag to make producing/consuming code easier to write.
 //
 // Equality operators are defined for use in unit tests.
+
+// All frames begin with a fixed 9-octet header followed by a variable-length
+// frame payload. The following sizes are in bits.
+// HTTP Frame {
+//   Length(24),
+//   Type(8),
+//   Flags(8),
+//   Reserved(1),
+//   Stream Identifier(31),
+//   Frame Payload(..),
+// }
+// Reference : https://www.rfc-editor.org/rfc/rfc9113.html#name-frame-format
+constexpr uint8_t kFrameHeaderSize = 9;
 
 // DATA frame
 struct Http2DataFrame {
@@ -102,6 +115,8 @@ struct Http2RstStreamFrame {
 // SETTINGS frame
 struct Http2SettingsFrame {
   struct Setting {
+    Setting(uint16_t id, uint32_t value) : id(id), value(value) {}
+
     uint16_t id;
     uint32_t value;
 
@@ -142,11 +157,20 @@ struct Http2GoawayFrame {
 
 // WINDOW_UPDATE frame
 struct Http2WindowUpdateFrame {
-  uint32_t stream_id;
-  uint32_t increment;
+  uint32_t stream_id = 0;
+  uint32_t increment = 0;
 
   bool operator==(const Http2WindowUpdateFrame& other) const {
     return stream_id == other.stream_id && increment == other.increment;
+  }
+};
+
+// Security-related frame
+struct Http2SecurityFrame {
+  SliceBuffer payload;
+
+  bool operator==(const Http2SecurityFrame& other) const {
+    return payload.JoinIntoString() == other.payload.JoinIntoString();
   }
 };
 
@@ -155,15 +179,21 @@ struct Http2UnknownFrame {
   bool operator==(const Http2UnknownFrame&) const { return true; }
 };
 
+// This is used as a fake frame to trigger events in the HTTP2 transport.
+struct Http2EmptyFrame {
+  bool operator==(const Http2EmptyFrame&) const { return true; }
+};
+
 ///////////////////////////////////////////////////////////////////////////////
 // Frame variant
 //
 // A union of all the frame types above, so that we may pass around an
 // arbitrary frame between layers as appropriate.
 using Http2Frame =
-    absl::variant<Http2DataFrame, Http2HeaderFrame, Http2ContinuationFrame,
-                  Http2RstStreamFrame, Http2SettingsFrame, Http2PingFrame,
-                  Http2GoawayFrame, Http2WindowUpdateFrame, Http2UnknownFrame>;
+    std::variant<Http2DataFrame, Http2HeaderFrame, Http2ContinuationFrame,
+                 Http2RstStreamFrame, Http2SettingsFrame, Http2PingFrame,
+                 Http2GoawayFrame, Http2WindowUpdateFrame, Http2SecurityFrame,
+                 Http2UnknownFrame, Http2EmptyFrame>;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Frame header
@@ -200,13 +230,102 @@ struct Http2FrameHeader {
 // If a frame should simply be ignored, this function returns a
 // Http2UnknownFrame.
 // It is expected that hdr.length == payload.Length().
-absl::StatusOr<Http2Frame> ParseFramePayload(const Http2FrameHeader& hdr,
-                                             SliceBuffer payload);
+http2::ValueOrHttp2Status<Http2Frame> ParseFramePayload(
+    const Http2FrameHeader& hdr, SliceBuffer payload);
 
 // Serialize frame and append to out, leaves frames in an unknown state (may
 // move things out of frames)
 void Serialize(absl::Span<Http2Frame> frames, SliceBuffer& out);
 
+http2::Http2ErrorCode Http2ErrorCodeFromRstFrameErrorCode(uint32_t error_code);
+
+///////////////////////////////////////////////////////////////////////////////
+// GRPC Header
+
+constexpr uint8_t kGrpcHeaderSizeInBytes = 5;
+
+struct GrpcMessageHeader {
+  uint8_t flags = 0;
+  uint32_t length = 0;
+};
+
+// If the payload SliceBuffer is too small to hold a gRPC header, this function
+// will crash. The calling function MUST ensure that the payload SliceBuffer
+// has length greater than or equal to the gRPC header.
+GrpcMessageHeader ExtractGrpcHeader(SliceBuffer& payload);
+
+void AppendGrpcHeaderToSliceBuffer(SliceBuffer& payload, const uint8_t flags,
+                                   const uint32_t length);
+
+namespace RFC9113 {
+// RFC9113: 5.1.1.
+inline constexpr absl::string_view kStreamIdMustBeOdd =
+    "RFC9113: Streams initiated by a client MUST use odd-numbered stream "
+    "identifiers";  // gRPC streams are only initiated by a client.
+
+// 6.
+// Stream Identifier related errors
+// Non-Zero Stream Identifier
+inline constexpr absl::string_view kDataStreamIdMustBeNonZero =
+    "RFC9113: DATA frames MUST be associated with a stream";
+inline constexpr absl::string_view kHeaderStreamIdMustBeNonZero =
+    "RFC9113: HEADERS frames MUST be associated with a stream";
+inline constexpr absl::string_view kContinuationStreamIdMustBeNonZero =
+    "RFC9113: CONTINUATION frames MUST be associated with a stream";
+inline constexpr absl::string_view kRstStreamStreamIdMustBeNonZero =
+    "RFC9113: RST_STREAM frames frames MUST be associated with a stream";
+
+// Zero Stream Identifier
+inline constexpr absl::string_view kPingStreamIdMustBeZero =
+    "RFC9113: If a PING frame is received with a Stream Identifier field "
+    "value other than 0x00, the recipient MUST respond with a connection error";
+inline constexpr absl::string_view kGoAwayStreamIdMustBeZero =
+    "RFC9113: An endpoint MUST treat a GOAWAY frame with a stream identifier "
+    "other than 0x00 as a connection error";
+inline constexpr absl::string_view kSettingsStreamIdMustBeZero =
+    "RFC9113: If an endpoint receives a SETTINGS frame whose Stream "
+    "Identifier field is anything other than 0x00, the endpoint MUST respond "
+    "with a connection error";
+
+// Frame length related errors
+inline constexpr absl::string_view kRstStreamLength4 =
+    "RFC9113: A RST_STREAM frame with a length other than 4 octets MUST be "
+    "treated as a connection error";
+inline constexpr absl::string_view kSettingsLength0 =
+    "RFC9113: Receipt of a SETTINGS frame with the ACK flag set and a length "
+    "field value other than 0 MUST be treated as a connection error";
+inline constexpr absl::string_view kSettingsLength6x =
+    "RFC9113: SETTINGS frame with a length other than a multiple of 6 octets "
+    "MUST be treated as a connection error";
+inline constexpr absl::string_view kPingLength8 =
+    "RFC9113: Receipt of a PING frame with a length field value other than 8 "
+    "MUST be treated as a connection error";
+inline constexpr absl::string_view kWindowUpdateLength4 =
+    "RFC9113: A WINDOW_UPDATE frame with a length other than 4 octets MUST be "
+    "treated as a connection error";
+inline constexpr absl::string_view kWindowSizeIncrement =
+    "RFC9113: The legal range for the increment to the flow-control window is "
+    "1 to (2^31)-1";
+inline constexpr absl::string_view kPaddingLengthLargerThanFrameLength =
+    "RFC9113: If the length of the padding is the length of the frame payload "
+    "or greater, the recipient MUST treat this as a connection error";
+
+// Misc Errors
+inline constexpr absl::string_view kNoPushPromise =
+    "RFC9113: PUSH_PROMISE MUST NOT be sent if the SETTINGS_ENABLE_PUSH "
+    "setting of the "
+    "peer endpoint is set to 0";
+
+inline constexpr absl::string_view kFrameParserIncorrectPadding =
+    "Incorrect length of padding in frame";
+inline constexpr absl::string_view kIncorrectFrame = "Incorrect Frame";
+inline constexpr absl::string_view kGoAwayLength8 =
+    "GOAWAY frame should have a Last-Stream-ID and Error Code making the "
+    "minimum length 8 octets";
+
+inline constexpr uint32_t kMaxStreamId31Bit = 0x7fffffffu;
+
+}  // namespace RFC9113
 }  // namespace grpc_core
 
 #endif  // GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_FRAME_H

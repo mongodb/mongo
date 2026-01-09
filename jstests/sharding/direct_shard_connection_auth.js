@@ -34,8 +34,6 @@ assert.commandWorked(
     }),
 );
 
-const resetClusterCardinalityOnRemoveShard = FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "ReplicaSetEndpoint");
-
 function getUnauthorizedDirectWritesCount() {
     return assert.commandWorked(shardAdminDB.runCommand({serverStatus: 1})).shardingStatistics
         .unauthorizedDirectShardOps;
@@ -156,7 +154,7 @@ removeShard(mongosAdminUser, newShard.getURL());
 // With one shard again, direct shard operations should still be prevented assuming that
 // featureFlagReplicaSetEndpoint is disabled.
 jsTest.log("Running tests with one shard again.");
-directWriteCount = runTests(!resetClusterCardinalityOnRemoveShard /* shouldBlockDirectConnections */, directWriteCount);
+directWriteCount = runTests(true /* shouldBlockDirectConnections */, directWriteCount);
 
 // Logout of final users
 mongosAdminUser.logout();

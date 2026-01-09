@@ -40,9 +40,6 @@
  * - verbose: verbosity level for logging (default: WT_VERBOSE_INFO)
  * - key_expires: key expiration period, in seconds (default: 12 hours = 43200 seconds).
  *     On creation, initial key is set.
- *     Special values:
- *       -1 - key never expires, i.e. get_key always returns without a key
- *        0 - key always expired, i.e. every get_key call gets the default key
  *
  * Enforced key states:
  * - KEY_STATE_CURRENT: the current active key used for new checkpoint writes
@@ -62,11 +59,6 @@
  * irrespective of key expiration:
  * - CURRENT -> CURRENT: key_load called, key loaded from persisted data
  */
-
-enum {
-    KEY_EXPIRES_NEVER = -1, /* Key never expires */
-    KEY_EXPIRES_ALWAYS = 0  /* Key always expires */
-};
 
 typedef enum { KEY_STATE_CURRENT = 0, KEY_STATE_PENDING, KEY_STATE_READ } KEY_STATE;
 

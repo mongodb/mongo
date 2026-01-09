@@ -37,8 +37,8 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_builds/index_build_interceptor.h"
@@ -202,6 +202,10 @@ public:
     CollectionPtr coll() const {
         return CollectionPtr(CollectionCatalog::get(&_opCtx)->establishConsistentCollection(
             &_opCtx, _nss, boost::none));
+    }
+
+    void insertDocument(const BSONObj& doc) {
+        ASSERT_OK(Helpers::insert(&_opCtx, coll(), doc));
     }
 
 protected:
@@ -399,16 +403,13 @@ public:
 
         RecordId id1;
         {
-            OpDebug* const nullOpDebug = nullptr;
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 2));
             commitTransaction();
         }
         releaseDb();
@@ -456,15 +457,12 @@ public:
         lockDb(MODE_X);
         RecordId id1;
         {
-            OpDebug* const nullOpDebug = nullptr;
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
             commitTransaction();
         }
 
@@ -516,19 +514,15 @@ public:
     void run() {
         // Create a new collection, insert three records.
         lockDb(MODE_X);
-        OpDebug* const nullOpDebug = nullptr;
         RecordId id1;
         {
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "b" << 3)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
+            insertDocument(BSON("_id" << 3 << "b" << 3));
             commitTransaction();
         }
 
@@ -570,18 +564,15 @@ public:
     void run() {
         // Create a new collection, insert records {_id: 1} and {_id: 2} and check it's valid.
         lockDb(MODE_X);
-        OpDebug* const nullOpDebug = nullptr;
         RecordId id1;
         {
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 2));
             commitTransaction();
         }
         releaseDb();
@@ -653,7 +644,6 @@ public:
     void run() {
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
-        OpDebug* const nullOpDebug = nullptr;
         RecordId id1;
         // {a: [b: 1, c: 2]}, {a: [b: 2, c: 2]}, {a: [b: 1, c: 1]}
         auto doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(BSON("b" << 1) << BSON("c" << 2)));
@@ -670,13 +660,10 @@ public:
             _db->createCollection(&_opCtx, _nss);
 
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(doc1), nullOpDebug, true));
+            insertDocument(doc1);
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(doc2), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(doc3), nullOpDebug, true));
+            insertDocument(doc2);
+            insertDocument(doc3);
             commitTransaction();
         }
         releaseDb();
@@ -737,20 +724,16 @@ public:
     void run() {
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
-        OpDebug* const nullOpDebug = nullptr;
         RecordId id1;
         {
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
+            insertDocument(BSON("_id" << 3 << "b" << 1));
             commitTransaction();
         }
 
@@ -792,26 +775,18 @@ public:
     void run() {
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
-        OpDebug* const nullOpDebug = nullptr;
         RecordId id1;
         {
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
             // Explicitly test that multi-key partial indexes containing documents that
             // don't match the filter expression are handled correctly.
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 3 << "a" << BSON_ARRAY(-1 << -2 << -3))),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 3 << "a" << BSON_ARRAY(-1 << -2 << -3)));
             commitTransaction();
         }
 
@@ -855,19 +830,13 @@ public:
         // Create a new collection and insert a record that has a non-indexable value on the indexed
         // field.
         lockDb(MODE_X);
-        OpDebug* const nullOpDebug = nullptr;
 
         RecordId id1;
         {
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 1 << "x" << 1 << "a" << 2)),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 1 << "x" << 1 << "a" << 2));
             commitTransaction();
         }
 
@@ -896,7 +865,6 @@ public:
     void run() {
         // Create a new collection, insert five records and check it's valid.
         lockDb(MODE_X);
-        OpDebug* const nullOpDebug = nullptr;
 
         RecordId id1;
         {
@@ -904,25 +872,12 @@ public:
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 4)),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 1 << "a" << 1 << "b" << 4));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 2 << "a" << 2 << "b" << 5)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 4 << "b" << 6)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 5 << "c" << 7)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 2 << "a" << 2 << "b" << 5));
+            insertDocument(BSON("_id" << 3 << "a" << 3));
+            insertDocument(BSON("_id" << 4 << "b" << 6));
+            insertDocument(BSON("_id" << 5 << "c" << 7));
             commitTransaction();
         }
 
@@ -972,7 +927,6 @@ public:
 
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
-        OpDebug* const nullOpDebug = nullptr;
 
         RecordId id1;
         {
@@ -980,13 +934,10 @@ public:
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
             id1 = coll()->getCursor(&_opCtx)->next()->id;
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "b" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
+            insertDocument(BSON("_id" << 3 << "b" << 1));
             commitTransaction();
         }
 
@@ -1100,22 +1051,11 @@ public:
         ASSERT_OK(status);
 
         // Insert non-multikey documents.
-        OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 2 << "b" << BSON("0" << 1))),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 1 << "a" << 1 << "b" << 1));
+            insertDocument(BSON("_id" << 2 << "b" << BSON("0" << 1)));
             commitTransaction();
         }
         releaseDb();
@@ -1125,18 +1065,8 @@ public:
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 3 << "mk_1" << BSON_ARRAY(1 << 2 << 3))),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 4 << "mk_2" << BSON_ARRAY(BSON("e" << 1)))),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 3 << "mk_1" << BSON_ARRAY(1 << 2 << 3)));
+            insertDocument(BSON("_id" << 4 << "mk_2" << BSON_ARRAY(BSON("e" << 1))));
             commitTransaction();
         }
         releaseDb();
@@ -1222,42 +1152,15 @@ public:
         ASSERT_OK(status);
 
         // Insert documents with indexed and not-indexed paths.
-        OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 2 << "a" << BSON("w" << 1))),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 3 << "a" << BSON_ARRAY("x" << 1))),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 4 << "b" << 2)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 5 << "b" << BSON("y" << 1))),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 6 << "b" << BSON_ARRAY("z" << 1))),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 1 << "a" << 1 << "b" << 1));
+            insertDocument(BSON("_id" << 2 << "a" << BSON("w" << 1)));
+            insertDocument(BSON("_id" << 3 << "a" << BSON_ARRAY("x" << 1)));
+            insertDocument(BSON("_id" << 4 << "b" << 2));
+            insertDocument(BSON("_id" << 5 << "b" << BSON("y" << 1)));
+            insertDocument(BSON("_id" << 6 << "b" << BSON_ARRAY("z" << 1)));
             commitTransaction();
         }
         releaseDb();
@@ -1318,17 +1221,13 @@ public:
         ASSERT_OK(status);
 
         // Insert documents.
-        OpDebug* const nullOpDebug = nullptr;
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
+            insertDocument(BSON("_id" << 3 << "a" << 3));
             rid = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -1407,17 +1306,13 @@ public:
         ASSERT_OK(status);
 
         // Insert documents.
-        OpDebug* const nullOpDebug = nullptr;
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
+            insertDocument(BSON("_id" << 3 << "a" << 3));
             rid = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -1518,17 +1413,13 @@ public:
         ASSERT_OK(status);
 
         // Insert documents.
-        OpDebug* const nullOpDebug = nullptr;
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
+            insertDocument(BSON("_id" << 3 << "a" << 3));
             rid = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -1606,28 +1497,12 @@ public:
                                                   << static_cast<int>(kIndexVersion))));
 
         // Insert documents.
-        OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 2 << "a" << 3 << "b" << 3)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 3 << "a" << 6 << "b" << 6)),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 1 << "a" << 1 << "b" << 1));
+            insertDocument(BSON("_id" << 2 << "a" << 3 << "b" << 3));
+            insertDocument(BSON("_id" << 3 << "a" << 6 << "b" << 6));
             commitTransaction();
         }
         releaseDb();
@@ -1787,17 +1662,13 @@ public:
         ASSERT_OK(status);
 
         // Insert documents.
-        OpDebug* const nullOpDebug = nullptr;
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
+            insertDocument(BSON("_id" << 3 << "a" << 3));
             rid = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -1965,17 +1836,13 @@ public:
         ASSERT_OK(status);
 
         // Insert documents.
-        OpDebug* const nullOpDebug = nullptr;
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 2 << "a" << 2)), nullOpDebug, true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 3 << "a" << 3)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
+            insertDocument(BSON("_id" << 2 << "a" << 2));
+            insertDocument(BSON("_id" << 3 << "a" << 3));
             rid = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -2101,13 +1968,11 @@ public:
         // Create a new collection and insert a document.
         lockDb(MODE_X);
 
-        OpDebug* const nullOpDebug = nullptr;
         {
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
             commitTransaction();
         }
 
@@ -2125,8 +1990,7 @@ public:
         BSONObj dupObj = BSON("_id" << 2 << "a" << 1);
         {
             beginTransaction();
-            ASSERT_NOT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(dupObj), nullOpDebug, true));
+            ASSERT_NOT_OK(Helpers::insert(&_opCtx, coll(), dupObj));
             abortTransaction();
         }
         releaseDb();
@@ -2361,17 +2225,11 @@ public:
         // Create a new collection and insert a document.
         lockDb(MODE_X);
 
-        OpDebug* const nullOpDebug = nullptr;
         {
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 1 << "a" << 1 << "b" << 1));
             commitTransaction();
         }
 
@@ -2400,8 +2258,7 @@ public:
         BSONObj dupObj = BSON("_id" << 2 << "a" << 1 << "b" << 1);
         {
             beginTransaction();
-            ASSERT_NOT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(dupObj), nullOpDebug, true));
+            ASSERT_NOT_OK(Helpers::insert(&_opCtx, coll(), dupObj));
             abortTransaction();
         }
         releaseDb();
@@ -2647,18 +2504,12 @@ public:
         // Create a new collection and insert a document.
         lockDb(MODE_X);
 
-        OpDebug* const nullOpDebug = nullptr;
         RecordId rid1 = RecordId::minLong();
         {
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 1 << "a" << 1 << "b" << 1));
             rid1 = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -2688,8 +2539,7 @@ public:
         BSONObj dupObj = BSON("_id" << 2 << "a" << 1 << "b" << 1);
         {
             beginTransaction();
-            ASSERT_NOT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(dupObj), nullOpDebug, true));
+            ASSERT_NOT_OK(Helpers::insert(&_opCtx, coll(), dupObj));
             abortTransaction();
         }
         releaseDb();
@@ -3034,13 +2884,11 @@ public:
         RecordId id1;
         BSONObj doc = BSON("_id" << 1 << "a" << 1);
         {
-            OpDebug* const nullOpDebug = nullptr;
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(doc), nullOpDebug, true));
+            insertDocument(doc);
             id1 = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -3243,17 +3091,11 @@ public:
         }
 
         // Insert a document.
-        OpDebug* const nullOpDebug = nullptr;
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << 1 << "a" << 1 << "b" << 1)),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << 1 << "a" << 1 << "b" << 1));
             rid = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -3384,12 +3226,10 @@ public:
         }
 
         // Insert a document.
-        OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(BSON("_id" << 1 << "a" << 1)), nullOpDebug, true));
+            insertDocument(BSON("_id" << 1 << "a" << 1));
             commitTransaction();
         }
 
@@ -3398,8 +3238,7 @@ public:
         BSONObj dupObj = BSON("_id" << 2 << "a" << 1);
         {
             beginTransaction();
-            ASSERT_NOT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(dupObj), nullOpDebug, true));
+            ASSERT_NOT_OK(Helpers::insert(&_opCtx, coll(), dupObj));
             abortTransaction();
         }
         releaseDb();
@@ -3827,13 +3666,11 @@ public:
         RecordId id1;
         BSONObj doc = BSON("_id" << 1 << "a" << 1);
         {
-            OpDebug* const nullOpDebug = nullptr;
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(doc), nullOpDebug, true));
+            insertDocument(doc);
             id1 = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -4064,14 +3901,11 @@ public:
         RecordId id1;
         BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2) << "b" << 1);
         {
-            OpDebug* const nullOpDebug = nullptr;
-
             beginTransaction();
             ASSERT_OK(_db->dropCollection(&_opCtx, _nss));
             _db->createCollection(&_opCtx, _nss);
 
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(doc1), nullOpDebug, true));
+            insertDocument(doc1);
             id1 = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -4328,11 +4162,9 @@ public:
         // state.
         RecordId id1;
         BSONObj doc1 = BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2) << "b" << 1);
-        OpDebug* const nullOpDebug = nullptr;
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(doc1), nullOpDebug, true));
+            insertDocument(doc1);
             id1 = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -4500,31 +4332,15 @@ public:
         ASSERT_OK(status);
 
         // Insert documents.
-        OpDebug* const nullOpDebug = nullptr;
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
 
         const OID firstRecordId = OID::gen();
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << firstRecordId << "a" << 1)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << OID::gen() << "a" << 2)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << firstRecordId << "a" << 1));
+            insertDocument(BSON("_id" << OID::gen() << "a" << 2));
+            insertDocument(BSON("_id" << OID::gen() << "a" << 3));
             rid = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -4666,15 +4482,12 @@ public:
             secondDoc = BSON("_id" << "2"
                                    << "a" << 10000002);
         }
-        OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx, coll(), InsertStatement(firstDoc), nullOpDebug, true));
+            insertDocument(firstDoc);
             if (falsePositiveCase) {
-                ASSERT_OK(collection_internal::insertDocument(
-                    &_opCtx, coll(), InsertStatement(secondDoc), nullOpDebug, true));
+                insertDocument(secondDoc);
             }
             commitTransaction();
         }
@@ -4802,31 +4615,15 @@ public:
         ASSERT_OK(status);
 
         // Insert documents.
-        OpDebug* const nullOpDebug = nullptr;
         RecordId rid = RecordId::minLong();
         lockDb(MODE_X);
 
         const OID firstRecordId = OID::gen();
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << firstRecordId << "a" << 1)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << OID::gen() << "a" << 2)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << firstRecordId << "a" << 1));
+            insertDocument(BSON("_id" << OID::gen() << "a" << 2));
+            insertDocument(BSON("_id" << OID::gen() << "a" << 3));
             rid = coll()->getCursor(&_opCtx)->next()->id;
             commitTransaction();
         }
@@ -4963,30 +4760,14 @@ public:
         }
 
         // Insert documents
-        OpDebug* const nullOpDebug = nullptr;
         lockDb(MODE_X);
 
         const OID firstRecordId = OID::gen();
         {
             beginTransaction();
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << firstRecordId << "a" << 1)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << OID::gen() << "a" << 2)),
-                nullOpDebug,
-                true));
-            ASSERT_OK(collection_internal::insertDocument(
-                &_opCtx,
-                coll(),
-                InsertStatement(BSON("_id" << OID::gen() << "a" << 3)),
-                nullOpDebug,
-                true));
+            insertDocument(BSON("_id" << firstRecordId << "a" << 1));
+            insertDocument(BSON("_id" << OID::gen() << "a" << 2));
+            insertDocument(BSON("_id" << OID::gen() << "a" << 3));
             commitTransaction();
         }
         releaseDb();
@@ -4995,7 +4776,7 @@ public:
 
         // Corrupt the first record in the RecordStore by dropping the document's _id field.
         // Corrupt the second record in the RecordStore by having the RecordId not match the _id
-        // field. Leave the third record untocuhed.
+        // field. Leave the third record untouched.
 
         RecordStore* rs = coll()->getRecordStore();
         auto cursor = coll()->getCursor(&_opCtx);

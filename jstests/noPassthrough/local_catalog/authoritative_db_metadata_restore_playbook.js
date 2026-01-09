@@ -1,8 +1,12 @@
 /*
  * Test that the playbook written for restoring a cluster to a consistent metadata state actually recovers it.
  *
+ * Marked as 'requires_persistence' to prevent the test from running on the 'inMemory' variant,
+ * because the restarted node relies on the replica set config persisted to disk to know that it
+ * is initialized as part of a replica set and should run for election.
  * @tags: [
  *   requires_fcv_83,
+ *   requires_persistence,
  * ]
  */
 

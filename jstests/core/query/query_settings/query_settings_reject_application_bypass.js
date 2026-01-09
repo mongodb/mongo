@@ -24,6 +24,11 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {QuerySettingsUtils} from "jstests/libs/query/query_settings_utils.js";
 
+// This test makes assertions about sessions on a particular node, which are not compatible with
+// random mongos dispatching.
+// pinToSingleMongos due to $listLocalSessions.
+TestData.pinToSingleMongos = true;
+
 // Creating the collection.
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());

@@ -51,6 +51,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/s/query/exec/target_write_op.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
@@ -604,9 +605,7 @@ TEST(SimpleCollectionRoutingInfoTargeterTest, ExtractBucketsShardKeyFromTimeseri
         ShardKeyPattern pattern{bucketsShardKeyPattern.getValue()};
 
         auto expectedShardKey = pattern.extractShardKeyFromDoc(inputBucket);
-        auto actualShardKey =
-            CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
-                inputDoc, pattern, options);
+        auto actualShardKey = extractBucketsShardKeyFromTimeseriesDoc(inputDoc, pattern, options);
 
         ASSERT_BSONOBJ_EQ(expectedShardKey, actualShardKey);
     };

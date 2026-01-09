@@ -40,8 +40,8 @@
 
 #include <vector>
 
-// TODO (SERVER-114286): The NSTargeter(s) hierarchy is a mixture of router role and query-specific
-// canonicalization logic. It needs to be decomposed into these parts and removed.
+// TODO (SERVER-116151): The NSTargeter(s) hierarchy is a legacy implementation. When it is no
+// longer needed by BatchWriteExec and bulk_write_exec it should be removed.
 
 namespace mongo {
 

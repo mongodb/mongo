@@ -26,6 +26,10 @@ import {arrayEq, assertErrorCode, orderedArrayEq} from "jstests/aggregation/extr
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js"; // For arrayEq, assertErrorCode, and
 import {getEngine, getSingleNodeExplain} from "jstests/libs/query/analyze_plan.js";
 
+// killCursors on multi-cursors is unsupported when queries are dispatched to multiple mongoses.
+// pinToSingleMongos due to killCursors command.
+TestData.pinToSingleMongos = true;
+
 let viewsDB = db.getSiblingDB("views_aggregation");
 assert.commandWorked(viewsDB.dropDatabase());
 

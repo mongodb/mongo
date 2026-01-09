@@ -77,13 +77,12 @@ let a = a_conn.getDB("foo");
 let b = b_conn.getDB("foo");
 
 // This test create indexes with fail point enabled on secondary which prevents secondary from
-// voting. So, disabling index build commit quorum.
-// initial data for both nodes
+// voting. So, setting index build commit quorum to 1.
 assert.commandWorked(a.b.insert({x: 1}));
-assert.commandWorked(a.b.createIndex({x: 1}, {}, 0));
+assert.commandWorked(a.b.createIndex({x: 1}, {}, 1));
 assert.commandWorked(a.oldname.insert({y: 1}));
 assert.commandWorked(a.oldname.insert({y: 2}));
-assert.commandWorked(a.oldname.createIndex({y: 1}, {unique: true}, 0));
+assert.commandWorked(a.oldname.createIndex({y: 1}, {unique: true}, 1));
 assert.commandWorked(a.bar.insert({q: 0}));
 assert.commandWorked(a.bar.insert({q: 1, a: "foo"}));
 assert.commandWorked(a.bar.insert({q: 2, a: "foo", x: 1}));
@@ -132,7 +131,7 @@ b.oldname.renameCollection("newname");
 b.newname.renameCollection("fooname");
 assert(b.fooname.find().itcount() > 0, "count rename");
 // create an index - verify that it is removed
-assert.commandWorked(b.fooname.createIndex({q: 1}, {}, 0));
+assert.commandWorked(b.fooname.createIndex({q: 1}, {}, 1));
 // test roll back (drop) a whole database
 let abc = b.getSiblingDB("abc");
 assert.commandWorked(abc.foo.insert({x: 1}));

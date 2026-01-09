@@ -6,7 +6,7 @@
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {line, linebreak, section, subSection} from "jstests/libs/pretty_md.js";
+import {line, linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 import {getQueryPlanner} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";

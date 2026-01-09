@@ -237,6 +237,12 @@ const wcCommandsTests = {
             }),
             setupFunc: (coll, cluster, clusterType, secondariesRunning, optionalArgs) => {
                 withRetryOnTransientTxnError(() => {
+                    // Ensure that any documents inserted during previous iterations of the retry
+                    // loop have been deleted.
+                    assert.commandWorked(coll.deleteMany({}));
+                    assert.eq(0, coll.find().itcount(), "test collection not empty");
+                    genNextTxnNumber();
+
                     assert.commandWorked(coll.insert({_id: 0}));
 
                     if (clusterType == "sharded" && bsonWoCompare(getShardKey(coll, fullNs), {}) == 0) {
@@ -297,6 +303,12 @@ const wcCommandsTests = {
             }),
             setupFunc: (coll) => {
                 withRetryOnTransientTxnError(() => {
+                    // Ensure that any documents inserted during previous iterations of the retry
+                    // loop have been deleted.
+                    assert.commandWorked(coll.deleteMany({}));
+                    assert.eq(0, coll.find().itcount(), "test collection not empty");
+                    genNextTxnNumber();
+
                     assert.commandWorked(
                         coll.getDB().runCommand({
                             insert: collName,
@@ -681,6 +693,12 @@ const wcCommandsTests = {
             }),
             setupFunc: (coll) => {
                 withRetryOnTransientTxnError(() => {
+                    // Ensure that any documents inserted during previous iterations of the retry
+                    // loop have been deleted.
+                    assert.commandWorked(coll.deleteMany({}));
+                    assert.eq(0, coll.find().itcount(), "test collection not empty");
+                    genNextTxnNumber();
+
                     assert.commandWorked(
                         coll.getDB().runCommand({
                             insert: collName,
@@ -718,6 +736,12 @@ const wcCommandsTests = {
             }),
             setupFunc: (coll) => {
                 withRetryOnTransientTxnError(() => {
+                    // Ensure that any documents inserted during previous iterations of the retry
+                    // loop have been deleted.
+                    assert.commandWorked(coll.deleteMany({}));
+                    assert.eq(0, coll.find().itcount(), "test collection not empty");
+                    genNextTxnNumber();
+
                     assert.commandWorked(
                         coll.getDB().runCommand({
                             insert: collName,

@@ -74,7 +74,7 @@ class DocumentSourceListCachedAndActiveUsers final {
 public:
     static constexpr StringData kStageName = "$listCachedAndActiveUsers"_sd;
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -83,7 +83,7 @@ public:
         }
 
         LiteParsed(const BSONElement& spec, const boost::optional<TenantId>& tenantId)
-            : LiteParsedDocumentSource(spec),
+            : LiteParsedDocumentSourceDefault(spec),
               _requiredPrivilege(Privilege(ResourcePattern::forAnyNormalResource(tenantId),
                                            ActionType::listCachedAndActiveUsers)) {}
 

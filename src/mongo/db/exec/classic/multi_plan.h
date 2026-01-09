@@ -37,6 +37,7 @@
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
@@ -69,14 +70,6 @@ extern FailPoint sleepWhileMultiplanning;
 class MultiPlanStage final : public RequiresCollectionStage {
 public:
     static const char* kStageType;
-
-    struct TrialPhaseConfig {
-        // How many works to give each plan during the trial period.
-        size_t maxNumWorksPerPlan;
-        // How many results per plan are we targeting to retrieve during the trial period.
-        // If a plan returns this many results, we can stop the trial period early.
-        size_t targetNumResults;
-    };
 
     struct EstimationResult {
         // The total cost of all plans (sum of plan costs).
@@ -151,10 +144,10 @@ public:
      * Returns a non-OK status if query planning fails. In particular, this function returns
      * ErrorCodes::QueryPlanKilled if the query plan was killed during a yield.
      */
-    Status runTrials(PlanYieldPolicy* yieldPolicy, TrialPhaseConfig trialConfig);
+    Status runTrials(PlanYieldPolicy* yieldPolicy, trial_period::TrialPhaseConfig trialConfig);
     Status runTrials(PlanYieldPolicy* yieldPolicy);
 
-    TrialPhaseConfig getTrialPhaseConfig() const;
+    trial_period::TrialPhaseConfig getTrialPhaseConfig() const;
 
     /**
      * Picks a best plan based on the statistics collected during trials. All further calls to

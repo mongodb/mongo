@@ -12,6 +12,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_base_partitioned.js";
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.iterations = 5;
@@ -58,7 +59,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Regardless of whether the splitChunk operation succeeded or failed,
         // verify that the shard the original chunk was on returns all data for the chunk.
-        let shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk.shard]);
+        let shardInfo = ShardingTopologyHelpers.getShardInfo(db, this.tid);
+        let shardPrimary = ChunkHelper.getPrimary(shardInfo.shards[chunk.shard]);
         let shardNumDocsAfter = ChunkHelper.getNumDocs(shardPrimary, ns, chunk.min._id, chunk.max._id);
         let msg = "Shard does not have same number of documents after splitChunk.\n" + msgBase;
         assert.eq(shardNumDocsAfter, numDocsBefore, msg);

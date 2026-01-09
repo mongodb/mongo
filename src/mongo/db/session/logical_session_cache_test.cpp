@@ -305,6 +305,7 @@ TEST_F(LogicalSessionCacheTest, ManySignedLsidsInCacheRefresh) {
     // Check that all signedLsids refresh
     sessions()->setRefreshHook([&count](const LogicalSessionRecordSet& sessions) {
         ASSERT_EQ(sessions.size(), size_t(count));
+        return SessionsCollection::RefreshSessionsResult{};
     });
 
     // Force a refresh

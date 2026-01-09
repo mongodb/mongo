@@ -14,16 +14,13 @@
 #ifndef GRPC_SRC_CORE_LIB_EVENT_ENGINE_WORK_QUEUE_WORK_QUEUE_H
 #define GRPC_SRC_CORE_LIB_EVENT_ENGINE_WORK_QUEUE_WORK_QUEUE_H
 
+#include <grpc/event_engine/event_engine.h>
 #include <grpc/support/port_platform.h>
-
 #include <stddef.h>
 
 #include "absl/functional/any_invocable.h"
 
-#include <grpc/event_engine/event_engine.h>
-
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 // An interface for thread-safe EventEngine callback work queues.
 //
@@ -54,9 +51,12 @@ class WorkQueue {
   virtual void Add(EventEngine::Closure* closure) = 0;
   // Wraps an AnyInvocable and adds it to the the queue.
   virtual void Add(absl::AnyInvocable<void()> invocable) = 0;
+  // Returns an optional owner id for queue identification.
+  // TODO(hork): revisit if this can be moved to the thread pool implementation
+  // if dynamic queue type experiments are warranted.
+  virtual const void* owner() = 0;
 };
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental
 
 #endif  // GRPC_SRC_CORE_LIB_EVENT_ENGINE_WORK_QUEUE_WORK_QUEUE_H

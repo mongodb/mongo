@@ -267,6 +267,10 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return BSONObj();
     }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToHostParseBadSpecParseNode>();
+    }
 };
 }  // namespace
 
@@ -351,6 +355,10 @@ public:
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<DepthLeafAstNode>();
+    }
 };
 
 // Helper to ensure each recursive stage used for depth checking has a unique name.
@@ -388,6 +396,10 @@ public:
         return {};
     }
 
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<DepthChainParseNode>(_remaining);
+    }
+
 private:
     int _remaining;
 };
@@ -412,6 +424,10 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
     }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<AdjacentCycleParseNode>();
+    }
 };
 
 // Non-adjacent cycle where a stage expands into a stage that then expands into itself: A -> B -> A
@@ -428,6 +444,10 @@ public:
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
     }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<NodeAParseNode>();
+    }
 };
 
 class NodeBParseNode : public sdk::AggStageParseNode {
@@ -442,6 +462,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
+    }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<NodeBParseNode>();
     }
 };
 
@@ -481,6 +505,10 @@ public:
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
         return {};
+    }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<TopSameNameChildrenParseNode>();
     }
 };
 }  // namespace
@@ -616,6 +644,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<TransformAggStageParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<TransformAggStageParseNode>();
     }
@@ -646,6 +678,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<SearchLikeSourceAggStageParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<SearchLikeSourceAggStageParseNode>();
     }
@@ -673,6 +709,10 @@ public:
         return BSONObj();
     }
 
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<ExpandToSearchAggStageParseNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
         return std::make_unique<ExpandToSearchAggStageParseNode>();
     }
@@ -692,6 +732,10 @@ public:
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
+    }
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<SingleActionRequiredPrivilegesAggStageAstNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -717,6 +761,10 @@ public:
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<MultipleActionsRequiredPrivilegesAggStageAstNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<MultipleActionsRequiredPrivilegesAggStageAstNode>();
     }
@@ -739,6 +787,10 @@ public:
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
+    }
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<MultipleRequiredPrivilegesAggStageAstNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -772,12 +824,17 @@ public:
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
             std::make_unique<MultipleRequiredPrivilegesAggStageAstNode>()));
         expanded.emplace_back(new sdk::ExtensionAggStageAstNode(
-            std::make_unique<sdk::shared_test_stages::NonePosAggStageAstNode>()));
+            std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(
+                BSON("position" << "none"))));
         return expanded;
     }
 
     BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
         return BSONObj();
+    }
+
+    std::unique_ptr<AggStageParseNode> clone() const override {
+        return std::make_unique<MultipleChildrenRequiredPrivilegesAggStageParseNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageParseNode> make() {
@@ -801,6 +858,10 @@ public:
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<EmptyActionsArrayRequiredPrivilegesAggStageAstNode>();
+    }
+
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<EmptyActionsArrayRequiredPrivilegesAggStageAstNode>();
     }
@@ -818,6 +879,10 @@ public:
 
     std::unique_ptr<sdk::LogicalAggStage> bind() const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
+    }
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<EmptyRequiredPrivilegesAggStageAstNode>();
     }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
@@ -1565,5 +1630,253 @@ TEST_F(DocumentSourceExtensionTest, ShouldPropagateSortKeyMetadata) {
         ASSERT_THROWS_CODE(sourceStage->getNext(), DBException, 11503701);
     }
     ASSERT_TRUE(sourceStage->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandableClonePreservesStageNameAndNamespace) {
+    auto rootParseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToExtAstParseNode>());
+    AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kExpandToExtAstName);
+    host::DocumentSourceExtension::LiteParsedExpandable original(
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
+
+    auto cloned = original.clone();
+
+    // Verify the cloned object has the same stage name.
+    ASSERT_EQ(cloned->getParseTimeName(), original.getParseTimeName());
+    ASSERT_EQ(cloned->getParseTimeName(),
+              std::string(sdk::shared_test_stages::kExpandToExtAstName));
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandableClonePreservesExpandedPipeline) {
+    auto rootParseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToMixedParseNode>());
+    AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson = createDummySpecFromStageName(sdk::shared_test_stages::kExpandToMixedName);
+    host::DocumentSourceExtension::LiteParsedExpandable original(
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
+
+    auto clonedBase = original.clone();
+
+    // Cast to LiteParsedExpandable to access getExpandedPipeline().
+    auto* cloned =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpandable*>(clonedBase.get());
+    ASSERT_TRUE(cloned != nullptr);
+
+    // Verify the expanded pipelines have the same size.
+    const auto& originalExpanded = original.getExpandedPipeline();
+    const auto& clonedExpanded = cloned->getExpandedPipeline();
+    ASSERT_EQ(originalExpanded.size(), clonedExpanded.size());
+    ASSERT_EQ(clonedExpanded.size(), 4);
+
+    // Verify the expanded pipeline elements have matching stage names.
+    for (size_t i = 0; i < originalExpanded.size(); ++i) {
+        ASSERT_EQ(originalExpanded[i]->getParseTimeName(), clonedExpanded[i]->getParseTimeName());
+    }
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandableClonePreservesProperties) {
+    // Use a parse node that expands to a stage with specific properties.
+    auto parseNode =
+        new sdk::ExtensionAggStageParseNode(std::make_unique<ExpandToSearchAggStageParseNode>());
+    auto handle = AggStageParseNodeHandle{parseNode};
+    BSONObj stageBson = createDummySpecFromStageName(kExpandToSearchName);
+
+    host::DocumentSourceExtension::LiteParsedExpandable original(
+        stageBson.firstElement(), std::move(handle), _nss, LiteParserOptions{});
+
+    auto clonedBase = original.clone();
+    auto* cloned =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpandable*>(clonedBase.get());
+    ASSERT_TRUE(cloned != nullptr);
+
+    // Verify isInitialSource() is preserved.
+    ASSERT_EQ(original.isInitialSource(), cloned->isInitialSource());
+    ASSERT_TRUE(cloned->isInitialSource());
+
+    // Verify requiresAuthzChecks() is preserved.
+    ASSERT_EQ(original.requiresAuthzChecks(), cloned->requiresAuthzChecks());
+    ASSERT_TRUE(cloned->requiresAuthzChecks());
+
+    // Verify requiredPrivileges() is preserved.
+    auto originalPrivileges =
+        original.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    auto clonedPrivileges =
+        cloned->requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    ASSERT_EQ(originalPrivileges.size(), clonedPrivileges.size());
+    ASSERT_EQ(clonedPrivileges.size(), 1);
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandableCloneIsIndependent) {
+    // Reset expand counter to verify clone triggers a fresh expansion.
+    sdk::shared_test_stages::ExpandToExtParseParseNode::expandCalls = 0;
+
+    auto rootParseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToExtParseParseNode>());
+    AggStageParseNodeHandle rootHandle{rootParseNode};
+    BSONObj stageBson =
+        createDummySpecFromStageName(sdk::shared_test_stages::kExpandToExtParseName);
+    host::DocumentSourceExtension::LiteParsedExpandable original(
+        stageBson.firstElement(), std::move(rootHandle), _nss, LiteParserOptions{});
+
+    // Original construction triggered one expand call.
+    ASSERT_EQ(sdk::shared_test_stages::ExpandToExtParseParseNode::expandCalls, 1);
+
+    // Clone should trigger another expand call since it's a fresh construction.
+    auto cloned = original.clone();
+    ASSERT_EQ(sdk::shared_test_stages::ExpandToExtParseParseNode::expandCalls, 2);
+
+    // Verify both have valid expanded pipelines.
+    auto* clonedExpandable =
+        dynamic_cast<host::DocumentSourceExtension::LiteParsedExpandable*>(cloned.get());
+    ASSERT_TRUE(clonedExpandable != nullptr);
+    ASSERT_EQ(original.getExpandedPipeline().size(), 1);
+    ASSERT_EQ(clonedExpandable->getExpandedPipeline().size(), 1);
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandedClonePreservesStageNameAndNamespace) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded original(
+        std::string(sdk::shared_test_stages::kTransformName), std::move(handle), _nss);
+
+    auto cloned = original.clone();
+
+    // Verify the cloned object has the same stage name.
+    ASSERT_EQ(cloned->getParseTimeName(), original.getParseTimeName());
+    ASSERT_EQ(cloned->getParseTimeName(), std::string(sdk::shared_test_stages::kTransformName));
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandedClonePreservesIsInitialSource) {
+    // Test with a transform stage (not an initial source).
+    {
+        auto astNode = new sdk::ExtensionAggStageAstNode(
+            sdk::shared_test_stages::TransformAggStageAstNode::make());
+        auto handle = AggStageAstNodeHandle{astNode};
+
+        host::DocumentSourceExtension::LiteParsedExpanded original(
+            std::string(sdk::shared_test_stages::kTransformName), std::move(handle), _nss);
+
+        auto cloned = original.clone();
+
+        ASSERT_EQ(original.isInitialSource(), cloned->isInitialSource());
+        ASSERT_FALSE(cloned->isInitialSource());
+    }
+
+    // Test with a source stage (is an initial source).
+    {
+        auto astNode = new sdk::ExtensionAggStageAstNode(
+            sdk::shared_test_stages::SearchLikeSourceAggStageAstNode::make());
+        auto handle = AggStageAstNodeHandle{astNode};
+
+        host::DocumentSourceExtension::LiteParsedExpanded original(
+            std::string(sdk::shared_test_stages::kSearchLikeSourceStageName),
+            std::move(handle),
+            _nss);
+
+        auto cloned = original.clone();
+
+        ASSERT_EQ(original.isInitialSource(), cloned->isInitialSource());
+        ASSERT_TRUE(cloned->isInitialSource());
+    }
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandedClonePreservesRequiredPrivileges) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(SingleActionRequiredPrivilegesAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded original(
+        std::string(SingleActionRequiredPrivilegesAggStageAstNode::kName), std::move(handle), _nss);
+
+    auto cloned = original.clone();
+
+    // Verify requiresAuthzChecks() is preserved.
+    ASSERT_EQ(original.requiresAuthzChecks(), cloned->requiresAuthzChecks());
+    ASSERT_TRUE(cloned->requiresAuthzChecks());
+
+    // Verify requiredPrivileges() is preserved.
+    auto originalPrivileges =
+        original.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    auto clonedPrivileges =
+        cloned->requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    ASSERT_EQ(originalPrivileges.size(), clonedPrivileges.size());
+    ASSERT_EQ(clonedPrivileges.size(), 1);
+
+    const auto& clonedPrivilege = clonedPrivileges.front();
+    ASSERT_TRUE(clonedPrivilege.getResourcePattern().isExactNamespacePattern());
+    ASSERT_EQ(clonedPrivilege.getResourcePattern().ns(), _nss);
+
+    const auto& actions = clonedPrivilege.getActions();
+    ASSERT_EQ(actions.getActionsAsStringDatas().size(), 1);
+    ASSERT_TRUE(actions.contains(ActionType::find));
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandedCloneWithMultiplePrivileges) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(MultipleActionsRequiredPrivilegesAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded original(
+        std::string(MultipleActionsRequiredPrivilegesAggStageAstNode::kName),
+        std::move(handle),
+        _nss);
+
+    auto cloned = original.clone();
+
+    auto originalPrivileges =
+        original.requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    auto clonedPrivileges =
+        cloned->requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+
+    ASSERT_EQ(originalPrivileges.size(), clonedPrivileges.size());
+    ASSERT_EQ(clonedPrivileges.size(), 1);
+
+    const auto& clonedPrivilege = clonedPrivileges.front();
+    const auto& actions = clonedPrivilege.getActions();
+    ASSERT_EQ(actions.getActionsAsStringDatas().size(), 2);
+    ASSERT_TRUE(actions.contains(ActionType::listIndexes));
+    ASSERT_TRUE(actions.contains(ActionType::planCacheRead));
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandedCloneWithNoPrivileges) {
+    auto astNode =
+        new sdk::ExtensionAggStageAstNode(EmptyRequiredPrivilegesAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded original(
+        std::string(EmptyRequiredPrivilegesAggStageAstNode::kName), std::move(handle), _nss);
+
+    auto cloned = original.clone();
+
+    // Verify requiresAuthzChecks() is preserved (should be false for empty privileges).
+    ASSERT_EQ(original.requiresAuthzChecks(), cloned->requiresAuthzChecks());
+    ASSERT_FALSE(cloned->requiresAuthzChecks());
+
+    auto clonedPrivileges =
+        cloned->requiredPrivileges(/*isMongos*/ false, /*bypassDocumentValidation*/ false);
+    ASSERT_EQ(clonedPrivileges, PrivilegeVector{});
+}
+
+TEST_F(DocumentSourceExtensionTest, LiteParsedExpandedCloneProducesIndependentStageParams) {
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        sdk::shared_test_stages::TransformAggStageAstNode::make());
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtension::LiteParsedExpanded original(
+        std::string(sdk::shared_test_stages::kTransformName), std::move(handle), _nss);
+
+    auto cloned = original.clone();
+
+    // Both original and cloned should be able to produce independent stage params.
+    auto originalParams = original.getStageParams();
+    auto clonedParams = cloned->getStageParams();
+
+    ASSERT_TRUE(originalParams != nullptr);
+    ASSERT_TRUE(clonedParams != nullptr);
+    // Params should be different instances.
+    ASSERT_NE(originalParams.get(), clonedParams.get());
 }
 }  // namespace mongo::extension

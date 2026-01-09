@@ -84,7 +84,7 @@ public:
         NamespaceString::createNamespaceString_forTest(_tenantId, "test.test");
     const UUID _testFooTenantUUID = UUID::gen();
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
-        .commitQuorum = CommitQuorumOptions(CommitQuorumOptions::kDisabled)};
+        .commitQuorum = CommitQuorumOptions(CommitQuorumOptions::kPrimarySelfVote)};
     std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoord;
 };
 
@@ -156,12 +156,13 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
+    const auto buildUUID = UUID::gen();
     auto testFoo1Future =
         assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
                                                      _testFooNss.dbName(),
                                                      _testFooUUID,
                                                      makeSpecs({"a", "b"}, {1, 2}),
-                                                     UUID::gen(),
+                                                     buildUUID,
                                                      IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
@@ -176,6 +177,11 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
                                                  _indexBuildOptions),
               ErrorCodes::IndexBuildAlreadyInProgress);
 
+    ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
+        operationContext(),
+        buildUUID,
+        repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
+
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
     auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
     ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
@@ -188,7 +194,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
-    auto testFoo1BuildUUID = UUID::gen();
+    const auto testFoo1BuildUUID = UUID::gen();
     auto testFoo1Future =
         assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
                                                      _testFooNss.dbName(),
@@ -211,12 +217,13 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
         [&](const auto& ex) { ASSERT_STRING_CONTAINS(ex.reason(), testFoo1BuildUUID.toString()); });
 
     // Register a second index build on _testFooNss.
+    const auto testFoo2BuildUUID = UUID::gen();
     auto testFoo2Future =
         assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
                                                      _testFooNss.dbName(),
                                                      _testFooUUID,
                                                      makeSpecs({"c", "d"}, {3, 4}),
-                                                     UUID::gen(),
+                                                     testFoo2BuildUUID,
                                                      IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
@@ -231,11 +238,12 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                        ErrorCodes::BackgroundOperationInProgressForDatabase);
 
     // Register an index build on a different collection _testBarNss.
+    const auto testBarBuildUUID = UUID::gen();
     auto testBarFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
                                                                       _testBarNss.dbName(),
                                                                       _testBarUUID,
                                                                       makeSpecs({"x", "y"}, {5, 6}),
-                                                                      UUID::gen(),
+                                                                      testBarBuildUUID,
                                                                       IndexBuildProtocol::kTwoPhase,
                                                                       _indexBuildOptions));
 
@@ -250,12 +258,13 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
                        ErrorCodes::BackgroundOperationInProgressForDatabase);
 
     // Register an index build on a collection in a different database _othertestFoo.
+    const auto othertestFooBuildUUID = UUID::gen();
     auto othertestFooFuture =
         assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
                                                      _othertestFooNss.dbName(),
                                                      _othertestFooUUID,
                                                      makeSpecs({"r", "s"}, {7, 8}),
-                                                     UUID::gen(),
+                                                     othertestFooBuildUUID,
                                                      IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
@@ -271,19 +280,39 @@ TEST_F(IndexBuildsCoordinatorMongodTest, Registration) {
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
 
+    ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
+        operationContext(),
+        testFoo1BuildUUID,
+        repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
+
     auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());
     ASSERT_GTE(indexCatalogStats.numIndexesBefore, 1);
     ASSERT_GT(indexCatalogStats.numIndexesAfter, 1);
     ASSERT_LTE(indexCatalogStats.numIndexesAfter, 5);
+
+    ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
+        operationContext(),
+        testFoo2BuildUUID,
+        repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
 
     indexCatalogStats = unittest::assertGet(testFoo2Future.getNoThrow());
     ASSERT_GTE(indexCatalogStats.numIndexesBefore, 1);
     ASSERT_GT(indexCatalogStats.numIndexesAfter, 1);
     ASSERT_LTE(indexCatalogStats.numIndexesAfter, 5);
 
+    ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
+        operationContext(),
+        testBarBuildUUID,
+        repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
+
     indexCatalogStats = unittest::assertGet(testBarFuture.getNoThrow());
     ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
     ASSERT_EQ(3, indexCatalogStats.numIndexesAfter);
+
+    ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
+        operationContext(),
+        othertestFooBuildUUID,
+        repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
 
     indexCatalogStats = unittest::assertGet(othertestFooFuture.getNoThrow());
     ASSERT_EQ(1, indexCatalogStats.numIndexesBefore);
@@ -322,12 +351,13 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
     ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
 
     // Register an index build on _testFooNss.
+    const auto testFoo1BuildUUID = UUID::gen();
     auto testFoo1Future =
         assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
                                                      _testFooNss.dbName(),
                                                      _testFooUUID,
                                                      makeSpecs({"a", "b"}, {1, 2}),
-                                                     UUID::gen(),
+                                                     testFoo1BuildUUID,
                                                      IndexBuildProtocol::kTwoPhase,
                                                      _indexBuildOptions));
 
@@ -341,64 +371,13 @@ TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumWithBadArguments) {
         operationContext(), _testFooNss, {"a_1", "b_1", "c_1"}, newCommitQuorum);
     ASSERT_EQUALS(ErrorCodes::IndexNotFound, status);
 
-    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
-    unittest::assertGet(testFoo1Future.getNoThrow());
-}
-
-TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumFailsToTurnCommitQuorumFromOffToOn) {
-    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
-
-    // Start an index build on _testFooNss with commit quorum disabled.
-    auto testFoo1Future =
-        assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
-                                                     _testFooNss.dbName(),
-                                                     _testFooUUID,
-                                                     makeSpecs({"a"}, {1}),
-                                                     UUID::gen(),
-                                                     IndexBuildProtocol::kTwoPhase,
-                                                     _indexBuildOptions));
-
-    // Update the commit quorum value such that it enables commit quorum for the index
-    // build 'a_1'.
-    auto status = _indexBuildsCoord->setCommitQuorum(
-        operationContext(), _testFooNss, {"a_1"}, CommitQuorumOptions(1));
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-
-    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
-    assertGet(testFoo1Future.getNoThrow());
-}
-
-TEST_F(IndexBuildsCoordinatorMongodTest, SetCommitQuorumFailsToTurnCommitQuorumFromOnToOff) {
-
-    const IndexBuildsCoordinator::IndexBuildOptions indexBuildOptionsWithCQOn = {
-        .commitQuorum = CommitQuorumOptions(1)};
-    const auto buildUUID = UUID::gen();
-
-    // Start an index build on _testFooNss with commit quorum enabled.
-    auto testFoo1Future =
-        assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
-                                                     _testFooNss.dbName(),
-                                                     _testFooUUID,
-                                                     makeSpecs({"a"}, {1}),
-                                                     buildUUID,
-                                                     IndexBuildProtocol::kTwoPhase,
-                                                     indexBuildOptionsWithCQOn));
-
-    // Update the commit quorum value such that it disables commit quorum for the index
-    // build 'a_1'.
-    auto status =
-        _indexBuildsCoord->setCommitQuorum(operationContext(),
-                                           _testFooNss,
-                                           {"a_1"},
-                                           CommitQuorumOptions(CommitQuorumOptions::kDisabled));
-    ASSERT_EQUALS(ErrorCodes::BadValue, status);
-
     ASSERT_OK(_indexBuildsCoord->voteCommitIndexBuild(
         operationContext(),
-        buildUUID,
+        testFoo1BuildUUID,
         repl::ReplicationCoordinator::get(operationContext())->getMyHostAndPort()));
 
-    assertGet(testFoo1Future.getNoThrow());
+    _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
+    unittest::assertGet(testFoo1Future.getNoThrow());
 }
 
 }  // namespace

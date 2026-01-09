@@ -33,24 +33,6 @@ variables:
     #   variant: rhel8-debug-aubsan-compile
 
   # THIS HAS COPIES IN:
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &linux_debug_aubsan_compile_variant_dependency
-    depends_on:
-      - name: archive_dist_test
-        variant: &linux_debug_aubsan_compile_variant_name linux-debug-aubsan-compile-required
-      - name: archive_jstestshell
-        variant: *linux_debug_aubsan_compile_variant_name
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
-    # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: rhel8-debug-aubsan-compile
-
-  # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml

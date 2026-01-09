@@ -280,6 +280,48 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradeSkippedOnConflictingView) 
     ASSERT(CollectionCatalog::get(operationContext())->lookupView(operationContext(), nss1));
 }
 
+/*SkipViewCreation*/
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreation) {
+    auto uuid = createViewlessTimeseriesCollection(nss1);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    downgradeFromViewlessTimeseries(
+        operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
+
+    auto opCtx = operationContext();
+    auto catalog = CollectionCatalog::get(opCtx);
+
+    auto bucketsColl =
+        catalog->lookupCollectionByNamespace(opCtx, nss1.makeTimeseriesBucketsNamespace());
+    ASSERT(bucketsColl);
+    ASSERT(bucketsColl->isTimeseriesCollection());
+    ASSERT(!bucketsColl->isNewTimeseriesWithoutView());
+    ASSERT_EQ(bucketsColl->uuid(), uuid);
+
+    ASSERT(!catalog->lookupView(opCtx, nss1));
+    ASSERT(!catalog->lookupCollectionByNamespace(opCtx, nss1));
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreationIdempotency) {
+    auto uuid = createViewlessTimeseriesCollection(nss1);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+
+    downgradeFromViewlessTimeseries(
+        operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
+
+    downgradeFromViewlessTimeseries(
+        operationContext(), nss1, boost::none /* expectedUUID */, true /* skipViewCreation */);
+
+    auto opCtx = operationContext();
+    auto catalog = CollectionCatalog::get(opCtx);
+
+    assertIsTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace(), uuid);
+
+    ASSERT(!catalog->lookupView(opCtx, nss1));
+}
 
 }  // namespace
 }  // namespace mongo::timeseries

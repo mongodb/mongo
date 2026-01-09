@@ -39,7 +39,10 @@ RecordStore::Options getRecordStoreOptions(const NamespaceString& nss,
 
     bool isClustered = collectionOptions.clusteredIndex.has_value();
     recordStoreOptions.keyFormat = isClustered ? KeyFormat::String : KeyFormat::Long;
-    recordStoreOptions.allowOverwrite = isClustered ? false : true;
+
+    // Overwrites are disallowed for clustered collections and collections with replicated record
+    // IDs to guarantee record uniqueness and prevent accidental overwrites of existing records.
+    recordStoreOptions.allowOverwrite = !(isClustered || collectionOptions.recordIdsReplicated);
 
     recordStoreOptions.isCapped = collectionOptions.capped;
 

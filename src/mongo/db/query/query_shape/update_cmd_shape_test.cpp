@@ -98,11 +98,19 @@ public:
         const auto letSize = updateComponents.let.size();
         const auto cSize =
             (updateComponents.representativeC) ? updateComponents.representativeC->objsize() : 0;
+        size_t representativeArrayFiltersSize = 0;
+        if (updateComponents.representativeArrayFilters) {
+            auto arrayFilters = *updateComponents.representativeArrayFilters;
+            representativeArrayFiltersSize = std::accumulate(
+                arrayFilters.begin(), arrayFilters.end(), 0, [](size_t total, const BSONObj& bson) {
+                    return total + sizeof(BSONObj) + static_cast<size_t>(bson.objsize());
+                });
+        }
 
         ASSERT_EQ(updateComponents.size(),
                   sizeof(UpdateCmdShapeComponents) + updateComponents.representativeQ.objsize() +
                       updateComponents._representativeUObj.objsize() + cSize + letSize -
-                      sizeof(LetShapeComponent));
+                      sizeof(LetShapeComponent) + representativeArrayFiltersSize);
     }
 
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
@@ -1101,6 +1109,83 @@ TEST_F(UpdateCmdShapeTest, PullAllModifierUpdateShape) {
         command: "update", 
         q: { "HASH<x>": { $eq: "?number" } },  
         u: {$pullAll: { "HASH<colorsToRemove>": "?array<?string>", "HASH<colorsToRemoveEmpty>": "[]" }}, 
+        multi: false, 
+        upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, ArrayFiltersModifierUpdateShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [{ 
+        q: { "x.$[testNonArrayFilterPath]": {$eq: 3} },  
+        u: { 
+            $inc: { "grades.$[t].questions.$[score]": 2 },
+            $set: { "categories.$[itemLow].discount": false, "categories.$[itemHigh].premium": false }
+        }, 
+        arrayFilters: [ 
+            { "t.type": "quiz" }, 
+            { "score": { $not: { $gte: 50 } } },
+            { "itemLow.stock": { $lt: 20 } },  
+            { "itemHigh.stock": { $gt: 100 } }   
+        ], 
+        multi: false, 
+        upsert: true }],
+        "$db": "testDB"})"_sd);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: { "x.$[testNonArrayFilterPath]": { $eq: 1 } }, 
+            u: { 
+                $inc: { "grades.$[t].questions.$[score]": 1 },
+                $set: { "categories.$[itemHigh].premium": true, "categories.$[itemLow].discount": true }
+            }, 
+            arrayFilters: [
+                { "itemHigh.stock": { $gt: 1 } },
+                { "itemLow.stock": { $lt: 1 } },
+                { "score": { $not: { $gte: 1 } } },  
+                { "t.type": { $eq: "?" } }
+            ], 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "testDB", coll: "testColl" }, 
+            command: "update", 
+            q: {"x.$[testNonArrayFilterPath]": {$eq: "?number"}},  
+            u: { 
+                $inc: { "grades.$[t].questions.$[score]": "?number" },
+                $set: { "categories.$[itemHigh].premium": "?bool", "categories.$[itemLow].discount": "?bool" }
+            }, 
+            arrayFilters: [
+                { "itemHigh.stock": { $gt: "?number" } },
+                { "itemLow.stock": { $lt: "?number" } },
+                { "score": { $not: { $gte: "?number" } } },
+                { "t.type": { $eq: "?string" } }   
+            ], 
+            multi: false, 
+            upsert: true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>.HASH<$[testNonArrayFilterPath]>": { $eq: "?number" } },  
+        u: { 
+                $inc: { "HASH<grades>.$[HASH<t>].HASH<questions>.$[HASH<score>]": "?number" },
+                $set: { "HASH<categories>.$[HASH<itemHigh>].HASH<premium>": "?bool", "HASH<categories>.$[HASH<itemLow>].HASH<discount>": "?bool" }
+        }, 
+        arrayFilters: [ 
+            { "HASH<itemHigh>.HASH<stock>": { $gt: "?number" } },
+            { "HASH<itemLow>.HASH<stock>": { $lt: "?number" } },
+            { "HASH<score>": { $not: { $gte: "?number" } } },
+            { "HASH<t>.HASH<type>": { $eq: "?string" } } 
+        ], 
         multi: false, 
         upsert: true })",
         shape.toBson(_operationContext.get(),
@@ -2162,14 +2247,17 @@ TEST_F(UpdateCmdShapeTest, StableQueryShapeHashValue) {
     expectedHash = "F373308007DC7A9F0BC2A7D2BD1862E77EEE1D1EDE45C9618C20905A674A2815";
     verifyHash(expectedHash, updateCmd);
 
-    // Changing update to a modifier style should change the hash.
+    // Changing update to a modifier style with array filter should change the hash.
     updateCmd.c = boost::none;
-    updateCmd.u = fromjson(R"({ "$set": { "foo": "bar", "num": "mynum" }})"_sd);
-    expectedHash = "670D08BB8ECAC87CDEF7AB4B600E08F7F1418767858A4FAB23A7478DFDFEF83C";
+    updateCmd.u = fromjson(R"({ "$set": { "foo": "bar", "myArray.$[element]": "mynum" }})"_sd);
+    updateCmd.arrayFilters = BSON_ARRAY(fromjson(R"({ "element": "myVal" })"_sd));
+    expectedHash = "68E51CA20FBCF067D764ACBEAF14891E36F20DB95070818CCF1425EFA9840DA1";
     verifyHash(expectedHash, updateCmd);
 
-    // TODO(SERVER-113907): When 'representativeArrayFilters' is supported, test hash stability when
-    // 'representativeArrayFilters' is added.
+    // Changing arrayFilters should change the hash.
+    updateCmd.arrayFilters = BSON_ARRAY(fromjson(R"({ "element": { $ne: "Bachelor" }})"_sd));
+    expectedHash = "771C202F22A12BF9C19B774983DCA99863A40D19E2BE3B7195EF7CAE2E657BD0";
+    verifyHash(expectedHash, updateCmd);
 }
 
 TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponents) {
@@ -2184,12 +2272,16 @@ TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponents) {
 TEST_F(UpdateCmdShapeTest, SizeOfUpdateCmdShapeComponentsForModifierUpdate) {
     auto shape = makeOneShapeFromUpdate(R"({
         update: "testColl",
-        updates: [ { q: { x: {$eq: 3} }, u: {$set: {foo: "bar" }}, multi: false, upsert: false } ],
+        updates: [ { 
+            q: { x: {$eq: 3} }, 
+            u: {$set: {"foo.$[element]": "bar" }}, 
+            arrayFilters: [{element: 0}], 
+            multi: false, 
+            upsert: false 
+        } ],
         "$db": "testDB"
     })"_sd);
 
-    // TODO SERVER-113907: When 'representativeArrayFilters' is supported, add tests for validating
-    // shape size with arrayFilters.
     validateShapeSize(shape);
 }
 
@@ -2351,6 +2443,75 @@ TEST_F(UpdateCmdShapeTest, CanShapifyUpdateWithSimpleIdQuery) {
         })",
         shape.toBson(_operationContext.get(),
                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, ReplacementUpdateShapeTokenization) {
+    // Note that an array filter is in the field path in the replacement document, which is
+    // unusual but valid.
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [ { q: { "x.$[identifier1]": {$eq: 3} }, u: { "foo.$[identifier2]": "bar" }, multi: false, upsert: false } ],
+        "$db": "testDB"
+    })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        q: { "HASH<x>.HASH<$[identifier1]>": { $eq: "?number" } },  
+        u: "?object",
+        multi: false, 
+        upsert: false })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
+TEST_F(UpdateCmdShapeTest, PipelineUpdateShapeTokenization) {
+    // Note that an array filter is in the field path in the replacement document, which is
+    // unusual but valid.
+    auto shape = makeOneShapeFromUpdate(R"({
+        "update": "testColl",
+        "updates": [
+            {
+            "q": { "_id": 1 },
+            "u": [{
+                "$set": {
+                    "x": {
+                        "$setField": {
+                            "field": { "$const": "$[identifier1]" },
+                            "input": "$x",
+                            "value": "newValue"
+                        }
+                    }
+                }
+            }],
+            "multi": false,
+            "upsert": false
+            }
+        ],
+        "$db": "testDB"
+        })"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ cmdNs: { db: "HASH<testDB>", coll: "HASH<testColl>" }, 
+        command: "update", 
+        "q": { "HASH<_id>": { "$eq": "?number" } },  
+        u: [{
+            "$set": {
+                "HASH<x>": {
+                    "$setField": {
+                        "field": "HASH<$[identifier1]>",
+                        "input": "$HASH<x>",
+                        "value": "?string"
+                    }
+                }
+            }
+        }],
+        multi: false, 
+        upsert: false })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
                      SerializationContext::stateDefault()));
 }
 

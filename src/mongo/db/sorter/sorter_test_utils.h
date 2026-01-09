@@ -76,7 +76,8 @@ private:
 };
 
 typedef std::pair<IntWrapper, IntWrapper> IWPair;
-typedef SortIteratorInterface<IntWrapper, IntWrapper> IWIterator;
+typedef sorter::Iterator<IntWrapper, IntWrapper> IWIterator;
+typedef sorter::IteratorBase<IntWrapper, IntWrapper> IWIteratorBase;
 typedef Sorter<IntWrapper, IntWrapper> IWSorter;
 
 enum Direction { ASC = 1, DESC = -1 };
@@ -95,7 +96,7 @@ private:
     Direction _dir;
 };
 
-class IntIterator : public IWIterator {
+class IntIterator : public IWIteratorBase {
 public:
     IntIterator(int start = 0, int stop = INT_MAX, int increment = 1)
         : _current(start), _increment(increment), _stop(stop) {}
@@ -127,7 +128,7 @@ private:
     int _stop;
 };
 
-class EmptyIterator : public IWIterator {
+class EmptyIterator : public IWIteratorBase {
 public:
     bool more() override {
         return false;
@@ -146,7 +147,7 @@ public:
     }
 };
 
-class LimitIterator : public IWIterator {
+class LimitIterator : public IWIteratorBase {
 public:
     LimitIterator(long long limit, std::shared_ptr<IWIterator> source)
         : _remaining(limit), _source(source) {
@@ -277,7 +278,7 @@ std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
         // Spill iterator outputs to a file and obtain a new iterator for it.
         vec.push_back(spillToFile(std::move(it), tempDir));
     }
-    return IWIterator::merge(vec, opts, IWComparator(Dir));
+    return sorter::merge<IntWrapper, IntWrapper>(vec, opts, IWComparator(Dir));
 }
 }  // namespace mongo::sorter
 

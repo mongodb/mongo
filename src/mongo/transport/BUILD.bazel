@@ -152,8 +152,8 @@ mongo_cc_library(
         "//src/mongo/rpc:message",
         "//src/mongo/util/options_parser",
         "//src/third_party/snappy",
-        "//src/third_party/zlib",
         "//src/third_party/zstandard:zstd",
+        "@zlib",
     ],
 )
 

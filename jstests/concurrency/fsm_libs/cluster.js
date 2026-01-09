@@ -196,7 +196,9 @@ export const Cluster = function (clusterOptions, sessionOptions) {
         }
 
         if (clusterOptions.sharded.enabled) {
-            st = new FSMShardingTest(`mongodb://${db.getMongo().host}`);
+            // TODO (SERVER-115639) refactor this line once the host property is unified.
+            const hosts = db.getMongo().isMultiRouter ? db.getMongo().hosts : db.getMongo().host;
+            st = new FSMShardingTest(`mongodb://${hosts}`);
 
             conn = st.s(0); // First mongos
 

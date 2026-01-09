@@ -69,6 +69,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_settings/query_settings_service.h"
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_stats/agg_key.h"
@@ -178,6 +179,20 @@ Document serializeForPassthrough(const boost::intrusive_ptr<ExpressionContext>& 
         if (auto&& queryShapeHash =
                 CurOp::get(expCtx->getOperationContext())->debug().getQueryShapeHash()) {
             req.setOriginalQueryShapeHash(queryShapeHash);
+        }
+    }
+
+    // If the featureFlagVectorSearchExtension IFR flag is enabled, all nodes are upgraded and can
+    // parse IFR flags.
+    // TODO SERVER-116118: Remove FCV gate once multiversion testing can handle IFR flags.
+    if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isGreaterThanOrEqualTo(
+            multiversion::FeatureCompatibilityVersion::kVersion_8_3)) {  // NOLINT
+        // TODO SERVER-116219: Expand IFR flag serialization beyond $vectorSearch.
+        auto ifrCtx = expCtx->getIfrContext();
+        tassert(11565104, "IFRContext cannot be null", ifrCtx);
+        if (ifrCtx->getSavedFlagValue(feature_flags::gFeatureFlagVectorSearchExtension)) {
+            req.setIfrFlags(
+                ifrCtx->serializeFlagValues({&feature_flags::gFeatureFlagVectorSearchExtension}));
         }
     }
 

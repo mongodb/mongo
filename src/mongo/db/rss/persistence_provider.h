@@ -134,6 +134,14 @@ public:
     virtual bool shouldForceUpdateWithFullDocument() const = 0;
 
     /**
+     * If true, the storage provider supports the reuse of cursors in express path queries. Used to
+     * disable this optimization for disaggregated storage for now.
+     *
+     * TODO SERVER-116261: re-enable the optimization for disaggregated storage.
+     */
+    virtual bool supportsCursorReuseForExpressPathQueries() const = 0;
+
+    /**
      * If true, the storage provider supports the use of local, unreplicated collections.
      */
     virtual bool supportsLocalCollections() const = 0;
@@ -157,13 +165,6 @@ public:
      * If true, the provider supports starting the oplog cap maintainer thread and oplog sampling.
      */
     virtual bool supportsOplogSampling() const = 0;
-
-    /**
-     * If true, the provider supports table verify.
-     *
-     * TODO SERVER-113061: remove this workaround.
-     */
-    virtual bool supportsTableVerify() const = 0;
 
     /**
      * If true, we disable transaction update coalescing on secondaries.

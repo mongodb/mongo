@@ -1,5 +1,5 @@
 // Tests that a query with $in filter over a large array chooses the optimal index.
-import {code, codeOneLine, section, subSection} from "jstests/libs/pretty_md.js";
+import {code, codeOneLine, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {normalizePlan, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db.large_in_with_indexes;

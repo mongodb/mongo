@@ -28,7 +28,7 @@ const collName = "coll";
 const indexSpec = {a: 1};
 const indexName = "non_resumable_index_build";
 
-// TODO(SERVER-109349): Remove this check when the feature flag is removed.
+// TODO(SERVER-109578): Remove this check when the feature flag is removed.
 if (!FeatureFlagUtil.isPresentAndEnabled(primary.getDB(dbName), "PrimaryDrivenIndexBuilds")) {
     jsTest.log.info("Skipping: featureFlagPrimaryDrivenIndexBuilds is disabled");
     rst.stopSet();

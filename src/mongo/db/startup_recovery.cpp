@@ -182,7 +182,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(
 
         writeConflictRetry(opCtx, "insertFCVDocument", fcvNss, [&] {
             WriteUnitOfWork wunit(opCtx);
-            uassertStatusOK(Helpers::insert(opCtx, fcvColl, fcvDoc.toBSON()));
+            uassertStatusOK(Helpers::insert(opCtx, fcvColl.getCollectionPtr(), fcvDoc.toBSON()));
             wunit.commit();
         });
     }

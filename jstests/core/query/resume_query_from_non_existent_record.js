@@ -27,6 +27,10 @@
  * ]
  */
 
+// killCursors on multi-cursors is unsupported when queries are dispatched to multiple mongoses.
+// pinToSingleMongos due to killCursors command.
+TestData.pinToSingleMongos = true;
+
 const collName = "resume_query_from_non_existent_record";
 const coll = db[collName];
 

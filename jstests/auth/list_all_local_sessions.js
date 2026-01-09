@@ -7,6 +7,10 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
 TestData.disableImplicitSessions = true;
+// This test makes assertions about sessions on a particular node, which are not compatible with
+// random mongos dispatching.
+// pinToSingleMongos due to $listLocalSessions.
+TestData.pinToSingleMongos = true;
 
 function runListAllLocalSessionsTest(mongod) {
     assert(mongod);

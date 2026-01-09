@@ -361,7 +361,7 @@ export default [
             "jstests/libs/override_methods/golden_overrides.js",
             "jstests/libs/override_methods/sharded_golden_overrides.js",
             "jstests/libs/query/golden_test_utils.js",
-            "jstests/libs/query_golden_sharding_utils.js",
+            "jstests/libs/query/golden_sharding_utils.js",
             "jstests/query_golden/**/*.js",
             "jstests/query_golden_sharding/**/*.js",
         ],

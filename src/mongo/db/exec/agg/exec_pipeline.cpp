@@ -49,11 +49,9 @@ Pipeline::Pipeline(StageContainer&& stages, boost::intrusive_ptr<ExpressionConte
 }
 
 Pipeline::~Pipeline() {
-    if (_disposeInDestructor) {
-        // 'dispose()' performs the actual disposal only once, so it is safe to call it again from
-        // here.
-        dispose();
-    }
+    // 'dispose()' performs the actual disposal only once, so it is safe to call it unconditionally
+    // from here.
+    dispose();
     tassert(10617100, "expecting the pipeline to be disposed at destruction", _disposed);
 }
 

@@ -170,7 +170,7 @@ public:
         uassert(
             ErrorCodes::CannotCreateCollection, "could not create collection", collection.exists());
 
-        Status status = Helpers::insert(opCtx, collection, obj);
+        Status status = Helpers::insert(opCtx, collection.getCollectionPtr(), obj);
         if (status.isOK()) {
             wunit.commit();
         }
@@ -261,8 +261,10 @@ public:
                 requestedPinTs,
                 round));
 
-        uassertStatusOK(Helpers::insert(
-            opCtx, collection, fixDocumentForInsert(opCtx, BSON("pinTs" << pinTs)).getValue()));
+        uassertStatusOK(
+            Helpers::insert(opCtx,
+                            collection.getCollectionPtr(),
+                            fixDocumentForInsert(opCtx, BSON("pinTs" << pinTs)).getValue()));
         wuow.commit();
 
         result.append("requestedPinTs", requestedPinTs);

@@ -36,7 +36,6 @@
 #include "mongo/util/string_map.h"
 
 #include <memory>
-#include <vector>
 
 namespace mongo {
 

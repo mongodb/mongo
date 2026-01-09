@@ -391,6 +391,11 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
         !metadata.currentShardHasAnyChunks()) {
         recipientDoc.setSkipCloning(true);
     }
+    if (resharding::gFeatureFlagReshardingSkipBuildingIndexesIfApplicable.isEnabled(
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        !metadata.currentShardHasAnyChunks()) {
+        recipientDoc.setSkipBuildingIndexes(true);
+    }
     if (resharding::gFeatureFlagReshardingStoreOplogFetcherProgress.isEnabled(
             vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         recipientDoc.setStoreOplogFetcherProgress(true);

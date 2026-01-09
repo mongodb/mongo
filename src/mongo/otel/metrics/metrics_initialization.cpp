@@ -124,18 +124,22 @@ void validateOptions() {
             (gOpenTelemetryMetricsHttpEndpoint.empty() && gOpenTelemetryMetricsDirectory.empty()));
 
     uassert(ErrorCodes::InvalidOptions,
-            "gOpenTelemetryMetricsHttpEndpoint and gOpenTelemetryMetricsDirectory cannot be set "
+            "openTelemetryMetricsHttpEndpoint and openTelemetryMetricsDirectory cannot be set "
             "simultaneously",
             gOpenTelemetryMetricsHttpEndpoint.empty() || gOpenTelemetryMetricsDirectory.empty());
 
     uassert(ErrorCodes::InvalidOptions,
-            "gOpenTelemetryMetricsCompression must be either `none` or `gzip`",
+            "openTelemetryMetricsCompression must be either `none` or `gzip`",
             gOpenTelemetryMetricsCompression == "none" ||
                 gOpenTelemetryMetricsCompression == "gzip");
 
     uassert(ErrorCodes::InvalidOptions,
-            "gOpenTelemetryMetricsCompression must be `none` for metrics file exporter",
+            "openTelemetryMetricsCompression must be `none` for metrics file exporter",
             gOpenTelemetryMetricsDirectory.empty() || gOpenTelemetryMetricsCompression == "none");
+
+    uassert(ErrorCodes::InvalidOptions,
+            "openTelemetryExportTimeoutMillis must be less than openTelemetryExportIntervalMillis",
+            gOpenTelemetryExportTimeoutMillis < gOpenTelemetryExportIntervalMillis);
 }
 }  // namespace
 

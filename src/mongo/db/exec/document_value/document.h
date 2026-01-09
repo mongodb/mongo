@@ -44,13 +44,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <cstring>
 #include <initializer_list>
 #include <iosfwd>
 #include <string>
-#include <type_traits>
 #include <typeinfo>
 #include <utility>
 #include <vector>
@@ -61,7 +61,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class BSONObj;
 
 class FieldIterator;
@@ -995,4 +995,4 @@ inline MutableValue MutableValue::getField(Position pos) {
 inline MutableValue MutableValue::getField(StringData key) {
     return MutableDocument(*this).getField(key);
 }
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

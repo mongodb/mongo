@@ -41,8 +41,8 @@
 #include <grpcpp/resource_quota.h>
 #include <grpcpp/security/credentials.h>
 #include <grpcpp/server_builder.h>
-#include <src/core/lib/security/credentials/ssl/ssl_credentials.h>
-#include <src/core/lib/security/security_connector/ssl_utils.h>
+#include <src/core/credentials/transport/ssl/ssl_credentials.h>
+#include <src/core/credentials/transport/tls/ssl_utils.h>
 #include <src/core/tsi/ssl_transport_security.h>
 #include <src/cpp/server/secure_server_credentials.h>
 

@@ -8,7 +8,7 @@
  */
 
 import {normalizeArray} from "jstests/libs/golden_test.js";
-import {code, line, section, subSection} from "jstests/libs/pretty_md.js";
+import {code, line, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});

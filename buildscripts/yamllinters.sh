@@ -1,7 +1,11 @@
 set -o errexit
 
-BASEDIR=$(dirname "$0")
-cd "$BASEDIR/../"
+if [ -n $BUILD_WORKING_DIRECTORY ]; then
+    cd $BUILD_WORKING_DIRECTORY
+else
+    BASEDIR=$(dirname "$0")
+    cd "$BASEDIR/../"
+fi
 
 yamllint -c etc/yamllint_config.yml buildscripts etc jstests
 

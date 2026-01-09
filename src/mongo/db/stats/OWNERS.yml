@@ -37,3 +37,6 @@ filters:
   - "timer_stats*":
     approvers:
       - 10gen/server-programmability
+  - "counter_ops.h":
+    approvers:
+      - 10gen/server-programmability

@@ -36,6 +36,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_indexability.h"
 #include "mongo/db/query/plan_cache/plan_cache_invalidator.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/modules.h"
@@ -133,9 +134,13 @@ public:
      * document insert or update flips  the multikeyness of indexes. This flip in multikeyness can
      * only go in one direction, non-multikey to multikey.
      *
-     * TODO: SERVER-115001: Explain const-ness of function when we implement.
+     * Const-ness: While this method modifies the 'PathArrayness' data associated with the
+     * 'CollectionQueryInfo', it can be marked as 'const' because the PathArrayness instance is
+     * marked as 'mutable'. This design ensures compatibility with
+     * 'IndexCatalogEntry::_catalogSetMultikey()' which require the method to be 'const'.
      */
-    void updatePathArraynessForSetMultikey(OperationContext* opCtx, const Collection* coll) const;
+    void updatePathArraynessForSetMultikey(const IndexDescriptor& descriptor,
+                                           const MultikeyPaths& multikeyPaths) const;
 
     std::shared_ptr<const PathArrayness> getPathArrayness() const;
 
@@ -172,19 +177,33 @@ private:
      * Wrapper around the underlying 'PathArrayness' instance. This allows us to modify the
      * underlying 'PathArrayness' instance despite the const-ness guarantees needed by callers.
      */
-    struct PathArraynessState {
-        PathArraynessState();
+    struct PathArraynessCollectionState {
+        PathArraynessCollectionState();
+
+        PathArraynessCollectionState(const PathArraynessCollectionState& other);
+        PathArraynessCollectionState& operator=(const PathArraynessCollectionState& other);
+
+        PathArraynessCollectionState(PathArraynessCollectionState&&) = delete;
+        PathArraynessCollectionState& operator=(PathArraynessCollectionState&&) = delete;
+
+        // Mutex to protect concurrent writers from re-assigning the pathArrayness pointer.
+        // This is going to face contention in the rare case where the multikeyness of an index is
+        // flipped in a document write transaction concurrently with a query.
+        mutable WriteRarelyRWMutex rwMutex;
 
         // All clones of CollectionQueryInfo will initially point to the same PathArrayness
         // instance.
-        std::shared_ptr<PathArrayness> pathArrayness;
+        // This needs to marked as mutable in order to be compatible with the const requirements
+        // of IndexCatalogEntryImpl::_catalogSetMultikey.
+        // While the shared_ptr may be re-assigned the PathArrayness object is immutable.
+        mutable std::shared_ptr<const PathArrayness> pathArrayness;
     };
 
     void updatePlanCacheIndexEntries(OperationContext* opCtx, const Collection* coll);
 
     std::shared_ptr<PlanCacheState> _planCacheState;
 
-    PathArraynessState _pathArraynessState;
+    PathArraynessCollectionState _pathArraynessState;
 };
 
 }  // namespace mongo

@@ -244,7 +244,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
 
     size_t plannerOptions = QueryPlannerParams::DEFAULT;
     if (isFeatureFlagShardFilteringDistinctScanEnabled &&
-        OperationShardingState::isComingFromRouter(opCtx)) {
+        coll.getShardingDescription().isSharded()) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 

@@ -5,7 +5,7 @@
  *   requires_fcv_83
  * ]
  */
-import {linebreak, section, subSection} from "jstests/libs/pretty_md.js";
+import {linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 import {prettyPrintWinningPlan, getWinningJoinOrderOneLine} from "jstests/query_golden/libs/pretty_plan.js";

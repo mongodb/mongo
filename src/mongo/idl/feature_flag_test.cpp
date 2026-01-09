@@ -29,26 +29,11 @@
 
 #include "mongo/db/feature_flag.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
-#include "mongo/db/tenant_id.h"
-#include "mongo/db/version_context.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/version/releases.h"
-
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 
@@ -569,6 +554,19 @@ TEST(IDLFeatureFlag, IFRContextDisableFlagPreviouslyFalse) {
     ASSERT_FALSE(ifrContext.getSavedFlagValue(developmentFeatureFlag));
     ifrContext.disableFlag(developmentFeatureFlag);
     ASSERT_FALSE(ifrContext.getSavedFlagValue(developmentFeatureFlag));
+}
+
+TEST(IDLFeatureFlag, SerializeFlagValues) {
+    auto& releaseFeatureFlag = feature_flags::gFeatureFlagReleasedForTest;
+    releaseFeatureFlag.setForServerParameter(true);
+
+    IncrementalFeatureRolloutContext ifrContext;
+
+    const auto& serializedResult = ifrContext.serializeFlagValues(
+        std::vector<IncrementalRolloutFeatureFlag*>{&releaseFeatureFlag});
+    ASSERT_EQ(serializedResult.size(), 1U);
+    ASSERT_EQ(serializedResult[0]["name"].String(), "featureFlagReleasedForTest");
+    ASSERT_TRUE(serializedResult[0]["value"].Bool());
 }
 
 }  // namespace

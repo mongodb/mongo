@@ -67,7 +67,7 @@ DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(ListMqlEntities);
  */
 class DocumentSourceListMqlEntities final : public DocumentSource {
 public:
-    class LiteParsed : public LiteParsedDocumentSource {
+    class LiteParsed : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& specElem,
@@ -75,7 +75,7 @@ public:
             return std::make_unique<LiteParsed>(specElem);
         }
 
-        LiteParsed(const BSONElement& spec) : LiteParsedDocumentSource(spec) {}
+        LiteParsed(const BSONElement& spec) : LiteParsedDocumentSourceDefault(spec) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();

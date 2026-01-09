@@ -24,7 +24,7 @@ mongo_cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        "//src/third_party/zlib",
         "//src/third_party/zstandard:zstd",
+        "@zlib",
     ],
 )

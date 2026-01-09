@@ -70,6 +70,12 @@ struct LiteParserOptions {
     // to use foreign db syntax for $lookup beyond the exempted internal collections during lite
     // parsing since lite parsing doesn't have an expressionContext.
     bool allowGenericForeignDbLookup = false;
+
+    // Optional IFR context to use for parser selection. When provided, parser selection will use
+    // per-request flag values from this context instead of querying the flag directly. This ensures
+    // consistent parser selection across the query execution, especially when flag values are
+    // modified mid-query.
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr;
 };
 
 namespace exec::agg {
@@ -81,7 +87,6 @@ class LoadExtensionsTest;
 class LoadNativeVectorSearchTest;
 }  // namespace extension::host
 
-// Forward declare LiteParsedDocumentSource.
 class LiteParsedDocumentSource;
 
 /**
@@ -194,6 +199,9 @@ struct DisallowViewsPolicy : public ViewPolicy {
  * parse error when encountering an invalid specification. Instead, the purpose of this class is to
  * make certain DocumentSource properties available before full parsing (e.g., getting the involved
  * foreign collections).
+ *
+ * This is the non-template base class for polymorphism. Derived classes should inherit from the
+ * templates below which provide a default clone() implementation.
  */
 class MONGO_MOD_UNFORTUNATELY_OPEN LiteParsedDocumentSource {
 public:
@@ -220,7 +228,8 @@ public:
      */
     class LiteParserRegistration {
     public:
-        const LiteParserInfo& getParserInfo() const;
+        const LiteParserInfo& getParserInfo(
+            const LiteParserOptions& options = LiteParserOptions{}) const;
 
         void setPrimaryParser(LiteParserInfo&& lpi);
 
@@ -504,6 +513,11 @@ public:
         return _originalBson;
     }
 
+    /**
+     * Returns a copy of the current LiteParsedDocumentSource.
+     */
+    virtual std::unique_ptr<LiteParsedDocumentSource> clone() const = 0;
+
 protected:
     BSONElement _originalBson;
 
@@ -546,6 +560,7 @@ private:
     friend class LiteParsedDocumentSourceParseTest;
     friend class extension::host::LoadExtensionsTest;
     friend class extension::host::LoadNativeVectorSearchTest;
+    friend class LiteParsedDesugarerTest;
 
     /**
      * Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding
@@ -578,21 +593,27 @@ private:
 };
 
 /**
- * Implementers must define getStageParams() and a parse() function. This should be used with
- * caution. Make sure your stage doesn't need to communicate any special behavior before registering
- * a DocumentSource using this parser. Additionally, explicitly ensure your stage does not require
- * authorization checks.
+ * CRTP (Curiously Recurring Template Pattern) template for simple document sources that don't
+ * need namespaces or privileges. Implementers must define getStageParams() and a parse() function.
+ * This should be used with caution. Make sure your stage doesn't need to communicate any special
+ * behavior before registering a DocumentSource using this parser. Additionally, explicitly ensure
+ * your stage does not require authorization checks.
+ *
+ * Example usage:
+ *   class MyLiteParsed final : public LiteParsedDocumentSourceDefault<MyLiteParsed> { ... };
  */
+template <typename Derived>
 class MONGO_MOD_OPEN LiteParsedDocumentSourceDefault : public LiteParsedDocumentSource {
 public:
     LiteParsedDocumentSourceDefault(const BSONElement& originalBson)
         : LiteParsedDocumentSource(originalBson) {}
 
-    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
         return stdx::unordered_set<NamespaceString>();
     }
 
-    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
+    PrivilegeVector requiredPrivileges(bool isMongos,
+                                       bool bypassDocumentValidation) const override {
         return {};
     }
 
@@ -600,93 +621,74 @@ public:
      * requiresAuthzChecks() is overriden to false because requiredPrivileges() returns an empty
      * vector and has no authz checks by default.
      */
-    bool requiresAuthzChecks() const final {
+    bool requiresAuthzChecks() const override {
         return false;
+    }
+
+    std::unique_ptr<LiteParsedDocumentSource> clone() const override {
+        return std::make_unique<Derived>(static_cast<const Derived&>(*this));
     }
 };
 
 /**
- * Implementers must define getStageParams() and a parse() function. Note that this requires the
- * privilege on 'internal' actions. This should still be used with caution. Make sure your stage
- * doesn't need to communicate any special behavior before registering a DocumentSource using this
- * parser.
+ * CRTP template for document sources that require internal privileges. Implementers must define
+ * getStageParams() and a parse() function. Note that this requires the privilege on 'internal'
+ * actions. This should still be used with caution. Make sure your stage doesn't need to communicate
+ * any special behavior before registering a DocumentSource using this parser.
+ *
+ * Example usage:
+ *   class MyLiteParsed final : public LiteParsedDocumentSourceInternal<MyLiteParsed> { ... };
  */
-class MONGO_MOD_OPEN LiteParsedDocumentSourceInternal : public LiteParsedDocumentSource {
+template <typename Derived>
+class MONGO_MOD_OPEN LiteParsedDocumentSourceInternal
+    : public LiteParsedDocumentSourceDefault<Derived> {
 public:
     LiteParsedDocumentSourceInternal(const BSONElement& originalBson)
-        : LiteParsedDocumentSource(originalBson) {}
+        : LiteParsedDocumentSourceDefault<Derived>(originalBson) {}
 
-    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-        return stdx::unordered_set<NamespaceString>();
-    }
-
-    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
+    PrivilegeVector requiredPrivileges(bool isMongos,
+                                       bool bypassDocumentValidation) const override {
         return {Privilege(ResourcePattern::forClusterResource(boost::none),
                           ActionSet{ActionType::internal})};
     }
+
+    bool requiresAuthzChecks() const override {
+        return true;
+    }
 };
 
 /**
- * Helper class for DocumentSources which reference a foreign collection.
+ * CRTP template for document sources that hold a foreign namespace. Implementers must define
+ * getStageParams(), parse(), and requiredPrivileges() functions. Note that this requires the
+ * privilege on 'internal' actions. This should still be used with caution. Make sure your stage
+ * doesn't need to communicate any special behavior before registering a DocumentSource using this
+ * parser.
+ *
+ * Example usage:
+ *   class MyLiteParsed final : public LiteParsedDocumentSourceForeignCollection<MyLiteParsed> { ...
+ * };
  */
-class LiteParsedDocumentSourceForeignCollection : public LiteParsedDocumentSource {
+template <typename Derived>
+class LiteParsedDocumentSourceForeignCollection : public LiteParsedDocumentSourceDefault<Derived> {
 public:
     LiteParsedDocumentSourceForeignCollection(const BSONElement& originalBson,
                                               NamespaceString foreignNss)
-        : LiteParsedDocumentSource(originalBson), _foreignNss(std::move(foreignNss)) {}
+        : LiteParsedDocumentSourceDefault<Derived>(originalBson),
+          _foreignNss(std::move(foreignNss)) {}
 
-    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
         return {_foreignNss};
     }
 
     PrivilegeVector requiredPrivileges(bool isMongos,
                                        bool bypassDocumentValidation) const override = 0;
 
-protected:
-    NamespaceString _foreignNss;
-};
-
-/**
- * Helper class for DocumentSources which can reference one or more child pipelines.
- */
-class LiteParsedDocumentSourceNestedPipelines : public LiteParsedDocumentSource {
-public:
-    LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
-                                            boost::optional<NamespaceString> foreignNss,
-                                            std::vector<LiteParsedPipeline> pipelines);
-
-    LiteParsedDocumentSourceNestedPipelines(const BSONElement& originalBson,
-                                            boost::optional<NamespaceString> foreignNss,
-                                            boost::optional<LiteParsedPipeline> pipeline);
-
-    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final;
-
-    void getForeignExecutionNamespaces(stdx::unordered_set<NamespaceString>& nssSet) const override;
-
-    bool isExemptFromIngressAdmissionControl() const override;
-
-    Status checkShardedForeignCollAllowed(const NamespaceString& nss,
-                                          bool inMultiDocumentTransaction) const override;
-
-    const std::vector<LiteParsedPipeline>& getSubPipelines() const override {
-        return _pipelines;
+    bool requiresAuthzChecks() const override {
+        return true;
     }
 
-    /**
-     * Check the read concern constraints of all sub-pipelines. If the stage that owns the
-     * sub-pipelines has its own constraints this should be overridden to take those into account.
-     */
-    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault) const override;
-
 protected:
-    /**
-     * Simple implementation that only gets the privileges needed by children pipelines.
-     */
-    PrivilegeVector requiredPrivilegesBasic(bool isMongos, bool bypassDocumentValidation) const;
-
-    boost::optional<NamespaceString> _foreignNss;
-    std::vector<LiteParsedPipeline> _pipelines;
+    NamespaceString _foreignNss;
 };
 
 /**
@@ -720,21 +722,21 @@ protected:
 #define DEFINE_LITE_PARSED_STAGE_INTERNAL_DERIVED(stageName) \
     DEFINE_LITE_PARSED_STAGE_DERIVED_IMPL(stageName, LiteParsedDocumentSourceInternal)
 
-#define DEFINE_LITE_PARSED_STAGE_DERIVED_IMPL(stageName, baseType)          \
-    DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(stageName);                        \
-    class stageName##LiteParsed : public mongo::baseType {                  \
-    public:                                                                 \
-        stageName##LiteParsed(const mongo::BSONElement& originalBson)       \
-            : mongo::baseType(originalBson) {}                              \
-        static std::unique_ptr<stageName##LiteParsed> parse(                \
-            const mongo::NamespaceString& nss,                              \
-            const mongo::BSONElement& spec,                                 \
-            const mongo::LiteParserOptions& options) {                      \
-            return std::make_unique<stageName##LiteParsed>(spec);           \
-        }                                                                   \
-        std::unique_ptr<mongo::StageParams> getStageParams() const final {  \
-            return std::make_unique<stageName##StageParams>(_originalBson); \
-        }                                                                   \
+#define DEFINE_LITE_PARSED_STAGE_DERIVED_IMPL(stageName, baseType)                      \
+    DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(stageName);                                    \
+    class stageName##LiteParsed final : public mongo::baseType<stageName##LiteParsed> { \
+    public:                                                                             \
+        stageName##LiteParsed(const mongo::BSONElement& originalBson)                   \
+            : mongo::baseType<stageName##LiteParsed>(originalBson) {}                   \
+        static std::unique_ptr<stageName##LiteParsed> parse(                            \
+            const mongo::NamespaceString& nss,                                          \
+            const mongo::BSONElement& spec,                                             \
+            const mongo::LiteParserOptions& options) {                                  \
+            return std::make_unique<stageName##LiteParsed>(spec);                       \
+        }                                                                               \
+        std::unique_ptr<mongo::StageParams> getStageParams() const final {              \
+            return std::make_unique<stageName##StageParams>(_originalBson);             \
+        }                                                                               \
     };
 
 }  // namespace MONGO_MOD_UNFORTUNATELY_OPEN mongo

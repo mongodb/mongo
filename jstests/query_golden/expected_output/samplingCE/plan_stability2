@@ -116,10 +116,10 @@
     "rows" :   2123},
 
 {">>>pipeline": [{"$match":{"$or":[{"field44_int":{"$ne":84},"field35_int_idx":{"$ne":9588},"field34_str_idx":{"$lte":"H"}},{"field47_Timestamp":{"$exists":false},"field5_dict_idx":{"$lt":{"c":1,"b":1}}},{"field45_bool":{"$eq":true},"field39_Decimal128":{"$gte":{"$numberDecimal":"8.4"}},"field15_mixed_idx":{"$gte":{"$timestamp":{"t":1764186033,"i":0}}},"field43_str":{"$regex":{"$regex":"^s","$options":""}}}],"$and":[{"field19_datetime_idx":{"$lte":"2024-01-19T00:00:00.000Z"},"field15_mixed_idx":{"$lt":"2024-01-18T00:00:00.000Z"},"field0_bool_idx":{"$lte":true}},{"field14_dict_idx":{"$ne":{"f":2,"c":1}},"field31_list_idx":{"$nin":[]},"field36_bool":{"$eq":false}}],"field30_Decimal128_idx":{"$type":"decimal"},"field24_mixed_idx":{"$nin":[]},"field35_int_idx":{"$lt":4531}}},{"$sort":{"field20_Timestamp_idx":1}},{"$limit":69},{"$project":{"field14_dict_idx":1,"field32_dict_idx":1,"field18_bool_idx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field15_mixed_idx_1","indexBounds":{"field15_mixed_idx":["[new Date(-9223372036854775808), new Date(1705536000000))"]}}}}},
-    "keys" :  86416,
-    "docs" :  86416,
-    "sorts":   1272,
+    "winningPlan": {"stage":"LIMIT","inputStage":{"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field20_Timestamp_idx_-1","indexBounds":{"field20_Timestamp_idx":["[MinKey, MaxKey]"]}}}}},
+    "keys" :  27801,
+    "docs" :  27801,
+    "sorts":      0,
     "plans":     10,
     "rows" :     69},
 
@@ -1250,14 +1250,6 @@
     "sorts":      0,
     "plans":     10,
     "rows" :    712},
-
-{">>>pipeline": [{"$match":{"field35_int_idx":{"$ne":8511},"field34_str_idx":{"$ne":"C"},"field2_Timestamp_idx":{"$gte":{"$timestamp":{"t":1764181167,"i":0}}},"field32_dict_idx":{"$ne":{"b":1,"c":3}},"field8_int_idx":{"$gt":7},"field31_list_idx":{"$in":[16,13,18,17,39,60,48,74,5]}}},{"$sort":{"field16_str_idx":-1}},{"$limit":19},{"$project":{"field6_mixed_idx":1,"field24_mixed_idx":1}}],
-    "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"SORT","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field31_list_idx_-1_field7_str_idx_-1","indexBounds":{"field31_list_idx":["[74.0, 74.0]","[60.0, 60.0]","[48.0, 48.0]","[39.0, 39.0]","[18.0, 18.0]","[17.0, 17.0]","[16.0, 16.0]","[13.0, 13.0]","[5.0, 5.0]"],"field7_str_idx":["[MaxKey, MinKey]"]}}}}},
-    "keys" :   2104,
-    "docs" :   2096,
-    "sorts":   1499,
-    "plans":      7,
-    "rows" :     19},
 
 {">>>pipeline": [{"$match":{"$or":[{"field44_int":{"$eq":63},"field31_list_idx":{"$size":8},"field25_str_idx":{"$eq":"AP"}},{"field23_dict_idx":{"$gte":{"g":2}},"field44_int":{"$lte":28}},{"$or":[{"field13_list_idx":{"$ne":5},"field38_Timestamp":{"$ne":{"$timestamp":{"t":1767139200,"i":0}}},"field6_mixed_idx":{"$in":["z","h"]}},{"field2_Timestamp_idx":{"$ne":{"$timestamp":{"t":1747473229,"i":0}}},"field35_int_idx":{"$ne":7960}}]}],"field23_dict_idx":{"$eq":{"c":4}},"field42_mixed":{"$lte":false},"field17_int_idx":{"$gte":514}}},{"$project":{"field14_dict_idx":1,"_id":0}}],
     "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field23_dict_idx_1","indexBounds":{"field23_dict_idx":["[{ c: 4.0 }, { c: 4.0 }]"]}}}},
@@ -8067,14 +8059,6 @@
     "plans":      3,
     "rows" :     28},
 
-{">>>pipeline": [{"$match":{"$or":[{"$and":[{"field40_list":{"$regex":{"$regex":"l","$options":""}},"field46_datetime":{"$type":"date"}},{"field24_mixed_idx":[{"$timestamp":{"t":1767139200,"i":0}}],"field16_str_idx":{"$gte":"Hn"},"field15_mixed_idx":{"$gte":458}},{"field2_Timestamp_idx":{"$gte":{"$timestamp":{"t":1764189883,"i":0}}},"field31_list_idx":{"$size":13}},{"field22_list_idx":[42,65,90,104,731,206,120,187],"field20_Timestamp_idx":{"$ne":{"$timestamp":{"t":1737830138,"i":0}}}}]},{"field39_Decimal128":{"$lt":{"$numberDecimal":"2.9"}},"field37_datetime":{"$lte":"2024-03-09T00:00:00.000Z"},"field38_Timestamp":{"$ne":{"$timestamp":{"t":1767139200,"i":0}}},"field13_list_idx":{"$ne":109}}]}},{"$sort":{"field5_dict_idx":1}},{"$project":{"field45_bool":1,"field24_mixed_idx":1}}],
-    "winningPlan": {"stage":"SUBPLAN","inputStage":{"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field5_dict_idx_-1","indexBounds":{"field5_dict_idx":["[MinKey, MaxKey]"]}}}}},
-    "keys" : 100000,
-    "docs" : 100000,
-    "sorts":      0,
-    "plans":      7,
-    "rows" :  44379},
-
 {">>>pipeline": [{"$match":{"$or":[{"field9_bool_idx":{"$gte":false},"field29_Timestamp_idx":{"$type":"timestamp"}},{"field24_mixed_idx":{"$all":[]},"field40_list":"v"}]}},{"$project":{"field2_Timestamp_idx":1,"_id":0}}],
     "winningPlan": {"stage":"PROJECTION_SIMPLE","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field29_Timestamp_idx_1","indexBounds":{"field29_Timestamp_idx":["[Timestamp(0, 0), Timestamp(4294967295, 4294967295)]"]}}}},
     "keys" : 100000,
@@ -8284,7 +8268,7 @@
     "rows" :  96224}
 
 ],
-">>>totals": {"pipelines": 1034, "plans": 7972, "keys": 27826317, "docs": 27103996, "sorts": 9791290, "rows": 10055721, "errors":      0},
+">>>totals": {"pipelines": 1032, "plans": 7958, "keys": 27665598, "docs": 26943285, "sorts": 9788519, "rows": 10011323, "errors":      0},
 ">>>parameters": {"planRankerMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":true}}
 
 

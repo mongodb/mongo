@@ -36,6 +36,7 @@
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/desugarer.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/modules.h"
 
@@ -129,15 +130,19 @@ public:
               }()) {}
 
         std::unique_ptr<StageParams> getStageParams() const override {
-            // TODO SERVER-115655: Clone instead of moving the node.
-            return std::make_unique<ExpandableStageParams>(std::move(_parseNode));
+            return std::make_unique<ExpandableStageParams>(_parseNode->clone());
         }
 
         /**
-         * Return the pre-computed expanded pipeline.
+         * Return a copy to the pre-computed expanded pipeline.
          */
-        const StageSpecs& getExpandedPipeline() const {
-            return _expanded;
+        StageSpecs getExpandedPipeline() const {
+            StageSpecs cloned;
+            cloned.reserve(_expanded.size());
+            for (const auto& stage : _expanded) {
+                cloned.push_back(stage->clone());
+            }
+            return cloned;
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -166,6 +171,14 @@ public:
             }
             return false;
         }
+
+        std::unique_ptr<LiteParsedDocumentSource> clone() const override {
+            return std::make_unique<LiteParsedExpandable>(
+                getOriginalBson(), _parseNode->clone(), _nss, _options);
+        }
+
+        // Define how to desugar a LiteParsedExpandable.
+        static LiteParsedDesugarer::StageExpander stageExpander;
 
     private:
         /**
@@ -197,8 +210,7 @@ public:
                                          const NamespaceString& nss,
                                          const LiteParserOptions& options);
 
-        // TODO SERVER-115655: Revert back to const.
-        mutable AggStageParseNodeHandle _parseNode;
+        const AggStageParseNodeHandle _parseNode;
         const NamespaceString _nss;
         const LiteParserOptions _options;
         const StageSpecs _expanded;
@@ -209,7 +221,7 @@ public:
      * AggStageAstNode.
      *
      * NOTE: This class is only instantiated during expansion of an extension stage, existing in the
-     * LiteParseExpandable's _expanded list. That means it will never exist at the top-level
+     * LiteParsedExpandable's _expanded list. That means it will never exist at the top-level
      * LiteParsedPipeline.
      */
     class LiteParsedExpanded : public LiteParsedDocumentSource {
@@ -227,8 +239,7 @@ public:
               _nss(nss) {}
 
         std::unique_ptr<StageParams> getStageParams() const override {
-            // TODO SERVER-115655: Clone instead of moving the node.
-            return std::make_unique<ExpandedStageParams>(std::move(_astNode));
+            return std::make_unique<ExpandedStageParams>(_astNode->clone());
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -274,9 +285,13 @@ public:
             return properties.has_value() && !properties->empty();
         }
 
+        std::unique_ptr<LiteParsedDocumentSource> clone() const override {
+            return std::make_unique<LiteParsedExpanded>(
+                getParseTimeName(), _astNode->clone(), _nss);
+        }
+
     private:
-        // TODO SERVER-115655: Revert back to const.
-        mutable AggStageAstNodeHandle _astNode;
+        const AggStageAstNodeHandle _astNode;
         const MongoExtensionStaticProperties _properties;
         const NamespaceString _nss;
     };

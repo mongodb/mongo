@@ -703,9 +703,10 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     }
 
     // A query not suitable for caching should not have made its way into the cache. The exception
-    // is if `internalQueryDisablePlanCache` was enabled after a cache entry was made. This knob
-    // marks all entries as "should not cache", meaning we would end up in a state where a query
-    // should not be cached, but is in the cached. This is why we check the knob.
+    // is if `internalQueryDisablePlanCache` was enabled after a cache entry was made. Enabling this
+    // knob blocks new cache entries from being inserted and blocks existing entries from
+    // being retrieved, meaning that in the exception case we would end up in a state where a query
+    // should not be cached, but is in the cache. This is why we check the knob.
     dassert(internalQueryDisablePlanCache.load() || shouldCacheQuery(query));
 
     if (SolutionCacheData::WHOLE_IXSCAN_SOLN == solnCacheData.solnType) {

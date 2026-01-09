@@ -61,7 +61,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -99,7 +99,7 @@ public:
 
         // TODO SERVER-114038 Remove redundancy of storing both originalBson and ownedSpec.
         LiteParsed(const BSONElement& specElem, BSONObj spec)
-            : LiteParsedDocumentSource(specElem),
+            : LiteParsedDocumentSourceDefault(specElem),
               _ownedSpec(spec.isOwned() ? std::move(spec) : spec.getOwned()) {}
 
     private:
@@ -147,14 +147,14 @@ public:
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**
-     * This stage must be run on each shard.
+     * This stage must be run on each shard, but that must be enforced at a higher-level in the
+     * pipeline-splitting logic.
+     *
+     * For the purposes of this function, we want default behavior to happen upon seeing an idLookup
+     * (which is to push it down to the shards and continue forward in looking for a split point).
      */
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        DistributedPlanLogic logic;
-
-        logic.shardsStage = this;
-
-        return logic;
+        return boost::none;
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}

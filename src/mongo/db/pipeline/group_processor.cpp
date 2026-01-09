@@ -116,30 +116,6 @@ namespace {
 
 using GroupsMap = GroupProcessorBase::GroupsMap;
 
-class SorterComparator {
-public:
-    SorterComparator(ValueComparator valueComparator) : _valueComparator(valueComparator) {}
-
-    int operator()(const Value& lhs, const Value& rhs) const {
-        return _valueComparator.compare(lhs, rhs);
-    }
-
-private:
-    ValueComparator _valueComparator;
-};
-
-class SpillSTLComparator {
-public:
-    SpillSTLComparator(ValueComparator valueComparator) : _valueComparator(valueComparator) {}
-
-    bool operator()(const GroupsMap::value_type* lhs, const GroupsMap::value_type* rhs) const {
-        return _valueComparator.evaluate(lhs->first < rhs->first);
-    }
-
-private:
-    ValueComparator _valueComparator;
-};
-
 }  // namespace
 
 void GroupProcessor::add(const Value& groupKey, const Document& root) {
@@ -167,8 +143,12 @@ void GroupProcessor::readyGroups() {
             spill();
         }
 
-        _sorterIterator = Sorter<Value, Value>::Iterator::merge(
-            _sortedFiles, SortOptions(), SorterComparator(_expCtx->getValueComparator()));
+        std::function<int(const Value&, const Value&)> comparator =
+            [valueComp = _expCtx->getValueComparator()](const Value& lhs, const Value& rhs) -> int {
+            return valueComp.compare(lhs, rhs);
+        };
+
+        _sorterIterator = sorter::merge<Value, Value>(_sortedFiles, SortOptions(), comparator);
 
         // prepare current to accumulate data
         _currentAccumulators.reserve(_accumulatedFields.size());
@@ -247,7 +227,13 @@ void GroupProcessor::spill() {
         ++spilledRecords;
     }
 
-    std::sort(ptrs.begin(), ptrs.end(), SpillSTLComparator(_expCtx->getValueComparator()));
+    std::function<int(const GroupsMap::value_type*, const GroupsMap::value_type*)> comparator =
+        [valueComp = _expCtx->getValueComparator()](const GroupsMap::value_type* lhs,
+                                                    const GroupsMap::value_type* rhs) -> int {
+        return valueComp.evaluate(lhs->first < rhs->first);
+    };
+
+    std::sort(ptrs.begin(), ptrs.end(), comparator);
 
     // Initialize '_file' in a lazy manner only when it is needed.
     if (!_file) {

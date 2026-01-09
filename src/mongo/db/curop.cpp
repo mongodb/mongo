@@ -376,12 +376,6 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
         auto sc = SerializationContext::stateCommandReply(expCtx->getSerializationContext());
         CurOp::get(clientOpCtx)->reportState(infoBuilder, sc, truncateOps);
     }
-
-    if (expCtx->getOperationContext()->routedByReplicaSetEndpoint()) {
-        // On the replica set endpoint, currentOp reports both router and shard operations so it
-        // should label each op with its associated role.
-        infoBuilder->append("role", toString(client->getService()->role()));
-    }
 }
 
 bool CurOp::currentOpBelongsToTenant(Client* client, TenantId tenantId) {

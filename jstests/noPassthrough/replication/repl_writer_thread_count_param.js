@@ -12,10 +12,11 @@ function testSettingParameter() {
     assert.throws(() =>
         MongoRunner.runMongod({replSet: "rs0", setParameter: "replWriterThreadCount=" + tooLowThreadCount.toString()}),
     );
-    assert(
-        rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount: ").match(
-            tooLowThreadCount.toString() + " is not greater than or equal to 1",
-        ),
+    assert.soon(
+        () =>
+            rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount: ").match(
+                tooLowThreadCount.toString() + " is not greater than or equal to 1",
+            ),
         "mongod started with too low a value for replWriterThreadCount",
     );
 
@@ -25,10 +26,11 @@ function testSettingParameter() {
     assert.throws(() =>
         MongoRunner.runMongod({replSet: "rs0", setParameter: "replWriterThreadCount=" + tooHighThreadCount.toString()}),
     );
-    assert(
-        rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount: ").match(
-            tooHighThreadCount.toString() + " is not less than or equal to 256",
-        ),
+    assert.soon(
+        () =>
+            rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount: ").match(
+                tooHighThreadCount.toString() + " is not less than or equal to 256",
+            ),
         "mongod started with too high a value for replWriterThreadCount",
     );
 
@@ -64,6 +66,7 @@ function testSettingParameter() {
 
     const actualExpectedMaxThreads = Math.min(acceptableThreadCount, threadCountCap);
 
+    // Wait for repl set initialization to finish
     assert.soon(
         () =>
             rawMongoProgramOutput("11280000.*Starting thread pool").match(
@@ -73,8 +76,6 @@ function testSettingParameter() {
                     actualExpectedMaxThreads.toString(),
             ),
         "ReplWriterWorker thread pool did not start",
-        // Wait up to 10 seconds for repl set initialization to finish
-        10 * 1000,
     );
     assert(
         rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount").length == 0,
@@ -230,8 +231,6 @@ function testSettingParameter() {
                     "11280003.*replWriterThreadCount is set to higher than the max number of threads",
                 ).match(matchParameters),
             "mongod did not warn the user that the value will not take effect due to exceeding the number of cores times two",
-            // Wait up to 10 seconds for the log to publish
-            10 * 1000,
         );
     }
 
@@ -289,10 +288,11 @@ function testOplogApplication() {
         assert.commandWorked(primaryColl.insert({_id: "majority2" + i}, {writeConcern: {w: 2}}));
     }
 
-    assert(
-        rawMongoProgramOutput("11280004.*Number of workers for oplog application").match(
-            '.*"nWorkers":' + twoThreadsPerCore.toString(),
-        ),
+    assert.soon(
+        () =>
+            rawMongoProgramOutput("11280004.*Number of workers for oplog application").match(
+                '.*"nWorkers":' + twoThreadsPerCore.toString(),
+            ),
         "mongod did not print the correct thread pool size (2*number of cores) when applying oplog",
     );
     assert(
@@ -315,20 +315,22 @@ function testOplogApplication() {
         assert.commandWorked(primaryColl.insert({_id: "majority2" + i}, {writeConcern: {w: 2}}));
     }
 
-    assert(
-        rawMongoProgramOutput("11280004.*Number of workers for oplog application").match(
-            '.*"nWorkers":' + numCores.toString(),
-        ),
+    assert.soon(
+        () =>
+            rawMongoProgramOutput("11280004.*Number of workers for oplog application").match(
+                '.*"nWorkers":' + numCores.toString(),
+            ),
         "mongod did not print the correct thread pool size (1*number of cores) when applying oplog",
     );
 
     // Check that threads above numCores were reaped
     for (let i = numCores; i < twoThreadsPerCore; i++) {
         const threadNum = i + 1;
-        assert(
-            rawMongoProgramOutput("Reaping this thread as we are above maxThreads").match(
-                '"numThreads":' + threadNum + ',"maxThreads":' + numCores,
-            ),
+        assert.soon(
+            () =>
+                rawMongoProgramOutput("Reaping this thread as we are above maxThreads").match(
+                    '"numThreads":' + threadNum + ',"maxThreads":' + numCores,
+                ),
             "the right number of threads were not reaped to meet maxThreads (" + threadNum + " was not present)",
         );
     }
@@ -353,10 +355,11 @@ function testOplogApplication() {
     }
     // check that new threads were spawned to meet minThreads
     for (let i = numCores; i < newThreads; i++) {
-        assert(
-            rawMongoProgramOutput("Spawning new thread as we are below minThreads").match(
-                '"numThreads":' + i + ',"minThreads":' + newThreads,
-            ),
+        assert.soon(
+            () =>
+                rawMongoProgramOutput("Spawning new thread as we are below minThreads").match(
+                    '"numThreads":' + i + ',"minThreads":' + newThreads,
+                ),
             "the right number of threads were not spawned to meet minThreads",
         );
     }
@@ -372,10 +375,11 @@ function testOplogApplication() {
         assert.commandWorked(primaryColl.insert({_id: "majority2" + i}, {writeConcern: {w: 2}}));
     }
 
-    assert(
-        rawMongoProgramOutput("11280004.*Number of workers for oplog application").match(
-            '.*"nWorkers":' + newThreads.toString(),
-        ),
+    assert.soon(
+        () =>
+            rawMongoProgramOutput("11280004.*Number of workers for oplog application").match(
+                '.*"nWorkers":' + newThreads.toString(),
+            ),
         "mongod did not print the correct thread pool size (1*number of cores) when applying oplog",
     );
     rst.stopSet();

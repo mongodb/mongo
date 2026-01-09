@@ -41,9 +41,7 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
-#include <compare>
 #include <cstddef>
-#include <cstdint>
 #include <string>
 
 namespace mongo {

@@ -23,6 +23,7 @@ jobs:
 
             ## What makes this change safe?
             Help reviewers focus their attention by answering these questions:
+            - **Data format compatibility**: Does this change modify the format of WT data or metadata? If so, does this change support non-disruptive upgrade of older systems?
             - **Test coverage**: Which specific tests validate your change? (Name the test files/functions that would fail if your change were reverted)
             - **Risk assessment**: What functionality could break if this change has bugs? How thoroughly have you tested edge cases?
             - **Review focus**: What aspects would you want a teammate to double-check?

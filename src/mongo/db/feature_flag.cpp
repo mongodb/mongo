@@ -333,6 +333,29 @@ void IncrementalRolloutFeatureFlag::registerFlag(IncrementalRolloutFeatureFlag* 
     getMutableAllIncrementalRolloutFeatureFlags().push_back(flag);
 }
 
+IncrementalFeatureRolloutContext::IncrementalFeatureRolloutContext(std::span<const BSONObj> flags) {
+    for (const auto& flagObj : flags) {
+        const auto& name = flagObj["name"];
+        uassert(11565102, "Expected 'name' field to be a string", name.type() == BSONType::string);
+
+        const auto& value = flagObj["value"];
+        uassert(
+            11565103, "Expected 'value' field to be a boolean", value.type() == BSONType::boolean);
+
+        const auto flagName = name.valueStringData();
+        auto* flag = IncrementalRolloutFeatureFlag::findByName(flagName);
+
+        // Reaching this error should be impossible if the proper upgrade/downgrade procedure is
+        // followed. If triggered, it implies something went wrong with the IFR flag rollout (e.g.
+        // the flag was enabled before all binaries were upgraded).
+        tassert(ErrorCodes::UnrecognizedIFRFlag,
+                str::stream() << "Unrecognized IFR flag: " << flagName,
+                flag != nullptr);
+
+        _savedFlagValues[flag] = value.boolean();
+    }
+}
+
 bool IncrementalFeatureRolloutContext::getSavedFlagValue(IncrementalRolloutFeatureFlag& flag) {
     if (auto flagIt = _savedFlagValues.find(&flag); flagIt != _savedFlagValues.end()) {
         return flagIt->second;
@@ -354,4 +377,18 @@ void IncrementalFeatureRolloutContext::appendSavedFlagValues(BSONArrayBuilder& b
 void IncrementalFeatureRolloutContext::disableFlag(IncrementalRolloutFeatureFlag& flag) {
     _savedFlagValues.insert_or_assign(&flag, false);
 }
+
+std::vector<BSONObj> IncrementalFeatureRolloutContext::serializeFlagValues(
+    const std::vector<IncrementalRolloutFeatureFlag*>& flags) {
+    std::vector<BSONObj> result;
+    result.reserve(flags.size());
+    for (auto* flag : flags) {
+        result.push_back(BSONObjBuilder{}
+                             .append("name", flag->getName())
+                             .append("value", getSavedFlagValue(*flag))
+                             .obj());
+    }
+    return result;
+}
+
 }  // namespace mongo

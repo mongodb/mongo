@@ -14,6 +14,7 @@
 #ifndef GRPC_SRC_CORE_LIB_EVENT_ENGINE_THREAD_POOL_THREAD_COUNT_H
 #define GRPC_SRC_CORE_LIB_EVENT_ENGINE_THREAD_POOL_THREAD_COUNT_H
 
+#include <grpc/support/cpu.h>
 #include <grpc/support/port_platform.h>
 
 #include <atomic>
@@ -24,15 +25,11 @@
 #include <vector>
 
 #include "absl/base/thread_annotations.h"
+#include "src/core/util/sync.h"
+#include "src/core/util/time.h"
+#include "src/core/util/useful.h"
 
-#include <grpc/support/cpu.h>
-
-#include "src/core/lib/gpr/useful.h"
-#include "src/core/lib/gprpp/sync.h"
-#include "src/core/lib/gprpp/time.h"
-
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
 
 // Tracks counts across some fixed number of shards.
 // It is intended for fast increment/decrement operations, but a slower overall
@@ -89,23 +86,11 @@ class BusyThreadCount {
   size_t NextIndex() { return next_idx_.fetch_add(1) % shards_.size(); }
 
  private:
-// We want to ensure that this data structure lands on different cachelines per
-// cpu. With C++17 we can do so explicitly with an `alignas` specifier. Prior
-// versions we can at best approximate it by padding the structure. It'll
-// probably work out ok, but it's not guaranteed across allocators.
-// TODO(ctiller): When we move to C++17 delete the duplicate definition.
-#if __cplusplus >= 201703L
+  // We want to ensure that this data structure lands on different cachelines
+  // per cpu.
   struct ShardedData {
     std::atomic<size_t> busy_count{0};
   } GPR_ALIGN_STRUCT(GPR_CACHELINE_SIZE);
-#else
-  struct ShardedDataHeader {
-    std::atomic<size_t> busy_count{0};
-  };
-  struct ShardedData : public ShardedDataHeader {
-    uint8_t padding[GPR_CACHELINE_SIZE - sizeof(ShardedDataHeader)];
-  };
-#endif
 
   std::vector<ShardedData> shards_;
   std::atomic<size_t> next_idx_{0};
@@ -151,7 +136,12 @@ class LivingThreadCount {
     --living_count_;
     cv_.SignalAll();
   }
-  void BlockUntilThreadCount(size_t desired_threads, const char* why)
+  // Blocks the calling thread until the desired number of threads is reached.
+  // If the thread count does not change for some given `stuck_timeout`
+  // duration, this method returns error. If the thread count does change, the
+  // timeout clock is reset.
+  absl::Status BlockUntilThreadCount(size_t desired_threads, const char* why,
+                                     grpc_core::Duration stuck_timeout)
       ABSL_LOCKS_EXCLUDED(mu_);
   size_t count() ABSL_LOCKS_EXCLUDED(mu_) {
     grpc_core::MutexLock lock(&mu_);
@@ -170,7 +160,6 @@ class LivingThreadCount {
   size_t living_count_ ABSL_GUARDED_BY(mu_) = 0;
 };
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental
 
 #endif  // GRPC_SRC_CORE_LIB_EVENT_ENGINE_THREAD_POOL_THREAD_COUNT_H

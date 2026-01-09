@@ -22,32 +22,53 @@
 #include <grpc/support/port_platform.h>
 
 #include "absl/status/statusor.h"
-
+#include "src/core/channelz/property_list.h"
 #include "src/core/lib/channel/channel_args.h"
 #include "src/core/lib/channel/channel_fwd.h"
 #include "src/core/lib/channel/promise_based_filter.h"
-#include "src/core/lib/promise/arena_promise.h"
-#include "src/core/lib/transport/transport.h"
 
 namespace grpc_core {
 
 // Processes metadata on the server side for HTTP2 transports
-class HttpServerFilter : public ChannelFilter {
+class HttpServerFilter final : public ImplementChannelFilter<HttpServerFilter>,
+                               public channelz::DataSource {
  public:
   static const grpc_channel_filter kFilter;
 
-  static absl::StatusOr<HttpServerFilter> Create(
+  static absl::string_view TypeName() { return "http-server"; }
+
+  static absl::StatusOr<std::unique_ptr<HttpServerFilter>> Create(
       const ChannelArgs& args, ChannelFilter::Args filter_args);
 
-  // Construct a promise for one call.
-  ArenaPromise<ServerMetadataHandle> MakeCallPromise(
-      CallArgs call_args, NextPromiseFactory next_promise_factory) override;
+  HttpServerFilter(const ChannelArgs& args, bool surface_user_agent,
+                   bool allow_put_requests)
+      : channelz::DataSource(args.GetObjectRef<channelz::BaseNode>()),
+        surface_user_agent_(surface_user_agent),
+        allow_put_requests_(allow_put_requests) {
+    SourceConstructed();
+  }
+  ~HttpServerFilter() override { SourceDestructing(); }
+
+  void AddData(channelz::DataSink sink) override {
+    sink.AddData("httpServerFilter",
+                 channelz::PropertyList()
+                     .Set("surface_user_agent", surface_user_agent_)
+                     .Set("allow_put_requests", allow_put_requests_));
+  }
+
+  class Call {
+   public:
+    ServerMetadataHandle OnClientInitialMetadata(ClientMetadata& md,
+                                                 HttpServerFilter* filter);
+    void OnServerInitialMetadata(ServerMetadata& md);
+    void OnServerTrailingMetadata(ServerMetadata& md);
+    static inline const NoInterceptor OnClientToServerMessage;
+    static inline const NoInterceptor OnClientToServerHalfClose;
+    static inline const NoInterceptor OnServerToClientMessage;
+    static inline const NoInterceptor OnFinalize;
+  };
 
  private:
-  HttpServerFilter(bool surface_user_agent, bool allow_put_requests)
-      : surface_user_agent_(surface_user_agent),
-        allow_put_requests_(allow_put_requests) {}
-
   bool surface_user_agent_;
   bool allow_put_requests_;
 };

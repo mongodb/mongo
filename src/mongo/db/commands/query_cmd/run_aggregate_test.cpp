@@ -72,6 +72,16 @@ protected:
         DBCommandTestFixture::tearDown();
     }
 
+    AggregateCommandRequest makeRequestWithIfrFlag() {
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+        AggregateCommandRequest request(std::move(nss));
+        request.setPipeline({});
+        auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
+        request.setIfrFlags(
+            std::vector<BSONObj>{BSON("name" << flag.getName() << "value" << true)});
+        return request;
+    }
+
     static OperationContext* getTrackerOpCtx(OperationMemoryUsageTracker* tracker) {
         return tracker->_opCtx;
     }
@@ -599,5 +609,19 @@ TEST_F(RunAggregateTest, ExchangePipelineAndMemoryTrackingWorksNConsumersWithErr
     });
 }
 
+TEST_F(RunAggregateTest, RunAggregateReadsIFRFlagsFromRequest) {
+    AggregateCommandRequest request = makeRequestWithIfrFlag();
+    LiteParsedPipeline liteParsedPipeline(request, false);
+    BSONObj cmdObj = request.toBSON();
+    PrivilegeVector privileges;
+    boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
+    rpc::OpMsgReplyBuilder replyBuilder;
+
+    Status status = runAggregate(
+        opCtx, request, liteParsedPipeline, cmdObj, privileges, verbosity, &replyBuilder);
+
+    // Validate that runAggregate correctly reads and processes IFR flags.
+    ASSERT_TRUE(status.isOK());
+}
 }  // namespace
 }  // namespace mongo

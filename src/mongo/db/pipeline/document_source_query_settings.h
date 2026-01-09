@@ -55,8 +55,6 @@
 
 #include <memory>
 #include <set>
-#include <string>
-#include <utility>
 
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
@@ -81,7 +79,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec,
@@ -97,7 +95,7 @@ public:
         }
 
         LiteParsed(const BSONElement& spec, const boost::optional<TenantId>& tenantId)
-            : LiteParsedDocumentSource(spec),
+            : LiteParsedDocumentSourceDefault(spec),
               _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
                                      ActionType::querySettings)}) {}
 

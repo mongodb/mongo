@@ -39,19 +39,15 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/replica_set_endpoint_feature_flag.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/topology/cluster_role.h"
-#include "mongo/db/topology/remove_shard_command_helpers.h"
 #include "mongo/db/topology/remove_shard_gen.h"
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/decorable.h"
-#include "mongo/util/scopeguard.h"
 
 #include <string>
 

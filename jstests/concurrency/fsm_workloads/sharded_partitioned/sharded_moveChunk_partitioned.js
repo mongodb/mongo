@@ -11,6 +11,7 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
+import {ShardingTopologyHelpers} from "jstests/concurrency/fsm_workload_helpers/catalog_and_routing/sharding_topology_helpers.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_base_partitioned.js";
 
@@ -49,7 +50,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
         let fromShard = chunk.shard;
 
         // Choose a random shard to move the chunk to.
-        let shardNames = Object.keys(connCache.shards);
+        let shardInfo = ShardingTopologyHelpers.getShardInfo(db, this.tid);
+        let shardNames = Object.keys(shardInfo.shards);
         let destinationShards = shardNames.filter(function (shard) {
             if (shard !== fromShard) {
                 return shard;
@@ -92,8 +94,8 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
 
         // Verify that the fromShard and toShard have the correct after-state
         // (see comments below for specifics).
-        let fromShardRSConn = connCache.rsConns.shards[fromShard];
-        let toShardRSConn = connCache.rsConns.shards[toShard];
+        let fromShardRSConn = shardInfo.rsConns[fromShard];
+        let toShardRSConn = shardInfo.rsConns[toShard];
         let fromShardNumDocsAfter = ChunkHelper.getNumDocs(fromShardRSConn, ns, chunk.min._id, chunk.max._id);
         let toShardNumDocsAfter = ChunkHelper.getNumDocs(toShardRSConn, ns, chunk.min._id, chunk.max._id);
         // If the moveChunk operation succeeded, verify that the shard the chunk

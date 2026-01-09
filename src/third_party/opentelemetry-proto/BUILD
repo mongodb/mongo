@@ -135,8 +135,8 @@ mongo_cc_library(
         ":logs_proto_cc",
         ":logs_service_cc_grpc",
         ":resource_proto_cc",
-        "//src/third_party/grpc:grpc++_reflection",
-        "//src/third_party/protobuf",
+        "@com_github_grpc_grpc//:grpc++_reflection",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 
@@ -165,8 +165,8 @@ mongo_cc_library(
         ":metrics_proto_cc",
         ":metrics_service_cc_grpc",
         ":resource_proto_cc",
-        "//src/third_party/grpc:grpc++_reflection",
-        "//src/third_party/protobuf",
+        "@com_github_grpc_grpc//:grpc++_reflection",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 
@@ -223,8 +223,8 @@ mongo_cc_library(
         ":resource_proto_cc",
         ":trace_proto_cc",
         ":trace_service_cc_grpc",
-        "//src/third_party/grpc:grpc++_reflection",
-        "//src/third_party/protobuf",
+        "@com_github_grpc_grpc//:grpc++_reflection",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 

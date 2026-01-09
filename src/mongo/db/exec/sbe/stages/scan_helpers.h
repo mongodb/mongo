@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_listset.h"
 
 namespace mongo {

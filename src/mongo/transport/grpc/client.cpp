@@ -58,7 +58,7 @@
 #include <grpcpp/security/tls_certificate_verifier.h>
 #include <grpcpp/security/tls_credentials_options.h>
 #include <grpcpp/support/async_stream.h>
-#include <src/core/lib/security/security_connector/ssl_utils.h>
+#include <src/core/credentials/transport/tls/ssl_utils.h>
 #include <src/core/tsi/ssl_transport_security.h>
 #include <src/core/tsi/transport_security_interface.h>
 
@@ -733,10 +733,11 @@ private:
                     "The use of both tlsCAFile and the System Certificate store is not supported.",
                     !sslGlobalParams.sslUseSystemCA);
                 caCert.emplace(ssl_util::readPEMFile(_options.tlsCAFile.get()).getValue());
-            } else if (sslGlobalParams.sslUseSystemCA) {
+            } else if (sslGlobalParams.sslUseSystemCA || _options.tlsAllowInvalidCertificates) {
+                // We also include the cert when _options.tlsAllowInvalidCertificates is true
+                // because of a bug in grpc that causes a segfault on older openssl versions when
+                // skipping cert validation and no cert is provided.
                 caCert.emplace(grpc_core::DefaultSslRootStore::GetPemRootCerts());
-            } else if (_options.tlsAllowInvalidCertificates) {
-                LOGV2_WARNING(9985603, "No tlsCAFile specified, and tlsUseSystemCA not specified");
             } else {
                 uasserted(9985604, "No tlsCAFile specified, and tlsUseSystemCA not specified");
             }
@@ -769,7 +770,11 @@ private:
             tlsOps.watch_identity_key_cert_pairs();
         }
 
-        if (_options.tlsCAFile || sslGlobalParams.sslUseSystemCA) {
+        if (_options.tlsCAFile || sslGlobalParams.sslUseSystemCA ||
+            _options.tlsAllowInvalidCertificates) {
+            // We also watch the cert when _options.tlsAllowInvalidCertificates is true
+            // because of a bug in grpc that causes a segfault on older openssl versions when
+            // skipping cert validation and no cert is provided.
             tlsOps.watch_root_certs();
         }
 

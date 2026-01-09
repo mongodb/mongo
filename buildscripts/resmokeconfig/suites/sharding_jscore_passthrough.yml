@@ -52,6 +52,7 @@ executor:
   fixture:
     class: ShardedClusterFixture
     num_shards: 2
+    num_mongos: 2
     mongos_options:
       set_parameters:
         enableTestCommands: 1

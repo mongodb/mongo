@@ -98,6 +98,42 @@ DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
         optimizable->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions);
 }
 
+DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
+             createFromParseNodeHandleWithMultipleNodesFails,
+             "11623000") {
+    // Create a parse node that expands to multiple nodes.
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::MidAParseNode>());
+    AggStageParseNodeHandle parseNodeHandle{parseNode};
+
+    [[maybe_unused]] auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(parseNodeHandle));
+}
+
+DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
+             createFromParseNodeHandleWithHostParseNodeFails,
+             "11623001") {
+    // Create a parse node that expands to a host parse node.
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToHostParseParseNode>());
+    auto parseNodeHandle = AggStageParseNodeHandle(parseNode);
+
+    [[maybe_unused]] auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(parseNodeHandle));
+}
+
+DEATH_TEST_F(DocumentSourceExtensionOptimizableTestDeathTest,
+             createFromParseNodeHandleWithExtensionParseNodeFails,
+             "11623002") {
+    // Create a parse node that expands to an extension parse node handle.
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToExtParseParseNode>());
+    auto parseNodeHandle = AggStageParseNodeHandle(parseNode);
+
+    [[maybe_unused]] auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(parseNodeHandle));
+}
+
 TEST_F(DocumentSourceExtensionOptimizableTest, stageWithDefaultStaticProperties) {
     // These should also be the default static properties for Transform stages.
     auto astNode = new sdk::ExtensionAggStageAstNode(
@@ -114,6 +150,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageWithDefaultStaticProperties)
     ASSERT_TRUE(staticProperties.getPreservesUpstreamMetadata());
     ASSERT_FALSE(staticProperties.getRequiredMetadataFields().has_value());
     ASSERT_FALSE(staticProperties.getProvidedMetadataFields().has_value());
+    ASSERT_TRUE(staticProperties.getUnionWithIsAllowed());
+    ASSERT_TRUE(staticProperties.getLookupIsAllowed());
+    ASSERT_TRUE(staticProperties.getFacetIsAllowed());
 
     auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
 
@@ -121,6 +160,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, stageWithDefaultStaticProperties)
     ASSERT_EQ(constraints.hostRequirement, StageConstraints::HostTypeRequirement::kNone);
     ASSERT_TRUE(constraints.requiresInputDocSource);
     ASSERT_TRUE(constraints.consumesLogicalCollectionData);
+    ASSERT_EQ(constraints.unionRequirement, StageConstraints::UnionRequirement::kAllowed);
+    ASSERT_EQ(constraints.lookupRequirement, StageConstraints::LookupRequirement::kAllowed);
+    ASSERT_EQ(constraints.facetRequirement, StageConstraints::FacetRequirement::kAllowed);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, searchLikeStageWithSourceStageStaticProperties) {
@@ -237,6 +279,27 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     ASSERT_THROWS_CODE(optimizable->getDependencies(&deps), AssertionException, 17308);
 }
 
+TEST_F(DocumentSourceExtensionOptimizableTest, stageWithNonDefaultSubPipelineStaticProperties) {
+    auto properties = BSON("unionWithIsAllowed" << false << "lookupIsAllowed" << false
+                                                << "facetIsAllowed" << false);
+    auto astNode = new sdk::ExtensionAggStageAstNode(
+        std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(properties));
+    auto astHandle = AggStageAstNodeHandle(astNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
+
+    const auto& staticProperties = optimizable->getStaticProperties();
+    ASSERT_FALSE(staticProperties.getUnionWithIsAllowed());
+    ASSERT_FALSE(staticProperties.getLookupIsAllowed());
+    ASSERT_FALSE(staticProperties.getFacetIsAllowed());
+
+    auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
+    ASSERT_EQ(constraints.unionRequirement, StageConstraints::UnionRequirement::kNotAllowed);
+    ASSERT_EQ(constraints.lookupRequirement, StageConstraints::LookupRequirement::kNotAllowed);
+    ASSERT_EQ(constraints.facetRequirement, StageConstraints::FacetRequirement::kNotAllowed);
+}
+
 TEST_F(DocumentSourceExtensionOptimizableTest, distributedPlanLogicReturnsNoneWhenNoDPL) {
     // TransformLogicalAggStage returns nullptr for getDistributedPlanLogic(), which should result
     // in boost::none being returned.
@@ -331,4 +394,20 @@ TEST_F(DocumentSourceExtensionOptimizableTest, distributedPlanLogicWithMergeOnly
     // Verify sort pattern is empty.
     ASSERT_FALSE(logic.mergeSortPattern.has_value());
 }
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       createFromParseNodeHandleWithSingleExtensionAstNode) {
+    // Create a parse node that expands to a single extension AST node.
+    auto parseNode = new sdk::ExtensionAggStageParseNode(
+        std::make_unique<sdk::shared_test_stages::ExpandToExtAstParseNode>());
+    auto parseNodeHandle = AggStageParseNodeHandle(parseNode);
+
+    auto optimizable =
+        host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(parseNodeHandle));
+
+    ASSERT_TRUE(optimizable);
+    ASSERT_EQ(std::string(optimizable->getSourceName()),
+              sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
+}
+
 }  // namespace mongo::extension

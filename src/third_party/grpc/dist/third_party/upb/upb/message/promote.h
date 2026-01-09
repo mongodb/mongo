@@ -1,35 +1,16 @@
-/*
- * Copyright (c) 2009-2022, Google LLC
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Google LLC nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL Google LLC BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+// Protocol Buffers - Google's data interchange format
+// Copyright 2023 Google LLC.  All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #ifndef UPB_MESSAGE_PROMOTE_H_
 #define UPB_MESSAGE_PROMOTE_H_
 
-#include "upb/collections/array.h"
-#include "upb/message/extension_internal.h"
+#include "upb/message/array.h"
+#include "upb/message/map.h"
+#include "upb/message/value.h"
 #include "upb/wire/decode.h"
 
 // Must be last.
@@ -52,15 +33,13 @@ typedef enum {
   kUpb_GetExtensionAsBytes_EncodeError,
 } upb_GetExtensionAsBytes_Status;
 
-// Returns a message extension or promotes an unknown field to
-// an extension.
+// Returns a message value or promotes an unknown field to an extension.
 //
-// TODO(ferhat): Only supports extension fields that are messages,
+// TODO: Only supports extension fields that are messages,
 // expand support to include non-message types.
-upb_GetExtension_Status upb_MiniTable_GetOrPromoteExtension(
+upb_GetExtension_Status upb_Message_GetOrPromoteExtension(
     upb_Message* msg, const upb_MiniTableExtension* ext_table,
-    int decode_options, upb_Arena* arena,
-    const upb_Message_Extension** extension);
+    int decode_options, upb_Arena* arena, upb_MessageValue* value);
 
 typedef enum {
   kUpb_FindUnknown_Ok,
@@ -74,12 +53,14 @@ typedef struct {
   const char* ptr;
   // Size of unknown field data.
   size_t len;
+  uintptr_t iter;
 } upb_FindUnknownRet;
 
 // Finds first occurrence of unknown data by tag id in message.
-upb_FindUnknownRet upb_MiniTable_FindUnknown(const upb_Message* msg,
-                                             uint32_t field_number,
-                                             int depth_limit);
+// A depth_limit of zero means to just use the upb default depth limit.
+upb_FindUnknownRet upb_Message_FindUnknown(const upb_Message* msg,
+                                           uint32_t field_number,
+                                           int depth_limit);
 
 typedef enum {
   kUpb_UnknownToMessage_Ok,

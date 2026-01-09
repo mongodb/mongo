@@ -728,8 +728,7 @@ config_cache(void)
     cache *= 2;
 
     /*
-     * FIXME-WT-16228: Re-evaluate whether setting large cache size is need after cache stuck issue
-     * is solved.
+     * FIXME-WT-16228: Re-evaluate whether setting large cache size is needed after PALI.
      */
     if (GV(PRECISE_CHECKPOINT))
         cache *= 2;

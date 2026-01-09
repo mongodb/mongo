@@ -483,6 +483,7 @@ Zstd
 Zstd's
 aa
 aaa
+abc
 abcdef
 abcdefghijklmnopqrstuvwxyz
 ackSstu
@@ -663,6 +664,7 @@ curversion
 cust
 customizable
 customp
+cutlim
 cv
 cval
 cx
@@ -679,6 +681,7 @@ dbar
 dbs
 dcalloc
 ddd
+dec
 decile
 deciles
 decl
@@ -747,6 +750,7 @@ encodings
 encryptor
 encryptors
 endian
+endptr
 enomem
 enum
 env
@@ -778,6 +782,7 @@ fd
 fdatasync
 fextend
 ffc
+ffee
 fff
 ffffffffffffffff
 fflush
@@ -858,6 +863,7 @@ hashsize
 hashtable
 havesize
 hdr
+hhhh
 hijinx
 hpp
 hs
@@ -1356,6 +1362,7 @@ timespec
 tinfo
 tlb
 tmp
+tmstmp
 tod
 tokenizer
 toklen
@@ -1510,3 +1517,4 @@ zu
 zyxwvutsrqponmlkjihgfedcba
 zz
 zzz
+zzzz

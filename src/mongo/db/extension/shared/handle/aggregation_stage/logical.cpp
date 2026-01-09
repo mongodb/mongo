@@ -52,7 +52,6 @@ BSONObj LogicalAggStageAPI::serialize() const {
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the caller.
-    // TODO: SERVER-112442 Avoid the BSON copy in getOwned() once the work is completed.
     ExtensionByteBufHandle ownedBuf{buf};
     return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }
@@ -67,7 +66,6 @@ BSONObj LogicalAggStageAPI::explain(mongo::ExplainOptions::Verbosity verbosity) 
 
     // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
     // BSONObj to return to the host.
-    // TODO: SERVER-112442 Avoid the BSON copy in getOwned() once the work is completed.
     ExtensionByteBufHandle ownedBuf{buf};
     return bsonObjFromByteView(ownedBuf->getByteView()).getOwned();
 }

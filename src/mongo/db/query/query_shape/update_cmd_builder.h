@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -52,6 +53,7 @@ struct UpdateCmdBuilder {
     boost::optional<BSONObj> c;
     BSONObj let = BSONObj();
     BSONObj collation = BSONObj();
+    boost::optional<BSONArray> arrayFilters;
 
     BSONObj toBSON() const {
         BSONObjBuilder builder;
@@ -67,6 +69,10 @@ struct UpdateCmdBuilder {
         }
         if (c.has_value()) {
             updateObj.append("c", *c);
+        }
+
+        if (arrayFilters.has_value()) {
+            updateObj.appendArray("arrayFilters", *arrayFilters);
         }
 
         if (multi.has_value()) {

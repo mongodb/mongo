@@ -141,21 +141,20 @@ function runModifierUpdateKeyTests(topologyName, setupFn, teardownFn) {
             });
         });
 
-        // TODO (SERVER-113907): Add tests for update with array filters.
-        // For now, this is a negative test to ensure that updates with array filters are skipped.
         it("should validate modifier update with array filters", function () {
             const modifierUpdateCommandObjSimple = {
                 update: collName,
                 updates: [{q: {v: 3}, u: {$set: {"myArray.$[element]": 10}}, arrayFilters: [{element: 0}]}],
             };
 
-            resetQueryStatsStore(testDB.getMongo(), "1MB");
-            assert.commandWorked(testDB.runCommand(modifierUpdateCommandObjSimple));
-            let sortedEntries = getQueryStats(
-                testDB.getMongo(),
-                Object.merge({customSort: {"metrics.latestSeenTimestamp": -1}}, {collName: coll.getName()}),
-            );
-            assert.eq([], sortedEntries);
+            const queryShapeUpdateFieldsRequiredWithArrayFilters = [...queryShapeUpdateFieldsRequired, "arrayFilters"];
+            runCommandAndValidateQueryStats({
+                coll: coll,
+                commandName: "update",
+                commandObj: modifierUpdateCommandObjSimple,
+                shapeFields: queryShapeUpdateFieldsRequiredWithArrayFilters,
+                keyFields: updateKeyFieldsRequired,
+            });
         });
 
         it("should validate modifier update with no-op operators", function () {

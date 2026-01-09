@@ -43,7 +43,7 @@ assert.commandWorked(
         createIndexes: coll1.getName(),
         indexes: [{key: {b: 1}, name: "b_1"}],
         writeConcern: {w: 1},
-        commitQuorum: 0,
+        commitQuorum: 1,
     }),
 );
 

@@ -132,6 +132,10 @@ public:
         return builder.obj();
     }
 
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<FruitsAsDocumentsAstNode>(_name, _arguments);
+    }
+
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<FruitsAsDocumentsAstNode>(
             static_cast<std::string_view>(kFruitsAsDocumentsName), BSONObj());
@@ -229,6 +233,10 @@ public:
         return builder.obj();
     }
 
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<AddFruitsToDocumentsWithMetadataAstNode>(_name, _arguments);
+    }
+
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<AddFruitsToDocumentsWithMetadataAstNode>(
             "$addFruitsToDocumentsWithMetadata", BSONObj());
@@ -323,6 +331,11 @@ public:
 
     AddFruitsToDocumentsAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
         : sdk::TestAstNode<AddFruitsToDocumentsLogicalStage>(stageName, arguments) {}
+
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<AddFruitsToDocumentsAstNode>();
+    }
 
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<AddFruitsToDocumentsAstNode>();

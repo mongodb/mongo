@@ -613,28 +613,6 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
 
     auto replState = swReplState.getValue();
 
-    {
-        // TODO SERVER-99706: Investigate if this is safe. Other commit quorum operations take the
-        // RSTL lock before locking the commit quorum lock. However, this operation follows the
-        // inverse order.
-        DisableLockerRuntimeOrderingChecks disable{opCtx};
-        // Secondary nodes will always try to vote regardless of the commit quorum value. If the
-        // commit quorum is disabled, do not record their entry into the commit ready nodes.
-        // If we fail to retrieve the persisted commit quorum, the index build might be in the
-        // middle of tearing down.
-        Lock::SharedLock commitQuorumLk(opCtx, *replState->commitQuorumLock);
-        auto commitQuorum =
-            uassertStatusOK(indexbuildentryhelpers::getCommitQuorum(opCtx, buildUUID));
-        if (commitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
-            return Status::OK();
-        }
-    }
-
-    // Our current contract is that commit quorum can't be disabled for an active index build with
-    // commit quorum on (i.e., commit value set as non-zero or a valid tag) and vice-versa. So,
-    // after this point, it's not possible for the index build's commit quorum value to get updated
-    // to CommitQuorumOptions::kDisabled.
-
     IndexBuildEntry indexbuildEntry(buildUUID,
                                     replState->collectionUUID,
                                     CommitQuorumOptions(),
@@ -699,54 +677,40 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
 
 bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
         replState->setSinglePhaseCommit(opCtx);
         return true;
     }
 
+    // TODO SERVER-109664: use IndexBuildProtocol::kPrimaryDriven
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const auto& vCtx = VersionContext::getDecoration(opCtx);
+    const bool usingPrimaryDrivenIndexBuilds = fcv.isVersionInitialized() &&
+        feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(vCtx, fcv);
+
+    if (usingPrimaryDrivenIndexBuilds) {
+        bool isPrimary = [&]() {
+            if (gFeatureFlagIntentRegistration.isEnabled()) {
+                return rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
+                    .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx);
+            } else {
+                auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+                const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+                repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+                return replCoord->canAcceptWritesFor(opCtx, dbAndUUID);
+            }
+        }();
+        // In primary driven index builds, primary directly transitions its next action to
+        // kCommitQuorumSatisfied without waiting for commit quorum. Secondaries skip voting and
+        // wait for the kOplogCommit signal.
+        if (isPrimary) {
+            _sendCommitQuorumSatisfiedSignal(opCtx, replState);
+        }
+        return true;
+    }
+
     invariant(IndexBuildProtocol::kTwoPhase == replState->protocol);
-
-    if (gFeatureFlagIntentRegistration.isEnabled()) {
-        if (!rss::consensus::IntentRegistry::get(opCtx->getServiceContext())
-                 .canDeclareIntent(rss::consensus::IntentRegistry::Intent::Write, opCtx)) {
-            return false;
-        }
-    } else {
-        const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-
-        // Secondaries should always try to vote even if the commit quorum is disabled. Secondaries
-        // must not read the on-disk commit quorum value as it may not be present at all times, such
-        // as during initial sync.
-        if (!replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {
-            return false;
-        }
-    }
-
-    // TODO SERVER-99706: Investigate if this is safe. Other commit quorum operations take the
-    // RSTL lock before locking the commit quorum lock. However, this operation follows the
-    // inverse order.
-    DisableLockerRuntimeOrderingChecks disable{opCtx};
-
-    // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
-    // after reading it from config.system.indexBuilds collection.
-    Lock::SharedLock commitQuorumLk(opCtx, *replState->commitQuorumLock);
-
-    // Read the commit quorum value from config.system.indexBuilds collection.
-    auto commitQuorum = uassertStatusOKWithContext(
-        indexbuildentryhelpers::getCommitQuorum(opCtx, replState->buildUUID),
-        str::stream() << "failed to get commit quorum before committing index build: "
-                      << replState->buildUUID);
-
-    // Check if the commit quorum is disabled for the index build.
-    if (commitQuorum.numNodes != CommitQuorumOptions::kDisabled) {
-        return false;
-    }
-
-    _sendCommitQuorumSatisfiedSignal(opCtx, replState);
-    return true;
+    return false;
 }
 
 void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort(
@@ -837,12 +801,12 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort
 void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     if (MONGO_unlikely(hangIndexBuildBeforeSignalPrimaryForCommitReadiness.shouldFail())) {
-        LOGV2(10528500, "Hanging index build after signaling the primary for commit readiness");
+        LOGV2(10528500, "Hanging index build before signaling the primary for commit readiness");
         hangIndexBuildBeforeSignalPrimaryForCommitReadiness.pauseWhileSet(opCtx);
     }
 
     // Before voting see if we are eligible to skip voting and signal
-    // to commit index build if the node is primary.
+    // to commit index build.
     if (_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
         LOGV2(7568001,
               "Index build: skipping vote for commit readiness",
@@ -1113,21 +1077,10 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     if (fcvSnapshot.isVersionInitialized() &&
         feature_flags::gFeatureFlagPrimaryDrivenIndexBuilds.isEnabled(
             VersionContext::getDecoration(opCtx), fcvSnapshot)) {
-        invariant(currentCommitQuorum.numNodes == CommitQuorumOptions::kDisabled);
+        invariant(currentCommitQuorum.numNodes == CommitQuorumOptions::kPrimarySelfVote);
         LOGV2_WARNING(11302401,
                       "Setting commitQuorum is not supported for primary-driven index builds.");
         return Status::OK();
-    }
-
-    if (currentCommitQuorum.numNodes == CommitQuorumOptions::kDisabled ||
-        newCommitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << "Commit quorum value can be changed only for index builds "
-                          << "with commit quorum enabled, nss: '" << nss.toStringForErrorMsg()
-                          << "' first index name: '" << indexNames.front()
-                          << "' currentCommitQuorum: " << currentCommitQuorum.toBSON()
-                          << " providedCommitQuorum: " << newCommitQuorum.toBSON());
     }
 
     invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() ||

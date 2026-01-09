@@ -54,7 +54,7 @@ const BSONObj CommitQuorumOptions::VotingMembers(BSON(kCommitQuorumField
 CommitQuorumOptions::CommitQuorumOptions(int numNodesOpts) {
     reset();
     numNodes = numNodesOpts;
-    invariant(numNodes >= 0 &&
+    invariant(numNodes > 0 &&
               numNodes <= static_cast<decltype(numNodes)>(repl::ReplSetConfig::kMaxMembers));
 }
 
@@ -77,7 +77,8 @@ Status CommitQuorumOptions::parse(const BSONElement& commitQuorumElement) {
                     << "commitQuorum has to be a non-negative number and not greater than "
                     << repl::ReplSetConfig::kMaxMembers);
         }
-        numNodes = static_cast<decltype(numNodes)>(cNumNodes);
+        // Implicitly upgrade commitQuorum of 0 to 1 as they have effectively the same semantics.
+        numNodes = std::max(kPrimarySelfVote, static_cast<decltype(numNodes)>(cNumNodes));
     } else if (commitQuorumElement.type() == BSONType::string) {
         mode = commitQuorumElement.str();
         if (mode.empty()) {

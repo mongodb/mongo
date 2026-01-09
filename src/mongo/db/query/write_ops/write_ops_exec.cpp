@@ -1451,14 +1451,6 @@ void registerRequestForQueryStats(OperationContext* opCtx,
             return;
     }
 
-    // TODO (SERVER-113907): Implement query shape for update with array filters.
-    if (modType == write_ops::UpdateModification::Type::kModifier) {
-        // Skip modifier updates that contains array filters.
-        if (!parsedUpdate.getRequest()->getArrayFilters().empty()) {
-            return;
-        }
-    }
-
     // TODO(SERVER-113688): Support recording query stats for pipeline updates containing
     // $_internalApplyOplogUpdate.
     if (modType == write_ops::UpdateModification::Type::kPipeline) {
@@ -1933,10 +1925,12 @@ WriteResult performUpdates(
         auto& parentCurOp = *CurOp::get(opCtx);
         const Command* cmd = parentCurOp.getCommand();
         boost::optional<CurOp> curOp;
+        boost::optional<int32_t> originalOpIndex;
         if (source != OperationSource::kTimeseriesInsert) {
             curOp.emplace(cmd);
             curOp->push(opCtx);
-            if (singleOp.getIncludeQueryStatsMetrics()) {
+            originalOpIndex = singleOp.getIncludeQueryStatsMetricsForOpIndex();
+            if (originalOpIndex.has_value()) {
                 curOp->debug().getQueryStatsInfo().metricsRequested = true;
             }
         }
@@ -1945,10 +1939,11 @@ WriteResult performUpdates(
                 finishCurOp(opCtx, &*curOp);
                 // The last SingleWriteResult will be for the operation we just executed. If it
                 // succeeded, and metrics were requested, set them now.
-                if (curOp->debug().getQueryStatsInfo().metricsRequested &&
+                if (originalOpIndex.has_value() &&
+                    curOp->debug().getQueryStatsInfo().metricsRequested &&
                     out.results.back().isOK()) {
-                    out.results.back().getValue().setQueryStatsMetrics(
-                        curOp->debug().getCursorMetrics());
+                    out.results.back().getValue().setQueryStatsMetrics(write_ops::QueryStatsMetrics(
+                        *originalOpIndex, curOp->debug().getCursorMetrics()));
                 }
             }
         });

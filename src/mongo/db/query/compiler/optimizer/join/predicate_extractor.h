@@ -29,6 +29,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
 

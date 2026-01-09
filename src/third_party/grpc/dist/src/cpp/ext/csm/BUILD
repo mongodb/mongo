@@ -23,10 +23,9 @@ licenses(["reciprocal"])
 
 package(
     default_visibility = ["//visibility:public"],
-    # TODO(yashykt): Google Cloud C++ does not explicitly export the headers. Remove this once that is fixed.
-    #features = [
-    #    "layering_check",
-    #],
+    features = [
+        "layering_check",
+    ],
 )
 
 grpc_cc_library(
@@ -42,31 +41,33 @@ grpc_cc_library(
     ],
     external_deps = [
         "absl/functional:any_invocable",
-        "absl/meta:type_traits",
+        "absl/log:check",
+        "absl/log:log",
         "absl/status:statusor",
         "absl/strings",
-        "absl/types:optional",
-        "absl/types:variant",
-        "google_cloud_cpp:experimental-opentelemetry",
+        "google_cloud_cpp:opentelemetry",
+        "otel/api",
         "otel/sdk/src/metrics",
         "otel/sdk:headers",
-        "upb_lib",
+        "@com_google_protobuf//upb/base",
+        "@com_google_protobuf//upb/mem",
     ],
-    language = "c++",
+    tags = [
+        # TODO(b/332369798): Remove after fixing bug
+        "grpc:otel-namespace-calamity",
+    ],
     visibility = ["//:__subpackages__"],
     deps = [
+        "//:call_tracer",
         "//:gpr",
         "//:gpr_platform",
         "//:grpc_base",
         "//:protobuf_struct_upb",
-        "//:uri_parser",
+        "//:uri",
         "//src/core:channel_args",
         "//src/core:env",
         "//src/core:error",
-        "//src/core:json",
-        "//src/core:json_args",
-        "//src/core:json_object_loader",
-        "//src/core:json_reader",
+        "//src/core:metadata_batch",
         "//src/core:slice",
         "//src/core:xds_enabled_server",
         "//src/cpp/ext/otel:otel_plugin",

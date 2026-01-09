@@ -16,6 +16,11 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
+// $currentOp with {localOps:true} will only report the current operations for the mongos it is run against.
+// In case the random mongos dispatching is enabled, the $currentOp may not report the expected operation
+// pinToSingleMongos due to $currentOp with {localOps:true}.
+TestData.pinToSingleMongos = true;
+
 const coll = db.jstests_currentop_cursors;
 
 // Avoiding using the shell helper to avoid the implicit collection recreation.

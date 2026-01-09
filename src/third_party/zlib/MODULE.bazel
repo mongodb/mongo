@@ -1,0 +1,4 @@
+module(
+    name = "zlib",
+)
+bazel_dep(name = "platforms", version = "1.3.1")

@@ -19,6 +19,11 @@
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {describe, it} from "jstests/libs/mochalite.js";
 
+// This test makes assertions about sessions on a particular node, which are not compatible with
+// random mongos dispatching.
+// pinToSingleMongos due to $listLocalSessions.
+TestData.pinToSingleMongos = true;
+
 const collName = "collectionless_agg_ns_test";
 db[collName].insert({a: 1}); // to avoid empty db
 const cursor = assert.commandWorked(

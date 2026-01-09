@@ -654,10 +654,11 @@ public:
 
     void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                               const NamespaceString& nss,
-                                              const UUID& uuid) override {
+                                              const UUID& uuid,
+                                              bool skipViewCreation = false) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onUpgradeDowngradeViewlessTimeseries(opCtx, nss, uuid);
+            o->onUpgradeDowngradeViewlessTimeseries(opCtx, nss, uuid, skipViewCreation);
     }
 
 private:

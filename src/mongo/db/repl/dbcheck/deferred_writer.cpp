@@ -130,7 +130,7 @@ Status DeferredWriter::_worker(BSONObj doc) noexcept try {
 
     Status status = writeConflictRetry(opCtx, "deferred insert", _nss, [&] {
         WriteUnitOfWork wuow(opCtx);
-        Status status = Helpers::insert(opCtx, collection, doc);
+        Status status = Helpers::insert(opCtx, collection.getCollectionPtr(), doc);
         if (!status.isOK()) {
             return status;
         }

@@ -43,6 +43,7 @@
 #include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session/internal_session_pool.h"
@@ -620,7 +621,12 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
 
         // Extract non-session options. Strip provenance so it can be correctly inferred for the
         // generated commands as if it came from an external client.
-        _readConcern = repl::ReadConcernArgs::get(opCtx).toBSONInner().removeField(
+        // We replace empty read concern with the implicit default read concern to avoid ambiguity
+        // when the user has a cluster wide default set.
+        const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx).isEmpty()
+            ? ReadWriteConcernDefaults::get(opCtx).getImplicitDefaultReadConcern()
+            : repl::ReadConcernArgs::get(opCtx);
+        _readConcern = readConcernArgs.toBSONInner().removeField(
             ReadWriteConcernProvenanceBase::kSourceFieldName);
         _writeConcern = opCtx->getWriteConcern().toBSON().removeField(
             ReadWriteConcernProvenanceBase::kSourceFieldName);

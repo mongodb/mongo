@@ -27,14 +27,11 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/validate/collection_validation.h"
+
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/column/bsoncolumnbuilder.h"
@@ -42,7 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -64,10 +61,6 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_assert.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/timeseries/bucket_compression.h"
-#include "mongo/db/timeseries/collection_pre_conditions_util.h"
-#include "mongo/db/timeseries/write_ops/timeseries_write_ops.h"
-#include "mongo/db/validate/collection_validation.h"
 #include "mongo/db/validate/validate_results.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -78,12 +71,13 @@
 #include "mongo/util/time_support.h"
 
 #include <cstdint>
-#include <initializer_list>
 #include <limits>
-#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 namespace mongo {
 namespace {
@@ -195,7 +189,7 @@ int insertDataRangeForNumFields(const NamespaceString& nss,
                                 const int numDocs,
                                 const int numFields) {
     const AutoGetCollection coll(opCtx, nss, MODE_IX);
-    std::vector<InsertStatement> inserts;
+    std::vector<BSONObj> inserts;
     for (int i = 0; i < numDocs; ++i) {
         BSONObjBuilder bsonBuilder;
         bsonBuilder << "_id" << i + startIDNum;
@@ -203,13 +197,12 @@ int insertDataRangeForNumFields(const NamespaceString& nss,
             bsonBuilder << "a" + std::to_string(c) << i + (i * numFields + startIDNum) + c;
         }
         const auto obj = bsonBuilder.obj();
-        inserts.push_back(InsertStatement(obj));
+        inserts.push_back(obj);
     }
 
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocuments(
-            opCtx, *coll, inserts.begin(), inserts.end(), nullptr, false));
+        ASSERT_OK(Helpers::insert(opCtx, *coll, inserts));
         wuow.commit();
     }
     return numDocs;
@@ -248,8 +241,7 @@ int setUpDataOfGivenSize(OperationContext* opCtx,
     BSONObj oversizeObj = builder.obj();
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocument(
-            opCtx, *coll, InsertStatement(oversizeObj), nullptr))
+        ASSERT_OK(Helpers::insert(opCtx, *coll, oversizeObj))
             << "Failed to insert object of size " << targetBsonSize;
         wuow.commit();
     }
@@ -718,8 +710,7 @@ protected:
         WriteUnitOfWork wuow(_opCtx);
         const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
         ASSERT_TRUE(coll->isTimeseriesCollection());
-        ASSERT_OK(
-            collection_internal::insertDocument(_opCtx, *coll, InsertStatement{doc}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *coll, doc));
         wuow.commit();
     }
 
@@ -769,8 +760,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationGoodData) {
         WriteUnitOfWork wuow(_opCtx);
         const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
         ASSERT_TRUE(coll->isTimeseriesCollection());
-        ASSERT_OK(
-            collection_internal::insertDocument(_opCtx, *coll, InsertStatement{bson}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *coll, bson));
         wuow.commit();
     }
     foregroundValidate(_nss,
@@ -1012,8 +1002,7 @@ TEST_F(TimeseriesCollectionValidationTest, TimeseriesValidationCorruptData) {
         WriteUnitOfWork wuow(_opCtx);
         const AutoGetCollection coll(_opCtx, _nss, MODE_IX);
         ASSERT_TRUE(coll->isTimeseriesCollection());
-        ASSERT_OK(collection_internal::insertDocument(
-            _opCtx, *coll, InsertStatement{corruptSampleDoc}, nullptr));
+        ASSERT_OK(Helpers::insert(_opCtx, *coll, corruptSampleDoc));
         wuow.commit();
     }
     foregroundValidate(_nss,

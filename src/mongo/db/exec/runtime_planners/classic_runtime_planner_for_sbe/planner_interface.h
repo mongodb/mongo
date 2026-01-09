@@ -223,7 +223,7 @@ public:
     /**
      * Runs the trial period by working all candidate plans for as long as given in 'trialConfig'.
      */
-    Status runTrials(MultiPlanStage::TrialPhaseConfig trialConfig);
+    Status runTrials(trial_period::TrialPhaseConfig trialConfig);
 
     /**
      * Returns the specific stats for the multi-plan stage.

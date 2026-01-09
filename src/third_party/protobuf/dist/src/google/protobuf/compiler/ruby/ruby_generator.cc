@@ -7,19 +7,21 @@
 
 #include "google/protobuf/compiler/ruby/ruby_generator.h"
 
-#include <iomanip>
+#include <cstddef>
 #include <memory>
 #include <sstream>
+#include <string>
 
-#include "google/protobuf/compiler/code_generator.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/absl_log.h"
 #include "absl/strings/escaping.h"
-#include "google/protobuf/compiler/plugin.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "google/protobuf/compiler/code_generator.h"
 #include "google/protobuf/compiler/retention.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
-#include "google/protobuf/descriptor_legacy.h"
 #include "google/protobuf/io/printer.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 
@@ -28,7 +30,7 @@ namespace protobuf {
 namespace compiler {
 namespace ruby {
 
-// Forward decls.
+// Forward declarations.
 template <class numeric_type>
 std::string NumberToString(numeric_type value);
 std::string GetRequireName(absl::string_view proto_file);
@@ -40,7 +42,7 @@ void GenerateEnumAssignment(absl::string_view prefix, const EnumDescriptor* en,
                             io::Printer* printer);
 std::string DefaultValueForField(const FieldDescriptor* field);
 
-template<class numeric_type>
+template <class numeric_type>
 std::string NumberToString(numeric_type value) {
   std::ostringstream os;
   os << value;
@@ -65,7 +67,6 @@ bool IsAlpha(char ch) { return IsLower(ch) || IsUpper(ch); }
 
 char UpperChar(char ch) { return IsLower(ch) ? (ch - 'a' + 'A') : ch; }
 
-
 // Package names in protobuf are snake_case by convention, but Ruby module
 // names must be PascalCased.
 //
@@ -75,7 +76,7 @@ std::string PackageToModule(absl::string_view name) {
   std::string result;
   result.reserve(name.size());
 
-  for (int i = 0; i < name.size(); i++) {
+  for (size_t i = 0; i < name.size(); i++) {
     if (name[i] == '_') {
       next_upper = true;
     } else {
@@ -123,14 +124,12 @@ void GenerateMessageAssignment(absl::string_view prefix,
     return;
   }
 
+  printer->Print("$prefix$$name$ = ", "prefix", prefix, "name",
+                 RubifyConstant(message->name()));
   printer->Print(
-    "$prefix$$name$ = ",
-    "prefix", prefix,
-    "name", RubifyConstant(message->name()));
-  printer->Print(
-    "::Google::Protobuf::DescriptorPool.generated_pool."
-    "lookup(\"$full_name$\").msgclass\n",
-    "full_name", message->full_name());
+      "::Google::Protobuf::DescriptorPool.generated_pool."
+      "lookup(\"$full_name$\").msgclass\n",
+      "full_name", message->full_name());
 
   std::string nested_prefix =
       absl::StrCat(prefix, RubifyConstant(message->name()), "::");
@@ -144,14 +143,12 @@ void GenerateMessageAssignment(absl::string_view prefix,
 
 void GenerateEnumAssignment(absl::string_view prefix, const EnumDescriptor* en,
                             io::Printer* printer) {
+  printer->Print("$prefix$$name$ = ", "prefix", prefix, "name",
+                 RubifyConstant(en->name()));
   printer->Print(
-    "$prefix$$name$ = ",
-    "prefix", prefix,
-    "name", RubifyConstant(en->name()));
-  printer->Print(
-    "::Google::Protobuf::DescriptorPool.generated_pool."
-    "lookup(\"$full_name$\").enummodule\n",
-    "full_name", en->full_name());
+      "::Google::Protobuf::DescriptorPool.generated_pool."
+      "lookup(\"$full_name$\").enummodule\n",
+      "full_name", en->full_name());
 }
 
 int GeneratePackageModules(const FileDescriptor* file, io::Printer* printer) {
@@ -169,19 +166,19 @@ int GeneratePackageModules(const FileDescriptor* file, io::Printer* printer) {
     //    -> A::B::C
     // otherwise, use the dot separator
     //    -> A.B.C
-    if (package_name.find("::") != std::string::npos) {
+    if (absl::StrContains(package_name, "::")) {
       need_change_to_module = false;
-    } else if (package_name.find('.') != std::string::npos) {
+    } else if (absl::StrContains(package_name, '.')) {
       ABSL_LOG(WARNING) << "ruby_package option should be in the form of:"
                         << " 'A::B::C' and not 'A.B.C'";
     }
   } else {
-    package_name = file->package();
+    package_name = std::string(file->package());
   }
 
   // Use the appropriate delimiter
   std::string delimiter = need_change_to_module ? "." : "::";
-  int delimiter_size = need_change_to_module ? 1 : 2;
+  size_t delimiter_size = need_change_to_module ? 1 : 2;
 
   // Extract each module name and indent
   while (!package_name.empty()) {
@@ -197,9 +194,7 @@ int GeneratePackageModules(const FileDescriptor* file, io::Printer* printer) {
     if (need_change_to_module) {
       component = PackageToModule(component);
     }
-    printer->Print(
-      "module $name$\n",
-      "name", component);
+    printer->Print("module $name$\n", "name", component);
     printer->Indent();
     levels++;
   }
@@ -210,8 +205,7 @@ void EndPackageModules(int levels, io::Printer* printer) {
   while (levels > 0) {
     levels--;
     printer->Outdent();
-    printer->Print(
-      "end\n");
+    printer->Print("end\n");
   }
 }
 
@@ -256,39 +250,44 @@ std::string DumpImportList(const FileDescriptor* file) {
   return ret;
 }
 
+namespace {
+
+// Escape a string for use in a Ruby string literal. This is a superset of
+// absl::CHexEscape() that also includes handling of the following characters:
+//   - # (hashmark)
+//
+// This is needed because Ruby double-quoted string literals interpolate the
+// contents of the string, and the hashmark character is used in the
+// interpolation syntax. Informed by MRI Ruby's implementation of String#dump.
+std::string RubyEscape(absl::string_view s) {
+  std::string c_escaped = absl::CHexEscape(s);
+  std::string result;
+  result.reserve(c_escaped.length());
+  for (size_t i = 0; i < c_escaped.length(); ++i) {
+    if (c_escaped[i] == '#' &&
+        (i + 1 < c_escaped.length() &&
+         (c_escaped[i + 1] == '{' || c_escaped[i + 1] == '$' ||
+          c_escaped[i + 1] == '@'))) {
+      absl::StrAppend(&result, "\\");
+    }
+    absl::StrAppend(&result, c_escaped.substr(i, 1));
+  }
+  return result;
+}
+
+}  // namespace
+
 void GenerateBinaryDescriptor(const FileDescriptor* file, io::Printer* printer,
                               std::string* error) {
   printer->Print(R"(
 descriptor_data = "$descriptor_data$"
 
-pool = Google::Protobuf::DescriptorPool.generated_pool
-
-begin
-  pool.add_serialized_file(descriptor_data)
-rescue TypeError
-  # Compatibility code: will be removed in the next major version.
-  require 'google/protobuf/descriptor_pb'
-  parsed = Google::Protobuf::FileDescriptorProto.decode(descriptor_data)
-  parsed.clear_dependency
-  serialized = parsed.class.encode(parsed)
-  file = pool.add_serialized_file(serialized)
-  warn "Warning: Protobuf detected an import path issue while loading generated file #{__FILE__}"
-  imports = [
-$imports$  ]
-  imports.each do |type_name, expected_filename|
-    import_file = pool.lookup(type_name).file_descriptor
-    if import_file.name != expected_filename
-      warn "- #{file.name} imports #{expected_filename}, but that import was loaded as #{import_file.name}"
-    end
-  end
-  warn "Each proto file must use a consistent fully-qualified name."
-  warn "This will become an error in the next major version."
-end
+pool = ::Google::Protobuf::DescriptorPool.generated_pool
+pool.add_serialized_file(descriptor_data)
 
 )",
-                 "descriptor_data",
-                 absl::CHexEscape(SerializedDescriptor(file)), "imports",
-                 DumpImportList(file));
+                 "descriptor_data", RubyEscape(SerializedDescriptor(file)),
+                 "imports", DumpImportList(file));
 }
 
 bool GenerateFile(const FileDescriptor* file, io::Printer* printer,
@@ -304,14 +303,10 @@ bool GenerateFile(const FileDescriptor* file, io::Printer* printer,
 
   if (file->dependency_count() != 0) {
     for (int i = 0; i < file->dependency_count(); i++) {
-      printer->Print("require '$name$'\n", "name", GetRequireName(file->dependency(i)->name()));
+      printer->Print("require '$name$'\n", "name",
+                     GetRequireName(file->dependency(i)->name()));
     }
     printer->Print("\n");
-  }
-
-  // TODO: Remove this when ruby supports extensions.
-  if (file->extension_count() > 0) {
-    ABSL_LOG(WARNING) << "Extensions are not yet supported in Ruby.";
   }
 
   GenerateBinaryDescriptor(file, printer, error);
@@ -328,17 +323,10 @@ bool GenerateFile(const FileDescriptor* file, io::Printer* printer,
   return true;
 }
 
-bool Generator::Generate(
-    const FileDescriptor* file,
-    const std::string& parameter,
-    GeneratorContext* generator_context,
-    std::string* error) const {
-  if (FileDescriptorLegacy(file).syntax() ==
-      FileDescriptorLegacy::Syntax::SYNTAX_UNKNOWN) {
-    *error = "Invalid or unsupported proto syntax";
-    return false;
-  }
-
+bool Generator::Generate(const FileDescriptor* file,
+                         const std::string& parameter,
+                         GeneratorContext* generator_context,
+                         std::string* error) const {
   std::unique_ptr<io::ZeroCopyOutputStream> output(
       generator_context->Open(GetOutputFilename(file->name())));
   io::Printer printer(output.get(), '$');

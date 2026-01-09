@@ -15,6 +15,8 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // with the counts of the number of times the "dbhash" and "validate" commands are run.
 TestData.skipCollectionAndIndexValidation = true;
 TestData.skipCheckDBHashes = true;
+// Skip checking ident hashes because the test runs initial syncs.
+TestData.isRunningInitialSync = true;
 
 function regexForValidateAndDBHashSlowQuery() {
     return String('Slow query.*"command":\\{"(validate|db[Hh]ash)');

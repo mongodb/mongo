@@ -36,6 +36,7 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/v2_log_builder.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

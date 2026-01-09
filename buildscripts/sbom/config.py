@@ -33,6 +33,15 @@ for component in components_remove:
     for prefix in prefixes:
         endor_components_remove.append(prefix + component)
 
+
+# ################ Third-Party Folder Filter ################
+
+# List of folders in src/third_party to exclude from SBOM generation warnings
+third_party_folders_remove = [
+    "scripts",
+    "boringssl_replacement",  # this is an alias folder
+]
+
 # ################ Component Renaming ################
 # Endor does not have syntactically valid PURLs for C/C++ packages.
 # e.g.,

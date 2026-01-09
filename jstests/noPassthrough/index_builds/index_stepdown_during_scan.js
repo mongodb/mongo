@@ -59,7 +59,7 @@ assert.neq(0, exitCode, "expected shell to exit abnormally due to index build be
 // after the node becomes primary again.
 rst.awaitReplication();
 
-// TODO(SERVER-109349): Remove this check when the feature flag is removed.
+// TODO(SERVER-109578): Remove this check when the feature flag is removed.
 // With primary driven index builds, the node will abort the in-progress index build on step up.
 if (FeatureFlagUtil.isPresentAndEnabled(testDB, "PrimaryDrivenIndexBuilds")) {
     IndexBuildTest.assertIndexes(coll, 1, ["_id_"]);

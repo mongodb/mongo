@@ -26,11 +26,11 @@ const stableAccumulatorPipelines = [
 
 for (const pipeline of stableAccumulatorPipelines) {
     // Assert success when running a pipeline with accumulators added to version 1.
-    APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(db, pipeline, collName);
 
     // Assert that if we don't specify apiStrict then the pipeline still succeeds.
-    APIVersionHelpers.assertAggregateSucceedsAPIVersionWithoutAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertAggregateSucceedsAPIVersionWithoutAPIStrict(db, pipeline, collName);
 
     // Assert success when creating a view on a pipeline with accumulators in APIv1
-    APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, viewName, collName);
+    APIVersionHelpers.assertViewSucceedsWithAPIStrict(db, pipeline, viewName, collName);
 }

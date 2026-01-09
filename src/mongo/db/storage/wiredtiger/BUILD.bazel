@@ -98,7 +98,7 @@ mongo_cc_library(
         "//src/mongo/util:processinfo",
         "//src/third_party/snappy",
         "//src/third_party/wiredtiger",
-        "//src/third_party/zlib",
+        "@zlib",
     ],
 )
 

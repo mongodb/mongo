@@ -70,7 +70,8 @@ export var DiscoverTopology = (function () {
 
         // Discover mongos URIs from the connection string. If a mongos is not passed in explicitly,
         // it will not be discovered.
-        const mongosUris = new MongoURI("mongodb://" + conn.host);
+        // TODO (SERVER-115639) refactor this line once the host property is unified.
+        const mongosUris = new MongoURI("mongodb://" + (conn.isMultiRouter ? conn.hosts : conn.host));
 
         const mongos = {
             type: Topology.kRouter,

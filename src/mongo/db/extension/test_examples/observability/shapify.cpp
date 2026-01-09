@@ -65,6 +65,10 @@ public:
         return BSON(_name << builder.obj());
     }
 
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ShapifyParseNode>(getName(), _arguments);
+    }
+
 private:
     void buildQueryShape(sdk::QueryShapeOptsHandle ctxHandle,
                          BSONObj input,
@@ -128,6 +132,10 @@ public:
         expanded.emplace_back(
             new sdk::ExtensionAggStageParseNode(std::make_unique<ShapifyParseNode>(shapifySpec)));
         return expanded;
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<ShapifyDesugarParseNode>(getName(), _arguments);
     }
 };
 

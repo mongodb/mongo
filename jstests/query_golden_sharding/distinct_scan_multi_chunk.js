@@ -7,9 +7,9 @@
  *   requires_fcv_82
  * ]
  */
-import {section, subSection} from "jstests/libs/pretty_md.js";
+import {section, subSection} from "jstests/libs/query/pretty_md.js";
 import {outputAggregationPlanAndResults, outputDistinctPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
-import {setupShardedCollectionWithOrphans} from "jstests/libs/query_golden_sharding_utils.js";
+import {setupShardedCollectionWithOrphans} from "jstests/libs/query/golden_sharding_utils.js";
 
 TestData.skipCheckOrphans = true; // Deliberately inserts orphans.
 

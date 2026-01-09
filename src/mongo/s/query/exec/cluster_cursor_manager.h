@@ -63,7 +63,6 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <utility>
 #include <vector>
 

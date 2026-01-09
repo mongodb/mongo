@@ -178,7 +178,7 @@ TEST_F(IndexBuildEntryHelpersTest, CommitQuorum) {
             unittest::assertGet(getCommitQuorum(operationContext(), _firstEntry.getBuildUUID()));
         ASSERT_BSONOBJ_EQ(opts.toBSON(), _firstEntry.getCommitQuorum().toBSON());
 
-        CommitQuorumOptions newCommitQuorum(0);
+        CommitQuorumOptions newCommitQuorum(2);
         ASSERT_OK(setCommitQuorum_forTest(
             operationContext(), _firstEntry.getBuildUUID(), newCommitQuorum));
 

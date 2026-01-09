@@ -526,6 +526,7 @@ mongo_cc_library(
         ":accumulator",
         ":change_stream_error_extra_info",
         ":change_stream_helpers",
+        ":desugarer",
         ":document_path_support",
         ":document_sources_idl",
         ":granularity_rounder",
@@ -1199,6 +1200,7 @@ mongo_cc_unit_test(
         "field_path_test.cpp",
         "granularity_rounder_powers_of_two_test.cpp",
         "granularity_rounder_preferred_numbers_test.cpp",
+        "lite_parsed_desugarer_test.cpp",
         "lite_parsed_document_source_test.cpp",
         "lookup_set_cache_test.cpp",
         "monotonic_expression_test.cpp",
@@ -1484,10 +1486,10 @@ idl_generator(
 
 mongo_cc_library(
     name = "desugarer",
-    srcs = ["desugarer.cpp"],
-    hdrs = ["desugarer.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//src/mongo/db/pipeline",
+    srcs = [
+        "desugarer.cpp",
+        "lite_parsed_desugarer.cpp",
     ],
+    visibility = ["//visibility:public"],
+    deps = [":lite_parsed_document_source"],
 )

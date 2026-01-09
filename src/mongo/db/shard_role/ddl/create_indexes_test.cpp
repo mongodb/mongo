@@ -28,11 +28,10 @@
  */
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -43,8 +42,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-
-#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {
@@ -67,20 +64,17 @@ TEST_F(CreateIndexesTest, CreateIndexesFailsWhenIndexBuildsCollectionIsMissing) 
         invariant(collection);
 
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocument(
-            opCtx, *collection, InsertStatement(BSONObj(BSON("_id" << 0 << "a" << 1))), nullptr));
+        ASSERT_OK(Helpers::insert(opCtx, *collection, BSON("_id" << 0 << "a" << 1)));
         wuow.commit();
     }  // Release the X lock on the collection.
 
     DBDirectClient client(opCtx);
     const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
     {
-        // Disable index build commit quorum as we don't have support of replication subsystem
-        // for voting.
         auto index = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
                               << "a_1");
         auto createIndexesCmdObj = BSON(
-            "createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index) << "commitQuorum" << 0);
+            "createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index) << "commitQuorum" << 1);
         BSONObj result;
         // This should fail since config.system.indexBuilds does not exist.
         unittest::LogCaptureGuard logs;
@@ -100,7 +94,7 @@ TEST_F(CreateIndexesTest, CreateIndexOnPreimagesCollectionFails) {
     auto index = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
                           << "a_1");
     auto cmd = BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index)
-                                    << "commitQuorum" << 0);
+                                    << "commitQuorum" << 1);
     BSONObj result;
     // This should fail because it is not permitted to create indexes on config.system.preimages.
     ASSERT_FALSE(client.runCommand(nss.dbName(), cmd, result)) << result;

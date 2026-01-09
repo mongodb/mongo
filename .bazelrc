@@ -55,7 +55,7 @@ common --nolegacy_external_runfiles
 common --remote_download_outputs=all
 
 # Files we always want to download for debugging and error checking
-common --remote_download_regex=.*\.(dwo|h|cpp|test.xml)$
+common --remote_download_regex=.*\.(dwo|h|cpp|test.xml|clang-tidy|clang-tidy\.strict)$
 
 # Disable caching of test results by default since many of our tests are non-deterministic.
 common --cache_test_results=no
@@ -97,6 +97,13 @@ common:windows --repo_env=BAZEL_VC_FULL_VERSION=14.31.31103
 # Default the Visual C Redistribution to v14.3 for Windows installer.
 common:windows --repo_env=MONGO_VC_REDIST_FULL_VERSION=v143
 
+# host_features will build tools that are meant to run in the build
+# we don't care about running sanitizer checks on tools that run in the build
+common:linux --host_features=-any_sanitizer
+common:linux --host_features=-asan
+common:linux --host_features=-fsan
+common:linux --host_features=-ubsan
+common:linux --host_features=-tsan
 
 # while in hybrid build state, using local unsandboxed linking should be faster. When most of our link
 # targets have been converted (i.e. unittest binaries) and we can BWOB, remote linking should be faster
@@ -565,6 +572,7 @@ common:public-release --grpc_keepalive_time=0s
 common:public-release --legacy_important_outputs
 common:public-release --//bazel/config:release=True
 common:public-release --//bazel/config:extensions_signature_verification_secure=True
+common:public-release --stamp
 
 --config=fission
 common:fission --fission=yes
@@ -617,4 +625,4 @@ try-import %workspace%/.bazelrc.sync
 try-import %workspace%/.bazelrc.engflow_creds
 
 # Repository root absolute path to set --execution_log_compact_file
-try-import %workspace%/.bazelrc.exec_log_file
+#try-import %workspace%/.bazelrc.exec_log_file

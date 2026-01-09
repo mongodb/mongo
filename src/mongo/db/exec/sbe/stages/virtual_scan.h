@@ -39,7 +39,6 @@
 #include "mongo/util/modules.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
 #include <vector>
 

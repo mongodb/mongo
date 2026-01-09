@@ -194,6 +194,13 @@ void validateRequestWithClient(const OperationContext* opCtx,
                 "BSON field 'originalQueryShapeHash' is an unknown field",
                 isInternalThreadOrClient || client->isInDirectClient());
     }
+
+    // Forbid users from passing 'ifrFlags' explicitly.
+    if (request.getIfrFlags()) {
+        uassert(11516201,
+                "BSON field 'ifrFlags' is an unknown field",
+                isInternalThreadOrClient || client->isInDirectClient());
+    }
 }
 
 void validateRequestFromClusterQueryWithoutShardKey(const AggregateCommandRequest& request) {

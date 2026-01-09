@@ -33,7 +33,6 @@
 #include "mongo/util/modules.h"
 
 #include <array>
-#include <stdexcept>
 #include <type_traits>
 
 namespace mongo::algebra {

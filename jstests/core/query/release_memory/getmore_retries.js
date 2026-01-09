@@ -22,6 +22,11 @@ import {findMatchingLogLine} from "jstests/libs/log.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {setParameterOnAllNonConfigNodes} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
+// Using a getMore in a parallel shell is unsupported when the test is run against a pool of routers.
+// The in-memory table used for pinning a mongos to a cursor is not accessible across shells.
+// pinToSingleMongos due to getMore on a parallel shell.
+TestData.pinToSingleMongos = true;
+
 function getServerParameter(knob) {
     return assert.commandWorked(db.adminCommand({getParameter: 1, [knob]: 1}))[knob];
 }

@@ -103,6 +103,8 @@ public:
      */
     bool shouldForceUpdateWithFullDocument() const override;
 
+    bool supportsCursorReuseForExpressPathQueries() const override;
+
     /**
      * We can support local, fully unreplicated collections.
      */
@@ -127,11 +129,6 @@ public:
      * We can support oplog cap maintainer thread and oplog sampling.
      */
     bool supportsOplogSampling() const override;
-
-    /**
-     * We can support table verify.
-     */
-    bool supportsTableVerify() const override;
 
     /**
      * We can enable it only for testing purposes.

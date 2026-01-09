@@ -202,6 +202,8 @@ public:
 
     virtual std::unique_ptr<LogicalAggStage> bind() const = 0;
 
+    virtual std::unique_ptr<AggStageAstNode> clone() const = 0;
+
 protected:
     AggStageAstNode() = delete;  // No default constructor.
     explicit AggStageAstNode(std::string_view name) : _name(name) {}
@@ -278,11 +280,22 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extClone(const ::MongoExtensionAggStageAstNode* astNode,
+                                             ::MongoExtensionAggStageAstNode** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            auto astNodePtr =
+                static_cast<const ExtensionAggStageAstNode*>(astNode)->getImpl().clone();
+
+            *output = new ExtensionAggStageAstNode(std::move(astNodePtr));
+        });
+    }
+
     static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE = {.destroy = &_extDestroy,
                                                                      .get_name = &_extGetName,
                                                                      .get_properties =
                                                                          &_extGetProperties,
-                                                                     .bind = &_extBind};
+                                                                     .bind = &_extBind,
+                                                                     .clone = &_extClone};
     std::unique_ptr<AggStageAstNode> _astNode;
 };
 
@@ -306,6 +319,8 @@ public:
     virtual size_t getExpandedSize() const = 0;
 
     virtual std::vector<VariantNodeHandle> expand() const = 0;
+
+    virtual std::unique_ptr<AggStageParseNode> clone() const = 0;
 
 protected:
     AggStageParseNode() = delete;  // No default constructor.
@@ -378,6 +393,16 @@ private:
             .getExpandedSize();
     }
 
+    static ::MongoExtensionStatus* _extClone(const ::MongoExtensionAggStageParseNode* parseNode,
+                                             ::MongoExtensionAggStageParseNode** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            auto parseNodePtr =
+                static_cast<const ExtensionAggStageParseNode*>(parseNode)->getImpl().clone();
+
+            *output = new ExtensionAggStageParseNode(std::move(parseNodePtr));
+        });
+    }
+
     /**
      * Expands the provided parse node into one or more AST or parse nodes.
      *
@@ -394,7 +419,8 @@ private:
         .get_name = &_extGetName,
         .get_query_shape = &_extGetQueryShape,
         .get_expanded_size = &_extGetExpandedSize,
-        .expand = &_extExpand};
+        .expand = &_extExpand,
+        .clone = &_extClone};
     std::unique_ptr<AggStageParseNode> _parseNode;
 };
 

@@ -369,12 +369,16 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
                 continue;
             }
 
-            const auto syncSourceCandidate = _rsConfig.getMemberAt(candidateIndex).getHostAndPort();
-            const auto closestNode = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
+            const auto& syncSourceCandidateConfig = _rsConfig.getMemberAt(candidateIndex);
+            const auto syncSourceCandidate = syncSourceCandidateConfig.getHostAndPortMaintenance();
+            const auto& closestNodeConfig = _rsConfig.getMemberAt(closestIndex);
+            const auto closestNode = closestNodeConfig.getHostAndPortMaintenance();
 
             LOGV2_INFO(8423401,
                        "Sync source candidate is eligible",
-                       "syncSourceCandidate"_attr = syncSourceCandidate);
+                       "syncSourceCandidate"_attr = syncSourceCandidate,
+                       "usingMaintenancePort"_attr =
+                           syncSourceCandidateConfig.isUsingMaintenancePort(syncSourceCandidate));
 
             // If the difference between the closest ping and candidate ping is within the
             // changeSyncSourceThreshold, then we consider them to be within the same data center.
@@ -395,14 +399,19 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
             // Nodes are within the same data center and one of them is the current primary.
             // Choose the primary.
             if (isWithinPingThreshold && isAnyCandidatePrimary) {
-                LOGV2_INFO(9649500,
-                           "Candidate sync source pings are within a threshold, indicating they "
-                           "are in the same data center. Prefer to select primary as sync source",
-                           "syncSourceCandidate"_attr = syncSourceCandidate,
-                           "syncSourceCandidatePing"_attr = syncSourceCandidatePing,
-                           "closestNode"_attr = closestNode,
-                           "closestPing"_attr = closestPing,
-                           "selectedNode"_attr = _currentPrimaryIndex);
+                LOGV2_INFO(
+                    9649500,
+                    "Candidate sync source pings are within a threshold, indicating they "
+                    "are in the same data center. Prefer to select primary as sync source",
+                    "syncSourceCandidate"_attr = syncSourceCandidate,
+                    "syncSourceCandidateUsingMaintenancePort"_attr =
+                        syncSourceCandidateConfig.isUsingMaintenancePort(syncSourceCandidate),
+                    "syncSourceCandidatePing"_attr = syncSourceCandidatePing,
+                    "closestNode"_attr = closestNode,
+                    "closestNodeUsingMaintenancePort"_attr =
+                        closestNodeConfig.isUsingMaintenancePort(closestNode),
+                    "closestPing"_attr = closestPing,
+                    "selectedNode"_attr = _currentPrimaryIndex);
                 closestIndex = _currentPrimaryIndex;
                 continue;
             }
@@ -412,7 +421,11 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
                        "Select sync source with lowest latency",
                        "syncSourceCandidate"_attr = syncSourceCandidate,
                        "syncSourceCandidatePing"_attr = syncSourceCandidatePing,
+                       "syncSourceCandidateUsingMaintenancePort"_attr =
+                           syncSourceCandidateConfig.isUsingMaintenancePort(syncSourceCandidate),
                        "closestNode"_attr = closestNode,
+                       "closestNodeUsingMaintenancePort"_attr =
+                           closestNodeConfig.isUsingMaintenancePort(closestNode),
                        "closestPing"_attr = closestPing,
                        "selectedNode"_attr = closerCandidate);
             closestIndex = closerCandidate;
@@ -433,8 +446,12 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
         return HostAndPort();
     }
 
-    auto syncSource = _rsConfig.getMemberAt(closestIndex).getHostAndPort();
-    LOGV2(21799, "Sync source candidate chosen", "syncSource"_attr = syncSource);
+    const auto& syncSourceConfig = _rsConfig.getMemberAt(closestIndex);
+    auto syncSource = syncSourceConfig.getHostAndPortMaintenance();
+    LOGV2(21799,
+          "Sync source candidate chosen",
+          "syncSource"_attr = syncSource,
+          "usingMaintenancePort"_attr = syncSourceConfig.isUsingMaintenancePort(syncSource));
     std::string msg(str::stream() << "syncing from: " << syncSource.toString(), 0);
     setMyHeartbeatMessage(now, msg);
     return syncSource;
@@ -473,7 +490,7 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
     }
 
     const MemberConfig& memberConfig(_rsConfig.getMemberAt(candidateIndex));
-    const auto syncSourceCandidate = memberConfig.getHostAndPort();
+    const auto syncSourceCandidate = memberConfig.getHostAndPortMaintenance();
     const auto memberData = _memberData[candidateIndex];
 
     // If limitLogFrequency is true, only log this message if it has not been logged in the last
@@ -488,7 +505,9 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
             _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
             LOGV2_INFO(3873106,
                        "Cannot select sync source because it is not up",
-                       "syncSourceCandidate"_attr = syncSourceCandidate);
+                       "syncSourceCandidate"_attr = syncSourceCandidate,
+                       "usingMaintenancePort"_attr =
+                           memberConfig.isUsingMaintenancePort(syncSourceCandidate));
         }
 
         return false;
@@ -499,7 +518,9 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
             _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
             LOGV2_INFO(3873107,
                        "Cannot select sync source because it is not readable",
-                       "syncSourceCandidate"_attr = syncSourceCandidate);
+                       "syncSourceCandidate"_attr = syncSourceCandidate,
+                       "usingMaintenancePort"_attr =
+                           memberConfig.isUsingMaintenancePort(syncSourceCandidate));
         }
         return false;
     }
@@ -513,7 +534,9 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                 LOGV2_INFO(3873101,
                            "Cannot select sync source because it is a primary and we are "
                            "looking for a secondary",
-                           "syncSourceCandidate"_attr = syncSourceCandidate);
+                           "syncSourceCandidate"_attr = syncSourceCandidate,
+                           "usingMaintenancePort"_attr =
+                               memberConfig.isUsingMaintenancePort(syncSourceCandidate));
             }
             return false;
         }
@@ -527,7 +550,9 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                 _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
                 LOGV2_INFO(3873108,
                            "Cannot select sync source because we are a voter and it is not",
-                           "syncSourceCandidate"_attr = syncSourceCandidate);
+                           "syncSourceCandidate"_attr = syncSourceCandidate,
+                           "usingMaintenancePort"_attr =
+                               memberConfig.isUsingMaintenancePort(syncSourceCandidate));
             }
             return false;
         }
@@ -537,7 +562,9 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                 _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
                 LOGV2_INFO(3873109,
                            "Cannot select sync source because it is hidden",
-                           "syncSourceCandidate"_attr = syncSourceCandidate);
+                           "syncSourceCandidate"_attr = syncSourceCandidate,
+                           "usingMaintenancePort"_attr =
+                               memberConfig.isUsingMaintenancePort(syncSourceCandidate));
             }
             return false;
         }
@@ -550,6 +577,8 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                     LOGV2_INFO(3873110,
                                "Cannot select sync source because it is too far behind",
                                "syncSourceCandidate"_attr = syncSourceCandidate,
+                               "usingMaintenancePort"_attr =
+                                   memberConfig.isUsingMaintenancePort(syncSourceCandidate),
                                "syncSourceCandidateOpTime"_attr =
                                    memberData.getHeartbeatAppliedOpTime(),
                                "oldestAcceptableOpTime"_attr = oldestSyncOpTime);
@@ -564,6 +593,8 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                 LOGV2_INFO(3873111,
                            "Cannot select sync source with larger secondaryDelaySecs than ours",
                            "syncSourceCandidate"_attr = syncSourceCandidate,
+                           "usingMaintenancePort"_attr =
+                               memberConfig.isUsingMaintenancePort(syncSourceCandidate),
                            "syncSourceCandidateSecondaryDelaySecs"_attr =
                                memberConfig.getSecondaryDelay(),
                            "secondaryDelaySecs"_attr = _selfConfig().getSecondaryDelay());
@@ -578,7 +609,9 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                 _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
                 LOGV2_INFO(3873112,
                            "Cannot select sync source which does not build indexes when we do",
-                           "syncSourceCandidate"_attr = syncSourceCandidate);
+                           "syncSourceCandidate"_attr = syncSourceCandidate,
+                           "usingMaintenancePort"_attr =
+                               memberConfig.isUsingMaintenancePort(syncSourceCandidate));
             }
             return false;
         }
@@ -590,6 +623,8 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
             LOGV2_INFO(3873113,
                        "Cannot select sync source which is not ahead of me",
                        "syncSourceCandidate"_attr = syncSourceCandidate,
+                       "usingMaintenancePort"_attr =
+                           memberConfig.isUsingMaintenancePort(syncSourceCandidate),
                        "syncSourceCandidateLastAppliedOpTime"_attr =
                            memberData.getHeartbeatAppliedOpTime().toBSON(),
                        "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
@@ -602,7 +637,9 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
             _recentSyncSourceChanges.lastLoggedIneligibleSrc = now;
             LOGV2_INFO(3873115,
                        "Cannot select sync source which is denylisted",
-                       "syncSourceCandidate"_attr = syncSourceCandidate);
+                       "syncSourceCandidate"_attr = syncSourceCandidate,
+                       "usingMaintenancePort"_attr =
+                           memberConfig.isUsingMaintenancePort(syncSourceCandidate));
         }
         return false;
     }
@@ -619,9 +656,13 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceReplSetSyncFr
 
     // If we have a target we've requested to sync from, use it.
     invariant(_forceSyncSourceIndex < _rsConfig.getNumMembers());
-    auto syncSource = _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
+    const auto& memberConfig = _rsConfig.getMemberAt(_forceSyncSourceIndex);
+    auto syncSource = memberConfig.getHostAndPortMaintenance();
     _forceSyncSourceIndex = -1;
-    LOGV2(21782, "Choosing sync source candidate by request", "syncSource"_attr = syncSource);
+    LOGV2(21782,
+          "Choosing sync source candidate by request",
+          "syncSource"_attr = syncSource,
+          "usingMaintenancePort"_attr = memberConfig.isUsingMaintenancePort(syncSource));
     std::string msg(str::stream() << "syncing from: " << syncSource.toString() << " by request");
     setMyHeartbeatMessage(now, msg);
     return syncSource;
@@ -670,13 +711,13 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialChecks
         const auto hostAndPortElem = data["hostAndPort"];
         if (!hostAndPortElem) {
             LOGV2_FATAL(50835,
-                        "'forceSyncSoureCandidate' parameter set with invalid host and port",
+                        "'forceSyncSourceCandidate' parameter set with invalid host and port",
                         "failpointData"_attr = data);
         }
 
         const auto hostAndPort = HostAndPort(hostAndPortElem.checkAndGetStringData());
-        const int syncSourceIndex = _rsConfig.findMemberIndexByHostAndPort(hostAndPort);
-        if (syncSourceIndex < 0) {
+        const auto& syncSourceConfig = _rsConfig.findMemberByHostAndPort(hostAndPort);
+        if (!syncSourceConfig) {
             LOGV2(3873118,
                   "'forceSyncSourceCandidate' failed due to host and port not in "
                   "replica set config.",
@@ -684,17 +725,20 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialChecks
             fassertFailed(50836);
         }
 
-        if (_memberIsDenylisted(_rsConfig.getMemberAt(syncSourceIndex), now)) {
+        if (_memberIsDenylisted(*syncSourceConfig, now)) {
             LOGV2(3873119,
                   "Cannot select a sync source because forced candidate is denylisted.",
-                  "syncSourceCandidate"_attr = hostAndPort.toString());
+                  "syncSourceCandidate"_attr = hostAndPort.toString(),
+                  "usingMaintenancePort"_attr =
+                      syncSourceConfig->isUsingMaintenancePort(hostAndPort));
             return HostAndPort();
         }
 
-        auto syncSource = _rsConfig.getMemberAt(syncSourceIndex).getHostAndPort();
+        auto syncSource = hostAndPort;
         LOGV2(21781,
               "Choosing sync source candidate due to 'forceSyncSourceCandidate' parameter",
-              "syncSource"_attr = syncSource);
+              "syncSource"_attr = syncSource,
+              "usingMaintenancePort"_attr = syncSourceConfig->isUsingMaintenancePort(syncSource));
         std::string msg(str::stream() << "syncing from: " << syncSource.toString()
                                       << " by 'forceSyncSourceCandidate' parameter");
         setMyHeartbeatMessage(now, msg);
@@ -733,7 +777,9 @@ HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
             3873116,
             1,
             "Cannot select the primary as sync source because the primary member is denylisted",
-            "primary"_attr = getCurrentPrimaryMember()->getHostAndPort());
+            "primary"_attr = getCurrentPrimaryMember()->getHostAndPortMaintenance(),
+            "usingMaintenancePort"_attr = getCurrentPrimaryMember()->isUsingMaintenancePort(
+                getCurrentPrimaryMember()->getHostAndPortMaintenance()));
         return HostAndPort();
     } else if (_currentPrimaryIndex == _selfIndex) {
         LOGV2_DEBUG(
@@ -744,14 +790,20 @@ HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
                     1,
                     "Cannot select the primary as sync source because the primary "
                     "is behind this node.",
-                    "primary"_attr = getCurrentPrimaryMember()->getHostAndPort(),
+                    "primary"_attr = getCurrentPrimaryMember()->getHostAndPortMaintenance(),
+                    "usingMaintenancePort"_attr = getCurrentPrimaryMember()->isUsingMaintenancePort(
+                        getCurrentPrimaryMember()->getHostAndPortMaintenance()),
                     "primaryOpTime"_attr =
                         _memberData.at(_currentPrimaryIndex).getLastAppliedOpTime(),
                     "lastFetchedOpTime"_attr = lastOpTimeFetched);
         return HostAndPort();
     } else {
-        auto syncSource = getCurrentPrimaryMember()->getHostAndPort();
-        LOGV2(3873117, "Choosing primary as sync source", "primary"_attr = syncSource);
+        auto syncSource = getCurrentPrimaryMember()->getHostAndPortMaintenance();
+        LOGV2(3873117,
+              "Choosing primary as sync source",
+              "primary"_attr = syncSource,
+              "usingMaintenancePort"_attr =
+                  getCurrentPrimaryMember()->isUsingMaintenancePort(syncSource));
         std::string msg(str::stream() << "syncing from primary: " << syncSource.toString());
         setMyHeartbeatMessage(now, msg);
         return syncSource;
@@ -759,14 +811,25 @@ HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
 }
 
 bool TopologyCoordinator::_memberIsDenylisted(const MemberConfig& memberConfig, Date_t now) const {
-    std::map<HostAndPort, Date_t>::const_iterator denylisted =
-        _syncSourceDenylist.find(memberConfig.getHostAndPort());
-    if (denylisted != _syncSourceDenylist.end()) {
-        if (denylisted->second > now) {
-            return true;
+    auto checkDenyListed = [&](const HostAndPort& hap, Date_t time) {
+        std::map<HostAndPort, Date_t>::const_iterator denylisted = _syncSourceDenylist.find(hap);
+        if (denylisted != _syncSourceDenylist.end()) {
+            if (denylisted->second > now) {
+                return true;
+            }
         }
-    }
-    return false;
+        return false;
+    };
+
+    // We check both the main and the maintenance port here where we don't in other places because
+    // the denylist reasons are not due to things like network errors which might be different on
+    // different ports but rather due to things that would be common to either port (ie. empty
+    // oplog, empty first document, etc.).
+    bool mainPortDenyListed = checkDenyListed(memberConfig.getHostAndPort(), now);
+    bool maintenancePortDenyListed = memberConfig.getMaintenancePort()
+        ? checkDenyListed(memberConfig.getHostAndPortMaintenance(), now)
+        : false;
+    return mainPortDenyListed || maintenancePortDenyListed;
 }
 
 void TopologyCoordinator::denylistSyncSource(const HostAndPort& host, Date_t until) {
@@ -821,7 +884,7 @@ void TopologyCoordinator::prepareSyncFromResponse(const HostAndPort& target,
     int targetIndex = 0;
     for (ReplSetConfig::MemberIterator it = _rsConfig.membersBegin(); it != _rsConfig.membersEnd();
          ++it) {
-        if (it->getHostAndPort() == target) {
+        if (it->getHostAndPortMaintenance() == target) {
             targetConfig = it;
             break;
         }
@@ -1166,7 +1229,9 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
         nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
         return nextAction;
     }
-    const int memberIndex = _rsConfig.findMemberIndexByHostAndPort(target);
+    // Heartbeats should always be sent via the maintenance port if it is available, thus we only
+    // act on heartbeat responses that match getHostAndPortMaintenance().
+    const int memberIndex = _rsConfig.findMemberIndexByHostAndPort(target, true /* strict */);
     if (memberIndex == -1) {
         LOGV2_DEBUG(21806,
                     1,
@@ -1380,7 +1445,7 @@ std::vector<HostAndPort> TopologyCoordinator::getHostsWrittenTo(const OpTime& op
             continue;
         }
 
-        hosts.push_back(memberData.getHostAndPort());
+        hosts.push_back(memberData.getHostAndPortMaintenance());
     }
     return hosts;
 }
@@ -1431,7 +1496,7 @@ std::pair<MemberId, Date_t> TopologyCoordinator::getStalestLiveMember() const {
 void TopologyCoordinator::resetMemberTimeouts(Date_t now,
                                               const stdx::unordered_set<HostAndPort>& member_set) {
     for (auto&& memberData : _memberData) {
-        if (member_set.count(memberData.getHostAndPort()))
+        if (member_set.count(memberData.getHostAndPortMaintenance()))
             memberData.updateLiveness(now);
     }
 }
@@ -2065,7 +2130,9 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 
             if (!_syncSource.empty() && !_iAmPrimary()) {
                 bb.append("syncSourceHost", _syncSource.toString());
-                const MemberConfig* member = _rsConfig.findMemberByHostAndPort(_syncSource);
+                // We want to report accurately whether this member is in the current config, so we
+                // rely on the strict lookup here.
+                const MemberConfig* member = _rsConfig.findMemberByHostAndPort(_syncSource, true);
                 bb.append("syncSourceId", member ? member->getId().getData() : -1);
             } else {
                 bb.append("syncSourceHost", "");
@@ -2145,7 +2212,9 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
             const HostAndPort& syncSource = it->getSyncSource();
             if (!syncSource.empty() && !state.primary()) {
                 bb.append("syncSourceHost", syncSource.toString());
-                const MemberConfig* member = _rsConfig.findMemberByHostAndPort(syncSource);
+                // We want to report accurately whether this member is in the current config, so we
+                // rely on the strict lookup here.
+                const MemberConfig* member = _rsConfig.findMemberByHostAndPort(syncSource, true);
                 bb.append("syncSourceId", member ? member->getId().getData() : -1);
             } else {
                 bb.append("syncSourceHost", "");
@@ -2181,7 +2250,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     // Add sync source info
     if (!_syncSource.empty() && !myState.primary() && !myState.removed()) {
         response->append("syncSourceHost", _syncSource.toString());
-        const MemberConfig* member = _rsConfig.findMemberByHostAndPort(_syncSource);
+        const MemberConfig* member = _rsConfig.findMemberByHostAndPort(_syncSource, true);
         response->append("syncSourceId", member ? member->getId().getData() : -1);
     } else {
         response->append("syncSourceHost", "");
@@ -2461,18 +2530,23 @@ void TopologyCoordinator::_updateHeartbeatDataForReconfig(const ReplSetConfig& n
         const MemberConfig& newMemberConfig = *it;
         MemberData newHeartbeatData;
         for (auto&& oldMemberData : oldHeartbeats) {
+            // This will copy over prior heartbeat data from the old config in 3 cases:
+            // 1. No change in the member
+            // 2. Member is this node
+            // 3. The member is the same but a maintenance port has beed added or removed.
             if ((oldMemberData.getMemberId() == newMemberConfig.getId() &&
                  oldMemberData.getHostAndPort() == newMemberConfig.getHostAndPort()) ||
                 (index == selfIndex && oldMemberData.isSelf())) {
-                // This member existed in the old config with the same member ID and
-                // HostAndPort, so copy its heartbeat data over.
                 newHeartbeatData = oldMemberData;
+                // Update the maintenance port in case this changed.
+                newHeartbeatData.setMaintenancePort(newMemberConfig.getMaintenancePort());
                 break;
             }
         }
         newHeartbeatData.setConfigIndex(index);
         newHeartbeatData.setIsSelf(index == selfIndex);
         newHeartbeatData.setHostAndPort(newMemberConfig.getHostAndPort());
+        newHeartbeatData.setMaintenancePort(newMemberConfig.getMaintenancePort());
         newHeartbeatData.setMemberId(newMemberConfig.getId());
         _memberData.push_back(newHeartbeatData);
     }
@@ -3310,8 +3384,10 @@ TopologyCoordinator::_shouldChangeSyncSourceInitialChecks(const HostAndPort& cur
     }
 
     // While we can allow data replication across config versions, we still do not allow syncing
-    // from a node that is not in our config.
-    const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(currentSource);
+    // from a node that is not in our config. Using the strict version of
+    // findMemberIndexByHostAndPort will cause us to choose a new sync source if a maintenance port
+    // has been added.
+    const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(currentSource, true);
     if (currentSourceIndex == -1) {
         LOGV2(21831,
               "Choosing new sync source because current sync source is not in our config",
@@ -3371,7 +3447,8 @@ bool TopologyCoordinator::_shouldChangeSyncSourceToBreakCycle(
     // Change sync source if our sync source is also syncing from us when we are in primary
     // catchup mode, forming a sync source selection cycle, and the sync source is not ahead
     // of us. This is to prevent a deadlock situation. See SERVER-58988 for details.
-    const bool isSyncingFromMe = syncSourceHost == _selfMemberData().getHostAndPort().toString();
+    const bool isSyncingFromMe =
+        syncSourceHost == _selfMemberData().getHostAndPortMaintenance().toString();
 
     if (isSyncingFromMe && _currentPrimaryIndex == _selfIndex &&
         currentSourceOpTime <= lastOpTimeFetched) {
@@ -3421,7 +3498,7 @@ bool TopologyCoordinator::_shouldChangeSyncSourceDueToLag(const HostAndPort& cur
                       "syncSource"_attr = currentSource,
                       "syncSourceOpTime"_attr = currentSourceOpTime.toString(),
                       "maxSyncSourceLagSecs"_attr = _options.maxSyncSourceLagSecs,
-                      "otherMember"_attr = member.getHostAndPort().toString(),
+                      "otherMember"_attr = member.getHostAndPortMaintenance().toString(),
                       "otherMemberHearbeatAppliedOpTime"_attr =
                           member.getHeartbeatAppliedOpTime().toString());
                 return true;
@@ -3515,7 +3592,7 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
     const bool primaryOnly = (readPreference == ReadPreference::PrimaryOnly);
     const bool primaryPreferredAndAlreadySyncing =
         (readPreference == ReadPreference::PrimaryPreferred &&
-         (currentSource == getCurrentPrimaryMember()->getHostAndPort()));
+         (currentSource == getCurrentPrimaryMember()->getHostAndPortMaintenance()));
 
     if (primaryOnly || primaryPreferredAndAlreadySyncing) {
         return false;
@@ -3544,7 +3621,7 @@ bool TopologyCoordinator::shouldChangeSyncSourceDueToPingTime(const HostAndPort&
 
     // Use ping times to look for another viable sync source that is significantly closer.
     for (size_t candidateIndex = 0; candidateIndex < _memberData.size(); candidateIndex++) {
-        const auto candidateNode = _memberData[candidateIndex].getHostAndPort();
+        const auto candidateNode = _memberData[candidateIndex].getHostAndPortMaintenance();
         if (_pings.count(candidateNode) == 0) {
             // Either we are the candidate node or ping data for the candidateNode could not be
             // found. Continue to the next node.
@@ -3732,7 +3809,7 @@ void TopologyCoordinator::setStorageEngineSupportsReadCommitted(bool supported) 
 
 void TopologyCoordinator::restartHeartbeat(const Date_t now, const HostAndPort& target) {
     for (auto&& member : _memberData) {
-        if (member.getHostAndPort() == target) {
+        if (member.getHostAndPortMaintenance() == target) {
             member.restart();
             member.updateLiveness(now);
             return;

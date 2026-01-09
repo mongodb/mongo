@@ -38,7 +38,6 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
-#include <variant>
 
 namespace mongo {
 

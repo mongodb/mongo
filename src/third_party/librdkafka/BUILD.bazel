@@ -172,8 +172,8 @@ mongo_cc_library(
     }),
     deps = [
         "//src/third_party/aws-sdk:aws-cjson",
-        "//src/third_party/zlib",
         "//src/third_party/zstandard:zstd",
+        "@zlib",
     ],
 )
 

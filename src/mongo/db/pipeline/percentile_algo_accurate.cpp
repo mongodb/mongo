@@ -120,17 +120,6 @@ void AccuratePercentile::emptyMemory() {
     _accumulatedValues.swap(emptyVector);
 }
 
-class SorterComparator {
-public:
-    SorterComparator(ValueComparator valueComparator) : _valueComparator(valueComparator) {}
-
-    int operator()(const Value& lhs, const Value& rhs) const {
-        return _valueComparator.compare(lhs, rhs);
-    }
-
-private:
-    ValueComparator _valueComparator;
-};
 /*
  * Serialize data currently in algorithm by casting to Value type.
  */
@@ -172,10 +161,15 @@ vector<double> AccuratePercentile::computePercentiles(const vector<double>& ps) 
         // the algorithm to spill again here so that all of the data is on disk when we sort it.
         spill();
 
+        std::function<int(const Value&, const Value&)> comparator =
+            [valueComparator = ValueComparator()](const Value& lhs, const Value& rhs) -> int {
+            return valueComparator.compare(lhs, rhs);
+        };
+
         // Initializes _sorterIterator as a MergeIterator that merge sorts the spilled sorted
         // segments of data together so that values can be iterated through in sorted order.
-        _sorterIterator = Sorter<Value, Value>::Iterator::merge(
-            _spilledSortedSegments, SortOptions(), SorterComparator(ValueComparator()));
+        _sorterIterator =
+            sorter::merge<Value, Value>(_spilledSortedSegments, SortOptions(), comparator);
         _indexNextSorted = 0;
 
         // Since we're reading one value from disk at a time, we compute the percentiles in

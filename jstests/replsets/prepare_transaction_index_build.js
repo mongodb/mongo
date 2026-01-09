@@ -44,13 +44,13 @@ assert.commandWorked(bulk.execute());
 secondary.getDB("admin").runCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "alwaysOn"});
 
 // This test create indexes with fail point enabled on secondary which prevents secondary from
-// voting. So, disabling index build commit quorum.
+// voting. So, setting index build commit quorum to 1.
 jsTestLog("Starting a background index build.");
 assert.commandWorked(
     testDB.runCommand({
         createIndexes: collName,
         indexes: [{key: {x: 1}, name: "x_1"}],
-        commitQuorum: 0,
+        commitQuorum: 1,
     }),
 );
 

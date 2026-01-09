@@ -855,7 +855,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCanRunTrialsInBatches) {
                                                   nss,
                                                   static_cast<PlanStage*>(mpsPtr),
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-    MultiPlanStage::TrialPhaseConfig trialsConfig{.maxNumWorksPerPlan = 7, .targetNumResults = 100};
+    trial_period::TrialPhaseConfig trialsConfig{.maxNumWorksPerPlan = 7, .targetNumResults = 100};
     // Run a first batch of trials. Up to 7 works per plan.
     ASSERT_OK(mpsPtr->runTrials(planYieldPolicy.get(), trialsConfig));
     auto mpStats = dynamic_cast<const MultiPlanStats*>(mpsPtr->getSpecificStats());
@@ -939,8 +939,8 @@ TEST_F(QueryStageMultiPlanTest, MPSRunTrialsEarlyExit) {
                                                   nss,
                                                   static_cast<PlanStage*>(mpsPtr),
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-    MultiPlanStage::TrialPhaseConfig trialsConfig{.maxNumWorksPerPlan = 1000,
-                                                  .targetNumResults = 100};
+    trial_period::TrialPhaseConfig trialsConfig{.maxNumWorksPerPlan = 1000,
+                                                .targetNumResults = 100};
     ASSERT_OK(mpsPtr->runTrials(planYieldPolicy.get(), trialsConfig));
     auto mpStats = dynamic_cast<const MultiPlanStats*>(mpsPtr->getSpecificStats());
     ASSERT_TRUE(mpStats->earlyExit);
@@ -1022,8 +1022,8 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
                                                   nss,
                                                   static_cast<PlanStage*>(mpsPtr),
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-    MultiPlanStage::TrialPhaseConfig trialsConfig{.maxNumWorksPerPlan = 1000,
-                                                  .targetNumResults = 100};
+    trial_period::TrialPhaseConfig trialsConfig{.maxNumWorksPerPlan = 1000,
+                                                .targetNumResults = 100};
     ASSERT_OK(mpsPtr->runTrials(planYieldPolicy.get(), trialsConfig));
     auto mpStats = dynamic_cast<const MultiPlanStats*>(mpsPtr->getSpecificStats());
     ASSERT_TRUE(mpStats->earlyExit);
@@ -1107,8 +1107,8 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
                                                   nss,
                                                   static_cast<PlanStage*>(mpsPtr),
                                                   PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-    MultiPlanStage::TrialPhaseConfig trialsConfig{.maxNumWorksPerPlan = 1000,
-                                                  .targetNumResults = 100};
+    trial_period::TrialPhaseConfig trialsConfig{.maxNumWorksPerPlan = 1000,
+                                                .targetNumResults = 100};
     ASSERT_OK(mpsPtr->runTrials(planYieldPolicy.get(), trialsConfig));
     auto mpStats = dynamic_cast<const MultiPlanStats*>(mpsPtr->getSpecificStats());
     ASSERT_TRUE(mpStats->earlyExit);

@@ -55,7 +55,9 @@ namespace router {
 
 namespace {
 constexpr size_t kMaxDatabaseCreationAttempts = 3;
-}
+
+MONGO_FAIL_POINT_DEFINE(waitForDatabaseToBeDropped);
+}  // namespace
 
 RouterBase::RouterBase(OperationContext* opCtx, CatalogCache* catalogCache)
     : _opCtx(opCtx), _catalogCache(catalogCache) {}
@@ -437,6 +439,77 @@ bool MultiCollectionRouter::isAnyCollectionNotLocal(
         }
     }
     return anyCollectionNotLocal;
+}
+
+std::unique_ptr<RoutingContext> createDatabasesAndGetRoutingCtx(
+    OperationContext* opCtx,
+    const std::vector<NamespaceString>& nssList,
+    bool checkTimeseriesBucketsNss,
+    bool refresh) {
+    for (const auto& nss : nssList) {
+        uassert(
+            ErrorCodes::InvalidNamespace,
+            str::stream() << "Must use a real namespace with CollectionRoutingInfoTargeter, got "
+                          << nss.toStringForErrorMsg(),
+            !nss.isCollectionlessAggregateNS());
+    }
+
+    // Scan 'nssList' and make a de-duplicated list of relevant databases.
+    auto dbList = [&]() {
+        std::vector<DatabaseName> dbList;
+        std::set<DatabaseName> dedup;
+        for (const auto& nss : nssList) {
+            if (auto [it, inserted] = dedup.insert(nss.dbName()); inserted) {
+                dbList.emplace_back(*it);
+            }
+        }
+
+        return dbList;
+    }();
+
+    size_t attempts = 1;
+    while (true) {
+        try {
+            // Ensure all the relevant databases exist.
+            for (const auto& dbName : dbList) {
+                cluster::createDatabase(opCtx, dbName);
+            }
+
+            if (refresh) {
+                for (const auto& nss : nssList) {
+                    Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
+                        nss, boost::none /* wantedVersion */);
+                }
+            }
+
+            if (MONGO_unlikely(waitForDatabaseToBeDropped.shouldFail())) {
+                LOGV2(8314600, "Hanging due to waitForDatabaseToBeDropped fail point");
+                waitForDatabaseToBeDropped.pauseWhileSet(opCtx);
+            }
+
+            // Create a RoutingContext and return it. If the RoutingContext constructor fails,
+            // an exception will be thrown.
+            const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
+                shard_role_details::getLocker(opCtx)->isLocked();
+
+            return std::make_unique<RoutingContext>(
+                opCtx, nssList, allowLocks, checkTimeseriesBucketsNss);
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            LOGV2_INFO(8314601,
+                       "Failed initialization of routing info because the database has been "
+                       "concurrently dropped",
+                       "db"_attr = dbList,
+                       "attemptNumber"_attr = attempts,
+                       "maxAttempts"_attr = kMaxDatabaseCreationAttempts);
+
+            if (attempts++ >= kMaxDatabaseCreationAttempts) {
+                // The maximum number of attempts has been reached, so the procedure fails as it
+                // could be a logical error. At this point, it is unlikely that the error is
+                // caused by concurrent drop database operations.
+                throw;
+            }
+        }
+    }
 }
 
 }  // namespace router

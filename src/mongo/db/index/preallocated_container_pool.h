@@ -33,7 +33,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/auto_clear_ptr.h"
+#include "mongo/util/modules.h"
 
+MONGO_MOD_PUBLIC;
 namespace mongo {
 
 /**

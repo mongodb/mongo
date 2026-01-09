@@ -64,9 +64,9 @@ nodes.forEach((node) =>
     assert.commandWorked(node.adminCommand({configureFailPoint: "disableSnapshotting", mode: "alwaysOn"})),
 );
 
-// This test create indexes with majority of nodes not available for replication. So, disabling
-// index build commit quorum.
-assert.commandWorked(coll.createIndexes([{foo: 1}], {}, 0));
+// This test create indexes with majority of nodes not available for replication. So, setting the
+// index build commit quorum to 1.
+assert.commandWorked(coll.createIndexes([{foo: 1}], {}, 1));
 rst.awaitReplication();
 
 rst.stopSet(undefined, true);

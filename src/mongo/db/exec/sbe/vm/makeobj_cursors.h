@@ -45,10 +45,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <limits>
-#include <memory>
 #include <utility>
-#include <vector>
 
 #include <boost/optional/optional.hpp>
 

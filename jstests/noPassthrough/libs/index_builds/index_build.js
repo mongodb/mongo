@@ -29,18 +29,10 @@ export var IndexBuildTest = class {
             }
             const keyPatterns = Array.isArray(keyPattern) ? keyPattern : [keyPattern];
             const coll = db.getMongo().getCollection(ns);
-            // The default for the commit quorum parameter to Collection.createIndexes() should be
-            // left as undefined if 'commitQuorum' is omitted. This is because we need to
-            // differentiate between undefined (which uses the default in the server) and 0 which
-            // disables the commit quorum.
-            if (commitQuorum !== undefined) {
-                assert.commandWorkedOrFailedWithCode(
-                    coll.createIndexes(keyPatterns, options, commitQuorum),
-                    expectedFailures,
-                );
-            } else {
-                assert.commandWorkedOrFailedWithCode(coll.createIndexes(keyPatterns, options), expectedFailures);
-            }
+            assert.commandWorkedOrFailedWithCode(
+                coll.createIndexes(keyPatterns, options, commitQuorum),
+                expectedFailures,
+            );
         };
         return startParallelShell(funWithArgs(func, args), conn.port);
     }

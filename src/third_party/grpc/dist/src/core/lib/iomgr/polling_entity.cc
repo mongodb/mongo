@@ -16,22 +16,24 @@
 //
 //
 
-#include <grpc/support/port_platform.h>
-
 #include "src/core/lib/iomgr/polling_entity.h"
 
-#include "absl/strings/str_format.h"
-
 #include <grpc/support/alloc.h>
-#include <grpc/support/log.h>
+#include <grpc/support/port_platform.h>
 
-#include "src/core/lib/gprpp/crash.h"
+#include "absl/log/check.h"
+#include "absl/strings/str_format.h"
+#include "src/core/util/crash.h"
 
 grpc_polling_entity grpc_polling_entity_create_from_pollset_set(
     grpc_pollset_set* pollset_set) {
   grpc_polling_entity pollent;
-  pollent.pollent.pollset_set = pollset_set;
-  pollent.tag = GRPC_POLLS_POLLSET_SET;
+  if (pollset_set == nullptr) {
+    pollent.tag = GRPC_POLLS_NONE;
+  } else {
+    pollent.pollent.pollset_set = pollset_set;
+    pollent.tag = GRPC_POLLS_POLLSET_SET;
+  }
   return pollent;
 }
 
@@ -65,14 +67,15 @@ bool grpc_polling_entity_is_empty(const grpc_polling_entity* pollent) {
 void grpc_polling_entity_add_to_pollset_set(grpc_polling_entity* pollent,
                                             grpc_pollset_set* pss_dst) {
   if (pollent->tag == GRPC_POLLS_POLLSET) {
-    // CFStream does not use file destriptors. When CFStream is used, the fd
-    // pollset is possible to be null.
+    // CFStream and EventEngine-based cqs do not use file descriptors.
     if (pollent->pollent.pollset != nullptr) {
       grpc_pollset_set_add_pollset(pss_dst, pollent->pollent.pollset);
     }
   } else if (pollent->tag == GRPC_POLLS_POLLSET_SET) {
-    GPR_ASSERT(pollent->pollent.pollset_set != nullptr);
+    CHECK_NE(pollent->pollent.pollset_set, nullptr);
     grpc_pollset_set_add_pollset_set(pss_dst, pollent->pollent.pollset_set);
+  } else if (pollent->tag == GRPC_POLLS_NONE) {
+    // Do nothing.
   } else {
     grpc_core::Crash(
         absl::StrFormat("Invalid grpc_polling_entity tag '%d'", pollent->tag));
@@ -82,17 +85,15 @@ void grpc_polling_entity_add_to_pollset_set(grpc_polling_entity* pollent,
 void grpc_polling_entity_del_from_pollset_set(grpc_polling_entity* pollent,
                                               grpc_pollset_set* pss_dst) {
   if (pollent->tag == GRPC_POLLS_POLLSET) {
-#ifdef GRPC_CFSTREAM
+    // CFStream and EventEngine-based cqs do not use file descriptors.
     if (pollent->pollent.pollset != nullptr) {
       grpc_pollset_set_del_pollset(pss_dst, pollent->pollent.pollset);
     }
-#else
-    GPR_ASSERT(pollent->pollent.pollset != nullptr);
-    grpc_pollset_set_del_pollset(pss_dst, pollent->pollent.pollset);
-#endif
   } else if (pollent->tag == GRPC_POLLS_POLLSET_SET) {
-    GPR_ASSERT(pollent->pollent.pollset_set != nullptr);
+    CHECK_NE(pollent->pollent.pollset_set, nullptr);
     grpc_pollset_set_del_pollset_set(pss_dst, pollent->pollent.pollset_set);
+  } else if (pollent->tag == GRPC_POLLS_NONE) {
+    // Do nothing.
   } else {
     grpc_core::Crash(
         absl::StrFormat("Invalid grpc_polling_entity tag '%d'", pollent->tag));

@@ -46,7 +46,6 @@
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
-#include <functional>
 #include <vector>
 
 #include <boost/optional.hpp>

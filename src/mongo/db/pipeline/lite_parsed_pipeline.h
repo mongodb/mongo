@@ -67,10 +67,12 @@ public:
      * validation happens later, during Pipeline construction.
      */
     LiteParsedPipeline(const AggregateCommandRequest& request,
-                       const bool isRunningAgainstView_ForHybridSearch = false)
-        : LiteParsedPipeline(
-              request.getNamespace(), request.getPipeline(), isRunningAgainstView_ForHybridSearch) {
-    }
+                       const bool isRunningAgainstView_ForHybridSearch = false,
+                       const LiteParserOptions& options = LiteParserOptions{})
+        : LiteParsedPipeline(request.getNamespace(),
+                             request.getPipeline(),
+                             isRunningAgainstView_ForHybridSearch,
+                             options) {}
     /**
      * Constructs a LiteParsedPipeline from the raw BSON stages in 'pipelineStages'.
      *
@@ -87,6 +89,39 @@ public:
         for (auto&& rawStage : pipelineStages) {
             _stageSpecs.push_back(LiteParsedDocumentSource::parse(nss, rawStage, options));
         }
+    }
+
+    /**
+     * Copy constructor. Calls clone on each LiteParsedDocumentSource in the pipeline and copies
+     * member variables.
+     */
+    LiteParsedPipeline(const LiteParsedPipeline& other)
+        : _isRunningAgainstView_ForHybridSearch(other._isRunningAgainstView_ForHybridSearch),
+          _hasChangeStream(&computeHasChangeStream),
+          _involvedNamespaces(&computeInvolvedNamespaces) {
+
+        _stageSpecs.reserve(other._stageSpecs.size());
+        for (const auto& stage : other._stageSpecs) {
+            _stageSpecs.push_back(stage->clone());
+        }
+    }
+
+    LiteParsedPipeline(LiteParsedPipeline&&) noexcept = default;
+
+    LiteParsedPipeline& operator=(LiteParsedPipeline other) {
+        std::swap(_stageSpecs, other._stageSpecs);
+        std::swap(_isRunningAgainstView_ForHybridSearch,
+                  other._isRunningAgainstView_ForHybridSearch);
+        // _hasChangeStream and _involvedNamespaces are Deferred and will be recomputed on demand,
+        // so we just reset them to point to our _stageSpecs.
+        _hasChangeStream = Deferred<bool (*)(const StageSpecs&)>(&computeHasChangeStream);
+        _involvedNamespaces = Deferred<stdx::unordered_set<NamespaceString> (*)(const StageSpecs&)>(
+            &computeInvolvedNamespaces);
+        return *this;
+    }
+
+    LiteParsedPipeline clone() const {
+        return LiteParsedPipeline(*this);
     }
 
     /**
@@ -301,6 +336,23 @@ public:
         return _stageSpecs;
     }
 
+    /**
+     * Replaces the stage at 'index' with the stages in 'newSources'. Returns the index after the
+     * inserted block.
+     */
+    size_t replaceStageWith(size_t index,
+                            std::vector<std::unique_ptr<LiteParsedDocumentSource>>&& newSources);
+
+    /**
+     * Resets the deferred caches for hasChangeStream and involvedNamespaces. Should be called after
+     * _stageSpecs has been modified.
+     */
+    void resetDeferredCaches() {
+        _hasChangeStream = Deferred<bool (*)(const StageSpecs&)>(&computeHasChangeStream);
+        _involvedNamespaces = Deferred<stdx::unordered_set<NamespaceString> (*)(const StageSpecs&)>(
+            &computeInvolvedNamespaces);
+    }
+
 private:
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.
@@ -311,22 +363,26 @@ private:
     // TODO SERVER-101722: Remove this once the validation is changed.
     bool _isRunningAgainstView_ForHybridSearch = false;
 
-    Deferred<bool (*)(const decltype(_stageSpecs)&)> _hasChangeStream{[](const auto& stageSpecs) {
-        return std::any_of(stageSpecs.begin(), stageSpecs.end(), [](auto&& spec) {
+    static bool computeHasChangeStream(const StageSpecs& stageSpecs) {
+        return std::any_of(stageSpecs.begin(), stageSpecs.end(), [](const auto& spec) {
             return spec->isChangeStream();
         });
-    }};
+    }
 
-    Deferred<stdx::unordered_set<NamespaceString> (*)(const decltype(_stageSpecs)&)>
-        _involvedNamespaces{[](const auto& stageSpecs) -> stdx::unordered_set<NamespaceString> {
-            stdx::unordered_set<NamespaceString> involvedNamespaces;
-            for (const auto& spec : stageSpecs) {
-                auto stagesInvolvedNamespaces = spec->getInvolvedNamespaces();
-                involvedNamespaces.insert(stagesInvolvedNamespaces.begin(),
-                                          stagesInvolvedNamespaces.end());
-            }
-            return involvedNamespaces;
-        }};
+    static stdx::unordered_set<NamespaceString> computeInvolvedNamespaces(
+        const StageSpecs& stageSpecs) {
+        stdx::unordered_set<NamespaceString> involved;
+        for (const auto& spec : stageSpecs) {
+            auto ns = spec->getInvolvedNamespaces();
+            involved.insert(ns.begin(), ns.end());
+        }
+        return involved;
+    }
+
+    Deferred<bool (*)(const StageSpecs&)> _hasChangeStream{&computeHasChangeStream};
+
+    Deferred<stdx::unordered_set<NamespaceString> (*)(const StageSpecs&)> _involvedNamespaces{
+        &computeInvolvedNamespaces};
 };
 
 }  // namespace mongo

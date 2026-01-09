@@ -459,6 +459,12 @@ export class QuerySettingsIndexHintsTests {
      * attached to them.
      */
     assertQuerySettingsFallback(querySettingsQuery, ns, explainWithoutQuerySettings = null) {
+        // Skip queries containing $$NOW since it evaluates to different values at different times,
+        // making plan comparisons unreliable.
+        if (tojson(querySettingsQuery).includes("$$NOW")) {
+            return;
+        }
+
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
         const explainCmd = getExplainCommand(query);
@@ -483,18 +489,20 @@ export class QuerySettingsIndexHintsTests {
         // replanning (namely in the case of subplanning with $or statements). Flatten the plan tree
         // & check that the plans' elements are equal using `assert.sameMembers` to accommodate this
         // behavior and avoid potential failures.
-        const getAllQueryPlans = (explain) =>
-            getQueryPlanners(explain).flatMap((queryPlanner) => {
-                const {winningPlan, rejectedPlans} = formatQueryPlanner(queryPlanner);
-                return {winningPlan, rejectedPlans};
-            });
+        const collectPlans = (explain) => {
+            const winningPlans = [];
+            const rejectedPlans = [];
+            for (const queryPlanner of getQueryPlanners(explain)) {
+                const {winningPlan, rejectedPlans: rejected} = formatQueryPlanner(queryPlanner);
+                winningPlans.push(winningPlan);
+                rejectedPlans.push(...(rejected || []));
+            }
+            return {winningPlans, rejectedPlans};
+        };
 
-        // First try to only compare the winning plan.
+        const plansWithoutSettings = collectPlans(explainWithoutQuerySettings);
+        const plansWithSettings = collectPlans(explainWithQuerySettings);
         const changeStreamIgnoreFields = ["t", "ts", "minRecord"];
-        const {winningPlanWithoutQuerySettings, rejectedPlansWithoutQuerySettings} =
-            getAllQueryPlans(explainWithoutQuerySettings);
-        const {winningPlanWithQuerySettings, rejectedPlansWithQuerySettings} =
-            getAllQueryPlans(explainWithQuerySettings);
 
         assert.eq(
             explainWithQuerySettings.pipeline,
@@ -502,10 +510,11 @@ export class QuerySettingsIndexHintsTests {
             "Expected the query without query settings and the one with settings to have " + "identical pipelines.",
         );
 
+        // First try to only compare the winning plans (optimization).
         if (
             anyEq(
-                winningPlanWithoutQuerySettings,
-                winningPlanWithQuerySettings,
+                plansWithoutSettings.winningPlans,
+                plansWithSettings.winningPlans,
                 false /* verbose */,
                 undefined /* valueComparator - will use bsonWoCompare() */,
                 changeStreamIgnoreFields,
@@ -515,24 +524,21 @@ export class QuerySettingsIndexHintsTests {
         }
 
         // Fall back to compare all the plans.
-        const queryPlansWithoutQuerySettings = rejectedPlansWithoutQuerySettings.concat([
-            winningPlanWithoutQuerySettings,
-        ]);
-        const queryPlansWithQuerySettings = rejectedPlansWithQuerySettings.concat([winningPlanWithQuerySettings]);
-        const allQueryPlansEq = anyEq(
-            queryPlansWithoutQuerySettings,
-            queryPlansWithQuerySettings,
-            false /* verbose */,
-            undefined /* valueComparator - will use bsonWoCompare() */,
-            changeStreamIgnoreFields,
-        );
+        const allPlansWithoutSettings = plansWithoutSettings.rejectedPlans.concat(plansWithoutSettings.winningPlans);
+        const allPlansWithSettings = plansWithSettings.rejectedPlans.concat(plansWithSettings.winningPlans);
         assert(
-            allQueryPlansEq,
+            anyEq(
+                allPlansWithoutSettings,
+                allPlansWithSettings,
+                false /* verbose */,
+                undefined /* valueComparator - will use bsonWoCompare() */,
+                changeStreamIgnoreFields,
+            ),
             "Expected the query without query settings and the one with query settings to " +
                 "have identical plans: " +
-                tojson(queryPlansWithoutQuerySettings) +
+                tojson(allPlansWithoutSettings) +
                 " != " +
-                tojson(queryPlansWithQuerySettings),
+                tojson(allPlansWithSettings),
         );
     }
 

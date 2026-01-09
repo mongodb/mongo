@@ -184,9 +184,8 @@ TEST_F(SplitPipelineTest, IdLookupInInvalidMergingPipelineLocation) {
                        11027701);
 }
 
-TEST_F(SplitPipelineTest, SplitAtIdLookup) {
-    // When IdLookup is the first stage in the pipeline that requires a split, it should end up on
-    // the shards.
+TEST_F(SplitPipelineTest, PushDownIdLookup) {
+    // IdLookup should be pushed down without forcing a pipeline split.
     testPipelineSplit(
         {
             BSON("$match" << BSON("x" << 1)),
@@ -198,8 +197,9 @@ TEST_F(SplitPipelineTest, SplitAtIdLookup) {
                 {
                     "$match",
                     "$_internalSearchIdLookup",
+                    "$match",
                 },
-            .mergeStages = {"$match"},
+            .mergeStages = {},
             .sortSpec = boost::none,
         });
 }

@@ -72,9 +72,18 @@ namespace mongo::timeseries {
 void upgradeToViewlessTimeseries(OperationContext* opCtx,
                                  const NamespaceString& mainNs,
                                  const boost::optional<UUID>& expectedUUID = boost::none);
+
+/**
+ * Downgrade a viewless timeseries collection to viewful format.
+ *
+ * If `skipViewCreation` is true, only the conversion to system.buckets is performed, but the
+ * view is not created. This is used by sharded clusters where only the primary shard creates
+ * the view.
+ */
 void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                                      const NamespaceString& mainNs,
-                                     const boost::optional<UUID>& expectedUUID = boost::none);
+                                     const boost::optional<UUID>& expectedUUID = boost::none,
+                                     bool skipViewCreation = false);
 
 /**
  * Bulk upgrade/downgrade over all collections in the shard catalog.

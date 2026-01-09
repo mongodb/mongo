@@ -280,6 +280,31 @@ function runUpdateTokenizationTests(topologyName, setupFn, teardownFn) {
             });
         });
 
+        it("should tokenize modifier update with array filters", function () {
+            const cmdObj = {
+                update: collName,
+                updates: [{q: {"v.$[q]": 3}, u: {$set: {"v.$[a]": 10}}, arrayFilters: [{a: 0}]}],
+                comment: "modifier update with array filters!",
+            };
+            assert.commandWorked(testDB.runCommand(cmdObj));
+
+            let queryStats = getQueryStatsUpdateCmd(testDB, {transformIdentifiers: true});
+
+            assert.eq(1, queryStats.length);
+            assert.eq("update", queryStats[0].key.queryShape.command);
+
+            const kHashedFieldForQuery = kHashedFieldName + ".wS5alCkV8OxkXnAw663TrK9STI0nka+n6aiaHJBU+wU=";
+            assert.eq({[kHashedFieldForQuery]: {$eq: "?number"}}, queryStats[0].key.queryShape.q);
+
+            const kHashedFieldForArrayElement = kHashedFieldName + ".$[" + kHashedFieldForA + "]";
+            assert.eq({$set: {[kHashedFieldForArrayElement]: "?number"}}, queryStats[0].key.queryShape.u);
+            assert.eq({[kHashedFieldForA]: {"$eq": "?number"}}, queryStats[0].key.queryShape.arrayFilters[0]);
+        });
+
+        //
+        // Pipeline update tests.
+        //
+
         it("should tokenize pipeline update with all allowed stages", function () {
             const cmdObj = {
                 update: collName,
@@ -358,8 +383,6 @@ function runUpdateTokenizationTests(topologyName, setupFn, teardownFn) {
             assert.eq([{$set: {[kHashedFieldName]: kHashedConstant}}], queryStats[0].key.queryShape.u);
             assert.eq({newVal: "?number"}, queryStats[0].key.queryShape.c);
         });
-
-        // TODO (SERVER-113907): Add tests for update with array filters.
     });
 }
 

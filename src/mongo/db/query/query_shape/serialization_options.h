@@ -104,7 +104,7 @@ struct SerializationOptions {
     // names.
     std::string serializeIdentifier(StringData str) const {
         if (transformIdentifiers) {
-            return transformIdentifiersCallback(str);
+            return transformIdentifier(str);
         }
         return std::string{str};
     }
@@ -116,7 +116,7 @@ struct SerializationOptions {
                 if (i > 0) {
                     hmaced << ".";
                 }
-                hmaced << transformIdentifiersCallback(path.getFieldName(i));
+                hmaced << transformIdentifier(path.getFieldName(i));
             }
             return hmaced.str();
         }
@@ -125,6 +125,18 @@ struct SerializationOptions {
 
     std::string serializeFieldPathWithPrefix(const FieldPath& path) const {
         return "$" + serializeFieldPath(path);
+    }
+
+    std::string transformIdentifier(StringData fieldPathPart) const {
+        // Update paths may contain array filter identifiers like "$[identifier]".
+        if (serializeForUpdateArrayFilters && fieldPathPart.size() >= 3 &&
+            fieldPathPart[0] == '$' && fieldPathPart[1] == '[' &&
+            fieldPathPart[fieldPathPart.size() - 1] == ']') {
+            StringData identifier = fieldPathPart.substr(2, fieldPathPart.size() - 3);
+            return std::string{"$[" + transformIdentifiersCallback(identifier) + "]"};
+        } else {
+            return std::string{transformIdentifiersCallback(fieldPathPart)};
+        }
     }
 
     std::string serializeFieldPathFromString(StringData path) const;
@@ -248,6 +260,9 @@ struct SerializationOptions {
 
     // If set to true, serializes each stage and expression as needed for query analysis.
     bool serializeForQueryAnalysis = false;
+
+    // If set to true, serializes each stage and expression as needed for array filters in updates.
+    bool serializeForUpdateArrayFilters = false;
 
     // Serialization state check helpers.
     bool isDefaultSerialization() const;

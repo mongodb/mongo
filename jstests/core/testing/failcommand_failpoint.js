@@ -12,6 +12,11 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
+// The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
+// Certain tasks (such as "sharding_jscore...") may use test fixtures with multiple mongos.
+// pinToSingleMongos due to configureFailPoint command.
+TestData.pinToSingleMongos = true;
+
 const testDB = db.getSiblingDB("test_failcommand");
 const adminDB = db.getSiblingDB("admin");
 

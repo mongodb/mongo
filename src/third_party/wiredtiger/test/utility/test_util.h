@@ -85,6 +85,9 @@ extern "C" {
     "\"%s/ext/page_log/%s/libwiredtiger_%s.so\"=("                                       \
     "config=(home=\"%s\",delay_ms=%" PRIu64 ",error_ms=%" PRIu64 ",force_delay=%" PRIu64 \
     ",force_error=%" PRIu64 ",cache_size_mb=%" PRIu64 ",verbose=%" PRIu32 "))"
+#define TESTUTIL_ENV_CONFIG_KEY_PROVIDER_EXT                        \
+    ",\"%s/ext/test/key_provider/libwiredtiger_key_provider.so\"=(" \
+    "early_load=true,config=(key_expires=60,verbose=-1))"
 #define TESTUTIL_ENV_CONFIG_TIERED               \
     ",tiered_storage=(bucket=%s"                 \
     ",bucket_prefix=%s,local_retention=%" PRIu32 \
@@ -141,6 +144,7 @@ typedef struct {
     bool absolute_bucket_dir;  /* Use an absolute bucket path when it is a directory */
     bool compat;               /* Compatibility */
     bool disagg_storage;       /* Uses disaggregated storage */
+    bool disagg_key_provider;  /* Uses key provider testing module for disaggregated storage */
     bool disagg_switch_mode;   /* Switching disaggregated storage mode during the test */
     bool do_data_ops;          /* Have schema ops use data */
     bool inmem;                /* In-memory */

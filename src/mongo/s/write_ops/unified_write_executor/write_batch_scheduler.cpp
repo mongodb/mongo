@@ -31,6 +31,7 @@
 
 #include "mongo/db/global_catalog/ddl/cluster_ddl.h"
 #include "mongo/db/query/shard_key_diagnostic_printer.h"
+#include "mongo/db/router_role/router_role.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -155,95 +156,66 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
 
 StatusWith<std::unique_ptr<RoutingContext>> WriteBatchScheduler::initRoutingContext(
     OperationContext* opCtx, const std::vector<NamespaceString>& nssList) {
-    constexpr size_t kMaxAttempts = 3u;
+    LOGV2_DEBUG_OPTIONS(11536700,
+                        2,
+                        {logv2::LogComponent::kShardMigrationPerf},
+                        "Creating RoutingContext in WriteBatchScheduler");
 
-    // Check to make sure isCollectionlessAggregateNS() is false for all names in 'nssList'.
-    for (const auto& nss : nssList) {
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Must use real namespaces with WriteBatchScheduler, got "
-                              << nss.toStringForErrorMsg(),
-                !nss.isCollectionlessAggregateNS());
-    }
+    try {
+        // Attempt to create the relevant databases and create a RoutingContext.
+        const bool checkTsBucketsNss = true;
+        const bool refresh = false;
+        auto routingCtx = sharding::router::createDatabasesAndGetRoutingCtx(
+            opCtx, nssList, checkTsBucketsNss, refresh);
 
-    size_t attempts = 0;
-
-    for (;;) {
-        ++attempts;
-
-        try {
-            // Ensure all the relevant databases exist.
-            std::set<DatabaseName> dbSet;
-            for (const auto& nss : nssList) {
-                if (auto [it, inserted] = dbSet.insert(nss.dbName()); inserted) {
-                    const auto& dbName = *it;
-                    cluster::createDatabase(opCtx, dbName);
-                }
-            }
-
-            // Create a RoutingContext and return it. If the RoutingContext constructor fails, an
-            // exception will be thrown.
-            const auto allowLocks = opCtx->inMultiDocumentTransaction() &&
-                shard_role_details::getLocker(opCtx)->isLocked();
-
-
-            // We should only be passing the target epoch if we're targeting one namespace. In
+        // If '_targetEpoch' is set, verify that the collection's epoch matches '_targetEpoch'.
+        if (_targetEpoch) {
+            // When '_targetEpoch' is set, we should only be targeting a single namespace. In
             // general, a target epoch is only passed for $merge commands to detect concurrent
             // collection drops between rounds of inserting documents.
-            tassert(11413801, "Expected at least one nss to be targeted", nssList.size() > 0);
             tassert(11413800,
                     "Expected only one namespace when target epoch is specified",
-                    !_targetEpoch || nssList.size() == 1);
+                    nssList.size() == 1);
             const auto firstNss = nssList.front();
+            const auto& cri = routingCtx->getCollectionRoutingInfo(firstNss);
+            const auto& cm = cri.getChunkManager();
 
-            auto routingCtx = std::make_unique<RoutingContext>(
-                opCtx, std::move(nssList), allowLocks, true /* checkTimeseriesBucketsNss */);
-
-            // Throws a StaleEpoch exception if the collection has been dropped and recreated or has
-            // an epoch that doesn't match that target epoch specified.
-            if (_targetEpoch) {
-                const auto& cri = routingCtx->getCollectionRoutingInfo(firstNss);
-                const auto& cm = cri.getChunkManager();
-
-                uassert(StaleEpochInfo(firstNss, ShardVersion{}, ShardVersion{}),
-                        "Collection has been dropped",
-                        cm.hasRoutingTable());
-                uassert(StaleEpochInfo(firstNss, ShardVersion{}, ShardVersion{}),
-                        "Collection epoch has changed",
-                        cm.getVersion().epoch() == _targetEpoch);
-            }
-
-            return std::move(routingCtx);
-
-        } catch (const DBException& ex) {
-            // For NamespaceNotFound errors, we will retry a couple of times before returning
-            // the error to the caller. For all other types of errors, we return the error to
-            // the caller immediately.
-            if (dynamic_cast<const ExceptionFor<ErrorCodes::NamespaceNotFound>*>(&ex)) {
-                LOGV2_INFO(10896505,
-                           "RoutingContext initialization failed due to a NamespaceNotFound error",
-                           "reason"_attr = ex.reason(),
-                           "attemptNumber"_attr = attempts,
-                           "maxAttempts"_attr = kMaxAttempts);
-
-                // If the maximum number of attempts has not been reached, continue and try
-                // again.
-                if (attempts < kMaxAttempts) {
-                    continue;
-                }
-            } else if (dynamic_cast<const ExceptionFor<ErrorCodes::StaleEpoch>*>(&ex)) {
-                LOGV2_DEBUG(10896506,
-                            2,
-                            "Failed to refresh RoutingContext in WriteBatchScheduler because "
-                            "collection was dropped",
-                            "error"_attr = redact(ex));
-            } else {
-                LOGV2_WARNING(10896507,
-                              "Failed to refresh RoutingContext in WriteBatchScheduler",
-                              "error"_attr = redact(ex));
-            }
-            // Return the error.
-            return ex.toStatus("Failed to refresh RoutingContext in WriteBatchScheduler");
+            // Throw a StaleEpoch exception if the collection's epoch does not match.
+            uassert(StaleEpochInfo(firstNss, ShardVersion{}, ShardVersion{}),
+                    "Collection has been dropped",
+                    cm.hasRoutingTable());
+            uassert(StaleEpochInfo(firstNss, ShardVersion{}, ShardVersion{}),
+                    "Collection epoch has changed",
+                    cm.getVersion().epoch() == _targetEpoch);
         }
+
+        LOGV2_DEBUG_OPTIONS(11536701,
+                            2,
+                            {logv2::LogComponent::kShardMigrationPerf},
+                            "Successfully created RoutingContext in WriteBatchScheduler");
+
+        return StatusWith(std::move(routingCtx));
+    } catch (const DBException& ex) {
+        // If an error occurs, log the error and return it.
+        if (dynamic_cast<const ExceptionFor<ErrorCodes::StaleEpoch>*>(&ex)) {
+            LOGV2_DEBUG(10896506,
+                        2,
+                        "Failed to create RoutingContext in WriteBatchScheduler because "
+                        "collection was dropped",
+                        "error"_attr = redact(ex));
+        } else {
+            LOGV2_WARNING(10896507,
+                          "Failed to create RoutingContext in WriteBatchScheduler",
+                          "error"_attr = redact(ex));
+        }
+
+        LOGV2_DEBUG_OPTIONS(11536702,
+                            2,
+                            {logv2::LogComponent::kShardMigrationPerf},
+                            "Failed to create RoutingContext in WriteBatchScheduler",
+                            "error"_attr = redact(ex));
+
+        return ex.toStatus("Failed to create RoutingContext in WriteBatchScheduler");
     }
 }
 

@@ -35,6 +35,7 @@
 #include "mongo/util/modules.h"
 
 #include <memory>
+#include <span>
 
 namespace mongo {
 
@@ -45,6 +46,16 @@ namespace mongo {
  */
 class MONGO_MOD_OPEN IntegerKeyedContainer {
 public:
+    class MONGO_MOD_OPEN Cursor {
+    public:
+        virtual ~Cursor() = default;
+
+        /**
+         * Returns the value in the container at the given key, or none if it is not present.
+         */
+        virtual boost::optional<std::span<const char>> find(int64_t key) = 0;
+    };
+
     virtual ~IntegerKeyedContainer() {}
 
     /**
@@ -67,6 +78,16 @@ public:
      * storage transaction.
      */
     virtual Status remove(RecoveryUnit& ru, int64_t key) = 0;
+
+    /**
+     * Returns a cursor on this container.
+     */
+    virtual std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const = 0;
+
+    /**
+     * Returns a shared cursor on this container.
+     */
+    virtual std::shared_ptr<Cursor> getSharedCursor(RecoveryUnit& ru) const = 0;
 };
 
 /**
@@ -76,6 +97,16 @@ public:
  */
 class MONGO_MOD_OPEN StringKeyedContainer {
 public:
+    class MONGO_MOD_OPEN Cursor {
+    public:
+        virtual ~Cursor() = default;
+
+        /**
+         * Returns the value in the container at the given key, or none if it is not present.
+         */
+        virtual boost::optional<std::span<const char>> find(std::span<const char> key) = 0;
+    };
+
     virtual ~StringKeyedContainer() {}
 
     /**
@@ -100,6 +131,16 @@ public:
      * storage transaction.
      */
     virtual Status remove(RecoveryUnit& ru, std::span<const char> key) = 0;
+
+    /**
+     * Returns a cursor on this container.
+     */
+    virtual std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const = 0;
+
+    /**
+     * Returns a shared cursor on this container.
+     */
+    virtual std::shared_ptr<Cursor> getSharedCursor(RecoveryUnit& ru) const = 0;
 };
 
 }  // namespace mongo

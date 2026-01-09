@@ -51,7 +51,7 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
 
 StageConstraints DocumentSourceExtensionOptimizable::constraints(
     PipelineSplitState pipeState) const {
-    // Default properties if unset
+    // Default properties if unset.
     auto constraints = DocumentSourceExtension::constraints(pipeState);
 
     // Apply potential overrides from static properties.
@@ -63,6 +63,15 @@ StageConstraints DocumentSourceExtensionOptimizable::constraints(
     }
     if (auto host = static_properties_util::toHostTypeRequirement(_properties.getHostType())) {
         constraints.hostRequirement = *host;
+    }
+    if (!_properties.getUnionWithIsAllowed()) {
+        constraints.unionRequirement = StageConstraints::UnionRequirement::kNotAllowed;
+    }
+    if (!_properties.getLookupIsAllowed()) {
+        constraints.lookupRequirement = StageConstraints::LookupRequirement::kNotAllowed;
+    }
+    if (!_properties.getFacetIsAllowed()) {
+        constraints.facetRequirement = StageConstraints::FacetRequirement::kNotAllowed;
     }
 
     return constraints;
@@ -170,6 +179,33 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic() {
     }
 
     return logic;
+}
+
+boost::intrusive_ptr<DocumentSourceExtensionOptimizable> DocumentSourceExtensionOptimizable::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const AggStageParseNodeHandle& parseNodeHandle) {
+    auto expanded = parseNodeHandle->expand();
+
+    tassert(
+        11623000, "Expected parseNode to only expand into a single node.", expanded.size() == 1);
+
+    boost::intrusive_ptr<DocumentSourceExtensionOptimizable> optimizable = nullptr;
+    helper::visitExpandedNodes(
+        expanded,
+        [&](const HostAggStageParseNode& host) {
+            tasserted(11623001, "Expected extension AST node, got host parse node.");
+        },
+        [&](const AggStageParseNodeHandle& handle) {
+            tasserted(11623002, "Expected extension AST node, got extension parse node.");
+        },
+        [&](const HostAggStageAstNode& hostAst) {
+            tasserted(11623003, "Expected extension AST node, got host AST node.");
+        },
+        [&](AggStageAstNodeHandle handle) {
+            optimizable = DocumentSourceExtensionOptimizable::create(expCtx, std::move(handle));
+        });
+
+    return optimizable;
 }
 
 }  // namespace mongo::extension::host

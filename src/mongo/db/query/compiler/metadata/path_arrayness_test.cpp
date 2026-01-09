@@ -176,7 +176,8 @@ TEST(ArraynessTrie, BuildAndLookupTrieWithConflictingArrayInformation) {
     pathArrayness.addPath(field_AB, multikeyPaths_AB);
     pathArrayness.addPath(field_ABC, multikeyPaths_ABC);
 
-    ASSERT_EQ(pathArrayness.isPathArray(field_AB), false);
+    // In the case of conflicts, we assume multikeyness.
+    ASSERT_EQ(pathArrayness.isPathArray(field_AB), true);
 
     // Now let's flip the insertion order.
     PathArrayness pathArrayness1;
@@ -184,7 +185,7 @@ TEST(ArraynessTrie, BuildAndLookupTrieWithConflictingArrayInformation) {
     pathArrayness1.addPath(field_AB, multikeyPaths_AB);
 
     // We should still get the same result.
-    ASSERT_EQ(pathArrayness1.isPathArray(field_AB), false);
+    ASSERT_EQ(pathArrayness1.isPathArray(field_AB), true);
 }
 
 TEST(ArraynessTrie, BuildAndLookupTrieWithSameArrayInformation) {

@@ -47,6 +47,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -59,7 +60,7 @@
 #include <utility>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class BSONElement;
 
 /** A variant type that can hold any type of data representable in BSON
@@ -503,7 +504,7 @@ public:
         return values;
     }
 };
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 

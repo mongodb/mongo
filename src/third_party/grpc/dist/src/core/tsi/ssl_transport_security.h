@@ -19,17 +19,14 @@
 #ifndef GRPC_SRC_CORE_TSI_SSL_TRANSPORT_SECURITY_H
 #define GRPC_SRC_CORE_TSI_SSL_TRANSPORT_SECURITY_H
 
+#include <grpc/grpc_crl_provider.h>
+#include <grpc/grpc_security_constants.h>
 #include <grpc/support/port_platform.h>
+#include <openssl/x509.h>
 
 #include <memory>
 
-#include <openssl/x509.h>
-
 #include "absl/strings/string_view.h"
-
-#include <grpc/grpc_crl_provider.h>
-#include <grpc/grpc_security_constants.h>
-
 #include "src/core/tsi/ssl/key_logging/ssl_key_logging.h"
 #include "src/core/tsi/ssl_transport_security_utils.h"
 #include "src/core/tsi/transport_security_interface.h"
@@ -98,7 +95,7 @@ static constexpr bool tsi_tls_session_key_logging_supported() {
 // --- tsi_ssl_client_handshaker_factory object ---
 
 // This object creates a client tsi_handshaker objects implemented in terms of
-// the TLS 1.2 specificiation.
+// the TLS 1.2 specification.
 
 typedef struct tsi_ssl_client_handshaker_factory
     tsi_ssl_client_handshaker_factory;
@@ -225,6 +222,9 @@ tsi_result tsi_create_ssl_client_handshaker_factory_with_options(
 //  extension.
 //- network_bio_buf_size and ssl_bio_buf_size represent BIO pair buffers used in
 //  SSL. The buffer size being 0 translates to 17KB in boringSSL.
+//- alpn_preferred_protocol_list is a comma sepparated ordered list of the
+//  preferred transport protocols for this handshaker. This will override the
+//  value provided by the handshaker factory for protocol negotiation.
 //- handshaker is the address of the handshaker pointer to be created.
 
 //- This method returns TSI_OK on success or TSI_INVALID_PARAMETER in the case
@@ -232,7 +232,9 @@ tsi_result tsi_create_ssl_client_handshaker_factory_with_options(
 tsi_result tsi_ssl_client_handshaker_factory_create_handshaker(
     tsi_ssl_client_handshaker_factory* factory,
     const char* server_name_indication, size_t network_bio_buf_size,
-    size_t ssl_bio_buf_size, tsi_handshaker** handshaker);
+    size_t ssl_bio_buf_size,
+    std::optional<std::string> alpn_preferred_protocol_list,
+    tsi_handshaker** handshaker);
 
 // Increments reference count of the client handshaker factory.
 tsi_ssl_client_handshaker_factory* tsi_ssl_client_handshaker_factory_ref(
@@ -246,7 +248,7 @@ void tsi_ssl_client_handshaker_factory_unref(
 // --- tsi_ssl_server_handshaker_factory object ---
 
 // This object creates a client tsi_handshaker objects implemented in terms of
-// the TLS 1.2 specificiation.
+// the TLS 1.2 specification.
 
 typedef struct tsi_ssl_server_handshaker_factory
     tsi_ssl_server_handshaker_factory;

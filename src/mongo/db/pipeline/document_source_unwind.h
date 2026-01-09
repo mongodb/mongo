@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -55,7 +56,8 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
-namespace mongo {
+// TODO SERVER-116044: Remove external dependencies on this header.
+namespace MONGO_MOD_NEEDS_REPLACEMENT mongo {
 
 DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(Unwind);
 
@@ -167,4 +169,4 @@ private:
     SbeCompatibility _sbeCompatibility{SbeCompatibility::requiresSbeFull};
 };  // class DocumentSourceUnwind
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_NEEDS_REPLACEMENT mongo

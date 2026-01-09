@@ -314,7 +314,8 @@ write_ops::UpdateOpEntry getOrMakeUpdateOpEntry(UpdateOpRef updateOp) {
     updateOpEntry.setArrayFilters(updateOp.getArrayFilters());
     updateOpEntry.setUpsert(updateOp.getUpsert());
     updateOpEntry.setUpsertSupplied(updateOp.getUpsertSupplied());
-    updateOpEntry.setIncludeQueryStatsMetrics(updateOp.getIncludeQueryStatsMetrics());
+    updateOpEntry.setIncludeQueryStatsMetricsForOpIndex(
+        updateOp.getIncludeQueryStatsMetricsForOpIndex());
     updateOpEntry.setSampleId(updateOp.getSampleId());
     updateOpEntry.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
         updateOp.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());

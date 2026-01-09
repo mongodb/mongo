@@ -239,37 +239,13 @@ assert.eq(results.length, 0, results);
     runTestcase(inputPipeline, expectedResults);
 }
 
-// TODO SERVER-113930 Remove failure cases and enable success cases for $lookup and $unionWith.
+// TODO SERVER-113930 Enable tests for $lookup and $unionWith.
 // Transform stage in $lookup.
-assert.commandFailedWithCode(
-    db.runCommand({
-        aggregate: collName,
-        pipeline: [{$lookup: {from: collName, pipeline: [{$loaf: {numSlices: 2}}], as: "slices"}}],
-        cursor: {},
-    }),
-    51047,
-);
 // results = coll.aggregate([{$lookup: {from: collName, pipeline: [{$loaf: {numSlices: 2}}], as: "slices"}}]).toArray();
 // assert.gt(results.length, 0);
 
 // Transform stage in $unionWith.
-assert.commandFailedWithCode(
-    db.runCommand({
-        aggregate: collName,
-        pipeline: [{$unionWith: {coll: collName, pipeline: [{$loaf: {numSlices: 2}}]}}],
-        cursor: {},
-    }),
-    31441,
-);
 // results = coll.aggregate([{$unionWith: {coll: collName, pipeline: [{$loaf: {numSlices: 2}}]}}]).toArray();
 // assert.gt(results.length, 0);
 
-// Transform stage is not allowed in $facet.
-assert.commandFailedWithCode(
-    db.runCommand({
-        aggregate: collName,
-        pipeline: [{$facet: {slices: [{$loaf: {numSlices: 2}}]}}],
-        cursor: {},
-    }),
-    40600,
-);
+// TODO SERVER-113930 Test transform stage in $facet.

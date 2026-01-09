@@ -168,7 +168,7 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     // parent states, so, we need to also reimplement the states.
     $config.states.movePrimary = function (db, collName, connCache) {
         db = $config.data.getRandomDb(db);
-        const shardId = $config.data.getRandomShard(connCache);
+        const shardId = $config.data.getRandomShard(db);
 
         jsTestLog("STATE:movePrimary moving: " + db.getName() + " to " + shardId);
         const res = db.adminCommand({movePrimary: db.getName(), to: shardId});

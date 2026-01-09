@@ -202,6 +202,10 @@ public:
         properties.serialize(&builder);
         return builder.obj();
     }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<ToastAstNode>(getName(), _arguments);
+    }
 };
 
 DEFAULT_AST_NODE(Loaf);

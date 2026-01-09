@@ -117,10 +117,6 @@ connection_page_delta_config_common = [
         Conversely, if the delta came to 21 bytes, reconciliation would not emit a
         delta. Deltas larger than full pages are permitted for measurement and testing
         reasons, and may be disallowed in future.''', min='1', max='1000', type='int', undoc=True),
-    Config('flatten_leaf_page_delta', 'false', r'''
-        When enabled, page read rewrites the leaf pages with deltas to a new
-        disk image if successful''',
-        type='boolean', undoc=True),
     Config('internal_page_delta', 'true', r'''
         When enabled, reconciliation may write deltas for internal pages
         instead of writing entire pages every time''',
@@ -2087,6 +2083,11 @@ methods = {
             checkpoint process. Lower values will trigger crashes in the initial phase of
             checkpoint, while higher values will result in crashes in the final phase of the
             checkpoint process''',
+            type='int'),
+        Config('key_provider_trigger_crash_points', '0', r'''
+            non-negative number between 1 and 3 will trigger a controlled crash during the
+            key provider process. A lower value would trigger crashes in the initial phase of
+            key provider, while a higher value would result in crashes in a later phase.''',
             type='int'),
         ]),
     Config('drop', '', r'''

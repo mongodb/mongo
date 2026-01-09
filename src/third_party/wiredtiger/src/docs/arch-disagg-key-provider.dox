@@ -1,0 +1,37 @@
+/*! @arch_page arch-disagg-key-provider Key Provider
+The WiredTiger key provider extension gives users a mechanism to persist custom metadata.
+Use this API when your application needs to store durable metadata outside of standard WiredTiger tables.
+A common example is persisting encryption key metadata. The key provider extension is strictly used
+with Disaggregated Storage Clusters (DSC).
+
+The key provider extension operates passively. It does not decide when data is persisted.
+WiredTiger persists metadata only during checkpoint operations. When a checkpoint occurs,
+WiredTiger writes the metadata to a special table named key provider and keeps the
+reference inside the shared metadata table.
+
+Only the leader node can run checkpoints and write to the key provider table.
+During a checkpoint, the leader may call get_key() to check whether new metadata is
+available, and load_key() to supply the key provider with the latest metadata.
+
+Follower nodes cannot update this metadata. They can only read the most recent metadata through load_key().
+
+@section key-provider-header Header information
+When WiredTiger persists metadata, it prepends a WT_CRYPT_HEADER. The header contains versioning and integrity fields
+(including a checksum) that WiredTiger uses to validate the metadata and recover it safely after a crash.
+
+@section key-provider-api API expectations
+The API provides three functions: WT_KEY_PROVIDER::load_key(), WT_KEY_PROVIDER::get_key() and WT_KEY_PROVIDER::on_key_update().
+WiredTiger owns the memory for all metadata buffers.
+
+WiredTiger calls load_key() during startup and checkpoint. It reads the persisted metadata and provides it to the key provider.
+If no metadata exists, it passes an empty WT_CRYPT_KEYS::keys structure..
+
+WiredTiger calls get_key() during a checkpoint to determine whether new metadata should be persisted.
+If WT_CRYPT_KEYS::keys::size is non zero, WiredTiger allocates a buffer and calls get_key() again so the key provider
+can write the new metadata into WT_CRYPT_KEYS::keys::data. Once WiredTiger calls this function for a key size,
+WiredTiger expects the same key to be returned when called again to retrieve key data. In other words, keys
+should not change between calls within the same checkpoint.
+
+WiredTiger invokes on_key_update() after it successfully persists the new metadata.
+The callback stores the metadata that WiredTiger just stored.
+*/

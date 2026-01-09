@@ -11,17 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include <grpc/support/port_platform.h>
-
 #include "src/core/lib/event_engine/work_queue/basic_work_queue.h"
+
+#include <grpc/support/port_platform.h>
 
 #include <utility>
 
 #include "src/core/lib/event_engine/common_closures.h"
-#include "src/core/lib/gprpp/sync.h"
+#include "src/core/util/sync.h"
 
-namespace grpc_event_engine {
-namespace experimental {
+namespace grpc_event_engine::experimental {
+
+BasicWorkQueue::BasicWorkQueue(void* owner) : owner_(owner) {}
 
 bool BasicWorkQueue::Empty() const {
   grpc_core::MutexLock lock(&mu_);
@@ -59,5 +60,4 @@ void BasicWorkQueue::Add(absl::AnyInvocable<void()> invocable) {
   q_.push_back(SelfDeletingClosure::Create(std::move(invocable)));
 }
 
-}  // namespace experimental
-}  // namespace grpc_event_engine
+}  // namespace grpc_event_engine::experimental

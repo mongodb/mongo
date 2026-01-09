@@ -24,6 +24,7 @@ import {
     runNestedAggregateCmdsOnRepeat,
 } from "jstests/sharding/analyze_shard_key/libs/sample_rates_common.js";
 import {isSlowBuild} from "jstests/sharding/libs/sharding_util.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
@@ -72,6 +73,7 @@ const st = new ShardingTest({
         },
     },
 });
+const uweEnabled = isUweEnabled(st.s);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 const mongosDB = st.s.getDB(dbName);
@@ -223,11 +225,14 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     // command.
     const maxCommandPercentageDiff = slowBuild ? 36 : 18;
 
+    // The UWE is slightly less performant than the old batch write executor so we increase the acceptable difference.
+    const maxDeletePercentageDiff = uweEnabled ? Math.max(24, maxCommandPercentageDiff) : maxCommandPercentageDiff;
+
     AnalyzeShardKeyUtil.assertDiffPercentage(sampleSize.total, expectedTotalCount, maxTotalSampleDiffPercentage);
     const actualFindPercentage = AnalyzeShardKeyUtil.calculatePercentage(sampleSize.find, sampleSize.total);
     assertDiffWindow(actualFindPercentage, expectedFindPercentage, maxCommandPercentageDiff);
     const actualDeletePercentage = AnalyzeShardKeyUtil.calculatePercentage(sampleSize[deleteField], sampleSize.total);
-    assertDiffWindow(actualDeletePercentage, expectedDeletePercentage, maxCommandPercentageDiff);
+    assertDiffWindow(actualDeletePercentage, expectedDeletePercentage, maxDeletePercentageDiff);
     const actualAggPercentage = AnalyzeShardKeyUtil.calculatePercentage(sampleSize.aggregate, sampleSize.total);
     assertDiffWindow(actualAggPercentage, expectedAggPercentage, maxCommandPercentageDiff);
 

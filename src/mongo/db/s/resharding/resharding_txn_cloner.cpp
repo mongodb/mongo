@@ -267,7 +267,6 @@ SemiFuture<void> ReshardingTxnCloner::run(
                                                 : MongoProcessInterface::create(opCtx.get()));
                        chainCtx->execPipeline =
                            exec::agg::buildPipeline(chainCtx->pipeline->freeze());
-                       chainCtx->execPipeline->dismissDisposal();
                        chainCtx->execPipeline->detachFromOperationContext();
                        chainCtx->pipeline->detachFromOperationContext();
                        chainCtx->donorRecord = boost::none;

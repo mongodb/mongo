@@ -2048,6 +2048,8 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
 
         // TODO (SERVER-114338): Pull commonalities out of switch cases if possible.
         switch (oplogEntry.getOpType()) {
+            case repl::OpTypeEnum::kUpdate:
+            case repl::OpTypeEnum::kDelete:
             case repl::OpTypeEnum::kInsert: {
                 if (!oplogEntry.getStatementIds().empty()) {
                     repl::OplogLink oplogLink;
@@ -2071,15 +2073,6 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
 
                 return;
             }
-            // // TODO (SERVER-114444): Handle single update ops
-            // case repl::OpTypeEnum::kUpdate: {
-            //     OpTimeBundle opTimes;
-            //     opTimes.writeOpTime = logOperation(
-            //         opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
-            //     opTimes.wallClockTime = oplogEntry.getWallClockTime();
-            // }
-            // // TODO (SERVER-114445): Handle single delete ops
-            // case repl::OpTypeEnum::kDelete:
             // // TODO (SERVER-114446): Handle single container insert
             // case repl::OpTypeEnum::kContainerInsert:
             // // TODO (SERVER-114447): Handle single container delete
@@ -2433,7 +2426,8 @@ void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
 
 void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                                           const NamespaceString& nss,
-                                                          const UUID& uuid) {
+                                                          const UUID& uuid,
+                                                          bool skipViewCreation) {
     tassert(11450500,
             "Expecting the main namespace for timeseries upgrade/downgrade ops",
             !nss.isTimeseriesBucketsCollection());
@@ -2446,6 +2440,9 @@ void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCt
     }
 
     UpgradeDowngradeViewlessTimeseriesOplogEntry objectEntry(std::string{nss.coll()});
+    if (skipViewCreation) {
+        objectEntry.setSkipViewCreation(true);
+    }
 
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);

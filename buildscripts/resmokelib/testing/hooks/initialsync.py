@@ -47,6 +47,13 @@ class BackgroundInitialSync(interface.Hook):
         self.n = n
         self.tests_run = 0
         self.random_restarts = 0
+
+        global_vars = shell_options.get("global_vars", {}).copy()
+        test_data = global_vars.get("TestData", {}).copy()
+        test_data["isRunningInitialSync"] = True
+        global_vars["TestData"] = test_data
+        shell_options["global_vars"] = global_vars
+
         self._shell_options = shell_options
 
     def before_test(self, test, test_report):
@@ -203,7 +210,7 @@ class IntermediateInitialSync(interface.Hook):
 
     IS_BACKGROUND = False
 
-    def __init__(self, hook_logger, fixture, n=DEFAULT_N):
+    def __init__(self, hook_logger, fixture, n=DEFAULT_N, shell_options={}):
         """Initialize IntermediateInitialSync."""
         if not isinstance(fixture, replicaset.ReplicaSetFixture):
             raise ValueError(
@@ -217,6 +224,14 @@ class IntermediateInitialSync(interface.Hook):
 
         self.n = n
         self.tests_run = 0
+
+        global_vars = shell_options.get("global_vars", {}).copy()
+        test_data = global_vars.get("TestData", {}).copy()
+        test_data["isRunningInitialSync"] = True
+        global_vars["TestData"] = test_data
+        shell_options["global_vars"] = global_vars
+
+        self._shell_options = shell_options
 
     def _should_run_after_test(self):
         self.tests_run += 1
@@ -233,7 +248,9 @@ class IntermediateInitialSync(interface.Hook):
         if not self._should_run_after_test():
             return
 
-        hook_test_case = IntermediateInitialSyncTestCase.create_after_test(test.logger, test, self)
+        hook_test_case = IntermediateInitialSyncTestCase.create_after_test(
+            test.logger, test, self, self._shell_options
+        )
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
@@ -243,10 +260,17 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
 
     JS_FILENAME = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
 
-    def __init__(self, logger, test_name, description, base_test_name, hook):
+    def __init__(self, logger, test_name, description, base_test_name, hook, shell_options=None):
         """Initialize IntermediateInitialSyncTestCase."""
         jsfile.DynamicJSTestCase.__init__(
-            self, logger, test_name, description, base_test_name, hook, self.JS_FILENAME
+            self,
+            logger,
+            test_name,
+            description,
+            base_test_name,
+            hook,
+            self.JS_FILENAME,
+            shell_options,
         )
 
     def run_test(self):

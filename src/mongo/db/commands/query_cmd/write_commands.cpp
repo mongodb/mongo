@@ -543,7 +543,7 @@ public:
 
             // This is populated by 'singleWriteHandler' and moved into the update reply in
             // 'postProcessHandler'.
-            std::vector<write_ops::StmtQueryStatsMetrics> queryStatsMetricsVec;
+            std::vector<write_ops::QueryStatsMetrics> queryStatsMetricsVec;
 
             // Handler to process each 'SingleWriteResult'.
             auto singleWriteHandler = [&](const SingleWriteResult& opResult, int index) {
@@ -551,7 +551,8 @@ public:
                 if (auto idElement = opResult.getUpsertedId().firstElement())
                     upsertedInfoVec.emplace_back(write_ops::Upserted(index, idElement));
                 if (auto queryStatsMetrics = opResult.getQueryStatsMetrics()) {
-                    queryStatsMetricsVec.emplace_back(index, *queryStatsMetrics);
+                    queryStatsMetricsVec.emplace_back(queryStatsMetrics->getOriginalOpIndex(),
+                                                      queryStatsMetrics->getMetrics());
                 }
             };
 

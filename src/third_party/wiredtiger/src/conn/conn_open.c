@@ -138,11 +138,12 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     /* Shut down disaggregated storage. */
     WT_TRET(__wti_disagg_destroy(session));
 
-    /* Free memory for collators, compressors, data sources. */
+    /* Free memory for collators, key provider, compressors, and data sources. */
     WT_TRET(__wti_conn_remove_collator(session));
     WT_TRET(__wti_conn_remove_compressor(session));
     WT_TRET(__wti_conn_remove_data_source(session));
     WT_TRET(__wti_conn_remove_encryptor(session));
+    WT_TRET(__wti_conn_remove_key_provider(session));
     WT_TRET(__wti_conn_remove_page_log(session));
     WT_TRET(__wti_conn_remove_storage_source(session));
 

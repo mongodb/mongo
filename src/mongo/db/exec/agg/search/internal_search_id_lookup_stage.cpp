@@ -33,7 +33,6 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
-#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -151,11 +150,6 @@ GetNextResult InternalSearchIdLookUpStage::doGetNext() {
             {
                 _catalogResourceHandle->acquire(pExpCtx->getOperationContext());
                 auto collection = _catalogResourceHandle->getCollection();
-                // We set the shard role to include the shard filterer during query planning.
-                ScopedSetShardRole setShardRole(pExpCtx->getOperationContext(),
-                                                collection.nss(),
-                                                collection.getShardVersion(),
-                                                collection.getDatabaseVersion());
                 pipeline = pExpCtx->getMongoProcessInterface()
                                ->attachCursorSourceToPipelineForLocalReadWithCatalog(
                                    std::move(pipeline),

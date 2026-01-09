@@ -57,6 +57,8 @@ Random.setRandomSeed();
  *     set. Ignored if 'replSet' is provided.
  */
 export function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet, nodeOptions) {
+    TestData.isRunningInitialSync = true;
+
     const State = {
         kStopped: "kStopped",
         kRollbackOps: "kRollbackOps",

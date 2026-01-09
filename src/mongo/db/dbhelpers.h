@@ -153,11 +153,19 @@ struct Helpers {
                        bool fromMigrate = false);
 
     /**
-     * Inserts document 'doc' into collection 'coll'.
+     * Inserts document 'doc' into collection 'coll'. Does not validate or modify the document in
+     * any way, and it is the caller's responsibility to handle things like adding the _id field.
+     */
+    static Status insert(OperationContext* opCtx, const CollectionPtr& coll, const BSONObj& doc);
+
+    /**
+     * Inserts a batch of documents 'docs' into collection 'coll'. Does not validate or modify the
+     * documents in any way, and it is the caller's responsibility to handle things like adding the
+     * _id field.
      */
     static Status insert(OperationContext* opCtx,
-                         const CollectionAcquisition& coll,
-                         const BSONObj& doc);
+                         const CollectionPtr& coll,
+                         std::span<const BSONObj> docs);
 
     /**
      * Deletes document from collection 'coll' via RecordId 'rid'.

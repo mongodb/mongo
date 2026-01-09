@@ -47,7 +47,6 @@ core:
     - src/mongo/db/request_execution_context.h
     - src/mongo/db/server_lifecycle_monitor[._]*
     - src/mongo/db/service_entry_point_bm_fixture.h
-    - src/mongo/db/service_entry_point_rs_endpoint.*
     - src/mongo/db/startup_warnings*
     - src/mongo/db/thread_client_test.cpp
     - src/mongo/db/throw_hook_impl[._]*
@@ -60,6 +59,7 @@ core:
     - src/mongo/executor/task_executor[._]*
     - src/mongo/executor/thread_pool[._]*
     - src/mongo/db/exec/scoped_timer*
+    - src/mongo/db/stats/counter_ops.h
 
 core.bson:
   files:
@@ -112,7 +112,6 @@ core.servers:
     - src/mongo/db/service_context_d_test_fixture.*
     - src/mongo/db/global_settings*
     - src/mongo/db/mongod_options_sharding*
-    - src/mongo/db/replica_set_endpoint*
     - src/mongo/s/mongos.cpp
     - src/mongo/s/mongos_main.*
     - src/mongo/s/mongos_options*
@@ -273,6 +272,7 @@ catalog_and_routing:
     - src/mongo/db/rs_local_client*
     - src/mongo/db/database_name[._]*
     - src/mongo/db/namespace_string[._]*
+    - src/mongo/db/stats/system_buckets_metrics*
     - src/mongo/util/namespace_string[._]*
     - src/mongo/util/database_name[._]*
 
@@ -341,9 +341,6 @@ catalog_and_routing.topology:
     - src/mongo/s/commands/s_read_write_concern_defaults_server_status.cpp
     - src/mongo/s/read_write_concern_defaults_cache_lookup_mongos*
 
-    # replica_set_endpoint: will be deleted eventually
-    - src/mongo/db/s/replica_set_endpoint*
-
     # change streams:
     - src/mongo/s/change_streams*
 
@@ -375,6 +372,7 @@ transactions:
     - src/mongo/db/commands/*session*
     - src/mongo/dbtests/logical_sessions_tests.cpp
     - src/mongo/s/client_transport_observer_mongos*
+    - src/mongo/db/stats/read_preference_metrics.idl
 
 fcv:
   meta:
@@ -790,6 +788,7 @@ index_builds: # authoritative: @10gen/server-index-builds
   files:
     - src/mongo/db/index_builds
     - src/mongo/db/index/index_access_method*
+    - src/mongo/db/index/preallocated_container_pool*
     - src/mongo/db/index_key_validate*
     - src/mongo/db/index_spec_validate*
     - src/mongo/db/commands/set_index_commit_quorum*
@@ -835,6 +834,7 @@ storage_engine_api:
     - src/mongo/db/storage/record_store*
     - src/mongo/db/storage/recovery_unit*
     - src/mongo/db/storage/sorted_data_interface*
+    - src/mongo/db/storage/container*
     - src/mongo/db/startup_recovery*
     - src/mongo/db/modules/enterprise/src/inmemory
     - src/mongo/db/modules/enterprise/src/queryable
@@ -1073,6 +1073,7 @@ replication.server_rw_concerns:
     - src/mongo/db/repl/*speculative_majority_read_info*
     - src/mongo/db/stats/server_write_concern*
     - src/mongo/db/stats/server_read_concern*
+    - src/mongo/db/stats/read_concern_stats.idl
     - src/mongo/db/write_concern*
 
 replication.rs_aware_service:
@@ -1121,7 +1122,6 @@ replication.replication_coordinator:
     - src/mongo/db/command_can_run_here*
     - src/mongo/db/repl/*always_allow_non_local_writes*
     - src/mongo/db/repl/*isself*
-    - src/mongo/db/repl/data_with_lock_free_reads*
     - src/mongo/db/repl/replication_waiter_list_bm.cpp
     - src/mongo/db/modules/atlas/src/disagg_storage/replication_coordinator*
 

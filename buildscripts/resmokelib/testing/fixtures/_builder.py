@@ -191,6 +191,7 @@ class ReplSetBuilder(FixtureBuilder):
         """
 
         launch_mongot = kwargs.get("launch_mongot")
+        use_maintenance_ports = kwargs.get("use_maintenance_ports")
         self._mutate_kwargs(kwargs)
         mixed_bin_versions, old_bin_version = _extract_multiversion_options(kwargs)
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
@@ -221,6 +222,7 @@ class ReplSetBuilder(FixtureBuilder):
                 mongod_binary_versions[node_index],
                 is_multiversion,
                 launch_mongot,
+                use_maintenance_ports,
             )
             replset.install_mongod(node)
 
@@ -257,6 +259,7 @@ class ReplSetBuilder(FixtureBuilder):
                     BinVersionEnum.NEW,
                     is_multiversion,
                     launch_mongot,
+                    use_maintenance_ports,
                 )
 
         if launch_mongot:
@@ -367,6 +370,7 @@ class ReplSetBuilder(FixtureBuilder):
         cur_version: str,
         is_multiversion: bool,
         launch_mongot: bool,
+        use_maintenance_port: bool,
     ) -> FixtureContainer:
         """Make a fixture container with configured mongod fixture(s) in it.
 
@@ -379,6 +383,7 @@ class ReplSetBuilder(FixtureBuilder):
         :param _class: str with the mongod fixture name
         :param cur_version: old or new version
         :param is_multiversion: whether we are in multiversion mode
+        :param use_maintenance_port: whether we should open a maintenance port on the new node
         :return: fixture container with configured mongod fixture(s) in it
         """
         mongod_logger = replset.get_logger_for_mongod(replset_node_index)
@@ -397,6 +402,7 @@ class ReplSetBuilder(FixtureBuilder):
                 mongod_executable=executables[BinVersionEnum.OLD],
                 mongod_options=mongod_options,
                 preserve_dbpath=replset.preserve_dbpath,
+                use_maintenance_port=use_maintenance_port,
             )
 
             # Assign the same port for old and new fixtures so upgrade/downgrade can be done without
@@ -414,6 +420,7 @@ class ReplSetBuilder(FixtureBuilder):
             preserve_dbpath=replset.preserve_dbpath,
             port=new_fixture_port,
             launch_mongot=launch_mongot,
+            use_maintenance_port=use_maintenance_port,
         )
 
         return FixtureContainer(new_fixture, old_fixture, cur_version)

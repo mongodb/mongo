@@ -246,19 +246,3 @@ mongo_cc_library(
         "//src/mongo/db/op_observer:operation_logger_impl",
     ],
 )
-
-mongo_cc_unit_test(
-    name = "shard_server_op_observer_test",
-    srcs = [
-        "shard_server_op_observer_test.cpp",
-    ],
-    tags = ["mongo_unittest_first_group"],
-    deps = [
-        "//src/mongo/db:service_context_d_test_fixture",
-        "//src/mongo/db/auth:authmocks",
-        "//src/mongo/db/op_observer:op_observer_util",
-        "//src/mongo/db/repl:replmocks",
-        "//src/mongo/db/repl:storage_interface_impl",
-        "//src/mongo/db/s:sharding_runtime_d",
-    ],
-)

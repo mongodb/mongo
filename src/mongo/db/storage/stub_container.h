@@ -43,6 +43,12 @@ public:
     Status remove(RecoveryUnit& ru, int64_t key) final {
         return Status::OK();
     }
+    std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const final {
+        return nullptr;
+    }
+    std::shared_ptr<Cursor> getSharedCursor(RecoveryUnit& ru) const final {
+        return nullptr;
+    }
 };
 
 class StubStringKeyedContainer final : public StringKeyedContainerBase {
@@ -53,6 +59,12 @@ public:
     }
     Status remove(RecoveryUnit& ru, std::span<const char> key) final {
         return Status::OK();
+    }
+    std::unique_ptr<Cursor> getCursor(RecoveryUnit& ru) const final {
+        return nullptr;
+    }
+    std::shared_ptr<Cursor> getSharedCursor(RecoveryUnit& ru) const final {
+        return nullptr;
     }
 };
 

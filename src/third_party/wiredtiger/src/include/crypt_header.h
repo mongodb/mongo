@@ -16,9 +16,9 @@ WT_PACKED_STRUCT_BEGIN(__wt_crypt_header)
 /*
  * Signature 'wtch' (WiredTiger Crypt Header)
  */
-#define WT_CRYPT_HEADER_SIGNATURE 0x68637477
+#define WT_CRYPT_HEADER_SIGNATURE 0x68637477u
     uint32_t signature; /* 00-03: Key header signature; always 'wtch' */
-#define WT_CRYPT_HEADER_VERSION 1
+#define WT_CRYPT_HEADER_VERSION 1u
     uint8_t version;     /* 04: Header version */
     uint8_t header_size; /* 05: Header size, in bytes */
     uint32_t crypt_size; /* 06-09: Payload size, in bytes */

@@ -582,6 +582,7 @@ def mongo_install(
                 "no-remote": "1",
                 "local": "1",
             },
+            preserve_mtime = True,
             testonly = testonly,
             target_compatible_with = select({
                 "@platforms//os:windows": ["@platforms//:incompatible"],
@@ -603,6 +604,7 @@ def mongo_install(
                     "no-remote": "1",
                     "local": "1",
                 },
+                preserve_mtime = True,
                 testonly = testonly,
                 target_compatible_with = select({
                     "@platforms//os:windows": ["@platforms//:incompatible"],

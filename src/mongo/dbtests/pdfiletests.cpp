@@ -35,8 +35,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/write_ops/insert.h"
@@ -53,7 +53,6 @@
 
 #include <memory>
 #include <string>
-
 
 namespace mongo {
 namespace PdfileTests {
@@ -100,16 +99,13 @@ public:
             coll = CollectionPtr::CollectionPtr_UNSAFE(_db->createCollection(&_opCtx, nss()));
         }
         ASSERT(coll);
-        OpDebug* const nullOpDebug = nullptr;
-        ASSERT_NOT_OK(collection_internal::insertDocument(
-            &_opCtx, coll, InsertStatement(x), nullOpDebug, true));
+        ASSERT_NOT_OK(Helpers::insert(&_opCtx, coll, x));
 
         StatusWith<BSONObj> fixed = fixDocumentForInsert(&_opCtx, x);
         ASSERT(fixed.isOK());
         x = fixed.getValue();
         ASSERT(x["_id"].type() == BSONType::oid);
-        ASSERT_OK(collection_internal::insertDocument(
-            &_opCtx, coll, InsertStatement(x), nullOpDebug, true));
+        ASSERT_OK(Helpers::insert(&_opCtx, coll, x));
         wunit.commit();
     }
 };

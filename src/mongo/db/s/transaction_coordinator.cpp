@@ -506,6 +506,8 @@ void TransactionCoordinator::runCommit(OperationContext* opCtx, std::vector<Shar
     invariant(opCtx != nullptr);
     invariant(opCtx->getClient() != nullptr);
     _updateAssociatedClient(opCtx->getClient());
+
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _participants = std::move(participants);
     _kickOffCommitPromise.emplaceValue();
 }
@@ -514,6 +516,7 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
     if (!_reserveKickOffCommitPromise())
         return;
 
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _transactionCoordinatorMetricsObserver->onRecoveryFromFailover();
 
     _participants = doc.getParticipants();

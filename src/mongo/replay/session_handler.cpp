@@ -51,9 +51,8 @@ void SessionHandler::createSession(key_t key, PacketSource source) {
                                                       _uri,
                                                       std::move(commandExecutor),
                                                       std::move(perfReporter));
-
+    ++_runningSessionCount;
     std::thread([session = std::move(session), this] {
-        ++_runningSessionCount;
         try {
             session->run(_allSessionStop.get_token());
         } catch (...) {
@@ -63,6 +62,7 @@ void SessionHandler::createSession(key_t key, PacketSource source) {
             }
             stopAllSessions();
         }
+        std::unique_lock ul(_notificationMutex);
         --_runningSessionCount;
         notify();
     }).detach();

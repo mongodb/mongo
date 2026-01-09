@@ -155,8 +155,8 @@ mongo_cc_library(
     deps = [
         "wiredtiger_checksum",
         "//src/third_party/snappy",
-        "//src/third_party/zlib",
         "//src/third_party/zstandard:zstd",
+        "@zlib",
     ] + TCMALLOC_DEPS,
 )
 

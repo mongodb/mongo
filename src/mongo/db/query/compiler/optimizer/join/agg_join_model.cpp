@@ -325,6 +325,13 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                 break;
             }
 
+            // Each $lookup must have a join predicate, as we currently don't support enumerating
+            // cross-product plans.
+            if (!lookup->hasLocalFieldForeignFieldJoin() &&
+                swPreds.getValue().joinPredicates.empty()) {
+                break;
+            }
+
             auto foreignNodeId = graph.addNode(lookup->getFromNs(),
                                                std::move(swPreds.getValue().canonicalQuery),
                                                lookup->getAsField());

@@ -1,6 +1,11 @@
 import {withTxnAndAutoRetry} from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
+import {
+    makeNewConnWithExistingSession,
+    getReplSetName,
+    makeReplSetConnWithExistingSession,
+} from "jstests/concurrency/fsm_utils/connection_utils.js";
 
 export var fsm = (function () {
     const kIsRunningInsideTransaction = Symbol("isRunningInsideTransaction");
@@ -47,71 +52,30 @@ export var fsm = (function () {
             // In order to ensure that all operations performed by a worker thread happen on the
             // same session, we override the "_defaultSession" property of the connections in the
             // cache to be the same as the session underlying 'args.db'.
-            const makeNewConnWithExistingSession = function (connStr) {
-                // We may fail to connect if the continuous stepdown thread had just terminated
-                // or killed a primary. We therefore use the connect() function defined in
-                // network_error_and_transaction_override.js to add automatic retries to
-                // connections. The override is loaded in worker_thread.js.
-                const conn = connect(connStr).getMongo();
-                conn._defaultSession = new _DelegatingDriverSession(conn, args.db.getSession());
-                return conn;
-            };
-
-            const getReplSetName = (conn) => {
-                let res;
-                assert.soonNoExcept(
-                    () => {
-                        res = conn.getDB("admin").runCommand({isMaster: 1});
-                        return true;
-                    },
-                    "Failed to establish a connection to the replica set",
-                    undefined, // default timeout is 10 mins
-                    2 * 1000,
-                ); // retry on a 2 second interval
-
-                assert.commandWorked(res);
-                assert.eq("string", typeof res.setName, () => `not connected to a replica set: ${tojson(res)}`);
-                return res.setName;
-            };
-
-            const makeReplSetConnWithExistingSession = (connStrList, replSetName) => {
-                let connStr = `mongodb://${connStrList.join(",")}/?appName=tid:${args.tid}&replicaSet=${replSetName}`;
-                if (jsTestOptions().shellGRPC) {
-                    connStr += "&grpc=false";
-                }
-                return makeNewConnWithExistingSession(connStr);
+            const makeNewConnWithCurrentSession = function (connStr) {
+                return makeNewConnWithExistingSession(connStr, args.db.getSession());
             };
 
             // Config shard conn strings do not use gRPC.
             const kNonGrpcConnStr = (connStr) =>
                 jsTestOptions().shellGRPC ? `mongodb://${connStr}/?grpc=false` : `mongodb://${connStr}`;
 
-            connCache = {mongos: [], config: [], shards: {}, rsConns: {config: undefined, shards: {}}};
-            connCache.mongos = args.cluster.mongos.map(makeNewConnWithExistingSession);
+            connCache = {mongos: [], config: [], rsConns: {config: undefined}};
+            connCache.mongos = args.cluster.mongos.map(makeNewConnWithCurrentSession);
             connCache.config = args.cluster.config
                 .map((connStr) => kNonGrpcConnStr(connStr))
-                .map(makeNewConnWithExistingSession);
+                .map(makeNewConnWithCurrentSession);
             connCache.rsConns.config = makeReplSetConnWithExistingSession(
                 args.cluster.config,
                 getReplSetName(connCache.config[0]),
+                args.tid,
+                args.db.getSession(),
             );
 
             // We set _isConfigServer=true on the Mongo connection object so
             // set_read_preference_secondary.js knows to avoid overriding the read preference as the
             // concurrency suite may be running with a 1-node CSRS.
             connCache.rsConns.config._isConfigServer = true;
-
-            let shardNames = Object.keys(args.cluster.shards);
-
-            shardNames.forEach((name) => {
-                connCache.shards[name] = args.cluster.shards[name]
-                    .map((connStr) => kNonGrpcConnStr(connStr))
-                    .map(makeNewConnWithExistingSession);
-                connCache.rsConns.shards[name] = makeReplSetConnWithExistingSession(
-                    args.cluster.shards[name],
-                    getReplSetName(connCache.shards[name][0]),
-                );
-            });
         }
 
         for (let i = 0; i < args.iterations; ++i) {

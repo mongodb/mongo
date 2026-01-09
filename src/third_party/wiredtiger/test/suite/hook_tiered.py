@@ -282,9 +282,6 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
 
     # Our current tiered storage implementation has a slow version of truncate, and
     # some tests are sensitive to that.
-    #
-    # FIXME-WT-11023: when we implement a fast truncate for tiered storage, we might remove
-    # this, and visit tests that are marked with @wttest.prevent(..."slow_truncate"...)
     def uses(self, use_list):
         if "slow_truncate" in use_list:
             return True

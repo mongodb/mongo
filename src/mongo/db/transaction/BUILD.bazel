@@ -134,6 +134,7 @@ mongo_cc_unit_test(
         ":transaction_api",
         ":transaction_operations",
         "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:read_write_concern_defaults_mock",
         "//src/mongo/db:service_context_d_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/db/op_observer",

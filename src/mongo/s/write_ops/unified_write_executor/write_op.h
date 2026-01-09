@@ -33,8 +33,6 @@
 #include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/util/modules.h"
 
-#include <variant>
-
 #include <boost/optional.hpp>
 
 namespace mongo {

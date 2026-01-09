@@ -65,7 +65,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -930,10 +929,6 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     if (command->shouldAffectQueryCounter()) {
         serviceOpCounters(opCtx).gotQuery();
-    }
-
-    if (opCtx->routedByReplicaSetEndpoint()) {
-        replica_set_endpoint::checkIfCanRunCommand(opCtx, request);
     }
 
     if (genericArgs.getRawData() && !invocation->supportsRawData()) {
