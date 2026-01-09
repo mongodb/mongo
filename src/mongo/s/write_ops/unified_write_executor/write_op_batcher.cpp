@@ -227,6 +227,34 @@ public:
     }
 
     /**
+     * Returns a single op write batch if the write type should not be combined with other ops.
+     */
+    boost::optional<WriteBatch> buildSingleOpWriteBatch(const WriteOp& writeOp,
+                                                        const Analysis& analysis) {
+        // If the WriteOp is kTwoPhaseWrite, put it in a TwoPhaseWriteBatch by itself and return the
+        // batch.
+        if (analysis.type == kTwoPhaseWrite) {
+            auto sampleId = analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+            return WriteBatch{
+                TwoPhaseWriteBatch{writeOp, std::move(sampleId), analysis.isViewfulTimeseries}};
+        }
+        // If the WriteOp is kInternalTransaction, put it in a InternalTransactionBatch by itself
+        // and return the batch.
+        if (analysis.type == kInternalTransaction) {
+            auto sampleId = analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+            return WriteBatch{InternalTransactionBatch{writeOp, std::move(sampleId)}};
+        }
+        // If the WriteOp is kMultiWriteBlockingMigration, put it in a
+        // MultiWriteBlockingMigrationsBatch by itself and return the batch.
+        if (analysis.type == kMultiWriteBlockingMigrations) {
+            auto sampleId = analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+            return WriteBatch{MultiWriteBlockingMigrationsBatch{
+                writeOp, std::move(sampleId), analysis.isViewfulTimeseries}};
+        }
+        return boost::none;
+    }
+
+    /**
      * Finish the current batch being built and return it.
      */
     WriteBatch done() {
@@ -290,6 +318,23 @@ void WriteOpBatcher::markBatchReprocess(WriteBatch batch) {
     markOpReprocess(batch.getWriteOps());
 }
 
+bool WriteOpBatcher::retryOnTargetError(RoutingContext& routingCtx, Status status) {
+    if (_retryOnTargetError) {
+        LOGV2_DEBUG(10896515,
+                    2,
+                    "Encountered a targeter error, will refresh RoutingContext",
+                    "error"_attr = redact(status));
+
+        for (const auto& nss : routingCtx.getNssList()) {
+            routingCtx.onStaleShardVersionError(nss, /*wantedVersion*/ boost::none);
+        }
+
+        _retryOnTargetError = false;
+        return true;
+    }
+    return false;
+}
+
 BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
                                                   RoutingContext& routingCtx) {
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
@@ -320,23 +365,12 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
 
                 return {WriteBatch{}, std::move(opsWithErrors), transientTxnError};
             }
-            // If the write command is not in a transaction and '_retryOnTargetError' is true, then
-            // discard the current batch, refresh the catalog cache, set '_retryOnTargetError' to
-            // false, and return an empty batch. For this case, we intentionally do not consume the
-            // op or record the error.
-            if (_retryOnTargetError) {
-                LOGV2_DEBUG(10896515,
-                            2,
-                            "Encountered a targeter error, will refresh RoutingContext",
-                            "error"_attr = redact(swAnalysis.getStatus()));
 
-                for (const auto& nss : routingCtx.getNssList()) {
-                    routingCtx.onStaleShardVersionError(nss, /*wantedVersion*/ boost::none);
-                }
-
-                _retryOnTargetError = false;
+            // Retry on target error once if possible.
+            if (retryOnTargetError(routingCtx, swAnalysis.getStatus())) {
                 return {WriteBatch{}, std::move(opsWithErrors)};
             }
+
             // When the write command is not in a transaction and '_retryOnTargetError' is false,
             // if the current batch is empty, then we consume the op, record the error, and return
             // an empty batch.
@@ -376,32 +410,12 @@ BatcherResult OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
         } else {
             // Consume the first op.
             _producer.advance();
-            // If the first WriteOp is kTwoPhaseWrite, then consume the op and put it in a
-            // TwoPhaseWriteBatch by itself and return the batch.
-            if (analysis.type == kTwoPhaseWrite) {
-                auto sampleId =
-                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{TwoPhaseWriteBatch{
-                            *writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
-                        std::move(opsWithErrors)};
+
+            // If the first WriteOp should be put into a single batch, return the batch directly.
+            if (auto singleOpWriteBatch = builder.buildSingleOpWriteBatch(*writeOp, analysis)) {
+                return {*singleOpWriteBatch, std::move(opsWithErrors)};
             }
-            // If the first WriteOp is kInternalTransaction, put it in a InternalTransactionBatch
-            // by itself and return the batch.
-            if (analysis.type == kInternalTransaction) {
-                auto sampleId =
-                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{InternalTransactionBatch{*writeOp, std::move(sampleId)}},
-                        std::move(opsWithErrors)};
-            }
-            // If the first WriteOp is kMultiWriteBlockingMigration, put it in a
-            // MultiWriteBlockingMigrationsBatch by itself and return the batch.
-            if (analysis.type == kMultiWriteBlockingMigrations) {
-                auto sampleId =
-                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{MultiWriteBlockingMigrationsBatch{
-                            *writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
-                        std::move(opsWithErrors)};
-            }
+
             // If the first WriteOp is kMultiShard or kRetryableWriteWithId, then start a new
             // SimpleWriteBatch, add the op to the batch, and break and return the batch.
             if (analysis.type != kSingleShard) {
@@ -469,23 +483,12 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
 
                 return {WriteBatch{}, std::move(opsWithErrors)};
             }
-            // If the write command is not in a transaction and '_retryOnTargetError' is true, then
-            // discard the current batch, refresh the catalog cache, set '_retryOnTargetError' to
-            // false, and return an empty batch. For this case, we intentionally do not consume the
-            // op or record the error.
-            if (_retryOnTargetError) {
-                LOGV2_DEBUG(10896518,
-                            2,
-                            "Encountered a targeter error, will refresh RoutingContext",
-                            "error"_attr = redact(swAnalysis.getStatus()));
 
-                for (const auto& nss : routingCtx.getNssList()) {
-                    routingCtx.onStaleShardVersionError(nss, /*wantedVersion*/ boost::none);
-                }
-
-                _retryOnTargetError = false;
+            // Retry on target error once if possible.
+            if (retryOnTargetError(routingCtx, swAnalysis.getStatus())) {
                 return {WriteBatch{}, std::move(opsWithErrors)};
             }
+
             // If the write command is not in a transaction and '_retryOnTargetError' is false,
             // then we consume the op, record the error, and continue looking for more ops to add
             // to the batch we're building.
@@ -517,32 +520,12 @@ BatcherResult UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
         } else {
             // Consume 'writeOp'.
             _producer.advance();
-            // If the first WriteOp is kTwoPhaseWrite, then consume the op and put it in a
-            // TwoPhaseWriteBatch by itself and return the batch.
-            if (analysis.type == kTwoPhaseWrite) {
-                auto sampleId =
-                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{TwoPhaseWriteBatch{
-                            writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
-                        std::move(opsWithErrors)};
+
+            // If the first WriteOp should be put into a single batch, return the batch directly.
+            if (auto singleOpWriteBatch = builder.buildSingleOpWriteBatch(writeOp, analysis)) {
+                return {*singleOpWriteBatch, std::move(opsWithErrors)};
             }
-            // If the first WriteOp is kInternalTransaction, then consume the op and put it in a
-            // InternalTransactionBatch by itself and return the batch.
-            if (analysis.type == kInternalTransaction) {
-                auto sampleId =
-                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{InternalTransactionBatch{writeOp, std::move(sampleId)}},
-                        std::move(opsWithErrors)};
-            }
-            // If the first WriteOp is kMultiWriteBlockingMigration, put it in a
-            // MultiWriteBlockingMigrationsBatch by itself and return the batch.
-            if (analysis.type == kMultiWriteBlockingMigrations) {
-                auto sampleId =
-                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
-                return {WriteBatch{MultiWriteBlockingMigrationsBatch{
-                            writeOp, std::move(sampleId), analysis.isViewfulTimeseries}},
-                        std::move(opsWithErrors)};
-            }
+
             // If the op is kSingleShard or kMultiShard or kRetryableWriteWithId, then start a new
             // SimpleWriteBatch and add the op to the batch, and keep looping to see if more ops can
             // be added to the batch.

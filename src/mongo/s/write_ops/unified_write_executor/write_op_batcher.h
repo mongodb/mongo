@@ -279,6 +279,14 @@ public:
     }
 
 protected:
+    /**
+     * If the write command is not in a transaction and '_retryOnTargetError' is true, then discard
+     * the current batch, refresh the catalog cache, set '_retryOnTargetError' to false. The caller
+     * should return an empty batch, and we intentionally do not consume the op or record the error
+     * in this case.
+     */
+    bool retryOnTargetError(RoutingContext& routingCtx, Status status);
+
     WriteOpProducer& _producer;
     WriteOpAnalyzer& _analyzer;
 
