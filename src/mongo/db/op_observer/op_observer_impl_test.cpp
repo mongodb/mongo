@@ -4514,7 +4514,7 @@ void BatchedWriteOutputsTest::testBatchedWriteSingleOplogEntryIsNotWrappedInAppl
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
     // Execution operation without grouping to get the expected oplog entry.
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+    AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
     WriteUnitOfWork wuow(opCtx);
     opLoggingFn(autoColl, opCtx);
     wuow.commit();
@@ -4583,6 +4583,28 @@ TEST_F(BatchedWriteOutputsTest, TestSingleUpdateIsNotInApplyOps) {
 
     // TODO SERVER-114338: Update test to check single retryable update oplog entries. We can do the
     // same thing above but also setting updateArgs.stmtIds to StmtId(0).
+}
+
+TEST_F(BatchedWriteOutputsTest, TestSingleContainerInsertIsNotInApplyOps) {
+    testBatchedWriteSingleOplogEntryIsNotWrappedInApplyOps(
+        [&](const AutoGetCollection& autoColl, OperationContext* opCtx) {
+            auto ident = "ident";
+            int64_t key = 100;
+            std::string value = "things";
+            opCtx->getServiceContext()->getOpObserver()->onContainerInsert(
+                opCtx, _nss, uuid, ident, key, value);
+        });
+}
+
+TEST_F(BatchedWriteOutputsTest, TestSingleContainerDeleteIsNotInApplyOps) {
+    testBatchedWriteSingleOplogEntryIsNotWrappedInApplyOps(
+        [&](const AutoGetCollection& autoColl, OperationContext* opCtx) {
+            auto ident = "ident";
+            int64_t key = 100;
+
+            opCtx->getServiceContext()->getOpObserver()->onContainerDelete(
+                opCtx, _nss, uuid, ident, key);
+        });
 }
 
 class OnDeleteOutputsTest : public OpObserverTest {

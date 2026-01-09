@@ -2056,7 +2056,10 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
                     _operationLogger->appendOplogEntryChainInfo(
                         opCtx, &oplogEntry, &oplogLink, oplogEntry.getStatementIds());
                 }
-
+                [[fallthrough]];
+            }
+            case repl::OpTypeEnum::kContainerDelete:
+            case repl::OpTypeEnum::kContainerInsert: {
                 auto opTime = logOperation(
                     opCtx, &oplogEntry, true /*assignCommonFields*/, _operationLogger.get());
 
@@ -2073,10 +2076,6 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx,
 
                 return;
             }
-            // // TODO (SERVER-114446): Handle single container insert
-            // case repl::OpTypeEnum::kContainerInsert:
-            // // TODO (SERVER-114447): Handle single container delete
-            // case repl::OpTypeEnum::kContainerDelete:
             default:
                 break;
         }
