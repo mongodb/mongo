@@ -425,10 +425,48 @@ tasks:
     commands:
       - func: "streams build and push"
 
-  - name: resmoke_tests
-    tags: ["assigned_to_jira_team_devprod_correctness", "experimental"]
+  - name: bazel_result_tasks_gen
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     depends_on:
       - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "git get project and add git tag"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "configure evergreen api credentials"
+      - func: "set up credentials"
+      - func: "get engflow creds"
+      - func: "bazel run"
+        vars:
+          target: //buildscripts:generate_result_tasks
+          args: -- --outfile=generated_tasks.json
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/generated_tasks.json
+          remote_file: ${project}/${version_id}/${build_variant}/bazel_result_tasks_gen/generated_tasks.json
+          bucket: mciuploads
+          permissions: private
+          visibility: signed
+          content_type: application/json
+      - command: generate.tasks
+        params:
+          files:
+            - generated_tasks.json
+
+  - name: resmoke_tests
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+      - name: bazel_result_tasks_gen
         variant: generate-tasks-for-version
     exec_timeout_secs: 1800 # 30 minutes.
     commands:
@@ -440,12 +478,12 @@ tasks:
             --test_tag_filters=${resmoke_tests_tag_filter},-incompatible_with_bazel_remote_test
             --test_arg=--testTimeout=960
             --test_timeout=1500
-            --keep_going
           # Timeouts are 16 minutes for individual tests, the same as the default idle timeout.
           # The bazel test timeout is 25 minutes, slightly shorter than the 30 minute exec
           # timeout, so that it will timeout before the task would.
           # The task_compile_flags are taken from what is set for archive_dist_test in bazel_compile.sh
           task_compile_flags: >-
+            --keep_going
             --verbose_failures
             --simple_build_id=True
             --define=MONGO_VERSION=${version}
@@ -466,38 +504,30 @@ task_groups:
       - func: "kill processes"
       - func: "cleanup environment"
       - func: "set up venv"
-      - func: "upload pip requirements"
       - func: "configure evergreen api credentials"
       - func: "set up credentials"
       - func: "get engflow creds"
     teardown_task:
+      - command: generate.tasks
+        params:
+          optional": true
+          files:
+            - generated_tasks.json
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/build_events.json
+          remote_file: ${project}/${version_id}/${build_variant}/${task_name}/build_events.json
+          bucket: mciuploads
+          permissions: private
+          visibility: signed
+          content_type: application/json
       - func: "debug full disk"
       - func: "attach bazel invocation"
-      - func: "upload bazel test logs"
-      - func: "attach report"
-      - func: "upload mongodatafiles"
-      - func: "attach multiversion download links"
       - func: "save failed tests"
       - func: "f_expansions_write"
       - func: "kill processes"
-      - func: "save mongo coredumps"
-      - func: "generate hang analyzer tasks"
-      - func: "save disk statistics"
-      - func: "save system resource information"
-      - func: "remove files"
-        vars:
-          files: >-
-            src/resmoke_error_code
-            src/*.gcda.gcov
-            src/gcov-intermediate-files.tgz
-            src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
-            mongo-coredumps.json
-            src/debugger*.*
-            src/mongo-hanganalyzer.tgz
-            diskstats.tgz
-            system-resource-info.tgz
-            ${report_file|src/report.json}
-            ${archive_file|src/archive.json}
-            src/network_diagnostics.txt
     tasks:
       - resmoke_tests

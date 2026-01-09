@@ -429,8 +429,8 @@ common:remote_test --features=-thin_archive
 common:remote_test --remote_download_outputs=minimal
 common:remote_test --test_output=summary
 common:remote_test --modify_execution_info=^(CppLink|CppArchive|SolibSymlink|ExtractDebugInfo|StripDebugInfo|CcGenerateIntermediateDwp|CcGenerateDwp)$=-no-remote-cache
-common:remote_test --remote_download_regex=.*(TestLogs.*|report.*\.json$|\.core$|data_archives.*\.tgz$) # Resmoke TestLogs directory, report, core dumps, and data directory archives.
 test:remote_test --test_tag_filters=-incompatible_with_bazel_remote_test
+test:remote_test --zip_undeclared_test_outputs
 
 # Coverage
 coverage --//bazel/config:coverage=True

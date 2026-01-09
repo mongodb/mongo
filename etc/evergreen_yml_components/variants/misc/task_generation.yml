@@ -15,3 +15,4 @@ buildvariants:
       - name: version_gen
       - name: version_burn_in_gen
       - name: version_expansions_gen
+      - name: bazel_result_tasks_gen

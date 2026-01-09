@@ -8,22 +8,7 @@ import requests
 from buildscripts.resmokelib.utils import evergreen_conn
 
 
-def main():
-    data_dir = "/data/mci"
-    dirs = os.listdir(data_dir)
-    contains_symbols = False
-    contains_binaries = False
-    for dir in dirs:
-        if "archive_dist_test_debug" in dir:
-            contains_symbols = True
-        elif "archive_dist_test" in dir:
-            contains_binaries = True
-
-    # early return if symbols already exist on disk
-    # early return if there are not binaries (which means this is not a resmoke task)
-    if contains_symbols or not contains_binaries:
-        return
-
+def get_task_id(evg_api):
     # some ec2 instances use a newer version of the metadata service.
     # we try to first use the newer version that required a token
     # if that doesn't work we then fallback to the unauthenticated version of the api
@@ -42,10 +27,29 @@ def main():
     if not response.ok:
         raise RuntimeError(f"Could not query the instance endpoint: {response.status_code}")
     instance_id = response.content.decode("utf-8")
+    host = evg_api.host_by_id(instance_id)
+    return host.json["provision_options"]["task_id"]
+
+
+def main():
+    data_dir = "/data/mci"
+    dirs = os.listdir(data_dir)
+    contains_symbols = False
+    contains_binaries = False
+    for dir in dirs:
+        if "archive_dist_test_debug" in dir:
+            contains_symbols = True
+        elif "archive_dist_test" in dir:
+            contains_binaries = True
+
+    # early return if symbols already exist on disk
+    # early return if there are not binaries (which means this is not a resmoke task)
+    if contains_symbols or not contains_binaries:
+        return
+
     evg_config = os.path.expanduser(os.path.join("~", ".evergreen.yml"))
     evg_api = evergreen_conn.get_evergreen_api(evergreen_config=evg_config)
-    host = evg_api.host_by_id(instance_id)
-    task_id = host.json["provision_options"]["task_id"]
+    task_id = get_task_id(evg_api)
 
     compile_tasks = evergreen_conn._filter_successful_tasks(evg_api, collections.deque([task_id]))
     debugsymbols_task = compile_tasks.symbols_task

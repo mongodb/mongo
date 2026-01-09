@@ -84,46 +84,6 @@ bazel_evergreen_shutils::write_last_engflow_link
 
 set -o errexit
 
-# Symlink test logs to where Evergreen expects them. Evergreen won't read into a symlinked directory,
-# so symlink each log file individually.
-find bazel-testlogs/ -type f -path "*TestLogs/**/*.log" -print0 |
-    while IFS= read -r -d '' test_outputs; do
-        source=${workdir}/src/$test_outputs
-        target=${workdir}/build/TestLogs/$(echo $test_outputs | sed -e 's/bazel-testlogs\///g' -e 's/test\.outputs\/build\/TestLogs\///g')
-        mkdir -p $(dirname $target)
-        ln -sf $source $target
-    done
-
-# Symlinks archived data directories from multiple tests/shards to a single folder. Evergreen needs a
-# single folder it can glob for s3.put. See the Evergreen function "upload mongodatafiles".
-target_from_undeclared_outputs() {
-    echo ${1} | sed -e 's/^.*bazel-testlogs\/\(.*\)\/test.outputs.*$/\1/'
-}
-find bazel-testlogs/ -path '*data_archives/*.tgz' -print0 |
-    while IFS= read -r -d '' archive; do
-        source=${workdir}/src/$archive
-        bazel_target_prefix=$(target_from_undeclared_outputs $archive | sed 's/\//_/g')
-        target=${workdir}/$(echo $archive | sed -e 's/.*\.outputs\///' -e "s/data_archives\//&$bazel_target_prefix-/g")
-        mkdir -p $(dirname $target)
-        ln -sf $source $target
-    done
-
-# Symlinks test.log from multiple tests/shards to a single folder. Evergreen needs a
-# single folder it can glob for s3.put. See the Evergreen function "upload bazel test logs".
-find bazel-testlogs/ -path '*test.log' -print0 |
-    while IFS= read -r -d '' log; do
-        log_renamed=$(echo $log | sed -e 's/bazel-testlogs\///g' -e 's/\//_/g')
-        source=${workdir}/src/$log
-        target=${workdir}/tmp/bazel-testlogs/$log_renamed
-        mkdir -p $(dirname $target)
-        ln -sf $source $target
-    done
-echo "format: text-timestamp" >${workdir}/build/TestLogs/log_spec.yaml
-echo "version: 0" >>${workdir}/build/TestLogs/log_spec.yaml
-
-# Combine reports from potentially multiple tests/shards.
-find bazel-testlogs/ -name report*.json | xargs $python buildscripts/combine_reports.py --no-report-exit --add-bazel-target-info -o report.json || true
-
 if [[ "$RET" != "0" ]]; then
     # This is a hacky way to save build time for the initial build during the `bazel test` above. They
     # are stripped binaries there. We should rebuild them with debug symbols and separate debug.
@@ -136,4 +96,16 @@ if [[ "$RET" != "0" ]]; then
     eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:gather_failed_tests || true
 fi
 
-exit $RET
+eval ${BAZEL_BINARY} run ${CONFIG_FLAGS} //buildscripts:append_result_tasks -- --outfile=generated_tasks.json
+
+# Return code 3 from `bazel test` indicates that the build was OK, but some tests failed or timed out.
+# The test failures are reported in individual results tasks, so don't fail the task here.
+if [[ "$RET" -eq 3 ]]; then
+    echo 'Some tests failed. See the generated task(s) for the failed targets for more details on the failure(s).'
+    exit 0
+elif [[ "$RET" -eq 0 ]]; then
+    exit 0
+else
+    echo 'Some tests failed to build. Look for "FAILED TO BUILD" or other build errors above. Tests with regular test failures will have their results in separate generated tasks.'
+    exit $RET
+fi

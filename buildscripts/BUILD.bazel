@@ -248,6 +248,40 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "generate_result_tasks",
+    srcs = ["generate_result_tasks.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:gather_failed_tests",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "shrub-py",
+            group = "testing",
+        ),
+    ],
+)
+
+py_binary(
+    name = "append_result_tasks",
+    srcs = ["append_result_tasks.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//buildscripts:gather_failed_tests",
+        dependency(
+            "typer",
+            group = "core",
+        ),
+        dependency(
+            "shrub-py",
+            group = "testing",
+        ),
+    ],
+)
+
 sh_binary(
     name = "setup_node_env",
     srcs = ["setup_node_env.sh"],

@@ -151,7 +151,7 @@ def resmoke_suite_test(
             "--archiveMode=directory",
             "--archiveLimitMb=500",
         ] + extra_args + resmoke_args,
-        tags = tags + ["no-cache", "resources:port_block:1"],
+        tags = tags + ["no-cache", "resources:port_block:1", "resmoke_suite_test"],
         timeout = timeout,
         size = size,
         env = {
