@@ -318,9 +318,6 @@ public:
 
 protected:
     const Settings _settings;
-    // TODO SERVER-116368: Push this into SortedFileWriter.
-    BufBuilder _buffer;
-
     // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
     // to ensure data has not been corrupted after reading from disk.
     SorterChecksumCalculator _checksumCalculator;
@@ -1002,6 +999,7 @@ public:
     void writeChunk() override;
 
 private:
+    BufBuilder _buffer;
     std::shared_ptr<SorterFile> _file;
 
     // Tracks where in the file we started writing the sorted data range so that the information can
