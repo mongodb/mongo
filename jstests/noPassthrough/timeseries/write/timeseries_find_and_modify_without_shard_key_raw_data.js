@@ -21,10 +21,15 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 const assertExplain = function(coll, commandResult) {
     const commandName = "findAndModify";
     assert(commandResult.ok);
-    assert.eq(commandResult.command[commandName],
-              coll.getName(),
-              `Expected command namespace to be ${tojson(coll.getName())} but got ${
-                  tojson(commandResult.command[commandName])}`);
+    assert.eq(
+        commandResult.command[commandName],
+        getTimeseriesCollForDDLOps(db, coll).getName(),
+        `Expected command namespace to be ${
+            tojson(getTimeseriesCollForDDLOps(db, coll).getName())} but got ${
+            tojson(
+                commandResult.command[commandName],
+                )}`,
+    );
     assert(isRawOperationSupported(db) === (commandResult.command.rawData ?? false));
     assert.isnull(getPlanStage(commandResult, "TS_MODIFY")),
         "Expected not to find TS_MODIFY stage " + tojson(commandResult);

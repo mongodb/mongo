@@ -491,7 +491,9 @@ namespace {
  * Replaces the target namespace in the 'cmdObj' by 'bucketNss'. Also sets the
  * 'isTimeseriesNamespace' flag.
  */
-BSONObj replaceNamespaceByBucketNss(const BSONObj& cmdObj, const NamespaceString& bucketNss) {
+BSONObj replaceNamespaceByBucketNss(OperationContext* opCtx,
+                                    const BSONObj& cmdObj,
+                                    const NamespaceString& bucketNss) {
     BSONObjBuilder bob;
     for (const auto& elem : cmdObj) {
         const auto name = elem.fieldNameStringData();
@@ -501,11 +503,12 @@ BSONObj replaceNamespaceByBucketNss(const BSONObj& cmdObj, const NamespaceString
             bob.append(elem);
         }
     }
-    // Set this flag so that shards can differentiate a request on a time-series view from a request
-    // on a time-series buckets collection since we replace the target namespace in the command with
-    // the buckets namespace.
-    bob.append(write_ops::FindAndModifyCommandRequest::kIsTimeseriesNamespaceFieldName, true);
-
+    if (!isRawDataOperation(opCtx)) {
+        // Set this flag so that shards can differentiate a request on a time-series view from a
+        // request on a time-series buckets collection since we replace the target namespace in the
+        // command with the buckets namespace.
+        bob.append(write_ops::FindAndModifyCommandRequest::kIsTimeseriesNamespaceFieldName, true);
+    }
     return bob.obj();
 }
 
@@ -639,6 +642,9 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     auto isTimeseriesViewRequest = false;
     if (isTrackedTimeseries && !nss.isTimeseriesBucketsCollection()) {
         nss = std::move(cm.getNss());
+        // If the request is for a view on a sharded timeseries buckets collection, we need to
+        // replace the namespace by buckets collection namespace in the command object.
+        cmdObj = replaceNamespaceByBucketNss(opCtx, cmdObj, nss);
         if (!isRawDataOperation(opCtx)) {
             isTimeseriesViewRequest = true;
         }
@@ -653,11 +659,6 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     const auto let = getLet(cmdObj);
     const auto rc = getLegacyRuntimeConstants(cmdObj);
     if (cri.hasRoutingTable()) {
-        // If the request is for a view on a sharded timeseries buckets collection, we need to
-        // replace the namespace by buckets collection namespace in the command object.
-        if (isTimeseriesViewRequest) {
-            cmdObj = replaceNamespaceByBucketNss(cmdObj, nss);
-        }
         auto expCtx = makeExpressionContextWithDefaultsForTargeter(
             opCtx, nss, cri, collation, boost::none /* verbosity */, let, rc);
         if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
@@ -787,24 +788,25 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         diagnostic_printers::ShardKeyDiagnosticPrinter{
             cm.isSharded() ? cm.getShardKeyPattern().toBSON() : BSONObj()});
 
+    // Append mongoS' runtime constants to the command object before forwarding it to the shard.
+    auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
+
     auto isTrackedTimeseries = cri.hasRoutingTable() && cm.getTimeseriesFields();
     auto isTimeseriesViewRequest = false;
     if (isTrackedTimeseries && !nss.isTimeseriesBucketsCollection()) {
+        // If the request is for a view on a sharded timeseries buckets collection, we need to
+        // replace the namespace by buckets collection namespace in the command object.
         nss = std::move(cm.getNss());
-        isTimeseriesViewRequest = true;
+        cmdObjForShard = replaceNamespaceByBucketNss(opCtx, cmdObjForShard, nss);
+        if (!isRawDataOperation(opCtx)) {
+            isTimeseriesViewRequest = true;
+        }
     }
+
     // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
     // writing to a sharded timeseries collection.
 
-    // Append mongoS' runtime constants to the command object before forwarding it to the shard.
-    auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
     if (cri.hasRoutingTable()) {
-        // If the request is for a view on a sharded timeseries buckets collection, we need to
-        // replace the namespace by buckets collection namespace in the command object.
-        if (isTimeseriesViewRequest) {
-            cmdObjForShard = replaceNamespaceByBucketNss(cmdObjForShard, nss);
-        }
-
         auto letParams = getLet(cmdObjForShard);
         auto runtimeConstants = getLegacyRuntimeConstants(cmdObjForShard);
         BSONObj collation = getCollation(cmdObjForShard);

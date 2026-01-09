@@ -14,6 +14,9 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/timeseries/timeseries_raw_data_operations.js";
+import {
+    assertExplainTargetsExpectedTimeseriesNamespace
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
@@ -30,10 +33,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             "Expected not to find TS_MODIFY stage " + tojson(commandResult);
         assert(commandResult.command.rawData,
                `Expected command to include rawData but got ${tojson(commandResult)}`);
-        assert.eq(commandResult.command[commandName],
-                  coll.getName(),
-                  `Expected command namespace to be ${tojson(coll.getName())} but got ${
-                      tojson(commandResult.command[commandName])}`);
+        assertExplainTargetsExpectedTimeseriesNamespace(db, coll, commandResult, commandName);
     };
 
     $config.states.explainAggregate = function explainAggregate(db, collName) {

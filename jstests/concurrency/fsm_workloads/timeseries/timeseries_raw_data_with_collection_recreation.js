@@ -15,6 +15,9 @@
  * ]
  */
 
+import {
+    assertExplainTargetsExpectedTimeseriesNamespace
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 export const $config = (function() {
@@ -88,12 +91,16 @@ export const $config = (function() {
             }
             assert.isnull(getPlanStage(commandResult, "TS_MODIFY")),
                 "Expected not to find TS_MODIFY stage " + tojson(commandResult);
-            assert(commandResult.command.rawData,
-                   `Expected command to include rawData but got ${tojson(commandResult)}`);
-            assert.eq(commandResult.command[commandName],
-                      coll.getName(),
-                      `Expected command namespace to be ${tojson(coll.getName())} but got ${
-                          tojson(commandResult.command[commandName])}`);
+            assert(
+                commandResult.command.rawData,
+                `Expected command to include rawData but got ${tojson(commandResult)}`,
+            );
+            assertExplainTargetsExpectedTimeseriesNamespace(db, coll, commandResult, commandName, {
+                // In balancer suites, `coll` may be tracked when the explain command was run,
+                // but then recreateCollection may drop the collection and re-create it as
+                // untracked.
+                mayConcurrentlyTrackOrUntrack: TestData.runningWithBalancer,
+            });
         },
 
         handleCollectionDrop: function(fn, opName) {

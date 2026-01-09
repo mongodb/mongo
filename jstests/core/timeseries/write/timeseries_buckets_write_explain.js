@@ -11,6 +11,9 @@ import {
     getTimeseriesCollForRawOps,
     kRawOperationSpec
 } from "jstests/core/libs/raw_operation_utils.js";
+import {
+    assertExplainTargetsExpectedTimeseriesNamespace
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 import {getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
@@ -32,19 +35,23 @@ assert.commandWorked(coll.insert([
 const assertExplain = function(commandResult, commandName) {
     assert(commandResult.ok);
     if (commandResult.command.bulkWrite) {
-        assert.eq(commandResult.command.nsInfo.length,
-                  1,
-                  `Expected 1 namespace in explain command but got ${
-                      commandResult.command.nsInfo.length}`);
-        assert.eq(commandResult.command.nsInfo[0].ns,
-                  coll.getFullName(),
-                  `Expected command namespace to be ${tojson(coll.getFullName())} but got ${
-                      tojson(commandResult.command.nsInfo[0].ns)}`);
+        assert.eq(
+            commandResult.command.nsInfo.length,
+            1,
+            `Expected 1 namespace in explain command but got ${
+                commandResult.command.nsInfo.length}`,
+        );
+        assert.eq(
+            commandResult.command.nsInfo[0].ns,
+            getTimeseriesCollForRawOps(coll).getFullName(),
+            `Expected command namespace to be ${
+                tojson(getTimeseriesCollForRawOps(coll).getFullName())} but got ${
+                tojson(
+                    commandResult.command.nsInfo[0].ns,
+                    )}`,
+        );
     } else {
-        assert.eq(commandResult.command[commandName],
-                  coll.getName(),
-                  `Expected command namespace to be ${tojson(coll.getName())} but got ${
-                      tojson(commandResult.command[commandName])}`);
+        assertExplainTargetsExpectedTimeseriesNamespace(db, coll, commandResult, commandName);
     }
     assert(commandResult.command.rawData);
     assert.isnull(getPlanStage(commandResult, "TS_MODIFY")),
