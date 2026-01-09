@@ -318,6 +318,7 @@ public:
 
 protected:
     const Settings _settings;
+    // TODO SERVER-116368: Push this into SortedFileWriter.
     BufBuilder _buffer;
 
     // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
