@@ -46,11 +46,13 @@ namespace detail {
  */
 template <ErrorCodes::Error E, typename Fn, typename OnError>
 auto retryOnImpl(StringData opName, Fn&& fn, OnError&& onError, size_t maxNumRetries) {
-    for (size_t attempt = 0; attempt <= maxNumRetries; ++attempt) {
+    size_t attempt = 0;
+
+    while (true) {
         try {
             return fn();
         } catch (ExceptionFor<E>& ex) {
-            if (attempt == maxNumRetries) {
+            if (attempt >= maxNumRetries) {
                 ex.addContext(str::stream()
                               << "Exhausted max retries (" << maxNumRetries << ") for " << opName);
                 throw;
@@ -66,6 +68,8 @@ auto retryOnImpl(StringData opName, Fn&& fn, OnError&& onError, size_t maxNumRet
                                  "attempt"_attr = attempt,
                                  "maxRetries"_attr = maxNumRetries,
                                  "reason"_attr = ex.reason());
+
+            ++attempt;
         }
     }
 
