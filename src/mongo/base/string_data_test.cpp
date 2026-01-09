@@ -494,5 +494,14 @@ TEST(StringData, ConversionToStringDataForInterop) {
     ASSERT_EQ(out.size(), in.size());
 }
 
+TEST(StringData, GtestPrintTo) {
+    std::string s(256, '\0');
+    StringData sd{s};
+    std::iota(s.begin(), s.end(), '\0');
+    for (auto m = s.begin(); m != s.end(); std::rotate(s.begin(), m++, s.end()))
+        ASSERT_EQ(testing::PrintToString(sd),
+                  testing::PrintToString(toStdStringViewForInterop(sd)));
+}
+
 }  // namespace
 }  // namespace mongo
