@@ -157,10 +157,22 @@ int getExceptionLogSeverityLevel() {
     return logSeverity().toInt();
 }
 
+int getMessageSizeErrorLogSeverityLevel() {
+    static logv2::SeveritySuppressor logSeverity{Seconds{gMessageSizeErrorRateSec},
+                                                 logv2::LogSeverity::Info(),
+                                                 logv2::LogSeverity::Debug(1)};
+
+    return logSeverity().toInt();
+}
+
 auto& totalIngressTLSConnections =  //
     *MetricBuilder<Counter64>("network.totalIngressTLSConnections");
 auto& totalIngressTLSHandshakeTimeMillis =  //
     *MetricBuilder<Counter64>("network.totalIngressTLSHandshakeTimeMillis");
+auto& totalMessageSizeErrorsPreAuth =
+    *MetricBuilder<Counter64>("network.totalMessageSizeErrorPreAuth");
+auto& totalMessageSizeErrorsPostAuth =
+    *MetricBuilder<Counter64>("network.totalMessageSizeErrorPostAuth");
 }  // namespace
 
 
@@ -583,16 +595,26 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
     return read(asio::buffer(ptr, kHeaderSize), baton)
         .then([headerBuffer = std::move(headerBuffer), this, baton]() mutable {
             const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
-            if (msgLen < kHeaderSize || msgLen > MaxMessageSizeBytes) {
+
+            const size_t maxMessageSize = _restrictedMode
+                ? static_cast<size_t>(gPreAuthMaximumMessageSizeBytes.loadRelaxed())
+                : MaxMessageSizeBytes;
+            if (msgLen < kHeaderSize || msgLen > maxMessageSize) {
                 StringBuilder sb;
-                sb << "recv(): message msgLen " << msgLen << " is invalid. "
-                   << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
+                sb << "recv(): message msgLen " << msgLen << " is invalid. " << "Min "
+                   << kHeaderSize << " Max: " << maxMessageSize;
                 const auto str = sb.str();
-                LOGV2(4615638,
-                      "recv(): message mstLen is invalid.",
-                      "msgLen"_attr = msgLen,
-                      "min"_attr = kHeaderSize,
-                      "max"_attr = MaxMessageSizeBytes);
+                LOGV2_DEBUG(4615638,
+                            getMessageSizeErrorLogSeverityLevel(),
+                            "recv(): message msgLen is invalid.",
+                            "msgLen"_attr = msgLen,
+                            "min"_attr = kHeaderSize,
+                            "max"_attr = maxMessageSize);
+                if (_restrictedMode) {
+                    totalMessageSizeErrorsPreAuth.increment();
+                } else {
+                    totalMessageSizeErrorsPostAuth.increment();
+                }
 
                 return Future<Message>::makeReady(Status(ErrorCodes::ProtocolError, str));
             }

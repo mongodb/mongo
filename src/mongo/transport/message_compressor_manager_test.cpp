@@ -40,6 +40,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/op_compressed.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/transport/message_compressor_noop.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/message_compressor_snappy.h"
@@ -501,7 +503,7 @@ TEST(MessageCompressorManager, RuntMessage) {
     badMessage.setOperation(dbCompressed);
     badMessage.setLen(MsgData::MsgDataHeaderSize + 8);
 
-    // This is a totally bogus compression header of just the orginal opcode + 0 byte uncompressed
+    // This is a totally bogus compression header of just the original opcode + 0 byte uncompressed
     // size
     DataRangeCursor cursor(badMessage.data(), badMessage.data() + badMessage.dataLen());
     cursor.writeAndAdvance<LittleEndian<int32_t>>(dbQuery);
@@ -509,6 +511,81 @@ TEST(MessageCompressorManager, RuntMessage) {
 
     auto status = compManager.decompressMessage(Message(badMessageBuffer), nullptr).getStatus();
     ASSERT_NOT_OK(status);
+}
+
+void checkWrongUncompressedSize(std::unique_ptr<MessageCompressorBase> compressor,
+                                std::string expectedError) {
+    MessageCompressorRegistry registry;
+    const auto compressorId = compressor->getId();
+
+    std::vector<std::string> compressorList = {compressor->getName()};
+    registry.setSupportedCompressors(std::move(compressorList));
+    registry.registerImplementation(std::move(compressor));
+    ASSERT_OK(registry.finalizeSupportedCompressors());
+    MessageCompressorManager manager(&registry);
+
+    OpMsgBuilder msgBuilder;
+    msgBuilder.setBody(BSON("ping" << 1));
+    Message originalMsg = msgBuilder.finishWithoutSizeChecking();
+    const auto originalView = originalMsg.singleData();
+    const size_t originalDataSize = originalView.dataLen();
+
+    auto swCompressed = manager.compressMessage(originalMsg, &compressorId);
+    ASSERT_OK(swCompressed);
+    Message properlyCompressedMsg = std::move(swCompressed.getValue());
+
+    const auto compressedView = properlyCompressedMsg.singleData();
+    ConstDataRangeCursor input(compressedView.data(),
+                               compressedView.data() + compressedView.dataLen());
+
+    CompressionHeader originalHeader(&input);
+
+    const size_t compressedDataSize = input.length();
+    const char* compressedDataPtr = input.data();
+
+    ASSERT_EQ(originalHeader.compressorId, compressorId);
+    ASSERT_EQ(originalHeader.originalOpCode, dbMsg);
+
+    const int32_t wrongUncompressedSize = static_cast<int32_t>(originalDataSize * 2);
+
+    const size_t malformedMessageSize =
+        MsgData::MsgDataHeaderSize + CompressionHeader::size() + compressedDataSize;
+    auto malformedBuffer = SharedBuffer::allocate(malformedMessageSize);
+
+    MsgData::View malformedView(malformedBuffer.get());
+    malformedView.setId(originalView.getId());
+    malformedView.setResponseToMsgId(originalView.getResponseToMsgId());
+    malformedView.setOperation(dbCompressed);
+    malformedView.setLen(malformedMessageSize);
+
+    DataRangeCursor output(malformedView.data(), malformedView.data() + malformedView.dataLen());
+    output.writeAndAdvance<LittleEndian<int32_t>>(originalHeader.originalOpCode);
+    output.writeAndAdvance<LittleEndian<int32_t>>(wrongUncompressedSize);
+    output.writeAndAdvance<LittleEndian<uint8_t>>(originalHeader.compressorId);
+
+    std::memcpy(output.data(), compressedDataPtr, compressedDataSize);
+
+    Message malformedMessage(malformedBuffer);
+
+    auto swDecompressed = manager.decompressMessage(malformedMessage);
+    ASSERT_NOT_OK(swDecompressed.getStatus());
+    ASSERT_EQ(swDecompressed.getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_STRING_CONTAINS(swDecompressed.getStatus().reason(), expectedError);
+}
+
+TEST(SnappyMessageCompressor, WrongUncompressedSize) {
+    checkWrongUncompressedSize(std::make_unique<SnappyMessageCompressor>(),
+                               "Uncompressed message size does not match expected size");
+}
+
+TEST(ZstdMessageCompressor, WrongUncompressedSize) {
+    checkWrongUncompressedSize(std::make_unique<ZstdMessageCompressor>(),
+                               "Uncompressed message size does not match expected size");
+}
+
+TEST(ZlibMessageCompressor, WrongUncompressedSize) {
+    checkWrongUncompressedSize(std::make_unique<ZlibMessageCompressor>(),
+                               "Decompressing message returned less data than expected");
 }
 
 }  // namespace

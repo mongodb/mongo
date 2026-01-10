@@ -127,7 +127,8 @@ public:
      * compressMessage, ensuring that the same compressor is used on both sides of a conversation.
      */
     StatusWith<Message> decompressMessage(const Message& msg,
-                                          MessageCompressorId* compressorId = nullptr);
+                                          MessageCompressorId* compressorId = nullptr,
+                                          size_t maxMessageSize = MaxMessageSizeBytes);
 
     const std::vector<MessageCompressorBase*>& getNegotiatedCompressors() const;
 

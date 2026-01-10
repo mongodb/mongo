@@ -495,6 +495,17 @@ config_fuzzer_params = {
             "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },
+        "preAuthMaximumMessageSizeBytes": {
+            "min": 65536,  # 64 KiB
+            "max": 16777216,  # 16 MiB
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "capMemoryConsumptionForPreAuthBuffers": {
+            "min": 80,
+            "max": 100,
+            "fuzz_at": ["startup"],
+        },
     },
     "mongos": {
         # We need a higher timeout to account for test slowness
@@ -537,6 +548,17 @@ config_fuzzer_params = {
         # TODO(SERVER-98867): re-enable config fuzzer signal testing.
         "failpoint.enableSignalTesting": {
             "choices": [{"mode": "off"}],
+            "fuzz_at": ["startup"],
+        },
+        "preAuthMaximumMessageSizeBytes": {
+            "min": 65536,  # 64 KiB
+            "max": 16777216,  # 16 MiB
+            "period": 10,
+            "fuzz_at": ["startup", "runtime"],
+        },
+        "capMemoryConsumptionForPreAuthBuffers": {
+            "min": 80,
+            "max": 100,
             "fuzz_at": ["startup"],
         },
     },
