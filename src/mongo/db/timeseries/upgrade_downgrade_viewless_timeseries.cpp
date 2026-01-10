@@ -60,7 +60,7 @@ struct UpgradeDowngradeTimeseriesLocks {
 };
 
 UpgradeDowngradeTimeseriesLocks acquireLocksForTimeseriesUpgradeDowngrade(
-    OperationContext* opCtx, const NamespaceString& mainNs) {
+    OperationContext* opCtx, const NamespaceString& mainNs, LockMode lockMode = MODE_X) {
     LOGV2_DEBUG(11450504,
                 1,
                 "Locking collection for viewless timeseries upgrade/downgrade",
@@ -86,11 +86,11 @@ UpgradeDowngradeTimeseriesLocks acquireLocksForTimeseriesUpgradeDowngrade(
             // iteration method used in `forEachTimeseriesCollectionFromDb`.
             AutoGetCollection bucketsColl(opCtx,
                                           mainNs.makeTimeseriesBucketsNamespace(),
-                                          MODE_X,
+                                          lockMode,
                                           auto_get_collection::Options{}.deadline(lockDeadline));
             AutoGetCollection mainColl(opCtx,
                                        mainNs,
-                                       MODE_X,
+                                       lockMode,
                                        auto_get_collection::Options{}
                                            .viewMode(auto_get_collection::ViewMode::kViewsPermitted)
                                            .deadline(lockDeadline));
@@ -99,7 +99,7 @@ UpgradeDowngradeTimeseriesLocks acquireLocksForTimeseriesUpgradeDowngrade(
             // Operations all lock system.views in the end to prevent deadlock.
             boost::optional<Lock::CollectionLock> systemViewsLock;
             if (auto db = mainColl.getDb()) {
-                systemViewsLock.emplace(opCtx, db->getSystemViewsName(), MODE_X, lockDeadline);
+                systemViewsLock.emplace(opCtx, db->getSystemViewsName(), lockMode, lockDeadline);
             }
 
             return UpgradeDowngradeTimeseriesLocks{
@@ -122,6 +122,128 @@ UpgradeDowngradeTimeseriesLocks acquireLocksForTimeseriesUpgradeDowngrade(
     }
 }
 
+Status canUpgradeToViewlessTimeseries(OperationContext* opCtx,
+                                      const UpgradeDowngradeTimeseriesLocks& locks) {
+    const auto& mainColl = locks.mainColl;
+    const auto& mainNs = mainColl.getNss();
+    const auto& bucketsColl = locks.bucketsColl;
+
+    if (!gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+            VersionContext::getDecoration(opCtx))) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "Cannot upgrade to viewless timeseries without the feature flag enabled");
+    }
+
+    // Idempotency check: already in viewless format
+    if (mainColl && mainColl->isTimeseriesCollection() && mainColl->isNewTimeseriesWithoutView() &&
+        !bucketsColl) {
+        return Status::OK();
+    }
+
+    // Buckets collection must exist
+    if (!bucketsColl) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Cannot upgrade to viewless timeseries: buckets collection "
+                                    << mainNs.makeTimeseriesBucketsNamespace().toStringForErrorMsg()
+                                    << " not found");
+    }
+
+    // Buckets collection must have valid timeseries options
+    if (!bucketsColl->isTimeseriesCollection() || bucketsColl->isNewTimeseriesWithoutView()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot upgrade to viewless timeseries: buckets collection "
+                                    << mainNs.makeTimeseriesBucketsNamespace().toStringForErrorMsg()
+                                    << " does not have valid timeseries options");
+    }
+
+    // Check for metadata inconsistencies. Return an error so the coordinator can handle it.
+    auto inconsistencies = checkBucketCollectionInconsistencies(
+        opCtx, *bucketsColl, false /* ensureViewExists */, mainColl.getView(), (*mainColl).get());
+    if (!inconsistencies.empty()) {
+        for (const auto& inconsistency : inconsistencies) {
+            LOGV2(11628800,
+                  "Timeseries upgrade validation found bucket metadata inconsistency",
+                  logAttrs(mainNs),
+                  "issue"_attr = inconsistency.issue,
+                  "options"_attr = inconsistency.options);
+        }
+        return Status(ErrorCodes::UserDataInconsistent,
+                      str::stream()
+                          << "Cannot upgrade to viewless timeseries: metadata inconsistency found "
+                             "for collection "
+                          << mainNs.toStringForErrorMsg());
+    }
+
+    return Status::OK();
+}
+
+Status canUpgradeToViewlessTimeseries(OperationContext* opCtx, const NamespaceString& mainNs) {
+    // Use MODE_IS for validation since we only need to read, not modify.
+    auto locks = acquireLocksForTimeseriesUpgradeDowngrade(opCtx, mainNs, MODE_IS);
+    return canUpgradeToViewlessTimeseries(opCtx, locks);
+}
+
+Status canDowngradeFromViewlessTimeseries(OperationContext* opCtx,
+                                          const UpgradeDowngradeTimeseriesLocks& locks,
+                                          bool skipViewCreation) {
+    const auto& mainColl = locks.mainColl;
+    const auto& mainNs = mainColl.getNss();
+    const auto& bucketsColl = locks.bucketsColl;
+
+    if (gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+            VersionContext::getDecoration(opCtx))) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "Cannot downgrade from viewless timeseries with the feature flag enabled");
+    }
+
+    // Idempotency check: already in viewful format.
+    if (bucketsColl && bucketsColl->isTimeseriesCollection() &&
+        !bucketsColl->isNewTimeseriesWithoutView() && !mainColl) {
+        // Verify view exists (unless skipViewCreation is set for non-primary shards)
+        if (!skipViewCreation && (!mainColl.getView() || !mainColl.getView()->timeseries())) {
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream()
+                              << "Already downgraded but missing expected timeseries view for "
+                              << mainNs.toStringForErrorMsg());
+        }
+        return Status::OK();
+    }
+
+    // Viewless collection must exist
+    if (!mainColl) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Cannot downgrade from viewless timeseries: collection "
+                                    << mainNs.toStringForErrorMsg() << " not found");
+    }
+
+    // Collection must be a viewless timeseries
+    if (!mainColl->isTimeseriesCollection() || !mainColl->isNewTimeseriesWithoutView()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      str::stream() << "Cannot downgrade from viewless timeseries: collection "
+                                    << mainNs.toStringForErrorMsg()
+                                    << " is not a viewless timeseries collection");
+    }
+
+    // No conflicting buckets collection
+    if (bucketsColl) {
+        return Status(ErrorCodes::NamespaceExists,
+                      str::stream()
+                          << "Cannot downgrade from viewless timeseries: conflicting buckets "
+                             "collection exists at "
+                          << mainNs.makeTimeseriesBucketsNamespace().toStringForErrorMsg());
+    }
+
+    return Status::OK();
+}
+
+Status canDowngradeFromViewlessTimeseries(OperationContext* opCtx,
+                                          const NamespaceString& mainNs,
+                                          bool skipViewCreation) {
+    // Use MODE_IS for validation since we only need to read, not modify.
+    auto locks = acquireLocksForTimeseriesUpgradeDowngrade(opCtx, mainNs, MODE_IS);
+    return canDowngradeFromViewlessTimeseries(opCtx, locks, skipViewCreation);
+}
+
 void upgradeToViewlessTimeseries(OperationContext* opCtx,
                                  UpgradeDowngradeTimeseriesLocks&& locks,
                                  const boost::optional<UUID>& expectedUUID) {
@@ -134,12 +256,16 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
     LOGV2(11483000, "Started upgrade to viewless timeseries", logAttrs(mainNs));
 
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
-    tassert(11483002,
-            "Tried to upgrade to viewless timeseries without the feature flag enabled",
-            gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
-                VersionContext::getDecoration(opCtx)));
 
     writeConflictRetry(opCtx, "viewlessTimeseriesUpgrade", mainNs, [&] {
+        // Validate upgrade preconditions (including idempotency check)
+        auto canUpgradeStatus = canUpgradeToViewlessTimeseries(opCtx, locks);
+        if (canUpgradeStatus.code() == ErrorCodes::UserDataInconsistent) {
+            // Metadata inconsistency found - skip upgrade (already logged by canUpgrade)
+            return;
+        }
+        tassert(11483004, canUpgradeStatus.reason(), canUpgradeStatus.isOK());
+
         // Idempotency check
         if (mainColl && mainColl->isTimeseriesCollection() &&
             mainColl->isNewTimeseriesWithoutView() && !bucketsColl) {
@@ -150,35 +276,10 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
             return;
         }
 
-        // Sanity checks
-        tassert(11483004,
-                "Did not find the buckets collection to upgrade to viewless timeseries",
-                bucketsColl);
         // TODO(SERVER-114517): Investigate if we should relax this check.
         tassert(11483005,
                 "The buckets collection to upgrade does not have the expected UUID",
                 !expectedUUID || bucketsColl->uuid() == *expectedUUID);
-        tassert(11483006,
-                "The buckets collection to upgrade does not have valid timeseries options",
-                bucketsColl->isTimeseriesCollection() &&
-                    !bucketsColl->isNewTimeseriesWithoutView());
-
-        auto inconsistencies = checkBucketCollectionInconsistencies(opCtx,
-                                                                    *bucketsColl,
-                                                                    false /* ensureViewExists */,
-                                                                    mainColl.getView(),
-                                                                    (*mainColl).get());
-        if (!inconsistencies.empty()) {
-            for (const auto& inconsistency : inconsistencies) {
-                LOGV2(
-                    11483007,
-                    "Skipping timeseries upgrade because we found a buckets metadata inconsistency",
-                    logAttrs(mainNs),
-                    "issue"_attr = inconsistency.issue,
-                    "options"_attr = inconsistency.options);
-            }
-            return;
-        }
 
         WriteUnitOfWork wuow(opCtx);
 
@@ -232,12 +333,13 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
           "skipViewCreation"_attr = skipViewCreation);
 
     VersionContext::FixedOperationFCVRegion fixedOfcvRegion(opCtx);
-    tassert(11483011,
-            "Tried to downgrade from viewless timeseries with the feature flag enabled",
-            !gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
-                VersionContext::getDecoration(opCtx)));
 
     writeConflictRetry(opCtx, "viewlessTimeseriesDowngrade", mainNs, [&] {
+        // Validate downgrade preconditions
+        auto canDowngradeStatus =
+            canDowngradeFromViewlessTimeseries(opCtx, locks, skipViewCreation);
+        tassert(11483013, canDowngradeStatus.reason(), canDowngradeStatus.isOK());
+
         // Idempotency check: already downgraded to viewful format
         if (bucketsColl && bucketsColl->isTimeseriesCollection() &&
             !bucketsColl->isNewTimeseriesWithoutView() && !mainColl) {
@@ -245,25 +347,13 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
             tassert(11483012,
                     "Found an already downgraded timeseries collection but with unexpected UUID",
                     !expectedUUID || bucketsColl->uuid() == *expectedUUID);
-            tassert(11613400,
-                    "Didn't find the expected timeseries view after viewless timeseries downgrade",
-                    // On non-primary shards, no view is expected
-                    skipViewCreation || (mainColl.getView() && mainColl.getView()->timeseries()));
             return;
         }
 
-        // Sanity checks
-        tassert(11483013, "Did not find the viewless timeseries collection to downgrade", mainColl);
         // TODO(SERVER-114517): Investigate if we should relax this check.
         tassert(11483014,
                 "The viewless collection to downgrade does not have the expected UUID",
                 !expectedUUID || mainColl->uuid() == *expectedUUID);
-        tassert(11483015,
-                "The viewless collection to downgrade does not have timeseries options",
-                mainColl->isTimeseriesCollection() && mainColl->isNewTimeseriesWithoutView());
-        tassert(11483016,
-                "While downgrading viewless timeseries, we found a conflicting buckets collection",
-                !bucketsColl);
 
         // Create system.views if it does not exist. This is done in a separate WUOW.
         // Only needed if we're creating the view.

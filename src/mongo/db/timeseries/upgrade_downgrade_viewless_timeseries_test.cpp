@@ -32,6 +32,7 @@
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/version_context.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -321,6 +322,179 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradeWithSkipViewCreationIdem
     assertIsTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace(), uuid);
 
     ASSERT(!catalog->lookupView(opCtx, nss1));
+}
+
+/**
+ * Tests for canUpgradeToViewlessTimeseries validation function.
+ */
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeReturnsOk) {
+    createViewfulTimeseriesCollection(nss1);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_OK(canUpgradeToViewlessTimeseries(operationContext(), nss1));
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeReturnsOkWhenAlreadyConverted) {
+    createViewlessTimeseriesCollection(nss1);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_OK(canUpgradeToViewlessTimeseries(operationContext(), nss1));
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsWithoutFeatureFlag) {
+    createViewfulTimeseriesCollection(nss1);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
+              ErrorCodes::IllegalOperation);
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsWhenBucketsNotFound) {
+    // Create a regular collection (not timeseries) at the main namespace
+    ASSERT_OK(createCollection(operationContext(), CreateCommand(nss1)));
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
+              ErrorCodes::NamespaceNotFound);
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsOnConflictingCollection) {
+    // Conflicting collection at main namespace
+    createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+    ASSERT_OK(createCollection(operationContext(), CreateCommand(nss1)));
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
+              ErrorCodes::UserDataInconsistent);
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeFailsOnConflictingView) {
+    // Conflicting view at main namespace
+    createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+
+    CreateCommand createViewCmd(nss1);
+    createViewCmd.setViewOn(nss2.coll());
+    createViewCmd.setPipeline({{}});
+    ASSERT_OK(createCollection(operationContext(), createViewCmd));
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_EQ(canUpgradeToViewlessTimeseries(operationContext(), nss1).code(),
+              ErrorCodes::UserDataInconsistent);
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanUpgradeSucceedsWithoutView) {
+    // Buckets collection without a view (buckets-only)
+    createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_OK(canUpgradeToViewlessTimeseries(operationContext(), nss1));
+}
+
+/**
+ * Tests for canDowngradeFromViewlessTimeseries validation function.
+ */
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeReturnsOk) {
+    createViewlessTimeseriesCollection(nss1);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_OK(canDowngradeFromViewlessTimeseries(operationContext(), nss1));
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeReturnsOkWhenAlreadyConverted) {
+    createViewfulTimeseriesCollection(nss1);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_OK(canDowngradeFromViewlessTimeseries(operationContext(), nss1));
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest,
+       CanDowngradeReturnsOkWhenAlreadyConvertedWithoutView) {
+    // Simulate non-primary shard: buckets collection exists but no view.
+    // This happens after downgrade with skipViewCreation=true.
+    createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    // Must pass skipViewCreation=true to match the non-primary shard scenario
+    ASSERT_OK(
+        canDowngradeFromViewlessTimeseries(operationContext(), nss1, true /* skipViewCreation */));
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest,
+       CanDowngradeFailsWhenAlreadyConvertedButMissingView) {
+    // Buckets collection exists but no view - with skipViewCreation=false this should fail
+    createViewfulTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    // Without skipViewCreation, we expect an error because the view is missing
+    ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
+              ErrorCodes::NamespaceNotFound);
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithFeatureFlag) {
+    createViewlessTimeseriesCollection(nss1);
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
+              ErrorCodes::IllegalOperation);
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWhenCollectionNotFound) {
+    // No collection at the namespace
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
+              ErrorCodes::NamespaceNotFound);
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWhenNotViewlessTimeseries) {
+    // Create a regular collection (not timeseries)
+    ASSERT_OK(createCollection(operationContext(), CreateCommand(nss1)));
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
+              ErrorCodes::IllegalOperation);
+}
+
+TEST_F(UpgradeDowngradeViewlessTimeseriesTest, CanDowngradeFailsWithConflictingBuckets) {
+    // Create viewless timeseries at main namespace
+    createViewlessTimeseriesCollection(nss1);
+
+    // Create a conflicting viewless timeseries at the buckets namespace.
+    // This simulates an inconsistent state where both foo and system.buckets.foo have collections.
+    createViewlessTimeseriesCollection(nss1.makeTimeseriesBucketsNamespace());
+
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    VersionContext::FixedOperationFCVRegion fixedOfcvRegion(operationContext());
+    ASSERT_EQ(canDowngradeFromViewlessTimeseries(operationContext(), nss1).code(),
+              ErrorCodes::NamespaceExists);
 }
 
 }  // namespace

@@ -86,6 +86,27 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
                                      bool skipViewCreation = false);
 
 /**
+ * Validate whether a timeseries collection can be upgraded to viewless format.
+ *
+ * Returns Status::OK() if the collection can be upgraded (or is already upgraded).
+ * Returns an error Status if the upgrade is not possible.
+ */
+Status canUpgradeToViewlessTimeseries(OperationContext* opCtx, const NamespaceString& mainNs);
+
+/**
+ * Validate whether a timeseries collection can be downgraded from viewless format.
+ *
+ * Returns Status::OK() if the collection can be downgraded (or is already downgraded).
+ * Returns an error Status if the downgrade is not possible.
+ *
+ * If `skipViewCreation` is true, the view existence check is skipped for the idempotency case.
+ * This is used by non-primary shards where no view is expected after downgrade.
+ */
+Status canDowngradeFromViewlessTimeseries(OperationContext* opCtx,
+                                          const NamespaceString& mainNs,
+                                          bool skipViewCreation = false);
+
+/**
  * Bulk upgrade/downgrade over all collections in the shard catalog.
  */
 void upgradeAllTimeseriesToViewless(OperationContext* opCtx);
