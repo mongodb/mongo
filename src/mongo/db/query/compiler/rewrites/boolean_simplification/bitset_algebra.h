@@ -235,6 +235,7 @@ inline Maxterm operator&(const Maxterm& lhs, const Maxterm& rhs) {
     return result;
 }
 
+bool operator<(const BitsetTerm& lhs, const BitsetTerm& rhs);
 bool operator==(const BitsetTerm& lhs, const BitsetTerm& rhs);
 std::ostream& operator<<(std::ostream& os, const BitsetTerm& term);
 bool operator==(const Maxterm& lhs, const Maxterm& rhs);

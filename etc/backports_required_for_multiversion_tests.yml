@@ -486,6 +486,8 @@ last-continuous:
       ticket: SERVER-111486
     - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
       ticket: SERVER-110953
+    - test_file: jstests/core/query/boolean_simplifier_stress.js
+      ticket: SERVER-114126
   suites: null
 last-lts:
   all:

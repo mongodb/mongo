@@ -33,28 +33,27 @@
 #include <boost/dynamic_bitset/dynamic_bitset.hpp>
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/query/compiler/rewrites/boolean_simplification/petrick.h"
 #include "mongo/stdx/unordered_set.h"
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
-#include <memory>
+
+#include <absl/container/btree_map.h>
 
 namespace mongo::boolean_simplification {
 namespace {
 
 struct MintermData {
-    MintermData(Minterm minterm, CoveredOriginalMinterms coveredMinterms)
-        : minterm(std::move(minterm)),
-          coveredMinterms(std::move(coveredMinterms)),
-          combined(false) {}
+    MintermData(CoveredOriginalMinterms coveredMinterms)
+        : coveredMinterms(std::move(coveredMinterms)), combined(false) {}
 
-    Minterm minterm;
-
-    // List of indices of original input minterms which are "covered" by the current derived
-    // minterm. The original minterm is covered by all minterms which are produced
-    // by combinations of the original minterm.
+    // Bitset where each bit corresponds to the index of one original input minterm. A bit is set
+    // when its corresponding minterm is "covered" by the current derived minterm. Note that the
+    // original minterm is covered by all minterms which are produced by combinations of the
+    // original minterm.
     CoveredOriginalMinterms coveredMinterms;
 
     // Set to true for minterms which are combination of at least two other minterms.
@@ -80,7 +79,10 @@ struct QmcTable {
         table.resize(size);
 
         for (uint32_t i = 0; i < static_cast<uint32_t>(minterms.size()); ++i) {
-            insert(std::move(minterms[i]), CoveredOriginalMinterms{i});
+            // The current minterm must cover itself.
+            CoveredOriginalMinterms coveredMinterms{minterms.size()};
+            coveredMinterms.set(i);
+            insert(std::move(minterms[i]), std::move(coveredMinterms));
         }
     }
 
@@ -89,7 +91,7 @@ struct QmcTable {
         if (table.size() <= count) {
             table.resize(count + 1);
         }
-        table[count].emplace_back(std::move(minterm), std::move(coveredMinterms));
+        table[count].emplace(std::move(minterm), std::move(coveredMinterms));
     }
 
     bool empty() const {
@@ -100,8 +102,9 @@ struct QmcTable {
         return table.size();
     }
 
-    // List of minterms origanized by number of true predicates.
-    std::vector<std::vector<MintermData>> table;
+    // Table of minterms where each row has minterms with the same number of true predicates.
+    // Note: we need these to be ordered & stable, which is why we don't use an absl::hash_map.
+    std::vector<absl::btree_map<Minterm, MintermData>> table;
 };
 
 /**
@@ -114,34 +117,26 @@ QmcTable combine(QmcTable& qmc) {
     for (size_t i = 0; i < qmc.table.size() - 1; ++i) {
         // QmcTable organizes minterms by number of true predicates in them. Therefore, here we
         // always try to combine minterms where the number of true predicates differ by 1.
-        for (auto& lhs : qmc.table[i]) {
-            for (auto& rhs : qmc.table[i + 1]) {
+        for (auto& [lMinterm, lhs] : qmc.table[i]) {
+            for (auto& [rMinterm, rhs] : qmc.table[i + 1]) {
                 // We combine two minterms if and only if:
                 // 1. They have the same mask.
-                if (lhs.minterm.mask != rhs.minterm.mask) {
+                if (lMinterm.mask != rMinterm.mask) {
                     continue;
                 }
-                const auto differentBits = lhs.minterm.predicates ^ rhs.minterm.predicates;
+                const auto differentBits = lMinterm.predicates ^ rMinterm.predicates;
                 // 2. The number of true predicates differs by 1.
                 if (differentBits.count() == 1) {
                     lhs.combined = true;
                     rhs.combined = true;
 
-                    CoveredOriginalMinterms coveredMinterms{};
-                    coveredMinterms.reserve(lhs.coveredMinterms.size() +
-                                            rhs.coveredMinterms.size());
-                    std::merge(begin(lhs.coveredMinterms),
-                               end(lhs.coveredMinterms),
-                               begin(rhs.coveredMinterms),
-                               end(rhs.coveredMinterms),
-                               back_inserter(coveredMinterms));
                     // Main QMC step: Adding the new combined minterm which is a combination of two
                     // minterms which have the same masks and the number of set bits in the
                     // predicates differs by 1. Now we can use this minterm only instead of the two
                     // originals. It unsets the differing bit from the mask.
-                    result.insert(Minterm{lhs.minterm.predicates & rhs.minterm.predicates,
-                                          lhs.minterm.mask & ~differentBits},
-                                  std::move(coveredMinterms));
+                    result.insert(Minterm{lMinterm.predicates & rMinterm.predicates,
+                                          lMinterm.mask & ~differentBits},
+                                  lhs.coveredMinterms | rhs.coveredMinterms);
                 }
             }
         }
@@ -180,13 +175,12 @@ std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> findPrimeImplicants(Max
         auto combinedTable = combine(qmc);
 
         for (auto&& mintermDataRow : qmc.table) {
-            for (auto&& mintermData : mintermDataRow) {
-                Minterm minterm{std::move(mintermData.minterm)};
+            for (auto&& [minterm, data] : mintermDataRow) {
                 // If the minterm was not combined during this step we need to preserve it in the
                 // result.
-                if (!mintermData.combined && seenMinterms.insert(minterm).second) {
+                if (!data.combined && seenMinterms.insert(minterm).second) {
                     result.first.minterms.emplace_back(std::move(minterm));
-                    result.second.emplace_back(std::move(mintermData.coveredMinterms));
+                    result.second.emplace_back(std::move(data.coveredMinterms));
                 }
             }
         }
@@ -197,15 +191,17 @@ std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> findPrimeImplicants(Max
     return result;
 }
 
-Maxterm quineMcCluskey(Maxterm inputMaxterm) {
+Maxterm quineMcCluskey(Maxterm inputMaxterm, size_t maxNumPrimeImplicants) {
     auto [maxterm, maxtermCoverage] = findPrimeImplicants(std::move(inputMaxterm));
     const bool allEssential = std::all_of(maxtermCoverage.begin(),
                                           maxtermCoverage.end(),
                                           [](const auto& cov) { return cov.size() == 1; });
+
     if (allEssential) {
         return maxterm;
     }
-    const auto& primeImplicantCoverages = petricksMethod(maxtermCoverage);
+
+    const auto& primeImplicantCoverages = petricksMethod(maxtermCoverage, maxNumPrimeImplicants);
     if (primeImplicantCoverages.size() < 2) {
         return maxterm;
     }
