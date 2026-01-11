@@ -1088,8 +1088,8 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
         /* Checkpoint cursor. */
         if (bulk)
             /* Fail now; otherwise we fail further down and then segfault trying to recover. */
-            WT_RET_MSG(session, EINVAL, "checkpoints are read-only and cannot be bulk-loaded");
-        WT_RET(__curfile_setup_checkpoint(cbt, cfg, hs_dhandle, ckpt_snapshot));
+            WT_ERR_MSG(session, EINVAL, "checkpoints are read-only and cannot be bulk-loaded");
+        WT_ERR(__curfile_setup_checkpoint(cbt, cfg, hs_dhandle, ckpt_snapshot));
     } else {
         /* We should not have been given the bits used by checkpoint cursors. */
         WT_ASSERT(session, hs_dhandle == NULL);

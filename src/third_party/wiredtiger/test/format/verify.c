@@ -43,18 +43,6 @@ table_verify(TABLE *table, void *arg)
     conn = (WT_CONNECTION *)arg;
     testutil_assert(table != NULL);
 
-    /*
-     * FIXME-WT-16211: We can run verify on layered tables when deltas are written as a full image.
-     *
-     * Remove this check once both tickets are resolved.
-     */
-    if (TV(DISAGG_ENABLED) && (GV(DISAGG_LEAF_PAGE_DELTA) || GV(DISAGG_INTERNAL_PAGE_DELTA))) {
-        printf("table.%u skipped verify because verify does not support disagg delta pages.\n",
-          table->id);
-        fflush(stdout);
-        return;
-    }
-
     memset(&sap, 0, sizeof(sap));
     wt_wrap_open_session(conn, &sap, table->track_prefix,
       enable_session_prefetch() ? SESSION_PREFETCH_CFG_ON : NULL, &session);

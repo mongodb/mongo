@@ -433,7 +433,6 @@ __wt_blkcache_read_multi(WT_SESSION_IMPL *session, WT_ITEM **buf, size_t *buf_co
     /* Skip block cache for M2, just read the base + delta pack. */
     count = WT_ELEMENTS(results);
 
-    /* FIXME-WT-16291: clean up tmp usage? */
     if (bm->read_multiple == NULL) {
         WT_RET(__wt_calloc_def(session, 1, &tmp));
         WT_CLEAR(tmp[0]);
@@ -624,6 +623,14 @@ __wt_blkcache_read_multi(WT_SESSION_IMPL *session, WT_ITEM **buf, size_t *buf_co
 
     if (0) {
 err:
+        /* Single read path: tmp points to a single WT_ITEM with a buffer. */
+        if (bm->read_multiple == NULL)
+            __wt_buf_free(session, tmp);
+
+        /* Multi-read path: results array is the current owner of any buffer we've allocated. */
+        for (i = 0; i < WT_ELEMENTS(results); ++i)
+            __wt_buf_free(session, &results[i]);
+
         __wt_free(session, tmp);
         __wt_scr_free(session, &etmp);
         __wt_scr_free(session, &ctmp);

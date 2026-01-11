@@ -133,27 +133,23 @@ err:
 }
 
 /*
- * __layered_create_missing_stable_tables --
+ * __layered_create_missing_stable_tables_helper --
  *     Create missing stable tables.
  */
 static int
-__layered_create_missing_stable_tables(WT_SESSION_IMPL *session)
+__layered_create_missing_stable_tables_helper(WT_SESSION_IMPL *session)
 {
     WT_CONFIG_ITEM cval;
-    WT_CONNECTION_IMPL *conn;
     WT_CURSOR *cursor_check, *cursor_scan;
     WT_DECL_RET;
-    WT_SESSION_IMPL *internal_session;
     char *stable_uri;
     const char *layered_uri, *layered_cfg;
 
-    conn = S2C(session);
     cursor_check = cursor_scan = NULL;
     stable_uri = NULL;
 
-    WT_ERR(__wt_open_internal_session(conn, "disagg-step-up", false, 0, 0, &internal_session));
-    WT_ERR(__wt_metadata_cursor(internal_session, &cursor_check));
-    WT_ERR(__wt_metadata_cursor(internal_session, &cursor_scan));
+    WT_ERR(__wt_metadata_cursor(session, &cursor_check));
+    WT_ERR(__wt_metadata_cursor(session, &cursor_scan));
 
     cursor_scan->set_key(cursor_scan, "layered:");
     WT_ERR(cursor_scan->bound(cursor_scan, "bound=lower"));
@@ -174,11 +170,11 @@ __layered_create_missing_stable_tables(WT_SESSION_IMPL *session)
         /* Create the stable table if it does not exist. */
         if (ret == WT_NOTFOUND) {
             WT_ERR_MSG_CHK(session,
-              __layered_create_missing_stable_table(internal_session, stable_uri, layered_cfg),
+              __layered_create_missing_stable_table(session, stable_uri, layered_cfg),
               "Failed to create missing stable table \"%s\" from \"%s\"", stable_uri, layered_cfg);
             /* Ensure that we properly handle empty tables. */
             WT_ERR(__wt_disagg_copy_metadata_later(
-              internal_session, stable_uri, layered_uri + strlen("layered:")));
+              session, stable_uri, layered_uri + strlen("layered:")));
             __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
               "Created missing stable table \"%s\" from \"%s\"", stable_uri, layered_uri);
         }
@@ -189,8 +185,30 @@ __layered_create_missing_stable_tables(WT_SESSION_IMPL *session)
 
 err:
     __wt_free(session, stable_uri);
-    WT_TRET(__wt_metadata_cursor_release(internal_session, &cursor_check));
-    WT_TRET(__wt_metadata_cursor_release(internal_session, &cursor_scan));
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor_check));
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor_scan));
+    return (ret);
+}
+
+/*
+ * __layered_create_missing_stable_tables --
+ *     Create missing stable tables.
+ */
+static int
+__layered_create_missing_stable_tables(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *internal_session;
+
+    conn = S2C(session);
+
+    WT_ERR(__wt_open_internal_session(conn, "disagg-step-up", false, 0, 0, &internal_session));
+    WT_WITH_SCHEMA_LOCK(
+      internal_session, ret = __layered_create_missing_stable_tables_helper(internal_session));
+    WT_ERR(ret);
+
+err:
     WT_TRET(__wt_session_close_internal(internal_session));
     return (ret);
 }

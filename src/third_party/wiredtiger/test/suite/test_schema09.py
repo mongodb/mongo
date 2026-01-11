@@ -32,6 +32,7 @@ from suite_subprocess import suite_subprocess
 # test_schema09.py
 #    Test that incomplete tables are properly cleaned up during recovery.
 @wttest.skip_for_hook("tiered", "test depends on metadata recovery")
+@wttest.skip_for_hook("disagg", "log tables is not supported on disagg")
 class test_schema09(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'log=(enabled=true)'
 

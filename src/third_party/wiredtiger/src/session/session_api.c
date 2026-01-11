@@ -2560,15 +2560,19 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      */
     WT_ASSERT(session, !F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING));
 
+    bool out_of_sessions = false;
+
     /* Find the first inactive session slot. */
     for (session_ret = WT_CONN_SESSIONS_GET(conn), i = 0; i < conn->session_array.size;
          ++session_ret, ++i)
         if (!session_ret->active)
             break;
-    if (i == conn->session_array.size)
+    if (i == conn->session_array.size) {
+        out_of_sessions = true;
         WT_ERR_MSG(session, WT_ERROR,
           "out of sessions, configured for %" PRIu32 " (including internal sessions)",
           conn->session_array.size);
+    }
 
     /*
      * If the active session count is increasing, update it. We don't worry about correcting the
@@ -2700,6 +2704,8 @@ err:
 #ifdef HAVE_DIAGNOSTIC
     __wt_spin_destroy(session, &session->thread_check.lock);
 #endif
+    if (ret != 0 && session_ret != NULL && !out_of_sessions)
+        __wt_txn_destroy(session_ret);
     __wt_spin_unlock(session, &conn->api_lock);
     return (ret);
 }
