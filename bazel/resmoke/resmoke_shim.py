@@ -39,14 +39,16 @@ def add_evergreen_build_info(args):
     add_volatile_arg(args, "--buildId=", "build_id")
     add_volatile_arg(args, "--distroId=", "distro_id")
     add_volatile_arg(args, "--executionNumber=", "execution")
-    add_volatile_arg(args, "--projectName=", "project")
     add_volatile_arg(args, "--gitRevision=", "revision")
+    add_volatile_arg(args, "--otelParentId=", "otel_parent_id")
+    add_volatile_arg(args, "--otelTraceId=", "otel_trace_id")
+    add_volatile_arg(args, "--projectName=", "project")
+    add_volatile_arg(args, "--requester=", "requester")
     add_volatile_arg(args, "--revisionOrderId=", "revision_order_id")
     add_volatile_arg(args, "--taskId=", "task_id")
     add_volatile_arg(args, "--taskName=", "task_name")
     add_volatile_arg(args, "--variantName=", "build_variant")
     add_volatile_arg(args, "--versionId=", "version_id")
-    add_volatile_arg(args, "--requester=", "requester")
 
 
 class ResmokeShimContext:

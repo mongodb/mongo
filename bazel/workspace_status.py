@@ -93,16 +93,18 @@ def print_test_runtimes_status():
 def print_evergreen_expansions():
     for expansion in [
         "build_id",
+        "build_variant",
         "distro_id",
         "execution",
+        "otel_parent_id",
+        "otel_trace_id",
         "project",
+        "requester",
         "revision",
         "revision_order_id",
         "task_id",
         "task_name",
-        "build_variant",
         "version_id",
-        "requester",
     ]:
         value = os.environ.get(expansion, "")
         if value:

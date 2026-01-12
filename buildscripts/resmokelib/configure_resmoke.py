@@ -16,7 +16,7 @@ import textwrap
 import traceback
 from functools import cache
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import git
 import pymongo.uri_parser
@@ -34,6 +34,7 @@ from buildscripts.resmokelib.run import TestRunner
 from buildscripts.resmokelib.utils import autoloader
 from buildscripts.resmokelib.utils.batched_baggage_span_processor import BatchedBaggageSpanProcessor
 from buildscripts.resmokelib.utils.file_span_exporter import FileSpanExporter
+from buildscripts.resmokelib.utils.otel_id_generator import ResmokeOtelIdGenerator
 from buildscripts.util.read_config import read_config_file
 from buildscripts.util.taskname import determine_task_base_name
 from buildscripts.util.teststats import HistoricTaskData
@@ -286,6 +287,8 @@ def _set_up_tracing(
     trace_id: Optional[str],
     parent_span_id: Optional[str],
     extra_context: Dict[str, object],
+    suite_files: Optional[List[str]] = None,
+    shard_index: Optional[int] = None,
 ) -> bool:
     """Try to set up otel tracing. On success return True. On failure return False.
 
@@ -306,7 +309,9 @@ def _set_up_tracing(
     # Service name is required for most backends
     resource = Resource(attributes={SERVICE_NAME: "resmoke"})
 
-    provider = TracerProvider(resource=resource)
+    # Use custom ID generator to prevent span ID collisions in parallel resmoke invocations
+    id_generator = ResmokeOtelIdGenerator(suite_files=suite_files, shard_index=shard_index)
+    provider = TracerProvider(resource=resource, id_generator=id_generator)
     if otel_collector_dir:
         try:
             otel_collector_dir = Path(otel_collector_dir)
@@ -861,6 +866,8 @@ flags in common: {common_set}
                 _config.OTEL_TRACE_ID,
                 _config.OTEL_PARENT_ID,
                 extra_context=extra_context,
+                suite_files=_config.SUITE_FILES,
+                shard_index=_config.SHARD_INDEX,
             )
             if not setup_success:
                 print(

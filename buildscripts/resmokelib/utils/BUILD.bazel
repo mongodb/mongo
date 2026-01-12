@@ -16,6 +16,7 @@ py_library(
         "globstar.py",
         "history.py",
         "jscomment.py",
+        "otel_id_generator.py",
         "otel_thread_pool_executor.py",
         "otel_utils.py",
         "queue.py",

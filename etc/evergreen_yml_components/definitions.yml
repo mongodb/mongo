@@ -1292,16 +1292,18 @@ functions:
       binary: bash
       env:
         build_id: ${build_id}
+        build_variant: ${build_variant}
         distro_id: ${distro_id}
         execution: ${execution}
+        otel_parent_id: ${otel_parent_id}
+        otel_trace_id: ${otel_trace_id}
         project: ${project}
+        requester: ${requester}
         revision: ${revision}
         revision_order_id: ${revision_order_id}
         task_id: ${task_id}
         task_name: ${task_name}
-        build_variant: ${build_variant}
         version_id: ${version_id}
-        requester: ${requester}
       args:
         - "./src/evergreen/resmoke_tests_execute_bazel.sh"
 

@@ -108,6 +108,45 @@ function symlink_test_logs() {
     done
 }
 
+# Combine all resmoke telemetry and place it where Evergreen expects it: ${workdir}/build/OTelTraces.
+# Metrics are batched into line-separated JSON files no greater than 4MB each. Evergreen processes
+# fewer files faster, but hits message size limitations if they are too large.
+function combine_metrics() {
+    local output_dir="${workdir}/build/OTelTraces"
+    mkdir -p "$output_dir"
+
+    local max_size=$((4 * 1024 * 1024)) # 4MB in bytes
+    local file_counter=0
+    local current_size=0
+    local current_output="${output_dir}/metrics.json"
+
+    # Create initial empty file
+    >"$current_output"
+
+    find "${workdir}/results" -wholename '*metrics/metrics*.json' -type f -print0 | while IFS= read -r -d '' file; do
+        local file_size=$(stat -c%s "$file")
+        local newline_size=1
+
+        # Check if adding this file would exceed the limit
+        if ((current_size + file_size + newline_size > max_size && current_size > 0)); then
+            # Start a new file
+            ((file_counter++))
+            current_output="${output_dir}/metrics_${file_counter}.json"
+            current_size=0
+            >"$current_output"
+        fi
+
+        # Append the file content
+        cat "$file" >>"$current_output"
+        echo "" >>"$current_output" # Adds a single newline after each file's content
+
+        # Update current size
+        current_size=$((current_size + file_size + newline_size))
+    done
+
+    echo 'Combined OTel metrics json'
+}
+
 # Combines all Resmoke test report JSONs into a single JSON.
 function combine_reports() {
     local report_files=$(find "${workdir}" -name 'report*.json' -type f 2>/dev/null)
@@ -186,6 +225,8 @@ while IFS= read -r test_result; do
 
     popd >/dev/null
 done < <(enumerate_test_results)
+
+combine_metrics
 
 failures=$(combine_reports)
 
