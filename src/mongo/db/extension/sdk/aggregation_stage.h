@@ -200,7 +200,8 @@ public:
         return BSONObj();
     }
 
-    virtual std::unique_ptr<LogicalAggStage> bind() const = 0;
+    virtual std::unique_ptr<LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const = 0;
 
     virtual std::unique_ptr<AggStageAstNode> clone() const = 0;
 
@@ -271,10 +272,14 @@ private:
 
     static ::MongoExtensionStatus* _extBind(
         const ::MongoExtensionAggStageAstNode* astNode,
+        const ::MongoExtensionCatalogContext* catalogContext,
         ::MongoExtensionLogicalAggStage** logicalStage) noexcept {
         return wrapCXXAndConvertExceptionToStatus([&]() {
+            sdk_tassert(
+                11647801, "Provided catalog context was invalid!", catalogContext != nullptr);
             auto logicalStagePtr =
-                static_cast<const ExtensionAggStageAstNode*>(astNode)->getImpl().bind();
+                static_cast<const ExtensionAggStageAstNode*>(astNode)->getImpl().bind(
+                    *catalogContext);
 
             *logicalStage = new ExtensionLogicalAggStage(std::move(logicalStagePtr));
         });

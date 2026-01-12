@@ -592,6 +592,30 @@ typedef struct MongoExtensionDistributedPlanLogicVTable {
 } MongoExtensionDistributedPlanLogicVTable;
 
 /**
+ * MongoExtensionNamespaceString contains a collection's NamespaceString components. Note that the
+ * members of this struct are provided as views, meaning the values' underlying data is not owned by
+ * this struct. Callees are responsible for making owned copies if the values must persist beyond
+ * the scope of the callee function.
+ */
+typedef struct MongoExtensionNamespaceString {
+    const MongoExtensionByteView databaseName;
+    const MongoExtensionByteView collectionName;
+} MongoExtensionNamespaceString;
+
+/**
+ * MongoExtensionCatalogContext contains a collection's catalog context information (i.e
+ * MongoExtensionNamespaceString, uuidString), which is generally available when an AstNode binds
+ * into a LogicalStage. Note that the members of this struct are provided as views, meaning the
+ * values' underlying data is not owned by this struct. When a callee receives a
+ * MongoExtensionCatalogContext as a parameter, the callee is responsible for immediately copying
+ * the values into an owned copy if they must persist beyond the scope of the callee function.
+ */
+typedef struct MongoExtensionCatalogContext {
+    const ::MongoExtensionNamespaceString namespaceString;
+    const MongoExtensionByteView uuidString;
+} MongoExtensionCatalogContext;
+
+/**
  * Virtual function table for MongoExtensionAggStageParseNode.
  */
 typedef struct MongoExtensionAggStageParseNodeVTable {
@@ -672,8 +696,11 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
      * Populates `logicalStage` with the stage's runtime implementation of the optimization
      * interface, ownership of which is transferred to the caller. This step should be called after
      * validating `astNode` and is used when converting into an optimizable stage.
+     * Note: catalogContext's contents must be copied by the extension into an owned copy in order
+     * for the values to persist beyond bind()'s scope.
      */
     MongoExtensionStatus* (*bind)(const MongoExtensionAggStageAstNode* astNode,
+                                  const MongoExtensionCatalogContext* catalogContext,
                                   MongoExtensionLogicalAggStage** logicalStage);
 
     /**

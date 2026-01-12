@@ -28,6 +28,7 @@
  */
 #pragma once
 
+#include "mongo/db/extension/host/catalog_context.h"
 #include "mongo/db/extension/host/document_source_extension.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
@@ -102,7 +103,13 @@ protected:
                                        AggStageAstNodeHandle astNode)
         : DocumentSourceExtension(astNode->getName(), expCtx),
           _properties(astNode->getProperties()),
-          _logicalStage(astNode->bind()) {}
+          _logicalStage([&]() {
+              tassert(11647800,
+                      "DocumentSourceExtensionOptimizable received invalid expression context",
+                      expCtx.get() != nullptr);
+              auto catalogContext = CatalogContext(*expCtx);
+              return astNode->bind(catalogContext.getAsBoundaryType());
+          }()) {}
 
     DocumentSourceExtensionOptimizable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        LogicalAggStageHandle logicalStage,

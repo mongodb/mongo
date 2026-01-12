@@ -352,7 +352,8 @@ class DepthLeafAstNode : public sdk::AggStageAstNode {
 public:
     DepthLeafAstNode() : sdk::AggStageAstNode(kDepthLeafName) {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
@@ -730,7 +731,8 @@ public:
                                           << "actions" << BSON_ARRAY(BSON("action" << "find")))));
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
@@ -757,7 +759,8 @@ public:
                                                         << BSON("action" << "planCacheRead")))));
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
@@ -785,7 +788,8 @@ public:
                                                   << BSON_ARRAY(BSON("action" << "indexStats")))));
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
@@ -854,7 +858,8 @@ public:
                                                          << "actions" << BSONArray())));
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 
@@ -877,7 +882,8 @@ public:
         return BSON("requiredPrivileges" << BSONArray());
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<sdk::shared_test_stages::TransformLogicalAggStage>();
     }
 

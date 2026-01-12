@@ -52,7 +52,8 @@ class NoOpExtensionAstNode : public sdk::AggStageAstNode {
 public:
     NoOpExtensionAstNode() : sdk::AggStageAstNode("$noOp") {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
         MONGO_UNIMPLEMENTED;
     }
 
@@ -145,7 +146,7 @@ DEATH_TEST(HostAstNodeTestDeathTest, HostBindUnimplemented, "11133600") {
     auto handle = AggStageAstNodeHandle{noOpAstNode};
 
     ::MongoExtensionLogicalAggStage** bind = nullptr;
-    handle->vtable().bind(noOpAstNode, bind);
+    handle->vtable().bind(noOpAstNode, nullptr, bind);
 }
 
 TEST(HostAstNodeCloneTest, CloneHostAllocatedAstNodePreservesSpec) {

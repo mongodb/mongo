@@ -94,7 +94,8 @@ public:
     TestAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
         : sdk::AggStageAstNode(stageName), _arguments(arguments.getOwned()) {}
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override {
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
         return std::make_unique<LogicalStageType>(getName(), _arguments);
     };
 

@@ -155,6 +155,7 @@ private:
 
     static ::MongoExtensionStatus* _hostBind(
         const ::MongoExtensionAggStageAstNode* astNode,
+        const ::MongoExtensionCatalogContext* catalogContext,
         ::MongoExtensionLogicalAggStage** logicalStage) noexcept {
         return wrapCXXAndConvertExceptionToStatus([]() {
             tasserted(11133600,

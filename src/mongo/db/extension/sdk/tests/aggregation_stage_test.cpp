@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
+#include "mongo/db/extension/host/catalog_context.h"
 #include "mongo/db/extension/host/query_execution_context.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/host_connector/adapter/query_execution_context_adapter.h"
@@ -272,7 +273,14 @@ TEST_F(AggStageTest, TransformAstNodeTest) {
         new ExtensionAggStageAstNode(shared_test_stages::TransformAggStageAstNode::make());
     auto handle = extension::AggStageAstNodeHandle{transformAggStageAstNode};
 
-    [[maybe_unused]] auto logicalStageHandle = handle->bind();
+    QueryTestServiceContext testCtx;
+    auto opCtx = testCtx.makeOperationContext();
+    auto expCtx = make_intrusive<ExpressionContextForTest>(
+        opCtx.get(),
+        NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd),
+        SerializationContext());
+    const auto catalogContext = mongo::extension::host::CatalogContext(*expCtx);
+    [[maybe_unused]] auto logicalStageHandle = handle->bind(catalogContext.getAsBoundaryType());
 }
 
 TEST_F(AggStageTest, TransformAstNodeWithDefaultGetPropertiesSucceeds) {
@@ -1576,7 +1584,8 @@ public:
         return _properties;
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> bind() const override{MONGO_UNIMPLEMENTED}
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override{MONGO_UNIMPLEMENTED}
 
     std::unique_ptr<sdk::AggStageAstNode> clone() const override {
         return std::make_unique<CloneableExtensionAstNode>(_properties);

@@ -74,7 +74,7 @@ public:
      * On failure, the error triggers an assertion.
      *
      */
-    LogicalAggStageHandle bind() const;
+    LogicalAggStageHandle bind(const ::MongoExtensionCatalogContext& catalogContext) const;
 
     /**
      * Clones this AST node into an identical AST node.

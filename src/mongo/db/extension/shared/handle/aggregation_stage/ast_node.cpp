@@ -48,11 +48,13 @@ MongoExtensionStaticProperties AggStageAstNodeAPI::getProperties() const {
     return MongoExtensionStaticProperties::parse(propertiesObj);
 }
 
-LogicalAggStageHandle AggStageAstNodeAPI::bind() const {
+LogicalAggStageHandle AggStageAstNodeAPI::bind(
+    const ::MongoExtensionCatalogContext& catalogContext) const {
     ::MongoExtensionLogicalAggStage* logicalStagePtr{nullptr};
 
     // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
-    invokeCAndConvertStatusToException([&]() { return vtable().bind(get(), &logicalStagePtr); });
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().bind(get(), &catalogContext, &logicalStagePtr); });
 
     return LogicalAggStageHandle(logicalStagePtr);
 }
