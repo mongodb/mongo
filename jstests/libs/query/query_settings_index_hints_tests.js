@@ -459,12 +459,6 @@ export class QuerySettingsIndexHintsTests {
      * attached to them.
      */
     assertQuerySettingsFallback(querySettingsQuery, ns, explainWithoutQuerySettings = null) {
-        // Skip queries containing $$NOW since it evaluates to different values at different times,
-        // making plan comparisons unreliable.
-        if (tojson(querySettingsQuery).includes("$$NOW")) {
-            return;
-        }
-
         const query = this._qsutils.withoutDollarDB(querySettingsQuery);
         const settings = {indexHints: {ns, allowedIndexes: ["doesnotexist"]}};
         const explainCmd = getExplainCommand(query);
