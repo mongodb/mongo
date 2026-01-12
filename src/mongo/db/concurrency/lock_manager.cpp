@@ -719,7 +719,7 @@ void LockManager::getLockInfoArray(const std::map<LockerId, BSONObj>& lockToClie
             auto o = BSONObjBuilder(locks->subobjStart());
             if (forLogging)
                 o.append("lockAddr", formatPtr(lock));
-            o.append("resourceId", lock->resourceId.toString());
+            o.append("resourceId", toStringForLogging(lock->resourceId));
             struct {
                 StringData key;
                 LockRequest* iter;
