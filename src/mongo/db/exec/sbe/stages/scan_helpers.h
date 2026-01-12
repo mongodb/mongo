@@ -56,9 +56,6 @@ MONGO_COMPILER_ALWAYS_INLINE inline void placeFieldsFromRecordInAccessors(
     const StringListSet& scanFieldNames,
     absl::InlinedVector<value::OwnedValueAccessor, 4>& scanFieldAccessors) {
     auto rawBson = record.data.data();
-    auto start = rawBson + 4;
-    auto end = rawBson + ConstDataView(rawBson).read<LittleEndian<uint32_t>>();
-    auto last = end - 1;
 
     if (scanFieldAccessors.size() == 1) {
         // If we're only looking for 1 field, then it's more efficient to forgo the hashtable
@@ -72,6 +69,9 @@ MONGO_COMPILER_ALWAYS_INLINE inline void placeFieldsFromRecordInAccessors(
             accessor.reset();
         }
 
+        auto start = rawBson + 4;
+        auto end = rawBson + ConstDataView(rawBson).read<LittleEndian<uint32_t>>();
+        auto last = end - 1;
         auto fieldsToMatch = scanFieldAccessors.size();
         for (auto bsonElement = start; bsonElement != last;) {
             auto field = bson::fieldNameAndLength(bsonElement);
