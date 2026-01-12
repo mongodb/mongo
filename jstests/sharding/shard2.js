@@ -206,7 +206,7 @@ assert.eq(1, res.nModified, res.toString());
 
 assert.eq(2, s.onNumShards("test", "foo"), "on 2 shards");
 
-secondary.foo.insert({num: -3});
+db.foo.insert({num: -3});
 
 assert.commandWorked(s.s0.adminCommand(
     {movechunk: "test.foo", find: {num: -2}, to: secondary.getMongo().name, _waitForDelete: true}));
