@@ -4655,13 +4655,34 @@ Value ExpressionReduce::evaluate(const Document& root, Variables* variables) con
                           << inputVal.toString(),
             inputVal.isArray());
 
-    Value accumulatedValue = _children[_kInitial]->evaluate(root, variables);
 
+    size_t itr = 0;
+    int32_t prevDepth = -1;
+    size_t interval = getAccumulatedValueDepthCheckInterval();
+    Value accumulatedValue = _children[_kInitial]->evaluate(root, variables);
     for (auto&& elem : inputVal.getArray()) {
         variables->setValue(_thisVar, elem);
         variables->setValue(_valueVar, accumulatedValue);
 
         accumulatedValue = _children[_kIn]->evaluate(root, variables);
+        if ((interval > 0) && (itr % interval) == 0 &&
+            (accumulatedValue.isObject() || accumulatedValue.isArray())) {
+            int32_t depth =
+                accumulatedValue.depth(2 * BSONDepth::getMaxAllowableDepth() /*maxDepth*/);
+            if (MONGO_unlikely(depth == -1)) {
+                uasserted(ErrorCodes::Overflow,
+                          "$reduce accumulated value exceeded max allowable BSON depth");
+            }
+            // Exponential backoff if depth has not increased.
+            if (depth == prevDepth) {
+                tassert(10236400,
+                        "unexpected control flow in $reduce object/array depth verification",
+                        prevDepth != -1);
+                interval *= 2;
+            }
+            prevDepth = depth;
+        }
+        itr++;
     }
 
     return accumulatedValue;
