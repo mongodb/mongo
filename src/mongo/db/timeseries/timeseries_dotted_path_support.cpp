@@ -173,7 +173,7 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
         case 0:
         case 1: {
             if (auto res = _splitPath(path)) {
-                auto& [left, next] = *res;
+                const auto& [left, next] = *res;
                 BSONElement e = obj.getField(left);
                 if (depth > 0 || left == timeseries::kBucketDataFieldName) {
                     if (e.type() == Object) {
@@ -228,7 +228,9 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
                     // measurement field (i.e. data.a) and we need to iterate over each of the
                     // numerically-indexed entries (i.e. data.a.1, data.a.5, etc.) to extract
                     // the actual field we want.
-                    invariant(depth == 1);
+                    massert(11388801,
+                            "Malformed measurement field in compressed timeseries bucket",
+                            depth == 1);
                     BSONColumn storage{e};
                     for (const BSONElement& e2 : storage) {
                         if (!e2.eoo()) {
@@ -250,7 +252,7 @@ boost::optional<BSONColumn> _extractAllElementsAlongBucketPath(
             // numerically-indexed entries (i.e. data.a.1, data.a.5, etc.) to extract the actual
             // field we want. If we are after a top-level field, then we already have the element we
             // want in 'e'. If we are after a nested field, then we need to recurse.
-            invariant(!isCompressed);
+            massert(11388802, "Expected uncompressed bucket", !isCompressed);
             for (const BSONElement& e : obj) {
                 if (path.empty()) {
                     // The top-level measurement field (i.e. data.a) is the indexed field we are
