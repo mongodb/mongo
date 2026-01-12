@@ -513,7 +513,7 @@ TEST(MessageCompressorManager, RuntMessage) {
 
 class ZlibDecompressTest : public unittest::Test {
 public:
-    Status doDecompress(const std::vector<char>& in, std::vector<char>& out) {
+    Status doDecompress(const std::vector<uint8_t>& in, std::vector<uint8_t>& out) {
         ConstDataRange inRange(in.data(), in.size());
         DataRange outRange(out.data(), out.size());
         auto swSize = compressor->decompressData(inRange, outRange);
@@ -522,13 +522,13 @@ public:
         return swSize.getStatus();
     }
 
-    Status doDecompress(const std::vector<char>& in) {
-        std::vector<char> out(1024);
+    Status doDecompress(const std::vector<uint8_t>& in) {
+        std::vector<uint8_t> out(1024);
         return doDecompress(in, out);
     }
 
-    std::vector<char> doCompress(const std::vector<char>& in) {
-        std::vector<char> out(compressor->getMaxCompressedSize(in.size()));
+    std::vector<uint8_t> doCompress(const std::vector<uint8_t>& in) {
+        std::vector<uint8_t> out(compressor->getMaxCompressedSize(in.size()));
         DataRange outRange(out.data(), out.size());
         auto swSz = compressor->compressData(in, outRange);
         ASSERT_OK(swSz);
@@ -536,8 +536,8 @@ public:
         return out;
     }
 
-    static std::vector<char> strVec(StringData s) {
-        return std::vector<char>{s.begin(), s.end()};
+    static std::vector<uint8_t> strVec(StringData s) {
+        return std::vector<uint8_t>(s.begin(), s.end());
     }
 
     std::unique_ptr<ZlibMessageCompressor> compressor{std::make_unique<ZlibMessageCompressor>()};
@@ -548,35 +548,26 @@ TEST_F(ZlibDecompressTest, RejectsEmptyPayload) {
 }
 
 TEST_F(ZlibDecompressTest, RejectsUndersizedPayload) {
-    ASSERT_EQ(doDecompress({char(0x78), char(0x9c), char(0x03), char(0x00)}), ErrorCodes::BadValue);
+    ASSERT_EQ(doDecompress({0x78, 0x9c, 0x03, 0x00}), ErrorCodes::BadValue);
 }
 
 TEST_F(ZlibDecompressTest, RejectsBadCompressionMethod) {
-    const char cm = 0;  // Expected to be 8.
-    const char cmf = 0x70 | (cm & 0xf);
-    ASSERT_EQ(doDecompress({cmf,
-                            char(0x9c),
-                            char(0x63),
-                            char(0x00),
-                            char(0x00),
-                            char(0x00),
-                            char(0x00),
-                            char(0x01),
-                            char(0x00),
-                            char(0x00)}),
+    const uint8_t cm = 0;  // Expected to be 8.
+    const uint8_t cmf = 0x70 | (cm & 0xf);
+    ASSERT_EQ(doDecompress({cmf, 0x9c, 0x63, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00}),
               ErrorCodes::BadValue);
 }
 
 TEST_F(ZlibDecompressTest, RoundTripLongerData) {
     const auto data = strVec("Hello, MongoDB! Compression hardening test.");
-    std::vector<char> out(data.size() + 100);
+    std::vector<uint8_t> out(data.size() + 100);
     ASSERT_OK(doDecompress(doCompress(data), out));
     ASSERT_EQ(out, data);
 }
 
 TEST_F(ZlibDecompressTest, RoundTripShortData) {
     const auto data = strVec("Short");
-    std::vector<char> out(10000);
+    std::vector<uint8_t> out(10000);
     ASSERT_OK(doDecompress(doCompress(data), out));
     ASSERT_EQ(out, data);
 }
@@ -595,11 +586,11 @@ TEST_F(ZlibDecompressTest, ByteCounts) {
         if (i >= 5)
             break;
 
-        std::vector<char> compressed = doCompress(data);
+        std::vector<uint8_t> compressed = doCompress(data);
         compressIn += data.size();
         compressOut += compressed.size();
 
-        std::vector<char> out(data.size() + 100);
+        std::vector<uint8_t> out(data.size() + 100);
         ASSERT_OK(doDecompress(compressed, out));
         ASSERT_EQ(out, data);
         decompressIn += compressed.size();
