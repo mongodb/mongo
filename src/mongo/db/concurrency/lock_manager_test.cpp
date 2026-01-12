@@ -75,6 +75,18 @@ TEST(ResourceId, Masking) {
     }
 }
 
+TEST(ResourceId, SaltingWorks) {
+    const std::string collAName = "db1.collA";
+
+    const uint64_t salt1 = 0;
+    const uint64_t salt2 = 1;
+
+    const auto id1Salt1 = hashStringDataForResourceId(collAName, salt1);
+    const auto id1Salt2 = hashStringDataForResourceId(collAName, salt2);
+
+    ASSERT_NE(id1Salt1, id1Salt2);
+}
+
 class ResourceIdTest : public unittest::Test {};
 
 DEATH_TEST_F(ResourceIdTest, StringConstructorMustNotBeCollection, "invariant") {
