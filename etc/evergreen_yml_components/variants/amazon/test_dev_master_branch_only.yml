@@ -134,6 +134,7 @@ buildvariants:
     stepback: true
     expansions: &amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
       <<: *amazon_linux2023_arm64_dynamic_expansions
+      tss_enabled: true
       large_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
       core_analyzer_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
       has_packages: false
@@ -169,6 +170,7 @@ buildvariants:
       - amazon2023-arm64-latest-m8g-xlarge
     expansions:
       <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
       large_distro_name: amazon2023-arm64-latest-m8g-4xlarge
       core_analyzer_distro_name: amazon2023-arm64-latest-xlarge
       test_flags: >-
@@ -251,6 +253,7 @@ buildvariants:
       - amazon2023-arm64-atlas-latest-m8g-xlarge
     expansions:
       <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
       large_distro_name: amazon2023-arm64-atlas-latest-m8g-4xlarge
       core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
       test_flags: >-
@@ -281,6 +284,7 @@ buildvariants:
       - amazon2023-arm64-atlas-latest-m8g-xlarge
     expansions:
       <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
       large_distro_name: amazon2023-arm64-atlas-latest-m8g-4xlarge
       core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
       test_flags: >-
@@ -309,6 +313,7 @@ buildvariants:
       - amazon2023-arm64-atlas-latest-m8g-xlarge
     expansions:
       <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
       large_distro_name: amazon2023-arm64-atlas-latest-m8g-2xlarge
       core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
     tasks: &fuzzers-task-list
@@ -329,6 +334,7 @@ buildvariants:
       - amazon2023-arm64-atlas-latest-m8g-xlarge
     expansions:
       <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
       large_distro_name: amazon2023-arm64-atlas-latest-m8g-4xlarge
       core_analyzer_distro_name: amazon2023-arm64-atlas-latest-xlarge
       test_flags: >-
@@ -340,6 +346,9 @@ buildvariants:
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-cluster-scalability-only
     display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Cluster Scalability Patch Only"
     tags: ["cluster_scalability_only", "suggested"]
+    expansions:
+      <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
     tasks:
       - name: .cluster_scalability_only
 
@@ -347,6 +356,9 @@ buildvariants:
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-execution-control-with-prioritization
     display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Execution Control with Prioritization Tasks"
     tags: ["suggested"]
+    expansions:
+      <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
     tasks:
       - name: .execution_control_with_prioritization
 
@@ -354,6 +366,9 @@ buildvariants:
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-magic-restore
     display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Magic Restore Tasks"
     tags: ["suggested"]
+    expansions:
+      <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
     tasks:
       - name: .magic_restore
 
@@ -364,6 +379,7 @@ buildvariants:
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
     expansions:
       <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
       test_flags: >-
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment
@@ -495,6 +511,7 @@ buildvariants:
     cron: "0 1 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     expansions:
       <<: *amazon_linux2023_arm64_dynamic_expansions
+      tss_enabled: false
       has_packages: false
       jstestfuzz_num_generated_files: 20
       jstestfuzz_concurrent_num_files: 5
@@ -630,6 +647,7 @@ buildvariants:
     cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
     expansions:
       <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,incompatible_with_atlas_environment,incompatible_with_extensions,m8g_incompatible
@@ -658,6 +676,7 @@ buildvariants:
       - amazon2023-arm64-atlas-latest-m8g-xlarge
     expansions:
       <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      tss_enabled: false
       test_flags: >-
         --runAllFeatureFlagTests
         --mongodSetParameters="{'failpoint.overrideRecordIdsReplicatedDefault': {mode: 'alwaysOn'}, 'failpoint.automaticallyCollmodToRecordIdsReplicatedFalse': {mode: 'alwaysOn'}}"

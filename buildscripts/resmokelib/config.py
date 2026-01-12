@@ -387,10 +387,15 @@ MODULE_SUITE_DIRS = []
 MODULE_DISABLED_JSTEST_DIRS = []
 
 # if set, enables test selection using the Evergreen API
-ENABLE_EVERGREEN_API_TEST_SELECTION = None
+ENABLE_EVERGREEN_API_TEST_SELECTION = False
 
 # If set, requests Evergreen to use the specified test selection strategies.
 EVERGREEN_TEST_SELECTION_STRATEGY = None
+
+# Boolean indicating if test selection service is enabled for this variant.
+# Read from the variant's 'tss_enabled' expansion in Evergreen YAML.
+# If None, test selection is disabled (default for local runs or variants without the expansion).
+TSS_ENABLED = None
 
 # Path to the YAML file containing the current `mongo_version`
 MONGO_VERSION_FILE = ".resmoke_mongo_version.yml"

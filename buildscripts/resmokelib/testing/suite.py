@@ -140,20 +140,34 @@ class Suite(object):
         if loggers.ROOT_EXECUTOR_LOGGER is None:
             loggers.ROOT_EXECUTOR_LOGGER = logging.getLogger("executor")
 
-        # to reduce the amount of API requests to Evergreen
-        use_select_tests = _config.ENABLE_EVERGREEN_API_TEST_SELECTION
-        call_select_tests = (
-            _config.EVERGREEN_PATCH_BUILD
-            and _config.EVERGREEN_VERSION_ID
-            and (hash(_config.EVERGREEN_VERSION_ID) % TSS_ENDPOINT_FREQUENCY == 0)
+        # Check if test selection is enabled for this variant
+        tss_enabled = _config.TSS_ENABLED
+        is_patch_build = _config.EVERGREEN_PATCH_BUILD
+
+        # Test selection is enabled if:
+        # - The feature is globally enabled (default: True)
+        # - The variant has tss_enabled expansion set to true
+        # - Running a patch build
+        use_test_selection = (
+            _config.ENABLE_EVERGREEN_API_TEST_SELECTION and tss_enabled and is_patch_build
         )
-        call_api = use_select_tests or call_select_tests
+
+        # Log when test selection is skipped
+        if tests and _config.EVERGREEN_TASK_ID and _config.ENABLE_EVERGREEN_API_TEST_SELECTION:
+            if not tss_enabled:
+                loggers.ROOT_EXECUTOR_LOGGER.info(
+                    "Skipping test selection services: variant does not have tss_enabled expansion set to true"
+                )
+            elif not is_patch_build:
+                loggers.ROOT_EXECUTOR_LOGGER.info(
+                    "Skipping test selection services: not a patch build (only enabled for patch builds)"
+                )
 
         # Apply Evergreen API test selection if:
         # 1. We have tests to filter
         # 2. We're running in Evergreen
-        # 3. Test selection is enabled
-        if tests and _config.EVERGREEN_TASK_ID and call_api:
+        # 3. Test selection is enabled (variant matches AND patch build AND feature enabled)
+        if tests and _config.EVERGREEN_TASK_ID and use_test_selection:
             try:
                 evg_api = evergreen_conn.get_evergreen_api()
             except RuntimeError:
@@ -164,7 +178,7 @@ class Suite(object):
                 test_selection_strategy = (
                     _config.EVERGREEN_TEST_SELECTION_STRATEGY
                     if _config.EVERGREEN_TEST_SELECTION_STRATEGY is not None
-                    else ["NotFailing", "NotPassing", "NotFlaky"]
+                    else ["NotFailing"]
                 )
                 request = {
                     "project_id": str(_config.EVERGREEN_PROJECT_NAME),
@@ -181,11 +195,7 @@ class Suite(object):
                     select_tests_succeeds_flag = True
                     execution = executor.submit(evg_api.select_tests, **request)
                     try:
-                        result = (
-                            execution.result(timeout=60)
-                            if _config.ENABLE_EVERGREEN_API_TEST_SELECTION
-                            else execution.result(timeout=20)
-                        )
+                        result = execution.result(timeout=60)
                         # if execution does not time out, checks for if result is in proper format to parse
                         if not isinstance(result, dict):
                             loggers.ROOT_EXECUTOR_LOGGER.info(f"Unexpected response type:{result}")
@@ -207,7 +217,7 @@ class Suite(object):
                         select_tests_succeeds_flag = False
 
                     # ensures that select_tests results is only used if no exceptions or type errors are thrown from it
-                    if select_tests_succeeds_flag and use_select_tests:
+                    if select_tests_succeeds_flag and use_test_selection:
                         evergreen_filtered_tests = result["tests"]
                         evergreen_excluded_tests = set(
                             evergreen_filtered_tests

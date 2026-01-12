@@ -73,8 +73,9 @@ class TestGetTestsForKind(unittest.TestCase):
         self.default_evergreen_project_name = under_test._config.EVERGREEN_PROJECT_NAME
         self.default_evergreen_variant_name = under_test._config.EVERGREEN_VARIANT_NAME
         self.default_evergreen_requester = under_test._config.EVERGREEN_REQUESTER
-        self.default_evergreen_task_id = under_test._config.EVERGREEN_TASK_ID
+        self.default_evergreen_patch_build = under_test._config.EVERGREEN_PATCH_BUILD
         self.default_evergreen_task_name = under_test._config.EVERGREEN_TASK_NAME
+        self.default_tss_enabled = under_test._config.TSS_ENABLED
 
     def tearDown(self):
         under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION = (
@@ -84,10 +85,12 @@ class TestGetTestsForKind(unittest.TestCase):
         under_test._config.EVERGREEN_VARIANT_NAME = self.default_evergreen_variant_name
         under_test._config.EVERGREEN_REQUESTER = self.default_evergreen_requester
         under_test._config.EVERGREEN_TASK_ID = self.default_evergreen_task_id
+        under_test._config.EVERGREEN_PATCH_BUILD = self.default_evergreen_patch_build
         under_test._config.EVERGREEN_TASK_NAME = self.default_evergreen_task_name
         under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = (
             self.default_evergreen_test_selection_strategy
         )
+        under_test._config.TSS_ENABLED = self.default_tss_enabled
 
     def test_simple(self):
         self.assertFalse(under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION)
@@ -110,6 +113,8 @@ class TestGetTestsForKind(unittest.TestCase):
         under_test._config.EVERGREEN_TASK_ID = "task_id"
         under_test._config.EVERGREEN_TASK_NAME = "task_name"
         under_test._config.EVERGREEN_TEST_SELECTION_STRATEGY = "strategy"
+        under_test._config.EVERGREEN_PATCH_BUILD = True
+        under_test._config.TSS_ENABLED = True
 
         # Mock Evergreen API
         mock_evg_api = MagicMock()
@@ -132,6 +137,7 @@ class TestGetTestsForKind(unittest.TestCase):
         )
 
         if under_test._config.ENABLE_EVERGREEN_API_TEST_SELECTION:
+            mock_evg_api.select_tests.assert_called_once()
             mock_evg_api.select_tests.assert_called_once_with(
                 project_id="project_name",
                 build_variant="variant_name",

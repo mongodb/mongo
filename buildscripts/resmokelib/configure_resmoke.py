@@ -602,6 +602,22 @@ flags in common: {common_set}
     _config.ENABLE_EVERGREEN_API_TEST_SELECTION = config.pop("enable_evergreen_api_test_selection")
     _config.EVERGREEN_TEST_SELECTION_STRATEGY = config.pop("test_selection_strategies_array")
 
+    # Read TSS_ENABLED from Evergreen expansions if available
+    _config.TSS_ENABLED = None
+    if os.path.exists(EVERGREEN_EXPANSIONS_FILE):
+        try:
+            expansions = read_config_file(EVERGREEN_EXPANSIONS_FILE)
+            tss_enabled_value = expansions.get("tss_enabled", None)
+            if tss_enabled_value is not None:
+                # Handle various boolean representations from YAML
+                if isinstance(tss_enabled_value, bool):
+                    _config.TSS_ENABLED = tss_enabled_value
+                elif isinstance(tss_enabled_value, str):
+                    _config.TSS_ENABLED = tss_enabled_value.lower() in ("true", "1", "yes")
+        except Exception:
+            # If we can't read expansions, default to None (TSS disabled)
+            pass
+
     shard_index = config.pop("shard_index")
     shard_count = config.pop("shard_count")
     _config.SHARD_INDEX = int(shard_index) if shard_index is not None else None
