@@ -66,6 +66,21 @@
 namespace mongo {
 
 /**
+ * Return type of the 'rewriteGroupAsTransformOnFirstDocument' function. See the function
+ * documentation for details of the rewrite.
+ */
+struct RewriteOnFirstDocumentResult {
+    // The optional SortPattern of $group's $top or $bottom.
+    boost::optional<SortPattern> sortPattern;
+
+    // True if the directions of the sortPattern and the previous sort stage are different.
+    bool sortDirectionChangeIsRequired;
+
+    // The rewritten $group stage. nullptr is the rewrite is impossible.
+    std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage;
+};
+
+/**
  * This class represents a $group stage generically - could be a streaming or hash based group.
  *
  * It contains some common execution code between the two algorithms, such as:
@@ -203,12 +218,10 @@ public:
      * If a $group with $top/$bottom accumulator is transformed, its SortPattern is necessary to
      * create a DISTINCT_SCAN plan.
      *
-     * Returns:
-     * - first: the optional SortPattern of $group's $top or $bottom.
-     * - second: The rewritten $group stage.
+     * Returns RewriteOnFirstDocumentResult.
      */
-    std::pair<boost::optional<SortPattern>, std::unique_ptr<GroupFromFirstDocumentTransformation>>
-    rewriteGroupAsTransformOnFirstDocument() const;
+    RewriteOnFirstDocumentResult rewriteGroupAsTransformOnFirstDocument(
+        boost::optional<SortPattern> sortStagePattern) const;
 
     // True if this $group can be pushed down to SBE.
     SbeCompatibility sbeCompatibility() const {
