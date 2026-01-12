@@ -130,6 +130,7 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
     const int kErrorMultikey = 0x04;
     const int kErrorCollation = 0x08;
     const int kErrorNotPrefix = 0x10;
+    const int kErrorWildcard = 0x20;
     int reasons = 0;
 
     auto desc = indexEntry->descriptor();
@@ -145,6 +146,10 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
 
     if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance)) {
         reasons |= kErrorNotPrefix;
+    }
+
+    if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
+        reasons |= kErrorWildcard;
     }
 
     if (reasons == 0) {  // that is, not partial index, not sparse, and not prefix, then:
@@ -181,6 +186,9 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
         }
         if (reasons & kErrorNotPrefix) {
             errors += " Shard key is not a prefix of index key.";
+        }
+        if (reasons & kErrorWildcard) {
+            errors += " Index key is a wildcard index.";
         }
         if (!errMsg->empty()) {
             *errMsg += "\n";
