@@ -109,6 +109,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
+#include "mongo/s/shard_targeting_helpers.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/processinfo.h"
@@ -375,6 +376,36 @@ CollectionStats fillOutCollectionStats(OperationContext* opCtx, const Collection
     return stats;
 }
 
+bool requiresShardFiltering(const CanonicalQuery& canonicalQuery,
+                            const CollectionPtr& collection,
+                            QueryPlannerParams* plannerParams) {
+    if (!(plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER)) {
+        // Shard filter was not requested; cmd may not be from a router.
+        return false;
+    }
+    // If the caller wants a shard filter, make sure we're actually sharded.
+    if (!collection.isSharded()) {
+        // Not actually sharded.
+        return false;
+    }
+
+    const auto& shardKeyPattern = collection.getShardKeyPattern();
+    // Shards cannot own orphans for the key ranges they own, so there is no need
+    // to include a shard filtering stage. By omitting the shard filter, it may be
+    // possible to get a more efficient plan (for example, a COUNT_SCAN may be used if
+    // the query is eligible).
+    const BSONObj extractedKey = extractShardKeyFromQuery(shardKeyPattern, canonicalQuery);
+
+    if (extractedKey.isEmpty()) {
+        // Couldn't extract all the fields of the shard key from the query,
+        // no way to target a single shard.
+        return true;
+    }
+
+    return !isEqualityOnShardKeyTargetable(
+        extractedKey, shardKeyPattern, !canonicalQuery.getCollator());
+}
+
 void fillOutPlannerParams(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const CanonicalQuery* canonicalQuery,
@@ -412,27 +443,14 @@ void fillOutPlannerParams(OperationContext* opCtx,
     }
 
     // If the caller wants a shard filter, make sure we're actually sharded.
-    if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        if (collection.isSharded()) {
-            const auto& shardKeyPattern = collection.getShardKeyPattern();
-
-            // If the shard key is specified exactly, the query is guaranteed to only target one
-            // shard. Shards cannot own orphans for the key ranges they own, so there is no need
-            // to include a shard filtering stage. By omitting the shard filter, it may be possible
-            // to get a more efficient plan (for example, a COUNT_SCAN may be used if the query is
-            // eligible).
-            const BSONObj extractedKey = extractShardKeyFromQuery(shardKeyPattern, *canonicalQuery);
-
-            if (extractedKey.isEmpty()) {
-                plannerParams->shardKey = shardKeyPattern.toBSON();
-            } else {
-                plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-            }
-        } else {
-            // If there's no metadata don't bother w/the shard filter since we won't know what
-            // the key pattern is anyway...
-            plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-        }
+    if (requiresShardFiltering(*canonicalQuery, collection, plannerParams)) {
+        // This query may have been issued to multiple shards.
+        // Knowing the shardKey may avoid fetching the document to apply shard filtering
+        // e.g., if an ixscan will provide all required fields.
+        plannerParams->shardKey = collection.getShardKeyPattern().toBSON();
+    } else {
+        // A shard filter was not requested, or is not required - clear the flag.
+        plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
     if (internalQueryPlannerEnableIndexIntersection.load()) {
