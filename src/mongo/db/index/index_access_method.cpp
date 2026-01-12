@@ -127,8 +127,12 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
         return std::make_unique<TwoDAccessMethod>(entry, makeSDI());
     else if (IndexNames::WILDCARD == type)
         return std::make_unique<WildcardAccessMethod>(entry, makeSDI());
-    LOGV2(20688, "Can't find index for keyPattern", "keyPattern"_attr = desc->keyPattern());
-    fassertFailed(31021);
+    LOGV2_ERROR_OPTIONS(20688,
+                        {logv2::UserAssertAfterLog(ErrorCodes::IndexOptionsConflict)},
+                        "Can't find index for keyPattern",
+                        "keyPattern"_attr = desc->keyPattern(),
+                        "type"_attr = type);
+    MONGO_UNREACHABLE;
 }
 
 namespace {

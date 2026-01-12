@@ -203,6 +203,9 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
             return {
                 ErrorCodes::CannotCreateIndex,
                 str::stream() << "GeoHaystack indexes cannot be created in version 5.0 and above"};
+        if (pluginName == IndexNames::ENCRYPTED_RANGE)
+            return {ErrorCodes::CannotCreateIndex,
+                    str::stream() << "EncryptedRange indexes cannot be created"};
         if (!IndexNames::isKnownName(pluginName))
             return Status(code, str::stream() << "Unknown index plugin '" << pluginName << '\'');
     }

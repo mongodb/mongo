@@ -221,7 +221,7 @@ void validateIndexType(OperationContext* opCtx, const CreateIndexesCommand& cmd)
         for (const auto& key : elem.getField("key").Obj()) {
             const auto type = key.str();  // will return "" for btree
             if (IndexNames::isInternalOnly(type)) {
-                uassert(ErrorCodes::IndexOptionsConflict,
+                uassert(ErrorCodes::CannotCreateIndex,
                         fmt::format("Index Type {} is for internal use only", type),
                         isAuthForInternal);
             }
