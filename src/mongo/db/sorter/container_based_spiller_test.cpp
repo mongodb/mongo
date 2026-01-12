@@ -86,7 +86,10 @@ private:
     std::vector<Entry> _entries;
 };
 
-class SortedContainerWriterTest : public ServiceContextMongoDTest {};
+class SortedContainerWriterTest : public ServiceContextMongoDTest {
+public:
+    SorterTracker sorterTracker;
+};
 
 TEST_F(SortedContainerWriterTest, ContainerWriterUsesNextKeyForContainerEntries) {
     auto opCtx = makeOperationContext();
@@ -104,8 +107,9 @@ TEST_F(SortedContainerWriterTest, ContainerWriterUsesNextKeyForContainerEntries)
     SortOptions opts;
     const int64_t startingKey = 5;
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    SorterContainerStats stats(&this->sorterTracker);
     SortedContainerWriter<IntWrapper, IntWrapper> writer(
-        *opCtx, ru, collPtr, container, opts, startingKey);
+        *opCtx, ru, collPtr, container, stats, opts, startingKey);
 
     const IntWrapper k1{1};
     const IntWrapper v1{2};
@@ -146,8 +150,9 @@ TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSe
     SortOptions opts;
     const int64_t startingKey = 29;
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    SorterContainerStats stats(&this->sorterTracker);
     SortedContainerWriter<NullValue, NullValue> writer(
-        *opCtx, ru, collPtr, container, opts, startingKey);
+        *opCtx, ru, collPtr, container, stats, opts, startingKey);
     writer.addAlreadySorted(NullValue{}, NullValue{});
 
     ASSERT_EQ(container.entries().size(), 1U);
@@ -171,8 +176,9 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
     SortOptions opts;
     const int64_t startingKey = 2002;
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+    SorterContainerStats stats(&this->sorterTracker);
     SortedContainerWriter<IntWrapper, NullValue> writer(
-        *opCtx, ru, collPtr, container, opts, startingKey);
+        *opCtx, ru, collPtr, container, stats, opts, startingKey);
 
     const IntWrapper key{123};
     writer.addAlreadySorted(key, NullValue{});

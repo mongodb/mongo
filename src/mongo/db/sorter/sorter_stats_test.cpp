@@ -219,5 +219,75 @@ TEST(SorterStatsTest, MultipleSortersMemUsage) {
     ASSERT_EQ(sorterTracker.memUsage.load(), 4);
 }
 
+template <typename T>
+class SorterStorageStatsTest : public testing::Test {
+public:
+    SorterTracker sorterTracker;
+};
+
+using SorterStorageStatsTypes = ::testing::Types<SorterContainerStats, SorterFileStats>;
+TYPED_TEST_SUITE(SorterStorageStatsTest, SorterStorageStatsTypes);
+
+TYPED_TEST(SorterStorageStatsTest, ConstructorWithTracker) {
+    TypeParam stats(&this->sorterTracker);
+
+    ASSERT_EQ(stats.bytesSpilledUncompressed(), 0);
+    ASSERT_EQ(this->sorterTracker.bytesSpilledUncompressed.loadRelaxed(), 0);
+}
+
+TYPED_TEST(SorterStorageStatsTest, ConstructorWithoutTracker) {
+    TypeParam stats(nullptr);
+
+    ASSERT_EQ(stats.bytesSpilledUncompressed(), 0);
+}
+
+TYPED_TEST(SorterStorageStatsTest, AddSpilledDataSizeUncompressed) {
+    TypeParam stats(&this->sorterTracker);
+
+    // Add some data
+    stats.addSpilledDataSizeUncompressed(100);
+
+    // Both local and tracker should be updated
+    ASSERT_EQ(stats.bytesSpilledUncompressed(), 100);
+    ASSERT_EQ(this->sorterTracker.bytesSpilledUncompressed.loadRelaxed(), 100);
+
+    // Add more data
+    stats.addSpilledDataSizeUncompressed(50);
+
+    // Should accumulate
+    ASSERT_EQ(stats.bytesSpilledUncompressed(), 150);
+    ASSERT_EQ(this->sorterTracker.bytesSpilledUncompressed.loadRelaxed(), 150);
+}
+
+TYPED_TEST(SorterStorageStatsTest, AddSpilledDataSizeUncompressedWithoutTracker) {
+    TypeParam stats(nullptr);
+
+    // Should not crash with null tracker
+    stats.addSpilledDataSizeUncompressed(100);
+    ASSERT_EQ(stats.bytesSpilledUncompressed(), 100);
+}
+
+TYPED_TEST(SorterStorageStatsTest, ZeroValueHandling) {
+    TypeParam stats(&this->sorterTracker);
+
+    // Adding zero should not change values
+    stats.addSpilledDataSizeUncompressed(0);
+
+    ASSERT_EQ(stats.bytesSpilledUncompressed(), 0);
+    ASSERT_EQ(this->sorterTracker.bytesSpilledUncompressed.loadRelaxed(), 0);
+}
+
+TYPED_TEST(SorterStorageStatsTest, MultipleInstancesShareTracker) {
+    TypeParam stats1(&this->sorterTracker);
+    TypeParam stats2(&this->sorterTracker);
+
+    // Both instances should update the same tracker
+    stats1.addSpilledDataSizeUncompressed(50);
+    stats2.addSpilledDataSizeUncompressed(30);
+
+    ASSERT_EQ(stats1.bytesSpilledUncompressed(), 50);
+    ASSERT_EQ(stats2.bytesSpilledUncompressed(), 30);
+    ASSERT_EQ(this->sorterTracker.bytesSpilledUncompressed.loadRelaxed(), 80);
+}
 }  // namespace
 }  // namespace mongo

@@ -56,6 +56,7 @@ public:
                           RecoveryUnit& ru,
                           const CollectionPtr& collection,
                           IntegerKeyedContainer& container,
+                          SorterContainerStats& containerStats,
                           const SortOptions& opts,
                           int64_t nextKey,
                           const Settings& settings = Settings())
@@ -64,6 +65,7 @@ public:
           _ru(ru),
           _collection(collection),
           _container(container),
+          _containerStats(containerStats),
           _nextKey(nextKey),
           _rangeStartKey(nextKey) {}
 
@@ -88,8 +90,8 @@ public:
 
         if (size > 0) {
             this->_checksumCalculator.addData(buffer.buf(), size);
-            // TODO SERVER-116257: Interaction with SorterContainerStats.
         }
+        _containerStats.addSpilledDataSizeUncompressed(size);
     }
 
     std::shared_ptr<Iterator> done() override {
@@ -110,6 +112,7 @@ private:
     RecoveryUnit& _ru;
     const CollectionPtr& _collection;
     IntegerKeyedContainer& _container;
+    SorterContainerStats& _containerStats;
     int64_t _nextKey;
     int64_t _rangeStartKey;
 };

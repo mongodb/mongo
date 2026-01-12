@@ -34,19 +34,30 @@
 #include <algorithm>
 
 namespace mongo {
-SorterFileStats::SorterFileStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker) {};
 
-void SorterFileStats::addSpilledDataSize(long long data) {
-    _bytesSpilled.fetchAndAdd(data);
+SorterContainerStats::SorterContainerStats(SorterTracker* sorterTracker)
+    : _sorterTracker(sorterTracker) {};
+
+void SorterContainerStats::addSpilledDataSizeUncompressed(long long size) {
+    _bytesSpilledUncompressed.fetchAndAdd(size);
     if (_sorterTracker) {
-        _sorterTracker->bytesSpilled.fetchAndAdd(data);
+        _sorterTracker->bytesSpilledUncompressed.fetchAndAdd(size);
     }
 }
 
-void SorterFileStats::addSpilledDataSizeUncompressed(long long data) {
-    _bytesSpilledUncompressed.fetchAndAdd(data);
+SorterFileStats::SorterFileStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker) {};
+
+void SorterFileStats::addSpilledDataSize(long long size) {
+    _bytesSpilled.fetchAndAdd(size);
     if (_sorterTracker) {
-        _sorterTracker->bytesSpilledUncompressed.fetchAndAdd(data);
+        _sorterTracker->bytesSpilled.fetchAndAdd(size);
+    }
+}
+
+void SorterFileStats::addSpilledDataSizeUncompressed(long long size) {
+    _bytesSpilledUncompressed.fetchAndAdd(size);
+    if (_sorterTracker) {
+        _sorterTracker->bytesSpilledUncompressed.fetchAndAdd(size);
     }
 }
 

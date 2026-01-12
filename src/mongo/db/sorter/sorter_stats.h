@@ -51,14 +51,34 @@ struct SorterTracker {
 };
 
 /**
+ * For collecting container usage metrics.
+ */
+class SorterContainerStats {
+public:
+    explicit SorterContainerStats(SorterTracker* sorterTracker);
+
+    void addSpilledDataSizeUncompressed(long long size);
+
+    long long bytesSpilledUncompressed() const {
+        return _bytesSpilledUncompressed.load();
+    }
+
+private:
+    SorterTracker* _sorterTracker;
+
+    AtomicWord<long long> _bytesSpilledUncompressed;
+};
+
+
+/**
  * For collecting file usage metrics.
  */
 class SorterFileStats {
 public:
     SorterFileStats(SorterTracker* sorterTracker);
 
-    void addSpilledDataSize(long long data);
-    void addSpilledDataSizeUncompressed(long long data);
+    void addSpilledDataSize(long long size);
+    void addSpilledDataSizeUncompressed(long long size);
 
     AtomicWord<long long> opened;
     AtomicWord<long long> closed;
