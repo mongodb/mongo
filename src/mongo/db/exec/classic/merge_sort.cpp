@@ -33,6 +33,7 @@
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
 
 #include <cstddef>
@@ -60,7 +61,12 @@ MergeSortStage::MergeSortStage(ExpressionContext* expCtx,
       // TODO SERVER-97746 Add internalMergeSortMaxMemoryBytes when it exists.
       _merging(StageWithValueComparison(ws, params.pattern, params.collator)),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-          *expCtx, loadMemoryLimit(StageMemoryLimit::MergeSortStageMaxMemoryBytes))) {}
+          *expCtx, loadMemoryLimit(StageMemoryLimit::MergeSortStageMaxMemoryBytes))),
+      _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
+          [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+              sortMergeCounters.incrementPerDeduplication(deduplicatedBytes, deduplicatedRecords);
+          },
+          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())) {}
 
 void MergeSortStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.emplace_back(std::move(child));
@@ -111,6 +117,7 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
                         _noResultToMerge.pop();
                         uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
                         _memoryTracker.add(dedupBytes - dedupBytesPrev);
+                        _dedupReporter.add(dedupBytes - dedupBytesPrev);
                         _specificStats.peakTrackedMemBytes =
                             _memoryTracker.peakTrackedMemoryBytes();
                         uassert(

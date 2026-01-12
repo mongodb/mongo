@@ -371,6 +371,11 @@ TextOrCounters textOrCounters;
 BucketAutoCounters bucketAutoCounters;
 GeoNearCounters geoNearCounters;
 TimeseriesCounters timeseriesCounters;
+OrCounters orCounters;
+SortMergeCounters sortMergeCounters;
+IxScanCounters ixScanCounters;
+UniqueCounters uniqueCounters;
+UniqueRoaringCounters uniqueRoaringCounters;
 PlanCacheCounters planCacheCounters;
 FastPathQueryCounters fastPathQueryCounters;
 

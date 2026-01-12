@@ -438,6 +438,12 @@ function verifyExplainMetrics({
     }
 }
 
+function verifyServerStatusMetrics({db, stageName}) {
+    const dedupStats = db.serverStatus().metrics.query.recordIdDeduplication[stageName];
+    assert.gt(dedupStats.deduplicatedBytes, 0);
+    assert.gt(dedupStats.deduplicatedRecords, 0);
+}
+
 /**
  * For a given pipeline, verify that memory tracking statistics are correctly reported to
  * the slow query log, system.profile, and explain("executionStats").
@@ -452,6 +458,7 @@ export function runMemoryStatsTest({
     checkInUseTrackedMemBytesResets = true,
     skipExplainStageCheck = false,
     explainStageSubpipelinePath = {},
+    skipServerStatusStageCheck = true,
 }) {
     assert("pipeline" in commandObj, "Command object must include a pipeline field.");
     assert("comment" in commandObj, "Command object must include a comment field.");
@@ -480,6 +487,10 @@ export function runMemoryStatsTest({
         logLines: logLines,
         verifyOptions: verifyOptions,
     });
+
+    if (!skipServerStatusStageCheck) {
+        verifyServerStatusMetrics({db, stageName});
+    }
 
     const profilerEntries = runPipelineAndGetDiagnostics({
         db: db,
@@ -520,6 +531,7 @@ export function runShardedMemoryStatsTest({
     skipExplain = false, // Some stages will execute on the merging part of the pipeline and will
     // not appear in the shards' explain output.
     skipInUseTrackedMemBytesCheck = false,
+    skipServerStatusStageCheck = true,
 }) {
     assert("pipeline" in commandObj, "Command object must include a pipeline field.");
     assert("comment" in commandObj, "Command object must include a comment field.");
@@ -543,6 +555,10 @@ export function runShardedMemoryStatsTest({
         logLines: logLines,
         verifyOptions: verifyOptions,
     });
+
+    if (!skipServerStatusStageCheck) {
+        verifyServerStatusMetrics({db, stageName});
+    }
 
     if (skipExplain) {
         jsTest.log.info("Skipping explain metrics verification");

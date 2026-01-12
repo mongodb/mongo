@@ -33,6 +33,7 @@ if (!checkSbeFullyEnabled(db)) {
 // for rate-limiting writes to CurOp. Otherwise, we may report no memory usage if the memory used is
 // less than the limit.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToCurOpMemoryUsageBytes: 16}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
 
 const normalColl = db[jsTestName() + "_normal"];
 normalColl.drop();
@@ -162,6 +163,7 @@ runMemoryStatsTest({
     },
     stageName: "unique",
     expectedNumGetMores: 2,
+    skipServerStatusStageCheck: false,
 });
 
 // Test UniqueRoaringStage with normal collection.
@@ -178,6 +180,7 @@ runMemoryStatsTest({
     },
     stageName: "unique_roaring",
     expectedNumGetMores: 2,
+    skipServerStatusStageCheck: false,
 });
 
 // Clean up.

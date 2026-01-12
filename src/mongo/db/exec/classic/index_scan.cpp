@@ -37,6 +37,7 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
@@ -81,7 +82,12 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
       _startKeyInclusive(IndexBounds::isStartIncludedInBound(_bounds.boundInclusion)),
       _endKeyInclusive(IndexBounds::isEndIncludedInBound(_bounds.boundInclusion)),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-          *expCtx, loadMemoryLimit(StageMemoryLimit::IndexScanStageMaxMemoryBytes))) {
+          *expCtx, loadMemoryLimit(StageMemoryLimit::IndexScanStageMaxMemoryBytes))),
+      _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
+          [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+              ixScanCounters.incrementPerDeduplication(deduplicatedBytes, deduplicatedRecords);
+          },
+          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())) {
     _specificStats.indexName = params.name;
     _specificStats.keyPattern = _keyPattern;
     _specificStats.isMultiKey = params.isMultiKey;
@@ -261,6 +267,8 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
             // ...skip it
             ++_specificStats.dupsDropped;
             return PlanStage::NEED_TIME;
+        } else if (!_filter) {
+            _dedupReporter.add(dedupBytes - dedupBytesPrev);
         }
     }
 
@@ -275,6 +283,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         _recordIdDeduplicator.insert(kv->loc);
         uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
         _memoryTracker.add(dedupBytes - dedupBytesPrev);
+        _dedupReporter.add(dedupBytes - dedupBytesPrev);
         _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
         uassert(11130304,
                 "Exceeded memory limit in record id deduplicator for IXSCAN stage",

@@ -77,6 +77,14 @@ SimpleMemoryUsageTracker OperationMemoryUsageTracker::createSimpleMemoryUsageTra
     return createSimpleMemoryUsageTrackerImpl(opCtx, maxMemoryUsageBytes);
 }
 
+DeduplicatorReporter OperationMemoryUsageTracker::createDeduplicatorReporter(
+    std::function<void(int64_t, int64_t)> callback, int64_t chunkSize) {
+    if (!feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+        return DeduplicatorReporter{nullptr, chunkSize};
+    }
+    return DeduplicatorReporter{std::move(callback), chunkSize};
+}
+
 SimpleMemoryUsageTracker OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForStage(
     const ExpressionContext& expCtx, int64_t maxMemoryUsageBytes) {
     return createSimpleMemoryUsageTrackerImpl(

@@ -75,6 +75,9 @@ public:
     static SimpleMemoryUsageTracker createSimpleMemoryUsageTrackerForSBE(
         OperationContext* opCtx, int64_t maxMemoryUsageBytes = std::numeric_limits<int64_t>::max());
 
+    static DeduplicatorReporter createDeduplicatorReporter(
+        std::function<void(int64_t, int64_t)> callback, int64_t chunkSize);
+
     /**
      * Rate-limited memory tracker. Chunking refers to the fact that memory usage reporting will be
      * done in discrete chunks (0, chunkSize, 2*chunkSize, etc.) rather than exact values.

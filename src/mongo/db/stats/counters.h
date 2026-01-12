@@ -588,6 +588,61 @@ public:
 };
 extern GeoNearCounters geoNearCounters;
 
+class RecordIdDeduplicationCounters {
+public:
+    RecordIdDeduplicationCounters(std::string stageName)
+        : deduplicatedBytes(*MetricBuilder<Counter64>{"query.recordIdDeduplication." + stageName +
+                                                      ".deduplicatedBytes"}),
+          deduplicatedRecords(*MetricBuilder<Counter64>{"query.recordIdDeduplication." + stageName +
+                                                        ".deduplicatedRecords"}) {}
+
+    RecordIdDeduplicationCounters(RecordIdDeduplicationCounters&) = delete;
+    RecordIdDeduplicationCounters& operator=(const RecordIdDeduplicationCounters&) = delete;
+
+    virtual ~RecordIdDeduplicationCounters() = default;
+
+    void incrementPerDeduplication(int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+        this->deduplicatedBytes.incrementRelaxed(deduplicatedBytes);
+        this->deduplicatedRecords.incrementRelaxed(deduplicatedRecords);
+    }
+
+private:
+    // The total number of bytes deduplicated.
+    Counter64& deduplicatedBytes;
+    // The number of records deduplicated.
+    Counter64& deduplicatedRecords;
+};
+
+class OrCounters : public RecordIdDeduplicationCounters {
+public:
+    OrCounters() : RecordIdDeduplicationCounters("OR") {}
+};
+extern OrCounters orCounters;
+
+class SortMergeCounters : public RecordIdDeduplicationCounters {
+public:
+    SortMergeCounters() : RecordIdDeduplicationCounters("SORT_MERGE") {}
+};
+extern SortMergeCounters sortMergeCounters;
+
+class IxScanCounters : public RecordIdDeduplicationCounters {
+public:
+    IxScanCounters() : RecordIdDeduplicationCounters("IXSCAN") {}
+};
+extern IxScanCounters ixScanCounters;
+
+class UniqueCounters : public RecordIdDeduplicationCounters {
+public:
+    UniqueCounters() : RecordIdDeduplicationCounters("unique") {}
+};
+extern UniqueCounters uniqueCounters;
+
+class UniqueRoaringCounters : public RecordIdDeduplicationCounters {
+public:
+    UniqueRoaringCounters() : RecordIdDeduplicationCounters("unique_roaring") {}
+};
+extern UniqueRoaringCounters uniqueRoaringCounters;
+
 /**
  * A common class which holds various counters related to Classic and SBE plan caches.
  */

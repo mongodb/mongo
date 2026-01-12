@@ -103,6 +103,8 @@ private:
         _seen;
     size_t _prevSeenSizeBytes = 0;
     UniqueStats _specificStats;
+
+    DeduplicatorReporter _dedupReporter;
 };
 
 /**
@@ -150,5 +152,7 @@ private:
     size_t _prevSeenSizeBytes = 0;
 
     UniqueStats _specificStats;
+
+    DeduplicatorReporter _dedupReporter;
 };
 }  // namespace mongo::sbe

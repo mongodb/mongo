@@ -145,6 +145,8 @@ private:
     MergeSortStats _specificStats;
 
     SimpleMemoryUsageTracker _memoryTracker;
+
+    DeduplicatorReporter _dedupReporter;
 };
 
 // Parameters that must be provided to a MergeSortStage

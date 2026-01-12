@@ -95,6 +95,8 @@ private:
 
     // Track memory used by this stage for deduplicating.
     SimpleMemoryUsageTracker _memoryTracker;
+
+    DeduplicatorReporter _dedupReporter;
 };
 
 }  // namespace mongo

@@ -179,7 +179,7 @@ private:
 /**
  * This is a utility class for tracking memory usage across multiple arbitrary operators or
  * functions, which are identified by their string names. Tracks both current and highest
- * encountered memory consumption,
+ * encountered memory consumption.
  *
  * It can be used directly by calling MemoryUsageTracker::add(int64_t diff), or by creating a
  * dependent tracker via MemoryUsageTracker::operator[].
@@ -305,6 +305,67 @@ private:
     SimpleMemoryUsageTracker _baseTracker;
     // Tracks memory consumption per function using the output field name as a key.
     stdx::unordered_map<std::string, SimpleMemoryUsageTracker> _functionMemoryTracker;
+};
+
+/**
+ * This is a utility class for tracking memory usage for record deduplication across multiple
+ * arbitrary operators. Optionally, it can be used to report the metrics to the serverStatus
+ * command.
+ */
+class MONGO_MOD_NEEDS_REPLACEMENT DeduplicatorReporter {
+public:
+    DeduplicatorReporter(const DeduplicatorReporter&) = delete;
+    DeduplicatorReporter& operator=(const DeduplicatorReporter&) = delete;
+
+    DeduplicatorReporter(DeduplicatorReporter&&) noexcept = default;
+    DeduplicatorReporter& operator=(DeduplicatorReporter&&) noexcept = default;
+
+    DeduplicatorReporter(std::function<void(int64_t, int64_t)> callback, int64_t chunkSize)
+        : _reportCallback(std::move(callback)), _chunkSize(chunkSize) {
+        tassert(11114200, "Expected positive value for chunkSize", _chunkSize > 0);
+    }
+
+    void add(int64_t diff) {
+        _inUseTrackedMemoryBytes += diff;
+        _inUseRecordIdCount++;
+
+        // When chunking is enabled, we report memory usage in discrete chunks (0, chunkSize,
+        // 2*chunkSize, ...) rather than exact values.
+        // This is to avoid performance regressions, but will also result having slightly less
+        // accurate statistics in serverStatus.
+        int64_t newLowerBound = (_inUseTrackedMemoryBytes / _chunkSize) * _chunkSize;
+
+        // Nothing to report, early exit.
+        if (newLowerBound == _lastReportedLowerBound) {
+            return;
+        }
+
+        if (_reportCallback) {
+            int64_t chunkedDelta = newLowerBound - _lastReportedLowerBound;
+            int64_t recordIdDelta = _inUseRecordIdCount - _lastReportedRecordIdCount;
+            _lastReportedLowerBound = newLowerBound;
+            _lastReportedRecordIdCount = _inUseRecordIdCount;
+            _reportCallback(chunkedDelta, recordIdDelta);
+        }
+    }
+
+private:
+    // Tracks the current memory footprint.
+    int64_t _inUseTrackedMemoryBytes = 0;
+    int64_t _inUseRecordIdCount = 0;
+
+    // Allow for some extra bookkeeping to be done when add() is called. If set, this function will
+    // be invoked with _inUseTrackedMemoryBytes and _inUseRecordIdCount.
+    std::function<void(int64_t, int64_t)> _reportCallback;
+
+    // If set, memory usage updates will only be written to serverStatus if the usage surpasses this
+    // size. Writing to serverStatus involves lock contention, so in performance-sensitive
+    // situations, we should set a non-one size. If 1, no chunking is performed.
+    int64_t _chunkSize;
+    // Last lower-bound chunk reported to serverStatus. Same as _inUseTrackedMemoryBytes and
+    // _inUseRecordIdCount if _chunkSize is 1 (no chunking).
+    int64_t _lastReportedLowerBound = 0;
+    int64_t _lastReportedRecordIdCount = 0;
 };
 
 /**

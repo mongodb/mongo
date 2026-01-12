@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/stats/counters.h"
 
 #include <utility>
 
@@ -67,7 +68,12 @@ UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
     : PlanStage("unique"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
-      _keySlots(keys) {
+      _keySlots(keys),
+      _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
+          [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+              uniqueCounters.incrementPerDeduplication(deduplicatedBytes, deduplicatedRecords);
+          },
+          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())) {
     _children.emplace_back(std::move(input));
 }
 
@@ -120,6 +126,7 @@ PlanState UniqueStage::getNext() {
             size_t newSeenSizeBytes = estimateSetSizeBytes(_seen);
             _memoryTracker->add((newSeenSizeBytes - _prevSeenSizeBytes) +
                                 estimateRowSizeBytes(*it));
+            _dedupReporter.add((newSeenSizeBytes - _prevSeenSizeBytes) + estimateRowSizeBytes(*it));
             _prevSeenSizeBytes = newSeenSizeBytes;
             uassert(11130301,
                     "Exceeded memory limit in record id deduplicator for unique stage",
@@ -205,7 +212,13 @@ UniqueRoaringStage::UniqueRoaringStage(std::unique_ptr<PlanStage> input,
       _seen(static_cast<size_t>(internalRoaringBitmapsThreshold.load()),
             static_cast<size_t>(internalRoaringBitmapsBatchSize.load()),
             static_cast<uint64_t>(internalRoaringBitmapsThreshold.load() /
-                                  internalRoaringBitmapsMinimalDensity.load())) {
+                                  internalRoaringBitmapsMinimalDensity.load())),
+      _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
+          [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+              uniqueRoaringCounters.incrementPerDeduplication(deduplicatedBytes,
+                                                              deduplicatedRecords);
+          },
+          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())) {
     _children.emplace_back(std::move(input));
 }
 
@@ -276,6 +289,7 @@ PlanState UniqueRoaringStage::getNext() {
         if (inserted) {
             size_t newSeenSizeBytes = _seen.getApproximateSize();
             _memoryTracker->add(newSeenSizeBytes - _prevSeenSizeBytes);
+            _dedupReporter.add(newSeenSizeBytes - _prevSeenSizeBytes);
             _prevSeenSizeBytes = newSeenSizeBytes;
             uassert(11130300,
                     "Exceeded memory limit in record id deduplicator for unique_roaring stage",

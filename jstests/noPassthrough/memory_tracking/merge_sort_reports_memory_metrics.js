@@ -32,6 +32,8 @@ if (checkSbeFullyEnabled(db)) {
     quit();
 }
 
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryMaxWriteToServerStatusMemoryUsageBytes: 1}));
+
 const collName = jsTestName();
 const coll = db[collName];
 db[collName].drop();
@@ -62,6 +64,7 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
         expectedNumGetMores: 5,
         // This stage does not release memory on EOF.
         checkInUseTrackedMemBytesResets: false,
+        skipServerStatusStageCheck: false,
     });
 }
 
@@ -80,6 +83,7 @@ assert.commandWorked(coll.createIndex({b: 1, c: 1}));
         stageName: "SORT_MERGE",
         expectedNumGetMores: 2,
         checkInUseTrackedMemBytesResets: false,
+        skipServerStatusStageCheck: false,
     });
 }
 

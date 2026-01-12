@@ -242,6 +242,8 @@ private:
     bool _endKeyInclusive;
 
     SimpleMemoryUsageTracker _memoryTracker;
+
+    DeduplicatorReporter _dedupReporter;
 };
 
 }  // namespace mongo

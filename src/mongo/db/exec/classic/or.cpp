@@ -33,12 +33,12 @@
 #include "mongo/db/exec/classic/filter.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/stats/counters.h"
 
 #include <iterator>
 #include <memory>
 #include <utility>
 #include <vector>
-
 
 namespace mongo {
 
@@ -58,7 +58,12 @@ OrStage::OrStage(ExpressionContext* expCtx,
       _dedup(dedup),
       _recordIdDeduplicator(expCtx),
       _memoryTracker(OperationMemoryUsageTracker::createSimpleMemoryUsageTrackerForStage(
-          *expCtx, loadMemoryLimit(StageMemoryLimit::OrStageMaxMemoryBytes))) {}
+          *expCtx, loadMemoryLimit(StageMemoryLimit::OrStageMaxMemoryBytes))),
+      _dedupReporter(OperationMemoryUsageTracker::createDeduplicatorReporter(
+          [](int64_t deduplicatedBytes, int64_t deduplicatedRecords) {
+              orCounters.incrementPerDeduplication(deduplicatedBytes, deduplicatedRecords);
+          },
+          internalQueryMaxWriteToServerStatusMemoryUsageBytes.loadRelaxed())) {}
 
 void OrStage::addChild(std::unique_ptr<PlanStage> child) {
     _children.emplace_back(std::move(child));
@@ -100,6 +105,7 @@ PlanStage::StageState OrStage::doWork(WorkingSetID* out) {
             } else {
                 uint64_t dedupBytes = _recordIdDeduplicator.getApproximateSize();
                 _memoryTracker.add(dedupBytes - dedupBytesPrev);
+                _dedupReporter.add(dedupBytes - dedupBytesPrev);
                 _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
                 uassert(11130302,
                         "Exceeded memory limit in record id deduplicator for OR stage",
