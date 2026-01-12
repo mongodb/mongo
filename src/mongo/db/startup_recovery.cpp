@@ -872,14 +872,20 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     Lock::GlobalWrite lk(opCtx);
 
-    // Create the FCV document for the first time, if necessary. Replica set nodes only initialize
-    // the FCV when the replica set is first initiated or by data replication.
+    // Create the FCV document for the first time, if necessary.
+    // - Replica set nodes only initialize the FCV when the replica set is first initiated or by
+    // data replication.
+    // - We should also not create the FCV document when the storage engine is not ready to accept
+    // writes according to PersistenceProvider::shouldDelayDataAccessDuringStartup(). In this
+    // persistence mode, the MDB catalog will not be available to include new entry for the FCV
+    // collection. The FCV collection will be included in the WT checkpoint that will be loaded
+    // eventually.
     const bool usingReplication =
         repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
-    if (isWriteableStorageEngine() && !usingReplication) {
-        const auto minumumRequiredFCV = rss::ReplicatedStorageService::get(opCtx)
-                                            .getPersistenceProvider()
-                                            .getMinimumRequiredFCV();
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    if (isWriteableStorageEngine() && !usingReplication &&
+        !provider.shouldDelayDataAccessDuringStartup()) {
+        const auto minumumRequiredFCV = provider.getMinimumRequiredFCV();
         FeatureCompatibilityVersion::setIfCleanStartup(
             opCtx, repl::StorageInterface::get(opCtx), minumumRequiredFCV);
     }
