@@ -52,6 +52,90 @@ inline auto swapStages(DocumentSourceContainer& container,
 }
 }  // namespace
 
+namespace registration_detail {
+namespace {
+struct RuleRegistration {
+    PipelineRewriteRule rule;
+    FeatureFlag* featureFlag = nullptr;
+};
+}  // namespace
+
+/**
+ * Manages a mapping between DocumentSources and rewrite rules that are applicable to them.
+ */
+class RuleRegistry {
+public:
+    void registerRules(std::type_index key,
+                       std::vector<Rule<PipelineRewriteContext>> rules,
+                       FeatureFlag* featureFlag) {
+        for (auto&& rule : rules) {
+            tassert(11010016,
+                    str::stream() << "Duplicate rule name \"" << rule.name << '\"',
+                    _registeredRuleNames.insert(rule.name).second);
+
+            _rules[key].emplace_back(std::move(rule), featureFlag);
+        }
+    }
+
+    const std::vector<RuleRegistration>& getRules(ExpressionContext& expCtx,
+                                                  const DocumentSource& ds) const {
+        static const std::vector<RuleRegistration> kEmpty = {};
+
+        auto it = _rules.find(std::type_index{typeid(ds)});
+        return it == _rules.end() ? kEmpty : it->second;
+    }
+
+private:
+    std::set<std::string> _registeredRuleNames;
+    stdx::unordered_map<std::type_index, std::vector<RuleRegistration>> _rules;
+};
+
+namespace {
+const auto getPipelineRewriteRuleRegistry = ServiceContext::declareDecoration<RuleRegistry>();
+}
+
+void registerRules(ServiceContext* serviceCtx,
+                   std::type_index key,
+                   std::vector<Rule<PipelineRewriteContext>> rules,
+                   FeatureFlag* featureFlag) {
+    auto& registry = getPipelineRewriteRuleRegistry(serviceCtx);
+    registry.registerRules(key, std::move(rules), featureFlag);
+}
+
+void clearRulesForTest(ServiceContext* serviceCtx) {
+    auto& registry = getPipelineRewriteRuleRegistry(serviceCtx);
+    registry = {};
+}
+}  // namespace registration_detail
+
+PipelineRewriteContext::PipelineRewriteContext(Pipeline& pipeline)
+    : PipelineRewriteContext(*pipeline.getContext(), pipeline.getSources()) {}
+
+PipelineRewriteContext::PipelineRewriteContext(
+    ExpressionContext& expCtx,
+    DocumentSourceContainer& container,
+    boost::optional<DocumentSourceContainer::iterator> startingPos)
+    : _container(container),
+      _itr(startingPos.value_or(_container.begin())),
+      _expCtx(expCtx),
+      _registry(registration_detail::getPipelineRewriteRuleRegistry(
+          _expCtx.getOperationContext()->getServiceContext())) {}
+
+void PipelineRewriteContext::enqueueRules() {
+    for (auto&& registration : _registry.getRules(_expCtx, current())) {
+        // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized.
+        bool enabled = !registration.featureFlag ||
+            registration.featureFlag->checkWithContext(
+                _expCtx.getVersionContext(),
+                *_expCtx.getIfrContext(),
+                ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS});
+
+        if (enabled) {
+            addRule(registration.rule);
+        }
+    }
+}
+
 void PipelineRewriteContext::advance() {
     tassert(11010008, "Already at the end of the container", hasMore());
     _itr = std::next(_itr);
@@ -126,77 +210,5 @@ bool Transforms::partialPushdown(PipelineRewriteContext& ctx,
     ctx._itr = prevOrFirstItr(ctx._container, std::prev(ctx._itr));
     return true;
 }
-
-namespace {
-struct RuleRegistration {
-    PipelineRewriteRule rule;
-    FeatureFlag* featureFlag = nullptr;
-};
-
-/**
- * Manages a mapping between DocumentSources and rewrite rules that are applicable to them.
- */
-class RuleRegistry {
-public:
-    void registerRules(std::type_index key,
-                       std::vector<PipelineRewriteRule> rules,
-                       FeatureFlag* featureFlag) {
-        for (auto&& rule : rules) {
-            tassert(11010016,
-                    str::stream() << "Duplicate rule name \"" << rule.name << '\"',
-                    _registeredRuleNames.insert(rule.name).second);
-
-            _rules[key].emplace_back(std::move(rule), featureFlag);
-        }
-    }
-
-    const std::vector<RuleRegistration>& getRules(ExpressionContext& expCtx,
-                                                  const DocumentSource& ds) const {
-        static const std::vector<RuleRegistration> kEmpty = {};
-
-        auto it = _rules.find(std::type_index{typeid(ds)});
-        return it == _rules.end() ? kEmpty : it->second;
-    }
-
-private:
-    std::set<std::string> _registeredRuleNames;
-    stdx::unordered_map<std::type_index, std::vector<RuleRegistration>> _rules;
-};
-
-const auto getPipelineRewriteRuleRegistry = ServiceContext::declareDecoration<RuleRegistry>();
-}  // namespace
-
-void PipelineRewriteContext::enqueueRules() {
-    auto& registry =
-        getPipelineRewriteRuleRegistry(_expCtx.getOperationContext()->getServiceContext());
-
-    for (auto&& registration : registry.getRules(_expCtx, current())) {
-        // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized.
-        bool enabled = !registration.featureFlag ||
-            registration.featureFlag->checkWithContext(
-                _expCtx.getVersionContext(),
-                *_expCtx.getIfrContext(),
-                ServerGlobalParams::FCVSnapshot{multiversion::GenericFCV::kLastLTS});
-
-        if (enabled) {
-            addRule(registration.rule);
-        }
-    }
-}
-
-namespace registration_detail {
-void registerRules(ServiceContext* serviceCtx,
-                   std::type_index key,
-                   std::vector<Rule<PipelineRewriteContext>> rules,
-                   FeatureFlag* featureFlag) {
-    auto& registry = getPipelineRewriteRuleRegistry(serviceCtx);
-    registry.registerRules(key, std::move(rules), featureFlag);
-}
-
-void clearRulesForTest(ServiceContext* serviceCtx) {
-    auto& registry = getPipelineRewriteRuleRegistry(serviceCtx);
-    registry = {};
-}
-}  // namespace registration_detail
 
 }  // namespace mongo::rule_based_rewrites::pipeline

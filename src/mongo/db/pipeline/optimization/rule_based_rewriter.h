@@ -112,6 +112,10 @@ constexpr double kDefaultOptimizeAtPriority = 10.0;
 // For rules that optimize a stage in place.
 constexpr double kDefaultOptimizeInPlacePriority = 1.0;
 
+namespace registration_detail {
+class RuleRegistry;
+}
+
 /**
  * Provides methods for walking and modifying a pipeline. Treats the pipeline as a linked list. Uses
  * the document source visitor registry to track which rules can apply to which document sources.
@@ -126,13 +130,11 @@ public:
         Reordering = 1 << 1,
     };
 
-    PipelineRewriteContext(Pipeline& pipeline)
-        : PipelineRewriteContext(*pipeline.getContext(), pipeline.getSources()) {}
+    PipelineRewriteContext(Pipeline& pipeline);
 
     PipelineRewriteContext(ExpressionContext& expCtx,
                            DocumentSourceContainer& container,
-                           boost::optional<DocumentSourceContainer::iterator> startingPos = {})
-        : _container(container), _itr(startingPos.value_or(_container.begin())), _expCtx(expCtx) {}
+                           boost::optional<DocumentSourceContainer::iterator> startingPos = {});
 
     bool hasMore() const final {
         return _itr != _container.end();
@@ -188,6 +190,7 @@ private:
     DocumentSourceContainer::iterator _itr;
 
     ExpressionContext& _expCtx;
+    registration_detail::RuleRegistry& _registry;
 
     friend struct Transforms;
 };
