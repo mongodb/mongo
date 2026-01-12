@@ -363,7 +363,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
  */
 StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx,
                                           const CollectionPtr& collection) {
-    invariant(collection);
+    tassert(9911911, "", collection);
 
     std::vector<const IndexDescriptor*> idxs;
     collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_2D, idxs);
@@ -1578,7 +1578,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& coll
     Pipeline::SourceContainer& sources = pipeline->_sources;
     auto expCtx = pipeline->getContext();
     const auto geoNearStage = dynamic_cast<DocumentSourceGeoNear*>(sources.front().get());
-    invariant(geoNearStage);
+    tassert(9911900, "", geoNearStage);
 
     // If the user specified a "key" field, use that field to satisfy the "near" query. Otherwise,
     // look for a geo-indexed field in 'collection' that can.
