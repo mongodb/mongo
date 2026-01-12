@@ -112,10 +112,11 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(mockExtension,
 using DocumentSourceExtensionParserTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyregisterParser) {
-    LiteParsedDocumentSource::registerParser("$customExtension",
-                                             MockExtensionLiteParsed::parse,
-                                             AllowedWithApiStrict::kAlways,
-                                             AllowedWithClientType::kAny);
+    LiteParsedDocumentSource::registerParser(
+        "$customExtension",
+        {.parser = MockExtensionLiteParsed::parse,
+         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+         .allowedWithClientType = AllowedWithClientType::kAny});
 
     // Verify registration by parsing a stage with the new parser.
     BSONObj stageSpec = BSON("$customExtension" << BSON("field" << 1));
@@ -126,10 +127,11 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldSuccessfullyregisterParser) {
 using DocumentSourceExtensionParserTestDeathTest = DocumentSourceExtensionParserTest;
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldCreateDocumentSourceFromExtensionParser) {
-    LiteParsedDocumentSource::registerParser("$workingExtension",
-                                             MockExtensionLiteParsed::parse,
-                                             AllowedWithApiStrict::kAlways,
-                                             AllowedWithClientType::kAny);
+    LiteParsedDocumentSource::registerParser(
+        "$workingExtension",
+        {.parser = MockExtensionLiteParsed::parse,
+         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+         .allowedWithClientType = AllowedWithClientType::kAny});
 
     BSONObj stageSpec = BSON("$workingExtension" << BSON("field" << 1));
 
@@ -141,10 +143,11 @@ TEST_F(DocumentSourceExtensionParserTest, ShouldCreateDocumentSourceFromExtensio
 }
 
 TEST_F(DocumentSourceExtensionParserTest, ShouldIntegrateWithBuiltinStages) {
-    LiteParsedDocumentSource::registerParser("$integrationTest",
-                                             MockExtensionLiteParsed::parse,
-                                             AllowedWithApiStrict::kAlways,
-                                             AllowedWithClientType::kAny);
+    LiteParsedDocumentSource::registerParser(
+        "$integrationTest",
+        {.parser = MockExtensionLiteParsed::parse,
+         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+         .allowedWithClientType = AllowedWithClientType::kAny});
 
     // Check for both built-in and extension parsers using a vector to avoid duplication.
     std::vector<std::pair<std::string, BSONObj>> stageTests = {

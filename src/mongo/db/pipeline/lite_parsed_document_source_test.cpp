@@ -60,11 +60,12 @@ std::unique_ptr<LiteParsedDocumentSource> createMockParser(const NamespaceString
 class LiteParserRegistrationTest : public unittest::Test {
 protected:
     void setUp() override {
-        primaryParser = {
-            createMockParser, AllowedWithApiStrict::kAlways, AllowedWithClientType::kAny};
-        fallbackParser = {createMockParser,
-                          AllowedWithApiStrict::kNeverInVersion1,
-                          AllowedWithClientType::kInternal};
+        primaryParser = {.parser = createMockParser,
+                         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+                         .allowedWithClientType = AllowedWithClientType::kAny};
+        fallbackParser = {.parser = createMockParser,
+                          .allowedWithApiStrict = AllowedWithApiStrict::kNeverInVersion1,
+                          .allowedWithClientType = AllowedWithClientType::kInternal};
     }
 
     void assertParserIsPrimary(const LiteParsedDocumentSource::LiteParserInfo& parserInfo) {
@@ -202,18 +203,20 @@ TEST_F(LiteParserRegistrationTest, GetParserWithEmptyIfrContextFlag) {
 class LiteParsedDocumentSourceParseTest : public unittest::Test {
 protected:
     void registerPrimaryParser() {
-        LiteParsedDocumentSource::registerParser(_stageName,
-                                                 createMockParser,
-                                                 AllowedWithApiStrict::kAlways,
-                                                 AllowedWithClientType::kAny);
+        LiteParsedDocumentSource::registerParser(
+            _stageName,
+            {.parser = createMockParser,
+             .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+             .allowedWithClientType = AllowedWithClientType::kAny});
     }
 
     void registerFallbackParser(FeatureFlag* ff) {
-        LiteParsedDocumentSource::registerFallbackParser(_stageName,
-                                                         createMockParser,
-                                                         ff,
-                                                         AllowedWithApiStrict::kNeverInVersion1,
-                                                         AllowedWithClientType::kInternal);
+        LiteParsedDocumentSource::registerFallbackParser(
+            _stageName,
+            ff,
+            {.parser = createMockParser,
+             .allowedWithApiStrict = AllowedWithApiStrict::kNeverInVersion1,
+             .allowedWithClientType = AllowedWithClientType::kInternal});
     }
 
     void tearDown() override {
@@ -266,11 +269,12 @@ TEST_F(LiteParsedDocumentSourceParseTest, FirstFallbackParserTakesPrecedence) {
     registerPrimaryParser();
 
     // Try creating another fallback parser.
-    LiteParsedDocumentSource::registerFallbackParser(_stageName,
-                                                     createMockParser,
-                                                     &mockFlag,
-                                                     AllowedWithApiStrict::kNeverInVersion1,
-                                                     AllowedWithClientType::kAny);
+    LiteParsedDocumentSource::registerFallbackParser(
+        _stageName,
+        &mockFlag,
+        {.parser = createMockParser,
+         .allowedWithApiStrict = AllowedWithApiStrict::kNeverInVersion1,
+         .allowedWithClientType = AllowedWithClientType::kAny});
 
     // Ensure that the parser info is the original fallback parser.
     auto parserInfo = getParserInfo();
@@ -286,11 +290,12 @@ TEST_F(LiteParsedDocumentSourceParseTest, FirstFallbackParserTakesPrecedenceWith
     registerFallbackParser(&mockFlag);
 
     // Try creating another fallback parser.
-    LiteParsedDocumentSource::registerFallbackParser(_stageName,
-                                                     createMockParser,
-                                                     &mockFlag,
-                                                     AllowedWithApiStrict::kNeverInVersion1,
-                                                     AllowedWithClientType::kAny);
+    LiteParsedDocumentSource::registerFallbackParser(
+        _stageName,
+        &mockFlag,
+        {.parser = createMockParser,
+         .allowedWithApiStrict = AllowedWithApiStrict::kNeverInVersion1,
+         .allowedWithClientType = AllowedWithClientType::kAny});
 
     // Ensure that the parser info is the original fallback parser.
     auto parserInfo = getParserInfo();

@@ -150,13 +150,15 @@ namespace mongo {
         bool evaluatedCondition{__VA_ARGS__};                                                   \
         if (!evaluatedCondition || (featureFlagValue && !featureFlagValue->canBeEnabled())) {   \
             LiteParsedDocumentSource::registerParser("$" #key,                                  \
-                                                     LiteParsedDocumentSource::parseDisabled,   \
-                                                     allowedWithApiStrict,                      \
-                                                     clientType);                               \
+                                                     {LiteParsedDocumentSource::parseDisabled,  \
+                                                      false,                                    \
+                                                      false,                                    \
+                                                      allowedWithApiStrict,                     \
+                                                      clientType});                             \
             return;                                                                             \
         }                                                                                       \
         LiteParsedDocumentSource::registerParser(                                               \
-            "$" #key, liteParser, allowedWithApiStrict, clientType);                            \
+            "$" #key, {liteParser, false, false, allowedWithApiStrict, clientType});            \
     }
 
 #define ALLOCATE_AND_REGISTER_STAGE_PARAMS(registrationName, StageParamsClass) \
@@ -206,14 +208,16 @@ namespace mongo {
  * Registers a fallback LiteParsedDocumentSource parser that will be used when no primary parser is
  * registered or when the associated feature flag is disabled.
  */
-#define REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(                                             \
-    key, liteParser, allowedWithApiStrict, featureFlag)                                            \
-    MONGO_INITIALIZER_GENERAL(addToLiteParsedFallbackParserMap_##key,                              \
-                              ("BeginDocumentSourceFallbackRegistration"),                         \
-                              ("EndDocumentSourceFallbackRegistration"))                           \
-    (InitializerContext*) {                                                                        \
-        LiteParsedDocumentSource::registerFallbackParser(                                          \
-            "$" #key, liteParser, featureFlag, allowedWithApiStrict, AllowedWithClientType::kAny); \
+#define REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(                                      \
+    key, liteParser, allowedWithApiStrict, featureFlag)                                     \
+    MONGO_INITIALIZER_GENERAL(addToLiteParsedFallbackParserMap_##key,                       \
+                              ("BeginDocumentSourceFallbackRegistration"),                  \
+                              ("EndDocumentSourceFallbackRegistration"))                    \
+    (InitializerContext*) {                                                                 \
+        LiteParsedDocumentSource::registerFallbackParser(                                   \
+            "$" #key,                                                                       \
+            featureFlag,                                                                    \
+            {liteParser, false, false, allowedWithApiStrict, AllowedWithClientType::kAny}); \
     }
 
 /**

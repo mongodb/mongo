@@ -88,12 +88,14 @@ void registerStubParser(std::string stageName, std::string message, FeatureFlag*
         uasserted(10918500, message);
     };
 
-    LiteParsedDocumentSource::registerFallbackParser(std::move(stageName),
-                                                     std::move(stubParser),
-                                                     featureFlag,
-                                                     AllowedWithApiStrict::kAlways,
-                                                     AllowedWithClientType::kAny,
-                                                     true /*isStub*/);
+    LiteParsedDocumentSource::registerFallbackParser(
+        std::move(stageName),
+        featureFlag,
+        {.parser = std::move(stubParser),
+         .fromExtension = true,
+         .isStub = true,
+         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+         .allowedWithClientType = AllowedWithClientType::kAny});
 }
 
 void registerUnloadedExtensionStubParsers() {

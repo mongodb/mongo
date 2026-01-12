@@ -197,7 +197,11 @@ void DocumentSourceExtension::registerStage(AggStageDescriptorHandle descriptor)
     }();
 
     LiteParsedDocumentSource::registerParser(
-        stageName, std::move(parser), AllowedWithApiStrict::kAlways, AllowedWithClientType::kAny);
+        stageName,
+        {.parser = std::move(parser),
+         .fromExtension = true,
+         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+         .allowedWithClientType = AllowedWithClientType::kAny});
 }
 
 DocumentSourceExtension::DocumentSourceExtension(

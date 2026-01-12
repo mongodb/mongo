@@ -99,11 +99,10 @@ void LiteParsedDocumentSource::LiteParserRegistration::setPrimaryParser(LitePars
 }
 
 void LiteParsedDocumentSource::LiteParserRegistration::setFallbackParser(
-    LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff, bool isStub) {
+    LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff) {
     _fallbackParser = std::move(lpi);
     _primaryParserFeatureFlag = ff;
     _fallbackIsSet = true;
-    _isStub = isStub;
 }
 
 bool LiteParsedDocumentSource::LiteParserRegistration::isPrimarySet() const {
@@ -114,10 +113,7 @@ bool LiteParsedDocumentSource::LiteParserRegistration::isFallbackSet() const {
     return _fallbackIsSet;
 }
 
-void LiteParsedDocumentSource::registerParser(const std::string& name,
-                                              Parser parser,
-                                              AllowedWithApiStrict allowedWithApiStrict,
-                                              AllowedWithClientType allowedWithClientType) {
+void LiteParsedDocumentSource::registerParser(const std::string& name, LiteParserInfo parserInfo) {
     // It's possible an extension stage is being registered to override an existing server stage
     // (like $vectorSearch), so we should skip re-initializing a counter. We do not assert that
     // this is legal since we do that validation in DocumentSource::registerParser().
@@ -135,15 +131,12 @@ void LiteParsedDocumentSource::registerParser(const std::string& name,
                     "Cannot override primary parser on aggregation stage.",
                     "stageName"_attr = name);
     }
-    registration.setPrimaryParser({parser, allowedWithApiStrict, allowedWithClientType});
+    registration.setPrimaryParser(std::move(parserInfo));
 }
 
 void LiteParsedDocumentSource::registerFallbackParser(const std::string& name,
-                                                      Parser parser,
                                                       FeatureFlag* parserFeatureFlag,
-                                                      AllowedWithApiStrict allowedWithApiStrict,
-                                                      AllowedWithClientType allowedWithClientType,
-                                                      bool isStub) {
+                                                      LiteParserInfo parserInfo) {
     if (parserMap.contains(name)) {
         const auto& registration = parserMap.at(name);
 
@@ -178,8 +171,7 @@ void LiteParsedDocumentSource::registerFallbackParser(const std::string& name,
                 ifrFeatureFlag != nullptr);
     }
 
-    registration.setFallbackParser(
-        {parser, allowedWithApiStrict, allowedWithClientType}, ifrFeatureFlag, isStub);
+    registration.setFallbackParser(std::move(parserInfo), ifrFeatureFlag);
 }
 
 void LiteParsedDocumentSource::unregisterParser_forTest(const std::string& name) {

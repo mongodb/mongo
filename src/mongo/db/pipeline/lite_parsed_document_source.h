@@ -218,6 +218,11 @@ public:
 
     struct LiteParserInfo {
         Parser parser;
+        // True if this stage is implemented by an extension.
+        bool fromExtension = false;
+        // Stub parsers are registered just to give a better error message if a stage is not loaded
+        // that might otherwise be available.
+        bool isStub = false;
         AllowedWithApiStrict allowedWithApiStrict;
         AllowedWithClientType allowedWithClientType;
     };
@@ -234,9 +239,7 @@ public:
         void setPrimaryParser(LiteParserInfo&& lpi);
 
         // TODO SERVER-114028 Update when fallback parsing supports all feature flags.
-        void setFallbackParser(LiteParserInfo&& lpi,
-                               IncrementalRolloutFeatureFlag* ff,
-                               bool isStub = false);
+        void setFallbackParser(LiteParserInfo&& lpi, IncrementalRolloutFeatureFlag* ff);
 
         bool isPrimarySet() const;
 
@@ -245,7 +248,7 @@ public:
         // Returns true if the parser is executable, meaning it has either a primary or a non-stub
         // fallback.
         bool isExecutable() const {
-            return _primaryIsSet || !_isStub;
+            return _primaryIsSet || !_fallbackParser.isStub;
         }
 
     private:
@@ -267,9 +270,6 @@ public:
 
         // Whether or not the fallback parser has been registered or not.
         bool _fallbackIsSet = false;
-
-        // Whether the fallback parser is a stub parser that just throws an error.
-        bool _isStub = false;
     };
 
     using ParserMap = StringMap<LiteParsedDocumentSource::LiteParserRegistration>;
@@ -287,24 +287,18 @@ public:
 
     /**
      * Registers a DocumentSource with a spec parsing function, so that when a stage with the given
-     * name is encountered, it will call 'parser' to construct that stage's specification object.
-     * The flag 'allowedWithApiStrict' is used to control the allowance of the stage when
-     * 'apiStrict' is set to true.
+     * name is encountered, it will call 'parserInfo.parser' to construct that stage's specification
+     * object. The flag 'parserInfo.allowedWithApiStrict' is used to control the allowance of the
+     * stage when 'apiStrict' is set to true.
      *
      * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
      * document_source.h.
      */
-    static void registerParser(const std::string& name,
-                               Parser parser,
-                               AllowedWithApiStrict allowedWithApiStrict,
-                               AllowedWithClientType allowedWithClientType);
+    static void registerParser(const std::string& name, LiteParserInfo parserInfo);
 
     static void registerFallbackParser(const std::string& name,
-                                       Parser parser,
                                        FeatureFlag* parserFeatureFlag,
-                                       AllowedWithApiStrict allowedWithApiStrict,
-                                       AllowedWithClientType allowedWithClientType,
-                                       bool isStub = false);
+                                       LiteParserInfo);
 
     /**
      * Function that will be used as an alternate parser for a document source that has been

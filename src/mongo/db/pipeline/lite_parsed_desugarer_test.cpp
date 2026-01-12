@@ -68,10 +68,11 @@ public:
             };
         }();
 
-        LiteParsedDocumentSource::registerParser(stageName,
-                                                 std::move(parser),
-                                                 AllowedWithApiStrict::kAlways,
-                                                 AllowedWithClientType::kAny);
+        LiteParsedDocumentSource::registerParser(
+            stageName,
+            {.parser = std::move(parser),
+             .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+             .allowedWithClientType = AllowedWithClientType::kAny});
     }
 
     void unregisterParser(const std::string& stageName) {
