@@ -491,6 +491,7 @@ tasks:
             --features=strip_debug
             --separate_debug=False
             --remote_download_outputs=minimal
+            --zip_undeclared_test_outputs
 
 task_groups:
   - name: resmoke_tests_TG
