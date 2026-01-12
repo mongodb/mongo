@@ -116,6 +116,12 @@ public:
         // cost. This may include some plans in 'solutions' and all of the plans in 'rejectedPlans'.
         // If two plans contain identical QSNs, they are treated as separate entries in this map.
         cost_based_ranker::EstimateMap estimates;
+
+        // True if these plans were chosen without a pre-execution trial run that measured the
+        // 'work' metric (for example, selected by a non-multiplanner). Such plans must be
+        // run in a pre-execution phase to measure the amount of work done to produce the
+        // first batch, so they can be considered for insertion into the classic plan cache.
+        bool needsWorksMeasured{false};
     };
 
     /**

@@ -1752,7 +1752,8 @@ StatusWith<QueryPlanner::PlanRankingResult> QueryPlanner::planWithCostBasedRanki
 
     return QueryPlanner::PlanRankingResult{.solutions = std::move(acceptedSoln),
                                            .rejectedPlans = std::move(rejectedSoln),
-                                           .estimates = std::move(estimates)};
+                                           .estimates = std::move(estimates),
+                                           .needsWorksMeasured = true};
 }
 
 /**
