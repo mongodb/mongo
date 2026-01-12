@@ -23,16 +23,16 @@ if (shardNames.length < 2) {
 }
 
 // Get the number of nodes in a shard's replica set
-const shardMap = db.adminCommand({getShardMap: 1});
+const shards = db.adminCommand({listShards: 1}).shards;
 let numNodesPerRS = 0;
-for (const [key, value] of Object.entries(shardMap.map)) {
-    if (key !== "config") {
-        const nodes = value.split(",").length;
-        if (numNodesPerRS == 0) {
-            numNodesPerRS = nodes;
-        } else {
-            assert(nodes >= numNodesPerRS);
-        }
+for (const shard of shards) {
+    // Parse the host connection string (format: "replicaSetName/host1:port,host2:port,...")
+    const hostString = shard.host;
+    const nodes = hostString.includes("/") ? hostString.split("/")[1].split(",").length : 1;
+    if (numNodesPerRS == 0) {
+        numNodesPerRS = nodes;
+    } else {
+        assert(nodes >= numNodesPerRS);
     }
 }
 
