@@ -217,8 +217,7 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
     StringSet topLevelSampleFieldNames;
     std::unique_ptr<ce::SamplingEstimator> samplingEstimator{nullptr};
     std::unique_ptr<ce::ExactCardinalityEstimator> exactCardinality{nullptr};
-    if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE ||
-        rankerMode == QueryPlanRankerModeEnum::kAutomaticCE) {
+    if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
         using namespace cost_based_ranker;
         samplingEstimator = ce::SamplingEstimatorImpl::makeDefaultSamplingEstimator(
             *_query,
@@ -253,7 +252,9 @@ Status SubplanStage::pickBestPlan(const QueryPlannerParams& plannerParams,
 
 
     // Plan each branch of the $or.
-    if (rankerMode != QueryPlanRankerModeEnum::kMultiPlanning && subplanningStatus.isOK()) {
+    bool useMultiplanner = rankerMode == QueryPlanRankerModeEnum::kMultiPlanning ||
+        rankerMode == QueryPlanRankerModeEnum::kAutomaticCE;
+    if (!useMultiplanner && subplanningStatus.isOK()) {
         if (rankerMode == QueryPlanRankerModeEnum::kSamplingCE) {
             // If we do not have any fields that we want to sample then we just include all the
             // fields in the sample. This can occur if we encounter a find all query with no project

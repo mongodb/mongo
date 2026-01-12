@@ -1000,6 +1000,9 @@ error_codes:
     }
   - {code: 480, name: UnrecognizedIFRFlag}
 
+  # Planner errors
+  - {code: 481, name: MaxNumberOrPlansExceeded}
+
   # Error codes 4000-8999 are reserved.
 
   # Non-sequential error codes for compatibility only)
