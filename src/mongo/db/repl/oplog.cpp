@@ -1312,6 +1312,19 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto idxName = setMkEntry.getIdxName();
           const auto paths = uassertStatusOK(multikey_paths::parse(setMkEntry.getPaths()));
 
+          // Ignore setMultikeyMetadata when in initial sync, to avoid having to deal with
+          // idempotency. This is acceptable because by design, the resynced node is not expected to
+          // have consistent multikey timestamping relative to its sync source. The syncing node
+          // will apply the multikey metadata implicitly during cloning and/or oplog application.
+          // See SERVER-113190.
+          if (mode == OplogApplication::Mode::kInitialSync) {
+              LOGV2_DEBUG(11643500,
+                          1,
+                          "Skipping applying operation during initialSync",
+                          "oplogEntry"_attr = redact(op->toBSONForLogging()));
+              return Status::OK();
+          }
+
           writeConflictRetryWithLimit(opCtx, "applyOps_setMultikeyMetadata", ns, [&] {
               const auto coll = acquireCollection(
                   opCtx,
@@ -1338,7 +1351,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           });
           return Status::OK();
       },
-      {ErrorCodes::NamespaceNotFound}}},
+      {}}},
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write
