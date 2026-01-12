@@ -130,7 +130,8 @@ public:
         boost::optional<ResolvedView> resolvedView,
         boost::optional<AggregateCommandRequest> originalRequest,
         boost::optional<ExplainOptions::Verbosity> verbosity,
-        BSONObjBuilder* result);
+        BSONObjBuilder* result,
+        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
 
     /**
      * Retries a command that was previously run on a view by resolving the view as an aggregation

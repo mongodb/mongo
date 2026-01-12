@@ -60,6 +60,9 @@ namespace search_helpers {
 
 static constexpr StringData kViewFieldName = "view"_sd;
 static constexpr StringData kProtocolStoredFieldsName = "storedSource"_sd;
+// The stage name of the extension's executable agg stage. IMPORTANT - if this changes in the vector
+// search extension, we must change it here or else the metrics will not be reported correctly.
+static constexpr StringData kExtensionVectorSearchStageName = "$_extensionVectorSearch"_sd;
 
 /**
  * Consult mongot to get planning information for sharded search queries, used to configure the
@@ -91,7 +94,7 @@ bool isSearchMetaPipeline(const Pipeline* pipeline);
  * Checks that the *user* pipeline contains a search stage and sets the view on expCtx.
  */
 void checkAndSetViewOnExpCtx(boost::intrusive_ptr<ExpressionContext> expCtx,
-                             std::vector<mongo::BSONObj> pipelineObj,
+                             const LiteParsedPipeline& liteParsedPipeline,
                              ResolvedView resolvedView,
                              const NamespaceString& viewName);
 
@@ -120,6 +123,12 @@ bool isSearchMetaStage(const DocumentSource* stage);
  * Check if this is a search-related stage that will rely on calls to mongot.
  */
 bool isMongotStage(DocumentSource* stage);
+
+/**
+ * Check if this is a $vectorSearch-as-an-extension stage.
+ * TODO SERVER-116021 Remove this function when the extension can do this through ViewPolicy.
+ */
+bool isExtensionVectorSearchStage(std::string stageName);
 
 /**
  * Asserts that $$SEARCH_META is accessed correctly; that is, it is set by a prior stage, and is

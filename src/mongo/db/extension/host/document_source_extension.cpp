@@ -33,6 +33,7 @@
 #include "mongo/db/extension/host/document_source_extension_expandable.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 
 namespace mongo::extension::host {
 
@@ -177,6 +178,16 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForLiteParsedExtension
             ExpandableStageParams::id != StageParams::kUnallocatedId);
     LiteParsedDesugarer::registerStageExpander(
         ExpandableStageParams::id, DocumentSourceExtension::LiteParsedExpandable::stageExpander);
+}
+
+// TODO SERVER-116021 Remove this check when the extension can do this through ViewPolicy.
+bool DocumentSourceExtension::LiteParsedExpandable::isExtensionVectorSearchStage() const {
+    return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
+}
+
+// TODO SERVER-116021 Remove this check when the extension can do this through ViewPolicy.
+bool DocumentSourceExtension::LiteParsedExpanded::isExtensionVectorSearchStage() const {
+    return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
 }
 
 // static

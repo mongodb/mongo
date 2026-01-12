@@ -51,7 +51,7 @@ struct VectorSearchServerStatusMetrics {
      * Counter for tracking the number of queries that went through the
      * $vectorSearch-on-a-view retry kickback.
      */
-    Atomic<int64_t> onViewKickBackRetryCount{0};
+    Atomic<int64_t> onViewKickbackRetryCount{0};
 
     /**
      * Counter for tracking the number of queries that went through the

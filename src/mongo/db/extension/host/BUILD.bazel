@@ -29,6 +29,22 @@ mongo_cc_library(
     ],
 )
 
+# Standalone library for vector search metrics to avoid circular dependencies.
+# Both pipeline and extension_host can depend on this.
+mongo_cc_library(
+    name = "extension_vector_search_server_status",
+    srcs = [
+        "extension_vector_search_server_status.cpp",
+    ],
+    hdrs = [
+        "extension_vector_search_server_status.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands/server_status:server_status_core",
+    ],
+)
+
 mongo_cc_library(
     name = "extension_host",
     srcs = [
@@ -36,10 +52,10 @@ mongo_cc_library(
         "document_source_extension_expandable.cpp",
         "document_source_extension_optimizable.cpp",
         "extension_stage.cpp",
-        "extension_vector_search_server_status.cpp",
     ],
     deps = [
         ":extension_operation_metrics_registry",
+        ":extension_vector_search_server_status",
         "//src/mongo:base",
         "//src/mongo/db:commands",
         "//src/mongo/db/commands/server_status:server_status_core",

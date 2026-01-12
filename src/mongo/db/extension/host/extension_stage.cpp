@@ -31,9 +31,11 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
+#include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/extension/host/query_execution_context.h"
 #include "mongo/db/extension/host_connector/adapter/executable_agg_stage_adapter.h"
 #include "mongo/db/extension/shared/get_next_result.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 
 namespace mongo {
 
@@ -43,6 +45,12 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceExtensionToStageFn(
     const boost::intrusive_ptr<DocumentSource>& source) {
     auto* documentSource = dynamic_cast<DocumentSourceExtensionOptimizable*>(source.get());
     tassert(10980400, "expected 'DocumentSourceExtensionOptimizable' type", documentSource);
+
+    // Increment extensionVectorSearchQueryCount if this is a $vectorSearch extension stage.
+    if (documentSource->getSourceName() == search_helpers::kExtensionVectorSearchStageName) {
+        sVectorSearchMetrics.extensionVectorSearchQueryCount.addAndFetch(1);
+    }
+
     auto execAggStageHandle = documentSource->compile();
     return make_intrusive<exec::agg::ExtensionStage>(documentSource->getSourceName(),
                                                      documentSource->getExpCtx(),

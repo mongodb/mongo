@@ -209,6 +209,15 @@ public:
     }
 
     /**
+     * Returns true if the pipeline has a vector search stage.
+     */
+    bool hasExtensionVectorSearchStage() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return spec->isExtensionVectorSearchStage();
+        });
+    }
+
+    /**
      * Returns true iff the pipeline has a $rankFusion or $scoreFusion stage.
      */
     bool hasHybridSearchStage() const {

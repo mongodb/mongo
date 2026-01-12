@@ -1,6 +1,10 @@
 /**
  * Tests that serverStatus contains the extension.vectorSearch section with all expected metrics.
+ *
+ * @tags: [featureFlagExtensionsAPI]
  */
+import {checkPlatformCompatibleWithExtensions, withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod failed to start");
 
@@ -58,4 +62,82 @@ const adminDB = conn.getDB("admin");
 
 MongoRunner.stopMongod(conn);
 
-// TODO SERVER-115772 Add actual tests verifying the values
+(function ExtensionVectorSearchUsedGetsIncremented() {
+    checkPlatformCompatibleWithExtensions();
+
+    withExtensions(
+        {"libvector_search_extension.so": {}},
+        (testConn) => {
+            const testAdminDB = testConn.getDB("admin");
+            const testDB = testConn.getDB("test");
+            const coll = testDB[jsTestName()];
+            const testData = [
+                {_id: 0, text: "apple"},
+                {_id: 1, text: "banana"},
+            ];
+            assert.commandWorked(coll.insertMany(testData));
+
+            assert.commandWorked(testAdminDB.runCommand({setParameter: 1, featureFlagVectorSearchExtension: true}));
+
+            // Get initial metrics.
+            const initialServerStatus = testAdminDB.runCommand({serverStatus: 1});
+            assert.commandWorked(initialServerStatus);
+            assert(
+                initialServerStatus.hasOwnProperty("extension.vectorSearch"),
+                "Initial serverStatus should have extension.vectorSearch section",
+            );
+
+            const initialMetrics = initialServerStatus["extension.vectorSearch"];
+            const initialExtensionCount = initialMetrics.extensionVectorSearchUsed;
+            const initialLegacyCount = initialMetrics.legacyVectorSearchUsed;
+            const initialOnViewKickbackCount = initialMetrics.onViewKickbackRetries;
+            const initialInSubpipelineKickbackCount = initialMetrics.inSubpipelineKickbackRetries;
+
+            // Run a vector search query to trigger the extension.
+            const pipeline = [{$vectorSearch: {}}];
+            const result = coll.aggregate(pipeline).toArray();
+            assert.eq(result.length, testData.length, "Vector search should return all documents");
+
+            // Get final metrics.
+            const finalServerStatus = testAdminDB.runCommand({serverStatus: 1});
+            assert.commandWorked(finalServerStatus);
+            assert(
+                finalServerStatus.hasOwnProperty("extension.vectorSearch"),
+                "Final serverStatus should have extension.vectorSearch section",
+            );
+
+            const finalMetrics = finalServerStatus["extension.vectorSearch"];
+
+            // Verify extensionVectorSearchUsed was incremented.
+            const finalExtensionCount = finalMetrics.extensionVectorSearchUsed;
+            assert.gt(
+                finalExtensionCount,
+                initialExtensionCount,
+                `extensionVectorSearchUsed should have increased from ${initialExtensionCount} to ${finalExtensionCount}:` +
+                    tojson(finalMetrics),
+            );
+
+            // Verify other metrics remain at 0.
+            const finalLegacyCount = finalMetrics.legacyVectorSearchUsed;
+            const finalOnViewKickbackCount = finalMetrics.onViewKickbackRetries;
+            const finalInSubpipelineKickbackCount = finalMetrics.inSubpipelineKickbackRetries;
+
+            assert.eq(
+                finalLegacyCount,
+                initialLegacyCount,
+                `legacyVectorSearchUsed should remain at ${initialLegacyCount}, got ${finalLegacyCount}`,
+            );
+            assert.eq(
+                finalOnViewKickbackCount,
+                initialOnViewKickbackCount,
+                `onViewKickbackRetries should remain at ${initialOnViewKickbackCount}, got ${finalOnViewKickbackCount}`,
+            );
+            assert.eq(
+                finalInSubpipelineKickbackCount,
+                initialInSubpipelineKickbackCount,
+                `inSubpipelineKickbackRetries should remain at ${initialInSubpipelineKickbackCount}, got ${finalInSubpipelineKickbackCount}`,
+            );
+        },
+        ["standalone"],
+    );
+})();

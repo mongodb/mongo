@@ -440,6 +440,14 @@ public:
     }
 
     /**
+     * Returns true if this is a vector search stage ($vectorSearch).
+     * TODO SERVER-116021 Remove this override when extensions can handle views through ViewPolicy.
+     */
+    virtual bool isExtensionVectorSearchStage() const {
+        return false;
+    }
+
+    /**
      * Returns true if this is a $rankFusion pipeline
      */
     virtual bool isHybridSearchStage() const {

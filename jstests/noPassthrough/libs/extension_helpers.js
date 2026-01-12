@@ -5,6 +5,7 @@ import {getPython3Binary} from "jstests/libs/python.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 export function checkPlatformCompatibleWithExtensions() {
     if (!isLinux()) {
@@ -88,7 +89,13 @@ export function deleteExtensionConfigs(names) {
  * Runs a test function in environments with one or more extension loaded, ensuring proper
  * generation and cleanup of .conf files.
  */
-export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["standalone", "sharded"], numShards = 1) {
+export function withExtensions(
+    extToOptionsMap,
+    testFn,
+    topologiesToTest = ["standalone", "sharded"],
+    numShards = 1,
+    additionalOptions = {},
+) {
     const extensionsToLoad = [];
 
     for (const [extLib, extensionOptions] of Object.entries(extToOptionsMap)) {
@@ -97,13 +104,16 @@ export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["sta
         extensionsToLoad.push(extensionName);
     }
 
-    const options = {
-        loadExtensions: extensionsToLoad,
-    };
+    const options = Object.assign(
+        {
+            loadExtensions: extensionsToLoad,
+        },
+        additionalOptions,
+    );
 
     function runStandaloneTest(func) {
         const mongodConn = MongoRunner.runMongod(options);
-        func(mongodConn);
+        func(mongodConn, null);
         MongoRunner.stopMongod(mongodConn);
     }
 
@@ -118,7 +128,7 @@ export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["sta
                 configOptions: options,
                 rsOptions: options,
             });
-            func(shardingTest.s);
+            func(shardingTest.s, shardingTest);
             shardingTest.stop();
         }
     }
@@ -128,7 +138,7 @@ export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["sta
         rst.startSet(options);
         rst.initiate();
         rst.awaitReplication();
-        func(rst.getPrimary());
+        func(rst.getPrimary(), null);
         rst.stopSet();
     }
 
@@ -144,6 +154,46 @@ export function withExtensions(extToOptionsMap, testFn, topologiesToTest = ["sta
         });
     } finally {
         deleteExtensionConfigs(extensionsToLoad);
+    }
+}
+
+/**
+ * Runs a test function in environments with one or more extensions loaded and mongot configured,
+ * ensuring proper generation and cleanup of .conf files.
+ */
+export function withExtensionsAndMongot(
+    extToOptionsMap,
+    testFn,
+    topologiesToTest = ["standalone", "sharded"],
+    numShards = 1,
+) {
+    // Set up mongot mock.
+    let mongotmock;
+    let mongotHost = "localhost:27017";
+    if (!_isWindows()) {
+        mongotmock = new MongotMock();
+        mongotmock.start();
+        mongotHost = mongotmock.getConnection().host;
+    }
+
+    // Wrap the test function to pass mongotmock and shardingTest (or null).
+    const wrappedTestFn = (connection, shardingTest) => {
+        return testFn(connection, mongotmock, shardingTest);
+    };
+
+    const additionalOptions = {
+        setParameter: {
+            mongotHost,
+            searchIndexManagementHostAndPort: mongotHost,
+        },
+    };
+
+    try {
+        withExtensions(extToOptionsMap, wrappedTestFn, topologiesToTest, numShards, additionalOptions);
+    } finally {
+        if (mongotmock) {
+            mongotmock.stop();
+        }
     }
 }
 

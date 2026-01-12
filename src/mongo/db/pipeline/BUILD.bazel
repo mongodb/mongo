@@ -550,6 +550,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/exec:sort_executor",
         "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/extension/host:extension_vector_search_server_status",
         "//src/mongo/db/fts:base_fts",
         "//src/mongo/db/index:index_access_method",
         "//src/mongo/db/memory_tracking",

@@ -30,6 +30,7 @@
 #include "mongo/db/exec/agg/search/vector_search_stage.h"
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
+#include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/vector_search_helper.h"
 
@@ -40,6 +41,10 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceVectorSearchToStageFn(
     auto documentSource = dynamic_cast<DocumentSourceVectorSearch*>(source.get());
 
     tassert(10807800, "expected 'DocumentSourceVectorSearch' type", documentSource);
+
+    // Increment legacyVectorSearchQueryCount when DocumentSourceVectorSearch is converted to
+    // executable stage.
+    sVectorSearchMetrics.legacyVectorSearchQueryCount.addAndFetch(1);
 
     auto execStatsWrapper = std::make_shared<DSVectorSearchExecStatsWrapper>();
     documentSource->_execStatsWrapper = execStatsWrapper;

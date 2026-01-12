@@ -177,6 +177,10 @@ public:
                 getOriginalBson(), _parseNode->clone(), _nss, _options);
         }
 
+        // TODO SERVER-116021 Remove this override when extensions can handle views through
+        // ViewPolicy.
+        bool isExtensionVectorSearchStage() const override;
+
         // Define how to desugar a LiteParsedExpandable.
         static LiteParsedDesugarer::StageExpander stageExpander;
 
@@ -289,6 +293,8 @@ public:
             return std::make_unique<LiteParsedExpanded>(
                 getParseTimeName(), _astNode->clone(), _nss);
         }
+
+        bool isExtensionVectorSearchStage() const override;
 
     private:
         const AggStageAstNodeHandle _astNode;

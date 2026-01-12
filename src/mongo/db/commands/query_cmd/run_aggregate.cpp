@@ -50,7 +50,10 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/agg/exchange_stage.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
+#include "mongo/db/extension/host/extension_vector_search_server_status.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 #include "mongo/db/namespace_string.h"
@@ -841,7 +844,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
 
     if (aggExState.isView()) {
         search_helpers::checkAndSetViewOnExpCtx(expCtx,
-                                                aggExState.getOriginalRequest().getPipeline(),
+                                                aggExState.getOriginalLiteParsedPipeline(),
                                                 aggExState.getResolvedView(),
                                                 aggExState.getOriginalNss());
 
@@ -1067,6 +1070,23 @@ Status executeResolvedAggregate(const AggExState& aggExState,
         !aggExState.startsWithCollStats()) {
         uasserted(ErrorCodes::CollectionBecameView,
                   "Namespace changed from collection to view during aggregation planning");
+    }
+
+    // TODO SERVER-116021 Remove this check when the extension itself can check and uassert
+    // in its ViewPolicy function, rather than doing it here in the runAggregate
+    // infrastructure. $vectorSearch-as-an-extension is not allowed to run against views, at
+    // least in v8.3. If we see that a $vectorSearch stage exists in the pipeline AND a view
+    // exists, then we throw the IFRFlagRetry to disable the vector search extension flag
+    // and use legacy vector search instead.
+    // TODO SERVER-116994 Remove this check either from here or SERVER-116021 when
+    // $vectorSearch-as-an-extension is allowed against views.
+    if (aggExState.isView() &&
+        aggExState.getIfrContext()->getSavedFlagValue(
+            feature_flags::gFeatureFlagVectorSearchExtension) &&
+        aggExState.getOriginalLiteParsedPipeline().hasExtensionVectorSearchStage()) {
+        uassertStatusOK(
+            Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
+                   "$vectorSearch-as-an-extension is not allowed against views."));
     }
 
     // Create an RAII object that prints the collection's shard key in the case of a tassert
@@ -1316,33 +1336,105 @@ Status runAggregate(
     if (ifrContext == nullptr) {
         ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
     }
-    auto body = [&]() {
-        auto aggExState = std::make_unique<AggExState>(opCtx,
-                                                       request,
-                                                       liteParsedPipeline,
-                                                       cmdObj,
-                                                       privileges,
-                                                       usedExternalDataSources,
-                                                       verbosity,
-                                                       std::move(ifrContext));
 
-        // NOTE: It's possible this aggExState will be unusable by the time _runAggregate returns.
-        auto status = _runAggregate(std::move(aggExState), result);
+    stdx::unordered_set<IncrementalRolloutFeatureFlag*> initialFlagsToDisable;
 
-        // The aggregation pipeline may change the namespace of the curop and we need to set it back
-        // to the original namespace to correctly report command stats. One example when the
-        // namespace can be changed is when the pipeline contains an $out stage, which executes an
-        // internal command to create a temp collection, changing the curop namespace to the name of
-        // this temp collection.
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setNS(lk, request.getNamespace());
-        }
-        return status;
-    };
+    // If there is no value for the feature flag passed on the request, that either means we have
+    // a direct user request (so we should check the node's flag value), or it means we have a
+    // request from a router where the value of the flag is false (so we should also commit to flag
+    // value false). We rely on OperationShardingState::isComingFromRouter() to differentiate
+    // between these situations.
+    // TODO SERVER-116472 Remove this when the router sends all IFRContext flags, regardless of flag
+    // value.
+    auto ifrFlags = request.getIfrFlags();
+    bool ifrContextProvidedVectorSearchFeatureFlag =
+        ifrFlags.has_value() &&
+        std::any_of(ifrFlags.value().begin(), ifrFlags.value().end(), [](const BSONObj& obj) {
+            const auto& name = obj["name"];
+            const auto flagName = name.valueStringData();
+            return flagName == feature_flags::gFeatureFlagVectorSearchExtension.getName();
+        });
 
-    // Retry if the namespace concurrently transitioned from collection to view during aggregation
-    // planning.
-    return retryOn<ErrorCodes::CollectionBecameView>("runAggregate", body);
+    if (!ifrContextProvidedVectorSearchFeatureFlag &&
+        OperationShardingState::isComingFromRouter(opCtx)) {
+        initialFlagsToDisable.insert(&feature_flags::gFeatureFlagVectorSearchExtension);
+    }
+
+    std::unique_ptr<LiteParsedPipeline> updatedLiteParsed;
+    auto body =
+        [&](stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {
+            // Track potentially multiple IFR flags. For example, consider the following case:
+            // 1. runAggregate with IFR Flag A enabled
+            // 2. IFRFlagRetryInfo gets thrown signalling to disable IFR Flag A
+            // 3. runAggregate retries with IFR Flag A pre-disabled
+            // 4. IFRFlagRetryInfo gets thrown signalling to disable IFR Flag B
+            // The correct behavior for the next retry is to run with both IFR Flags A and B
+            // disabled.
+            for (auto* ifrFlag : ifrFlagsToDisableOnRetries) {
+                ifrContext->disableFlag(*ifrFlag);
+            }
+
+            std::unique_ptr<AggExState> aggExState;
+            if (ifrFlagsToDisableOnRetries.empty()) {
+                aggExState = std::make_unique<AggExState>(opCtx,
+                                                          request,
+                                                          liteParsedPipeline,
+                                                          cmdObj,
+                                                          privileges,
+                                                          usedExternalDataSources,
+                                                          verbosity,
+                                                          ifrContext);
+            } else {
+                // Save the newly lite parsed pipeline in a unique pointer. This is because the
+                // AggExState and the resulting AggRequestDerivatives do not take ownership of the
+                // LiteParsedPipeline and we must keep in scope.
+                // TODO SERVER-116471 Investigate ways that we could better keep this alive and in
+                // scope.
+                updatedLiteParsed = std::make_unique<LiteParsedPipeline>(
+                    request, false, LiteParserOptions{.ifrContext = ifrContext});
+
+                // Reparse the LiteParsedPipeline with the updated IFR context.
+                aggExState = std::make_unique<AggExState>(opCtx,
+                                                          request,
+                                                          *updatedLiteParsed,
+                                                          cmdObj,
+                                                          privileges,
+                                                          usedExternalDataSources,
+                                                          verbosity,
+                                                          ifrContext);
+            }
+
+            // NOTE: It's possible this aggExState will be unusable by the time _runAggregate
+            // returns.
+            auto status = _runAggregate(std::move(aggExState), result);
+
+            // The aggregation pipeline may change the namespace of the curop and we need to set it
+            // back to the original namespace to correctly report command stats. One example when
+            // the namespace can be changed is when the pipeline contains an $out stage, which
+            // executes an internal command to create a temp collection, changing the curop
+            // namespace to the name of this temp collection.
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setNS(lk, request.getNamespace());
+            }
+            return status;
+        };
+
+    auto onIFRError =
+        [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
+            stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {
+            sVectorSearchMetrics.onViewKickbackRetryCount.addAndFetch(1);
+            ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
+                ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
+        };
+
+    // Retry on CollectionBecameView if the namespace concurrently transitioned from collection to
+    // view during aggregation planning.
+    return retryOnWithState("runAggregate",
+                            std::move(initialFlagsToDisable),
+                            kDefaultMaxRetries,
+                            body,
+                            makeErrorHandler<ErrorCodes::IFRFlagRetry>(onIFRError),
+                            makeErrorHandler<ErrorCodes::CollectionBecameView>([](auto, auto) {}));
 }
 }  // namespace mongo

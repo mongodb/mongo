@@ -55,7 +55,7 @@ public:
             static_cast<long long>(sVectorSearchMetrics.extensionVectorSearchQueryCount.load()));
         builder.append(
             "onViewKickbackRetries",
-            static_cast<long long>(sVectorSearchMetrics.onViewKickBackRetryCount.load()));
+            static_cast<long long>(sVectorSearchMetrics.onViewKickbackRetryCount.load()));
         builder.append(
             "inSubpipelineKickbackRetries",
             static_cast<long long>(sVectorSearchMetrics.inSubpipelineKickbackCount.load()));
