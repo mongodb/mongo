@@ -62,7 +62,6 @@ public:
     virtual void record(T value) = 0;
 };
 
-#ifdef MONGO_CONFIG_OTEL
 /**
  * Thin wrapper around OpenTelemetry Histogram for recording distributions of values.
  *
@@ -75,6 +74,7 @@ public:
 template <HistogramValueType T>
 class HistogramImpl final : public Histogram<T> {
 public:
+#ifdef MONGO_CONFIG_OTEL
     /**
      * Creates a new Histogram instance.
      *
@@ -84,6 +84,9 @@ public:
                   const std::string& name,
                   const std::string& description,
                   const std::string& unit);
+#else
+    HistogramImpl();
+#endif  // MONGO_CONFIG_OTEL
 
     /**
      * Records a value.
@@ -100,8 +103,10 @@ public:
 private:
     using UnderlyingType = std::conditional_t<std::is_same_v<T, int64_t>, uint64_t, double>;
 
+#ifdef MONGO_CONFIG_OTEL
     // The underlying OpenTelemety histogram implementation.
     std::unique_ptr<opentelemetry::metrics::Histogram<UnderlyingType>> _histogram;
+#endif  // MONGO_CONFIG_OTEL
 
     // Internal metrics used for server status reporting.
     MovingAverage _avg;
@@ -111,6 +116,7 @@ private:
 // The smoothing factor for the exponential moving average. See moving_average.h.
 constexpr double kAlpha = 0.2;
 
+#ifdef MONGO_CONFIG_OTEL
 template <HistogramValueType T>
 HistogramImpl<T>::HistogramImpl(opentelemetry::metrics::Meter* meter,
                                 const std::string& name,
@@ -129,11 +135,17 @@ HistogramImpl<T>::HistogramImpl(opentelemetry::metrics::Meter* meter,
         _histogram = meter->CreateDoubleHistogram(name, description, unit);
     }
 }
+#else
+template <HistogramValueType T>
+HistogramImpl<T>::HistogramImpl() : _avg(kAlpha) {}
+#endif  // MONGO_CONFIG_OTEL
 
 template <HistogramValueType T>
 void HistogramImpl<T>::record(T value) {
     massert(ErrorCodes::BadValue, "Histogram values must be nonnegative", value >= 0);
+#ifdef MONGO_CONFIG_OTEL
     _histogram->Record(value, opentelemetry::context::Context{});
+#endif  // MONGO_CONFIG_OTEL
     _avg.addSample(value);
     _count.fetchAndAddRelaxed(1);
 }
@@ -147,16 +159,4 @@ BSONObj HistogramImpl<T>::serializeToBson(const std::string& key) const {
     metrics.doneFast();
     return builder.obj();
 }
-
-#else
-template <HistogramValueType T>
-class NoopHistogramImpl final : public Histogram<T> {
-public:
-    void record(T value) override {}
-
-    BSONObj serializeToBson(const std::string& key) const override {
-        return BSON(key << BSONObj());
-    }
-};
-#endif
 }  // namespace mongo::otel::metrics

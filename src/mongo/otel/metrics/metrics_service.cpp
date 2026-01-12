@@ -112,6 +112,7 @@ void createHistogramView(WithLock lock,
                std::move(aggregationConfig));
 }
 }  // namespace
+#endif  // MONGO_CONFIG_OTEL
 
 template <typename T>
 T* MetricsService::getDuplicateMetric(WithLock,
@@ -133,6 +134,7 @@ T* MetricsService::getDuplicateMetric(WithLock,
     return nullptr;
 }
 
+#ifdef MONGO_CONFIG_OTEL
 template <typename T>
 std::shared_ptr<opentelemetry::metrics::ObservableInstrument> makeObservableInstrument(
     std::string name, std::string description, MetricUnit unit);
@@ -184,6 +186,7 @@ makeObservableInstrument<Gauge<double>>(std::string name,
                                       description,
                                       toStdStringViewForInterop(toString(unit)));
 }
+#endif  // MONGO_CONFIG_OTEL
 
 template <typename T>
 Counter<T>* MetricsService::createCounter(MetricName name,
@@ -203,6 +206,7 @@ Counter<T>* MetricsService::createCounter(MetricName name,
     Counter<T>* const counter_ptr = counter.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(counter)};
 
+#ifdef MONGO_CONFIG_OTEL
     // Observe the raw counter.
     std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableCounter =
         makeObservableInstrument<Counter<T>>(nameStr, description, unit);
@@ -212,6 +216,7 @@ Counter<T>* MetricsService::createCounter(MetricName name,
             observableCounter != nullptr);
     observableCounter->AddCallback(observableCounterCallback<T>, counter_ptr);
     _observableInstruments.push_back(std::move(observableCounter));
+#endif  // MONGO_CONFIG_OTEL
 
     return counter_ptr;
 }
@@ -243,6 +248,7 @@ Gauge<T>* MetricsService::createGauge(MetricName name, std::string description, 
     Gauge<T>* const gauge_ptr = gauge.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(gauge)};
 
+#ifdef MONGO_CONFIG_OTEL
     // Observe the raw gauge.
     std::shared_ptr<opentelemetry::metrics::ObservableInstrument> observableGauge =
         makeObservableInstrument<Gauge<T>>(nameStr, description, unit);
@@ -251,6 +257,7 @@ Gauge<T>* MetricsService::createGauge(MetricName name, std::string description, 
             observableGauge != nullptr);
     observableGauge->AddCallback(observableGaugeCallback<T>, gauge_ptr);
     _observableInstruments.push_back(std::move(observableGauge));
+#endif  // MONGO_CONFIG_OTEL
 
     return gauge_ptr;
 }
@@ -281,6 +288,7 @@ Histogram<double>* MetricsService::createDoubleHistogram(
     }
 
     const std::string unitStr(toString(unit));
+#ifdef MONGO_CONFIG_OTEL
     if (explicitBucketBoundaries.has_value()) {
         createHistogramView(
             lock, nameStr, description, unitStr, std::move(explicitBucketBoundaries.value()));
@@ -293,6 +301,9 @@ Histogram<double>* MetricsService::createDoubleHistogram(
                                                 nameStr,
                                                 description,
                                                 unitStr);
+#else
+    auto histogram = std::make_unique<HistogramImpl<double>>();
+#endif  // MONGO_CONFIG_OTEL
     Histogram<double>* const histogram_ptr = histogram.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
 
@@ -313,6 +324,7 @@ Histogram<int64_t>* MetricsService::createInt64Histogram(
     }
 
     const std::string unitStr(toString(unit));
+#ifdef MONGO_CONFIG_OTEL
     if (explicitBucketBoundaries.has_value()) {
         createHistogramView(
             lock, nameStr, description, unitStr, std::move(explicitBucketBoundaries.value()));
@@ -325,6 +337,9 @@ Histogram<int64_t>* MetricsService::createInt64Histogram(
         nameStr,
         description,
         unitStr);
+#else
+    auto histogram = std::make_unique<HistogramImpl<int64_t>>();
+#endif  // MONGO_CONFIG_OTEL
     Histogram<int64_t>* const histogram_ptr = histogram.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
 
@@ -351,69 +366,6 @@ BSONObj MetricsService::serializeMetrics() const {
     otelMetrics.doneFast();
     return builder.obj();
 }
-#else
-Counter<int64_t>* MetricsService::createInt64Counter(MetricName name,
-                                                     std::string description,
-                                                     MetricUnit unit) {
-    stdx::lock_guard lock(_mutex);
-    _metrics.push_back(std::make_unique<CounterImpl<int64_t>>(
-        std::string(name.getName()), std::move(description), std::string(toString(unit))));
-    auto ptr = dynamic_cast<Counter<int64_t>*>(_metrics.back().get());
-    invariant(ptr);
-    return ptr;
-}
-
-Counter<double>* MetricsService::createDoubleCounter(MetricName name,
-                                                     std::string description,
-                                                     MetricUnit unit) {
-    stdx::lock_guard lock(_mutex);
-    _metrics.push_back(std::make_unique<CounterImpl<double>>(
-        std::string(name.getName()), std::move(description), std::string(toString(unit))));
-    auto ptr = dynamic_cast<Counter<double>*>(_metrics.back().get());
-    invariant(ptr);
-    return ptr;
-}
-
-Gauge<int64_t>* MetricsService::createInt64Gauge(MetricName name,
-                                                 std::string description,
-                                                 MetricUnit unit) {
-    stdx::lock_guard lock(_mutex);
-    _metrics.push_back(std::make_unique<GaugeImpl<int64_t>>());
-    auto ptr = dynamic_cast<Gauge<int64_t>*>(_metrics.back().get());
-    invariant(ptr);
-    return ptr;
-}
-
-Gauge<double>* MetricsService::createDoubleGauge(MetricName name,
-                                                 std::string description,
-                                                 MetricUnit unit) {
-    stdx::lock_guard lock(_mutex);
-    _metrics.push_back(std::make_unique<GaugeImpl<double>>());
-    auto ptr = dynamic_cast<Gauge<double>*>(_metrics.back().get());
-    invariant(ptr);
-    return ptr;
-}
-
-Histogram<int64_t>* MetricsService::createInt64Histogram(MetricName name,
-                                                         std::string description,
-                                                         MetricUnit unit) {
-    stdx::lock_guard lock(_mutex);
-    _metrics.push_back(std::make_unique<NoopHistogramImpl<int64_t>>());
-    auto ptr = dynamic_cast<Histogram<int64_t>*>(_metrics.back().get());
-    invariant(ptr);
-    return ptr;
-}
-
-Histogram<double>* MetricsService::createDoubleHistogram(MetricName name,
-                                                         std::string description,
-                                                         MetricUnit unit) {
-    stdx::lock_guard lock(_mutex);
-    _metrics.push_back(std::make_unique<NoopHistogramImpl<double>>());
-    auto ptr = dynamic_cast<Histogram<double>*>(_metrics.back().get());
-    invariant(ptr);
-    return ptr;
-}
-#endif
 
 MetricsService& MetricsService::get(ServiceContext* serviceContext) {
     return getMetricsService(serviceContext);

@@ -35,10 +35,12 @@
 
 #include <type_traits>
 
+#ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/metrics/provider.h>
 #include <opentelemetry/sdk/metrics/meter.h>
 #include <opentelemetry/sdk/metrics/meter_provider.h>
 #include <opentelemetry/sdk/metrics/meter_provider_factory.h>
+#endif  // MONGO_CONFIG_OTEL
 
 namespace mongo::otel::metrics {
 namespace {
@@ -169,6 +171,7 @@ TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentType) {
         ErrorCodes::ObjectAlreadyExists);
 }
 
+#ifdef MONGO_CONFIG_OTEL
 // Assert that when a valid MeterProvider in place, we create a working Meter implementation with
 // the expected metadata.
 TEST_F(MetricsServiceTest, MeterIsInitialized) {
@@ -197,6 +200,7 @@ TEST_F(MetricsServiceTest, ServiceContextInitBeforeMeterProvider) {
     EXPECT_TRUE(isNoopMeter(
         meterProvider->GetMeter(toStdStringViewForInterop(MetricsService::kMeterName)).get()));
 }
+#endif  // MONGO_CONFIG_OTEL
 
 TEST_F(MetricsServiceTest, SerializeMetrics) {
     auto& metricsService = MetricsService::get(getServiceContext());
@@ -232,8 +236,10 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
     Counter<int64_t>* counter_2 =
         metricsService.createInt64Counter(MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
-    EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 0);
-    EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 0);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 0);
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 0);
+    }
 
     counter_1->add(10);
     counter_2->add(1);
@@ -241,11 +247,15 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
     counter_2->add(1);
     counter_2->add(1);
 
-    EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 15);
-    EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 3);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 15);
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 3);
+    }
 
     counter_1->add(5);
-    EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 20);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 20);
+    }
 }
 
 using CreateDoubleCounterTest = MetricsServiceTest;
@@ -258,8 +268,10 @@ TEST_F(CreateDoubleCounterTest, RecordsValues) {
     Counter<double>* counter_2 =
         metricsService.createDoubleCounter(MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
-    EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 0.0);
-    EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 0.0);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 0.0);
+        EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 0.0);
+    }
 
     counter_1->add(10.5);
     counter_2->add(1.25);
@@ -267,8 +279,10 @@ TEST_F(CreateDoubleCounterTest, RecordsValues) {
     counter_2->add(1.25);
     counter_2->add(1.25);
 
-    EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 16.0);
-    EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 3.75);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 16.0);
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 3.75);
+    }
 }
 
 using CreateInt64GaugeTest = MetricsServiceTest;
@@ -281,17 +295,23 @@ TEST_F(CreateInt64GaugeTest, RecordsValues) {
     Gauge<int64_t>* gauge_2 =
         metricsService.createInt64Gauge(MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
-    EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 0);
-    EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2), 0);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 0);
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2), 0);
+    }
 
     gauge_1->set(10);
     gauge_2->set(3);
 
-    EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 10);
-    EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2), 3);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 10);
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest2), 3);
+    }
 
     gauge_1->set(20);
-    EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 20);
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 20);
+    }
 }
 
 using CreateDoubleGaugeTest = MetricsServiceTest;
@@ -304,17 +324,23 @@ TEST_F(CreateDoubleGaugeTest, RecordsValues) {
     Gauge<double>* gauge_2 =
         metricsService.createDoubleGauge(MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
-    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 0.0);
-    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 0.0);
+    if (metricsCapturer.canReadMetrics()) {
+        ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 0.0);
+        ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 0.0);
+    }
 
     gauge_1->set(10.5);
     gauge_2->set(3.5);
 
-    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 10.5);
-    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 3.5);
+    if (metricsCapturer.canReadMetrics()) {
+        ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 10.5);
+        ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 3.5);
+    }
 
     gauge_1->set(20.8);
-    ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 20.8);
+    if (metricsCapturer.canReadMetrics()) {
+        ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 20.8);
+    }
 }
 
 using CreateHistogramTest = MetricsServiceTest;
@@ -331,40 +357,48 @@ TEST_F(CreateHistogramTest, RecordsValues) {
         0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000};
 
     int64Histogram->record(5);
-    const auto data1 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
-    EXPECT_THAT(data1.boundaries, ElementsAreArray(expectedBoundaries));
-    EXPECT_EQ(data1.sum, 5);
-    EXPECT_EQ(data1.min, 5);
-    EXPECT_EQ(data1.max, 5);
-    EXPECT_THAT(data1.counts, ElementsAre(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-    EXPECT_EQ(data1.count, 1);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data1 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+        EXPECT_THAT(data1.boundaries, ElementsAreArray(expectedBoundaries));
+        EXPECT_EQ(data1.sum, 5);
+        EXPECT_EQ(data1.min, 5);
+        EXPECT_EQ(data1.max, 5);
+        EXPECT_THAT(data1.counts, ElementsAre(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        EXPECT_EQ(data1.count, 1);
+    }
 
     int64Histogram->record(15);
-    const auto data2 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
-    EXPECT_THAT(data2.boundaries, ElementsAreArray(expectedBoundaries));
-    EXPECT_EQ(data2.sum, 20);
-    EXPECT_EQ(data2.min, 5);
-    EXPECT_EQ(data2.max, 15);
-    EXPECT_THAT(data2.counts, ElementsAre(0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-    EXPECT_EQ(data2.count, 2);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data2 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+        EXPECT_THAT(data2.boundaries, ElementsAreArray(expectedBoundaries));
+        EXPECT_EQ(data2.sum, 20);
+        EXPECT_EQ(data2.min, 5);
+        EXPECT_EQ(data2.max, 15);
+        EXPECT_THAT(data2.counts, ElementsAre(0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        EXPECT_EQ(data2.count, 2);
+    }
 
     doubleHistogram->record(103.14);
-    const auto data3 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
-    EXPECT_THAT(data3.boundaries, ElementsAreArray(expectedBoundaries));
-    EXPECT_DOUBLE_EQ(data3.sum, 103.14);
-    EXPECT_DOUBLE_EQ(data3.min, 103.14);
-    EXPECT_DOUBLE_EQ(data3.max, 103.14);
-    EXPECT_THAT(data3.counts, ElementsAre(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0));
-    EXPECT_EQ(data3.count, 1);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data3 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
+        EXPECT_THAT(data3.boundaries, ElementsAreArray(expectedBoundaries));
+        EXPECT_DOUBLE_EQ(data3.sum, 103.14);
+        EXPECT_DOUBLE_EQ(data3.min, 103.14);
+        EXPECT_DOUBLE_EQ(data3.max, 103.14);
+        EXPECT_THAT(data3.counts, ElementsAre(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0));
+        EXPECT_EQ(data3.count, 1);
+    }
 
     doubleHistogram->record(10.0);
-    const auto data4 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
-    EXPECT_THAT(data4.boundaries, ElementsAreArray(expectedBoundaries));
-    EXPECT_DOUBLE_EQ(data4.sum, 113.14);
-    EXPECT_DOUBLE_EQ(data4.min, 10.0);
-    EXPECT_DOUBLE_EQ(data4.max, 103.14);
-    EXPECT_THAT(data4.counts, ElementsAre(0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0));
-    EXPECT_EQ(data4.count, 2);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data4 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
+        EXPECT_THAT(data4.boundaries, ElementsAreArray(expectedBoundaries));
+        EXPECT_DOUBLE_EQ(data4.sum, 113.14);
+        EXPECT_DOUBLE_EQ(data4.min, 10.0);
+        EXPECT_DOUBLE_EQ(data4.max, 103.14);
+        EXPECT_THAT(data4.counts, ElementsAre(0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0));
+        EXPECT_EQ(data4.count, 2);
+    }
 }
 
 TEST_F(CreateHistogramTest, RecordsValuesExplicitBoundaries) {
@@ -376,22 +410,26 @@ TEST_F(CreateHistogramTest, RecordsValuesExplicitBoundaries) {
         MetricNames::kTest2, "description", MetricUnit::kSeconds, std::vector<double>({10, 100}));
 
     int64Histogram->record(15);
-    const auto data1 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
-    EXPECT_THAT(data1.boundaries, ElementsAre(2, 4));
-    EXPECT_EQ(data1.sum, 15);
-    EXPECT_EQ(data1.min, 15);
-    EXPECT_EQ(data1.max, 15);
-    EXPECT_THAT(data1.counts, ElementsAre(0, 0, 1));
-    EXPECT_EQ(data1.count, 1);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data1 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+        EXPECT_THAT(data1.boundaries, ElementsAre(2, 4));
+        EXPECT_EQ(data1.sum, 15);
+        EXPECT_EQ(data1.min, 15);
+        EXPECT_EQ(data1.max, 15);
+        EXPECT_THAT(data1.counts, ElementsAre(0, 0, 1));
+        EXPECT_EQ(data1.count, 1);
+    }
 
     doubleHistogram->record(2);
-    const auto data2 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
-    EXPECT_THAT(data2.boundaries, ElementsAre(10, 100));
-    EXPECT_DOUBLE_EQ(data2.sum, 2);
-    EXPECT_DOUBLE_EQ(data2.min, 2);
-    EXPECT_DOUBLE_EQ(data2.max, 2);
-    EXPECT_THAT(data2.counts, ElementsAre(1, 0, 0));
-    EXPECT_EQ(data2.count, 1);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data2 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
+        EXPECT_THAT(data2.boundaries, ElementsAre(10, 100));
+        EXPECT_DOUBLE_EQ(data2.sum, 2);
+        EXPECT_DOUBLE_EQ(data2.min, 2);
+        EXPECT_DOUBLE_EQ(data2.max, 2);
+        EXPECT_THAT(data2.counts, ElementsAre(1, 0, 0));
+        EXPECT_EQ(data2.count, 1);
+    }
 }
 
 }  // namespace

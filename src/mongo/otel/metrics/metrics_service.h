@@ -44,6 +44,7 @@
 #ifdef MONGO_CONFIG_OTEL
 #include <opentelemetry/metrics/meter.h>
 #include <opentelemetry/metrics/provider.h>
+#endif  // MONGO_CONFIG_OTEL
 
 namespace mongo::otel::metrics {
 
@@ -194,42 +195,14 @@ private:
     // Guards `_observableInstruments` and `_metrics`.
     mutable stdx::mutex _mutex;
 
+#ifdef MONGO_CONFIG_OTEL
     // Pointers to all observable instruments. These are not directly used, but must be kept alive
     // while the instruments they back are still in use. Guarded by `_mutex`.
     std::vector<std::shared_ptr<opentelemetry::metrics::ObservableInstrument>>
         _observableInstruments;
+#endif  // MONGO_CONFIG_OTEL
 
     // Map from metric name to its definition and implementation. Guarded by `_mutex`.
     absl::btree_map<std::string, IdentifierAndMetric> _metrics;
 };
 }  // namespace mongo::otel::metrics
-#else
-namespace mongo::otel::metrics {
-class MONGO_MOD_PUBLIC MetricsService {
-public:
-    static constexpr StringData kMeterName = "mongodb";
-
-    static MetricsService& get(ServiceContext*);
-
-    Counter<int64_t>* createInt64Counter(MetricName name, std::string description, MetricUnit unit);
-
-    Counter<double>* createDoubleCounter(MetricName name, std::string description, MetricUnit unit);
-
-    Gauge<int64_t>* createInt64Gauge(MetricName name, std::string description, MetricUnit unit);
-
-    Gauge<double>* createDoubleGauge(MetricName name, std::string description, MetricUnit unit);
-
-    Histogram<int64_t>* createInt64Histogram(MetricName name,
-                                             std::string description,
-                                             MetricUnit unit);
-
-    Histogram<double>* createDoubleHistogram(MetricName name,
-                                             std::string description,
-                                             MetricUnit unit);
-
-private:
-    stdx::mutex _mutex;
-    std::vector<std::unique_ptr<Metric>> _metrics;
-};
-}  // namespace mongo::otel::metrics
-#endif
