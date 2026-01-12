@@ -479,16 +479,9 @@ PARSE_TEST(DoubleNormalParse) {
     ASSERT_PARSES(NumberType, "1e-8", 1e-8);
     ASSERT_PARSES(NumberType, "12e-8", 12e-8);
     ASSERT_PARSES(NumberType, "-485.381e-8", -485.381e-8);
-
-#if !defined(_WIN32)
-    // Parse hexadecimal representations of a double.  Hex literals not supported by MSVC, and
-    // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
-    // See SERVER-14131.
-
     ASSERT_PARSES(NumberType, "0xff", 255);
     ASSERT_PARSES(NumberType, "-0xff", -255);
     ASSERT_PARSES(NumberType, "0xabcab.defdefP-10", 687.16784283419838);
-#endif
 }
 
 TEST(NumberParser, TestDoubleNormalParse) {
@@ -535,16 +528,9 @@ TEST(Double, TestParsingNormal) {
     ASSERT_PARSES(double, "1e-8", 1e-8);
     ASSERT_PARSES(double, "12e-8", 12e-8);
     ASSERT_PARSES(double, "-485.381e-8", -485.381e-8);
-
-#if !defined(_WIN32)
-    // Parse hexadecimal representations of a double.  Hex literals not supported by MSVC, and
-    // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
-    // See SERVER-14131.
-
     ASSERT_PARSES(double, "0xff", 255);
     ASSERT_PARSES(double, "-0xff", -255);
     ASSERT_PARSES(double, "0xabcab.defdefP-10", 687.16784283419838);
-#endif
 }
 
 }  // namespace

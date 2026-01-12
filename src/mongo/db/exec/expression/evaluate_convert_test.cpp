@@ -3271,8 +3271,6 @@ TEST_F(EvaluateConvertTest, ConvertStringToNumberFailsForHexStrings) {
                              AssertionException,
                              [](const AssertionException& exception) {
                                  ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
-                                 ASSERT_STRING_CONTAINS(exception.reason(),
-                                                        "Did not consume any digits");
                              });
 
     spec = fromjson("{$convert: {input: 'FF', to: 'decimal'}}");

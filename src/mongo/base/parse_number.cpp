@@ -44,6 +44,7 @@
 #include <limits>
 #include <string>
 
+#include <absl/strings/charconv.h>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 
@@ -228,54 +229,41 @@ Status _parseNumber(StringData stringValue,
     if (endptr)
         *endptr = stringValue.data();
     if (parser._base != 0) {
-        return Status(ErrorCodes::BadValue, "NumberParser::base must be 0 for a double.");
+        return {ErrorCodes::BadValue, "NumberParser::base must be 0 for a double."};
     }
     if (stringValue.empty())
-        return Status(ErrorCodes::FailedToParse, "Empty string");
+        return {ErrorCodes::FailedToParse, "Empty string"};
 
-    if (!parser._skipLeadingWhitespace && ctype::isSpace(stringValue[0]))
-        return Status(ErrorCodes::FailedToParse, "Leading whitespace");
+    // `std::from_chars` will not ignore leading whitespace and `+`.
+    // `absl::from_chars` implements the same behavior.
+    if (ctype::isSpace(stringValue[0])) {
+        if (!parser._skipLeadingWhitespace)
+            return {ErrorCodes::FailedToParse, "Leading whitespace"};
+        stringValue = removeLeadingWhitespace(stringValue);
+    }
+    if (stringValue.empty())
+        return {ErrorCodes::FailedToParse, "Whitespace-only string"};
+    if (stringValue.front() == '+')
+        stringValue.remove_prefix(1);
 
-    std::string str = std::string{stringValue};
-    const char* cStr = str.c_str();
-    char* endp;
-    errno = 0;
-    double d = strtod(cStr, &endp);
-    int actualErrno = errno;
-    if (endp == cStr) {
-#ifdef _WIN32
-        // The Windows libc implementation of strtod cannot parse +/-infinity or nan,
-        // so handle that here.
-        for (char& c : str)
-            c = ctype::toLower(c);
-        if (str == "nan"_sd) {
-            *result = std::numeric_limits<double>::quiet_NaN();
-            if (endptr)
-                *endptr = stringValue.data() + stringValue.size();
-            return Status::OK();
-        } else if (str == "+infinity"_sd || str == "infinity"_sd) {
-            *result = std::numeric_limits<double>::infinity();
-            if (endptr)
-                *endptr = stringValue.data() + stringValue.size();
-            return Status::OK();
-        } else if (str == "-infinity"_sd) {
-            *result = -std::numeric_limits<double>::infinity();
-            if (endptr)
-                *endptr = stringValue.data() + stringValue.size();
-            return Status::OK();
-        }
-#endif  // defined(_WIN32)
-        return Status(ErrorCodes::FailedToParse, "Did not consume any digits");
+    auto stringStart = stringValue.data();
+    auto stringEnd = stringStart + stringValue.size();
+    double d;
+    auto r = absl::from_chars(stringStart, stringEnd, d);
+    if (r.ec != std::errc{}) {
+        if (r.ec == std::errc::result_out_of_range)
+            return {ErrorCodes::Overflow, "Out of range"};
+        if (r.ec == std::errc::invalid_argument)
+            return {ErrorCodes::FailedToParse, "Invalid number"};
+        return {ErrorCodes::FailedToParse, "Failed to parse number"};
     }
-    if (actualErrno == ERANGE) {
-        return Status(ErrorCodes::Overflow, "Out of range");
-    }
-    if (endptr) {
-        size_t charsConsumed = endp - cStr;
-        *endptr = stringValue.data() + charsConsumed;
-    }
-    if (!parser._allowTrailingText && endp != (cStr + str.size()))
-        return Status(ErrorCodes::FailedToParse, "Did not consume whole string.");
+    if (r.ptr == stringStart)
+        return {ErrorCodes::FailedToParse, "Did not consume any digits"};
+    if (endptr)
+        *endptr = r.ptr;
+    if (r.ptr != stringEnd && !parser._allowTrailingText)
+        return {ErrorCodes::FailedToParse, "Did not consume whole string"};
+
     *result = d;
     return Status::OK();
 }
