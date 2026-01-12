@@ -249,6 +249,15 @@ public:
     void benchmarkSortArrayBSONObj(benchmark::State& state);
     void benchmarkSortArray2D(benchmark::State& state);
 
+    void benchmarkReduceSum(benchmark::State& state);
+    void benchmarkReduceConcatArrays(benchmark::State& state);
+    void benchmarkReduceCreatingNestedObject(benchmark::State& state,
+                                             size_t perIterationNestingDepth);
+    void benchmarkReduceCreatingNestedObject1(benchmark::State& state);
+    void benchmarkReduceCreatingNestedObject2(benchmark::State& state);
+    void benchmarkReduceCreatingNestedObject4(benchmark::State& state);
+    void benchmarkReduceCreatingNestedObject8(benchmark::State& state);
+
 private:
     void testDateDiffExpression(long long startDate,
                                 long long endDate,
@@ -309,6 +318,30 @@ private:
     }                                                                                           \
     BENCHMARK_F(Fixture, ArrayFilter10)(benchmark::State & state) {                             \
         benchmarkArrayFilter10(state);                                                          \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, ReduceSum)(benchmark::State & state) {                                 \
+        benchmarkReduceSum(state);                                                              \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, ReduceConcatArrays)(benchmark::State & state) {                        \
+        benchmarkReduceConcatArrays(state);                                                     \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, ReduceCreatingNestedObject1)(benchmark::State & state) {               \
+        benchmarkReduceCreatingNestedObject1(state);                                            \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, ReduceCreatingNestedObject2)(benchmark::State & state) {               \
+        benchmarkReduceCreatingNestedObject2(state);                                            \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, ReduceCreatingNestedObject4)(benchmark::State & state) {               \
+        benchmarkReduceCreatingNestedObject4(state);                                            \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, ReduceCreatingNestedObject8)(benchmark::State & state) {               \
+        benchmarkReduceCreatingNestedObject8(state);                                            \
     }                                                                                           \
                                                                                                 \
     BENCHMARK_F(Fixture, SortArrayInt)(benchmark::State & state) {                              \
