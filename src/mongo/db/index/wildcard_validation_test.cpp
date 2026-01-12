@@ -114,4 +114,14 @@ TEST(WildcardProjectionValidation, IdField) {
     ASSERT_OK(validateWildcardProjection(BSON("$**" << 1 << "other" << 1),
                                          BSON("_id" << 1 << "a" << 0 << "other" << 0)));
 }
+
+TEST(WildcardProjectionValidation, IdFieldExcludedWithCompoundIndex) {
+    ASSERT_NOT_OK(validateWildcardProjection(BSON("a" << 1 << "$**" << 1), BSON("_id" << 0)));
+    ASSERT_NOT_OK(validateWildcardProjection(BSON("$**" << 1 << "a" << 1), BSON("_id" << 0)));
+    ASSERT_NOT_OK(
+        validateWildcardProjection(BSON("b" << 1 << "$**" << 1 << "a" << 1), BSON("_id" << 0)));
+
+    ASSERT_OK(validateWildcardProjection(BSON("$**" << 1 << "_id" << 1), BSON("_id" << 0)));
+    ASSERT_OK(validateWildcardProjection(BSON("_id" << 1 << "$**" << 1), BSON("_id" << 0)));
+}
 }  // namespace mongo
