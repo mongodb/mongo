@@ -216,18 +216,14 @@ function testSetFCVDoesNotBlockWhileMigratingChunk() {
 
     // Send FCV command with a maxTimeMS and assert that it does not timeout.
     assert.commandWorked(
-        st.shard0
-            .getDB("admin")
-            .runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true, maxTimeMS: 10000}),
+        st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true, maxTimeMS: 10000}),
     );
 
     failpoint.off();
     awaitShell();
 
     // Ensure FCV is consistent between all shards before stopping the test to pass teardown hooks.
-    assert.commandWorked(
-        st.shard0.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
-    );
+    assert.commandWorked(st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     st.stop();
 }

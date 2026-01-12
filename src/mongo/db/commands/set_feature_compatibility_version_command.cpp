@@ -729,7 +729,7 @@ public:
             1034131,
             "'phase' field must be present on shards",
             !feature_flags::gUseTopologyChangeCoordinators.isEnabledOnVersion(requestedVersion) ||
-                request.getPhase() || (!role || !role->hasExclusively(ClusterRole::ShardServer)));
+                isDryRun || request.getPhase() || (!role || !role->isShardOnly()));
 
         if (isDryRun) {
             processDryRun(opCtx, request, requestedVersion, actualVersion);
