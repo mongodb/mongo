@@ -85,7 +85,7 @@ class ShardingCommandGenerator {
      * @returns {Array<Command>} Array of commands.
      */
     generateCommands(testModel, params) {
-        // Re-seed to ensure reproducibility since Random is a global singleton
+        // Re-seed to ensure reproducibility since Random is a global singleton.
         Random.srand(this.seed);
 
         const startState = testModel.getStartState();
@@ -316,6 +316,14 @@ class ShardingCommandGenerator {
     }
 
     /**
+     * Remove an index from the context's existing indexes.
+     * Uses bsonWoCompare for proper BSON object comparison.
+     */
+    _removeIndex(ctx, indexSpec) {
+        ctx.existingIndexes = ctx.existingIndexes.filter((idx) => bsonWoCompare(idx, indexSpec) !== 0);
+    }
+
+    /**
      * Update collection context after executing an action.
      * Sharding type is determined by the action itself.
      */
@@ -339,9 +347,9 @@ class ShardingCommandGenerator {
                 break;
             case Action.RESHARD_COLLECTION_TO_RANGE:
             case Action.RESHARD_COLLECTION_TO_HASHED: {
-                // Remove old shard key index, add new one
+                // Remove old shard key index, add new one.
                 assert(ctx.shardKeySpec, "Reshard requires existing shard key");
-                ctx.existingIndexes = ctx.existingIndexes.filter((idx) => bsonWoCompare(idx, ctx.shardKeySpec) !== 0);
+                this._removeIndex(ctx, ctx.shardKeySpec);
                 const newShardKeySpec =
                     action === Action.RESHARD_COLLECTION_TO_RANGE
                         ? getShardKeySpec(ShardingType.RANGE)
@@ -357,7 +365,11 @@ class ShardingCommandGenerator {
                 break;
             case Action.UNSHARD_COLLECTION:
                 // Collection becomes unsplittable (single-shard) but still exists.
-                // Shard key and indexes are preserved.
+                // Remove old shard key index since collection is no longer sharded.
+                assert(ctx.shardKeySpec, "Unshard requires existing shard key");
+                this._removeIndex(ctx, ctx.shardKeySpec);
+                ctx.shardKeySpec = null;
+                ctx.isSharded = false;
                 break;
             case Action.DROP_COLLECTION:
             case Action.DROP_DATABASE:
@@ -374,7 +386,7 @@ class ShardingCommandGenerator {
         }
     }
 
-    // Maps actions to their sharding type (for determining shard key spec)
+    // Maps actions to their sharding type (for determining shard key spec).
     static actionToShardingType = {
         [Action.CREATE_SHARDED_COLLECTION_RANGE]: ShardingType.RANGE,
         [Action.SHARD_COLLECTION_RANGE]: ShardingType.RANGE,
@@ -384,7 +396,7 @@ class ShardingCommandGenerator {
         [Action.RESHARD_COLLECTION_TO_HASHED]: ShardingType.HASHED,
     };
 
-    // Actions that require shard key index to exist before execution
+    // Actions that require shard key index to exist before execution.
     static actionsRequiringIndex = new Set([
         Action.SHARD_COLLECTION_RANGE,
         Action.SHARD_COLLECTION_HASHED,
@@ -392,10 +404,11 @@ class ShardingCommandGenerator {
         Action.RESHARD_COLLECTION_TO_HASHED,
     ]);
 
-    // Actions that require dropping the old shard key index after execution
+    // Actions that require dropping the old shard key index after execution.
     static actionsRequiringIndexCleanup = new Set([
         Action.RESHARD_COLLECTION_TO_RANGE,
         Action.RESHARD_COLLECTION_TO_HASHED,
+        Action.UNSHARD_COLLECTION,
     ]);
 
     /**
@@ -414,14 +427,14 @@ class ShardingCommandGenerator {
         }
 
         // Step 3: Pre-commands
-        // Create shard key index if action requires it and index doesn't exist
+        // Create shard key index if action requires it and index doesn't exist.
         if (
             ShardingCommandGenerator.actionsRequiringIndex.has(action) &&
             !this._indexExists(collectionCtx, targetShardKeySpec)
         ) {
             commands.push(new CreateIndexCommand(params.getDbName(), params.getCollName(), params.getShardSet(), ctx));
         }
-        // Drop collection before dropping database (simplifies change event matching)
+        // Drop collection before dropping database (simplifies change event matching).
         if (action === Action.DROP_DATABASE && collectionCtx.exists) {
             commands.push(
                 new DropCollectionCommand(params.getDbName(), params.getCollName(), params.getShardSet(), ctx),
@@ -431,11 +444,14 @@ class ShardingCommandGenerator {
         // Step 4: Main command
         commands.push(this.createCommand(action, params, ctx));
 
-        // Step 5: Post-commands - drop old shard key index after resharding (only if key changed)
+        // Step 5: Post-commands - drop old shard key index after resharding/unsharding.
         if (ShardingCommandGenerator.actionsRequiringIndexCleanup.has(action)) {
             const oldShardKeySpec = collectionCtx.shardKeySpec;
-            // Only drop old index if it's different from the new one
-            if (bsonWoCompare(oldShardKeySpec, targetShardKeySpec) !== 0) {
+            // For reshard: only drop old index if it's different from the new one.
+            // For unshard: always drop the old shard key index (no new shard key).
+            const shouldDropIndex =
+                action === Action.UNSHARD_COLLECTION || bsonWoCompare(oldShardKeySpec, targetShardKeySpec) !== 0;
+            if (shouldDropIndex && oldShardKeySpec) {
                 const dropCtx = {...ctx, shardKeySpec: oldShardKeySpec};
                 commands.push(
                     new DropIndexCommand(params.getDbName(), params.getCollName(), params.getShardSet(), dropCtx),

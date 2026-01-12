@@ -75,7 +75,7 @@ class ChangeStreamReader {
         if (config.watchMode === ChangeStreamWatchMode.kCluster) {
             changeStreamSpec.allChangesForCluster = true;
         }
-        // Use startAfter for invalidate tokens, resumeAfter for normal tokens
+        // Use startAfter for invalidate tokens, resumeAfter for normal tokens.
         if (resumeToken) {
             if (useStartAfter) {
                 changeStreamSpec.startAfter = resumeToken;
@@ -121,7 +121,7 @@ class ChangeStreamReader {
 
             const isInvalidate = isInvalidated(changeEvent);
 
-            // cursorClosed is true for invalidate events (server closes cursor after invalidate)
+            // cursorClosed is true for invalidate events (server closes cursor after invalidate).
             Connector.writeChangeEvent(conn, cfg.instanceName, {
                 changeEvent,
                 cursorClosed: isInvalidate,
@@ -159,10 +159,10 @@ class ChangeStreamReader {
             const isInvalidate = isInvalidated(changeEvent);
 
             resumeToken = changeEvent._id;
-            // Must use startAfter (not resumeAfter) when resuming from invalidate
+            // Must use startAfter (not resumeAfter) when resuming from invalidate.
             useStartAfter = isInvalidate;
 
-            // cursorClosed is true for invalidate events (server closes cursor after invalidate)
+            // cursorClosed is true for invalidate events (server closes cursor after invalidate).
             Connector.writeChangeEvent(conn, cfg.instanceName, {
                 changeEvent,
                 cursorClosed: isInvalidate,

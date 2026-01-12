@@ -3,7 +3,7 @@
  * Validates that the ShardingCommandGenerator produces correct command sequences
  * and that Writers can execute them both sequentially and concurrently.
  *
- * @tags: [uses_change_streams]
+ * @tags: [assumes_balancer_off, uses_change_streams]
  */
 import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
 import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_collection_test_model.js";
@@ -54,6 +54,7 @@ function getClusterTime(conn, dbName) {
 describe("ShardingCommandGenerator", function () {
     before(() => {
         this.st = new ShardingTest({shards: 2, mongos: 1});
+        this.st.stopBalancer();
         this.shards = assert.commandWorked(this.st.s.adminCommand({listShards: 1})).shards;
     });
 
@@ -92,7 +93,7 @@ describe("ShardingCommandGenerator", function () {
 
         jsTest.log.info(`Generated ${commands.length} commands (seed: ${seed})`);
 
-        // Verify commands were generated
+        // Verify commands were generated.
         assert.gt(commands.length, 0, "Should generate at least one command");
         for (let i = 0; i < commands.length; i++) {
             assert(commands[i].execute, `Command ${i} should have execute method`);
@@ -112,16 +113,16 @@ describe("ShardingCommandGenerator", function () {
         const db = this.st.s.getDB(dbName);
         db.dropDatabase();
 
-        // Set up writer config
+        // Set up writer config.
         const params = new ShardingCommandGeneratorParams(dbName, collName, this.shards);
         const config = setupWriterConfig(testSeed, params, instanceName);
 
-        // Execute commands using Writer
+        // Execute commands using Writer.
         jsTest.log.info(`Executing ${config.commands.length} commands using Writer...`);
         Writer.run(this.st.s, config);
         jsTest.log.info(`✓ Writer completed successfully`);
 
-        // Verify completion was signaled
+        // Verify completion was signaled.
         assert(Connector.isDone(this.st.s, instanceName), "Writer should have signaled completion");
         jsTest.log.info(`✓ Completion was properly signaled`);
     });
@@ -139,22 +140,22 @@ describe("ShardingCommandGenerator", function () {
         const db = this.st.s.getDB(dbName);
         db.dropDatabase();
 
-        // Set up writer configs with same seed but different collections
+        // Set up writer configs with same seed but different collections.
         const writerAParams = new ShardingCommandGeneratorParams(dbName, collName1, this.shards);
         const writerBParams = new ShardingCommandGeneratorParams(dbName, collName2, this.shards);
 
         const writerAConfig = setupWriterConfig(testSeed, writerAParams, writerA);
         const writerBConfig = setupWriterConfig(testSeed, writerBParams, writerB);
 
-        // Execute writers sequentially
+        // Execute writers sequentially.
         Writer.run(this.st.s, writerAConfig);
         Writer.run(this.st.s, writerBConfig);
 
-        // Verify both completed
+        // Verify both completed.
         assert(Connector.isDone(this.st.s, writerA), "Writer A should be done");
         assert(Connector.isDone(this.st.s, writerB), "Writer B should be done");
 
-        // Verify both collections have same count (same command sequence)
+        // Verify both collections have same count (same command sequence).
         const coll1 = db.getCollection(collName1);
         const coll2 = db.getCollection(collName2);
         assert.eq(
@@ -317,7 +318,7 @@ describe("ChangeEventMatcher helpers", function () {
 
         const multiMatcher = new MultipleChangeStreamMatcher([stream1]);
 
-        // Event _id:99 doesn't match any stream
+        // Event _id:99 doesn't match any stream.
         assert(!multiMatcher.matches({operationType: "insert", fullDocument: {_id: 99}}));
     });
 });
@@ -329,10 +330,11 @@ describe("ChangeStreamReader integration", function () {
             mongos: 1,
             rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
         });
+        this.st.stopBalancer();
         this.shards = assert.commandWorked(this.st.s.adminCommand({listShards: 1})).shards;
-        // Track instance names for cleanup in afterEach
+        // Track instance names for cleanup in afterEach.
         this.instanceNamesToCleanup = [];
-        // Track databases to drop in afterEach
+        // Track databases to drop in afterEach.
         this.databasesToCleanup = new Set();
     });
 
@@ -341,13 +343,13 @@ describe("ChangeStreamReader integration", function () {
     });
 
     afterEach(() => {
-        // Clean up any change events captured during the test
+        // Clean up any change events captured during the test.
         for (const instanceName of this.instanceNamesToCleanup) {
             Connector.cleanup(this.st.s, instanceName);
         }
         this.instanceNamesToCleanup = [];
 
-        // Drop databases used during the test
+        // Drop databases used during the test.
         for (const dbName of this.databasesToCleanup) {
             this.st.s.getDB(dbName).dropDatabase();
         }
@@ -369,15 +371,15 @@ describe("ChangeStreamReader integration", function () {
         ctx.instanceNamesToCleanup.push(readerInstanceName);
         ctx.databasesToCleanup.add(dbName);
 
-        // Create collection (drop first to ensure clean state)
+        // Create collection (drop first to ensure clean state).
         const db = ctx.st.s.getDB(dbName);
         db.dropDatabase();
         assert.commandWorked(db.createCollection(collName));
 
-        // Get cluster time BEFORE Writer runs
+        // Get cluster time BEFORE Writer runs.
         const clusterTime = getClusterTime(ctx.st.s, dbName);
 
-        // Execute inserts using Writer
+        // Execute inserts using Writer.
         const numInserts = 3;
         const insertCommands = [];
         for (let i = 0; i < numInserts; i++) {
@@ -389,7 +391,7 @@ describe("ChangeStreamReader integration", function () {
         };
         Writer.run(ctx.st.s, writerConfig);
 
-        // Use ChangeStreamReader with specified mode
+        // Use ChangeStreamReader with specified mode.
         const readerConfig = {
             instanceName: readerInstanceName,
             watchMode: ChangeStreamWatchMode.kCollection,
@@ -403,7 +405,7 @@ describe("ChangeStreamReader integration", function () {
 
         ChangeStreamReader.run(ctx.st.s, readerConfig);
 
-        // Read captured events
+        // Read captured events.
         const capturedRecords = Connector.readAllChangeEvents(ctx.st.s, readerInstanceName);
 
         assert.eq(capturedRecords.length, numInserts, `Expected ${numInserts} events, got ${capturedRecords.length}`);
@@ -432,16 +434,16 @@ describe("ChangeStreamReader integration", function () {
         const writerInstanceName = "writer_invalidate_test";
         const readerInstanceName = "reader_invalidate_test";
 
-        // Register for cleanup in afterEach
+        // Register for cleanup in afterEach.
         this.instanceNamesToCleanup.push(readerInstanceName);
         this.databasesToCleanup.add(dbName);
 
         jsTest.log.info(`\n========== ChangeStreamReader Invalidate Test ==========`);
 
-        // Expected events: 3 inserts + drop (which triggers invalidate)
+        // Expected events: 3 inserts + drop (which triggers invalidate).
         const expectedEventTypes = ["insert", "insert", "insert", "drop", "invalidate"];
 
-        // Build commands: 3 inserts + drop
+        // Build commands: 3 inserts + drop.
         const collectionCtx = {exists: true, nonEmpty: false};
         const commands = [
             new InsertDocCommand(dbName, collName, this.shards, collectionCtx),
@@ -498,13 +500,13 @@ describe("ChangeStreamReader integration", function () {
         setupCollection();
         const db = this.st.s.getDB(dbName);
 
-        // Get cluster time BEFORE operations
+        // Get cluster time BEFORE operations.
         const startTime = getClusterTime(this.st.s, dbName);
         jsTest.log.info(`Start time: ${tojson(startTime)}`);
 
         executeCommands();
 
-        // Configure ChangeStreamReader
+        // Configure ChangeStreamReader.
         const readerConfig = {
             instanceName: readerInstanceName,
             watchMode: ChangeStreamWatchMode.kCollection,
@@ -519,7 +521,7 @@ describe("ChangeStreamReader integration", function () {
         jsTest.log.info(`Running ChangeStreamReader.run()...`);
         ChangeStreamReader.run(this.st.s, readerConfig);
 
-        // Read captured events from Connector
+        // Read captured events from Connector.
         const capturedRecords = Connector.readAllChangeEvents(this.st.s, readerInstanceName);
         const events = capturedRecords.map((r) => r.changeEvent);
 
@@ -538,16 +540,16 @@ describe("ChangeStreamReader integration", function () {
         const writerInstanceName = "writer_resume_inv_test";
         const readerInstanceName = "reader_resume_inv_test";
 
-        // Register for cleanup in afterEach
+        // Register for cleanup in afterEach.
         this.instanceNamesToCleanup.push(readerInstanceName);
         this.databasesToCleanup.add(dbName);
 
         jsTest.log.info(`\n========== ChangeStreamReader FetchOneAndResume + Invalidate ==========`);
 
-        // Expected events: 2 inserts + drop + invalidate
+        // Expected events: 2 inserts + drop + invalidate.
         const expectedEventTypes = ["insert", "insert", "drop", "invalidate"];
 
-        // Build commands: 2 inserts + drop
+        // Build commands: 2 inserts + drop.
         const collectionCtx = {exists: true, nonEmpty: false};
         const commands = [
             new InsertDocCommand(dbName, collName, this.shards, collectionCtx),
@@ -592,7 +594,7 @@ describe("ChangeStreamReader integration", function () {
             jsTest.log.info(`${testName}: ✓ All events verified`);
         };
 
-        // Test with ChangeStreamReader in FetchOneAndResume mode
+        // Test with ChangeStreamReader in FetchOneAndResume mode.
         setupCollection();
         const db = this.st.s.getDB(dbName);
 
@@ -632,16 +634,16 @@ describe("ChangeStreamReader integration", function () {
         const writerInstanceName = "writer_db_watch_test";
         const readerInstanceName = "reader_db_watch_test";
 
-        // Register for cleanup in afterEach
+        // Register for cleanup in afterEach.
         this.instanceNamesToCleanup.push(readerInstanceName);
         this.databasesToCleanup.add(dbName);
 
         jsTest.log.info(`\n========== ChangeStreamReader Database Watch ==========`);
 
-        // Expected: inserts into both collections
+        // Expected: inserts into both collections.
         const expectedEventTypes = ["insert", "insert", "insert", "insert"];
 
-        // Build commands: 2 inserts into each collection (interleaved)
+        // Build commands: 2 inserts into each collection (interleaved).
         const collectionCtx = {exists: true, nonEmpty: false};
         const commands = [
             new InsertDocCommand(dbName, collName1, this.shards, collectionCtx),
@@ -650,7 +652,7 @@ describe("ChangeStreamReader integration", function () {
             new InsertDocCommand(dbName, collName2, this.shards, {...collectionCtx, nonEmpty: true}),
         ];
 
-        // Setup: drop and recreate collections (drop to ensure clean state before test)
+        // Setup: drop and recreate collections (drop to ensure clean state before test).
         const db = this.st.s.getDB(dbName);
         db.dropDatabase();
         assert.commandWorked(db.createCollection(collName1));
@@ -658,7 +660,7 @@ describe("ChangeStreamReader integration", function () {
 
         const startTime = getClusterTime(this.st.s, dbName);
 
-        // Execute commands using Writer
+        // Execute commands using Writer.
         const writerConfig = {
             commands: commands,
             instanceName: writerInstanceName,
@@ -693,12 +695,12 @@ describe("ChangeStreamReader integration", function () {
             `Expected ${expectedEventTypes.length} events, got ${capturedRecords.length}`,
         );
 
-        // Verify all are inserts
+        // Verify all are inserts.
         for (const record of capturedRecords) {
             assert.eq(record.changeEvent.operationType, "insert", "All events should be inserts");
         }
 
-        // Verify events from both collections
+        // Verify events from both collections.
         const collsWithEvents = new Set(capturedRecords.map((r) => r.changeEvent.ns.coll));
         assert(collsWithEvents.has(collName1), `Should have events from ${collName1}`);
         assert(collsWithEvents.has(collName2), `Should have events from ${collName2}`);

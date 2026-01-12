@@ -86,9 +86,9 @@ class Connector {
      */
     static cleanup(conn, instanceName) {
         const db = conn.getDB(Connector.controlDatabase);
-        // Drop the change events collection
+        // Drop the change events collection.
         db.getCollection(instanceName).drop();
-        // Remove the notification document
+        // Remove the notification document.
         db.getCollection(Connector.notificationsCollection).deleteOne({_id: instanceName});
     }
 }
