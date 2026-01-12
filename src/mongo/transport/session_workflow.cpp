@@ -388,8 +388,26 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
     return false;
 }
 
-// Counts the # of responses to completed operations that we were unable to send back to the
-// client.
+bool isPreAuth(Client* client) {
+    if (MONGO_unlikely(serverGlobalParams.isMongoBridge)) {
+        // Do not perform pre-auth check for mongo bridge connections.
+        return false;
+    }
+
+    if (!AuthorizationSession::exists(client)) {
+        return true;
+    }
+
+    const auto authorizationSession = AuthorizationSession::get(client);
+    if (authorizationSession->shouldIgnoreAuthChecks()) {
+        // If authentication is disabled, never consider sessions pre-auth.
+        return false;
+    }
+
+    return !authorizationSession->isAuthenticated();
+};
+
+// Counts the # of responses to completed operations that we were unable to send back to the client.
 auto& unsendableCompletedResponses =
     *MetricBuilder<Counter64>("operation.unsendableCompletedResponses");
 }  // namespace
@@ -509,6 +527,9 @@ private:
         // latency.
         _yieldPointReached();
         _iterationFrame->metrics.yieldedBeforeReceive();
+        ON_BLOCK_EXIT(
+            [&, old = session()->getRestrictedMode()] { session()->setRestrictedMode(old); });
+        session()->setRestrictedMode(isPreAuth(client()));
         return _receiveRequest();
     }
 
@@ -592,7 +613,10 @@ public:
         if (_in.operation() != dbCompressed)
             return;
         MessageCompressorId cid;
-        _in = uassertStatusOK(compressorMgr().decompressMessage(_in, &cid));
+        _in = isPreAuth(_swf->client())
+            ? uassertStatusOK(compressorMgr().decompressMessage(
+                  _in, &cid, gPreAuthMaximumMessageSizeBytes.loadRelaxed()))
+            : uassertStatusOK(compressorMgr().decompressMessage(_in, &cid));
         _compressorId = cid;
     }
 

@@ -180,6 +180,9 @@ def generate_mongod_parameters(rng, mode):
 
     ret["internalQueryFindCommandBatchSize"] = rng.randint(1, 500)
 
+    ret["preAuthMaximumMessageSizeBytes"] = rng.randint(65536, 16777216)
+    ret["capMemoryConsumptionForPreAuthBuffers"] = rng.randint(80, 100)
+
     return ret
 
 
@@ -193,6 +196,9 @@ def generate_mongos_parameters(rng, mode):
     ret["defaultConfigCommandTimeoutMS"] = 90000
 
     ret["internalQueryFindCommandBatchSize"] = rng.randint(1, 500)
+
+    ret["preAuthMaximumMessageSizeBytes"] = rng.randint(65536, 16777216)
+    ret["capMemoryConsumptionForPreAuthBuffers"] = rng.randint(80, 100)
 
     return ret
 
