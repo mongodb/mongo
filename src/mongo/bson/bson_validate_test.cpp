@@ -290,31 +290,16 @@ private:
             });
     }
 
-    class O {
-    public:
-        explicit(false) O(std::initializer_list<std::pair<StringData, AnyValue>> fields) {
-            BSONObjBuilder bob;
-            for (auto&& [k, v] : fields)
-                visit([&](auto&& alt) { bob.append(k, alt); }, v);
-            _obj = bob.obj();
-        }
+    static BSONObj mkO(std::vector<std::pair<StringData, AnyValue>> fields) {
+        BSONObjBuilder bob;
+        for (auto&& [k, v] : fields)
+            visit([&](auto&& alt) { bob.append(k, alt); }, v);
+        return bob.obj();
+    }
 
-        operator BSONObj() const {
-            return _obj;
-        }
-
-    private:
-        BSONObj _obj;
-    };
-
-    class A : private O {
-    public:
-        using O::O;
-
-        operator BSONArray() const {
-            return BSONArray{BSONObj{*this}};
-        }
-    };
+    static BSONArray mkA(std::vector<std::pair<StringData, AnyValue>> arr) {
+        return BSONArray{mkO(std::move(arr))};
+    }
 
 public:
     static auto validTestValues() {
@@ -322,44 +307,56 @@ public:
             {
                 {
                     "arr",
-                    O{{"obj",
-                       A{
-                           {"0", "1"},
-                           {"1", "b"},
-                       }}},
+                    mkO({
+                        {"obj",
+                         mkA({
+                             {"0", "1"},
+                             {"1", "b"},
+                         })},
+                    }),
                 },
                 {
                     "longArray",
-                    O{{"obj",
-                       A{
-                           {"0", "a"},
-                           {"1", "b"},
-                           {"2", "c"},
-                           {"3", "d"},
-                           {"4", "e"},
-                           {"5", "f"},
-                           {"6", "g"},
-                           {"7", "h"},
-                           {"8", "i"},
-                           {"9", "j"},
-                           {"10", "k"},
-                       }}},
+                    mkO({
+                        {"obj",
+                         mkA({
+                             {"0", "a"},
+                             {"1", "b"},
+                             {"2", "c"},
+                             {"3", "d"},
+                             {"4", "e"},
+                             {"5", "f"},
+                             {"6", "g"},
+                             {"7", "h"},
+                             {"8", "i"},
+                             {"9", "j"},
+                             {"10", "k"},
+                         })},
+                    }),
                 },
                 {
                     "validNestedArraysAndObjects",
-                    O{{"obj",
-                       O{{"arr",
-                          A{{"0",
-                             O{
-                                 {"2", 1},
-                                 {"1", 0},
-                                 {"3",
-                                  A{
-                                      {"0", "a"},
-                                      {"1", "b"},
-                                  }},
-                                 {"4", "b"},
-                             }}}}}}},
+                    mkO({
+                        {
+                            "obj",
+                            mkO({
+                                {"arr",
+                                 mkA({
+                                     {"0",
+                                      mkO({
+                                          {"2", 1},
+                                          {"1", 0},
+                                          {"3",
+                                           mkA({
+                                               {"0", "a"},
+                                               {"1", "b"},
+                                           })},
+                                          {"4", "b"},
+                                      })},
+                                 })},
+                            }),
+                        },
+                    }),
                 },
             },
             {
@@ -374,65 +371,79 @@ public:
             {
                 {
                     "nonNumericalArray",
-                    O{{"obj",
-                       A{
-                           {"a", 1},
-                           {"b", 2},
-                       }}},
+                    mkO({
+                        {"obj",
+                         mkA({
+                             {"a", 1},
+                             {"b", 2},
+                         })},
+                    }),
                 },
                 {
                     "nonSequentialArray",
-                    O{{"obj",
-                       A{
-                           {"1", "a"},
-                           {"2", "b"},
-                       }}},
+                    mkO({
+                        {"obj",
+                         mkA({
+                             {"1", "a"},
+                             {"2", "b"},
+                         })},
+                    }),
                 },
                 {
                     "nestedArraysAndObjects",
-                    O{{"obj",
-                       A{
-                           {"0", "a"},
-                           {"1",
-                            A{
-                                {"0", "a"},
-                                {"2", "b"},
-                            }},
-                           {"2", "b"},
-                       }}},
+                    mkO({
+                        {"obj",
+                         mkA({
+                             {"0", "a"},
+                             {"1",
+                              mkA({
+                                  {"0", "a"},
+                                  {"2", "b"},
+                              })},
+                             {"2", "b"},
+                         })},
+                    }),
                 },
                 {
                     "longNonSequentialArray",
-                    O{{"obj",
-                       A{
-                           {"0", "a"},
-                           {"1", "b"},
-                           {"2", "c"},
-                           {"3", "d"},
-                           {"4", "e"},
-                           {"5", "f"},
-                           {"6", "g"},
-                           {"7", "h"},
-                           {"8", "i"},
-                           {"9", "j"},
-                           {"11", "k"},
-                       }}},
+                    mkO({
+                        {"obj",
+                         mkA({
+                             {"0", "a"},
+                             {"1", "b"},
+                             {"2", "c"},
+                             {"3", "d"},
+                             {"4", "e"},
+                             {"5", "f"},
+                             {"6", "g"},
+                             {"7", "h"},
+                             {"8", "i"},
+                             {"9", "j"},
+                             {"11", "k"},
+                         })},
+                    }),
                 },
                 {
                     "invalidNestedArraysAndObjects",
-                    O{{"obj",
-                       O{{"arr",
-                          A{{"0",
-                             O{
-                                 {"2", 1},
-                                 {"3", 0},
-                                 {"4",
-                                  A{
-                                      {"0", "a"},
-                                      {"2", "b"},
-                                  }},
-                                 {"5", "b"},
-                             }}}}}}},
+                    mkO({
+                        {"obj",
+                         mkO({
+                             {"arr",
+                              mkA({
+                                  {"0",
+                                   mkO({
+                                       {"2", 1},
+                                       {"3", 0},
+                                       {"4",
+                                        mkA({
+                                            {"0", "a"},
+                                            {"2", "b"},
+                                        })},
+                                       {"5", "b"},
+                                   })},
+                              })},
+                         })},
+                    }),
                 },
             },
             {
