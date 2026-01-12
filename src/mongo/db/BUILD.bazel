@@ -1756,6 +1756,7 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:expression_function.cpp",
         "//src/mongo/db/pipeline:expression_js_emit.cpp",
         "//src/mongo/db/pipeline:expression_let.cpp",
+        "//src/mongo/db/pipeline:expression_map_reduce_filter.cpp",
         "//src/mongo/db/pipeline:expression_parser_gen",
         "//src/mongo/db/pipeline:expression_test_api_version.cpp",
         "//src/mongo/db/pipeline:expression_test_feature_flags.cpp",
