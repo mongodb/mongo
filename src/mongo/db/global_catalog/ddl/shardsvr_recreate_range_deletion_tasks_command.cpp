@@ -133,7 +133,7 @@ public:
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
-                                                           ActionType::internal));
+                                                           ActionType::cleanupOrphaned));
         }
 
         NamespaceString ns() const override {
@@ -240,7 +240,7 @@ public:
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
-                                                           ActionType::internal));
+                                                           ActionType::cleanupOrphaned));
         }
 
         NamespaceString ns() const override {
