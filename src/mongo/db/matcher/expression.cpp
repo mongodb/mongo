@@ -153,6 +153,7 @@ std::unique_ptr<MatchExpression> MatchExpression::optimize(
             ExpressionSimlifierSettings settings{
                 static_cast<size_t>(internalQueryMaximumNumberOfUniquePredicatesToSimplify.load()),
                 static_cast<size_t>(internalQueryMaximumNumberOfMintermsInSimplifier.load()),
+                static_cast<size_t>(internalQueryMaxNumPrimeImplicants.load()),
                 internalQueryMaxSizeFactorToSimplify.load(),
                 internalQueryDoNotOpenContainedOrsInSimplifier.load(),
                 /*applyQuineMcCluskey*/ true};
