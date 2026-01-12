@@ -127,7 +127,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     WT_RWLOCK new, old;
     int64_t **stats;
 
-    WT_STAT_CONN_INCR_ATOMIC(session, rwlock_read);
+    WT_STAT_CONN_INCR(session, rwlock_read);
     if (l->stat_read_count_off != -1 && WT_STAT_ENABLED(session)) {
         stats = (int64_t **)S2C(session)->stats;
         __wt_atomic_add_int64_relaxed(&stats[session->stat_conn_bucket][l->stat_read_count_off], 1);
@@ -183,7 +183,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     uint8_t ticket;
     int pause_cnt;
 
-    WT_STAT_CONN_INCR_ATOMIC(session, rwlock_read);
+    WT_STAT_CONN_INCR(session, rwlock_read);
 
     WT_DIAGNOSTIC_YIELD;
 
@@ -332,7 +332,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     WT_RWLOCK new, old;
     int64_t **stats;
 
-    WT_STAT_CONN_INCR_ATOMIC(session, rwlock_write);
+    WT_STAT_CONN_INCR(session, rwlock_write);
     if (l->stat_write_count_off != -1 && WT_STAT_ENABLED(session)) {
         stats = (int64_t **)S2C(session)->stats;
         __wt_atomic_add_int64_relaxed(

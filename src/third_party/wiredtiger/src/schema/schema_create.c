@@ -625,9 +625,11 @@ __create_colgroup(WT_SESSION_IMPL *session, const char *name, bool exclusive, co
             sourcecfg[config == NULL ? 0 : 1] = fmt.data;
         }
 
+        __wt_free(session, sourceconf);
         WT_ERR(__wt_config_merge(session, sourcecfg, NULL, &sourceconf));
         WT_ERR(__wt_schema_create(session, source, sourceconf));
 
+        __wt_free(session, cgconf);
         WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
 
         /* FIXME-WT-12021 Replace this with a proper failpoint once the framework is available. */

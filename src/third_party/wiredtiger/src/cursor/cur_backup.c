@@ -712,10 +712,13 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
     }
 
 err:
-    if (ret != 0 && cb->incr_src != NULL) {
-        F_CLR(cb->incr_src, WT_BLKINCR_INUSE);
-        F_CLR(cb, WT_CURBACKUP_CONSOLIDATE);
-        F_SET(cb, consolidate);
+    if (ret != 0) {
+        WT_TRET(__backup_free(session, cb));
+        if (cb->incr_src != NULL) {
+            F_CLR(cb->incr_src, WT_BLKINCR_INUSE);
+            F_CLR(cb, WT_CURBACKUP_CONSOLIDATE);
+            F_SET(cb, consolidate);
+        }
     }
     __wt_scr_free(session, &tmp);
     return (ret);
