@@ -63,6 +63,8 @@
 #define GTEST_FATAL_FAILURE_(message) \
     GTEST_FATAL_FAILURE_RETURN_ GTEST_MESSAGE_(message, ::testing::TestPartResult::kFatalFailure)
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
@@ -262,6 +264,19 @@ namespace mongo {
  */
 inline void PrintTo(StringData s, std::ostream* os) {
     unittest::universalPrint(toStdStringViewForInterop(s), *os);
+}
+
+inline void PrintTo(const Status& s, std::ostream* os) {
+    *os << s.toString();
+}
+
+template <typename T>
+inline void PrintTo(const StatusWith<T>& s, std::ostream* os) {
+    if (s.isOK()) {
+        *os << ::testing::PrintToString(s.getValue());
+    } else {
+        *os << ::testing::PrintToString(s.getStatus());
+    }
 }
 }  // namespace mongo
 

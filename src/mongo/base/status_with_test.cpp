@@ -107,5 +107,15 @@ TEST(StatusWith, AssertionFormat) {
     ASSERT_EQ(unittest::stringify::invoke(StatusWith<StringData>("foo")), "foo");
 }
 
+TEST(StatusWith, ErrorGtestPrintTo) {
+    StatusWith<StringData> sw(ErrorCodes::MaxError, "error");
+    ASSERT_EQUALS(testing::PrintToString(sw.getStatus()), testing::PrintToString(sw));
+}
+
+TEST(StatusWith, DataGtestPrintTo) {
+    StatusWith<StringData> sw{"value"};
+    ASSERT_EQUALS(testing::PrintToString(sw.getValue()), testing::PrintToString(sw));
+}
+
 }  // namespace
 }  // namespace mongo
