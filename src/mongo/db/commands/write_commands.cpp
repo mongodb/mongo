@@ -61,6 +61,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/local_executor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
@@ -529,10 +530,7 @@ public:
             bool isTimeseriesRetryableUpdate = isTimeseriesViewRequest &&
                 opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction();
             if (isTimeseriesRetryableUpdate) {
-                auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
-                    ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
-                          opCtx->getServiceContext())
-                    : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+                auto executor = getLocalExecutor(opCtx);
                 ON_BLOCK_EXIT([&] {
                     // Increments the counter if the command contains retries. This is normally done
                     // within write_ops_exec::performUpdates. But for retryable timeseries updates,

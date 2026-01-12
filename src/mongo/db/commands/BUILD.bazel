@@ -74,6 +74,7 @@ mongo_cc_library(
         "//src/mongo/db/commands:write_commands_common.cpp",
     ],
     deps = [
+        "//src/mongo/db:local_executor",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
         "//src/mongo/db/commands:update_metrics",
@@ -929,6 +930,7 @@ mongo_cc_library(
         "//src/mongo/db:index_builds_coordinator_interface",
         "//src/mongo/db:index_commands_idl",
         "//src/mongo/db:introspect",
+        "//src/mongo/db:local_executor",
         "//src/mongo/db:multitenancy",
         "//src/mongo/db:rw_concern_d",
         "//src/mongo/db:server_base",
