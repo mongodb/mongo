@@ -730,7 +730,7 @@ int64_t WiredTigerRecordStore::storageSize(RecoveryUnit& ru,
     }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(ru).getSessionNoTxn();
     auto result = WiredTigerUtil::getStatisticsValue(
-        *session, "statistics:" + getURI(), "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
+        *session, "statistics:" + getURI(), "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
     uassertStatusOK(result.getStatus());
 
     return result.getValue();
