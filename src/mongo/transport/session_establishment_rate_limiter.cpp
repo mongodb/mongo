@@ -84,7 +84,13 @@ SessionEstablishmentRateLimiter* SessionEstablishmentRateLimiter::get(ServiceCon
 }
 
 Status SessionEstablishmentRateLimiter::throttleIfNeeded(Client* client) {
-    // Check if the session is exempt from rate limiting based on its IP.
+    // Exempt maintenance port sessions from rate limiters
+    if (client->isMaintenancePortClient()) {
+        _rateLimiter.recordExemption();
+        return Status::OK();
+    }
+
+    // Exempt session from rate limiters when its IP is whitelisted
     maxEstablishingConnsOverride.refreshSnapshot(_maxEstablishingConnsOverride);
     if (_maxEstablishingConnsOverride &&
         client->session()->isExemptedByCIDRList(*_maxEstablishingConnsOverride)) {

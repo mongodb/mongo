@@ -146,6 +146,15 @@ public:
         return getRemote().isLocalHost();
     }
 
+    /**
+     * Indicates whether this client targets the maintenance port or its corresponding unix
+     * domain socket (on non-Windows platforms). These clients are intended to allow high-priority
+     * operations, bypassing rate limiters, during connection storms.
+     */
+    bool isMaintenancePortClient() const {
+        return _isMaintenancePortClient;
+    }
+
     bool hasRemote() const {
         return (_session != nullptr);
     }
@@ -426,6 +435,9 @@ private:
 
     // Indicates that this client claims to be internal to the cluster.
     bool _isInternalClient{false};
+
+    // See isMaintenancePortClient() for more details on this internal flag.
+    const bool _isMaintenancePortClient{false};
 
     ErrorCodes::Error _disconnectErrorCode = ErrorCodes::ClientDisconnect;
 

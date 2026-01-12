@@ -69,6 +69,20 @@ export function getRateLimiterStats(exemptConn) {
 }
 
 /**
+ * Expected error labels present in command responses when requests are rejected by the
+ * ingress request rate limiter.
+ */
+export const kExpectedErrorLabels = ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"];
+
+/**
+ * Returns true if the expected rate limiting error labels are encountered in the command response.
+ */
+export function assertContainsExpectedErrorLabels(res) {
+    assert(res.hasOwnProperty("errorLabels"), res);
+    assert.sameMembers(kExpectedErrorLabels, res.errorLabels);
+}
+
+/**
  * Runs a test for the ingress admission rate limiter using a single mongod process.
  */
 export function runTestStandalone({startupParams, auth, cmdParams = {}}, testFunction) {

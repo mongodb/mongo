@@ -71,8 +71,8 @@ public:
 
     /**
      * New Sessions should call into this function to respect the configured establishment rate
-     * limit. If the session's IP is not exempt from rate-limiting, it will block until it is let
-     * through by the underlying rate limiter.
+     * limit. Sessions connected to the maintenance port or whose IP is in the exemption list
+     * will be exempt. All other sessions will block until admitted by the rate limiter.
      */
     Status throttleIfNeeded(Client* client);
 

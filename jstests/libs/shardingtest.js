@@ -1888,10 +1888,15 @@ export class ShardingTest {
             // TODO (SERVER-112863) Remove this once the maintenance port is supported on lastLTS.
             this._rs.forEach((rs) => {
                 if (skipInitiatingWithMaintenancePort) {
-                    rs.test.reInitiate();
+                    if (this.keyFile) {
+                        authutil.asCluster(rs.test.nodes, this.keyFile, () => {
+                            rs.test.reInitiate();
+                        });
+                    } else {
+                        rs.test.reInitiate();
+                    }
                 }
             });
-
 
             // Ensure that the sessions collection exists so jstests can run things with
             // logical sessions and test them. We do this by forcing an immediate cache refresh

@@ -17,9 +17,9 @@ import {
     runTestReplSet,
     runTestSharded,
     runTestStandalone,
+    kExpectedErrorLabels,
+    assertContainsExpectedErrorLabels,
 } from "jstests/noPassthrough/admission/libs/ingress_request_rate_limiter_helper.js";
-
-const kExpectedErrorLabels = ["SystemOverloadedError", "RetryableError", "NoWritesPerformed"];
 
 /**
  * Runs the set parameter commands with some arbitrary value to ensure invalid values are rejected.
@@ -118,11 +118,6 @@ function testRateLimiterMetrics(conn, exemptConn) {
     // We run inserts command that will either pass or fail. When it fails, we validate the error
     // code and label.
     for (let i = 0; i < requestAmount; ++i) {
-        const assertContainsExpectedErrorLabels = (res) => {
-            assert(res.hasOwnProperty("errorLabels"), res);
-            assert.sameMembers(kExpectedErrorLabels, res.errorLabels);
-        };
-
         const collName = `${jsTest.name()}_coll`;
 
         const db = conn.getDB(`${jsTest.name()}_db`);

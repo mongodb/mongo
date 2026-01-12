@@ -229,5 +229,14 @@ protected:
     std::list<Promise<void>> _waitForDataQueue;
 };
 
+class MockMaintenanceSession : public MockSession {
+public:
+    explicit MockMaintenanceSession(TransportLayer* tl) : MockSession(tl) {}
+
+    bool isConnectedToMaintenancePort() const override {
+        return true;
+    }
+};
+
 }  // namespace transport
 }  // namespace mongo

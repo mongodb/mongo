@@ -31,6 +31,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/transport/mock_session.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -44,8 +46,9 @@ public:
     constexpr static auto kClientName1 = "foo";
     constexpr static auto kClientName2 = "bar";
 
-    auto makeClient(std::string desc = "ClientTest") {
-        return getService()->makeClient(std::move(desc));
+    auto makeClient(std::string desc = "ClientTest",
+                    const std::shared_ptr<transport::Session>& session = nullptr) {
+        return getService()->makeClient(std::move(desc), session);
     }
 };
 
@@ -98,6 +101,25 @@ DEATH_TEST_REGEX_F(ClientTestDeathTest, OverwriteThreadsClient, "Invariant failu
 
     Client::setCurrent(std::move(client1));
     Client::setCurrent(std::move(client2));
+}
+
+TEST_F(ClientTest, ShouldNotBeConnectedToMaintenancePort) {
+    transport::TransportLayerMock transportLayer;
+    transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
+        return std::make_shared<transport::MockSession>(tl);
+    };
+    auto mainPortClient = makeClient("mainPortClient", transportLayer.createSession());
+    ASSERT_FALSE(mainPortClient->isMaintenancePortClient());
+}
+
+TEST_F(ClientTest, ShouldBeConnectedToMaintenancePort) {
+    transport::TransportLayerMock transportLayer;
+    transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
+        return std::make_shared<transport::MockMaintenanceSession>(tl);
+    };
+    auto maintenancePortClient =
+        makeClient("maintenancePortClient", transportLayer.createSession());
+    ASSERT_TRUE(maintenancePortClient->isMaintenancePortClient());
 }
 
 }  // namespace

@@ -81,7 +81,7 @@ private:
             !authorizationSession->isAuthenticated();
     };
 
-    bool _isConnectionExempt(Client* client) {
+    bool _isIPExempt(Client* client) {
         ingressRequestRateLimiterIPExemptions.refreshSnapshot(_ipExemptions);
         return _ipExemptions && client->session()->isExemptedByCIDRList(*_ipExemptions);
     }
@@ -112,14 +112,14 @@ private:
 
     bool _isExempted(Client* client) {
         // The rate limiter applies only requests when the client is authenticated to prevent DoS
-        // attacks caused by many unauthenticated requests. In the case auth is disabled, all
-        // requests will be subject to rate limiting.
-        if (_isAuthorizationExempt(client)) {
+        // attacks caused by many unauthenticated requests. Requests from clients connected to the
+        // maintenance port or related unix socket bypass the rate limiter.
+        if (_isAuthorizationExempt(client) || client->isMaintenancePortClient()) {
             return true;
         }
 
         if (MONGO_unlikely(!_exempted.has_value() || !_areSnapshotsCurrent())) {
-            _exempted = _isConnectionExempt(client) || _isApplicationExempt(client);
+            _exempted = _isIPExempt(client) || _isApplicationExempt(client);
         }
         return *_exempted;
     }

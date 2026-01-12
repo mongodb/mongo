@@ -897,15 +897,6 @@ TEST(CurOpTest, ShouldReportIsFromUserConnection) {
     ASSERT_TRUE(bsonObjUserConn.getField("isFromUserConnection").Bool());
 }
 
-class MockMaintenanceSession : public transport::MockSession {
-public:
-    explicit MockMaintenanceSession(transport::TransportLayer* tl) : MockSession(tl) {}
-
-    bool isConnectedToMaintenancePort() const override {
-        return true;
-    }
-};
-
 TEST(CurOpTest, ShouldNotReportIsFromMaintenancePortConnectionWhenFFDisabled) {
     gFeatureFlagDedicatedPortForMaintenanceOperations.setForServerParameter(false);
 
@@ -916,7 +907,7 @@ TEST(CurOpTest, ShouldNotReportIsFromMaintenancePortConnectionWhenFFDisabled) {
     // Mock a client with a user connection.
     transport::TransportLayerMock transportLayer;
     transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
-        return std::make_shared<MockMaintenanceSession>(tl);
+        return std::make_shared<transport::MockMaintenanceSession>(tl);
     };
     auto clientMaintenanceConn = serviceContext.getServiceContext()->getService()->makeClient(
         "maintenanceConn", transportLayer.createSession());
@@ -957,7 +948,7 @@ TEST(CurOpTest, ShouldReportIsFromMaintenancePortConnection) {
     // Mock a client with a user connection.
     transport::TransportLayerMock transportLayer;
     transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
-        return std::make_shared<MockMaintenanceSession>(tl);
+        return std::make_shared<transport::MockMaintenanceSession>(tl);
     };
     auto clientMaintenanceConn = serviceContext.getServiceContext()->getService()->makeClient(
         "maintenanceConn", transportLayer.createSession());
