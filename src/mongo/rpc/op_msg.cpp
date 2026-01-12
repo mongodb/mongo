@@ -42,7 +42,12 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/wire_message_payload.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/hex.h"
@@ -168,7 +173,13 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
             case Section::kBody: {
                 uassert(40430, "Multiple body sections in message", !haveBody);
                 haveBody = true;
-                msg.body = sectionsBuf.read<Validated<BSONObj>>();
+
+                // Parse and validate the payload using a temporary WireMessagePayload struct.
+                // This allows for a slightly higher maximum object size than a regular BSONObj.
+                // This is neede in order to parse messages containing large BSONObj bodies with
+                // extra metadata, as in the oplog replication.
+                WireMessagePayload payload = sectionsBuf.read<Validated<WireMessagePayload>>();
+                msg.body = std::move(payload.obj);
 
                 uassert(ErrorCodes::InvalidOptions,
                         "Multitenancy not enabled, cannot set $tenant in command body",
@@ -443,11 +454,12 @@ AtomicWord<bool> OpMsgBuilder::disableDupeFieldCheck_forTest{false};
 
 Message OpMsgBuilder::finish() {
     const auto size = _buf.len();
+    constexpr auto maxSize = BSONObjMaxWireMessageSize;
     uassert(ErrorCodes::BSONObjectTooLarge,
             str::stream() << "BSON size limit hit while building Message. Size: " << size << " (0x"
-                          << unsignedHex(size) << "); maxSize: " << BSONObjMaxInternalSize << "("
-                          << (BSONObjMaxInternalSize / (1024 * 1024)) << "MB)",
-            size <= BSONObjMaxInternalSize);
+                          << unsignedHex(size) << "); maxSize: " << maxSize << "("
+                          << (maxSize / (1024 * 1024)) << "MB)",
+            size <= maxSize);
 
     return finishWithoutSizeChecking();
 }

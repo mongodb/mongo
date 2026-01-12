@@ -635,6 +635,8 @@ last-continuous:
     ticket: SERVER-93153
   - test_file: jstests/change_streams/resume_expanded_events.js
     ticket: SERVER-93153
+  - test_file: jstests/replsets/insert_documents_close_to_size_limit.js
+    ticket: SERVER-113532
   suites: null
 last-lts:
   all:
@@ -1322,4 +1324,6 @@ last-lts:
     ticket: SERVER-93153
   - test_file: jstests/change_streams/resume_expanded_events.js
     ticket: SERVER-93153
+  - test_file: jstests/replsets/insert_documents_close_to_size_limit.js
+    ticket: SERVER-113532
   suites: null
