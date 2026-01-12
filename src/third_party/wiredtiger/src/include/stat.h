@@ -584,6 +584,7 @@ struct __wt_connection_stats {
     int64_t cache_eviction_trigger_dirty_reached;
     int64_t cache_eviction_trigger_reached;
     int64_t cache_eviction_trigger_updates_reached;
+    int64_t cache_obsolete_updates_removed;
     int64_t cache_timed_out_ops;
     int64_t cache_eviction_blocked_overflow_keys;
     int64_t cache_read_overflow;
@@ -607,6 +608,7 @@ struct __wt_connection_stats {
     int64_t cache_eviction_clear_ordinary;
     int64_t cache_pages_requested;
     int64_t cache_pages_prefetch;
+    int64_t cache_pages_requested_hs;
     int64_t cache_eviction_pages_seen;
     int64_t cache_eviction_pages_already_queued;
     int64_t cache_eviction_fail;
@@ -1226,6 +1228,7 @@ struct __wt_dsrc_stats {
     int64_t cache_eviction_trigger_dirty_reached;
     int64_t cache_eviction_trigger_reached;
     int64_t cache_eviction_trigger_updates_reached;
+    int64_t cache_obsolete_updates_removed;
     int64_t cache_eviction_blocked_overflow_keys;
     int64_t cache_read_overflow;
     int64_t cache_eviction_deepen;
@@ -1237,6 +1240,7 @@ struct __wt_dsrc_stats {
     int64_t cache_read_checkpoint;
     int64_t cache_pages_requested;
     int64_t cache_pages_prefetch;
+    int64_t cache_pages_requested_hs;
     int64_t cache_eviction_pages_seen;
     int64_t cache_write;
     int64_t cache_write_restore;

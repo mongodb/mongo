@@ -46,10 +46,10 @@ class test_cache_evict_config01(wttest.WiredTigerTestCase):
 
         # Try different eviction reconfigurations.
         configs = [
-            "eviction=[prefer_scrub_eviction=true,cache_tolerance_for_app_eviction=0]",
-            "eviction=[prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=100]",
-            "eviction=[prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=25]",
-            "eviction=[prefer_scrub_eviction=true,cache_tolerance_for_app_eviction=20]",
+            "eviction=[skip_update_obsolete_check=false,prefer_scrub_eviction=true,cache_tolerance_for_app_eviction=0]",
+            "eviction=[skip_update_obsolete_check=true,prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=100]",
+            "eviction=[skip_update_obsolete_check=false,prefer_scrub_eviction=false,cache_tolerance_for_app_eviction=25]",
+            "eviction=[skip_update_obsolete_check=true,prefer_scrub_eviction=true,cache_tolerance_for_app_eviction=20]",
         ]
 
         # Try different eviction failure reconfigurations.

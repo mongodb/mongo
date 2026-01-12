@@ -672,6 +672,10 @@ connection_runtime_config = [
                 The configured percentage will be taken in increments of 10 only,
                 by applying the floor to the given percentage value. ''',
                 min='0', max='100'),
+            Config('skip_update_obsolete_check', 'false', 
+                r'''Skip checking for obsolete updates whenever an update operation is
+                performed.''',
+                type='boolean'),
             ]),
     Config('eviction_checkpoint_target', '1', r'''
         perform eviction at the beginning of checkpoints to bring the dirty content in cache
@@ -747,8 +751,9 @@ connection_runtime_config = [
             min=1, max=100000),
         ]),
     Config('generation_drain_timeout_ms', '240000', r'''
-        the number of milliseconds to wait for a resource to drain before timing out in diagnostic
-        mode. Default will wait for 4 minutes, 0 will wait forever''',
+        the number of milliseconds to wait for a resource to drain before timing out. In the
+        diagnostic mode, it will log an error and crash the system. In the production mode, it will
+        only log an error. Default will wait for 4 minutes, 0 will wait forever''',
         min=0),
     Config('heuristic_controls', '', r'''
         control the behavior of various optimizations. This is primarily used as a mechanism for
@@ -766,7 +771,7 @@ connection_runtime_config = [
             Config('obsolete_tw_btree_max', '100', r'''
                 maximum number of btrees that can be checked for obsolete time window cleanup in a
                 single checkpoint''',
-                min=0, max=500000),
+                min=0, max=500000)
         ]),
     Config('history_store', '', r'''
         history store configuration options''',
