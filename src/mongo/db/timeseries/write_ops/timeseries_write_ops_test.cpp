@@ -32,14 +32,22 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include "mongo/db/commands/query_cmd/bulk_write.h"
+#include "mongo/db/commands/query_cmd/bulk_write_gen.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
-#include "mongo/db/shard_role/shard_catalog/create_collection.h"
+#include "mongo/db/shard_role/shard_catalog/collection_sharding_runtime.h"
+#include "mongo/db/shard_role/shard_catalog/database_sharding_state_mock.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/collection_pre_conditions_util.h"
 #include "mongo/db/timeseries/timeseries_test_fixture.h"
 #include "mongo/db/timeseries/write_ops/internal/timeseries_write_ops_internal.h"
+#include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/shard_version_factory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -251,6 +259,120 @@ TEST_F(TimeseriesWriteOpsTest, PerformTimeseriesWritesNoCollection) {
         timeseries::write_ops::performTimeseriesWrites(_opCtx, request, preConditions),
         DBException,
         8555700);
+}
+
+class TimeseriesWriteOpsShardedTest : public TimeseriesWriteOpsTest {
+public:
+    void SetUp() override {
+        TimeseriesWriteOpsTest::SetUp();
+        _shardVersion = ShardVersionFactory::make(ChunkVersion(
+            CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)));
+        _incorrectShardVersion = ShardVersionFactory::make(ChunkVersion(
+            CollectionGeneration{OID::gen(), Timestamp(12, 0)}, CollectionPlacement(10, 1)));
+        _nss = _nsNoMeta.makeTimeseriesBucketsNamespace();
+        _dbName = _nss.dbName();
+
+        const auto untrackedCollectionMetadata = CollectionMetadata::UNTRACKED();
+
+        // AutoGetCollection coll(_opCtx, _nss, MODE_IX);
+        // CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, _nss)
+        //     ->setFilteringMetadata(_opCtx, untrackedCollectionMetadata);
+
+        _uuid = std::invoke([&] {
+            const auto optUuid = CollectionCatalog::get(_opCtx)->lookupUUIDByNSS(_opCtx, _nss);
+            ASSERT(optUuid);
+            return *optUuid;
+        });
+
+        const ChunkRange cr{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)};
+        const ShardId shardName{"myShardName"};
+        const std::vector<ChunkType> chunks{
+            ChunkType(_uuid, cr, _shardVersion.placementVersion(), shardName)};
+
+        constexpr StringData shardKey("skey");
+        const ShardKeyPattern shardKeyPattern{BSON(shardKey << 1)};
+
+        const auto epoch = chunks.front().getVersion().epoch();
+        const auto timestamp = chunks.front().getVersion().getTimestamp();
+
+        auto rt = RoutingTableHistory::makeNew(_nss,
+                                               _uuid,
+                                               shardKeyPattern.getKeyPattern(),
+                                               false, /* unsplittable */
+                                               nullptr,
+                                               false,
+                                               epoch,
+                                               timestamp,
+                                               boost::none /* timeseriesFields */,
+                                               boost::none /* resharding Fields */,
+                                               true /* allowMigrations */,
+                                               chunks);
+
+        const auto version = rt.getVersion();
+        const auto rtHandle = RoutingTableHistoryValueHandle(
+            std::make_shared<RoutingTableHistory>(std::move(rt)),
+            ComparableChunkVersion::makeComparableChunkVersion(version));
+
+        const auto collectionMetadata =
+            CollectionMetadata(CurrentChunkManager(rtHandle), shardName);
+
+        AutoGetCollection coll(_opCtx, _nss, MODE_IX);
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, _nss)
+            ->setFilteringMetadata(_opCtx, collectionMetadata);
+    }
+
+protected:
+    UUID _uuid = UUID::gen();
+    DatabaseVersion _databaseVersion{UUID::gen(), Timestamp(1, 0)};
+    DatabaseVersion _incorrectDatabaseVersion{UUID::gen(), Timestamp(3, 0)};
+    ShardVersion _shardVersion;
+    ShardVersion _incorrectShardVersion;
+    NamespaceString _nss;
+    DatabaseName _dbName;
+};
+
+TEST_F(TimeseriesWriteOpsShardedTest, PerformTimeseriesWritesFailCollectionAcquisition) {
+
+    auto scopedDss = DatabaseShardingStateMock::acquire(_opCtx, _dbName);
+    scopedDss->expectFailureDbVersionCheckWithMismatchingVersion(_databaseVersion,
+                                                                 _incorrectDatabaseVersion);
+
+    // Set the failpoint and try another insert, expect to fail
+    // TODO(SERVER-116453): Generate the stale DB or stale shard state to test this execution path
+    // and remove the failpoint.
+    setGlobalFailPoint("failCollectionAcquisition", BSON("mode" << "alwaysOn"));
+    ON_BLOCK_EXIT([&] {
+        setGlobalFailPoint("failCollectionAcquisition", BSON("mode" << "off"));
+        auto& oss{OperationShardingState::get(_opCtx)};
+        oss.resetShardingOperationFailedStatus();
+    });
+
+    const auto request = std::invoke([this] {
+        write_ops::InsertCommandRequest request(
+            _nss,
+            std::vector{fromjson(R"({_id: 0, time:{$date:"2025-12-31T12:00:00.000Z"}, foo: 1})"),
+                        fromjson(R"({_id: 1, time:{$date:"2025-12-31T12:00:01.000Z"}, foo: 2})"),
+                        fromjson(R"({_id: 2, time:{$date:"2025-12-31T12:00:02.000Z"}, foo: 3})")});
+
+        request.setDatabaseVersion(_incorrectDatabaseVersion);
+        request.setShardVersion(_incorrectShardVersion);
+        return request;
+    });
+
+    const auto preConditions =
+        timeseries::CollectionPreConditions::getCollectionPreConditions(_opCtx, _nss, _uuid);
+
+
+    const auto cmdReply =
+        timeseries::write_ops::performTimeseriesWrites(_opCtx, request, preConditions);
+
+    EXPECT_EQ(0, cmdReply.getN());
+    EXPECT_TRUE(!cmdReply.getRetriedStmtIds() || cmdReply.getRetriedStmtIds().value().empty())
+        << "Expect retries to be boost::none or empty container";
+    ASSERT_FALSE(cmdReply.getWriteErrors().value_or(std::vector<write_ops::WriteError>{}).empty())
+        << "A write error related to shard or database version should exist";
+    const auto status = cmdReply.getWriteErrors()->front().getStatus();
+    EXPECT_EQ(status.code(), ErrorCodes::FailPointEnabled) << status;
 }
 
 }  // namespace

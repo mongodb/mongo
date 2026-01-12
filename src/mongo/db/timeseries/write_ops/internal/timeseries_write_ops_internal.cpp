@@ -62,6 +62,8 @@ namespace mongo::timeseries::write_ops::internal {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failAtomicTimeseriesWrites);
+// TODO(SERVER-116453): Remove failpoint
+MONGO_FAIL_POINT_DEFINE(failCollectionAcquisition);
 MONGO_FAIL_POINT_DEFINE(failUnorderedTimeseriesInsert);
 MONGO_FAIL_POINT_DEFINE(hangInsertIntoBucketCatalogBeforeCheckingTimeseriesCollection);
 MONGO_FAIL_POINT_DEFINE(hangCommitTimeseriesBucketBeforeCheckingTimeseriesCollection);
@@ -69,6 +71,7 @@ MONGO_FAIL_POINT_DEFINE(hangCommitTimeseriesBucketsAtomicallyBeforeCheckingTimes
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
 
+static constexpr auto errorAcquiringCollectionReason{"Error acquiring collection."_sd};
 
 using TimeseriesBatches =
     std::vector<std::pair<std::shared_ptr<bucket_catalog::WriteBatch>, size_t>>;
@@ -87,6 +90,13 @@ enum class StageWritesStatus {
 
 bool isTimeseriesWriteRetryable(OperationContext* opCtx) {
     return (opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction());
+}
+
+bool isStaleRouterInfoError(const DBException& ex) {
+    const bool causedByFailpoint =
+        failCollectionAcquisition.shouldFail() && ex.code() == ErrorCodes::FailPointEnabled;
+    return causedByFailpoint || ex.code() == ErrorCodes::StaleDbVersion ||
+        ErrorCodes::isStaleShardVersionError(ex);
 }
 
 inline uint64_t getStorageCacheSizeBytes(OperationContext* opCtx) {
@@ -256,7 +266,11 @@ CollectionAcquisition acquireAndValidateBucketsCollection(
     const CollectionPreConditions& preConditions,
     CollectionAcquisitionRequest acquisitionReq,
     LockMode lockMode) {
-
+    // TODO(SERVER-116453): Remove failpoint
+    massert(ErrorCodes::FailPointEnabled,
+            "Failed acquireAndValidateBucketsCollection due to "
+            "failCollectionAcquisition fail point",
+            !failCollectionAcquisition.shouldFail());
     auto bucketsAcq = preConditions.acquireCollectionAndCheck(opCtx, acquisitionReq, lockMode);
     timeseries::assertTimeseriesBucketsCollection(bucketsAcq.getCollectionPtr().get());
     return bucketsAcq;
@@ -410,8 +424,7 @@ Status commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             nss = bucketsAq.nss();
             collator = bucketsAq.getCollectionPtr()->getDefaultCollator();
         } catch (const DBException& ex) {
-            if (ex.code() != ErrorCodes::StaleDbVersion &&
-                !ErrorCodes::isStaleShardVersionError(ex)) {
+            if (!isStaleRouterInfoError(ex)) {
                 throw;
             }
             // The unsuccessful ordered timeseries insert will resolve into a sequence of unordered
@@ -649,7 +662,7 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
         timeseriesOptions = bucketsColl->getTimeseriesOptions().get();
         rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsAcq.nss(), timeseriesOptions);
     } catch (const DBException& ex) {
-        if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
+        if (!isStaleRouterInfoError(ex)) {
             throw;
         }
 
@@ -726,12 +739,17 @@ bucket_catalog::TimeseriesWriteBatches stageOrderedWritesToBucketCatalog(
     return std::move(writeBatches);
 }
 
+struct OrderedTimeseriesWritesAtomicResult {
+    Status status{Status::OK()};
+    bool doRetry{true};  // Only has meaning on !status.isOK().
+};
 /**
  * Writes to the underlying system.buckets collection as a series of ordered time-series inserts.
- * Returns true on success, false otherwise, filling out errors as appropriate on failure as well
- * as containsRetry which is used at a higher layer to report a retry count metric.
+ * Returns status code and whether to retry if the status is not OK. Errors are populated as
+ * appropriate on failure as well as containsRetry which is used at a higher layer to report a retry
+ * count metric on the top-level user operation.
  */
-Status performOrderedTimeseriesWritesAtomically(
+OrderedTimeseriesWritesAtomicResult performOrderedTimeseriesWritesAtomically(
     OperationContext* opCtx,
     const mongo::write_ops::InsertCommandRequest& request,
     const CollectionPreConditions& preConditions,
@@ -750,10 +768,15 @@ Status performOrderedTimeseriesWritesAtomically(
         case StageWritesStatus::kStagingError:
             // Don't attempt commit, retry both of these cases as unordered.
             invariant(batches.empty());
-            return Status(ErrorCodes::UnknownError, "Error during time-series write staging"_sd);
+            return {.status = Status(ErrorCodes::UnknownError,
+                                     "Error during time-series write staging"_sd),
+                    .doRetry = true};
         case StageWritesStatus::kCollectionAcquisitionError:
-            // No retry, return to user.
-            return Status::OK();
+            // No retry, an error should be populated by the result
+            return {.status = !errors->empty()
+                        ? errors->front().getStatus()
+                        : Status(ErrorCodes::UnknownError, errorAcquiringCollectionReason),
+                    .doRetry = false};
         case StageWritesStatus::kSuccess:
             break;
         default:
@@ -762,8 +785,10 @@ Status performOrderedTimeseriesWritesAtomically(
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
-    return commitTimeseriesBucketsAtomically(
-        opCtx, request, preConditions, batches, opTime, electionId);
+    // Any failure in commit needs to be retried.
+    return {.status = commitTimeseriesBucketsAtomically(
+                opCtx, request, preConditions, batches, opTime, electionId),
+            .doRetry = true};
 }
 
 /**
@@ -1128,7 +1153,7 @@ commit_result::Result commitTimeseriesBucketForBatch(
         nss = bucketsAcq.nss();
         collator = bucketsAcq.getCollectionPtr()->getDefaultCollator();
     } catch (const DBException& ex) {
-        if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
+        if (!isStaleRouterInfoError(ex)) {
             throw;
         }
         auto& oss{OperationShardingState::get(opCtx)};
@@ -1242,6 +1267,7 @@ void performUnorderedTimeseriesWritesWithRetries(
     } while (!docsToRetry.empty());
 }
 
+
 size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
                                       const mongo::write_ops::InsertCommandRequest& request,
                                       const CollectionPreConditions& preConditions,
@@ -1249,37 +1275,41 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
                                       boost::optional<repl::OpTime>* opTime,
                                       boost::optional<OID>* electionId,
                                       bool* containsRetry) {
-    auto result = performOrderedTimeseriesWritesAtomically(
+    const auto [result, doRetry] = performOrderedTimeseriesWritesAtomically(
         opCtx, request, preConditions, errors, opTime, electionId, containsRetry);
+
     if (result.isOK()) {
         if (!errors->empty()) {
             invariant(errors->size() == 1);
             return errors->front().getIndex();
         }
         return request.getDocuments().size();
-    }
-
-    for (size_t i = 0; i < request.getDocuments().size(); ++i) {
-        bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening =
-            result.code() == ErrorCodes::BSONObjectTooLarge
-            ? bucket_catalog::AllowQueryBasedReopening::kDisallow
-            : bucket_catalog::AllowQueryBasedReopening::kAllow;
-        performUnorderedTimeseriesWritesWithRetries(opCtx,
-                                                    request,
-                                                    preConditions,
-                                                    i,
-                                                    1,
-                                                    allowQueryBasedReopening,
-                                                    errors,
-                                                    opTime,
-                                                    electionId,
-                                                    containsRetry);
-        if (!errors->empty()) {
-            return i;
+    } else if (doRetry) {
+        for (size_t i = 0; i < request.getDocuments().size(); ++i) {
+            bucket_catalog::AllowQueryBasedReopening allowQueryBasedReopening =
+                result.code() == ErrorCodes::BSONObjectTooLarge
+                ? bucket_catalog::AllowQueryBasedReopening::kDisallow
+                : bucket_catalog::AllowQueryBasedReopening::kAllow;
+            performUnorderedTimeseriesWritesWithRetries(opCtx,
+                                                        request,
+                                                        preConditions,
+                                                        i,
+                                                        1,
+                                                        allowQueryBasedReopening,
+                                                        errors,
+                                                        opTime,
+                                                        electionId,
+                                                        containsRetry);
+            if (!errors->empty()) {
+                return i;  // Return the index of the document that failed.
+            }
         }
+        return request.getDocuments().size();
+    } else {
+        // No documents were written.
+        // Occurs when collection acquisition fails during ordered atomic writes.
+        return 0;
     }
-
-    return request.getDocuments().size();
 }
 
 void rewriteIndicesForSubsetOfBatch(OperationContext* opCtx,
@@ -1364,7 +1394,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalog(
         timeseriesOptions = bucketsColl->getTimeseriesOptions().get();
         rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsAcq.nss(), timeseriesOptions);
     } catch (const DBException& ex) {
-        if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
+        if (!isStaleRouterInfoError(ex)) {
             throw;
         }
 
@@ -1477,7 +1507,7 @@ bucket_catalog::TimeseriesWriteBatches stageUnorderedWritesToBucketCatalogUnopti
         timeseriesOptions = bucketsColl->getTimeseriesOptions().get();
         rebuildOptionsWithGranularityFromConfigServer(opCtx, bucketsAcq.nss(), timeseriesOptions);
     } catch (const DBException& ex) {
-        if (ex.code() != ErrorCodes::StaleDbVersion && !ErrorCodes::isStaleShardVersionError(ex)) {
+        if (!isStaleRouterInfoError(ex)) {
             throw;
         }
 
