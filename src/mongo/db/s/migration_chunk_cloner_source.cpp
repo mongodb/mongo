@@ -447,6 +447,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
                 return status;
             }
         } else {
+            stdx::lock_guard sl(_mutex);
             invariant(PlanExecutor::IS_EOF == _jumboChunkCloneState->clonerState);
             invariant(!_cloneList.hasMore());
         }
