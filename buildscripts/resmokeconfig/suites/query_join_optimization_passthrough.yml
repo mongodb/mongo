@@ -43,7 +43,7 @@ selector:
     - jstests/sharding/query/collation/collation_lookup.js
     # TODO SERVER-114740 Join optimization: includeArrayIndex argument to $unwind is disregarded
     - jstests/aggregation/sources/lookup/lookup_absorb_match.js
-    # TODO SERVER-115709 Join optimization: "Encountered unexpected array in NDV computation"
+    # TODO SERVER-113718 Do not use join optimizer path if join predicates/fields operate over arrays
     - jstests/core/query/release_memory/hash_lookup_unwind.js
     - jstests/aggregation/sources/match/sbe_non_leading_match_pbt.js
 executor:
