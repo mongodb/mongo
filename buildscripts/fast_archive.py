@@ -5,6 +5,7 @@ import gzip
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 from typing import Dict, List, Optional
@@ -95,7 +96,32 @@ def main(output_file: str, patterns: List[str], display_name: str, expansions_fi
     files = set()
 
     for pattern in patterns:
-        files.update({path for path in glob.glob(pattern) if os.path.isfile(path)})
+        glob_results = glob.glob(pattern)
+        for path in glob_results:
+            # Try the path as-is first (works on Linux/Mac with native symlinks)
+            if os.path.isfile(path):
+                files.add(path)
+            # On Windows, Cygwin symlinks are not recognized by Python
+            # Use cygpath to resolve the symlink and convert to Windows path
+            elif sys.platform in ("win32", "cygwin"):
+                try:
+                    result = subprocess.run(
+                        ["bash", "-c", f'cygpath -wa "{path}"'],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if result.returncode == 0:
+                        resolved = result.stdout.strip()
+                        if resolved and os.path.isfile(resolved):
+                            files.add(resolved)
+                    else:
+                        print(
+                            f"ERROR: cygpath command failed for {path}: {result.stderr}",
+                            file=sys.stderr,
+                        )
+                except Exception as e:
+                    print(f"ERROR: Could not resolve symlink {path}: {e}", file=sys.stderr)
 
     files = list(files)
 
