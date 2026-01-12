@@ -1677,6 +1677,10 @@ void PlanEnumerator::tagMemo(size_t id) {
             for (size_t j = 0; j < assign.preds.size(); ++j) {
                 MatchExpression* pred = assign.preds[j];
                 if (pred->getTag()) {
+                    tassert(11390000,
+                            "Expected the predicate's tag to be of type OrPushdownTag",
+                            pred->getTag()->getType() ==
+                                MatchExpression::TagData::Type::OrPushdownTag);
                     OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(pred->getTag());
                     orPushdownTag->setIndexTag(
                         new IndexTag(assign.index, assign.positions[j], assign.canCombineBounds));

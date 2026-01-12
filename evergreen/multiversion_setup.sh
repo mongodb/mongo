@@ -95,4 +95,4 @@ db-contrib-tool setup-repro-env \
   --fallbackToMaster \
   --resmokeCmd "python buildscripts/resmoke.py" \
   --debug \
-  $last_lts_arg 5.0
+  $last_lts_arg 5.0 7.0.25

@@ -36,7 +36,7 @@ namespace mongo {
 namespace {
 static const StringData idFieldName = "_id";
 /*
- * Validate that wildcatdProject fields have no overlapping. It takes a sorted list of the
+ * Validate that wildcardProjection fields do not overlap. It takes a sorted list of the
  * projection fields.
  */
 Status validateOverlappingFieldsInWildcardProjectionOnly(
@@ -110,7 +110,7 @@ Status validateWildcardIndex(const BSONObj& keyPattern) {
 
 Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& pathProjection) {
     if (pathProjection.isEmpty()) {
-        return {ErrorCodes::Error{7246205}, "WildcardProjection must be non-empty if specified."};
+        return {ErrorCodes::Error{7246205}, "WildcardProjection must be non-empty if specified"};
     }
 
     // Prepare data for validation.
@@ -152,8 +152,41 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
         return status;
     }
 
-    // test overlappings between index keys and wildcard projection
-    {
+    // The wildcardProjection cannot combine inclusion and exclusion statements, with the exception
+    // that _id may be excluded for inclusion projections and included for exclusion projections.
+    if (!projectionIncludedFields.empty() && !projectionExcludedFields.empty()) {
+        const FieldRef idFieldRef{idFieldName};
+        const bool idOnlyExclusion =
+            projectionExcludedFields.size() == 1 && projectionExcludedFields.front() == idFieldRef;
+        const bool idOnlyInclusion =
+            projectionIncludedFields.size() == 1 && projectionIncludedFields.front() == idFieldRef;
+
+        // In order for the projection to be valid when there are both inclusions and exclusions,
+        // _id has to be the sole field whose inclusion/exclusion value does not match the others.
+        if (idOnlyExclusion && idOnlyInclusion) {
+            return {ErrorCodes::Error{11368500},
+                    "The wildcard projection both excludes and includes _id"};
+        } else if (!idOnlyExclusion && !idOnlyInclusion) {
+            return {ErrorCodes::Error{7246211},
+                    "The wildcardProjection cannot combine inclusion and exclusion statements, "
+                    "with the exception that _id may be excluded for inclusion projections and "
+                    "included for exclusion projections"};
+        }
+
+        // If _id is the only excluded field, ignore the exclusion in the checks below. For example,
+        // we can treat {_id: 0, a: 1} as just {a: 1}. In wildcard indexes (unlike regular
+        // projections) _id is excluded by default.
+        if (idOnlyExclusion) {
+            projectionExcludedFields.clear();
+        } else {
+            // Here idOnlyInclusion is implied from the checks above. Similarly, ignore an _id-only
+            // inclusion.
+            projectionIncludedFields.clear();
+        }
+    }
+
+    // There cannot be overlap between the index keys and the wildcard projection's inclusions.
+    if (!projectionIncludedFields.empty()) {
         auto indexPos = indexFields.begin();
         auto projectionPos = projectionIncludedFields.begin();
         while (indexPos != indexFields.end() && projectionPos != projectionIncludedFields.end()) {
@@ -162,8 +195,8 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
                         str::stream()
                             << "Index Key and Wildcard Projection cannot contain "
                                "overlapping fields, however '"
-                            << indexPos->dottedField() << "' index field is ovverlapping with '"
-                            << projectionPos->dottedField() << "' wildcardProjection path."};
+                            << indexPos->dottedField() << "' index field is overlapping with '"
+                            << projectionPos->dottedField() << "' wildcardProjection path"};
             }
 
             int cmp = projectionPos->compare(*indexPos);
@@ -173,14 +206,12 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
                 ++indexPos;
             }
         }
-    }
+    } else {
+        tassert(11368501,
+                "Expected projectionExcludedFields to be populated",
+                !projectionExcludedFields.empty());
 
-    const FieldRef idFieldRef{idFieldName};
-    const bool idOnlyExclusion =
-        projectionExcludedFields.size() == 1 && projectionExcludedFields.front() == idFieldRef;
-
-    // test test wildcard projects exclude all regular index fields
-    if (!projectionExcludedFields.empty() && !idOnlyExclusion) {
+        // If the wildcardProjection is an exclusion, it must exclude all regular index fields.
         auto indexPos = indexFields.begin();
         auto projectionPos = projectionExcludedFields.begin();
         while (indexPos != indexFields.end() && projectionPos != projectionExcludedFields.end()) {
@@ -195,7 +226,7 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
                     return {ErrorCodes::Error{7246209},
                             str::stream() << "wildcardProjection paths must exclude all regular "
                                              "index fields, however '"
-                                          << indexPos->dottedField() << "'is not excluded."};
+                                          << indexPos->dottedField() << "'is not excluded"};
                 }
             }
         }
@@ -204,22 +235,7 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
             return {ErrorCodes::Error{7246210},
                     str::stream() << "wildcardProjection paths must exclude all regular "
                                      "index fields, however '"
-                                  << indexPos->dottedField() << "'is not excluded."};
-        }
-    }
-
-    // With the exception of explicitly including _id field, you cannot combine inclusion and
-    // exclusion statements in the wildcardProjection document.
-    if (!projectionIncludedFields.empty() && !projectionExcludedFields.empty()) {
-        const bool idOnlyInclusion =
-            projectionIncludedFields.size() == 1 && projectionIncludedFields.front() == idFieldRef;
-        const bool idIsSingleField = idOnlyExclusion || idOnlyInclusion;
-        if (!idIsSingleField) {
-            return {
-                ErrorCodes::Error{7246211},
-                str::stream()
-                    << "Inclusion and exclusion statements cannot combine in the "
-                       "wildcardProjection with an exception of explicitly including _id field"};
+                                  << indexPos->dottedField() << "'is not excluded"};
         }
     }
 
