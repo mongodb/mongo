@@ -324,7 +324,8 @@ const failureModes = {
                     // Any read shard failure should have triggered an implicit abort on all shards.
                     // Note the first shard already received commitTransaction but couldn't majority
                     // commit it, so it should have already committed the transaction.
-                    const dummyTxnCmd = addTxnFields({commitTransaction: 1}, lsid, txnNumber);
+                    const dummyTxnCmd =
+                        addTxnFields({commitTransaction: 1, writeConcern: {w: 1}}, lsid, txnNumber);
                     assert.commandWorked(st.rs0.getPrimary().adminCommand(dummyTxnCmd));
                     assert.commandFailedWithCode(st.rs1.getPrimary().adminCommand(dummyTxnCmd),
                                                  ErrorCodes.NoSuchTransaction);
