@@ -338,9 +338,6 @@ public:
     }
 };
 
-REGISTER_RULES(DocumentSourceWritesPersistentData,
-               OPTIMIZE_IN_PLACE_RULE(DocumentSourceWritesPersistentData));
-
 TEST_F(DocumentSourceFacetTest, FacetWithChildThatWritesDataAlsoReportsWritingData) {
     auto ctx = getExpCtx();
     auto writesDataStage = DocumentSourceWritesPersistentData::create(ctx);
@@ -693,8 +690,6 @@ public:
     }
 };
 
-REGISTER_RULES(DocumentSourceNeedsA, OPTIMIZE_IN_PLACE_RULE(DocumentSourceNeedsA));
-
 /**
  * A dummy DocumentSource which has one dependency: the field "b".
  */
@@ -713,8 +708,6 @@ public:
         return new DocumentSourceNeedsB(expCtx);
     }
 };
-
-REGISTER_RULES(DocumentSourceNeedsB, OPTIMIZE_IN_PLACE_RULE(DocumentSourceNeedsB));
 
 TEST_F(DocumentSourceFacetTest, ShouldUnionDependenciesOfInnerPipelines) {
     auto ctx = getExpCtx();
@@ -766,9 +759,6 @@ public:
     }
 };
 
-REGISTER_RULES(DocumentSourceNeedsWholeDocument,
-               OPTIMIZE_IN_PLACE_RULE(DocumentSourceNeedsWholeDocument));
-
 TEST_F(DocumentSourceFacetTest, ShouldRequireWholeDocumentIfAnyPipelineRequiresWholeDocument) {
     auto ctx = getExpCtx();
 
@@ -805,9 +795,6 @@ public:
         return new DocumentSourceNeedsOnlyTextScore(expCtx);
     }
 };
-
-REGISTER_RULES(DocumentSourceNeedsOnlyTextScore,
-               OPTIMIZE_IN_PLACE_RULE(DocumentSourceNeedsOnlyTextScore));
 
 TEST_F(DocumentSourceFacetTest, ShouldRequireTextScoreIfAnyPipelineRequiresTextScore) {
     auto ctx = getExpCtx();
@@ -878,9 +865,6 @@ public:
     }
 };
 const ShardId DocumentSourceNeedsSpecificShardMerger::kMergeShard = ShardId("merge_shard_name");
-
-REGISTER_RULES(DocumentSourceNeedsSpecificShardMerger,
-               OPTIMIZE_IN_PLACE_RULE(DocumentSourceNeedsSpecificShardMerger));
 
 TEST_F(DocumentSourceFacetTest, ShouldRequirePrimaryShardIfAnyStageRequiresSpecificShardMerger) {
     auto ctx = getExpCtx();
@@ -961,9 +945,6 @@ public:
     }
 };
 
-REGISTER_RULES(DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn,
-               OPTIMIZE_IN_PLACE_RULE(DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn));
-
 const ShardId DocumentSourceNeedsSpecificShardMergerTmpDataNoTxn::kMergeShard =
     ShardId("merge_shard_name_no_txn");
 
@@ -990,8 +971,6 @@ public:
         return new DocumentSourceBannedInLookup(expCtx);
     }
 };
-
-REGISTER_RULES(DocumentSourceBannedInLookup, OPTIMIZE_IN_PLACE_RULE(DocumentSourceBannedInLookup));
 
 TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstraint) {
     auto ctx = getExpCtx();

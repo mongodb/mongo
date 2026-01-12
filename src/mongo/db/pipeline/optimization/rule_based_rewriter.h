@@ -283,7 +283,7 @@ inline bool alwaysTrue(PipelineRewriteContext&) {
 namespace registration_detail {
 
 void registerRules(ServiceContext* serviceCtx,
-                   std::type_index key,
+                   DocumentSource::Id key,
                    std::vector<Rule<PipelineRewriteContext>> rules,
                    FeatureFlag* featureFlag = nullptr);
 
@@ -291,7 +291,7 @@ template <std::derived_from<DocumentSource> DS>
 void registerRules(ServiceContext* serviceCtx,
                    std::vector<Rule<PipelineRewriteContext>> rules,
                    FeatureFlag* featureFlag = nullptr) {
-    registerRules(serviceCtx, typeid(DS), std::move(rules), featureFlag);
+    registerRules(serviceCtx, DS::id, std::move(rules), featureFlag);
 }
 
 void clearRulesForTest(ServiceContext* serviceCtx);

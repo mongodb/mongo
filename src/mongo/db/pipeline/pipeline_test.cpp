@@ -6287,9 +6287,6 @@ private:
     DepsTracker::State _depsState;
 };
 
-REGISTER_RULES(DocumentSourceProducerConsumer,
-               OPTIMIZE_IN_PLACE_RULE(DocumentSourceProducerConsumer));
-
 TEST_F(PipelineDependenciesTest, ShouldNotReturnDependenciesOnGeneratedPaths) {
     auto ctx = getExpCtx();
     auto needsAProducesBC = DocumentSourceProducerConsumer::create(ctx, {"a"}, {"b", "c"});

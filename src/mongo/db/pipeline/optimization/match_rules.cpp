@@ -235,17 +235,6 @@ REGISTER_RULES(DocumentSourceMatch,
                    .tags = PipelineRewriteContext::Tags::Reordering,
                });
 
-REGISTER_RULES(DocumentSourceInternalChangeStreamMatch,
-               OPTIMIZE_AT_RULE(DocumentSourceInternalChangeStreamMatch),
-               OPTIMIZE_IN_PLACE_RULE(DocumentSourceInternalChangeStreamMatch),
-               {
-                   .name = "INTERNAL_CHANGE_STREAM_MATCH_PUSHDOWN",
-                   .precondition = matchCanSwapWithPrecedingStage,
-                   .transform = pushMatchBeforePrecedingStage,
-                   .priority = kDefaultPushdownPriority,
-                   .tags = PipelineRewriteContext::Tags::Reordering,
-               });
-
 REGISTER_RULES(DocumentSourceListSessions,
                OPTIMIZE_AT_RULE(DocumentSourceListSessions),
                OPTIMIZE_IN_PLACE_RULE(DocumentSourceListSessions),

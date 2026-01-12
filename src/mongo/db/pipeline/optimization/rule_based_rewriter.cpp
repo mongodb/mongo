@@ -65,7 +65,7 @@ struct RuleRegistration {
  */
 class RuleRegistry {
 public:
-    void registerRules(std::type_index key,
+    void registerRules(DocumentSource::Id key,
                        std::vector<Rule<PipelineRewriteContext>> rules,
                        FeatureFlag* featureFlag) {
         for (auto&& rule : rules) {
@@ -79,15 +79,14 @@ public:
 
     const std::vector<RuleRegistration>& getRules(ExpressionContext& expCtx,
                                                   const DocumentSource& ds) const {
-        static const std::vector<RuleRegistration> kEmpty = {};
-
-        auto it = _rules.find(std::type_index{typeid(ds)});
-        return it == _rules.end() ? kEmpty : it->second;
+        auto id = ds.getId();
+        tassert(11641501, "Out of bounds id", id < _rules.size());
+        return _rules[id];
     }
 
 private:
     std::set<std::string> _registeredRuleNames;
-    stdx::unordered_map<std::type_index, std::vector<RuleRegistration>> _rules;
+    std::array<std::vector<RuleRegistration>, 128> _rules;
 };
 
 namespace {
@@ -95,9 +94,10 @@ const auto getPipelineRewriteRuleRegistry = ServiceContext::declareDecoration<Ru
 }
 
 void registerRules(ServiceContext* serviceCtx,
-                   std::type_index key,
+                   DocumentSource::Id key,
                    std::vector<Rule<PipelineRewriteContext>> rules,
                    FeatureFlag* featureFlag) {
+    tassert(11641502, "Unallocated id", key != DocumentSource::kUnallocatedId);
     auto& registry = getPipelineRewriteRuleRegistry(serviceCtx);
     registry.registerRules(key, std::move(rules), featureFlag);
 }
