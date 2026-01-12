@@ -1,10 +1,6 @@
 // Tests that $out preserves the collection options of the "out" collection.
 // @tags: [
 //   does_not_support_transactions,
-//   # TODO (SERVER-89668): Remove tag. Currently incompatible due to collection
-//   # options containing the recordIdsReplicated:true option, which
-//   # this test dislikes.
-//   exclude_when_record_ids_replicated
 // ]
 import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
 
@@ -23,6 +19,8 @@ assert.commandWorked(db.createCollection(targetName, {validationLevel: "moderate
 const targetOptionsResponse = assert.commandWorked(db.runCommand({listCollections: 1, filter: {"name": targetName}}));
 const targetOptionsResults = new DBCommandCursor(db, targetOptionsResponse).toArray();
 assert.eq(targetOptionsResults.length, 1, targetOptionsResults);
+// Make test compatible regardless of whether 'recordIdsReplicated' is true.
+delete targetOptionsResults[0].options.recordIdsReplicated;
 assert.eq({validationLevel: "moderate"}, targetOptionsResults[0].options, targetOptionsResults[0]);
 
 // Run $out pipeline.
@@ -36,4 +34,6 @@ const targetOptionsResponseNew = assert.commandWorked(
 );
 const targetOptionsResultsNew = new DBCommandCursor(db, targetOptionsResponseNew).toArray();
 assert.eq(targetOptionsResultsNew.length, 1, targetOptionsResultsNew);
+// Make test compatible regardless of whether 'recordIdsReplicated' is true.
+delete targetOptionsResultsNew[0].options.recordIdsReplicated;
 assert.eq({validationLevel: "moderate"}, targetOptionsResultsNew[0].options, targetOptionsResultsNew[0]);

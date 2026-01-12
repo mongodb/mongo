@@ -83,8 +83,40 @@ export function assertInvalidateOp({cursor, opType}) {
     return null;
 }
 
+/**
+ * Checks whether an object has a nested property at the given dot-separated path.
+ * For example, hasAttributeAtPath(obj, 'foo.bar.baz') returns true if obj.foo.bar.baz exists.
+ */
+function hasAttributeAtPath(obj, path) {
+    const parts = path.split(".");
+    let curr = obj;
+    for (const part of parts) {
+        if (!curr || !curr.hasOwnProperty(part)) {
+            return false;
+        }
+        curr = curr[part];
+    }
+    return true;
+}
+
+/**
+ * Deletes a property from an object at a specified dot-separated path.
+ * For example, deleteAttributeAtPath(obj, 'foo.bar.baz') removes obj.foo.bar.baz if it exists.
+ */
+function deleteAttributeAtPath(obj, path) {
+    const parts = path.split(".");
+    let curr = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+        if (!curr || !curr.hasOwnProperty(parts[i])) {
+            return;
+        }
+        curr = curr[parts[i]];
+    }
+    delete curr[parts[parts.length - 1]];
+}
+
 export function canonicalizeEventForTesting(event, expected) {
-    for (let fieldName of [
+    for (let fieldPath of [
         "_id",
         "clusterTime",
         "txnNumber",
@@ -95,24 +127,20 @@ export function canonicalizeEventForTesting(event, expected) {
         "updateDescription",
         "commitTimestamp",
         "nsType",
+        // Exclude "recordIdsReplicated" if not explicitly specified in the expected event. This allows
+        // standard change-stream tests to work with 'replicatedRecordIds'.
+        "operationDescription.recordIdsReplicated",
+        "stateBeforeChange.collectionOptions.recordIdsReplicated",
+        // Exclude "updateDescription.disambiguatedPaths" if not explicitly specified in the expected
+        // event. This is necessary because in v8.2.0, we expose this field unconditionally, but in
+        // versions before or after v8.2.0 the field is only exposed if the change stream is opened with
+        // '{showExpandedEvents: true}'.
+        "updateDescription.disambiguatedPaths",
     ]) {
-        if (!expected.hasOwnProperty(fieldName)) {
-            delete event[fieldName];
+        if (!hasAttributeAtPath(expected, fieldPath)) {
+            deleteAttributeAtPath(event, fieldPath);
         }
     }
-
-    // Exclude "updateDescription.disambiguatedPaths" if not explicitly specified in the expected
-    // event. This is necessary because in v8.2.0, we expose this field unconditionally, but in
-    // versions before or after v8.2.0 the field is only exposed if the change stream is opened with
-    // '{showExpandedEvents: true}'.
-    if (
-        expected.hasOwnProperty("updateDescription") &&
-        !expected.updateDescription.hasOwnProperty("disambiguatedPaths") &&
-        event.hasOwnProperty("updateDescription")
-    ) {
-        delete event.updateDescription.disambiguatedPaths;
-    }
-
     return event;
 }
 

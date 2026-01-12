@@ -10,10 +10,6 @@
 //   requires_non_retryable_commands,
 //   uses_rename,
 //   incompatible_with_preimages_by_default,
-//   # TODO (SERVER-89668): Remove tag. Currently incompatible due to collection
-//   # options containing the recordIdsReplicated:true option, which
-//   # this test dislikes.
-//   exclude_when_record_ids_replicated,
 //   requires_getmore,
 //   # TODO(SERVER-113810): Check accessing sharded cluster components on replicasets running with
 //   # --shardsvr
@@ -41,6 +37,13 @@ let commandObj = {
     indexes: [],
     collectionOptions: {uuid: optionsArray[0].info.uuid},
 };
+
+const recordIdsReplicatedByDefault = optionsArray[0].options.recordIdsReplicated;
+if (recordIdsReplicatedByDefault) {
+    // RecordIds are replicated by default - make the collectionOptions reflect that.
+    commandObj.collectionOptions.recordIdsReplicated = optionsArray[0].options.recordIdsReplicated;
+}
+
 // Destination has an extra index.
 assert.commandFailedWithCode(adminDB.runCommand(commandObj), ErrorCodes.CommandFailed);
 
@@ -72,4 +75,8 @@ commandObj.collectionOptions = {
     size: 256,
     max: 2,
 };
+if (recordIdsReplicatedByDefault) {
+    commandObj.collectionOptions.recordIdsReplicated = optionsArray[0].options.recordIdsReplicated;
+}
+
 assert.commandWorked(adminDB.runCommand(commandObj));

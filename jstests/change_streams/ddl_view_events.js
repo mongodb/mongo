@@ -3,10 +3,6 @@
  *
  * @tags: [
  *   requires_fcv_60,
- *   # TODO (SERVER-89668): Remove tag. Currently incompatible due to change
- *   # events containing the recordIdsReplicated:true option, which
- *   # this test dislikes.
- *   exclude_when_record_ids_replicated,
  *   # TODO SERVER-111733 re-enable this test in viewless timeseries suites
  *   featureFlagCreateViewlessTimeseriesCollections_incompatible,
  * ]
