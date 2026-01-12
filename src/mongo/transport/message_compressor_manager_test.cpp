@@ -548,13 +548,22 @@ TEST_F(ZlibDecompressTest, RejectsEmptyPayload) {
 }
 
 TEST_F(ZlibDecompressTest, RejectsUndersizedPayload) {
-    ASSERT_EQ(doDecompress({0x78, 0x9c, 0x03, 0x00}), ErrorCodes::BadValue);
+    ASSERT_EQ(doDecompress({char(0x78), char(0x9c), char(0x03), char(0x00)}), ErrorCodes::BadValue);
 }
 
 TEST_F(ZlibDecompressTest, RejectsBadCompressionMethod) {
     const char cm = 0;  // Expected to be 8.
     const char cmf = 0x70 | (cm & 0xf);
-    ASSERT_EQ(doDecompress({cmf, 0x9c, 0x63, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00}),
+    ASSERT_EQ(doDecompress({cmf,
+                            char(0x9c),
+                            char(0x63),
+                            char(0x00),
+                            char(0x00),
+                            char(0x00),
+                            char(0x00),
+                            char(0x01),
+                            char(0x00),
+                            char(0x00)}),
               ErrorCodes::BadValue);
 }
 
