@@ -33,6 +33,8 @@
 #include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/unittest/unittest.h"
 
+#include <type_traits>
+
 #include <opentelemetry/metrics/provider.h>
 #include <opentelemetry/sdk/metrics/meter.h>
 #include <opentelemetry/sdk/metrics/meter_provider.h>
@@ -150,6 +152,21 @@ TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentParameters) {
                            metricsService, MetricNames::kTest1, "description", MetricUnit::kBytes),
                        DBException,
                        ErrorCodes::ObjectAlreadyExists);
+}
+
+TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentType) {
+    auto& metricsService = MetricsService::get(this->getServiceContext());
+    MetricCreator<TypeParam>::create(
+        metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    // Choose a metric type that is different from the current type.
+    using DifferentType = std::conditional_t<std::is_same_v<TypeParam, Counter<int64_t>>,
+                                             Counter<double>,
+                                             Counter<int64_t>>;
+    ASSERT_THROWS_CODE(
+        MetricCreator<DifferentType>::create(
+            metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
 }
 
 // Assert that when a valid MeterProvider in place, we create a working Meter implementation with
@@ -377,13 +394,5 @@ TEST_F(CreateHistogramTest, RecordsValuesExplicitBoundaries) {
     EXPECT_EQ(data2.count, 1);
 }
 
-TEST_F(CreateHistogramTest, ExceptionWhenSameNameButDifferentType) {
-    auto& metricsService = MetricsService::get(getServiceContext());
-    metricsService.createInt64Histogram(MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    ASSERT_THROWS_CODE(metricsService.createDoubleHistogram(
-                           MetricNames::kTest1, "description", MetricUnit::kSeconds),
-                       DBException,
-                       ErrorCodes::ObjectAlreadyExists);
-}
 }  // namespace
 }  // namespace mongo::otel::metrics
