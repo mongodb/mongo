@@ -178,7 +178,7 @@ server_parameters:
     set_at: [startup, runtime]
     cpp_varname: gProxyProtocolMaximumPendingConnections
     cpp_vartype: Atomic<int32_t>
-    default: {expr: "static_cast<int32_t>(DEFAULT_MAX_CONN)"}
+    default: 16000
     validator: {gte: 0}
     redact: false
 
