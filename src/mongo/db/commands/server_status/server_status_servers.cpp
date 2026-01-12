@@ -38,6 +38,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/service_executor.h"
@@ -91,8 +92,8 @@ public:
     void appendIngressRequestRateLimiterStats(BSONObjBuilder* b, ServiceContext* service) const {
         auto ingressRequestRateLimiterBuilder =
             BSONObjBuilder{b->subobjStart("ingressRequestRateLimiter")};
-        const auto& ingressRequestRateLimeter = IngressRequestRateLimiter::get(service);
-        ingressRequestRateLimeter.appendStats(&ingressRequestRateLimiterBuilder);
+        const auto& ingressRequestRateLimiter = IngressRequestRateLimiter::get(service);
+        ingressRequestRateLimiter.appendStats(&ingressRequestRateLimiterBuilder);
         ingressRequestRateLimiterBuilder.done();
     }
 };
@@ -119,6 +120,30 @@ public:
 // Register one instance of the section shared by both roles; the system has one set of FQDNs.
 auto& advisoryHostFQDNs =
     *ServerStatusSectionBuilder<AdvisoryHostFQDNs>("advisoryHostFQDNs").forShard().forRouter();
+
+/**
+ * Section for metrics gathered via OpenTelemetry.
+ */
+class OtelServerStatusSection final : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        BSONObjBuilder b;
+        auto svcCtx = opCtx->getServiceContext();
+
+        auto& metricsService = otel::metrics::MetricsService::get(svcCtx);
+        metricsService.appendMetricsForServerStatus(b);
+
+        return b.obj();
+    }
+};
+auto& otelMetrics = *ServerStatusSectionBuilder<OtelServerStatusSection>("otelMetrics");
 
 }  // namespace
 }  // namespace mongo

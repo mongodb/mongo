@@ -215,15 +215,14 @@ TEST_F(MetricsServiceTest, SerializeMetrics) {
     counter->add(1);
 
     BSONObjBuilder expectedBson;
-    BSONObjBuilder expectedOtelMetrics(expectedBson.subobjStart("otelMetrics"));
-    expectedOtelMetrics.append("test_only.metric1_seconds",
-                               BSON("average" << 10.0 << "count" << 1));
-    expectedOtelMetrics.append("test_only.metric2_seconds",
-                               BSON("average" << 20.0 << "count" << 1));
-    expectedOtelMetrics.append("test_only.metric3_seconds", 1);
-    expectedOtelMetrics.doneFast();
+    expectedBson.append("test_only.metric1_seconds", BSON("average" << 10.0 << "count" << 1));
+    expectedBson.append("test_only.metric2_seconds", BSON("average" << 20.0 << "count" << 1));
+    expectedBson.append("test_only.metric3_seconds", 1);
+    expectedBson.doneFast();
 
-    ASSERT_BSONOBJ_EQ(metricsService.serializeMetrics(), expectedBson.obj());
+    BSONObjBuilder builder;
+    metricsService.appendMetricsForServerStatus(builder);
+    ASSERT_BSONOBJ_EQ(builder.obj(), expectedBson.obj());
 }
 
 using CreateInt64CounterTest = MetricsServiceTest;

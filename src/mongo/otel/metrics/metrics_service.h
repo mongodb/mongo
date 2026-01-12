@@ -148,9 +148,9 @@ public:
         boost::optional<std::vector<double>> explicitBucketBoundaries = boost::none);
 
     /**
-     * Serializes the created metrics to BSON for server status reporting.
+     * Appends all the created metrics for server status reporting.
      */
-    BSONObj serializeMetrics() const;
+    void appendMetricsForServerStatus(BSONObjBuilder& bsonBuilder) const;
 
 private:
     // Identifies metrics to help prevent conflicting registrations.

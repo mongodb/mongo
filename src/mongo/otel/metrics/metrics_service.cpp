@@ -346,9 +346,7 @@ Histogram<int64_t>* MetricsService::createInt64Histogram(
     return histogram_ptr;
 }
 
-BSONObj MetricsService::serializeMetrics() const {
-    BSONObjBuilder builder;
-    BSONObjBuilder otelMetrics(builder.subobjStart("otelMetrics"));
+void MetricsService::appendMetricsForServerStatus(BSONObjBuilder& bsonBuilder) const {
     stdx::lock_guard lock(_mutex);
     for (const auto& [name, identifierAndMetric] : _metrics) {
         std::visit(
@@ -359,12 +357,10 @@ BSONObj MetricsService::serializeMetrics() const {
                 massert(ErrorCodes::KeyNotFound,
                         fmt::format("Provided key {} not found in serialized BSONObj", key),
                         !obj.getField(key).eoo());
-                otelMetrics.append(obj.getField(key));
+                bsonBuilder.append(obj.getField(key));
             },
             identifierAndMetric.metric);
     }
-    otelMetrics.doneFast();
-    return builder.obj();
 }
 
 MetricsService& MetricsService::get(ServiceContext* serviceContext) {

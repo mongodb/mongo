@@ -44,6 +44,7 @@ mongo_cc_library(
         ":server_status_core",
         "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/stats:counters",
+        "//src/mongo/otel/metrics:metrics_service",
         "//src/mongo/transport:message_compressor",
         "//src/mongo/transport:service_executor",
         "//src/mongo/util/net:ssl_manager",
