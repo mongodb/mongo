@@ -602,7 +602,10 @@ bool findSbeCompatibleStagesForPushdown(
         if ((*itr)->getId() == DocumentSourceLookUp::id &&
             plannerParams->secondaryCollectionsInfo.empty()) {
             plannerParams->fillOutSecondaryCollectionsInfo(
-                pipeline->getContext()->getOperationContext(), *cq, collections);
+                pipeline->getContext()->getOperationContext(),
+                *cq,
+                collections,
+                false /* includeSizeStats */);
         }
 
         if (!pushDownPipelineStageIfCompatible(pipeline->getContext()->getOperationContext(),

@@ -237,6 +237,18 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     };
 
     /**
+     * Struct containing all the arguments required for initializing QueryPlannerParams when using
+     * them to decide if a $lookup stage will be pushed to SBE based on the indexes available on the
+     * foreign collection.
+     */
+    struct ArgsForPushDownStagesDecision {
+        OperationContext* opCtx;
+        const CanonicalQuery& canonicalQuery;
+        const MultipleCollectionAccessor& collections;
+        size_t plannerOptions;
+    };
+
+    /**
      * Struct containing the necessary arguments for initializing QueryPlannerParams for internal
      * shard key queries.
      */
@@ -289,6 +301,23 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
     }
 
     /**
+     * Initializes query planner parameters needed to compute secondaryCollectionsInfo. This is used
+     * when deciding whether lookup will be pushed to SBE using the available indexes. We do not
+     * need to fill any information for the main collection since we only need information for the
+     * secondary collections.
+     */
+    explicit QueryPlannerParams(ArgsForPushDownStagesDecision&& args)
+        : providedOptions(args.plannerOptions) {
+        mainCollectionInfo.options = args.plannerOptions;
+        if (!args.collections.hasMainCollection()) {
+            return;
+        }
+
+        fillOutPlannerParamsForExpressQuery(
+            args.opCtx, args.canonicalQuery, args.collections.getMainCollection());
+    }
+
+    /**
      * Initializes query planner parameters by simply inserting the provided index entry.
      */
     explicit QueryPlannerParams(ArgsForInternalShardKeyQuery&& args)
@@ -320,7 +349,8 @@ struct MONGO_MOD_NEEDS_REPLACEMENT QueryPlannerParams {
      */
     void fillOutSecondaryCollectionsInfo(OperationContext* opCtx,
                                          const CanonicalQuery& canonicalQuery,
-                                         const MultipleCollectionAccessor& collections);
+                                         const MultipleCollectionAccessor& collections,
+                                         bool includeSizeStats);
 
     /**
      * This method updates this QueryPlannerParams object as needed so that it can be used with
@@ -427,10 +457,6 @@ private:
         const query_settings::IndexHintSpecs& indexHintSpecs,
         CollectionInfo& collectionInfo,
         const boost::optional<TimeseriesOptions>& timeseriesOptions);
-
-    void applyQuerySettingsIndexHintsForCollection(const CanonicalQuery& canonicalQuery,
-                                                   const std::vector<mongo::IndexHint>& indexHints,
-                                                   std::vector<IndexEntry>& indexes);
 
     void applyQuerySettingsNaturalHintsForCollection(
         const CanonicalQuery& canonicalQuery,

@@ -206,12 +206,10 @@ std::vector<IndexHint> transformTimeseriesHints(std::vector<IndexHint> qsIndexHi
     }
     return qsIndexHints;
 }
-}  // namespace
 
-void QueryPlannerParams::applyQuerySettingsIndexHintsForCollection(
-    const CanonicalQuery& canonicalQuery,
-    const std::vector<mongo::IndexHint>& allowedIndexes,
-    std::vector<IndexEntry>& indexes) {
+void applyQuerySettingsIndexHintsForCollection(const CanonicalQuery& canonicalQuery,
+                                               const std::vector<mongo::IndexHint>& allowedIndexes,
+                                               std::vector<IndexEntry>& indexes) {
     // Checks if index entry is present in the 'allowedIndexes' list.
     auto notInAllowedIndexes = [&](const IndexEntry& indexEntry) {
         return std::none_of(
@@ -234,6 +232,7 @@ void QueryPlannerParams::applyQuerySettingsIndexHintsForCollection(
     indexes.erase(std::remove_if(indexes.begin(), indexes.end(), notInAllowedIndexes),
                   indexes.end());
 }
+}  // namespace
 
 // Handle the '$natural' and cluster key (for clustered indexes) cases. Iterate over the
 // 'allowedIndexes' list and resolve the allowed directions for performing collection scans.
@@ -437,7 +436,8 @@ void QueryPlannerParams::applyQuerySettingsOrIndexFiltersForMainCollection(
 void QueryPlannerParams::fillOutSecondaryCollectionsInfo(
     OperationContext* opCtx,
     const CanonicalQuery& canonicalQuery,
-    const MultipleCollectionAccessor& collections) {
+    const MultipleCollectionAccessor& collections,
+    bool includeSizeStats) {
     auto fillOutSecondaryInfo = [&](const NamespaceString& nss,
                                     const CollectionPtr& secondaryColl) {
         CollectionInfo secondaryInfo;
@@ -445,7 +445,7 @@ void QueryPlannerParams::fillOutSecondaryCollectionsInfo(
         if (secondaryColl) {
             fillOutIndexEntries(opCtx, canonicalQuery, secondaryColl, secondaryInfo.indexes);
             fillOutPlannerCollectionInfo(
-                opCtx, secondaryColl, &secondaryInfo.stats, true /* include size stats */);
+                opCtx, secondaryColl, &secondaryInfo.stats, includeSizeStats);
             if (storageGlobalParams.noTableScan.load()) {
                 // There are certain cases where we ignore this restriction.
                 bool ignore = nss.isSystem() || nss.isOnInternalDb();
@@ -495,7 +495,8 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
         return;
     }
 
-    fillOutSecondaryCollectionsInfo(opCtx, canonicalQuery, collections);
+    fillOutSecondaryCollectionsInfo(
+        opCtx, canonicalQuery, collections, true /* includeSizeStats */);
 }
 
 void QueryPlannerParams::fillOutMainCollectionPlannerParams(
