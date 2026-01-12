@@ -79,6 +79,18 @@ bool PathArrayness::isPathArray(const FieldPath& path) const {
     return arrayness;
 }
 
+bool PathArrayness::isPathArray(const FieldRef& path) const {
+    StringData pathString = path.dottedField(0);
+    StatusWith<FieldPath> maybeFieldPath = fieldPathWithValidationStatus(std::string(pathString));
+
+    // If FieldPath validation fails, conservatively assume this path is an array.
+    if (!maybeFieldPath.isOK()) {
+        return true;
+    }
+
+    return isPathArray(maybeFieldPath.getValue());
+}
+
 bool PathArrayness::TrieNode::isPathArray(const FieldPath& path) const {
     const TrieNode* current = this;
     // Track the number of times we have seen an array prefix.

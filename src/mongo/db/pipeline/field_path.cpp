@@ -68,6 +68,7 @@ std::string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffi
     return str::stream() << prefix << "." << suffix;
 }
 
+// TODO SERVER-116314: Refactor constructor to use fieldPathWithValidationStatus()
 FieldPath::FieldPath(std::string inputPath, bool precomputeHashes, bool validateFieldNames)
     : _fieldPath(std::move(inputPath)), _fieldPathDotPosition{std::string::npos} {
     uassert(40352, "FieldPath cannot be constructed with empty string", !_fieldPath.empty());
@@ -105,6 +106,59 @@ FieldPath::FieldPath(std::string inputPath, bool precomputeHashes, bool validate
             _fieldHash.push_back(FieldNameHasher()(fieldName));
         }
     }
+}
+
+StatusWith<FieldPath> fieldPathWithValidationStatus(std::string inputPath,
+                                                    bool precomputeHashes,
+                                                    bool validateFieldNames) {
+    std::string fieldPath = std::move(inputPath);
+    std::vector<size_t> dotPositions = {std::string::npos};
+
+    if (fieldPath.empty()) {
+        return Status(ErrorCodes::InvalidPath, "Fieldpath failed validation");
+    }
+
+    if (fieldPath[fieldPath.size() - 1] == '.') {
+        return Status(ErrorCodes::InvalidPath, "Fieldpath failed validation");
+    }
+
+    // Store index delimiter position for use in field lookup.
+    size_t dotPos;
+    size_t startPos = 0;
+    while (std::string::npos != (dotPos = fieldPath.find('.', startPos))) {
+        dotPositions.push_back(dotPos);
+        startPos = dotPos + 1;
+    }
+
+    dotPositions.push_back(fieldPath.size());
+
+    // Validate the path length and the fields, and precompute their hashes if requested.
+    const auto pathLength = FieldPath::getPathLength(dotPositions);
+    if (pathLength > BSONDepth::getMaxAllowableDepth()) {
+        return Status(ErrorCodes::InvalidPath, "Fieldpath failed validation");
+    }
+
+    // Only allocate heap storage space for the vector of precomputed hashes if it is actually
+    // needed.
+    std::vector<uint32_t> fieldHash;
+    if (precomputeHashes) {
+        fieldHash.reserve(pathLength);
+    }
+    Status validationStatus = Status::OK();
+    for (size_t i = 0; i < pathLength; ++i) {
+        auto fieldName = FieldPath::getFieldName(i, dotPositions, fieldPath);
+        if (validateFieldNames) {
+            validationStatus = FieldPath::validateFieldName(fieldName);
+            if (!validationStatus.isOK()) {
+                return Status(ErrorCodes::InvalidPath, "Fieldpath failed validation");
+            }
+        }
+        if (precomputeHashes) {
+            fieldHash.push_back(FieldNameHasher()(fieldName));
+        }
+    }
+
+    return {FieldPath(fieldPath, dotPositions, fieldHash)};
 }
 
 Status FieldPath::validateFieldName(StringData fieldName) {

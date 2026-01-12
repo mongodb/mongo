@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/field_ref.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
@@ -73,6 +74,7 @@ public:
      * For field paths that are not included in any index, assumes that the path has an array.
      */
     bool isPathArray(const FieldPath& path) const;
+    bool isPathArray(const FieldRef& path) const;
 
     /**
      * Debugging helper to visualize trie.

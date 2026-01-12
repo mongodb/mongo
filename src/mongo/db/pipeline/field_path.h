@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/document_value/document_internal.h"
@@ -86,6 +87,15 @@ public:
                              bool precomputeHashes = false,
                              bool validateFieldNames = true)
         : FieldPath(std::string(inputPath), precomputeHashes, validateFieldNames) {}
+
+    /**
+     * Factory function to create a FieldPath with validation that returns a StatusWith instead of
+     * throwing exceptions. Returns an error Status if validation fails, or a StatusWith containing
+     * an optional FieldPath if validation succeeds.
+     */
+    friend StatusWith<FieldPath> fieldPathWithValidationStatus(std::string inputPath,
+                                                               bool precomputeHashes,
+                                                               bool validateFieldNames);
 
     /**
      * Returns the number of path elements in the field path.
@@ -201,7 +211,29 @@ private:
           _fieldHash(std::move(hashes)) {
         uassert(ErrorCodes::Overflow,
                 "FieldPath is too long",
-                _fieldPathDotPosition.size() <= BSONDepth::getMaxAllowableDepth());
+                getPathLength() <= BSONDepth::getMaxAllowableDepth());
+    }
+
+    /**
+     * Given a vector of dot positions, returns the number of elements in the field path.
+     * ONLY FOR USE IN FACTORY FUNCTION. Otherwise use non-static member function of same name.
+     */
+    static size_t getPathLength(std::vector<size_t> dotPositions) {
+        return dotPositions.size() - 1;
+    }
+
+    /**
+     * Given a vector of dot positions and a field path, gets the ith field name using 0-based
+     * indexes.
+     * ONLY FOR USE IN FACTORY FUNCTION. Otherwise use non-static member function of same name.
+     */
+    static StringData getFieldName(size_t i,
+                                   std::vector<size_t> dotPositions,
+                                   const std::string& fieldPath) {
+        dassert(i < getPathLength(dotPositions));
+        const auto begin = dotPositions[i] + 1;
+        const auto end = dotPositions[i + 1];
+        return StringData(&fieldPath[begin], end - begin);
     }
 
     static constexpr char prefix = '$';
@@ -221,6 +253,10 @@ private:
     // concatenating two field paths of which the second did not have precomputed hashes.
     std::vector<uint32_t> _fieldHash;
 };
+
+StatusWith<FieldPath> fieldPathWithValidationStatus(std::string inputPath,
+                                                    bool precomputeHashes = false,
+                                                    bool validateFieldNames = true);
 
 inline bool operator<(const FieldPath& lhs, const FieldPath& rhs) {
     return lhs.fullPath() < rhs.fullPath();

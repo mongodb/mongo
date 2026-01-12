@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
+#include "mongo/bson/bson_depth.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness_test_helpers.h"
 #include "mongo/unittest/unittest.h"
@@ -214,4 +216,106 @@ TEST(ArraynessTrie, BuildAndLookupTrieWithSameArrayInformation) {
     // Path "a" is not an array in either of the paths inserted into the trie.
     ASSERT_EQ(pathArrayness.isPathArray(field_A), false);
 }
+
+
+/**
+ * Test that FieldRef conversion to FieldPath is handled correctly
+ * Since FieldPath has stricter validation than FieldRef, a path that is valid by FieldRef standards
+ * but not by FieldPath standards should not be added to the trie on insert and on lookup should
+ * always conservatively return true for arrayness.
+ */
+
+// FieldRef allows empty string, but FieldPath does not.
+TEST(PathArraynessTest, FieldRefEmptyString) {
+    FieldRef emptyFieldRef("");
+    MultikeyComponents multikeyPaths{0U};
+
+    PathArrayness pathArrayness;
+
+    // Lookup should conservatively return true for invalid FieldPath.
+    ASSERT_EQ(pathArrayness.isPathArray(emptyFieldRef), true);
+}
+
+// FieldRef allows paths ending with a dot, but FieldPath does not.
+TEST(PathArraynessTest, FieldRefEndsWithDot) {
+    FieldRef fieldRefWithDot("a.b.");
+    MultikeyComponents multikeyPaths{0U};
+
+    PathArrayness pathArrayness;
+
+    // Lookup should conservatively return true for invalid FieldPath.
+    ASSERT_EQ(pathArrayness.isPathArray(fieldRefWithDot), true);
+}
+
+// FieldRef allows empty field names between dots (e.g., "a..b"), but FieldPath does not.
+TEST(PathArraynessTest, FieldRefEmptyFieldNameBetweenDots) {
+    FieldRef fieldRefWithEmpty("a..b");
+    MultikeyComponents multikeyPaths{0U};
+
+    PathArrayness pathArrayness;
+
+    // Lookup should conservatively return true for invalid FieldPath.
+    ASSERT_EQ(pathArrayness.isPathArray(fieldRefWithEmpty), true);
+}
+
+// FieldRef allows up to 255 components, but FieldPath only allows 200.
+TEST(PathArraynessTest, FieldRefTooManyComponents) {
+    // Create a path with 201 components (exceeding FieldPath limit).
+    std::string longPath = "a";
+    for (int i = 0; i < BSONDepth::kDefaultMaxAllowableDepth; ++i) {
+        longPath += ".b";
+    }
+    // Now longPath has 1 + 200 = 201 components, which exceeds the FieldPath limit of 200.
+
+    FieldRef fieldRefLong(longPath);
+    MultikeyComponents multikeyPaths{0U};
+
+    PathArrayness pathArrayness;
+
+    // Lookup should conservatively return true for invalid FieldPath.
+    ASSERT_EQ(pathArrayness.isPathArray(fieldRefLong), true);
+}
+
+// FieldRef allows any field name starting with $, but FieldPath only allows certain
+// dollar-prefixed fields (like "$ref", "$id", etc.). A field like "$invalidField" should fail
+// FieldPath validation.
+TEST(PathArraynessTest, FieldRefInvalidDollarPrefix) {
+    FieldRef fieldRefWithInvalidDollar("a.$invalidField");
+    MultikeyComponents multikeyPaths{1U};
+
+    PathArrayness pathArrayness;
+
+    // Lookup should conservatively return true for invalid FieldPath.
+    ASSERT_EQ(pathArrayness.isPathArray(fieldRefWithInvalidDollar), true);
+}
+
+// Test that a FieldRef that is also a valid FieldPath works correctly.
+TEST(PathArraynessTest, FieldRefValidPath) {
+    std::string validFieldRefString("a.b.c");
+    MultikeyComponents multikeyPaths{0U, 1U};
+
+    PathArrayness pathArrayness;
+    auto initialState = pathArrayness.exportToMap_forTest();
+
+    // Insert valid path - should succeed and be added to trie.
+    pathArrayness.addPath(FieldPath(validFieldRefString), multikeyPaths);
+    auto afterInsertState = pathArrayness.exportToMap_forTest();
+
+    // Trie should have changed since the path is valid and was added.
+    ASSERT_NE(initialState, afterInsertState);
+    // Should have "a", "a.b", and "a.b.c" entries (all nodes in the path)
+    ASSERT_EQ(afterInsertState.size(), 3U);
+    ASSERT_EQ(afterInsertState["a"], true);       // Component 0 is array
+    ASSERT_EQ(afterInsertState["a.b"], true);     // Component 1 is array
+    ASSERT_EQ(afterInsertState["a.b.c"], false);  // Component 2 is not array
+
+    // Lookup should work correctly - "a.b.c" has array prefix, so it's considered an array.
+    FieldRef validFieldRef = FieldRef(validFieldRefString);
+    ASSERT_EQ(pathArrayness.isPathArray(validFieldRef), true);
+
+    // Test lookup of a prefix that is an array.
+    FieldRef prefixFieldRef("a");
+    ASSERT_EQ(pathArrayness.isPathArray(prefixFieldRef), true);
+}
+
 }  // namespace mongo
