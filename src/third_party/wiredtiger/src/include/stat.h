@@ -594,6 +594,7 @@ struct __wt_connection_stats {
     int64_t cache_hazard_max;
     int64_t cache_hs_insert;
     int64_t cache_hs_insert_restart;
+    int64_t cache_hs_key_processed;
     int64_t cache_hs_ondisk_max;
     int64_t cache_hs_ondisk;
     int64_t cache_hs_read;
@@ -609,6 +610,7 @@ struct __wt_connection_stats {
     int64_t cache_hs_btree_truncate_dryrun;
     int64_t cache_hs_key_truncate_rts_unstable_dryrun;
     int64_t cache_hs_key_truncate_rts_dryrun;
+    int64_t cache_hs_update_processed;
     int64_t cache_hs_order_reinsert;
     int64_t cache_hs_write_squash;
     int64_t cache_inmem_splittable;
@@ -1300,6 +1302,7 @@ struct __wt_dsrc_stats {
     int64_t cache_eviction_blocked_hazard;
     int64_t cache_hs_insert;
     int64_t cache_hs_insert_restart;
+    int64_t cache_hs_key_processed;
     int64_t cache_hs_read;
     int64_t cache_hs_read_miss;
     int64_t cache_hs_read_squash;
@@ -1313,6 +1316,7 @@ struct __wt_dsrc_stats {
     int64_t cache_hs_btree_truncate_dryrun;
     int64_t cache_hs_key_truncate_rts_unstable_dryrun;
     int64_t cache_hs_key_truncate_rts_dryrun;
+    int64_t cache_hs_update_processed;
     int64_t cache_hs_order_reinsert;
     int64_t cache_hs_write_squash;
     int64_t cache_inmem_splittable;

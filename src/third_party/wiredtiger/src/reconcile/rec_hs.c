@@ -670,6 +670,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
     wt_off_t hs_size;
     uint64_t insert_cnt, max_hs_size, modify_cnt;
     uint64_t cache_hs_insert_full_update, cache_hs_insert_reverse_modify, cache_hs_write_squash;
+    uint64_t cache_hs_key_processed, cache_hs_update_processed;
     uint32_t i;
     int nentries;
     bool enable_reverse_modify, error_on_ts_ordering, hs_inserted, squashed, hs_flag_set;
@@ -684,6 +685,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
     error_on_ts_ordering = F_ISSET(r, WT_REC_CHECKPOINT_RUNNING) ||
       FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_EVICTION_CKPT_TS_ORDERING);
     cache_hs_insert_full_update = cache_hs_insert_reverse_modify = cache_hs_write_squash = 0;
+    cache_hs_key_processed = cache_hs_update_processed = 0;
 
     WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
@@ -726,6 +728,8 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
         ref_upd = list->onpage_upd;
 
         __wt_update_vector_clear(&updates);
+
+        ++cache_hs_key_processed;
 
         /*
          * Reverse deltas are only supported on 'S' and 'u' value formats.
@@ -873,29 +877,32 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
           "moving %" WT_SIZET_FMT " updates to the history store in saved update list %u of ref %p",
           updates.size, i, (void *)ref);
 
-        WT_ASSERT(session, updates.size > 0);
-        __wt_update_vector_peek(&updates, &oldest_upd);
+        if (updates.size > 0) {
+            cache_hs_update_processed += updates.size;
 
-        WT_ASSERT(session,
-          oldest_upd->type == WT_UPDATE_STANDARD || oldest_upd->type == WT_UPDATE_TOMBSTONE);
+            __wt_update_vector_peek(&updates, &oldest_upd);
 
-        /*
-         * Fix the history store record here if the oldest update is a tombstone without a
-         * timestamp. This situation is possible only when the tombstone is globally visible. Delete
-         * all the updates of the key in the history store with timestamps. In the rare case we have
-         * a modify update already written to the history store (we saved the state in hs_flag_set),
-         * deal with it here and skip the deletion as there is nothing to do
-         */
-        if (!hs_flag_set && oldest_upd->type == WT_UPDATE_TOMBSTONE &&
-          oldest_upd->start_ts == WT_TS_NONE) {
-            WT_ERR(__wti_rec_hs_delete_key(
-              session, hs_cursor, btree->id, key, false, error_on_ts_ordering));
+            WT_ASSERT(session,
+              oldest_upd->type == WT_UPDATE_STANDARD || oldest_upd->type == WT_UPDATE_TOMBSTONE);
 
-            WT_STAT_CONN_DSRC_INCR(session, cache_hs_key_truncate);
+            /*
+             * Fix the history store record here if the oldest update is a tombstone without a
+             * timestamp. This situation is possible only when the tombstone is globally visible.
+             * Delete all the updates of the key in the history store with timestamps. In the rare
+             * case we have a modify update already written to the history store (we saved the state
+             * in hs_flag_set), deal with it here and skip the deletion as there is nothing to do
+             */
+            if (!hs_flag_set && oldest_upd->type == WT_UPDATE_TOMBSTONE &&
+              oldest_upd->start_ts == WT_TS_NONE) {
+                WT_ERR(__wti_rec_hs_delete_key(
+                  session, hs_cursor, btree->id, key, false, error_on_ts_ordering));
 
-            /* Reset the update without a timestamp if it is the last update in the chain. */
-            if (oldest_upd == no_ts_upd)
-                no_ts_upd = NULL;
+                WT_STAT_CONN_DSRC_INCR(session, cache_hs_key_truncate);
+
+                /* Reset the update without a timestamp if it is the last update in the chain. */
+                if (oldest_upd == no_ts_upd)
+                    no_ts_upd = NULL;
+            }
         }
 
         /* Skip if we have nothing to insert to the history store. */
@@ -1101,6 +1108,8 @@ err:
     WT_STAT_CONN_DSRC_INCRV(
       session, cache_hs_insert_reverse_modify, cache_hs_insert_reverse_modify);
     WT_STAT_CONN_DSRC_INCRV(session, cache_hs_write_squash, cache_hs_write_squash);
+    WT_STAT_CONN_DSRC_INCRV(session, cache_hs_key_processed, cache_hs_key_processed);
+    WT_STAT_CONN_DSRC_INCRV(session, cache_hs_update_processed, cache_hs_update_processed);
 
     return (ret);
 }

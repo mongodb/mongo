@@ -763,11 +763,12 @@ __rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_UPDATE *first_up
  *     Fill the time window information and the selected update.
  */
 static int
-__rec_fill_tw_from_upd_select(
-  WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *vpack, WTI_UPDATE_SELECT *upd_select)
+__rec_fill_tw_from_upd_select(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *vpack,
+  WTI_UPDATE_SELECT *upd_select, WTI_RECONCILE *r)
 {
     WT_TIME_WINDOW *select_tw;
     WT_UPDATE *last_upd, *tombstone, *upd;
+    bool tombstone_globally_visible;
 
     upd = upd_select->upd;
     last_upd = tombstone = NULL;
@@ -798,16 +799,40 @@ __rec_fill_tw_from_upd_select(
         WT_TIME_WINDOW_SET_STOP(select_tw, upd);
         tombstone = upd_select->tombstone = upd;
 
-        /* Find the update this tombstone applies to. */
-        if (!__wt_txn_upd_visible_all(session, upd)) {
+        /*
+         * Find the update this tombstone applies to.
+         *
+         * To handle scenarios where a prepared tombstone is rolled back, we need to retrieve the
+         * full update associated with it. We resolve prepared updates recursively, processing them
+         * from the oldest to the newest. If a prepared tombstone is written, there's a possibility
+         * that a prepared update from the same transaction was rolled back. In such cases, ensure
+         * that the rolled-back update is also written to disk to maintain data consistency.
+         *
+         * Additionally, if a tombstone with a zero timestamp is selected and there is a need to
+         * move the updates from this btree to the history store, it is essential to identify the
+         * update that the tombstone deletes. Failing to do so could lead to missed deletions of
+         * related updates in the history store, potentially causing data inconsistencies.
+         */
+        tombstone_globally_visible = __wt_txn_upd_visible_all(session, upd);
+        if ((F_ISSET(r, WT_REC_HS) && upd->start_ts == WT_TS_NONE) || !tombstone_globally_visible) {
             while (upd->next != NULL && upd->next->txnid == WT_TXN_ABORTED)
                 upd = upd->next;
-
-            WT_ASSERT(session, upd->next == NULL || upd->next->txnid != WT_TXN_ABORTED);
-            upd_select->upd = upd = upd->next;
-            /* We should not see multiple consecutive tombstones. */
-            WT_ASSERT_ALWAYS(session, upd == NULL || upd->type != WT_UPDATE_TOMBSTONE,
-              "Consecutive tombstones found on the update chain");
+            /*
+             * Do not write the key to the disk image if the tombstone is globally visible. However,
+             * the timestamps of the update it deletes are still required to determine whether the
+             * key's values need to be removed from the history store.
+             */
+            if (tombstone_globally_visible) {
+                if (upd->next != NULL)
+                    upd = upd->next;
+                else
+                    upd = tombstone;
+            } else {
+                upd_select->upd = upd = upd->next;
+                /* We should not see multiple consecutive tombstones. */
+                WT_ASSERT_ALWAYS(session, upd == NULL || upd->type != WT_UPDATE_TOMBSTONE,
+                  "Consecutive tombstones found on the update chain");
+            }
         }
     }
 
@@ -975,7 +1000,7 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
         r->update_used = true;
 
     if (upd != NULL)
-        WT_RET(__rec_fill_tw_from_upd_select(session, page, vpack, upd_select));
+        WT_RET(__rec_fill_tw_from_upd_select(session, page, vpack, upd_select, r));
 
     /* Mark the page dirty after reconciliation. */
     if (has_newer_updates)
@@ -1000,26 +1025,14 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
      * Set the flag if the selected tombstone has no timestamp. Based on this flag, the caller
      * functions perform the history store truncation for this key.
      */
-    if (!F_ISSET(session->dhandle, WT_DHANDLE_HS) && upd_select->tombstone != NULL &&
+    if (!WT_IS_HS(session->dhandle) && upd_select->tombstone != NULL &&
       !F_ISSET(upd_select->tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)) {
-        upd = upd_select->upd;
-
-        /*
-         * The selected update can be the tombstone itself when the tombstone is globally visible.
-         * Compare the tombstone's timestamp with either the next update in the update list or the
-         * on-disk cell timestamp to determine if the tombstone is discarding a timestamp.
-         */
-        if (upd_select->tombstone == upd) {
-            upd = upd->next;
-
-            /* Loop until a valid update is found. */
-            while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
-                upd = upd->next;
-        }
-
-        if ((upd != NULL && upd->start_ts > upd_select->tombstone->start_ts) ||
-          (vpack != NULL && vpack->tw.start_ts > upd_select->tombstone->start_ts))
+        if (upd_select->tw.start_ts > upd_select->tw.stop_ts ||
+          (vpack != NULL && vpack->type != WT_CELL_DEL &&
+            vpack->tw.start_ts > upd_select->tw.stop_ts && upd_select->tw.stop_ts == WT_TS_NONE)) {
+            WT_ASSERT(session, upd_select->tw.stop_ts == WT_TS_NONE);
             upd_select->no_ts_tombstone = true;
+        }
     }
 
     /*
@@ -1029,8 +1042,8 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
      * Returning EBUSY here is okay as the previous call to validate the update chain wouldn't have
      * caught the situation where only a tombstone is selected.
      */
-    if (__timestamp_no_ts_fix(session, &upd_select->tw) && F_ISSET(r, WT_REC_HS) &&
-      F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)) {
+    if (onpage_upd != NULL && __timestamp_no_ts_fix(session, &upd_select->tw) &&
+      F_ISSET(r, WT_REC_HS) && F_ISSET(r, WT_REC_CHECKPOINT_RUNNING)) {
         /* Catch this case in diagnostic builds. */
         WT_STAT_CONN_DSRC_INCR(session, cache_eviction_blocked_no_ts_checkpoint_race_3);
         WT_ASSERT(session, false);
