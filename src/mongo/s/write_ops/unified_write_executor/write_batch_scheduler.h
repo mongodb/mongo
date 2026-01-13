@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/sharding_environment/mongos_server_parameters_gen.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_batch_response_processor.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
@@ -40,8 +41,6 @@ namespace unified_write_executor {
 class WriteBatchScheduler {
 public:
     using CollectionsToCreate = ProcessorResult::CollectionsToCreate;
-
-    static constexpr size_t kMaxRoundsWithoutProgress = 10;
 
     WriteBatchScheduler(WriteCommandRef cmdRef,
                         WriteOpBatcher& batcher,
@@ -111,6 +110,7 @@ protected:
      */
     bool createCollections(OperationContext* opCtx, const CollectionsToCreate& collsToCreate);
 
+    const int32_t _kMaxRoundsWithoutProgress = gMaxRoundsWithoutProgress.loadRelaxed();
     const WriteCommandRef _cmdRef;
     const std::set<NamespaceString> _nssSet;
     WriteOpBatcher& _batcher;

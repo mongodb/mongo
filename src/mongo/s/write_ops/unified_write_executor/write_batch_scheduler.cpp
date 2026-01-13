@@ -43,8 +43,8 @@ void WriteBatchScheduler::run(OperationContext* opCtx) {
     // consecutive rounds that don't make progress. If there are too many consecutive rounds without
     // progress, this function will eventually give up and fail with an error. These variables are
     // used to implement this mechanism.
-    size_t rounds = 0;
-    size_t numRoundsWithoutProgress = 0;
+    int32_t rounds = 0;
+    int32_t numRoundsWithoutProgress = 0;
     Backoff backoff(Seconds(1), Seconds(2));
 
     // Keep executing rounds until the batcher says it can't make any more batches or until an
@@ -52,10 +52,10 @@ void WriteBatchScheduler::run(OperationContext* opCtx) {
     while (!_batcher.isDone()) {
         // If there have been too many consecutive rounds without progress, record an error for
         // the remaining ops and break out of the loop.
-        if (numRoundsWithoutProgress > kMaxRoundsWithoutProgress) {
+        if (numRoundsWithoutProgress > _kMaxRoundsWithoutProgress) {
             Status status{ErrorCodes::NoProgressMade,
                           str::stream() << "No progress was made executing write ops in after "
-                                        << kMaxRoundsWithoutProgress << " rounds (" << rounds
+                                        << _kMaxRoundsWithoutProgress << " rounds (" << rounds
                                         << " rounds total)"};
             recordErrorForRemainingOps(opCtx, status);
             break;
