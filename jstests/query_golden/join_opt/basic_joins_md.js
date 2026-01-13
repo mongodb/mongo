@@ -339,3 +339,14 @@ runBasicJoinTest([
     {$lookup: {from: foreignColl3.getName(), as: "z", localField: "x.c", foreignField: "c"}},
     {$unwind: "$z"},
 ]);
+
+section("Example with a cycle in the join graph");
+runBasicJoinTest([
+    {$match: {b: "foo"}},
+    {$lookup: {from: foreignColl1.getName(), as: "x", localField: "a", foreignField: "a"}},
+    {$unwind: "$x"},
+    {$lookup: {from: foreignColl2.getName(), as: "y", localField: "a", foreignField: "_id"}},
+    {$unwind: "$y"},
+    {$lookup: {from: foreignColl3.getName(), as: "z", localField: "a", foreignField: "_id"}},
+    {$unwind: "$z"},
+]);
