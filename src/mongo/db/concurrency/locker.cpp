@@ -343,7 +343,7 @@ void Locker::reacquireTicket(OperationContext* opCtx) {
                     fmt::format("Unable to acquire ticket with mode '{}' due to detected lock "
                                 "conflict for resource {}",
                                 fmt::underlying(_modeForTicket),
-                                it.key().toString()),
+                                it.key().toStringForErrorMessage()),
                     !_lockManager->hasConflictingRequests(it.key(), it.objAddr()));
         }
     } while (!_acquireTicket(opCtx, _modeForTicket, Date_t::now() + Milliseconds{100}));
@@ -839,7 +839,7 @@ void Locker::dump() const {
 
         BSONObj toBSON() const {
             BSONObjBuilder b;
-            b.append("key", key.toString());
+            b.append("key", toStringForLogging(key));
             b.append("status", lockRequestStatusName(status));
             b.append("recursiveCount", static_cast<int>(recursiveCount));
             b.append("unlockPending", static_cast<int>(unlockPending));
@@ -872,7 +872,7 @@ LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMod
                        resType != RESOURCE_DDL_COLLECTION)) {
         LOGV2_FATAL(9360800,
                     "Operation attempted to acquire lock after indicating that it should not",
-                    "resourceId"_attr = resId.toString(),
+                    "resourceId"_attr = resId,
                     "mode"_attr = modeName(mode));
     }
 
@@ -1008,7 +1008,7 @@ void Locker::_lockComplete(OperationContext* opCtx,
                        resType != RESOURCE_DDL_COLLECTION)) {
         LOGV2_FATAL(9360801,
                     "Operation attempted to acquire lock after indicating that it should not",
-                    "resourceId"_attr = resId.toString(),
+                    "resourceId"_attr = resId,
                     "mode"_attr = modeName(mode));
     }
 
@@ -1026,7 +1026,8 @@ void Locker::_lockComplete(OperationContext* opCtx,
     if (!opCtx->uninterruptibleLocksRequested_DO_NOT_USE() && isUserOperation &&  // NOLINT
         MONGO_unlikely(failNonIntentLocksIfWaitNeeded.shouldFail())) {
         uassert(ErrorCodes::LockTimeout,
-                str::stream() << "Cannot immediately acquire lock '" << resId.toString()
+                str::stream() << "Cannot immediately acquire lock '"
+                              << resId.toStringForErrorMessage()
                               << "'. Timing out due to failpoint.",
                 (mode == MODE_IS || mode == MODE_IX));
     }
@@ -1089,8 +1090,8 @@ void Locker::_lockComplete(OperationContext* opCtx,
                 onTimeout();
             }
             std::string timeoutMessage = str::stream()
-                << "Unable to acquire " << modeName(mode) << " lock on '" << resId.toString()
-                << "' within " << timeout << ".";
+                << "Unable to acquire " << modeName(mode) << " lock on '"
+                << resId.toStringForErrorMessage() << "' within " << timeout << ".";
             if (opCtx->getClient()) {
                 timeoutMessage = str::stream()
                     << timeoutMessage << " opId: " << opCtx->getOpID()
