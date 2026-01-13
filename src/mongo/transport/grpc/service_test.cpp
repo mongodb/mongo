@@ -370,9 +370,6 @@ TEST_F(CommandServiceTest, InvalidMetadataDocumentBase64Encoding) {
     runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
 }
 
-// TODO SERVER-115255 Re-enable this test under ASAN once the issue with uninitialized variables
-// causing out-of-bounds reads is resolved.
-#if !__has_feature(address_sanitizer)
 TEST_F(CommandServiceTest, InvalidMetadataDocumentBSON) {
     ContextInitializerType initContext = [](auto& ctx) {
         CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
@@ -381,7 +378,18 @@ TEST_F(CommandServiceTest, InvalidMetadataDocumentBSON) {
     };
     runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
 }
-#endif
+
+TEST_F(CommandServiceTest, PartiallyValidMetadataDocumentBSON) {
+    ContextInitializerType initContext = [](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        StringBuilder builder;
+        BSONObj clientDoc = makeClientMetadataDocument();
+        builder << StringData(clientDoc.objdata(), clientDoc.objsize()) << "Not BSON";
+        ctx.AddMetadata(std::string{util::constants::kClientMetadataKey},
+                        base64::encode(builder.str()));
+    };
+    runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
+}
 
 TEST_F(CommandServiceTest, UnrecognizedReservedKey) {
     ContextInitializerType initContext = [](auto& ctx) {
