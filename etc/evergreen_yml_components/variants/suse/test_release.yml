@@ -26,7 +26,7 @@ buildvariants:
         --build_otel=False
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
-      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_ldap_pool,resource_intensive
+      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_ldap_pool,resource_intensive,requires_otel_build
       has_packages: true
       packager_script: packager_enterprise.py
       packager_arch: x86_64
@@ -74,7 +74,7 @@ buildvariants:
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
       test_flags: >-
-        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
+        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_otel_build
         --modules=none
       multiversion_platform: suse15
       multiversion_edition: targeted
