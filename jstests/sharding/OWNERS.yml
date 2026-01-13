@@ -148,3 +148,6 @@ filters:
   - "index_not_cloned_on_non_owner_shards.js":
     approvers:
       - 10gen/server-cluster-scalability
+  - "*user_write_block*":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

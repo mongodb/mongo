@@ -213,10 +213,6 @@ void UserWritesRecoverableCriticalSectionService::
         OperationContext* opCtx,
         const NamespaceString& nss,
         boost::optional<UserWritesBlockReasonEnum> reason) {
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::None),
-              "Acquiring the user writes recoverable critical section directly to start blocking "
-              "writes is only allowed on non-sharded cluster.");
-
     acquireRecoverableCriticalSection(
         opCtx, nss, false /* blockShardedDDL */, true /* blockUserWrites */, reason);
 }

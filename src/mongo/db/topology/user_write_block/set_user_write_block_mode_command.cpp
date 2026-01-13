@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role/ddl/replica_set_ddl_tracker.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/user_write_block/global_user_write_block_state.h"
 #include "mongo/db/topology/user_write_block/set_user_write_block_mode_gen.h"
@@ -84,13 +85,11 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << Request::kCommandName
-                                  << " cannot be run on shardsvrs nor configsvrs",
-                    serverGlobalParams.clusterRole.has(ClusterRole::None));
-
-            uassert(ErrorCodes::IllegalOperation,
                     str::stream() << Request::kCommandName << " cannot be run on standalones",
                     repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet());
+
+            ReplicaSetDDLTracker::ScopedReplicaSetDDL scopedReplicaSetDDL(
+                opCtx, {UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace});
 
             // Only one attempt to change write block mode may make progress at once, because the
             // way we enable/disable user index build blocking is not concurrency-safe.
