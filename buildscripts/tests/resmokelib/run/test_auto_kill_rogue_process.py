@@ -1,4 +1,5 @@
 """Unit tests for buildscripts/resmokelib/run/list_tags.py."""
+
 # pylint: disable=protected-access
 import logging
 import os
@@ -23,15 +24,15 @@ class MockTestRunner(TestRunner):
 
 class TestDetectRogueProcess(unittest.TestCase):
     def setUp(self) -> None:
-        self.command = [sys.executable, '-c', "import time; time.sleep(5)"]
-        if sys.platform.lower() == 'win32':
+        self.command = [sys.executable, "-c", "import time; time.sleep(5)"]
+        if sys.platform.lower() == "win32":
             self.sigkill_return = fixture_interface.TeardownMode.TERMINATE.value
         else:
             self.sigkill_return = -fixture_interface.TeardownMode.KILL.value
 
-        if not os.environ.get('RESMOKE_PARENT_PROCESS'):
-            os.environ['RESMOKE_PARENT_PROCESS'] = str(os.getpid())
-            os.environ['RESMOKE_PARENT_CTIME'] = str(psutil.Process().create_time())
+        if not os.environ.get("RESMOKE_PARENT_PROCESS"):
+            os.environ["RESMOKE_PARENT_PROCESS"] = str(os.getpid())
+            os.environ["RESMOKE_PARENT_CTIME"] = str(psutil.Process().create_time())
 
     # TODO: SERVER-90631 reenable this test
     # This works locally which is what we care about but it unclear why it is failing remotly
@@ -41,7 +42,7 @@ class TestDetectRogueProcess(unittest.TestCase):
         reason="TODO: SERVER-90631 reenable this test on macos",
     )
     def test_warn(self):
-        buildscripts.resmokelib.config.AUTO_KILL = 'warn'
+        buildscripts.resmokelib.config.AUTO_KILL = "warn"
         buildscripts.resmokelib.config.SHELL_CONN_STRING = None
 
         test_runner = MockTestRunner("test")
@@ -52,11 +53,11 @@ class TestDetectRogueProcess(unittest.TestCase):
         except errors.ResmokeError:
             self.fail("Detected processes when there should be none.")
 
-        tmp_ctime = os.environ['RESMOKE_PARENT_CTIME']
-        os.environ['RESMOKE_PARENT_CTIME'] = str("rogue_process")
+        tmp_ctime = os.environ["RESMOKE_PARENT_CTIME"]
+        os.environ["RESMOKE_PARENT_CTIME"] = str("rogue_process")
         proc = process.Process(logging.getLogger(), self.command)
         proc.start()
-        os.environ['RESMOKE_PARENT_CTIME'] = tmp_ctime
+        os.environ["RESMOKE_PARENT_CTIME"] = tmp_ctime
 
         with self.assertRaises(errors.ResmokeError):
             test_runner._check_for_mongo_processes()
@@ -65,8 +66,7 @@ class TestDetectRogueProcess(unittest.TestCase):
         proc.wait()
 
     def test_on(self):
-
-        buildscripts.resmokelib.config.AUTO_KILL = 'on'
+        buildscripts.resmokelib.config.AUTO_KILL = "on"
         buildscripts.resmokelib.config.SHELL_CONN_STRING = None
 
         test_runner = MockTestRunner("test")
@@ -74,11 +74,11 @@ class TestDetectRogueProcess(unittest.TestCase):
 
         test_runner._check_for_mongo_processes()
 
-        tmp_ctime = os.environ['RESMOKE_PARENT_CTIME']
-        os.environ['RESMOKE_PARENT_CTIME'] = str("rogue_process")
+        tmp_ctime = os.environ["RESMOKE_PARENT_CTIME"]
+        os.environ["RESMOKE_PARENT_CTIME"] = str("rogue_process")
         proc = process.Process(logging.getLogger(), self.command)
         proc.start()
-        os.environ['RESMOKE_PARENT_CTIME'] = tmp_ctime
+        os.environ["RESMOKE_PARENT_CTIME"] = tmp_ctime
 
         test_runner._check_for_mongo_processes()
 
@@ -90,7 +90,7 @@ class TestDetectRogueProcess(unittest.TestCase):
             )
 
     def test_off(self):
-        buildscripts.resmokelib.config.AUTO_KILL = 'off'
+        buildscripts.resmokelib.config.AUTO_KILL = "off"
         buildscripts.resmokelib.config.SHELL_CONN_STRING = None
 
         test_runner = MockTestRunner("test")
@@ -110,8 +110,8 @@ class TestDetectRogueProcess(unittest.TestCase):
         proc.wait()
 
     def test_shell_constring(self):
-        buildscripts.resmokelib.config.AUTO_KILL = 'warn'
-        buildscripts.resmokelib.config.SHELL_CONN_STRING = '127.0.0.1:27000'
+        buildscripts.resmokelib.config.AUTO_KILL = "warn"
+        buildscripts.resmokelib.config.SHELL_CONN_STRING = "127.0.0.1:27000"
 
         test_runner = MockTestRunner("test")
         test_runner._setup_logging()

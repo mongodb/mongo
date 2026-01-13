@@ -36,7 +36,9 @@ class CedarTestReport:
         return {
             "info": {
                 "test_name": self.test_name,
-                "args": {"thread_level": self.thread_level, },
+                "args": {
+                    "thread_level": self.thread_level,
+                },
             },
             "metrics": [metric.as_dict() for metric in self.metrics],
         }

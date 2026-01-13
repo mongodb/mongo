@@ -67,7 +67,9 @@ def download_buildozer(download_location: str = "./"):
     operating_system = determine_platform()
     architechture = determine_architecture()
     if operating_system == "windows" and architechture == "arm64":
-        raise RuntimeError("There are no published arm windows releases for buildifier.")
+        raise RuntimeError(
+            "There are no published arm windows releases for buildifier."
+        )
 
     extension = ".exe" if operating_system == "windows" else ""
     binary_name = f"buildozer-{operating_system}-{architechture}{extension}"
@@ -167,7 +169,8 @@ def validate_bazel_groups(generate_report, fix):
                 bazel_bin,
                 "query",
                 'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest[,\]]", //src/...))',
-            ] + query_opts,
+            ]
+            + query_opts,
             capture_output=True,
             text=True,
             check=True,
@@ -194,7 +197,8 @@ def validate_bazel_groups(generate_report, fix):
                     bazel_bin,
                     "query",
                     f'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest_{group}_group[,\]]", //src/...))',
-                ] + query_opts,
+                ]
+                + query_opts,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -210,35 +214,45 @@ def validate_bazel_groups(generate_report, fix):
         if groups[group] != group_tests:
             for test in group_tests:
                 if test not in bazel_unittests:
-                    failures.append([
-                        test + " tag",
-                        f"{test} not a 'mongo_unittest' but has 'mongo_unittest_{group}_group' tag.",
-                    ])
+                    failures.append(
+                        [
+                            test + " tag",
+                            f"{test} not a 'mongo_unittest' but has 'mongo_unittest_{group}_group' tag.",
+                        ]
+                    )
                     print(failures[-1][1])
                     if fix:
-                        buildozer_update_cmds += [[
-                            f"remove tags mongo_unittest_{group}_group", test
-                        ]]
+                        buildozer_update_cmds += [
+                            [f"remove tags mongo_unittest_{group}_group", test]
+                        ]
 
             for test in groups[group]:
                 if test not in group_tests:
                     failures.append(
-                        [test + " tag", f"{test} missing 'mongo_unittest_{group}_group'"])
+                        [
+                            test + " tag",
+                            f"{test} missing 'mongo_unittest_{group}_group'",
+                        ]
+                    )
                     print(failures[-1][1])
                     if fix:
-                        buildozer_update_cmds += [[f"add tags mongo_unittest_{group}_group", test]]
+                        buildozer_update_cmds += [
+                            [f"add tags mongo_unittest_{group}_group", test]
+                        ]
 
             for test in group_tests:
                 if test not in groups[group]:
-                    failures.append([
-                        test + " tag",
-                        f"{test} is tagged in the wrong group.",
-                    ])
+                    failures.append(
+                        [
+                            test + " tag",
+                            f"{test} is tagged in the wrong group.",
+                        ]
+                    )
                     print(failures[-1][1])
                     if fix:
-                        buildozer_update_cmds += [[
-                            f"remove tags mongo_unittest_{group}_group", test
-                        ]]
+                        buildozer_update_cmds += [
+                            [f"remove tags mongo_unittest_{group}_group", test]
+                        ]
 
     if fix:
         for cmd in buildozer_update_cmds:

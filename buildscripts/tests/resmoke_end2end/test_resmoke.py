@@ -51,7 +51,10 @@ class _ResmokeSelftest(unittest.TestCase):
     def execute_resmoke(self, resmoke_args, **kwargs):  # pylint: disable=unused-argument
         resmoke_process = core.programs.make_process(
             self.logger,
-            [sys.executable, "buildscripts/resmoke.py"] + self.resmoke_const_args + resmoke_args)
+            [sys.executable, "buildscripts/resmoke.py"]
+            + self.resmoke_const_args
+            + resmoke_args,
+        )
         resmoke_process.start()
         self.resmoke_process = resmoke_process
 
@@ -88,7 +91,9 @@ class TestArchivalOnFailure(_ResmokeSelftest):
 
         # test archival
         archival_dirs_to_expect = 4  # 2 tests * 2 nodes
-        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
+        self.assert_dir_file_count(
+            self.test_dir, self.archival_file, archival_dirs_to_expect
+        )
 
     def test_archival_on_task_failure_no_passthrough(self):
         # The --originSuite argument is to trick the resmoke local invocation into passing
@@ -108,7 +113,9 @@ class TestArchivalOnFailure(_ResmokeSelftest):
 
         # test archival
         archival_dirs_to_expect = 8  # (2 tests + 2 stacktrace files) * 2 nodes
-        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
+        self.assert_dir_file_count(
+            self.test_dir, self.archival_file, archival_dirs_to_expect
+        )
 
     def test_no_archival_locally(self):
         # archival should not happen if --taskId is not set.
@@ -140,10 +147,14 @@ class TestTimeout(_ResmokeSelftest):
         rmtree(self.test_dir_inner, ignore_errors=True)
 
     def signal_resmoke(self):
-        hang_analyzer_options = f"-o=file -o=stdout -m=contains -p=python -d={self.resmoke_process.pid}"
+        hang_analyzer_options = (
+            f"-o=file -o=stdout -m=contains -p=python -d={self.resmoke_process.pid}"
+        )
         signal_resmoke_process = core.programs.make_process(
-            self.logger, [sys.executable, "buildscripts/resmoke.py", "hang-analyzer"
-                          ] + hang_analyzer_options.split())
+            self.logger,
+            [sys.executable, "buildscripts/resmoke.py", "hang-analyzer"]
+            + hang_analyzer_options.split(),
+        )
         signal_resmoke_process.start()
 
         # Wait for resmoke_process to be killed by 'run-timeout' so this doesn't hang.
@@ -170,7 +181,9 @@ class TestTimeout(_ResmokeSelftest):
         started_polling_datetime = datetime.datetime.now()
         while not os.path.isfile(sentinel_path):
             time.sleep(0.1)
-            if datetime.datetime.now() - started_polling_datetime > datetime.timedelta(minutes=5):
+            if datetime.datetime.now() - started_polling_datetime > datetime.timedelta(
+                minutes=5
+            ):
                 self.fail("SUT is not available within 99 seconds; aborting test")
 
         # Kill resmoke:
@@ -193,10 +206,14 @@ class TestTimeout(_ResmokeSelftest):
         self.execute_resmoke(resmoke_args, sentinel_file="timeout0")
 
         archival_dirs_to_expect = 4  # 2 tests * 2 mongod
-        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
+        self.assert_dir_file_count(
+            self.test_dir, self.archival_file, archival_dirs_to_expect
+        )
 
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
-        self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
+        self.assert_dir_file_count(
+            self.test_dir, self.analysis_file, analysis_pids_to_expect
+        )
 
     def test_task_timeout_no_passthrough(self):
         # The --originSuite argument is to trick the resmoke local invocation into passing
@@ -215,10 +232,14 @@ class TestTimeout(_ResmokeSelftest):
         self.execute_resmoke(resmoke_args, sentinel_file="timeout1")
 
         archival_dirs_to_expect = 8  # (2 tests + 2 stacktrace files) * 2 nodes
-        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
+        self.assert_dir_file_count(
+            self.test_dir, self.archival_file, archival_dirs_to_expect
+        )
 
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
-        self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
+        self.assert_dir_file_count(
+            self.test_dir, self.analysis_file, analysis_pids_to_expect
+        )
 
     # Test scenarios where an resmoke-launched process launches resmoke.
     def test_nested_timeout(self):
@@ -237,12 +258,20 @@ class TestTimeout(_ResmokeSelftest):
 
         self.execute_resmoke(resmoke_args, sentinel_file="inner_level_timeout")
 
-        archival_dirs_to_expect = 4  # ((2 tests + 2 stacktrace files) * 2 nodes) / 2 data_file directories
-        self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
-        self.assert_dir_file_count(self.test_dir_inner, self.archival_file, archival_dirs_to_expect)
+        archival_dirs_to_expect = (
+            4  # ((2 tests + 2 stacktrace files) * 2 nodes) / 2 data_file directories
+        )
+        self.assert_dir_file_count(
+            self.test_dir, self.archival_file, archival_dirs_to_expect
+        )
+        self.assert_dir_file_count(
+            self.test_dir_inner, self.archival_file, archival_dirs_to_expect
+        )
 
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
-        self.assert_dir_file_count(self.test_dir, self.analysis_file, analysis_pids_to_expect)
+        self.assert_dir_file_count(
+            self.test_dir, self.analysis_file, analysis_pids_to_expect
+        )
 
 
 class TestTestSelection(_ResmokeSelftest):
@@ -252,7 +281,9 @@ class TestTestSelection(_ResmokeSelftest):
 
     def execute_resmoke(self, resmoke_args):  # pylint: disable=arguments-differ
         resmoke_process = core.programs.make_process(
-            self.logger, [sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args)
+            self.logger,
+            [sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args,
+        )
         resmoke_process.start()
 
         return resmoke_process
@@ -273,24 +304,34 @@ class TestTestSelection(_ResmokeSelftest):
         # Tests a suite that excludes a missing file
         self.assertEqual(
             0,
-            self.execute_resmoke([
-                f"--reportFile={self.report_file}", "--repeatTests=2",
-                f"--suites={self.suites_root}/resmoke_missing_test.yml",
-                f"{self.testfiles_root}/one.js", f"{self.testfiles_root}/one.js",
-                f"{self.testfiles_root}/one.js"
-            ]).wait())
+            self.execute_resmoke(
+                [
+                    f"--reportFile={self.report_file}",
+                    "--repeatTests=2",
+                    f"--suites={self.suites_root}/resmoke_missing_test.yml",
+                    f"{self.testfiles_root}/one.js",
+                    f"{self.testfiles_root}/one.js",
+                    f"{self.testfiles_root}/one.js",
+                ]
+            ).wait(),
+        )
 
         self.assertEqual(6 * [f"{self.testfiles_root}/one.js"], self.get_tests_run())
 
     def test_positional_arguments(self):
         self.assertEqual(
             0,
-            self.execute_resmoke([
-                f"--reportFile={self.report_file}", "--repeatTests=2",
-                f"--suites={self.suites_root}/resmoke_no_mongod.yml",
-                f"{self.testfiles_root}/one.js", f"{self.testfiles_root}/one.js",
-                f"{self.testfiles_root}/one.js"
-            ]).wait())
+            self.execute_resmoke(
+                [
+                    f"--reportFile={self.report_file}",
+                    "--repeatTests=2",
+                    f"--suites={self.suites_root}/resmoke_no_mongod.yml",
+                    f"{self.testfiles_root}/one.js",
+                    f"{self.testfiles_root}/one.js",
+                    f"{self.testfiles_root}/one.js",
+                ]
+            ).wait(),
+        )
 
         self.assertEqual(6 * [f"{self.testfiles_root}/one.js"], self.get_tests_run())
 
@@ -299,34 +340,49 @@ class TestTestSelection(_ResmokeSelftest):
 
         self.assertEqual(
             0,
-            self.execute_resmoke([
-                f"--reportFile={self.report_file}", "--repeatTests=2",
-                f"--suites={self.suites_root}/resmoke_no_mongod.yml",
-                f"--replay={self.test_dir}/replay"
-            ]).wait())
+            self.execute_resmoke(
+                [
+                    f"--reportFile={self.report_file}",
+                    "--repeatTests=2",
+                    f"--suites={self.suites_root}/resmoke_no_mongod.yml",
+                    f"--replay={self.test_dir}/replay",
+                ]
+            ).wait(),
+        )
 
         self.assertEqual(6 * [f"{self.testfiles_root}/two.js"], self.get_tests_run())
 
     def test_suite_file(self):
         self.assertEqual(
             0,
-            self.execute_resmoke([
-                f"--reportFile={self.report_file}", "--repeatTests=2",
-                f"--suites={self.suites_root}/resmoke_no_mongod.yml"
-            ]).wait())
+            self.execute_resmoke(
+                [
+                    f"--reportFile={self.report_file}",
+                    "--repeatTests=2",
+                    f"--suites={self.suites_root}/resmoke_no_mongod.yml",
+                ]
+            ).wait(),
+        )
 
-        self.assertEqual(2 * [f"{self.testfiles_root}/one.js", f"{self.testfiles_root}/two.js"],
-                         self.get_tests_run())
+        self.assertEqual(
+            2 * [f"{self.testfiles_root}/one.js", f"{self.testfiles_root}/two.js"],
+            self.get_tests_run(),
+        )
 
     def test_at_sign_as_replay_file(self):
         self.create_file_in_test_dir("replay", f"{self.testfiles_root}/two.js\n" * 3)
 
         self.assertEqual(
             0,
-            self.execute_resmoke([
-                f"--reportFile={self.report_file}", "--repeatTests=2",
-                f"--suites={self.suites_root}/resmoke_no_mongod.yml", f"@{self.test_dir}/replay"
-            ]).wait())
+            self.execute_resmoke(
+                [
+                    f"--reportFile={self.report_file}",
+                    "--repeatTests=2",
+                    f"--suites={self.suites_root}/resmoke_no_mongod.yml",
+                    f"@{self.test_dir}/replay",
+                ]
+            ).wait(),
+        )
 
         self.assertEqual(6 * [f"{self.testfiles_root}/two.js"], self.get_tests_run())
 
@@ -337,17 +393,23 @@ class TestTestSelection(_ResmokeSelftest):
         self.assertEqual(
             2,
             self.execute_resmoke(
-                [f"--replay={self.test_dir}/replay", f"{self.testfiles_root}/one.js"]).wait())
+                [f"--replay={self.test_dir}/replay", f"{self.testfiles_root}/one.js"]
+            ).wait(),
+        )
 
         # When multiple positional arguments are presented, they're all treated as test files.
         self.assertEqual(
             2,
-            self.execute_resmoke([f"@{self.test_dir}/replay",
-                                  f"{self.testfiles_root}/one.js"]).wait())
+            self.execute_resmoke(
+                [f"@{self.test_dir}/replay", f"{self.testfiles_root}/one.js"]
+            ).wait(),
+        )
         self.assertEqual(
             2,
-            self.execute_resmoke([f"{self.testfiles_root}/one.js",
-                                  f"@{self.test_dir}/replay"]).wait())
+            self.execute_resmoke(
+                [f"{self.testfiles_root}/one.js", f"@{self.test_dir}/replay"]
+            ).wait(),
+        )
 
 
 class TestSetParameters(_ResmokeSelftest):
@@ -372,7 +434,8 @@ class TestSetParameters(_ResmokeSelftest):
             pass
 
         suite["executor"]["config"]["shell_options"]["global_vars"]["TestData"][
-            "outputLocation"] = self.shell_output_file
+            "outputLocation"
+        ] = self.shell_output_file
         with open(os.path.normpath(suite_output_path), "w") as fd:
             yaml.dump(suite, fd, default_flow_style=False)
 
@@ -390,19 +453,25 @@ class TestSetParameters(_ResmokeSelftest):
 
         self.logger.info(
             "Running test. Template suite: %s Rewritten suite: %s Resmoke Args: %s Test output file: %s.",
-            suite_template, suite_file, resmoke_args, self.shell_output_file)
+            suite_template,
+            suite_file,
+            resmoke_args,
+            self.shell_output_file,
+        )
 
         resmoke_process = core.programs.make_process(
             self.logger,
-            [sys.executable, "buildscripts/resmoke.py", "run", f"--suites={suite_file}"
-             ] + resmoke_args)
+            [sys.executable, "buildscripts/resmoke.py", "run", f"--suites={suite_file}"]
+            + resmoke_args,
+        )
         resmoke_process.start()
 
         return resmoke_process
 
     def test_suite_set_parameters(self):
         self.generate_suite_and_execute_resmoke(
-            f"{self.suites_root}/resmoke_selftest_set_parameters.yml", []).wait()
+            f"{self.suites_root}/resmoke_selftest_set_parameters.yml", []
+        ).wait()
 
         set_params = self.parse_output_json()
         self.assertEqual("1", set_params["enableTestCommands"])
@@ -412,8 +481,10 @@ class TestSetParameters(_ResmokeSelftest):
     def test_cli_set_parameters(self):
         self.generate_suite_and_execute_resmoke(
             f"{self.suites_root}/resmoke_selftest_set_parameters.yml",
-            ["""--mongodSetParameter={"enableFlowControl": false, "flowControlMaxSamples": 500}"""
-             ]).wait()
+            [
+                """--mongodSetParameter={"enableFlowControl": false, "flowControlMaxSamples": 500}"""
+            ],
+        ).wait()
 
         set_params = self.parse_output_json()
         self.assertEqual("1", set_params["enableTestCommands"])
@@ -423,7 +494,8 @@ class TestSetParameters(_ResmokeSelftest):
     def test_override_set_parameters(self):
         self.generate_suite_and_execute_resmoke(
             f"{self.suites_root}/resmoke_selftest_set_parameters.yml",
-            ["""--mongodSetParameter={"testingDiagnosticsEnabled": true}"""]).wait()
+            ["""--mongodSetParameter={"testingDiagnosticsEnabled": true}"""],
+        ).wait()
 
         set_params = self.parse_output_json()
         self.assertEqual("true", set_params["testingDiagnosticsEnabled"])
@@ -431,10 +503,12 @@ class TestSetParameters(_ResmokeSelftest):
 
     def test_merge_cli_set_parameters(self):
         self.generate_suite_and_execute_resmoke(
-            f"{self.suites_root}/resmoke_selftest_set_parameters.yml", [
+            f"{self.suites_root}/resmoke_selftest_set_parameters.yml",
+            [
                 """--mongodSetParameter={"enableFlowControl": false}""",
-                """--mongodSetParameter={"flowControlMaxSamples": 500}"""
-            ]).wait()
+                """--mongodSetParameter={"flowControlMaxSamples": 500}""",
+            ],
+        ).wait()
 
         set_params = self.parse_output_json()
         self.assertEqual("false", set_params["testingDiagnosticsEnabled"])
@@ -446,52 +520,72 @@ class TestSetParameters(_ResmokeSelftest):
         self.assertEqual(
             2,
             self.generate_suite_and_execute_resmoke(
-                f"{self.suites_root}/resmoke_selftest_set_parameters.yml", [
+                f"{self.suites_root}/resmoke_selftest_set_parameters.yml",
+                [
                     """--mongodSetParameter={"enableFlowControl": false}""",
-                    """--mongodSetParameter={"enableFlowControl": true}"""
-                ]).wait())
+                    """--mongodSetParameter={"enableFlowControl": true}""",
+                ],
+            ).wait(),
+        )
 
     def test_mongos_set_parameter(self):
         self.generate_suite_and_execute_resmoke(
-            f"{self.suites_root}/resmoke_selftest_set_parameters_sharding.yml", [
+            f"{self.suites_root}/resmoke_selftest_set_parameters_sharding.yml",
+            [
                 """--mongosSetParameter={"maxTimeMSForHedgedReads": 100}""",
-                """--mongosSetParameter={"mongosShutdownTimeoutMillisForSignaledShutdown": 1000}"""
-            ]).wait()
+                """--mongosSetParameter={"mongosShutdownTimeoutMillisForSignaledShutdown": 1000}""",
+            ],
+        ).wait()
 
         set_params = self.parse_output_json()
         self.assertEqual("100", set_params["maxTimeMSForHedgedReads"])
-        self.assertEqual("1000", set_params["mongosShutdownTimeoutMillisForSignaledShutdown"])
+        self.assertEqual(
+            "1000", set_params["mongosShutdownTimeoutMillisForSignaledShutdown"]
+        )
 
     def test_merge_error_cli_mongos_set_parameter(self):
         self.assertEqual(
             2,
             self.generate_suite_and_execute_resmoke(
-                f"{self.suites_root}/resmoke_selftest_set_parameters_sharding.yml", [
+                f"{self.suites_root}/resmoke_selftest_set_parameters_sharding.yml",
+                [
                     """--mongosSetParameter={"maxTimeMSForHedgedReads": 100}""",
-                    """--mongosSetParameter={"maxTimeMSForHedgedReads": 1000}"""
-                ]).wait())
+                    """--mongosSetParameter={"maxTimeMSForHedgedReads": 1000}""",
+                ],
+            ).wait(),
+        )
 
     def test_allow_duplicate_set_parameter_values(self):
         self.assertEqual(
             0,
             self.generate_suite_and_execute_resmoke(
-                f"{self.suites_root}/resmoke_selftest_set_parameters.yml", [
+                f"{self.suites_root}/resmoke_selftest_set_parameters.yml",
+                [
                     """--mongodSetParameter={"enableFlowControl": false}""",
-                    """--mongodSetParameter={"enableFlowControl": false}"""
-                ]).wait())
+                    """--mongodSetParameter={"enableFlowControl": false}""",
+                ],
+            ).wait(),
+        )
 
         self.assertEqual(
             0,
             self.generate_suite_and_execute_resmoke(
-                f"{self.suites_root}/resmoke_selftest_set_parameters.yml", [
+                f"{self.suites_root}/resmoke_selftest_set_parameters.yml",
+                [
                     """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}""",
-                    """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}"""
-                ]).wait())
+                    """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}""",
+                ],
+            ).wait(),
+        )
 
 
 def execute_resmoke(resmoke_args):
-    return subprocess.run([sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args,
-                          text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return subprocess.run(
+        [sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
 
 
 class TestExceptionExtraction(unittest.TestCase):
@@ -577,14 +671,15 @@ class TestSetShellSeed(unittest.TestCase):
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_set_shellseed.yml",
             "buildscripts/tests/resmoke_end2end/testfiles/random_with_seed.js",
-            f"--shellSeed={test_seed}"
+            f"--shellSeed={test_seed}",
         ]
 
         seed = self.execute_resmoke_and_get_seed(resmoke_args)
 
         self.assertEqual(
-            seed, test_seed, msg=
-            "The found random seed does not match the seed passed with the --shellSeed resmoke argument."
+            seed,
+            test_seed,
+            msg="The found random seed does not match the seed passed with the --shellSeed resmoke argument.",
         )
 
     def test_random_shell_seed(self):
@@ -600,7 +695,9 @@ class TestSetShellSeed(unittest.TestCase):
             random_seeds.add(seed)
 
         self.assertTrue(
-            len(random_seeds) > 1, msg="Resmoke generated the same random seed 10 times in a row.")
+            len(random_seeds) > 1,
+            msg="Resmoke generated the same random seed 10 times in a row.",
+        )
 
 
 # In resmoke we expect certain parts of the evergreen config to be a certain way
@@ -616,8 +713,10 @@ class TestEvergreenYML(unittest.TestCase):
             suite_config = suitesconfig.get_suite(suite_name).get_config()
             expected_selector = ["jstestfuzz/out/*.js"]
             self.assertEqual(
-                suite_config["selector"]["roots"], expected_selector,
-                msg=f"The jstestfuzz selector for {suite_name} did not match 'jstestfuzz/out/*.js'")
+                suite_config["selector"]["roots"],
+                expected_selector,
+                msg=f"The jstestfuzz selector for {suite_name} did not match 'jstestfuzz/out/*.js'",
+            )
 
     # This test asserts that the jstestfuzz tasks uploads the the URL we expect it to
     # If the remote url changes, also change it in the _log_local_resmoke_invocation method
@@ -631,13 +730,16 @@ class TestEvergreenYML(unittest.TestCase):
                 continue
 
             remote_url = item["params"]["remote_file"]
-            if remote_url == "${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz":
+            if (
+                remote_url
+                == "${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz"
+            ):
                 contains_correct_url = True
                 break
 
         self.assertTrue(
-            contains_correct_url, msg=
-            "The 'run jstestfuzz' function in evergreen did not contain the remote_url that was expected"
+            contains_correct_url,
+            msg="The 'run jstestfuzz' function in evergreen did not contain the remote_url that was expected",
         )
 
     # This tasks asserts that the way implicit multiversion tasks are defined has not changed
@@ -652,8 +754,11 @@ class TestEvergreenYML(unittest.TestCase):
             if func is not None:
                 implicit_multiversion_count += 1
 
-        self.assertNotEqual(0, implicit_multiversion_count,
-                            msg="Could not find any implicit multiversion tasks in evergreen")
+        self.assertNotEqual(
+            0,
+            implicit_multiversion_count,
+            msg="Could not find any implicit multiversion tasks in evergreen",
+        )
 
     # This tasks asserts that the way jstestfuzz tasks are defined has not changed
     # It also asserts that the selector for jstestfuzz tasks always points to jstestfuzz/out/*.js
@@ -663,31 +768,43 @@ class TestEvergreenYML(unittest.TestCase):
         jstestfuzz_count = 0
         for task in self.evg_conf.tasks:
             generate_func = task.find_func_command("generate resmoke tasks")
-            if (generate_func is None
-                    or get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) != "true"):
+            if (
+                generate_func is None
+                or get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) != "true"
+            ):
                 continue
 
             jstestfuzz_count += 1
 
             self.validate_jstestfuzz_selector(task.get_suite_names())
 
-        self.assertNotEqual(0, jstestfuzz_count, msg="Could not find any jstestfuzz tasks")
+        self.assertNotEqual(
+            0, jstestfuzz_count, msg="Could not find any jstestfuzz tasks"
+        )
 
 
 class TestMultiversionConfig(unittest.TestCase):
     def test_valid_yaml(self):
         file_name = "multiversion-config.yml"
-        subprocess.run([
-            sys.executable, "buildscripts/resmoke.py", "multiversion-config",
-            "--config-file-output", file_name
-        ], check=True)
+        subprocess.run(
+            [
+                sys.executable,
+                "buildscripts/resmoke.py",
+                "multiversion-config",
+                "--config-file-output",
+                file_name,
+            ],
+            check=True,
+        )
         with open(file_name, "r") as file:
             file_contents = file.read()
 
         try:
             yaml.safe_load(file_contents)
         except Exception:
-            self.fail(msg="`resmoke.py multiversion-config` does not output valid yaml.")
+            self.fail(
+                msg="`resmoke.py multiversion-config` does not output valid yaml."
+            )
 
         os.remove(file_name)
 
@@ -697,5 +814,9 @@ class TestCoreAnalyzerFunctions(unittest.TestCase):
         task_name = "test_tast_name"
         execution = "0"
         generated_task_name = get_generated_task_name(task_name, execution)
-        self.assertEquals(matches_generated_task_pattern(task_name, generated_task_name), execution)
-        self.assertIsNone(matches_generated_task_pattern("not_same_task", generated_task_name))
+        self.assertEquals(
+            matches_generated_task_pattern(task_name, generated_task_name), execution
+        )
+        self.assertIsNone(
+            matches_generated_task_pattern("not_same_task", generated_task_name)
+        )

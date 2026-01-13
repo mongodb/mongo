@@ -1,4 +1,5 @@
 """Library functions for powercycle."""
+
 import getpass
 import logging
 import os
@@ -24,7 +25,9 @@ class PowercycleCommand(Subcommand):
     def __init__(self):
         """Initialize PowercycleCommand."""
         self.expansions = yaml.safe_load(open(powercycle_constants.EXPANSIONS_FILE))
-        self.ssh_connection_options = f"-i powercycle.pem {powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS}"
+        self.ssh_connection_options = (
+            f"-i powercycle.pem {powercycle_constants.DEFAULT_SSH_CONNECTION_OPTIONS}"
+        )
         self.sudo = "" if self.is_windows() else "sudo"
         # The username on the Windows image that powercycle uses is currently the default user.
         self.user = "Administrator" if self.is_windows() else getpass.getuser()
@@ -44,7 +47,9 @@ class PowercycleCommand(Subcommand):
     def _call(cmd):
         cmd = shlex.split(cmd)
         # Use a common pipe for stdout & stderr for logging.
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
         buff_stdout, _ = process.communicate()
         buff = buff_stdout.decode("utf-8", "replace")
         return process.poll(), buff

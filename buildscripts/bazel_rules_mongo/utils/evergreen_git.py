@@ -36,7 +36,14 @@ def get_mongodb_remote(repo: Repo) -> Remote:
         assert len(parts) >= 2, f"Unexpected git remote url: {url}"
         owner = parts[-2].split(":")[-1]
 
-        if owner in ("10gen", "mongodb", "evergreen-ci", "mongodb-ets", "realm", "mongodb-js"):
+        if owner in (
+            "10gen",
+            "mongodb",
+            "evergreen-ci",
+            "mongodb-ets",
+            "realm",
+            "mongodb-js",
+        ):
             picked_remote = remote
             print(f"Selected remote: {remote.url}")
             break
@@ -106,13 +113,15 @@ def get_diff_revision(expansions_file: str = None, branch: str = None) -> str:
     return diff_commit
 
 
-def get_changed_files(expansions_file: str = None, branch: str = None,
-                      diff_filter: str = "d") -> List[str]:
+def get_changed_files(
+    expansions_file: str = None, branch: str = None, diff_filter: str = "d"
+) -> List[str]:
     diff_commit = get_diff_revision(expansions_file, branch)
     repo = Repo()
 
     output = repo.git.execute(
-        ["git", "diff", "--name-only", f"--diff-filter={diff_filter}", diff_commit])
+        ["git", "diff", "--name-only", f"--diff-filter={diff_filter}", diff_commit]
+    )
     files = output.split("\n")
     return [file for file in files if file]
 
@@ -135,7 +144,10 @@ def get_files_to_lint() -> List[str]:
     tracked_files = repo.git.execute(["git", "ls-files"]).split("\n")
     # all unstaged files from git
     tracked_files.extend(
-        repo.git.execute(["git", "ls-files", "--others", "--exclude-standard"]).split("\n"))
+        repo.git.execute(["git", "ls-files", "--others", "--exclude-standard"]).split(
+            "\n"
+        )
+    )
     # remove any empty entries
     tracked_files = list(filter(bool, tracked_files))
     return tracked_files

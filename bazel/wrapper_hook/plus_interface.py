@@ -25,7 +25,9 @@ class DuplicateSourceNames(Exception):
 def get_buildozer_output(autocomplete_query):
     from buildscripts.install_bazel import install_bazel
 
-    buildozer_name = "buildozer" if not platform.system() == "Windows" else "buildozer.exe"
+    buildozer_name = (
+        "buildozer" if not platform.system() == "Windows" else "buildozer.exe"
+    )
     buildozer = shutil.which(buildozer_name)
     if not buildozer:
         buildozer = str(pathlib.Path(f"~/.local/bin/{buildozer_name}").expanduser())
@@ -87,7 +89,12 @@ def test_runner_interface(
 
     if autocomplete_query:
         str_args = " ".join(args)
-        if "'//:*'" in str_args or "':*'" in str_args or "//:all" in str_args or ":all" in str_args:
+        if (
+            "'//:*'" in str_args
+            or "':*'" in str_args
+            or "//:all" in str_args
+            or ":all" in str_args
+        ):
             plus_autocomplete_query = True
 
     if os.environ.get("CI") is not None:
@@ -174,7 +181,9 @@ def test_runner_interface(
             if not real_target:
                 for bin_target in set(sources_to_bin.values()):
                     if (
-                        pathlib.Path(bin_target.replace("//", "").replace(":", "/")).name
+                        pathlib.Path(
+                            bin_target.replace("//", "").replace(":", "/")
+                        ).name
                         == test_name
                     ):
                         bin_targets.append(bin_target)

@@ -12,7 +12,10 @@ if clang_tidy:
     failures = []
     for root, _, files in os.walk("bazel-bin"):
         for name in files:
-            if name.endswith(".clang-tidy.status") and "mongo_tidy_checks/tests/" not in root:
+            if (
+                name.endswith(".clang-tidy.status")
+                and "mongo_tidy_checks/tests/" not in root
+            ):
                 with open(os.path.join(root, name)) as f:
                     if f.read().strip() == "1":
                         tokens = name.split(".")
@@ -29,7 +32,9 @@ if clang_tidy:
                         filename = os.path.basename(log_file)
                         parts = filename.split(".")
                         if len(parts) < 5:
-                            raise ValueError(f"Unexpected status file format: {filename}")
+                            raise ValueError(
+                                f"Unexpected status file format: {filename}"
+                            )
                         source_file = ".".join(parts[:2])
                         target_name = parts[2]
                         target_dir = re.search(
@@ -41,7 +46,9 @@ if clang_tidy:
                         failures.append(
                             [
                                 os.path.join(
-                                    re.sub("^.*/bazel_clang_tidy_src/", "src/", root, 1),
+                                    re.sub(
+                                        "^.*/bazel_clang_tidy_src/", "src/", root, 1
+                                    ),
                                     source_file,
                                 ),
                                 content,

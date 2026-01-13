@@ -1,4 +1,5 @@
 """Module for retrieving the configuration of resmoke.py test suites."""
+
 import collections
 import copy
 import os
@@ -39,7 +40,8 @@ def get_named_suites() -> List[SuiteName]:
         dbtest = {"dbtest"}
 
         explicit_suite_names = [
-            name for name in ExplicitSuiteConfig.get_named_suites()
+            name
+            for name in ExplicitSuiteConfig.get_named_suites()
             if (name not in executor_only and name not in dbtest)
         ]
         composed_suite_names = MatrixSuiteConfig.get_named_suites()
@@ -50,7 +52,9 @@ def get_named_suites() -> List[SuiteName]:
 
 def get_suite_files() -> Dict[str, str]:
     """Get the physical files defining these suites for parsing comments."""
-    return merge_dicts(ExplicitSuiteConfig.get_suite_files(), MatrixSuiteConfig.get_suite_files())
+    return merge_dicts(
+        ExplicitSuiteConfig.get_suite_files(), MatrixSuiteConfig.get_suite_files()
+    )
 
 
 def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
@@ -105,7 +109,11 @@ def get_suites(suite_names_or_paths, test_files) -> List[_suite.Suite]:
         # specified. If an option is specified, then sort the tests for consistent execution order.
         _config.ORDER_TESTS_BY_NAME = any(
             tag_filter is not None
-            for tag_filter in (_config.EXCLUDE_WITH_ANY_TAGS, _config.INCLUDE_WITH_ANY_TAGS))
+            for tag_filter in (
+                _config.EXCLUDE_WITH_ANY_TAGS,
+                _config.INCLUDE_WITH_ANY_TAGS,
+            )
+        )
         # Build configuration for list of files to run.
         suite_roots = _make_suite_roots(test_files)
 
@@ -121,11 +129,13 @@ def get_suites(suite_names_or_paths, test_files) -> List[_suite.Suite]:
             for test in override_suite.tests:
                 if test in suite.excluded:
                     if _config.FORCE_EXCLUDED_TESTS:
-                        loggers.ROOT_EXECUTOR_LOGGER.warning("Will forcibly run excluded test: %s",
-                                                             test)
+                        loggers.ROOT_EXECUTOR_LOGGER.warning(
+                            "Will forcibly run excluded test: %s", test
+                        )
                     else:
                         raise errors.TestExcludedFromSuiteError(
-                            f"'{test}' excluded in '{suite.get_name()}'")
+                            f"'{test}' excluded in '{suite.get_name()}'"
+                        )
             suite = override_suite
         suites.append(suite)
     return suites
@@ -180,7 +190,9 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
             if os.path.isfile(suite_name):
                 suite_path = suite_name
             else:
-                raise ValueError("Expected a suite YAML config, but got '%s'" % suite_name)
+                raise ValueError(
+                    "Expected a suite YAML config, but got '%s'" % suite_name
+                )
         else:
             # Not an explicit suite, return None.
             return None
@@ -226,8 +238,9 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         """Get all YAML files in the given directory."""
         return {
             short_name: load_yaml_file(path)
-            for short_name, path in cls.__get_suite_files_in_dir(os.path.abspath(
-                target_dir)).items()
+            for short_name, path in cls.__get_suite_files_in_dir(
+                os.path.abspath(target_dir)
+            ).items()
         }
 
     @staticmethod
@@ -246,8 +259,8 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         generated_path = cls.get_generated_suite_path(suite_name)
         if not os.path.exists(generated_path):
             raise errors.InvalidMatrixSuiteError(
-                f"No generated suite file was found for {suite_name}" +
-                "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+                f"No generated suite file was found for {suite_name}"
+                + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
             )
 
         new_text = cls.generate_matrix_suite_text(suite_name)
@@ -260,8 +273,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
                 loggers.ROOT_EXECUTOR_LOGGER.error(new_text)
                 raise errors.InvalidMatrixSuiteError(
                     f"The generated file found on disk did not match the mapping file for {suite_name}. "
-                    +
-                    "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+                    + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
                 )
 
         return config
@@ -291,14 +303,16 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         base_suite = ExplicitSuiteConfig.get_config_obj_no_verify(base_suite_name)
 
         if base_suite is None:
-            raise ValueError(f"Unknown base suite {base_suite_name} for matrix suite {suite_name}")
+            raise ValueError(
+                f"Unknown base suite {base_suite_name} for matrix suite {suite_name}"
+            )
 
         res = copy.deepcopy(base_suite)
-        res['matrix_suite'] = True
+        res["matrix_suite"] = True
         overrides = copy.deepcopy(overrides)
 
         if description:
-            res['description'] = description
+            res["description"] = description
 
         if override_names:
             for override_name in override_names:
@@ -310,7 +324,9 @@ class MatrixSuiteConfig(SuiteConfigInterface):
 
                 for key in excludes_dict:
                     if key not in ["exclude_with_any_tags", "exclude_files"]:
-                        raise ValueError(f"{excludes_name}  is not supported in the 'excludes' tag")
+                        raise ValueError(
+                            f"{excludes_name}  is not supported in the 'excludes' tag"
+                        )
                     value = excludes_dict[key]
 
                     if not isinstance(value, list):
@@ -360,11 +376,14 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             for filename, override_config_file in overrides_files.items():
                 for override_config in override_config_file:
                     if "name" in override_config and "value" in override_config:
-                        cls._all_overrides[
-                            f"{filename}.{override_config['name']}"] = override_config["value"]
+                        cls._all_overrides[f"{filename}.{override_config['name']}"] = (
+                            override_config["value"]
+                        )
                     else:
-                        raise ValueError("Invalid override configuration, missing required keys. ",
-                                         override_config)
+                        raise ValueError(
+                            "Invalid override configuration, missing required keys. ",
+                            override_config,
+                        )
         return cls._all_overrides
 
     @classmethod
@@ -394,8 +413,10 @@ class MatrixSuiteConfig(SuiteConfigInterface):
                 if "base_suite" in suite_config:
                     cls._all_mappings[suite_name] = suite_config
                 else:
-                    raise ValueError("Invalid suite configuration, missing required keys. ",
-                                     suite_config)
+                    raise ValueError(
+                        "Invalid suite configuration, missing required keys. ",
+                        suite_config,
+                    )
         return cls._all_mappings
 
     @classmethod
@@ -456,7 +477,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     def generate_matrix_suite_file(cls, suite_name):
         text = cls.generate_matrix_suite_text(suite_name)
         path = cls.get_generated_suite_path(suite_name)
-        with open(path, 'w+') as file:
+        with open(path, "w+") as file:
             file.write(text)
         print(f"Generated matrix suite file {path}")
 
@@ -481,7 +502,8 @@ class SuiteFinder(object):
 
         if explicit_suite and matrix_suite:
             raise errors.DuplicateSuiteDefinition(
-                "Multiple definitions for suite '%s'" % suite_path)
+                "Multiple definitions for suite '%s'" % suite_path
+            )
 
         suite = matrix_suite or explicit_suite
 

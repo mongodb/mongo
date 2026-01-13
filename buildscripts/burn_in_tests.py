@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Command line utility for determining what jstests have been added or modified."""
+
 import collections
 import copy
 import json
@@ -61,18 +62,27 @@ SUITE_FILES = ["with_server"]
 
 BURN_IN_TEST_MEMBERSHIP_FILE = "burn_in_test_membership_map_file_for_ci.json"
 
-SUPPORTED_TEST_KINDS = ("fsm_workload_test", "js_test", "json_schema_test",
-                        "multi_stmt_txn_passthrough", "parallel_fsm_workload_test",
-                        "all_versions_js_test")
+SUPPORTED_TEST_KINDS = (
+    "fsm_workload_test",
+    "js_test",
+    "json_schema_test",
+    "multi_stmt_txn_passthrough",
+    "parallel_fsm_workload_test",
+    "all_versions_js_test",
+)
 RUN_ALL_FEATURE_FLAG_TESTS = "--runAllFeatureFlagTests"
 
 
 class RepeatConfig(object):
     """Configuration for how tests should be repeated."""
 
-    def __init__(self, repeat_tests_secs: Optional[int] = None,
-                 repeat_tests_min: Optional[int] = None, repeat_tests_max: Optional[int] = None,
-                 repeat_tests_num: Optional[int] = None):
+    def __init__(
+        self,
+        repeat_tests_secs: Optional[int] = None,
+        repeat_tests_min: Optional[int] = None,
+        repeat_tests_max: Optional[int] = None,
+        repeat_tests_num: Optional[int] = None,
+    ):
         """
         Create a Repeat Config.
 
@@ -97,10 +107,14 @@ class RepeatConfig(object):
 
         if self.repeat_tests_max:
             if not self.repeat_tests_secs:
-                raise ValueError("Must specify --repeat-tests-secs with --repeat-tests-max")
+                raise ValueError(
+                    "Must specify --repeat-tests-secs with --repeat-tests-max"
+                )
 
             if self.repeat_tests_min and self.repeat_tests_min > self.repeat_tests_max:
-                raise ValueError("--repeat-tests-secs-min is greater than --repeat-tests-max")
+                raise ValueError(
+                    "--repeat-tests-secs-min is greater than --repeat-tests-max"
+                )
 
         if self.repeat_tests_min and not self.repeat_tests_secs:
             raise ValueError("Must specify --repeat-tests-secs with --repeat-tests-min")
@@ -120,15 +134,19 @@ class RepeatConfig(object):
                 repeat_options += f" --repeatTestsMax={self.repeat_tests_max} "
             return repeat_options
 
-        repeat_suites = self.repeat_tests_num if self.repeat_tests_num else REPEAT_SUITES
+        repeat_suites = (
+            self.repeat_tests_num if self.repeat_tests_num else REPEAT_SUITES
+        )
         return f" --repeatSuites={repeat_suites} "
 
     def __repr__(self):
         """Build string representation of object for debugging."""
-        return "".join([
-            f"RepeatConfig[num={self.repeat_tests_num}, secs={self.repeat_tests_secs}, ",
-            f"min={self.repeat_tests_min}, max={self.repeat_tests_max}]",
-        ])
+        return "".join(
+            [
+                f"RepeatConfig[num={self.repeat_tests_num}, secs={self.repeat_tests_secs}, ",
+                f"min={self.repeat_tests_min}, max={self.repeat_tests_max}]",
+            ]
+        )
 
 
 def is_file_a_test_file(file_path: str) -> bool:
@@ -161,11 +179,15 @@ def find_excludes(selector_file: str) -> Tuple[List, List, List]:
     try:
         js_test = yml["selector"]["js_test"]
     except KeyError:
-        raise Exception(f"The selector file {selector_file} is missing the 'selector.js_test' key")
+        raise Exception(
+            f"The selector file {selector_file} is missing the 'selector.js_test' key"
+        )
 
-    return (default_if_none(js_test.get("exclude_suites"), []),
-            default_if_none(js_test.get("exclude_tasks"), []),
-            default_if_none(js_test.get("exclude_tests"), []))
+    return (
+        default_if_none(js_test.get("exclude_suites"), []),
+        default_if_none(js_test.get("exclude_tasks"), []),
+        default_if_none(js_test.get("exclude_tests"), []),
+    )
 
 
 def filter_tests(tests: Set[str], exclude_tests: List[str]) -> Set[str]:
@@ -199,7 +221,9 @@ def create_executor_list(suites, exclude_suites):
     try:
         with open(BURN_IN_TEST_MEMBERSHIP_FILE) as file:
             test_membership = collections.defaultdict(list, json.load(file))
-        LOGGER.info(f"Using cached test membership file {BURN_IN_TEST_MEMBERSHIP_FILE}.")
+        LOGGER.info(
+            f"Using cached test membership file {BURN_IN_TEST_MEMBERSHIP_FILE}."
+        )
     except FileNotFoundError:
         LOGGER.info("Getting test membership data.")
         test_membership = create_test_membership_map(test_kind=SUPPORTED_TEST_KINDS)
@@ -208,7 +232,9 @@ def create_executor_list(suites, exclude_suites):
     for suite in suites:
         LOGGER.debug("Adding tests for suite", suite=suite, tests=suite.tests)
         for test in suite.tests:
-            LOGGER.debug("membership for test", test=test, membership=test_membership[test])
+            LOGGER.debug(
+                "membership for test", test=test, membership=test_membership[test]
+            )
             for executor in set(test_membership[test]) - set(exclude_suites):
                 if test not in memberships[executor]:
                     memberships[executor].append(test)
@@ -255,9 +281,9 @@ class TaskToBurnInInfo(NamedTuple):
 
     @classmethod
     def from_task(
-            cls,
-            task: VariantTask,
-            tests_by_suite: Dict[str, List[str]],
+        cls,
+        task: VariantTask,
+        tests_by_suite: Dict[str, List[str]],
     ) -> "TaskToBurnInInfo":
         """
         Gather the information needed to run the given task.
@@ -271,7 +297,8 @@ class TaskToBurnInInfo(NamedTuple):
                 name=suite_name,
                 resmoke_args=resmoke_args,
                 tests=tests_by_suite[suite_name],
-            ) for suite_name, resmoke_args in task.combined_suite_to_resmoke_args_map.items()
+            )
+            for suite_name, resmoke_args in task.combined_suite_to_resmoke_args_map.items()
             if len(tests_by_suite[suite_name]) > 0
         ]
         return cls(
@@ -280,9 +307,12 @@ class TaskToBurnInInfo(NamedTuple):
         )
 
 
-def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
-                     tests_by_suite: Dict[str, List[str]],
-                     exclude_tasks: [str]) -> Dict[str, TaskToBurnInInfo]:
+def create_task_list(
+    evergreen_conf: EvergreenProjectConfig,
+    build_variant: str,
+    tests_by_suite: Dict[str, List[str]],
+    exclude_tasks: [str],
+) -> Dict[str, TaskToBurnInInfo]:
     """
     Find associated tasks for the specified build_variant and suites.
 
@@ -294,15 +324,20 @@ def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
     """
     log = LOGGER.bind(build_variant=build_variant)
 
-    log.debug("creating task list for suites", suites=tests_by_suite, exclude_tasks=exclude_tasks)
+    log.debug(
+        "creating task list for suites",
+        suites=tests_by_suite,
+        exclude_tasks=exclude_tasks,
+    )
     evg_build_variant = _get_evg_build_variant_by_name(evergreen_conf, build_variant)
 
     # Find all the build variant tasks.
     exclude_tasks_set = set(exclude_tasks)
     all_variant_tasks = {
         task.name: task
-        for task in evg_build_variant.tasks if task.name not in exclude_tasks_set and (
-            task.is_run_tests_task or task.is_generate_resmoke_task)
+        for task in evg_build_variant.tasks
+        if task.name not in exclude_tasks_set
+        and (task.is_run_tests_task or task.is_generate_resmoke_task)
     }
 
     # Return the list of tasks to run for the specified suite.
@@ -327,10 +362,13 @@ def _set_resmoke_cmd(repeat_config: RepeatConfig, resmoke_args: [str]) -> [str]:
     return new_args
 
 
-def create_task_list_for_tests(changed_tests: Set[str], build_variant: str,
-                               evg_conf: EvergreenProjectConfig,
-                               exclude_suites: Optional[List] = None,
-                               exclude_tasks: Optional[List] = None) -> Dict[str, TaskToBurnInInfo]:
+def create_task_list_for_tests(
+    changed_tests: Set[str],
+    build_variant: str,
+    evg_conf: EvergreenProjectConfig,
+    exclude_suites: Optional[List] = None,
+    exclude_tasks: Optional[List] = None,
+) -> Dict[str, TaskToBurnInInfo]:
     """
     Create a list of tests by task for the given tests.
 
@@ -355,9 +393,12 @@ def create_task_list_for_tests(changed_tests: Set[str], build_variant: str,
     return create_task_list(evg_conf, build_variant, tests_by_executor, exclude_tasks)
 
 
-def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
-                         changed_tests: Set[str],
-                         install_dir: Optional[str]) -> Dict[str, TaskToBurnInInfo]:
+def create_tests_by_task(
+    build_variant: str,
+    evg_conf: EvergreenProjectConfig,
+    changed_tests: Set[str],
+    install_dir: Optional[str],
+) -> Dict[str, TaskToBurnInInfo]:
     """
     Create a list of tests by task.
 
@@ -378,8 +419,9 @@ def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
     buildscripts.resmokelib.parser.set_run_options(run_options)
 
     if changed_tests:
-        return create_task_list_for_tests(changed_tests, build_variant, evg_conf, exclude_suites,
-                                          exclude_tasks)
+        return create_task_list_for_tests(
+            changed_tests, build_variant, evg_conf, exclude_suites, exclude_tasks
+        )
 
     LOGGER.info("No new or modified tests found.")
     return {}
@@ -404,7 +446,9 @@ def run_tests(tests_by_task: Dict[str, TaskToBurnInInfo], resmoke_cmd: [str]) ->
             try:
                 subprocess.check_call(new_resmoke_cmd, shell=False)
             except subprocess.CalledProcessError as err:
-                log.warning("Resmoke returned an error with suite", error=err.returncode)
+                log.warning(
+                    "Resmoke returned an error with suite", error=err.returncode
+                )
                 sys.exit(err.returncode)
 
 
@@ -424,7 +468,9 @@ def _configure_logging(verbose: bool):
         logging.getLogger(log_name).setLevel(logging.WARNING)
 
 
-def _get_evg_build_variant_by_name(evergreen_conf: EvergreenProjectConfig, name: str) -> Variant:
+def _get_evg_build_variant_by_name(
+    evergreen_conf: EvergreenProjectConfig, name: str
+) -> Variant:
     """
     Get the evergreen build variant by name from the evergreen config file.
 
@@ -467,7 +513,11 @@ class FileChangeDetector(ABC):
         LOGGER.info("Calculated revision map", revision_map=revision_map)
 
         changed_files = find_changed_files_in_repos(repos, revision_map)
-        return {os.path.normpath(path) for path in changed_files if is_file_a_test_file(path)}
+        return {
+            os.path.normpath(path)
+            for path in changed_files
+            if is_file_a_test_file(path)
+        }
 
 
 class LocalFileChangeDetector(FileChangeDetector):
@@ -588,23 +638,31 @@ class YamlBurnInExecutor(BurnInExecutor):
 
         :param tests_by_task: Dictionary of tasks to run with tests to run in each.
         """
-        discovered_tasks = DiscoveredTaskList(discovered_tasks=[
-            DiscoveredTask(
-                task_name=task_name,
-                suites=[
-                    DiscoveredSuite(suite_name=suite.name, test_list=suite.tests)
-                    for suite in task_info.suites
-                ],
-            ) for task_name, task_info in tests_by_task.items()
-        ])
+        discovered_tasks = DiscoveredTaskList(
+            discovered_tasks=[
+                DiscoveredTask(
+                    task_name=task_name,
+                    suites=[
+                        DiscoveredSuite(suite_name=suite.name, test_list=suite.tests)
+                        for suite in task_info.suites
+                    ],
+                )
+                for task_name, task_info in tests_by_task.items()
+            ]
+        )
         print(yaml.safe_dump(discovered_tasks.dict()))
 
 
 class BurnInOrchestrator:
     """Orchestrate the execution of burn_in_tests."""
 
-    def __init__(self, change_detector: FileChangeDetector, burn_in_executor: BurnInExecutor,
-                 evg_conf: EvergreenProjectConfig, install_dir: Optional[str]) -> None:
+    def __init__(
+        self,
+        change_detector: FileChangeDetector,
+        burn_in_executor: BurnInExecutor,
+        evg_conf: EvergreenProjectConfig,
+        install_dir: Optional[str],
+    ) -> None:
         """
         Create a new orchestrator.
 
@@ -627,8 +685,9 @@ class BurnInOrchestrator:
         changed_tests = self.change_detector.find_changed_tests(repos)
         LOGGER.info("Found changed tests", files=changed_tests)
 
-        tests_by_task = create_tests_by_task(build_variant, self.evg_conf, changed_tests,
-                                             self.install_dir)
+        tests_by_task = create_tests_by_task(
+            build_variant, self.evg_conf, changed_tests, self.install_dir
+        )
         LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
         self.burn_in_executor.execute(tests_by_task)
@@ -640,34 +699,92 @@ def cli():
 
 
 @cli.command(context_settings=dict(ignore_unknown_options=True))
-@click.option("--no-exec", "no_exec", default=False, is_flag=True,
-              help="Do not execute the found tests.")
-@click.option("--build-variant", "build_variant", default=DEFAULT_VARIANT, metavar='BUILD_VARIANT',
-              help="Tasks to run will be selected from this build variant.")
-@click.option("--repeat-tests", "repeat_tests_num", default=None, type=int,
-              help="Number of times to repeat tests.")
-@click.option("--repeat-tests-min", "repeat_tests_min", default=None, type=int,
-              help="The minimum number of times to repeat tests if time option is specified.")
-@click.option("--repeat-tests-max", "repeat_tests_max", default=None, type=int,
-              help="The maximum number of times to repeat tests if time option is specified.")
-@click.option("--repeat-tests-secs", "repeat_tests_secs", default=None, type=int, metavar="SECONDS",
-              help="Repeat tests for the given time (in secs).")
-@click.option("--yaml", "use_yaml", is_flag=True, default=False,
-              help="Output discovered tasks in YAML. Tests will not be run.")
-@click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
 @click.option(
-    "--origin-rev", "origin_rev", default=None,
-    help="The revision in the mongo repo that changes will be compared against if specified.")
-@click.option("--install-dir", "install_dir", type=str,
-              help="Path to bin directory of a testable installation")
-@click.option("--evg-project-file", "evg_project_file", default=DEFAULT_EVG_PROJECT_FILE,
-              help="Evergreen project config file")
+    "--no-exec",
+    "no_exec",
+    default=False,
+    is_flag=True,
+    help="Do not execute the found tests.",
+)
+@click.option(
+    "--build-variant",
+    "build_variant",
+    default=DEFAULT_VARIANT,
+    metavar="BUILD_VARIANT",
+    help="Tasks to run will be selected from this build variant.",
+)
+@click.option(
+    "--repeat-tests",
+    "repeat_tests_num",
+    default=None,
+    type=int,
+    help="Number of times to repeat tests.",
+)
+@click.option(
+    "--repeat-tests-min",
+    "repeat_tests_min",
+    default=None,
+    type=int,
+    help="The minimum number of times to repeat tests if time option is specified.",
+)
+@click.option(
+    "--repeat-tests-max",
+    "repeat_tests_max",
+    default=None,
+    type=int,
+    help="The maximum number of times to repeat tests if time option is specified.",
+)
+@click.option(
+    "--repeat-tests-secs",
+    "repeat_tests_secs",
+    default=None,
+    type=int,
+    metavar="SECONDS",
+    help="Repeat tests for the given time (in secs).",
+)
+@click.option(
+    "--yaml",
+    "use_yaml",
+    is_flag=True,
+    default=False,
+    help="Output discovered tasks in YAML. Tests will not be run.",
+)
+@click.option(
+    "--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging."
+)
+@click.option(
+    "--origin-rev",
+    "origin_rev",
+    default=None,
+    help="The revision in the mongo repo that changes will be compared against if specified.",
+)
+@click.option(
+    "--install-dir",
+    "install_dir",
+    type=str,
+    help="Path to bin directory of a testable installation",
+)
+@click.option(
+    "--evg-project-file",
+    "evg_project_file",
+    default=DEFAULT_EVG_PROJECT_FILE,
+    help="Evergreen project config file",
+)
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
-def run(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
-        repeat_tests_min: Optional[int], repeat_tests_max: Optional[int],
-        repeat_tests_secs: Optional[int], resmoke_args: str, verbose: bool,
-        origin_rev: Optional[str], install_dir: Optional[str], use_yaml: bool,
-        evg_project_file: Optional[str]) -> None:
+def run(
+    build_variant: str,
+    no_exec: bool,
+    repeat_tests_num: Optional[int],
+    repeat_tests_min: Optional[int],
+    repeat_tests_max: Optional[int],
+    repeat_tests_secs: Optional[int],
+    resmoke_args: str,
+    verbose: bool,
+    origin_rev: Optional[str],
+    install_dir: Optional[str],
+    use_yaml: bool,
+    evg_project_file: Optional[str],
+) -> None:
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -719,7 +836,9 @@ def run(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
     elif no_exec:
         executor = NopBurnInExecutor()
 
-    burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf, install_dir)
+    burn_in_orchestrator = BurnInOrchestrator(
+        change_detector, executor, evg_conf, install_dir
+    )
     burn_in_orchestrator.burn_in(repos, build_variant)
 
 
@@ -742,7 +861,8 @@ def generate_test_membership_map_file_for_ci():
     with open(BURN_IN_TEST_MEMBERSHIP_FILE, "w") as file:
         json.dump(test_membership, file)
     LOGGER.info(
-        f"Finished writing burn_in test membership mapping to {BURN_IN_TEST_MEMBERSHIP_FILE}")
+        f"Finished writing burn_in test membership mapping to {BURN_IN_TEST_MEMBERSHIP_FILE}"
+    )
 
 
 if __name__ == "__main__":

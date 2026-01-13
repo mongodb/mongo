@@ -10,11 +10,13 @@ def get_validator_env() -> dict:
     """Prepare the environment for the codeowners-validator."""
     env = os.environ.copy()
 
-    env.update({
-        "REPOSITORY_PATH": ".",
-        "CHECKS": "duppatterns,syntax",
-        "EXPERIMENTAL_CHECKS": "avoid-shadowing",
-    })
+    env.update(
+        {
+            "REPOSITORY_PATH": ".",
+            "CHECKS": "duppatterns,syntax",
+            "EXPERIMENTAL_CHECKS": "avoid-shadowing",
+        }
+    )
     return env
 
 
@@ -28,8 +30,9 @@ def run_validator(validator_path: str) -> int:
     env = get_validator_env()
 
     try:
-        result = subprocess.run([validator_path], env=env, check=True, capture_output=True,
-                                text=True)
+        result = subprocess.run(
+            [validator_path], env=env, check=True, capture_output=True, text=True
+        )
         if result.stdout:
             print(result.stdout)
         return 0
@@ -40,7 +43,10 @@ def run_validator(validator_path: str) -> int:
             print(exc.stderr, file=sys.stderr)
         return exc.returncode
     except FileNotFoundError:
-        print("Error: Failed to run codeowners-validator after installation", file=sys.stderr)
+        print(
+            "Error: Failed to run codeowners-validator after installation",
+            file=sys.stderr,
+        )
         return 1
     except Exception:
         raise

@@ -1,4 +1,5 @@
 """Unit tests for buildscripts/mongosymb.py."""
+
 import unittest
 
 from buildscripts import mongosymb as under_test
@@ -12,7 +13,9 @@ class TestGetVersion(unittest.TestCase):
             }
         }
         version = under_test.get_version(trace_doc)
-        self.assertEqual(version, "6.0.0-alpha0-37-ge1d28c1-patch-6257e60a32f417196bc25169")
+        self.assertEqual(
+            version, "6.0.0-alpha0-37-ge1d28c1-patch-6257e60a32f417196bc25169"
+        )
 
     def test_get_version_without_patch(self):
         trace_doc = {"processInfo": {"mongodbVersion": "6.1.0-alpha-504-g0c8a142"}}

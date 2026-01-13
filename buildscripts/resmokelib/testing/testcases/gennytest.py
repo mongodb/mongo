@@ -12,11 +12,17 @@ class GennyTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "genny_test"
 
-    def __init__(self, logger, genny_workload, genny_executable=None, genny_options=None):
+    def __init__(
+        self, logger, genny_workload, genny_executable=None, genny_options=None
+    ):
         """Init the GennyTestCase with the genny workload to run."""
-        interface.ProcessTestCase.__init__(self, logger, "Genny workload", genny_workload)
+        interface.ProcessTestCase.__init__(
+            self, logger, "Genny workload", genny_workload
+        )
 
-        self.genny_executable = utils.default_if_none(config.GENNY_EXECUTABLE, genny_executable)
+        self.genny_executable = utils.default_if_none(
+            config.GENNY_EXECUTABLE, genny_executable
+        )
         self.genny_options = utils.default_if_none(genny_options, {}).copy()
         self.genny_options["workload-file"] = genny_workload
 
@@ -37,4 +43,6 @@ class GennyTestCase(interface.ProcessTestCase):
         self.genny_options.setdefault("metrics-output-file", output_file)
 
     def _make_process(self):
-        return core.programs.genny_program(self.logger, self.genny_executable, **self.genny_options)
+        return core.programs.genny_program(
+            self.logger, self.genny_executable, **self.genny_options
+        )

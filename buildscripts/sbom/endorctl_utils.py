@@ -156,7 +156,12 @@ class EndorCtl:
         """https://docs.endorlabs.com/endorctl/"""
 
         try:
-            command = [self.endorctl_path, command, subcommand, f"--namespace={self.namespace}"]
+            command = [
+                self.endorctl_path,
+                command,
+                subcommand,
+                f"--namespace={self.namespace}",
+            ]
             if self.config_path:
                 command.append(f"--config-path={self.config_path}")
 
@@ -198,12 +203,18 @@ class EndorCtl:
         tries = 0
         while True:
             tries += 1
-            result = self._call_endorctl("api", "list", resource=resource, filter=filter, **kwargs)
+            result = self._call_endorctl(
+                "api", "list", resource=resource, filter=filter, **kwargs
+            )
 
             # The expected output of 'endorctl api list' is: { "list": { "objects": [...] } }
             # We want to just return the objects. In case we get an empty list, return a list
             # with a single None to avoid having to handle index errors downstream.
-            if result and result["list"].get("objects") and len(result["list"]["objects"]) > 0:
+            if (
+                result
+                and result["list"].get("objects")
+                and len(result["list"]["objects"]) > 0
+            ):
                 return result["list"]["objects"]
             elif retry:
                 logger.info(
@@ -286,7 +297,9 @@ class EndorCtl:
         resource_description = (
             f"{resource_kind} with filter '{filter}' in namespace '{self.namespace}'"
         )
-        scan_result = self.get_resources(resource_kind, filter=filter, retry=retry, page_size=1)[0]
+        scan_result = self.get_resources(
+            resource_kind, filter=filter, retry=retry, page_size=1
+        )[0]
         self._check_resource(scan_result, resource_description)
         uuid = scan_result.get("uuid")
         start_time = scan_result["spec"].get("start_time")
@@ -402,7 +415,9 @@ class EndorCtl:
             ]
 
             # Export SBOM
-            sbom = self.export_sbom(package_version_uuids=package_version_uuids, app_name=app_name)
+            sbom = self.export_sbom(
+                package_version_uuids=package_version_uuids, app_name=app_name
+            )
             print(
                 f"Retrieved: CycloneDX SBOM for PackageVersion(s), name: {package_version_names}, uuid: {package_version_uuids}"
             )
@@ -429,7 +444,9 @@ class EndorCtl:
             repository_version_uuid = repository_version["uuid"]
             repository_version_ref = repository_version["spec"]["version"]["ref"]
             repository_version_sha = repository_version["spec"]["version"]["sha"]
-            repository_version_scan_object_status = repository_version["scan_object"]["status"]
+            repository_version_scan_object_status = repository_version["scan_object"][
+                "status"
+            ]
             if repository_version_scan_object_status != "STATUS_SCANNED":
                 logger.warning(
                     f"RepositoryVersion (uuid: {repository_version_uuid}, ref: {repository_version_ref}, sha: {repository_version_sha}) scan status is '{repository_version_scan_object_status}' (expected 'STATUS_SCANNED')"
@@ -437,7 +454,10 @@ class EndorCtl:
 
             # ScanResult: search for a completed scan
             filter_str = endor_filter.scan_result(
-                EndorContextType.MAIN, project_uuid, repository_version_ref, repository_version_sha
+                EndorContextType.MAIN,
+                project_uuid,
+                repository_version_ref,
+                repository_version_sha,
             )
             scan_result = self.get_scan_result(filter_str, retry=False)
             project_uuid = scan_result["meta"]["parent_uuid"]
@@ -449,13 +469,17 @@ class EndorCtl:
             else:
                 context_type = EndorContextType.REF
                 context_id = branch
-            filter_str = endor_filter.package_version(context_type, context_id, project_uuid)
+            filter_str = endor_filter.package_version(
+                context_type, context_id, project_uuid
+            )
             package_version = self.get_package_versions(filter_str)[0]
             package_version_name = package_version["meta"]["name"]
             package_version_uuid = package_version["uuid"]
 
             # Export SBOM
-            sbom = self.export_sbom(package_version_uuid=package_version_uuid, app_name=app_name)
+            sbom = self.export_sbom(
+                package_version_uuid=package_version_uuid, app_name=app_name
+            )
             logger.info(
                 f"SBOM: Retrieved CycloneDX SBOM for PackageVersion, name: {package_version_name}, uuid {package_version_uuid}"
             )

@@ -41,7 +41,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 from pymongo import IndexModel
 from random_generator import DataType, RandomDistribution
 
-__all__ = ['DataGenerator']
+__all__ = ["DataGenerator"]
 
 
 @dataclass
@@ -96,52 +96,78 @@ class DataGenerator:
             coll = self.database.database[coll_info.name]
             if self.config.write_mode == WriteMode.REPLACE:
                 await coll.drop()
-            tasks.append(asyncio.create_task(self._populate_collection(coll, coll_info)))
+            tasks.append(
+                asyncio.create_task(self._populate_collection(coll, coll_info))
+            )
             if self.config.create_indexes:
                 tasks.append(
-                    asyncio.create_task(create_single_field_indexes(coll, coll_info.fields)))
-                tasks.append(asyncio.create_task(create_compound_indexes(coll, coll_info)))
+                    asyncio.create_task(
+                        create_single_field_indexes(coll, coll_info.fields)
+                    )
+                )
+                tasks.append(
+                    asyncio.create_task(create_compound_indexes(coll, coll_info))
+                )
 
         for task in tasks:
             await task
 
         t1 = time.time()
-        print(f'\npopulate Collections took {t1-t0} s.')
+        print(f"\npopulate Collections took {t1-t0} s.")
 
     def _generate_collection_infos(self):
         for coll_template in self.config.collection_templates:
             fields = [
-                FieldInfo(name=ft.name, type=ft.data_type, distribution=ft.distribution,
-                          indexed=ft.indexed) for ft in coll_template.fields
+                FieldInfo(
+                    name=ft.name,
+                    type=ft.data_type,
+                    distribution=ft.distribution,
+                    indexed=ft.indexed,
+                )
+                for ft in coll_template.fields
             ]
             for doc_count in coll_template.cardinalities:
-                name = f'{coll_template.name}'
+                name = f"{coll_template.name}"
                 if self.config.collection_name_with_card is True:
-                    name = f'{coll_template.name}_{doc_count}'
-                yield CollectionInfo(name=name, fields=fields, documents_count=doc_count,
-                                     compound_indexes=coll_template.compound_indexes)
+                    name = f"{coll_template.name}_{doc_count}"
+                yield CollectionInfo(
+                    name=name,
+                    fields=fields,
+                    documents_count=doc_count,
+                    compound_indexes=coll_template.compound_indexes,
+                )
 
-    async def _populate_collection(self, coll: AsyncIOMotorCollection,
-                                   coll_info: CollectionInfo) -> None:
-        print(f'\nGenerating ${coll_info.name} ...')
+    async def _populate_collection(
+        self, coll: AsyncIOMotorCollection, coll_info: CollectionInfo
+    ) -> None:
+        print(f"\nGenerating ${coll_info.name} ...")
         batch_size = self.config.batch_size
         tasks = []
         for _ in range(coll_info.documents_count // batch_size):
-            tasks.append(asyncio.create_task(populate_batch(coll, batch_size, coll_info.fields)))
+            tasks.append(
+                asyncio.create_task(populate_batch(coll, batch_size, coll_info.fields))
+            )
         if coll_info.documents_count % batch_size > 0:
             tasks.append(
                 asyncio.create_task(
-                    populate_batch(coll, coll_info.documents_count % batch_size, coll_info.fields)))
+                    populate_batch(
+                        coll, coll_info.documents_count % batch_size, coll_info.fields
+                    )
+                )
+            )
 
         for task in tasks:
             await task
 
 
-async def populate_batch(coll: AsyncIOMotorCollection, documents_count: int,
-                         fields: Sequence[FieldInfo]) -> None:
+async def populate_batch(
+    coll: AsyncIOMotorCollection, documents_count: int, fields: Sequence[FieldInfo]
+) -> None:
     """Generate collection data and write it to the collection."""
 
-    await coll.insert_many(generate_collection_data(documents_count, fields), ordered=False)
+    await coll.insert_many(
+        generate_collection_data(documents_count, fields), ordered=False
+    )
 
 
 def generate_collection_data(documents_count: int, fields: Sequence[FieldInfo]):
@@ -149,30 +175,43 @@ def generate_collection_data(documents_count: int, fields: Sequence[FieldInfo]):
 
     documents = [{} for _ in range(documents_count)]
     for field in fields:
-        for field_index, field_data in enumerate(field.distribution.generate(documents_count)):
+        for field_index, field_data in enumerate(
+            field.distribution.generate(documents_count)
+        ):
             documents[field_index][field.name] = field_data
     return documents
 
 
-async def create_single_field_indexes(coll: AsyncIOMotorCollection,
-                                      fields: Sequence[FieldInfo]) -> None:
+async def create_single_field_indexes(
+    coll: AsyncIOMotorCollection, fields: Sequence[FieldInfo]
+) -> None:
     """Create single-fields indexes on the given collection."""
 
-    indexes = [IndexModel([(field.name, pymongo.ASCENDING)]) for field in fields if field.indexed]
+    indexes = [
+        IndexModel([(field.name, pymongo.ASCENDING)])
+        for field in fields
+        if field.indexed
+    ]
     if len(indexes) > 0:
         await coll.create_indexes(indexes)
-        print(f'create_single_field_indexes done. {[index.document for index in indexes]}')
+        print(
+            f"create_single_field_indexes done. {[index.document for index in indexes]}"
+        )
 
 
-async def create_compound_indexes(coll: AsyncIOMotorCollection, coll_info: CollectionInfo) -> None:
+async def create_compound_indexes(
+    coll: AsyncIOMotorCollection, coll_info: CollectionInfo
+) -> None:
     """Create a coumpound indexes on the given collection."""
 
     indexes_spec = []
     index_specs = []
     for compound_index in coll_info.compound_indexes:
-        index_spec = IndexModel([(field, pymongo.ASCENDING) for field in compound_index])
+        index_spec = IndexModel(
+            [(field, pymongo.ASCENDING) for field in compound_index]
+        )
         indexes_spec.append(index_spec)
         index_specs.append([(field, pymongo.ASCENDING) for field in compound_index])
     if len(indexes_spec) > 0:
         await coll.create_indexes(indexes_spec)
-        print(f'create_compound_indexes done. {index_specs}')
+        print(f"create_compound_indexes done. {index_specs}")

@@ -31,13 +31,14 @@ def add_file_to_tree(root_node: FileNode, file_parts: List[str]):
     for i, dir in enumerate(file_parts[:-1]):
         node_dirs = current_node.dirs
         if dir not in node_dirs:
-            directory = "/".join(file_parts[:i + 1])
+            directory = "/".join(file_parts[: i + 1])
             node_dirs[dir] = FileNode(f"./{directory}")
 
         current_node = node_dirs[dir]
 
-    assert (current_node.owners_file is
-            None), f"{'/'.join(file_parts[:-1])} there are two OWNERS files in this directory"
+    assert (
+        current_node.owners_file is None
+    ), f"{'/'.join(file_parts[:-1])} there are two OWNERS files in this directory"
     current_node.owners_file = file_parts[-1]
 
 
@@ -65,7 +66,9 @@ def process_owners_file(output_lines: list[str], node: FileNode) -> None:
     with open(owners_file_path, "r") as file:
         contents = yaml.safe_load(file)
         assert "version" in contents, f"Version not found in {owners_file_path}"
-        assert contents["version"] in parsers, f"Unsupported version in {owners_file_path}"
+        assert (
+            contents["version"] in parsers
+        ), f"Unsupported version in {owners_file_path}"
         parser = parsers[contents["version"]]
         owners_lines = parser.parse(directory, owners_file_path, contents)
         output_lines.extend(owners_lines)
@@ -91,7 +94,9 @@ def print_diff_and_instructions(old_codeowners_contents, new_codeowners_contents
     )
     sys.stdout.writelines(diff)
 
-    print("If you are seeing this message in CI you likely need to run `bazel run codeowners`")
+    print(
+        "If you are seeing this message in CI you likely need to run `bazel run codeowners`"
+    )
 
 
 def validate_generated_codeowners(validator_path: str) -> int:
@@ -114,7 +119,9 @@ def validate_generated_codeowners(validator_path: str) -> int:
 
 
 @cache
-def get_unowned_files(codeowners_binary_path: str, codeowners_file: str = None) -> Set[str]:
+def get_unowned_files(
+    codeowners_binary_path: str, codeowners_file: str = None
+) -> Set[str]:
     temp_output_file = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
     temp_output_file.close()
     codeowners_file_arg = ""
@@ -140,7 +147,9 @@ def get_unowned_files(codeowners_binary_path: str, codeowners_file: str = None) 
     return unowned_files
 
 
-def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: str) -> int:
+def check_new_files(
+    codeowners_binary_path: str, expansions_file: str, branch: str
+) -> int:
     new_files = evergreen_git.get_new_files(expansions_file, branch)
     if not new_files:
         print("No new files were detected.")
@@ -168,27 +177,35 @@ def check_new_files(codeowners_binary_path: str, expansions_file: str, branch: s
     return 0
 
 
-def check_orphaned_files(codeowners_binary_path: str, expansions_file: str, branch: str,
-                         codeowners_file: str) -> int:
+def check_orphaned_files(
+    codeowners_binary_path: str, expansions_file: str, branch: str, codeowners_file: str
+) -> int:
     # This compares the new codeowners file with the old codeowners file on the same working tree
     # This tells us which coverage is lost between codeowners file changes
     current_unowned_files = get_unowned_files(codeowners_binary_path)
     base_revision = evergreen_git.get_diff_revision(expansions_file, branch)
     previous_codeowners_file_contents = evergreen_git.get_file_at_revision(
-        codeowners_file, base_revision)
+        codeowners_file, base_revision
+    )
     if previous_codeowners_file_contents is None:
         return 0
-    temp_codeowners_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt")
+    temp_codeowners_file = tempfile.NamedTemporaryFile(
+        mode="w", delete=False, suffix=".txt"
+    )
     temp_codeowners_file.write(previous_codeowners_file_contents)
     temp_codeowners_file.close()
-    old_unowned_files = get_unowned_files(codeowners_binary_path, temp_codeowners_file.name)
+    old_unowned_files = get_unowned_files(
+        codeowners_binary_path, temp_codeowners_file.name
+    )
 
     unowned_files_difference = current_unowned_files - old_unowned_files
     if not unowned_files_difference:
         print("No files have lost ownership with these changes.")
         return 0
 
-    print("The following files lost ownership with CODEOWNERS changes:", file=sys.stderr)
+    print(
+        "The following files lost ownership with CODEOWNERS changes:", file=sys.stderr
+    )
     for file in sorted(unowned_files_difference):
         print(f"- {file}", file=sys.stderr)
 
@@ -196,21 +213,22 @@ def check_orphaned_files(codeowners_binary_path: str, expansions_file: str, bran
 
 
 def post_generation_checks(
-        validator_path: str,
-        should_run_validation: bool,
-        codeowners_binary_path: str,
-        should_check_new_files: bool,
-        expansions_file: str,
-        branch: str,
-        codeowners_file_path: str,
+    validator_path: str,
+    should_run_validation: bool,
+    codeowners_binary_path: str,
+    should_check_new_files: bool,
+    expansions_file: str,
+    branch: str,
+    codeowners_file_path: str,
 ) -> int:
     status = 0
     if should_run_validation:
         status |= validate_generated_codeowners(validator_path)
     if should_check_new_files:
         status |= check_new_files(codeowners_binary_path, expansions_file, branch)
-        status |= check_orphaned_files(codeowners_binary_path, expansions_file, branch,
-                                       codeowners_file_path)
+        status |= check_orphaned_files(
+            codeowners_binary_path, expansions_file, branch, codeowners_file_path
+        )
 
     return status
 
@@ -219,8 +237,12 @@ def main():
     # If we are running in bazel, default the directory to the workspace
     default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
     if not default_dir:
-        process = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True,
-                                 text=True, check=True)
+        process = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
         default_dir = process.stdout.strip()
 
     codeowners_validator_path = os.environ.get("CODEOWNERS_VALIDATOR_PATH")
@@ -247,12 +269,14 @@ def main():
         help="Path of the CODEOWNERS file to be generated.",
         default=os.path.join(".github", "CODEOWNERS"),
     )
-    parser.add_argument("--repo-dir", help="Root of the repo to scan for OWNER files.",
-                        default=default_dir)
+    parser.add_argument(
+        "--repo-dir",
+        help="Root of the repo to scan for OWNER files.",
+        default=default_dir,
+    )
     parser.add_argument(
         "--check",
-        help=
-        "When set, program exits 1 when the CODEOWNERS content changes. This will skip generation",
+        help="When set, program exits 1 when the CODEOWNERS content changes. This will skip generation",
         default=False,
         action="store_true",
     )
@@ -276,8 +300,7 @@ def main():
     )
     parser.add_argument(
         "--branch",
-        help=
-        "Helps the script understand what branch to compare against to see what new files are added when run locally. Defaults to master or main.",
+        help="Helps the script understand what branch to compare against to see what new files are added when run locally. Defaults to master or main.",
         default=None,
         action="store",
     )
@@ -301,9 +324,14 @@ def main():
         root_node = build_tree(files)
         process_dir(output_lines, root_node)
     except Exception as ex:
-        print("An exception was found while generating the CODEOWNERS file.", file=sys.stderr)
-        print("Please refer to the docs to see the spec for OWNERS.yml files here :",
-              file=sys.stderr)
+        print(
+            "An exception was found while generating the CODEOWNERS file.",
+            file=sys.stderr,
+        )
+        print(
+            "Please refer to the docs to see the spec for OWNERS.yml files here :",
+            file=sys.stderr,
+        )
         print(
             "https://github.com/10gen/mongo/blob/master/docs/owners/owners_format.md",
             file=sys.stderr,
@@ -327,7 +355,8 @@ def main():
             should_check_new_files = True
         else:
             raise RuntimeError(
-                f"Invalid value for CODEOWNERS_CHECK_NEW_FILES: {should_check_new_files}")
+                f"Invalid value for CODEOWNERS_CHECK_NEW_FILES: {should_check_new_files}"
+            )
     else:
         should_check_new_files = args.check_new_files
 
@@ -350,7 +379,9 @@ def main():
 
     with open(output_file, "w") as file:
         file.write(new_contents)
-        print(f"Successfully wrote to the CODEOWNERS file at: {os.path.abspath(output_file)}")
+        print(
+            f"Successfully wrote to the CODEOWNERS file at: {os.path.abspath(output_file)}"
+        )
 
     # Add validation after generating CODEOWNERS file
     return post_generation_checks(

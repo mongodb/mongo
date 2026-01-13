@@ -24,7 +24,9 @@ def _upload(local_source_directory: str, s3_destination_directory: str) -> None:
     files_to_upload = []
     for file in pathlib.Path(local_source_directory).iterdir():
         files_to_upload.append(file)
-    print("Please authenticate with an account that can upload to the s3 bucket mdb-build-public")
+    print(
+        "Please authenticate with an account that can upload to the s3 bucket mdb-build-public"
+    )
     subprocess.check_call(["aws", "configure", "sso", "--profile", "devprod-build"])
 
     s3_destination_directory = s3_destination_directory.rstrip("/") + "/"
@@ -49,25 +51,37 @@ def _upload(local_source_directory: str, s3_destination_directory: str) -> None:
 
     print("Storing hashes in buildscripts/s3_binary/hashes.py...")
     for file in files_to_upload:
-        https_path = (re.sub(r"s3://(.*?)/(.*)", r"https://\1.s3.amazonaws.com/\2",
-                             s3_destination_directory) + file.name)
+        https_path = (
+            re.sub(
+                r"s3://(.*?)/(.*)",
+                r"https://\1.s3.amazonaws.com/\2",
+                s3_destination_directory,
+            )
+            + file.name
+        )
         S3_SHA256_HASHES[https_path] = _sha256_file(file)
 
     with open("buildscripts/s3_binary/hashes.py", "w", encoding="utf-8") as hash_file:
-        hash_dict = (pformat(S3_SHA256_HASHES, indent=4).replace("'", '"').replace("}", "").replace(
-            "{", ""))
+        hash_dict = (
+            pformat(S3_SHA256_HASHES, indent=4)
+            .replace("'", '"')
+            .replace("}", "")
+            .replace("{", "")
+        )
         hash_file.write(f"S3_SHA256_HASHES = {{\n {hash_dict}\n}}\n")
 
     print(f"Uploading to {s3_destination_directory}...")
-    result = subprocess.check_call([
-        "aws",
-        "s3",
-        "cp",
-        "--recursive",
-        "--profile=devprod-build",
-        local_source_directory,
-        s3_destination_directory,
-    ])
+    result = subprocess.check_call(
+        [
+            "aws",
+            "s3",
+            "cp",
+            "--recursive",
+            "--profile=devprod-build",
+            local_source_directory,
+            s3_destination_directory,
+        ]
+    )
     return False
 
 

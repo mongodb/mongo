@@ -12,7 +12,9 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
     def __init__(self, logger, program_executable, program_options=None):
         """Initialize the CPPIntegrationTestCase with the executable to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "C++ integration test", program_executable)
+        interface.ProcessTestCase.__init__(
+            self, logger, "C++ integration test", program_executable
+        )
 
         self.program_executable = program_executable
         self.program_options = utils.default_if_none(program_options, {}).copy()
@@ -21,8 +23,11 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
         """Configure the test case."""
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
-        self.program_options["connectionString"] = self.fixture.get_internal_connection_string()
+        self.program_options["connectionString"] = (
+            self.fixture.get_internal_connection_string()
+        )
 
     def _make_process(self):
-        return core.programs.generic_program(self.logger, [self.program_executable],
-                                             **self.program_options)
+        return core.programs.generic_program(
+            self.logger, [self.program_executable], **self.program_options
+        )

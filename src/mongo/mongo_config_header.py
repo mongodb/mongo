@@ -145,7 +145,9 @@ def explicit_bzero_present_flag() -> list[HeaderDefinition]:
 
 
 def pthread_setname_np_present_flag() -> list[HeaderDefinition]:
-    log_check("[MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP] Checking for pthread_setname_np...")
+    log_check(
+        "[MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP] Checking for pthread_setname_np..."
+    )
 
     if compile_check("""
         #ifndef _GNU_SOURCE
@@ -377,7 +379,9 @@ def altivec_vbpermq_output_flag() -> list[HeaderDefinition]:
 
     for index in [0, 1]:
         if check_altivec_vbpermq_output(index):
-            return [HeaderDefinition("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", index)]
+            return [
+                HeaderDefinition("MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", index)
+            ]
     return []
 
 
@@ -385,7 +389,9 @@ def usdt_provider_flags() -> list[HeaderDefinition]:
     if platform.system() == "Darwin":
         return []
 
-    log_check("[MONGO_CONFIG_USDT_PROVIDER] Checking if SDT usdt provider is available...")
+    log_check(
+        "[MONGO_CONFIG_USDT_PROVIDER] Checking if SDT usdt provider is available..."
+    )
     if compile_check("""
         #include <sys/sdt.h>
         int main(void) { return 0; }
@@ -399,39 +405,64 @@ def usdt_provider_flags() -> list[HeaderDefinition]:
 
 def get_config_header_substs():
     config_header_substs = (
-        ('@mongo_config_altivec_vec_vbpermq_output_index@',
-        'MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX'),
-        ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
-        ('@mongo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
-        ('@mongo_config_have_explicit_bzero@', 'MONGO_CONFIG_HAVE_EXPLICIT_BZERO'),
-        ('@mongo_config_have_fips_mode_set@', 'MONGO_CONFIG_HAVE_FIPS_MODE_SET'),
-        ('@mongo_config_have_header_unistd_h@', 'MONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
-        ('@mongo_config_have_memset_s@', 'MONGO_CONFIG_HAVE_MEMSET_S'),
-        ('@mongo_config_have_posix_monotonic_clock@', 'MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
-        ('@mongo_config_have_pthread_setname_np@', 'MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
-        ('@mongo_config_have_ssl_ec_key_new@', 'MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW'),
-        ('@mongo_config_have_ssl_set_ecdh_auto@', 'MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO'),
-        ('@mongo_config_have_strnlen@', 'MONGO_CONFIG_HAVE_STRNLEN'),
-        ('@mongo_config_max_extended_alignment@', 'MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT'),
-        ('@mongo_config_ocsp_stapling_enabled@', 'MONGO_CONFIG_OCSP_STAPLING_ENABLED'),
-        ('@mongo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
-        ('@mongo_config_ssl_has_asn1_any_definitions@', 'MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
-        ('@mongo_config_ssl_provider@', 'MONGO_CONFIG_SSL_PROVIDER'),
-        ('@mongo_config_ssl@', 'MONGO_CONFIG_SSL'),
-        ('@mongo_config_usdt_enabled@', 'MONGO_CONFIG_USDT_ENABLED'),
-        ('@mongo_config_usdt_provider@', 'MONGO_CONFIG_USDT_PROVIDER'),
-        ('@mongo_config_use_libunwind@', 'MONGO_CONFIG_USE_LIBUNWIND'),
-        ('@mongo_config_use_raw_latches@', 'MONGO_CONFIG_USE_RAW_LATCHES'),
-        ('@mongo_config_wiredtiger_enabled@', 'MONGO_CONFIG_WIREDTIGER_ENABLED'),
-        ('@mongo_config_glibc_rseq@', 'MONGO_CONFIG_GLIBC_RSEQ'),
-        ('@mongo_config_tcmalloc_google@', 'MONGO_CONFIG_TCMALLOC_GOOGLE'),
-        ('@mongo_config_tcmalloc_gperf@', 'MONGO_CONFIG_TCMALLOC_GPERF'),
+        (
+            "@mongo_config_altivec_vec_vbpermq_output_index@",
+            "MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX",
+        ),
+        ("@mongo_config_debug_build@", "MONGO_CONFIG_DEBUG_BUILD"),
+        (
+            "@mongo_config_have_execinfo_backtrace@",
+            "MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE",
+        ),
+        ("@mongo_config_have_explicit_bzero@", "MONGO_CONFIG_HAVE_EXPLICIT_BZERO"),
+        ("@mongo_config_have_fips_mode_set@", "MONGO_CONFIG_HAVE_FIPS_MODE_SET"),
+        ("@mongo_config_have_header_unistd_h@", "MONGO_CONFIG_HAVE_HEADER_UNISTD_H"),
+        ("@mongo_config_have_memset_s@", "MONGO_CONFIG_HAVE_MEMSET_S"),
+        (
+            "@mongo_config_have_posix_monotonic_clock@",
+            "MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK",
+        ),
+        (
+            "@mongo_config_have_pthread_setname_np@",
+            "MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP",
+        ),
+        ("@mongo_config_have_ssl_ec_key_new@", "MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW"),
+        (
+            "@mongo_config_have_ssl_set_ecdh_auto@",
+            "MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO",
+        ),
+        ("@mongo_config_have_strnlen@", "MONGO_CONFIG_HAVE_STRNLEN"),
+        (
+            "@mongo_config_max_extended_alignment@",
+            "MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT",
+        ),
+        ("@mongo_config_ocsp_stapling_enabled@", "MONGO_CONFIG_OCSP_STAPLING_ENABLED"),
+        ("@mongo_config_optimized_build@", "MONGO_CONFIG_OPTIMIZED_BUILD"),
+        (
+            "@mongo_config_ssl_has_asn1_any_definitions@",
+            "MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS",
+        ),
+        ("@mongo_config_ssl_provider@", "MONGO_CONFIG_SSL_PROVIDER"),
+        ("@mongo_config_ssl@", "MONGO_CONFIG_SSL"),
+        ("@mongo_config_usdt_enabled@", "MONGO_CONFIG_USDT_ENABLED"),
+        ("@mongo_config_usdt_provider@", "MONGO_CONFIG_USDT_PROVIDER"),
+        ("@mongo_config_use_libunwind@", "MONGO_CONFIG_USE_LIBUNWIND"),
+        ("@mongo_config_use_raw_latches@", "MONGO_CONFIG_USE_RAW_LATCHES"),
+        ("@mongo_config_wiredtiger_enabled@", "MONGO_CONFIG_WIREDTIGER_ENABLED"),
+        ("@mongo_config_glibc_rseq@", "MONGO_CONFIG_GLIBC_RSEQ"),
+        ("@mongo_config_tcmalloc_google@", "MONGO_CONFIG_TCMALLOC_GOOGLE"),
+        ("@mongo_config_tcmalloc_gperf@", "MONGO_CONFIG_TCMALLOC_GPERF"),
     )
     return config_header_substs
 
 
 def generate_config_header(
-    compiler_path, compiler_args, env_vars, logpath, additional_inputs=[], extra_definitions={}
+    compiler_path,
+    compiler_args,
+    env_vars,
+    logpath,
+    additional_inputs=[],
+    extra_definitions={},
 ) -> Dict[str, str]:
     global logfile_path
     CompilerSettings.compiler_path = compiler_path

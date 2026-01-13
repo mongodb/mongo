@@ -20,7 +20,9 @@ from github import (
 SBOM_FILES = ["sbom.json", "README.third_party.md"]
 
 
-def get_repository(github_owner, github_repo, app_id, _private_key) -> Repository.Repository:
+def get_repository(
+    github_owner, github_repo, app_id, _private_key
+) -> Repository.Repository:
     """
     Gets the mongo github repository
     """
@@ -52,7 +54,8 @@ def create_branch(base_branch, new_branch) -> None:
     """
     try:
         print(
-            f"Attempting to create branch '{new_branch}' with base branch '{base_branch}'.")
+            f"Attempting to create branch '{new_branch}' with base branch '{base_branch}'."
+        )
         ref = f"refs/heads/{new_branch}"
         base_repo_branch = repo.get_branch(base_branch)
         sha = base_repo_branch.commit.sha
@@ -83,16 +86,18 @@ if __name__ == "__main__":
         description="This script checks for changes to SBOM and related files and creats a PR if files have been updated.",
     )
     parser.add_argument(
-        "--github-owner", help="GitHub org/owner (e.g., 10gen).", type=str)
+        "--github-owner", help="GitHub org/owner (e.g., 10gen).", type=str
+    )
     parser.add_argument(
-        "--github-repo", help="GitHub repository name (e.g., mongo).", type=str)
-    parser.add_argument(
-        "--base-branch", help="base branch to merge into.", type=str)
-    parser.add_argument(
-        "--new-branch", help="New branch for the PR.", type=str)
+        "--github-repo", help="GitHub repository name (e.g., mongo).", type=str
+    )
+    parser.add_argument("--base-branch", help="base branch to merge into.", type=str)
+    parser.add_argument("--new-branch", help="New branch for the PR.", type=str)
     parser.add_argument("--pr-title", help="Title for the PR.", type=str)
     parser.add_argument(
-        "--saved-warnings", help="Path to file to include as text in PR message.", type=str
+        "--saved-warnings",
+        help="Path to file to include as text in PR message.",
+        type=str,
     )
     parser.add_argument(
         "--app-id",
@@ -115,19 +120,20 @@ if __name__ == "__main__":
 
     # Replace spaces with newline, if applicable
     private_key = (
-        args.private_key[:31] + args.private_key[31:-
-                                                 29].replace(" ", "\n") + args.private_key[-29:]
+        args.private_key[:31]
+        + args.private_key[31:-29].replace(" ", "\n")
+        + args.private_key[-29:]
     )
 
-    repo = get_repository(
-        args.github_owner, args.github_repo, args.app_id, private_key)
+    repo = get_repository(args.github_owner, args.github_repo, args.app_id, private_key)
     print("repo: ", repo)
 
     HAS_UPDATE = False
 
     for file_path in SBOM_FILES:
         original_file = repo.get_contents(
-            file_path, ref=f"refs/heads/{args.base_branch}")
+            file_path, ref=f"refs/heads/{args.base_branch}"
+        )
         print("original_file: ", original_file)
         original_content = original_file.decoded_content.decode()
         try:
@@ -140,9 +146,9 @@ if __name__ == "__main__":
         PATTERN = r'{"name":"EndorLabsInc","version":".*"}'
         REPL = r'{"name":"EndorLabsInc","version":""}'
         original_content_compare = re.sub(
-            PATTERN, REPL, "".join(original_content.split()))
-        new_content_compare = re.sub(
-            PATTERN, REPL, "".join(new_content.split()))
+            PATTERN, REPL, "".join(original_content.split())
+        )
+        new_content_compare = re.sub(PATTERN, REPL, "".join(new_content.split()))
 
         if original_content_compare != new_content_compare:
             create_branch(args.base_branch, args.new_branch)
@@ -178,7 +184,9 @@ if __name__ == "__main__":
     if HAS_UPDATE:
         # Get open PR or create new PR
         pull_requests = repo.get_pulls(
-            state="open", head=f"{args.github_owner}:{args.new_branch}", base=args.base_branch
+            state="open",
+            head=f"{args.github_owner}:{args.new_branch}",
+            base=args.base_branch,
         )
         if pull_requests.totalCount:
             pull_request = pull_requests[0]
@@ -200,7 +208,9 @@ if __name__ == "__main__":
             print("pull_request: ", pull_request)
 
         if args.saved_warnings:
-            pr_comment = "The following warnings were output by the SBOM generation script:\n"
+            pr_comment = (
+                "The following warnings were output by the SBOM generation script:\n"
+            )
             if os.path.isfile(args.saved_warnings):
                 pr_comment += read_text_file(args.saved_warnings)
             comment = pull_request.create_issue_comment(pr_comment)

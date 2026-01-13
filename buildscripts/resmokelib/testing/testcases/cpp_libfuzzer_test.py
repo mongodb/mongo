@@ -13,11 +13,19 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
     REGISTERED_NAME = "cpp_libfuzzer_test"
     DEFAULT_TIMEOUT = datetime.timedelta(hours=1)
 
-    def __init__(self, logger, program_executable, program_options=None, runs=1000000,
-                 corpus_directory_stem="corpora"):
+    def __init__(
+        self,
+        logger,
+        program_executable,
+        program_options=None,
+        runs=1000000,
+        corpus_directory_stem="corpora",
+    ):
         """Initialize the CPPLibfuzzerTestCase with the executable to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "C++ libfuzzer test", program_executable)
+        interface.ProcessTestCase.__init__(
+            self, logger, "C++ libfuzzer test", program_executable
+        )
 
         self.program_executable = program_executable
         self.program_options = utils.default_if_none(program_options, {}).copy()
@@ -25,7 +33,9 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         self.runs = runs
 
         self.corpus_directory = f"{corpus_directory_stem}/corpus-{self.short_name()}"
-        self.merged_corpus_directory = f"{corpus_directory_stem}-merged/corpus-{self.short_name()}"
+        self.merged_corpus_directory = (
+            f"{corpus_directory_stem}-merged/corpus-{self.short_name()}"
+        )
 
         os.makedirs(self.corpus_directory, exist_ok=True)
 
@@ -38,4 +48,6 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             f"-runs={self.runs}",
             self.corpus_directory,
         ]
-        return core.programs.make_process(self.logger, default_args, **self.program_options)
+        return core.programs.make_process(
+            self.logger, default_args, **self.program_options
+        )

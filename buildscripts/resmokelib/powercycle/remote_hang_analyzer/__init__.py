@@ -17,11 +17,17 @@ class RunHangAnalyzerOnRemoteInstance(PowercycleCommand):
         """:return: None."""
         if "private_ip_address" not in self.expansions:
             return
-        hang_analyzer_processes = "dbtest,java,mongo,mongod,mongos,python,_test" if "hang_analyzer_processes" not in self.expansions else self.expansions[
-            "hang_analyzer_processes"]
+        hang_analyzer_processes = (
+            "dbtest,java,mongo,mongod,mongos,python,_test"
+            if "hang_analyzer_processes" not in self.expansions
+            else self.expansions["hang_analyzer_processes"]
+        )
         hang_analyzer_option = f"-o file -o stdout -p {hang_analyzer_processes}"
-        hang_analyzer_dump_core = True if "hang_analyzer_dump_core" not in self.expansions else self.expansions[
-            "hang_analyzer_dump_core"]
+        hang_analyzer_dump_core = (
+            True
+            if "hang_analyzer_dump_core" not in self.expansions
+            else self.expansions["hang_analyzer_dump_core"]
+        )
         if hang_analyzer_dump_core:
             hang_analyzer_option = f"-c {hang_analyzer_option}"
 

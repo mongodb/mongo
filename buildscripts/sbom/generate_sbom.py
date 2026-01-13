@@ -60,7 +60,9 @@ script_directory = script_path.parent
 # Regex for validation
 REGEX_COMMIT_SHA = r"^[0-9a-fA-F]{40}$"
 REGEX_GIT_BRANCH = r"^[a-zA-Z0-9_.\-/]+$"
-REGEX_GITHUB_URL = r"^(https://github.com/)([a-zA-Z0-9-]{1,39}/[a-zA-Z0-9-_.]{1,100})(\.git)$"
+REGEX_GITHUB_URL = (
+    r"^(https://github.com/)([a-zA-Z0-9-]{1,39}/[a-zA-Z0-9-_.]{1,100})(\.git)$"
+)
 REGEX_RELEASE_BRANCH = r"^v\d\.\d$"
 REGEX_RELEASE_TAG = r"^r\d\.\d.\d(-\w*)?$"
 
@@ -165,9 +167,13 @@ class GitInfo:
                 # filter tags for latest release e.g., r8.2.1
                 release_tags = []
                 filtered_tags = [
-                    tag for tag in self._repo.tags if re.fullmatch(REGEX_RELEASE_TAG, tag.name)
+                    tag
+                    for tag in self._repo.tags
+                    if re.fullmatch(REGEX_RELEASE_TAG, tag.name)
                 ]
-                logging.info(f"GIT: Parsing {len(filtered_tags)} release tags for match to commit")
+                logging.info(
+                    f"GIT: Parsing {len(filtered_tags)} release tags for match to commit"
+                )
                 for tag in filtered_tags:
                     if tag.commit == self.commit:
                         release_tags.append(tag.name)
@@ -235,7 +241,9 @@ def is_valid_purl(purl: str) -> bool:
     """Validate a GitHub or Generic PURL"""
     for purl_type, regex in REGEX_PURL.items():
         if regex.match(purl):
-            logger.debug(f"PURL: {purl} matched PURL type '{purl_type}' regex '{regex.pattern}'")
+            logger.debug(
+                f"PURL: {purl} matched PURL type '{purl_type}' regex '{regex.pattern}'"
+            )
             return True
     return False
 
@@ -245,7 +253,8 @@ def sbom_components_to_dict(sbom: dict, with_version: bool = False) -> dict:
     components = sbom["components"]
     if with_version:
         components_dict = {
-            urllib.parse.unquote(component["bom-ref"]): component for component in components
+            urllib.parse.unquote(component["bom-ref"]): component
+            for component in components
         }
     else:
         components_dict = {
@@ -283,7 +292,9 @@ def read_sbom_json_file(file_path: str) -> dict:
         logger.error(f"Error loading SBOM file from {file_path}")
         logger.error(e)
     else:
-        logger.info(f"SBOM loaded from {file_path} with {len(result['components'])} components")
+        logger.info(
+            f"SBOM loaded from {file_path} with {len(result['components'])} components"
+        )
         return result
 
 
@@ -335,7 +346,9 @@ def set_component_version(
         component["cpe"] = component["cpe"].replace("{{VERSION}}", cpe_version)
 
 
-def set_dependency_version(dependencies: list, meta_bom_ref: str, purl_version: str) -> None:
+def set_dependency_version(
+    dependencies: list, meta_bom_ref: str, purl_version: str
+) -> None:
     """Update the appropriate dependency version fields in the metadata SBOM"""
     r = 0
     d = 0
@@ -350,7 +363,9 @@ def set_dependency_version(dependencies: list, meta_bom_ref: str, purl_version: 
                 )
                 d += 1
 
-    logger.debug(f"set_dependency_version: '{meta_bom_ref}' updated {r} refs and {d} dependsOn")
+    logger.debug(
+        f"set_dependency_version: '{meta_bom_ref}' updated {r} refs and {d} dependsOn"
+    )
 
 
 def get_subfolders_dict(folder_path: str = ".") -> dict:
@@ -408,7 +423,10 @@ def del_component_priority_version_source(component: dict) -> None:
     # Reverse iterate properties list to safely modify in situ
     if "properties" in component:
         for i in range(len(component["properties"]) - 1, -1, -1):
-            if component["properties"][i].get("name") == "generate_sbom:priority_version_source":
+            if (
+                component["properties"][i].get("name")
+                == "generate_sbom:priority_version_source"
+            ):
                 logger.debug(
                     f"PRIORITY VERSION SOURCE: {component['bom-ref']}: Removing priority version source from SBOM metadata."
                 )
@@ -461,7 +479,9 @@ def main() -> None:
         type=str,
     )
     endor.add_argument(
-        "--namespace", help="Endor Labs namespace (Default: mongodb.{git org})", type=str
+        "--namespace",
+        help="Endor Labs namespace (Default: mongodb.{git org})",
+        type=str,
     )
     endor.add_argument(
         "--target",
@@ -476,7 +496,9 @@ def main() -> None:
         type=str,
     )
 
-    target = parser.add_argument_group("Target values. Apply only if --target is not 'project'")
+    target = parser.add_argument_group(
+        "Target values. Apply only if --target is not 'project'"
+    )
     exclusive_target = target.add_mutually_exclusive_group()
     exclusive_target.add_argument(
         "--commit",
@@ -526,7 +548,9 @@ def main() -> None:
         default=None,
         type=str,
     )
-    parser.add_argument("--debug", help="Set logging level to DEBUG", action="store_true")
+    parser.add_argument(
+        "--debug", help="Set logging level to DEBUG", action="store_true"
+    )
 
     # endregion define args
 
@@ -589,7 +613,9 @@ def main() -> None:
     # region export Endor Labs SBOM
 
     print_banner(f"Exporting Endor Labs SBOM for {target} {getattr(git_info, target)}")
-    endorctl = EndorCtl(namespace, retry_limit, sleep_duration, endorctl_path, config_path)
+    endorctl = EndorCtl(
+        namespace, retry_limit, sleep_duration, endorctl_path, config_path
+    )
     if target == "commit":
         endor_bom = endorctl.get_sbom_for_commit(git_info.project, git_info.commit)
     elif target == "branch":
@@ -602,7 +628,9 @@ def main() -> None:
     if not endor_bom:
         logger.error("Empty result for Endor SBOM!")
         if target == "commit":
-            logger.error("Check Endor Labs for any unanticipated issues with the target PR scan.")
+            logger.error(
+                "Check Endor Labs for any unanticipated issues with the target PR scan."
+            )
         else:
             logger.error("Check Endor Labs for status of the target monitoring scan.")
         sys.exit(1)
@@ -633,7 +661,9 @@ def main() -> None:
                 component["bom-ref"] = component["bom-ref"].replace(old, new)
                 component["purl"] = component["purl"].replace(old, new)
 
-    logger.info(f"Endor Labs SBOM pre-processed with {len(endor_bom['components'])} components")
+    logger.info(
+        f"Endor Labs SBOM pre-processed with {len(endor_bom['components'])} components"
+    )
 
     # endregion Pre-process Endor Labs SBOM
 
@@ -735,7 +765,9 @@ def main() -> None:
         )
 
     # Set main component version
-    set_component_version(meta_bom["metadata"]["component"], version, purl_version, cpe_version)
+    set_component_version(
+        meta_bom["metadata"]["component"], version, purl_version, cpe_version
+    )
     # Run through 'dependency' objects to set main component version
     set_dependency_version(meta_bom["dependencies"], meta_bom_ref, purl_version)
 
@@ -745,7 +777,9 @@ def main() -> None:
 
     # region Parse metadata SBOM components
 
-    third_party_folders = get_subfolders_dict(git_info.repo_root.as_posix() + "/src/third_party")
+    third_party_folders = get_subfolders_dict(
+        git_info.repo_root.as_posix() + "/src/third_party"
+    )
     # pre-exclude 'scripts' folder
     del third_party_folders["scripts"]
 
@@ -786,9 +820,13 @@ def main() -> None:
         if import_script_path:
             import_script = Path(import_script_path)
             if import_script.exists():
-                versions["import_script"] = get_version_from_import_script(import_script_path)
+                versions["import_script"] = get_version_from_import_script(
+                    import_script_path
+                )
                 if versions["import_script"]:
-                    versions["import_script"] = versions["import_script"].replace("release-", "")
+                    versions["import_script"] = versions["import_script"].replace(
+                        "release-", ""
+                    )
                 if versions["import_script"]:
                     logger.debug(
                         f"VERSION IMPORT SCRIPT: {component_key}: Found version '{versions['import_script']}' in import script '{import_script_path}'"
@@ -839,13 +877,18 @@ def main() -> None:
 
         # For the standard workflow, we favor the pre-set priority version source,
         # followed by Endor Labs version, followed by import script, followed by hard coded
-        if versions["priority_version_source"] and versions["priority_version_source"] in versions:
+        if (
+            versions["priority_version_source"]
+            and versions["priority_version_source"] in versions
+        ):
             version = versions[versions["priority_version_source"]]
             logger.info(
                 f"VERSION: {component_key}: Using priority_version_source '{priority_version_source}' from metadata file."
             )
         else:
-            version = versions["endor"] or versions["import_script"] or versions["metadata"]
+            version = (
+                versions["endor"] or versions["import_script"] or versions["metadata"]
+            )
 
         ############## Assign Version ###############
         if version:
@@ -854,7 +897,9 @@ def main() -> None:
             ## Special case for FireFox ##
             # The CPE for FireFox ESR needs the 'esr' removed from the version, as it is specified in another section
             if component["bom-ref"].startswith("pkg:deb/debian/firefox-esr@"):
-                set_component_version(component, version, cpe_version=version.replace("esr", ""))
+                set_component_version(
+                    component, version, cpe_version=version.replace("esr", "")
+                )
             else:
                 semver = get_semver_from_release_version(version)
                 set_component_version(component, semver, version, semver)
@@ -934,7 +979,8 @@ def main() -> None:
 
     # Have the SBOM app version changed?
     sbom_app_version_changed = (
-        prev_bom["metadata"]["component"]["version"] != meta_bom["metadata"]["component"]["version"]
+        prev_bom["metadata"]["component"]["version"]
+        != meta_bom["metadata"]["component"]["version"]
     )
     logger.info(f"SUMMARY: MongoDB version changed: {sbom_app_version_changed}")
 
@@ -949,7 +995,9 @@ def main() -> None:
     # Components in prev SBOM but not in generated SBOM
     prev_components = sbom_components_to_dict(prev_bom, with_version=False)
     meta_components = sbom_components_to_dict(meta_bom, with_version=False)
-    prev_components_diff = list(set(prev_components.keys()) - set(meta_components.keys()))
+    prev_components_diff = list(
+        set(prev_components.keys()) - set(meta_components.keys())
+    )
     if prev_components_diff:
         logger.info(
             "SBOM_DIFF: Components in previous SBOM and not in generated SBOM: "
@@ -957,7 +1005,9 @@ def main() -> None:
         )
 
     # Components in generated SBOM but not in prev SBOM
-    meta_components_diff = list(set(meta_components.keys()) - set(prev_components.keys()))
+    meta_components_diff = list(
+        set(meta_components.keys()) - set(prev_components.keys())
+    )
     if meta_components_diff:
         logger.info(
             "SBOM_DIFF: Components in generated SBOM and not in previous SBOM: "
@@ -982,7 +1032,9 @@ def main() -> None:
     # Only update the timestamp if something has changed
     if sbom_app_version_changed or sbom_components_changed:
         meta_bom["metadata"]["timestamp"] = (
-            datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+            datetime.now(timezone.utc)
+            .isoformat(timespec="seconds")
+            .replace("+00:00", "Z")
         )
     else:
         meta_bom["metadata"]["timestamp"] = prev_bom["metadata"]["timestamp"]
@@ -1005,7 +1057,9 @@ def main() -> None:
 
     print_banner("COMPLETED")
     if not os.getenv("CI"):
-        print("Be sure to add the SBOM to your next commit if the file content has changed.")
+        print(
+            "Be sure to add the SBOM to your next commit if the file content has changed."
+        )
 
     # endregion Finalize SBOM
 

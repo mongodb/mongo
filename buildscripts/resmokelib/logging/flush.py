@@ -9,7 +9,7 @@ import threading
 import time
 
 _FLUSH_THREAD_LOCK = threading.Lock()
-_FLUSH_THREAD: '_FlushThread' = None
+_FLUSH_THREAD: "_FlushThread" = None
 
 
 def start_thread():

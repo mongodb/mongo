@@ -64,7 +64,9 @@ class Repo(_git.Repository):
             valid_files = list(self.get_candidate_files(filter_function))
 
         # Get the full file name here
-        valid_files = [os.path.normpath(os.path.join(self.directory, f)) for f in valid_files]
+        valid_files = [
+            os.path.normpath(os.path.join(self.directory, f)) for f in valid_files
+        ]
 
         return valid_files
 
@@ -75,7 +77,11 @@ class Repo(_git.Repository):
 
         # This allows us to pick all the interesting files
         # in the mongo and mongo-enterprise repos
-        file_list = [line.rstrip() for line in gito.splitlines() if filter_function(line.rstrip())]
+        file_list = [
+            line.rstrip()
+            for line in gito.splitlines()
+            if filter_function(line.rstrip())
+        ]
 
         return file_list
 
@@ -121,7 +127,9 @@ class Repo(_git.Repository):
         valid_files = list(self.get_working_tree_candidate_files(filter_function))
 
         # Get the full file name here
-        valid_files = [os.path.normpath(os.path.join(self.directory, f)) for f in valid_files]
+        valid_files = [
+            os.path.normpath(os.path.join(self.directory, f)) for f in valid_files
+        ]
 
         # Filter out files that git thinks exist but were removed.
         valid_files = [f for f in valid_files if os.path.exists(f)]
@@ -166,7 +174,9 @@ def get_valid_files_from_candidates(candidates, filter_fn: Callable[[str], bool]
     repos = get_repos()
 
     valid_files = list(
-        itertools.chain.from_iterable([r.get_candidates(candidates, filter_fn) for r in repos])
+        itertools.chain.from_iterable(
+            [r.get_candidates(candidates, filter_fn) for r in repos]
+        )
     )
 
     return valid_files
@@ -185,7 +195,9 @@ def get_files_to_check(files, filter_function):
     valid_files = get_valid_files_from_candidates(candidates, filter_function)
 
     if files and not valid_files:
-        raise ValueError("Globs '%s' did not find any files with glob in git." % (files))
+        raise ValueError(
+            "Globs '%s' did not find any files with glob in git." % (files)
+        )
 
     return valid_files
 

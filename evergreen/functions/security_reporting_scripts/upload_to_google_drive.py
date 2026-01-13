@@ -82,7 +82,9 @@ def upload(
         print(f"Failed to authenticate with Google API: {e}")
         sys.exit(1)
 
-    folder_id = releases_folder_id if triggered_by_tag.lower() == "true" else test_folder_id
+    folder_id = (
+        releases_folder_id if triggered_by_tag.lower() == "true" else test_folder_id
+    )
 
     if upload_file_name is None:
         input_file_name_str = str(input_file.resolve().name)

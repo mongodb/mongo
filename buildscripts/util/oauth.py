@@ -45,13 +45,13 @@ class Configs:
     SCOPE = "kanopy+openid+profile"
 
     def __init__(
-            self,
-            client_credentials_scope: str = None,
-            client_credentials_user_name: str = None,
-            auth_domain: str = None,
-            client_id: str = None,
-            redirect_port: int = None,
-            scope: str = None,
+        self,
+        client_credentials_scope: str = None,
+        client_credentials_user_name: str = None,
+        auth_domain: str = None,
+        client_id: str = None,
+        redirect_port: int = None,
+        scope: str = None,
     ):
         """Initialize configs instance."""
 
@@ -80,7 +80,9 @@ class OAuthCredentials(BaseModel):
         return self.created_time + timedelta(seconds=self.expires_in) < datetime.now()
 
     @classmethod
-    def get_existing_credentials_from_file(cls, file_path: str) -> Optional[OAuthCredentials]:
+    def get_existing_credentials_from_file(
+        cls, file_path: str
+    ) -> Optional[OAuthCredentials]:
         """
         Try to get OAuth credentials from a file location.
 
@@ -90,8 +92,13 @@ class OAuthCredentials(BaseModel):
         """
         try:
             creds = OAuthCredentials(**read_yaml_file(file_path))
-            if (creds.access_token and creds.created_time and creds.expires_in and creds.user_name
-                    and not creds.are_expired()):
+            if (
+                creds.access_token
+                and creds.created_time
+                and creds.expires_in
+                and creds.user_name
+                and not creds.are_expired()
+            ):
                 return creds
             else:
                 return None
@@ -111,13 +118,13 @@ class _RedirectServer(HTTPServer):
     code_verifier: str
 
     def __init__(
-            self,
-            server_address: Tuple[str, int],
-            handler: Callable[..., BaseHTTPRequestHandler],
-            redirect_uri: str,
-            auth_domain: str,
-            client_id: str,
-            code_verifier: str,
+        self,
+        server_address: Tuple[str, int],
+        handler: Callable[..., BaseHTTPRequestHandler],
+        redirect_uri: str,
+        auth_domain: str,
+        client_id: str,
+        code_verifier: str,
     ):
         self.redirect_uri = redirect_uri
         self.auth_domain = auth_domain
@@ -169,11 +176,14 @@ class _Handler(BaseHTTPRequestHandler):
         expires_in = resp.get("expires_in")
 
         if not access_token or not expires_in:
-            raise ValueError("Could not get access token or expires_in data about access token")
+            raise ValueError(
+                "Could not get access token or expires_in data about access token"
+            )
 
         headers = {"Authorization": f"Bearer {access_token}"}
-        resp = requests.get(f"https://{self.server.auth_domain}/v1/userinfo",
-                            headers=headers).json()
+        resp = requests.get(
+            f"https://{self.server.auth_domain}/v1/userinfo", headers=headers
+        ).json()
 
         split_username = resp["preferred_username"].split("@")
 
@@ -199,7 +209,9 @@ class PKCEOauthTools:
     redirect_uri: str
     scope: str
 
-    def __init__(self, auth_domain: str, client_id: str, redirect_port: int, scope: str):
+    def __init__(
+        self, auth_domain: str, client_id: str, redirect_port: int, scope: str
+    ):
         """
         Create a new PKCEOauth tools instance.
 
@@ -225,15 +237,17 @@ class PKCEOauthTools:
 
         state = "".join(choice(ascii_lowercase) for i in range(10))
 
-        authorization_url = (f"https://{self.auth_domain}/v1/authorize?"
-                             f"scope={self.scope}&"
-                             f"response_type=code&"
-                             f"response_mode=query&"
-                             f"client_id={self.client_id}&"
-                             f"code_challenge={code_challenge}&"
-                             f"state={state}&"
-                             f"code_challenge_method=S256&"
-                             f"redirect_uri={self.redirect_uri}")
+        authorization_url = (
+            f"https://{self.auth_domain}/v1/authorize?"
+            f"scope={self.scope}&"
+            f"response_type=code&"
+            f"response_mode=query&"
+            f"client_id={self.client_id}&"
+            f"code_challenge={code_challenge}&"
+            f"state={state}&"
+            f"code_challenge_method=S256&"
+            f"redirect_uri={self.redirect_uri}"
+        )
 
         httpd = _RedirectServer(
             ("", self.redirect_port),
@@ -253,12 +267,15 @@ class PKCEOauthTools:
         if not httpd.pkce_credentials:
             raise ValueError(
                 "Could not retrieve Okta credentials to talk to Kanopy with. "
-                "Please sign out of Okta in your browser and try runnning this script again")
+                "Please sign out of Okta in your browser and try runnning this script again"
+            )
 
         return httpd.pkce_credentials
 
 
-def get_oauth_credentials(configs: Configs, print_auth_url: bool = False) -> OAuthCredentials:
+def get_oauth_credentials(
+    configs: Configs, print_auth_url: bool = False
+) -> OAuthCredentials:
     """
     Run the OAuth workflow to get credentials for a human user.
 
@@ -276,8 +293,9 @@ def get_oauth_credentials(configs: Configs, print_auth_url: bool = False) -> OAu
     return credentials
 
 
-def get_client_cred_oauth_credentials(client_id: str, client_secret: str,
-                                      configs: Configs) -> OAuthCredentials:
+def get_client_cred_oauth_credentials(
+    client_id: str, client_secret: str, configs: Configs
+) -> OAuthCredentials:
     """
     Run the OAuth workflow to get credentials for a machine user.
 
@@ -298,7 +316,9 @@ def get_client_cred_oauth_credentials(client_id: str, client_secret: str,
     expires_in = token.get("expires_in")
 
     if not access_token or not expires_in:
-        raise ValueError("Could not get access token or expires_in data about access token")
+        raise ValueError(
+            "Could not get access token or expires_in data about access token"
+        )
 
     return OAuthCredentials(
         access_token=access_token,

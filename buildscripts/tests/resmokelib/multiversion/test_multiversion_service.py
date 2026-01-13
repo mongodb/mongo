@@ -1,4 +1,5 @@
 """Unit tests for multiversion_service.py."""
+
 from unittest import TestCase
 
 from packaging.version import Version
@@ -17,7 +18,9 @@ class TestTagStr(TestCase):
 
 class TestGetVersion(TestCase):
     def test_version_should_be_extracted(self):
-        mongo_version = under_test.MongoVersion(mongo_version="6.0.0-rc5-18-gbcdfaa9035b")
+        mongo_version = under_test.MongoVersion(
+            mongo_version="6.0.0-rc5-18-gbcdfaa9035b"
+        )
 
         self.assertEqual(mongo_version.get_version(), Version("6.0"))
 
@@ -34,13 +37,35 @@ class TestCalculateFcvConstants(TestCase):
         mongo_releases = under_test.MongoReleases(
             **{
                 "featureCompatibilityVersions": [
-                    "4.0", "4.2", "4.4", "4.7", "4.8", "4.9", "5.0", "5.1", "5.2", "5.3", "6.0",
-                    "100.0"
+                    "4.0",
+                    "4.2",
+                    "4.4",
+                    "4.7",
+                    "4.8",
+                    "4.9",
+                    "5.0",
+                    "5.1",
+                    "5.2",
+                    "5.3",
+                    "6.0",
+                    "100.0",
                 ],
                 "longTermSupportReleases": ["4.0", "4.2", "4.4", "5.0"],
-                "eolVersions":
-                    ["2.0", "2.2", "2.4", "2.6", "3.0", "3.2", "3.4", "3.6", "4.0", "5.1", "5.2"],
-            })
+                "eolVersions": [
+                    "2.0",
+                    "2.2",
+                    "2.4",
+                    "2.6",
+                    "3.0",
+                    "3.2",
+                    "3.4",
+                    "3.6",
+                    "4.0",
+                    "5.1",
+                    "5.2",
+                ],
+            }
+        )
 
         multiversion_service = under_test.MultiversionService(
             mongo_version=mongo_version,
@@ -52,26 +77,67 @@ class TestCalculateFcvConstants(TestCase):
         self.assertEqual(version_constants.latest, Version("6.0"))
         self.assertEqual(version_constants.last_continuous, Version("5.3"))
         self.assertEqual(version_constants.last_lts, Version("5.0"))
-        self.assertEqual(version_constants.requires_fcv_tag_list,
-                         [Version(v) for v in ["5.1", "5.2", "5.3", "6.0"]])
-        self.assertEqual(version_constants.requires_fcv_tag_list_continuous, [Version("6.0")])
-        self.assertEqual(version_constants.fcvs_less_than_latest, [
-            Version(v)
-            for v in ["4.0", "4.2", "4.4", "4.7", "4.8", "4.9", "5.0", "5.1", "5.2", "5.3"]
-        ])
+        self.assertEqual(
+            version_constants.requires_fcv_tag_list,
+            [Version(v) for v in ["5.1", "5.2", "5.3", "6.0"]],
+        )
+        self.assertEqual(
+            version_constants.requires_fcv_tag_list_continuous, [Version("6.0")]
+        )
+        self.assertEqual(
+            version_constants.fcvs_less_than_latest,
+            [
+                Version(v)
+                for v in [
+                    "4.0",
+                    "4.2",
+                    "4.4",
+                    "4.7",
+                    "4.8",
+                    "4.9",
+                    "5.0",
+                    "5.1",
+                    "5.2",
+                    "5.3",
+                ]
+            ],
+        )
 
     def test_fcv_constants_should_be_accurate_for_future_git_tag(self):
         mongo_version = under_test.MongoVersion(mongo_version="100.0")
         mongo_releases = under_test.MongoReleases(
             **{
                 "featureCompatibilityVersions": [
-                    "4.0", "4.2", "4.4", "4.7", "4.8", "4.9", "5.0", "5.1", "5.2", "5.3", "6.0",
-                    "6.1", "100.0"
+                    "4.0",
+                    "4.2",
+                    "4.4",
+                    "4.7",
+                    "4.8",
+                    "4.9",
+                    "5.0",
+                    "5.1",
+                    "5.2",
+                    "5.3",
+                    "6.0",
+                    "6.1",
+                    "100.0",
                 ],
                 "longTermSupportReleases": ["4.0", "4.2", "4.4", "5.0", "6.0"],
-                "eolVersions":
-                    ["2.0", "2.2", "2.4", "2.6", "3.0", "3.2", "3.4", "3.6", "4.0", "5.1", "5.2"],
-            })
+                "eolVersions": [
+                    "2.0",
+                    "2.2",
+                    "2.4",
+                    "2.6",
+                    "3.0",
+                    "3.2",
+                    "3.4",
+                    "3.6",
+                    "4.0",
+                    "5.1",
+                    "5.2",
+                ],
+            }
+        )
 
         multiversion_service = under_test.MultiversionService(
             mongo_version=mongo_version,
@@ -83,10 +149,30 @@ class TestCalculateFcvConstants(TestCase):
         self.assertEqual(version_constants.latest, Version("100.0"))
         self.assertEqual(version_constants.last_continuous, Version("6.1"))
         self.assertEqual(version_constants.last_lts, Version("6.0"))
-        self.assertEqual(version_constants.requires_fcv_tag_list,
-                         [Version(v) for v in ["6.1", "100.0"]])
-        self.assertEqual(version_constants.requires_fcv_tag_list_continuous, [Version("100.0")])
-        self.assertEqual(version_constants.fcvs_less_than_latest, [
-            Version(v) for v in
-            ["4.0", "4.2", "4.4", "4.7", "4.8", "4.9", "5.0", "5.1", "5.2", "5.3", "6.0", "6.1"]
-        ])
+        self.assertEqual(
+            version_constants.requires_fcv_tag_list,
+            [Version(v) for v in ["6.1", "100.0"]],
+        )
+        self.assertEqual(
+            version_constants.requires_fcv_tag_list_continuous, [Version("100.0")]
+        )
+        self.assertEqual(
+            version_constants.fcvs_less_than_latest,
+            [
+                Version(v)
+                for v in [
+                    "4.0",
+                    "4.2",
+                    "4.4",
+                    "4.7",
+                    "4.8",
+                    "4.9",
+                    "5.0",
+                    "5.1",
+                    "5.2",
+                    "5.3",
+                    "6.0",
+                    "6.1",
+                ]
+            ],
+        )

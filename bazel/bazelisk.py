@@ -198,7 +198,9 @@ def get_releases_json(bazelisk_directory):
                     pass
 
     with open(releases, "wb") as f:
-        body = read_remote_text_file("https://api.github.com/repos/bazelbuild/bazel/releases")
+        body = read_remote_text_file(
+            "https://api.github.com/repos/bazelbuild/bazel/releases"
+        )
         f.write(body.encode("utf-8"))
         return json.loads(body)
 
@@ -245,7 +247,9 @@ def get_operating_system():
     if operating_system not in ("linux", "darwin", "windows"):
         raise Exception(
             'Unsupported operating system "{}". '
-            "Bazel currently only supports Linux, macOS and Windows.".format(operating_system)
+            "Bazel currently only supports Linux, macOS and Windows.".format(
+                operating_system
+            )
         )
     return operating_system
 
@@ -262,7 +266,10 @@ def determine_bazel_filename(version):
     if machine not in supported_machines:
         raise Exception(
             'Unsupported machine architecture "{}". Bazel {} only supports {} on {}.'.format(
-                machine, version, ", ".join(supported_machines), operating_system.capitalize()
+                machine,
+                version,
+                ", ".join(supported_machines),
+                operating_system.capitalize(),
             )
         )
 
@@ -270,7 +277,9 @@ def determine_bazel_filename(version):
     bazel_flavor = "bazel"
     if get_env_or_config("BAZELISK_NOJDK", "0") != "0":
         bazel_flavor = "bazel_nojdk"
-    return "{}-{}-{}-{}{}".format(bazel_flavor, version, operating_system, machine, filename_suffix)
+    return "{}-{}-{}-{}{}".format(
+        bazel_flavor, version, operating_system, machine, filename_suffix
+    )
 
 
 def get_supported_machine_archs(version, operating_system):
@@ -498,7 +507,9 @@ def execute_bazel(bazel_path, argv):
     cmd = make_bazel_cmd(bazel_path, argv)
 
     # We cannot use close_fds on Windows, so disable it there.
-    p = subprocess.Popen([cmd["exec"]] + cmd["args"], close_fds=os.name != "nt", env=cmd["env"])
+    p = subprocess.Popen(
+        [cmd["exec"]] + cmd["args"], close_fds=os.name != "nt", env=cmd["env"]
+    )
     while True:
         try:
             return p.wait()

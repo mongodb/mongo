@@ -13,7 +13,7 @@ import psutil
 
 from buildscripts.resmokelib import core
 
-_IS_WINDOWS = (sys.platform == "win32")
+_IS_WINDOWS = sys.platform == "win32"
 
 if _IS_WINDOWS:
     import win32api
@@ -34,8 +34,11 @@ def call(args, logger, timeout_seconds=None, pinfo=None, check=True) -> int:
     try:
         ret = process.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
-        logger.error("Killing %s processes with PIDs %s because time limit expired", pinfo.name,
-                     str(pinfo.pidv))
+        logger.error(
+            "Killing %s processes with PIDs %s because time limit expired",
+            pinfo.name,
+            str(pinfo.pidv),
+        )
         process.kill()
         process.wait()
         logger_pipe.wait_until_finished()
@@ -63,7 +66,7 @@ def find_program(prog, paths):
 def callo(args, logger):
     """Call subprocess on args string."""
     logger.info("%s", str(args))
-    return subprocess.check_output(args).decode('utf-8', 'replace')
+    return subprocess.check_output(args).decode("utf-8", "replace")
 
 
 def signal_python(logger, pname, pid):
@@ -78,10 +81,14 @@ def signal_python(logger, pname, pid):
     # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
     # a signal handler to wait for the signal since it supports POSIX signals.
     if _IS_WINDOWS:
-        logger.info("Calling SetEvent to signal python process %s with PID %d", pname, pid)
+        logger.info(
+            "Calling SetEvent to signal python process %s with PID %d", pname, pid
+        )
         signal_event_object(logger, pid)
     else:
-        logger.info("Sending signal SIGUSR1 to python process %s with PID %d", pname, pid)
+        logger.info(
+            "Sending signal SIGUSR1 to python process %s with PID %d", pname, pid
+        )
         signal_process(logger, pid, signal.SIGUSR1)
 
     logger.info("Waiting for process to report")
@@ -97,7 +104,9 @@ def signal_event_object(logger, pid):
     try:
         desired_access = win32event.EVENT_MODIFY_STATE
         inherit_handle = False
-        task_timeout_handle = win32event.OpenEvent(desired_access, inherit_handle, event_name)
+        task_timeout_handle = win32event.OpenEvent(
+            desired_access, inherit_handle, event_name
+        )
     except win32event.error as err:
         logger.info("Exception from win32event.OpenEvent with error: %s", err)
         return
@@ -143,7 +152,9 @@ def resume_process(logger, pname, pid):
 
 def teardown_processes(logger, processes, dump_pids):
     """Kill processes with SIGKILL or SIGABRT."""
-    logger.info("Starting to kill or abort processes. Logs should be ignored from this point.")
+    logger.info(
+        "Starting to kill or abort processes. Logs should be ignored from this point."
+    )
     for pinfo in processes:
         for pid in pinfo.pidv:
             try:

@@ -21,8 +21,9 @@ class TestLoggerPipe(unittest.TestCase):
         logger = logging.Logger("for_testing")
         logger.log = mock.MagicMock()
 
-        logger_pipe = _pipe.LoggerPipe(logger=logger, level=cls.LOG_LEVEL,
-                                       pipe_out=io.BytesIO(output))
+        logger_pipe = _pipe.LoggerPipe(
+            logger=logger, level=cls.LOG_LEVEL, pipe_out=io.BytesIO(output)
+        )
         logger_pipe.wait_until_started()
         logger_pipe.wait_until_finished()
 

@@ -13,13 +13,17 @@ class DBTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = "db_test"
 
-    def __init__(self, logger, dbtest_suite, dbtest_executable=None, dbtest_options=None):
+    def __init__(
+        self, logger, dbtest_suite, dbtest_executable=None, dbtest_options=None
+    ):
         """Initialize the DBTestCase with the dbtest suite to run."""
 
         interface.ProcessTestCase.__init__(self, logger, "dbtest suite", dbtest_suite)
 
         # Command line options override the YAML configuration.
-        self.dbtest_executable = utils.default_if_none(config.DBTEST_EXECUTABLE, dbtest_executable)
+        self.dbtest_executable = utils.default_if_none(
+            config.DBTEST_EXECUTABLE, dbtest_executable
+        )
 
         self.dbtest_suite = dbtest_suite
         self.dbtest_options = utils.default_if_none(dbtest_options, {}).copy()
@@ -29,7 +33,9 @@ class DBTestCase(interface.ProcessTestCase):
         interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         # If a dbpath was specified, then use it as a container for all other dbpaths.
-        dbpath_prefix = self.dbtest_options.pop("dbpath", DBTestCase._get_dbpath_prefix())
+        dbpath_prefix = self.dbtest_options.pop(
+            "dbpath", DBTestCase._get_dbpath_prefix()
+        )
         dbpath = os.path.join(dbpath_prefix, "job%d" % self.fixture.job_num, "unittest")
         self.dbtest_options["dbpath"] = dbpath
 
@@ -49,8 +55,12 @@ class DBTestCase(interface.ProcessTestCase):
         shutil.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
     def _make_process(self):
-        return core.programs.dbtest_program(self.logger, executable=self.dbtest_executable,
-                                            suites=[self.dbtest_suite], **self.dbtest_options)
+        return core.programs.dbtest_program(
+            self.logger,
+            executable=self.dbtest_executable,
+            suites=[self.dbtest_suite],
+            **self.dbtest_options,
+        )
 
     @staticmethod
     def _get_dbpath_prefix():

@@ -12,7 +12,9 @@ class JSHook(interface.Hook):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self, hook_logger, fixture, js_filename, description, shell_options=None):
+    def __init__(
+        self, hook_logger, fixture, js_filename, description, shell_options=None
+    ):
         """Initialize JSHook."""
         interface.Hook.__init__(self, hook_logger, fixture, description)
         self._js_filename = js_filename
@@ -31,8 +33,9 @@ class JSHook(interface.Hook):
         if not self._should_run_after_test():
             return
 
-        hook_test_case = DynamicJSTestCase.create_after_test(test.logger, test, self,
-                                                             self._js_filename, self._shell_options)
+        hook_test_case = DynamicJSTestCase.create_after_test(
+            test.logger, test, self, self._js_filename, self._shell_options
+        )
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
@@ -68,14 +71,22 @@ class PerClusterDataConsistencyHook(DataConsistencyHook):
         """After test execution."""
 
         # Break the fixture down into its participant clusters if it is a MultiClusterFixture.
-        clusters = [self.fixture] if not isinstance(self.fixture, MultiClusterFixture)\
-                    else self.fixture.get_independent_clusters()
+        clusters = (
+            [self.fixture]
+            if not isinstance(self.fixture, MultiClusterFixture)
+            else self.fixture.get_independent_clusters()
+        )
 
         for cluster in clusters:
-            self.logger.info("Running jsfile '%s' on '%s' with driver URL '%s'", self._js_filename,
-                             cluster, cluster.get_driver_connection_url())
+            self.logger.info(
+                "Running jsfile '%s' on '%s' with driver URL '%s'",
+                self._js_filename,
+                cluster,
+                cluster.get_driver_connection_url(),
+            )
             hook_test_case = DynamicJSTestCase.create_after_test(
-                test.logger, test, self, self._js_filename, self._shell_options)
+                test.logger, test, self, self._js_filename, self._shell_options
+            )
             hook_test_case.configure(cluster)
             hook_test_case.run_dynamic_test(test_report)
 
@@ -83,13 +94,23 @@ class PerClusterDataConsistencyHook(DataConsistencyHook):
 class DynamicJSTestCase(interface.DynamicTestCase):
     """A dynamic TestCase that runs a JavaScript file."""
 
-    def __init__(self, logger, test_name, description, base_test_name, hook, js_filename,
-                 shell_options=None):
+    def __init__(
+        self,
+        logger,
+        test_name,
+        description,
+        base_test_name,
+        hook,
+        js_filename,
+        shell_options=None,
+    ):
         """Initialize DynamicJSTestCase."""
-        interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
-                                           hook)
-        self._js_test_builder = jstest.JSTestCaseBuilder(logger, js_filename, self.id(),
-                                                         shell_options=shell_options)
+        interface.DynamicTestCase.__init__(
+            self, logger, test_name, description, base_test_name, hook
+        )
+        self._js_test_builder = jstest.JSTestCaseBuilder(
+            logger, js_filename, self.id(), shell_options=shell_options
+        )
         self._js_test_case = None
 
     def override_logger(self, new_logger):
@@ -106,7 +127,9 @@ class DynamicJSTestCase(interface.DynamicTestCase):
         """Configure the fixture."""
         super().configure(fixture, *args, **kwargs)
         self._js_test_builder.configure(fixture, *args, **kwargs)
-        self._js_test_case = self._js_test_builder.create_test_case_for_thread(self.logger)
+        self._js_test_case = self._js_test_builder.create_test_case_for_thread(
+            self.logger
+        )
 
     def run_test(self):
         """Execute the test."""

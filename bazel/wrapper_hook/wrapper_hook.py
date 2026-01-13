@@ -32,7 +32,12 @@ def main():
     autogenerate_targets(sys.argv, sys.argv[1])
 
     enterprise = True
-    if check_bazel_command_type(sys.argv[1:]) not in ["clean", "shutdown", "version", None]:
+    if check_bazel_command_type(sys.argv[1:]) not in [
+        "clean",
+        "shutdown",
+        "version",
+        None,
+    ]:
         args = sys.argv
         enterprise_mod = REPO_ROOT / "src" / "mongo" / "db" / "modules" / "enterprise"
         if not enterprise_mod.exists():

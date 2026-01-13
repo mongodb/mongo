@@ -4,6 +4,7 @@ Helper class to read output of a subprocess.
 Used to avoid deadlocks from the pipe buffer filling up and blocking the subprocess while it's
 being waited on.
 """
+
 import threading
 from textwrap import wrap
 from typing import List

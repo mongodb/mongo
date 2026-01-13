@@ -38,7 +38,9 @@ from packaging.version import Version
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    sys.path.append(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    )
 
 # pylint: disable=wrong-import-position
 from buildscripts.resmokelib.multiversionconstants import (
@@ -49,7 +51,7 @@ from buildscripts.resmokelib.multiversionconstants import (
 
 # pylint: enable=wrong-import-position
 
-LOGGER_NAME = 'checkout-idl'
+LOGGER_NAME = "checkout-idl"
 LOGGER = logging.getLogger(LOGGER_NAME)
 
 
@@ -57,9 +59,9 @@ def get_tags() -> List[str]:
     """Get a list of git tags that the IDL compatibility script should check against."""
 
     def gen_versions_and_tags():
-        for tag in check_output(['git', 'tag']).decode().split():
+        for tag in check_output(["git", "tag"]).decode().split():
             # Releases are like "r5.6.7". Older ones aren't r-prefixed but we don't care about them.
-            if not tag.startswith('r'):
+            if not tag.startswith("r"):
                 continue
 
             try:
@@ -90,7 +92,9 @@ def get_tags() -> List[str]:
         for version, tag in sorted(gen_versions_and_tags(), reverse=True):
             major_minor_version = Version(f"{version.major}.{version.minor}")
             if major_minor_version in results:
-                candidate_tag, candidate_is_prerelease_version = results[major_minor_version]
+                candidate_tag, candidate_is_prerelease_version = results[
+                    major_minor_version
+                ]
                 if candidate_tag is None:
                     # This is the first tag we have seen for this version. Set our first
                     # candidate tag and if this tag is a prerelease version.
@@ -115,27 +119,36 @@ def make_idl_directories(tags: List[str], destination: str) -> None:
     for tag in tags:
         LOGGER.info("Checking out IDL files in %s", tag)
         directory = os.path.join(destination, tag)
-        for path in check_output(['git', 'ls-tree', '--name-only', '-r', tag]).decode().split():
-            if not path.endswith('.idl'):
+        for path in (
+            check_output(["git", "ls-tree", "--name-only", "-r", tag]).decode().split()
+        ):
+            if not path.endswith(".idl"):
                 continue
 
-            contents = check_output(['git', 'show', f'{tag}:{path}']).decode()
+            contents = check_output(["git", "show", f"{tag}:{path}"]).decode()
             output_path = os.path.join(directory, path)
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            with open(output_path, 'w+') as fd:
+            with open(output_path, "w+") as fd:
                 fd.write(contents)
 
 
 def main():
     """Run the script."""
     arg_parser = argparse.ArgumentParser(description=__doc__)
-    arg_parser.add_argument("-v", "--verbose", action="count", help="Enable verbose logging")
-    arg_parser.add_argument("destination", metavar="DESTINATION",
-                            help="Directory to check out past IDL file versions")
+    arg_parser.add_argument(
+        "-v", "--verbose", action="count", help="Enable verbose logging"
+    )
+    arg_parser.add_argument(
+        "destination",
+        metavar="DESTINATION",
+        help="Directory to check out past IDL file versions",
+    )
     args = arg_parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING)
-    logging.getLogger(LOGGER_NAME).setLevel(logging.DEBUG if args.verbose else logging.INFO)
+    logging.getLogger(LOGGER_NAME).setLevel(
+        logging.DEBUG if args.verbose else logging.INFO
+    )
 
     tags = get_tags()
     LOGGER.info("Fetching IDL files for past tags: %s", tags)

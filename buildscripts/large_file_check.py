@@ -13,7 +13,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import structlog
 from git import Repo
 
-mongo_dir = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
+mongo_dir = os.path.dirname(
+    os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
+)
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(mongo_dir)
@@ -63,7 +65,9 @@ def _get_repos_and_revisions() -> Tuple[List[Repo], RevisionMap]:
     else:
         repos = [Repo(git.get_base_dir())]
 
-    revision_map = generate_revision_map(repos, {"mongo": os.environ.get(MONGO_REVISION_ENV_VAR)})
+    revision_map = generate_revision_map(
+        repos, {"mongo": os.environ.get(MONGO_REVISION_ENV_VAR)}
+    )
     return repos, revision_map
 
 
@@ -87,7 +91,9 @@ def git_changed_files(excludes: List[pathlib.Path]) -> List[pathlib.Path]:
 
     files = [
         filename
-        for filename in list(map(pathlib.Path, find_changed_files_in_repos(repos, revision_map)))
+        for filename in list(
+            map(pathlib.Path, find_changed_files_in_repos(repos, revision_map))
+        )
         if _filter_fn(filename)
     ]
 
@@ -95,7 +101,9 @@ def git_changed_files(excludes: List[pathlib.Path]) -> List[pathlib.Path]:
     return files
 
 
-def diff_file_sizes(size_limit: int, excludes: Optional[List[str]] = None) -> List[pathlib.Path]:
+def diff_file_sizes(
+    size_limit: int, excludes: Optional[List[str]] = None
+) -> List[pathlib.Path]:
     if excludes is None:
         excludes = []
 
@@ -129,7 +137,9 @@ def main(*args: str) -> int:
         type=pathlib.Path,
         required=False,
     )
-    parser.add_argument("--size-mb", help="File size limit (MiB)", type=int, default="10")
+    parser.add_argument(
+        "--size-mb", help="File size limit (MiB)", type=int, default="10"
+    )
     parsed_args = parser.parse_args(args[1:])
 
     if parsed_args.verbose:
@@ -139,7 +149,9 @@ def main(*args: str) -> int:
         logging.basicConfig(level=logging.INFO)
         structlog.stdlib.filter_by_level(LOGGER, "info", {})
 
-    large_files = diff_file_sizes(parsed_args.size_mb * 1024 * 1024, parsed_args.exclude)
+    large_files = diff_file_sizes(
+        parsed_args.size_mb * 1024 * 1024, parsed_args.exclude
+    )
     if len(large_files) == 0:
         LOGGER.info("All files passed size check")
         return 0

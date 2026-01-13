@@ -20,14 +20,22 @@ class CleanupConcurrencyWorkloads(interface.Hook):
 
     IS_BACKGROUND = False
 
-    def __init__(self, hook_logger, fixture, exclude_dbs=None, same_collection=False,
-                 same_db=False):
+    def __init__(
+        self,
+        hook_logger,
+        fixture,
+        exclude_dbs=None,
+        same_collection=False,
+        same_db=False,
+    ):
         """Initialize CleanupConcurrencyWorkloads."""
         description = "CleanupConcurrencyWorkloads drops all databases in the fixture"
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
         protected_dbs = ["admin", "config", "local", "$external"]
-        self.exclude_dbs = list(set().union(protected_dbs, utils.default_if_none(exclude_dbs, [])))
+        self.exclude_dbs = list(
+            set().union(protected_dbs, utils.default_if_none(exclude_dbs, []))
+        )
         self.same_collection_name = None
         self.same_db_name = None
         if same_db or same_collection:
@@ -40,7 +48,8 @@ class CleanupConcurrencyWorkloads(interface.Hook):
     def after_test(self, test, test_report):
         """After test cleanup."""
         hook_test_case = CleanupConcurrencyWorkloadsTestCase.create_after_test(
-            test.logger, test, self)
+            test.logger, test, self
+        )
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
@@ -73,7 +82,9 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
             try:
                 with_naive_retry(lambda: client.drop_database(db_name))
             except:
-                self.logger.exception("Encountered an error while dropping database %s.", db_name)
+                self.logger.exception(
+                    "Encountered an error while dropping database %s.", db_name
+                )
                 raise
 
         if self._hook.same_collection_name and same_db_name:
@@ -83,11 +94,16 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
                 self._hook.same_collection_name,
             )
             colls = with_naive_retry(client[same_db_name].list_collection_names)
-            for coll in [coll for coll in colls if coll != self._hook.same_collection_name]:
+            for coll in [
+                coll for coll in colls if coll != self._hook.same_collection_name
+            ]:
                 self.logger.info("Dropping db %s collection %s", same_db_name, coll)
                 try:
                     with_naive_retry(lambda: client[same_db_name].drop_collection(coll))
                 except:
-                    self.logger.exception("Encountered an error while dropping db % collection %s.",
-                                          same_db_name, coll)
+                    self.logger.exception(
+                        "Encountered an error while dropping db % collection %s.",
+                        same_db_name,
+                        coll,
+                    )
                     raise

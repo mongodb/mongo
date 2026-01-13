@@ -1,4 +1,5 @@
 """Unit tests for the evergreen_task_timeout script."""
+
 import unittest
 
 from buildscripts.validate_commit_message import STATUS_ERROR, STATUS_OK, main
@@ -8,7 +9,7 @@ class ValidateCommitMessageTest(unittest.TestCase):
     def test_valid(self):
         messages = [
             "SERVER-44338",
-            "Revert \"SERVER-60",
+            'Revert "SERVER-60',
             "Import wiredtiger: 58115abb6fbb3c1cc7bfd087d41a47347bce9a69 from branch mongodb-4.4",
             'Revert "Import wiredtiger: 58115abb6fbb3c1cc7bfd087d41a47347bce9a69 from branch mongodb-4.4"',
         ]

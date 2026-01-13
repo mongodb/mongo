@@ -7,6 +7,7 @@ To import script in lldb, run:
 This file must maintain Python 2 and 3 compatibility until Apple
 upgrades to Python 3 and updates their LLDB to use it.
 """
+
 from __future__ import print_function
 
 import datetime
@@ -29,29 +30,49 @@ except ImportError:
 def __lldb_init_module(debugger, *_args):
     """Register pretty printers."""
     debugger.HandleCommand(
-        "type summary add -s 'A${*var.__ptr_.__value_}' -x '^std::__1::unique_ptr<.+>$'")
+        "type summary add -s 'A${*var.__ptr_.__value_}' -x '^std::__1::unique_ptr<.+>$'"
+    )
 
-    debugger.HandleCommand("type summary add -s '${var._value}' -x '^mongo::AtomicWord<.+>$'")
-    debugger.HandleCommand("type summary add -s '${var._M_base._M_i}' 'std::atomic<bool>'")
+    debugger.HandleCommand(
+        "type summary add -s '${var._value}' -x '^mongo::AtomicWord<.+>$'"
+    )
+    debugger.HandleCommand(
+        "type summary add -s '${var._M_base._M_i}' 'std::atomic<bool>'"
+    )
     debugger.HandleCommand("type summary add -s '${var._M_i}' -x '^std::atomic<.+>$'")
 
-    debugger.HandleCommand("type summary add mongo::BSONObj -F lldb_printers.BSONObjPrinter")
     debugger.HandleCommand(
-        "type summary add mongo::BSONElement -F lldb_printers.BSONElementPrinter")
-
-    debugger.HandleCommand("type summary add mongo::Status -F lldb_printers.StatusPrinter")
+        "type summary add mongo::BSONObj -F lldb_printers.BSONObjPrinter"
+    )
     debugger.HandleCommand(
-        "type summary add -x '^mongo::StatusWith<.+>$' -F lldb_printers.StatusWithPrinter")
+        "type summary add mongo::BSONElement -F lldb_printers.BSONElementPrinter"
+    )
 
-    debugger.HandleCommand("type summary add mongo::StringData -F lldb_printers.StringDataPrinter")
-    debugger.HandleCommand("type summary add mongo::NamespaceString --summary-string '${var._ns}'")
+    debugger.HandleCommand(
+        "type summary add mongo::Status -F lldb_printers.StatusPrinter"
+    )
+    debugger.HandleCommand(
+        "type summary add -x '^mongo::StatusWith<.+>$' -F lldb_printers.StatusWithPrinter"
+    )
+
+    debugger.HandleCommand(
+        "type summary add mongo::StringData -F lldb_printers.StringDataPrinter"
+    )
+    debugger.HandleCommand(
+        "type summary add mongo::NamespaceString --summary-string '${var._ns}'"
+    )
 
     debugger.HandleCommand("type summary add mongo::UUID -F lldb_printers.UUIDPrinter")
-    debugger.HandleCommand("type summary add mongo::Decimal128 -F lldb_printers.Decimal128Printer")
-    debugger.HandleCommand("type summary add mongo::Date_t -F lldb_printers.Date_tPrinter")
+    debugger.HandleCommand(
+        "type summary add mongo::Decimal128 -F lldb_printers.Decimal128Printer"
+    )
+    debugger.HandleCommand(
+        "type summary add mongo::Date_t -F lldb_printers.Date_tPrinter"
+    )
 
     debugger.HandleCommand(
-        "type summary add --summary-string '${var.m_pathname}' 'boost::filesystem::path'")
+        "type summary add --summary-string '${var.m_pathname}' 'boost::filesystem::path'"
+    )
 
     debugger.HandleCommand(
         "type synthetic add -x '^boost::optional<.+>$' --python-class lldb_printers.OptionalPrinter"
@@ -61,9 +82,11 @@ def __lldb_init_module(debugger, *_args):
     )
 
     debugger.HandleCommand(
-        "type summary add -x '^boost::optional<.+>$' -F lldb_printers.OptionalSummaryPrinter")
+        "type summary add -x '^boost::optional<.+>$' -F lldb_printers.OptionalSummaryPrinter"
+    )
     debugger.HandleCommand(
-        "type summary add mongo::ConstDataRange -F lldb_printers.ConstDataRangePrinter")
+        "type summary add mongo::ConstDataRange -F lldb_printers.ConstDataRangePrinter"
+    )
 
     debugger.HandleCommand(
         "type synthetic add  -x '^mongo::stdx::unordered_set<.+>$' --python-class lldb_printers.AbslHashSetPrinter"
@@ -85,20 +108,23 @@ def StatusPrinter(valobj, *_args):  # pylint: disable=invalid-name
     if px.GetValueAsUnsigned() == 0:
         return "Status::OK()"
     code = px.GetChildMemberWithName("code").GetValue()
-    reason = px.GetChildMemberWithName("reason").\
-        GetSummary()
+    reason = px.GetChildMemberWithName("reason").GetSummary()
     return "Status({}, {})".format(code, reason)
 
 
 def StatusWithPrinter(valobj, *_args):  # pylint: disable=invalid-name
     """Extend the StatusPrinter to print the value of With for a StatusWith."""
     status = valobj.GetChildMemberWithName("_status")
-    code = status.GetChildMemberWithName("_error").\
-        GetChildMemberWithName("px").\
-        GetChildMemberWithName("code").\
-        GetValueAsUnsigned()
+    code = (
+        status.GetChildMemberWithName("_error")
+        .GetChildMemberWithName("px")
+        .GetChildMemberWithName("code")
+        .GetValueAsUnsigned()
+    )
     if code == 0:
-        return "StatusWith(OK, {})".format(valobj.GetChildMemberWithName("_t").children[0])
+        return "StatusWith(OK, {})".format(
+            valobj.GetChildMemberWithName("_t").children[0]
+        )
     rep = StatusPrinter(status)
     return rep.replace("Status", "StatusWith", 1)
 
@@ -107,10 +133,12 @@ def StringDataPrinter(valobj, *_args):  # pylint: disable=invalid-name
     """Print StringData value."""
     ptr = valobj.GetChildMemberWithName("_data").GetValueAsUnsigned()
     if ptr == 0:
-        return 'nullptr'
+        return "nullptr"
 
     size1 = valobj.GetChildMemberWithName("_size").GetValueAsUnsigned(0)
-    return '"{}"'.format(valobj.GetProcess().ReadMemory(ptr, size1, lldb.SBError()).decode("utf-8"))
+    return '"{}"'.format(
+        valobj.GetProcess().ReadMemory(ptr, size1, lldb.SBError()).decode("utf-8")
+    )
 
 
 def read_memory_as_hex(process, address, size):
@@ -179,9 +207,11 @@ def BSONElementPrinter(valobj, *_args):  # pylint: disable=invalid-name
     mem = bytes(memoryview(valobj.GetProcess().ReadMemory(ptr, size, lldb.SBError())))
 
     # Call an internal bson method to directly convert an BSON element to a string
-    el_tuple = bson._element_to_dict(mem, memoryview(mem), 0, len(mem), DEFAULT_CODEC_OPTIONS)  # pylint: disable=protected-access
+    el_tuple = bson._element_to_dict(
+        mem, memoryview(mem), 0, len(mem), DEFAULT_CODEC_OPTIONS
+    )  # pylint: disable=protected-access
 
-    return "\"%s\": %s" % (el_tuple[0], el_tuple[1])
+    return '"%s": %s' % (el_tuple[0], el_tuple[1])
 
 
 def Date_tPrinter(valobj, *_args):  # pylint: disable=invalid-name
@@ -240,8 +270,11 @@ class UniquePtrPrinter:
         Always prints object pointed at by the ptr.
         """
         if index == 0:
-            return self.valobj.GetChildMemberWithName("__ptr_").GetChildMemberWithName(
-                "__value_").Dereference()
+            return (
+                self.valobj.GetChildMemberWithName("__ptr_")
+                .GetChildMemberWithName("__value_")
+                .Dereference()
+            )
         else:
             return None
 
@@ -286,7 +319,10 @@ class OptionalPrinter:
 
     def update(self):
         """Check if the optional has changed."""
-        self.is_init = self.valobj.GetChildMemberWithName("m_initialized").GetValueAsUnsigned() != 0
+        self.is_init = (
+            self.valobj.GetChildMemberWithName("m_initialized").GetValueAsUnsigned()
+            != 0
+        )
         self.value = None
         if self.is_init:
             temp_type = self.valobj.GetType().GetTemplateArgumentType(0)
@@ -358,7 +394,8 @@ class AbslHashSetPrinter:
                 pos += 1
 
         value = self.valobj.GetChildMemberWithName("slots_").CreateChildAtOffset(
-            "%d" % (index), (pos - 1) * self.data_size, self.data_type)
+            "%d" % (index), (pos - 1) * self.data_size, self.data_type
+        )
         return value.Dereference()
 
     def has_children(self):
@@ -366,7 +403,9 @@ class AbslHashSetPrinter:
         return True
 
     def update(self):
-        self.capacity = self.valobj.GetChildMemberWithName("capacity_").GetValueAsUnsigned()
+        self.capacity = self.valobj.GetChildMemberWithName(
+            "capacity_"
+        ).GetValueAsUnsigned()
 
         self.data_type = self.valobj.GetChildMemberWithName("slots_").GetType()
 
@@ -374,7 +413,8 @@ class AbslHashSetPrinter:
 
         try:
             self.data_type = resolve_type_to_base(
-                self.valobj.GetChildMemberWithName("slots_").GetType()).GetPointerType()
+                self.valobj.GetChildMemberWithName("slots_").GetType()
+            ).GetPointerType()
         except:  # pylint: disable=bare-except
             print("Exception: " + str(sys.exc_info()))
 
@@ -412,15 +452,20 @@ class AbslHashMapPrinter:
 
                 pos += 1
 
-        return self.valobj.GetChildMemberWithName("slots_").GetChildAtIndex(pos - 1, False,
-                                                                            True).Dereference()
+        return (
+            self.valobj.GetChildMemberWithName("slots_")
+            .GetChildAtIndex(pos - 1, False, True)
+            .Dereference()
+        )
 
     def has_children(self):
         """Match LLDB's expected API."""
         return True
 
     def update(self):
-        self.capacity = self.valobj.GetChildMemberWithName("capacity_").GetValueAsUnsigned()
+        self.capacity = self.valobj.GetChildMemberWithName(
+            "capacity_"
+        ).GetValueAsUnsigned()
         self.data_type = self.valobj.GetChildMemberWithName("slots_").GetType()
         self.data_size = self.data_type.GetByteSize()
 
@@ -429,7 +474,6 @@ class AbslHashMapPrinter:
 # LLDB Debugging utility functions
 #
 def print_type_base(data_type):
-
     print("type: %s " % (data_type))
     print("basic_type: %s " % (data_type.GetBasicType()))
     # print("canonical: %s " % (data_type.GetCanonicalType()))
@@ -446,13 +490,19 @@ def print_type_base(data_type):
     print("IsPolymorphicClass: %s " % (data_type.IsPolymorphicClass()))
     print("GetNumberOfFields: %s " % (data_type.GetNumberOfFields()))
     print("GetNumberOfMemberFunctions: %s " % (data_type.GetNumberOfMemberFunctions()))
-    print("GetNumberOfTemplateArguments: %s " % (data_type.GetNumberOfTemplateArguments()))
-    print("GetNumberOfVirtualBaseClasses: %s " % (data_type.GetNumberOfVirtualBaseClasses()))
-    print("GetNumberOfDirectBaseClasses: %s " % (data_type.GetNumberOfDirectBaseClasses()))
+    print(
+        "GetNumberOfTemplateArguments: %s " % (data_type.GetNumberOfTemplateArguments())
+    )
+    print(
+        "GetNumberOfVirtualBaseClasses: %s "
+        % (data_type.GetNumberOfVirtualBaseClasses())
+    )
+    print(
+        "GetNumberOfDirectBaseClasses: %s " % (data_type.GetNumberOfDirectBaseClasses())
+    )
 
 
 def print_type(data_type):
-
     if isinstance(data_type, lldb.SBTypeMember):
         print("TypeMember: " + str(data_type))
         print_type(data_type.GetType())
@@ -465,7 +515,6 @@ def print_type(data_type):
 
 
 def walk_type_to_base(data_type):
-
     print("walk_type: %s " % (data_type))
     if data_type.IsPointerType():
         print("===P")
@@ -480,7 +529,6 @@ def walk_type_to_base(data_type):
 
 
 def resolve_type_to_base(data_type):
-
     if isinstance(data_type, lldb.SBTypeMember):
         return resolve_type_to_base(data_type.GetType())
 

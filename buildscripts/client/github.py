@@ -1,4 +1,5 @@
 """Functions for working with github."""
+
 import logging
 import time
 
@@ -38,7 +39,7 @@ class GithubApi(object):
         links = response.headers["Link"].split(",")
         for link in links:
             link_parts = link.split(";")
-            link_type = link_parts[1].replace("rel=", "").strip(" \"")
+            link_type = link_parts[1].replace("rel=", "").strip(' "')
             link_address = link_parts[0].strip("<> ")
             link_object[link_type] = link_address
 
@@ -46,8 +47,9 @@ class GithubApi(object):
 
     def get_commits(self, owner, project, params):
         """Get the list of commits from a specified repository from github."""
-        url = "{api_server}/repos/{owner}/{project}/commits".format(api_server=self.api_server,
-                                                                    owner=owner, project=project)
+        url = "{api_server}/repos/{owner}/{project}/commits".format(
+            api_server=self.api_server, owner=owner, project=project
+        )
 
         LOGGER.debug("get_commits project=%s/%s, params: %s", owner, project, params)
         response = self._make_request(url, params)
@@ -61,7 +63,11 @@ class GithubApi(object):
 
             links = self._parse_link(response)
 
-        LOGGER.debug("Commits from github (count=%d): [%s - %s]", len(commits), commits[-1]["sha"],
-                     commits[0]["sha"])
+        LOGGER.debug(
+            "Commits from github (count=%d): [%s - %s]",
+            len(commits),
+            commits[-1]["sha"],
+            commits[0]["sha"],
+        )
 
         return commits

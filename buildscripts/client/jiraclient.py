@@ -1,4 +1,5 @@
 """Module to access a JIRA server."""
+
 from enum import Enum
 
 import jira

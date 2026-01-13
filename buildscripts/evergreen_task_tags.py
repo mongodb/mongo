@@ -20,17 +20,42 @@ def parse_command_line():
     """Parse command line options."""
     parser = argparse.ArgumentParser(description=main.__doc__)
 
-    parser.add_argument("--list-tags", action="store_true", default=False,
-                        help="List all tags used by tasks in evergreen yml.")
-    parser.add_argument("--list-tasks", type=str, help="List all tasks for the given buildvariant.")
-    parser.add_argument("--list-variants-and-tasks", action="store_true",
-                        help="List all tasks for every buildvariant.")
-    parser.add_argument("-t", "--tasks-for-tag", type=str, default=None, action="append",
-                        help="List all tasks that use the given tag.")
-    parser.add_argument("-x", "--remove-tasks-for-tag-filter", type=str, default=None,
-                        action="append", help="Remove tasks tagged with given tag.")
-    parser.add_argument("--evergreen-file", type=str, default=DEFAULT_EVERGREEN_FILE,
-                        help="Location of evergreen file.")
+    parser.add_argument(
+        "--list-tags",
+        action="store_true",
+        default=False,
+        help="List all tags used by tasks in evergreen yml.",
+    )
+    parser.add_argument(
+        "--list-tasks", type=str, help="List all tasks for the given buildvariant."
+    )
+    parser.add_argument(
+        "--list-variants-and-tasks",
+        action="store_true",
+        help="List all tasks for every buildvariant.",
+    )
+    parser.add_argument(
+        "-t",
+        "--tasks-for-tag",
+        type=str,
+        default=None,
+        action="append",
+        help="List all tasks that use the given tag.",
+    )
+    parser.add_argument(
+        "-x",
+        "--remove-tasks-for-tag-filter",
+        type=str,
+        default=None,
+        action="append",
+        help="Remove tasks tagged with given tag.",
+    )
+    parser.add_argument(
+        "--evergreen-file",
+        type=str,
+        default=DEFAULT_EVERGREEN_FILE,
+        help="Location of evergreen file.",
+    )
 
     options = parser.parse_args()
 
@@ -116,7 +141,9 @@ def get_tasks_with_tag(evg_config, tags, filters):
     :param filters: lst of tags to filter out.
     :return: list of tasks marked with the given tag.
     """
-    return sorted([task.name for task in evg_config.tasks if is_task_tagged(task, tags, filters)])
+    return sorted(
+        [task.name for task in evg_config.tasks if is_task_tagged(task, tags, filters)]
+    )
 
 
 def list_tasks_with_tag(evg_config, tags, filters):
@@ -148,7 +175,9 @@ def main():
         list_all_tasks(evg_config, options.list_tasks)
 
     if options.tasks_for_tag:
-        list_tasks_with_tag(evg_config, options.tasks_for_tag, options.remove_tasks_for_tag_filter)
+        list_tasks_with_tag(
+            evg_config, options.tasks_for_tag, options.remove_tasks_for_tag_filter
+        )
 
 
 if __name__ == "__main__":

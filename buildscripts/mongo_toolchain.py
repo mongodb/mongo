@@ -14,7 +14,9 @@ from bazelisk import get_bazel_path, make_bazel_cmd
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
+    sys.path.append(
+        os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
+    )
 
 SUPPORTED_VERSIONS = "v5"
 
@@ -49,10 +51,10 @@ class MongoToolchain:
 
     def check_exists(self) -> None:
         for directory in (
-                self._root_dir,
-                self._get_bin_dir_path(),
-                self._get_include_dir_path(),
-                self._get_lib_dir_path(),
+            self._root_dir,
+            self._get_bin_dir_path(),
+            self._get_include_dir_path(),
+            self._get_lib_dir_path(),
         ):
             if not directory.is_dir():
                 raise MongoToolchainNotFoundError(f"{directory} is not a directory")
@@ -102,10 +104,17 @@ def _execute_bazel(argv):
 def _fetch_bazel_toolchain(version: str) -> None:
     try:
         _execute_bazel(
-            ["build", "--bes_backend=", "--bes_results_url=", f"@mongo_toolchain_{version}//:all"])
+            [
+                "build",
+                "--bes_backend=",
+                "--bes_results_url=",
+                f"@mongo_toolchain_{version}//:all",
+            ]
+        )
     except subprocess.CalledProcessError as e:
         raise MongoToolchainNotFoundError(
-            f"Failed to fetch bazel toolchain: `{e.cmd}` exited with code {e.returncode}")
+            f"Failed to fetch bazel toolchain: `{e.cmd}` exited with code {e.returncode}"
+        )
 
 
 def _get_bazel_execroot() -> Path:
@@ -113,7 +122,8 @@ def _get_bazel_execroot() -> Path:
         execroot_str = _execute_bazel(["info", "execution_root"])
     except subprocess.CalledProcessError as e:
         raise MongoToolchainNotFoundError(
-            f"Couldn't find bazel execroot: `{e.cmd}` exited with code {e.returncode}")
+            f"Couldn't find bazel execroot: `{e.cmd}` exited with code {e.returncode}"
+        )
     return Path(execroot_str)
 
 
@@ -133,7 +143,8 @@ def _get_bazel_toolchain(version: str) -> MongoToolchain:
         _fetch_bazel_toolchain(version)
     if not path.is_dir():
         raise MongoToolchainNotFoundError(
-            f"Couldn't find bazel toolchain: {path} is not a directory")
+            f"Couldn't find bazel toolchain: {path} is not a directory"
+        )
     return _get_toolchain_from_path(path)
 
 
@@ -145,8 +156,9 @@ def _get_installed_toolchain(version: str):
     return _get_toolchain_from_path(_get_installed_toolchain_path(version))
 
 
-def get_mongo_toolchain(*, version: str | None = None,
-                        from_bazel: bool | None = None) -> MongoToolchain:
+def get_mongo_toolchain(
+    *, version: str | None = None, from_bazel: bool | None = None
+) -> MongoToolchain:
     # When running under bazel this environment variable will be set and will point to the
     # toolchain the target was configured to use. It can also be set manually to override
     # a script's selection of toolchain.
@@ -197,10 +209,11 @@ if __name__ == "__main__":
 
     @_app.command()
     def main(
-            tool: Annotated[Optional[str], typer.Argument()] = None,
-            version: Annotated[Optional[str], typer.Option("--version")] = None,
-            from_bazel: Annotated[Optional[bool],
-                                  typer.Option("--bazel/--no-bazel")] = None,
+        tool: Annotated[Optional[str], typer.Argument()] = None,
+        version: Annotated[Optional[str], typer.Option("--version")] = None,
+        from_bazel: Annotated[
+            Optional[bool], typer.Option("--bazel/--no-bazel")
+        ] = None,
     ):
         """
         Prints the path to tools in the mongo toolchain or the toolchain's root directory (which

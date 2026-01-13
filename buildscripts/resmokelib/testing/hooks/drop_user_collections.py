@@ -14,5 +14,11 @@ class DropUserCollections(jsfile.JSHook):
         """."""
         description = "Drop all user collections"
         js_filename = os.path.join("jstests", "hooks", "drop_user_collections.js")
-        jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename, description,
-                               shell_options=shell_options)
+        jsfile.JSHook.__init__(
+            self,
+            hook_logger,
+            fixture,
+            js_filename,
+            description,
+            shell_options=shell_options,
+        )

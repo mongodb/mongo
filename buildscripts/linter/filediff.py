@@ -9,7 +9,9 @@ from git import Repo
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
+    sys.path.append(
+        os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
+    )
 
 from buildscripts.linter import git
 from buildscripts.patch_builds.change_data import (
@@ -27,7 +29,9 @@ def _get_repos_and_revisions() -> Tuple[List[Repo], RevisionMap]:
     """Get the repo object and a map of revisions to compare against."""
 
     repos = [Repo(git.get_base_dir())]
-    revision_map = generate_revision_map(repos, {"mongo": os.environ.get(MONGO_REVISION_ENV_VAR)})
+    revision_map = generate_revision_map(
+        repos, {"mongo": os.environ.get(MONGO_REVISION_ENV_VAR)}
+    )
     return repos, revision_map
 
 
@@ -42,7 +46,9 @@ def _filter_file(filename: str, is_interesting_file: Callable[[str], bool]) -> b
     return os.path.exists(filename) and is_interesting_file(filename)
 
 
-def gather_changed_files_for_lint(is_interesting_file: Callable[[str], bool]) -> List[str]:
+def gather_changed_files_for_lint(
+    is_interesting_file: Callable[[str], bool],
+) -> List[str]:
     """
     Get the files that have changes since the last git commit.
 
@@ -54,7 +60,9 @@ def gather_changed_files_for_lint(is_interesting_file: Callable[[str], bool]) ->
 
     candidate_files = find_changed_files_in_repos(repos, revision_map)
     files = [
-        filename for filename in candidate_files if _filter_file(filename, is_interesting_file)
+        filename
+        for filename in candidate_files
+        if _filter_file(filename, is_interesting_file)
     ]
 
     LOGGER.info("Found files to lint", files=files)

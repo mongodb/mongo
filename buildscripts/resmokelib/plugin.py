@@ -8,7 +8,9 @@ class Subcommand(object):
 
     def execute(self):
         """Execute the subcommand."""
-        raise NotImplementedError("execute must be implemented by Subcommand subclasses")
+        raise NotImplementedError(
+            "execute must be implemented by Subcommand subclasses"
+        )
 
 
 class PluginInterface(abc.ABC):

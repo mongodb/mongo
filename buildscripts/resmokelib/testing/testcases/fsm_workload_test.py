@@ -14,13 +14,20 @@ class _SingleFSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self, logger, test_name, test_id, shell_executable=None, shell_options=None):
+    def __init__(
+        self, logger, test_name, test_id, shell_executable=None, shell_options=None
+    ):
         """Initialize the _SingleFSMWorkloadTestCase with the FSM workload file."""
 
         jsrunnerfile.JSRunnerFileTestCase.__init__(
-            self, logger, "FSM workload", test_name,
+            self,
+            logger,
+            "FSM workload",
+            test_name,
             test_runner_file="jstests/concurrency/fsm_libs/resmoke_runner.js",
-            shell_executable=shell_executable, shell_options=shell_options)
+            shell_executable=shell_executable,
+            shell_options=shell_options,
+        )
         self._id = test_id
 
     def configure(self, fixture, *args, **kwargs):
@@ -34,10 +41,22 @@ class _FSMWorkloadTestCaseBuilder(interface.TestCaseFactory):
     _COUNTER_LOCK = threading.Lock()
     _COUNTER = 0
 
-    def __init__(self, logger, fsm_workload_group, test_name, test_id, shell_executable=None,
-                 shell_options=None, same_db=False, same_collection=False, db_name_prefix=None):
+    def __init__(
+        self,
+        logger,
+        fsm_workload_group,
+        test_name,
+        test_id,
+        shell_executable=None,
+        shell_options=None,
+        same_db=False,
+        same_collection=False,
+        db_name_prefix=None,
+    ):
         """Initialize the _FSMWorkloadTestCaseBuilder."""
-        interface.TestCaseFactory.__init__(self, _SingleFSMWorkloadTestCase, shell_options)
+        interface.TestCaseFactory.__init__(
+            self, _SingleFSMWorkloadTestCase, shell_options
+        )
         self.logger = logger
         self.fsm_workload_group = fsm_workload_group
         self.test_name = test_name
@@ -88,8 +107,9 @@ class _FSMWorkloadTestCaseBuilder(interface.TestCaseFactory):
         return test_case._make_process()  # pylint: disable=protected-access
 
     def create_test_case(self, logger, shell_options) -> _SingleFSMWorkloadTestCase:
-        test_case = _SingleFSMWorkloadTestCase(logger, self.test_name, self.test_id,
-                                               self.shell_executable, shell_options)
+        test_case = _SingleFSMWorkloadTestCase(
+            logger, self.test_name, self.test_id, self.shell_executable, shell_options
+        )
         test_case.configure(self.fixture)
         return test_case
 
@@ -100,18 +120,35 @@ class FSMWorkloadTestCase(jstest.MultiClientsTestCase):
     REGISTERED_NAME = "fsm_workload_test"
     TEST_KIND = "FSM workload"
 
-    def __init__(self, logger, selected_tests, shell_executable=None, shell_options=None,
-                 same_db=False, same_collection=False, db_name_prefix=None):
+    def __init__(
+        self,
+        logger,
+        selected_tests,
+        shell_executable=None,
+        shell_options=None,
+        same_db=False,
+        same_collection=False,
+        db_name_prefix=None,
+    ):
         """Initialize the FSMWorkloadTestCase with the FSM workload file."""
         fsm_workload_group = self.get_workload_group(selected_tests)
         test_name = self.get_workload_uid(selected_tests)
         test_id = uuid.uuid4()
 
-        factory = _FSMWorkloadTestCaseBuilder(logger, fsm_workload_group, test_name, test_id,
-                                              shell_executable, shell_options, same_db,
-                                              same_collection, db_name_prefix)
-        jstest.MultiClientsTestCase.__init__(self, logger, self.TEST_KIND, test_name, test_id,
-                                             factory)
+        factory = _FSMWorkloadTestCaseBuilder(
+            logger,
+            fsm_workload_group,
+            test_name,
+            test_id,
+            shell_executable,
+            shell_options,
+            same_db,
+            same_collection,
+            db_name_prefix,
+        )
+        jstest.MultiClientsTestCase.__init__(
+            self, logger, self.TEST_KIND, test_name, test_id, factory
+        )
 
     @staticmethod
     def get_workload_group(selected_tests):

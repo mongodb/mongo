@@ -98,7 +98,9 @@ def _read_vcxproj(file_name):
 
     tree = ET.parse(file_name)
 
-    interesting_tags = ["{%s}%s" % (VCXPROJ_NAMESPACE, tag) for tag in VCXPROJ_FIELDS_TO_PRESERVE]
+    interesting_tags = [
+        "{%s}%s" % (VCXPROJ_NAMESPACE, tag) for tag in VCXPROJ_FIELDS_TO_PRESERVE
+    ]
 
     save_elements = {}
 
@@ -119,7 +121,9 @@ def _replace_vcxproj(file_name, restore_elements):
 
     tree = ET.parse(file_name)
 
-    interesting_tags = ["{%s}%s" % (VCXPROJ_NAMESPACE, tag) for tag in VCXPROJ_FIELDS_TO_PRESERVE]
+    interesting_tags = [
+        "{%s}%s" % (VCXPROJ_NAMESPACE, tag) for tag in VCXPROJ_FIELDS_TO_PRESERVE
+    ]
 
     for parent in tree.getroot():
         for child in parent:
@@ -137,7 +141,9 @@ def _replace_vcxproj(file_name, restore_elements):
 
     # Strip the "ns0:" namespace prefix because ElementTree does not support default namespaces.
     str_value = (
-        str_value.replace("<ns0:", "<").replace("</ns0:", "</").replace("xmlns:ns0", "xmlns")
+        str_value.replace("<ns0:", "<")
+        .replace("</ns0:", "</")
+        .replace("xmlns:ns0", "xmlns")
     )
 
     with io.open(file_name, mode="w") as file_handle:
@@ -201,7 +207,9 @@ class ProjFileGenerator(object):
             + ";".join(common_defines)
             + ";%(PreprocessorDefinitions)\n"
         )
-        self.vcxproj.write("</PreprocessorDefinitions></ClCompile></ItemDefinitionGroup>\n")
+        self.vcxproj.write(
+            "</PreprocessorDefinitions></ClCompile></ItemDefinitionGroup>\n"
+        )
 
         self.vcxproj.write("  <ItemGroup>\n")
         for command in self.compiles:
@@ -216,7 +224,9 @@ class ProjFileGenerator(object):
                     + "</PreprocessorDefinitions></ClCompile>\n"
                 )
             else:
-                self.vcxproj.write('    <ClCompile Include="' + command["file"] + '" />\n')
+                self.vcxproj.write(
+                    '    <ClCompile Include="' + command["file"] + '" />\n'
+                )
         self.vcxproj.write("  </ItemGroup>\n")
 
         self.filters = open(self.target + ".vcxproj.filters", "w")
@@ -338,7 +348,9 @@ class ProjFileGenerator(object):
         self.filters.write("  <ItemGroup>\n")
         for file_name in sorted(dirs):
             self.filters.write("    <Filter Include='%s'>\n" % file_name)
-            self.filters.write("        <UniqueIdentifier>{%s}</UniqueIdentifier>\n" % uuid.uuid4())
+            self.filters.write(
+                "        <UniqueIdentifier>{%s}</UniqueIdentifier>\n" % uuid.uuid4()
+            )
             self.filters.write("    </Filter>\n")
         self.filters.write("  </ItemGroup>\n")
 
@@ -347,7 +359,9 @@ class ProjFileGenerator(object):
         for file_name in sorted(self.files):
             if not self.__is_header(file_name):
                 self.filters.write("    <ClCompile Include='%s'>\n" % file_name)
-                self.filters.write("        <Filter>%s</Filter>\n" % os.path.dirname(file_name))
+                self.filters.write(
+                    "        <Filter>%s</Filter>\n" % os.path.dirname(file_name)
+                )
                 self.filters.write("    </ClCompile>\n")
         self.filters.write("  </ItemGroup>\n")
 
@@ -356,7 +370,9 @@ class ProjFileGenerator(object):
         for file_name in sorted(self.files):
             if self.__is_header(file_name):
                 self.filters.write("    <ClInclude Include='%s'>\n" % file_name)
-                self.filters.write("        <Filter>%s</Filter>\n" % os.path.dirname(file_name))
+                self.filters.write(
+                    "        <Filter>%s</Filter>\n" % os.path.dirname(file_name)
+                )
                 self.filters.write("    </ClInclude>\n")
         self.filters.write("  </ItemGroup>\n")
 
@@ -364,7 +380,9 @@ class ProjFileGenerator(object):
         self.filters.write("  <ItemGroup>\n")
         for file_name in sorted(bazel_files):
             self.filters.write("    <None Include='%s'>\n" % file_name)
-            self.filters.write("        <Filter>%s</Filter>\n" % os.path.dirname(file_name))
+            self.filters.write(
+                "        <Filter>%s</Filter>\n" % os.path.dirname(file_name)
+            )
             self.filters.write("    </None>\n")
         self.filters.write("  </ItemGroup>\n")
 

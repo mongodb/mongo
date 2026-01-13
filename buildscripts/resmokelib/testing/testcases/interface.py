@@ -2,6 +2,7 @@
 
 This is used to perform the actual test case.
 """
+
 import glob
 import os
 import os.path
@@ -15,14 +16,16 @@ from buildscripts.resmokelib.utils import registry
 _TEST_CASES: Dict[str, Callable] = {}  # type: ignore
 
 
-def make_test_case(test_kind, *args, **kwargs) -> 'TestCase':
+def make_test_case(test_kind, *args, **kwargs) -> "TestCase":
     """Provide factory function for creating TestCase instances."""
     if test_kind not in _TEST_CASES:
         raise ValueError("Unknown test kind '%s'" % test_kind)
     return _TEST_CASES[test_kind](*args, **kwargs)
 
 
-class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TEST_CASES)):  # pylint: disable=invalid-metaclass
+class TestCase(
+    unittest.TestCase, metaclass=registry.make_registry_metaclass(_TEST_CASES)
+):  # pylint: disable=invalid-metaclass
     """A test case to execute."""
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
@@ -146,7 +149,7 @@ class UndoDBUtilsMixin:
         # But that should be rare and there's no harm in having more recordings stored.
         for recording in glob.glob(program_executable + "*.undo"):
             self.logger.info("Keeping recording %s", recording)
-            os.rename(recording, recording + '.tokeep')
+            os.rename(recording, recording + ".tokeep")
 
 
 class ProcessTestCase(TestCase, UndoDBUtilsMixin):
@@ -160,8 +163,9 @@ class ProcessTestCase(TestCase, UndoDBUtilsMixin):
         except self.failureException:
             raise
         except:
-            self.logger.exception("Encountered an error running %s %s", self.test_kind,
-                                  self.basename())
+            self.logger.exception(
+                "Encountered an error running %s %s", self.test_kind, self.basename()
+            )
             raise
 
     def as_command(self):
@@ -170,10 +174,14 @@ class ProcessTestCase(TestCase, UndoDBUtilsMixin):
 
     def _execute(self, process):
         """Run the specified process."""
-        self.logger.info("Starting %s...\n%s", self.short_description(), process.as_command())
+        self.logger.info(
+            "Starting %s...\n%s", self.short_description(), process.as_command()
+        )
 
         process.start()
-        self.logger.info("%s started with pid %s.", self.short_description(), process.pid)
+        self.logger.info(
+            "%s started with pid %s.", self.short_description(), process.pid
+        )
 
         self.return_code = process.wait()
         if self.return_code != 0:
@@ -183,36 +191,48 @@ class ProcessTestCase(TestCase, UndoDBUtilsMixin):
 
     def _make_process(self):
         """Return a new Process instance that could be used to run the test or log the command."""
-        raise NotImplementedError("_make_process must be implemented by TestCase subclasses")
+        raise NotImplementedError(
+            "_make_process must be implemented by TestCase subclasses"
+        )
 
 
 class TestCaseFactory:
     def __init__(self, factory_class, shell_options):
         if not issubclass(factory_class, TestCase):
-            raise TypeError("factory_class should be a subclass of Interface.TestCase",
-                            factory_class)
+            raise TypeError(
+                "factory_class should be a subclass of Interface.TestCase",
+                factory_class,
+            )
         self._factory_class = factory_class
         self.shell_options = shell_options
 
     def create_test_case(self, logger, shell_options) -> TestCase:
         raise NotImplementedError(
-            "create_test_case must be implemented by TestCaseFactory subclasses")
+            "create_test_case must be implemented by TestCaseFactory subclasses"
+        )
 
-    def create_test_case_for_thread(self, logger, num_clients=1, thread_id=0,
-                                    tenant_id=None) -> TestCase:
+    def create_test_case_for_thread(
+        self, logger, num_clients=1, thread_id=0, tenant_id=None
+    ) -> TestCase:
         """Create and configure a TestCase to be run in a separate thread."""
 
-        shell_options = self._get_shell_options_for_thread(num_clients, thread_id, tenant_id)
+        shell_options = self._get_shell_options_for_thread(
+            num_clients, thread_id, tenant_id
+        )
         test_case = self.create_test_case(logger, shell_options)
         return test_case
 
     def configure(self, fixture, *args, **kwargs):
         """Configure the test case factory."""
-        raise NotImplementedError("configure must be implemented by TestCaseFactory subclasses")
+        raise NotImplementedError(
+            "configure must be implemented by TestCaseFactory subclasses"
+        )
 
     def make_process(self):
         """Make a process for a TestCase."""
-        raise NotImplementedError("make_process must be implemented by TestCaseFactory subclasses")
+        raise NotImplementedError(
+            "make_process must be implemented by TestCaseFactory subclasses"
+        )
 
     def _get_shell_options_for_thread(self, num_clients, thread_id, tenant_id):
         """Get shell_options with an initialized TestData object for given thread."""

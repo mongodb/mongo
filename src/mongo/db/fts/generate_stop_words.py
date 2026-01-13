@@ -7,7 +7,11 @@ def read_stop_words(file_path):
         print(f"Warning: File {file_path} does not exist. Skipping.")
         return []
     with open(file_path, "r", encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
+        return [
+            line.strip()
+            for line in f
+            if line.strip() and not line.strip().startswith("#")
+        ]
 
 
 def generate(source, language_files):

@@ -34,7 +34,9 @@ def main():
     host = evg_api.host_by_id(instance_id)
     task_id = host.json["provision_options"]["task_id"]
 
-    compile_tasks = evergreen_conn._filter_successful_tasks(evg_api, collections.deque([task_id]))
+    compile_tasks = evergreen_conn._filter_successful_tasks(
+        evg_api, collections.deque([task_id])
+    )
     debugsymbols_task = compile_tasks.symbols_task
     if debugsymbols_task is None:
         raise RuntimeError("Could not find debugsymbols task")
@@ -58,7 +60,9 @@ def main():
                 continue
 
             ext = artifact.name.split(".")[-1]
-            urlretrieve(artifact.url, f"{output_dir}/debugsymbols-manually-downloaded.{ext}")
+            urlretrieve(
+                artifact.url, f"{output_dir}/debugsymbols-manually-downloaded.{ext}"
+            )
             return
 
     raise RuntimeError("Error occured while trying to download debugsymbols.")

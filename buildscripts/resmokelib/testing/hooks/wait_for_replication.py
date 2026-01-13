@@ -36,9 +36,15 @@ class WaitForReplication(interface.Hook):
                 jsTestLog("Ignoring shutdown error in quiesce mode");
             }}"""
         shell_options = {"nodb": "", "eval": js_cmds.format(client_conn)}
-        shell_proc = core.programs.mongo_shell_program(self.hook_logger, **shell_options)
+        shell_proc = core.programs.mongo_shell_program(
+            self.hook_logger, **shell_options
+        )
         shell_proc.start()
         return_code = shell_proc.wait()
         if return_code:
-            raise errors.ServerFailure("Awaiting replication failed for {}".format(client_conn))
-        self.hook_logger.info("WaitForReplication took %0.4f seconds", time.time() - start_time)
+            raise errors.ServerFailure(
+                "Awaiting replication failed for {}".format(client_conn)
+            )
+        self.hook_logger.info(
+            "WaitForReplication took %0.4f seconds", time.time() - start_time
+        )

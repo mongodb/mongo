@@ -7,7 +7,9 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--depfile", action="append")
 parser.add_argument("--install-dir")
-parser.add_argument("--install-mode", choices=["copy", "symlink", "hardlink"], default="hardlink")
+parser.add_argument(
+    "--install-mode", choices=["copy", "symlink", "hardlink"], default="hardlink"
+)
 
 args = parser.parse_args()
 if os.path.exists(args.install_dir):
@@ -67,12 +69,15 @@ def install(src, install_type):
                     if os.path.isdir(src):
                         for root, _, files in os.walk(src):
                             for name in files:
-                                dest_dir = os.path.dirname(os.path.join(root, name)).replace(
-                                    src, dst
-                                )
+                                dest_dir = os.path.dirname(
+                                    os.path.join(root, name)
+                                ).replace(src, dst)
                                 if not os.path.exists(dest_dir):
                                     os.makedirs(dest_dir)
-                                os.link(os.path.join(root, name), os.path.join(dest_dir, name))
+                                os.link(
+                                    os.path.join(root, name),
+                                    os.path.join(dest_dir, name),
+                                )
                     else:
                         try:
                             os.link(src, dst)

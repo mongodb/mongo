@@ -72,7 +72,9 @@ VERSION_PATTERN_REPL = [
     # 'asio-1-34-2' pkg:github/chriskohlhoff/asio
     # 'cares-1_27_0' pkg:github/c-ares/c-ares
     [
-        re.compile(rf"^[a-z]+-{RE_VER_NUM}[_-]{RE_VER_NUM}[_-]{RE_VER_NUM}{RE_VER_LBL}$"),
+        re.compile(
+            rf"^[a-z]+-{RE_VER_NUM}[_-]{RE_VER_NUM}[_-]{RE_VER_NUM}{RE_VER_LBL}$"
+        ),
         r"\1.\2.\3",
     ],
     # 'pcre2-10.40' pkg:github/pcre2project/pcre2
@@ -149,7 +151,9 @@ def process_component_special_cases(
         #         "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
         # Rather than add the complexity of Bazel queries to this script, we just search the text.
 
-        versions["import_script"] = get_version_sasl_from_workspace(repo_root + "/WORKSPACE.bazel")
+        versions["import_script"] = get_version_sasl_from_workspace(
+            repo_root + "/WORKSPACE.bazel"
+        )
         logger.info(
             f"VERSION SPECIAL CASE: {component_key}: Found version '{versions['import_script']}' in 'WORKSPACE.bazel' file"
         )
@@ -168,5 +172,6 @@ def process_component_special_cases(
             logger.info(
                 f"VERSION SPECIAL CASE: {component_key}: Found version '{versions['import_script']}' in 'RELEASE_INFO' file"
             )
+
 
 # endregion special component use-case functions

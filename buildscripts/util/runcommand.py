@@ -11,7 +11,9 @@ from . import fileops
 class RunCommand(object):
     """Class to abstract executing a subprocess."""
 
-    def __init__(self, string=None, output_file=None, append_file=False, propagate_signals=True):
+    def __init__(
+        self, string=None, output_file=None, append_file=False, propagate_signals=True
+    ):
         """Initialize the RunCommand object."""
         self._command = string if string else ""
         self.output_file = output_file

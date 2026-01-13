@@ -27,6 +27,7 @@
 # it in the license file.
 #
 """Validate that the commit message is ok."""
+
 import argparse
 import logging
 import re
@@ -42,7 +43,8 @@ def main(argv=None):
     """Execute Main function to validate commit messages."""
     parser = argparse.ArgumentParser(
         usage="Validate the commit message. "
-        "It validates the latest message when no arguments are provided.")
+        "It validates the latest message when no arguments are provided."
+    )
     parser.add_argument(
         "message",
         metavar="commit message",

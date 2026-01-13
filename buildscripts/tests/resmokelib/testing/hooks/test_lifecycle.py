@@ -52,8 +52,9 @@ class TestFlagBasedThreadLifecycle(unittest.TestCase):
 
 
 class TestFileBasedThreadLifecycle(unittest.TestCase):
-
-    ACTION_FILES = lifecycle_interface.ActionFiles._make(lifecycle_interface.ActionFiles._fields)
+    ACTION_FILES = lifecycle_interface.ActionFiles._make(
+        lifecycle_interface.ActionFiles._fields
+    )
 
     def test_still_idle_after_test_starts(self):
         lifecycle = lifecycle_interface.FileBasedThreadLifecycle(self.ACTION_FILES)
@@ -96,7 +97,9 @@ class TestFileBasedThreadLifecycle(unittest.TestCase):
 
     @mock.patch("threading.Condition")
     @mock.patch("os.path")
-    def test_thread_waits_until_permitted_file_exists(self, mock_os_path, MockCondition):  # pylint: disable=invalid-name
+    def test_thread_waits_until_permitted_file_exists(
+        self, mock_os_path, MockCondition
+    ):  # pylint: disable=invalid-name
         lifecycle = lifecycle_interface.FileBasedThreadLifecycle(self.ACTION_FILES)
         lifecycle.mark_test_started()
 
@@ -104,7 +107,7 @@ class TestFileBasedThreadLifecycle(unittest.TestCase):
             if filename == "permitted":
                 return permitted_file_exists
 
-            self.fail("Mock called with unexpected filename: %s" % (filename, ))
+            self.fail("Mock called with unexpected filename: %s" % (filename,))
 
         mock_os_path.isfile = mock_does_permitted_file_exists
 
@@ -121,7 +124,9 @@ class TestFileBasedThreadLifecycle(unittest.TestCase):
 
     @mock.patch("threading.Condition")
     @mock.patch("os.path")
-    def test_waiting_for_action_permitted_is_interruptible(self, mock_os_path, MockCondition):  # pylint: disable=invalid-name
+    def test_waiting_for_action_permitted_is_interruptible(
+        self, mock_os_path, MockCondition
+    ):  # pylint: disable=invalid-name
         lifecycle = lifecycle_interface.FileBasedThreadLifecycle(self.ACTION_FILES)
         lifecycle.mark_test_started()
 

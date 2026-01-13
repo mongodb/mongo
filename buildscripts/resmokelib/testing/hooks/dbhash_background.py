@@ -21,10 +21,20 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckReplDBHashInBackground."""
-        description = "Check dbhashes of all replica set members while a test is running"
-        js_filename = os.path.join("jstests", "hooks", "run_check_repl_dbhash_background.js")
-        jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename, description,
-                               shell_options=shell_options)
+        description = (
+            "Check dbhashes of all replica set members while a test is running"
+        )
+        js_filename = os.path.join(
+            "jstests", "hooks", "run_check_repl_dbhash_background.js"
+        )
+        jsfile.JSHook.__init__(
+            self,
+            hook_logger,
+            fixture,
+            js_filename,
+            description,
+            shell_options=shell_options,
+        )
 
         self._background_job = None
 
@@ -36,11 +46,14 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
         # replica set shards supports snapshot reads.
         if not client.is_mongos:
             server_status = client.admin.command("serverStatus")
-            if not server_status["storageEngine"].get("supportsSnapshotReadConcern", False):
+            if not server_status["storageEngine"].get(
+                "supportsSnapshotReadConcern", False
+            ):
                 self.logger.info(
                     "Not enabling the background check repl dbhash thread because '%s' storage"
                     " engine doesn't support snapshot reads.",
-                    server_status["storageEngine"]["name"])
+                    server_status["storageEngine"]["name"],
+                )
                 return
 
         self._background_job = _BackgroundJob("CheckReplDBHashInBackground")
@@ -61,7 +74,8 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
             return
 
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
-            test.logger, test, self, self._js_filename, self._shell_options)
+            test.logger, test, self, self._js_filename, self._shell_options
+        )
         hook_test_case.configure(self.fixture)
 
         self.logger.info("Resuming the background check repl dbhash thread.")
@@ -86,5 +100,6 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
             else:
                 self.logger.error(
                     "Encountered an error inside the background check repl dbhash thread.",
-                    exc_info=self._background_job.exc_info)
+                    exc_info=self._background_job.exc_info,
+                )
                 raise self._background_job.exc_info[1]

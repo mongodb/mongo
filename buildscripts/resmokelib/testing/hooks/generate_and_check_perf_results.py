@@ -62,7 +62,9 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
     def __init__(self, hook_logger, fixture):
         """Initialize GenerateAndCheckPerfResults."""
-        interface.Hook.__init__(self, hook_logger, fixture, GenerateAndCheckPerfResults.DESCRIPTION)
+        interface.Hook.__init__(
+            self, hook_logger, fixture, GenerateAndCheckPerfResults.DESCRIPTION
+        )
         self.cedar_report_file = _config.CEDAR_REPORT_FILE
         self.variant = _config.EVERGREEN_VARIANT_NAME
         self.cedar_reports: List[CedarTestReport] = []
@@ -89,10 +91,17 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
         self.cedar_reports.extend(cedar_formatted_results)
 
-        self._check_pass_fail(benchmark_reports, cedar_formatted_results, test, test_report)
+        self._check_pass_fail(
+            benchmark_reports, cedar_formatted_results, test, test_report
+        )
 
-    def _check_pass_fail(self, benchmark_reports: Dict[str, "_BenchmarkThreadsReport"],
-                         cedar_formatted_results: List[CedarTestReport], test, test_report):
+    def _check_pass_fail(
+        self,
+        benchmark_reports: Dict[str, "_BenchmarkThreadsReport"],
+        cedar_formatted_results: List[CedarTestReport],
+        test,
+        test_report,
+    ):
         """Check to see if any of the reported results violate any of the thresholds set."""
         if self.variant is None:
             self.logger.info(
@@ -103,7 +112,8 @@ class GenerateAndCheckPerfResults(interface.Hook):
             variant_thresholds = self.performance_thresholds.get(test_name, None)
             if variant_thresholds is None:
                 self.logger.info(
-                    f"No thresholds were set for {test_name}, skipping threshold check")
+                    f"No thresholds were set for {test_name}, skipping threshold check"
+                )
                 continue
             test_thresholds = variant_thresholds.get(self.variant, None)
             if test_thresholds is None:
@@ -117,24 +127,33 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 thread_level = item["thread_level"]
                 for metric in item["metrics"]:
                     metrics_to_check.append(
-                        IndividualMetricThreshold(test_name=test_name, thread_level=thread_level,
-                                                  metric_name=metric["name"], value=metric["value"],
-                                                  bound_direction=metric["bound_direction"]))
+                        IndividualMetricThreshold(
+                            test_name=test_name,
+                            thread_level=thread_level,
+                            metric_name=metric["name"],
+                            value=metric["value"],
+                            bound_direction=metric["bound_direction"],
+                        )
+                    )
             # Transform the reported performance results into something we can more easily use.
             transformed_metrics: Dict[ReportedMetric, CedarMetric] = {}
             for cedar_result in cedar_formatted_results:
                 for individual_metric in cedar_result.metrics:
-                    reported_metric = ReportedMetric(test_name=cedar_result.test_name,
-                                                     thread_level=cedar_result.thread_level,
-                                                     metric_name=individual_metric.name)
+                    reported_metric = ReportedMetric(
+                        test_name=cedar_result.test_name,
+                        thread_level=cedar_result.thread_level,
+                        metric_name=individual_metric.name,
+                    )
                     if transformed_metrics.get(reported_metric, None) is not None:
                         raise CedarReportError(
-                            f"Multiple values reported for the same metric: {reported_metric}")
+                            f"Multiple values reported for the same metric: {reported_metric}"
+                        )
                     else:
                         transformed_metrics[reported_metric] = individual_metric
             # Add a dynamic resmoke test to make sure that the pass/fail results are reported correctly.
             hook_test_case = CheckPerfResultTestCase.create_after_test(
-                self.logger, test, self, metrics_to_check, transformed_metrics)
+                self.logger, test, self, metrics_to_check, transformed_metrics
+            )
             hook_test_case.configure(self.fixture)
             hook_test_case.run_dynamic_test(test_report)
 
@@ -148,7 +167,8 @@ class GenerateAndCheckPerfResults(interface.Hook):
         except Exception:
             self.logger.exception(
                 f"Could not load in the threshold file needed to check performance results. "
-                f"Trying to retrieve them from {THRESHOLD_LOCATION}.")
+                f"Trying to retrieve them from {THRESHOLD_LOCATION}."
+            )
             raise ServerFailure(
                 "Could not load the needed threshold information. Please make sure you are in the root of the mongo repo."
             )
@@ -164,7 +184,8 @@ class GenerateAndCheckPerfResults(interface.Hook):
                 json.dump(dict_formatted_results, fh)
 
     def _generate_cedar_report(
-            self, benchmark_reports: Dict[str, "_BenchmarkThreadsReport"]) -> List[CedarTestReport]:
+        self, benchmark_reports: Dict[str, "_BenchmarkThreadsReport"]
+    ) -> List[CedarTestReport]:
         """Format the data to look like a cedar report."""
         cedar_report = []
 
@@ -176,8 +197,9 @@ class GenerateAndCheckPerfResults(interface.Hook):
                     raise CedarReportError(msg)
 
             for threads_count, thread_metrics in cedar_metrics.items():
-                test_report = CedarTestReport(test_name=name, thread_level=threads_count,
-                                              metrics=thread_metrics)
+                test_report = CedarTestReport(
+                    test_name=name, thread_level=threads_count, metrics=thread_metrics
+                )
                 cedar_report.append(test_report)
 
         return cedar_report
@@ -191,19 +213,32 @@ class GenerateAndCheckPerfResults(interface.Hook):
             bm_name_obj = _BenchmarkThreadsReport.parse_bm_name(benchmark_res)
 
             if bm_name_obj.base_name not in benchmark_reports:
-                benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(context)
-            benchmark_reports[bm_name_obj.base_name].add_report(bm_name_obj, benchmark_res)
+                benchmark_reports[bm_name_obj.base_name] = _BenchmarkThreadsReport(
+                    context
+                )
+            benchmark_reports[bm_name_obj.base_name].add_report(
+                bm_name_obj, benchmark_res
+            )
         return benchmark_reports
 
 
 class CheckPerfResultTestCase(interface.DynamicTestCase):
     """CheckPerfResultTestCase class."""
 
-    def __init__(self, logger, test_name, description, base_test_name, hook,
-                 thresholds_to_check: List["IndividualMetricThreshold"],
-                 reported_metrics: Dict[ReportedMetric, CedarMetric]):
+    def __init__(
+        self,
+        logger,
+        test_name,
+        description,
+        base_test_name,
+        hook,
+        thresholds_to_check: List["IndividualMetricThreshold"],
+        reported_metrics: Dict[ReportedMetric, CedarMetric],
+    ):
         super().__init__(logger, test_name, description, base_test_name, hook)
-        self.thresholds_to_check: List["IndividualMetricThreshold"] = thresholds_to_check
+        self.thresholds_to_check: List["IndividualMetricThreshold"] = (
+            thresholds_to_check
+        )
         self.reported_metrics: Dict[ReportedMetric, CedarMetric] = reported_metrics
 
     def run_test(self):
@@ -217,19 +252,26 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
 
         for metric_to_check in self.thresholds_to_check:
             reported_metric = self.reported_metrics.get(
-                ReportedMetric(test_name=metric_to_check.test_name,
-                               thread_level=metric_to_check.thread_level,
-                               metric_name=metric_to_check.metric_name), None)
+                ReportedMetric(
+                    test_name=metric_to_check.test_name,
+                    thread_level=metric_to_check.thread_level,
+                    metric_name=metric_to_check.metric_name,
+                ),
+                None,
+            )
             if reported_metric is None:
                 self.logger.error(
                     f"One of the expected metrics was not able to be found in the performance results generated by this task. {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} did not report a metric called {metric_to_check.metric_name}."
                 )
                 any_metric_has_failed = True
                 continue
-            if (metric_to_check.bound_direction == BoundDirection.UPPER
-                    and metric_to_check.value < reported_metric.value) or (
-                        metric_to_check.bound_direction == BoundDirection.LOWER
-                        and metric_to_check.value > reported_metric.value):
+            if (
+                metric_to_check.bound_direction == BoundDirection.UPPER
+                and metric_to_check.value < reported_metric.value
+            ) or (
+                metric_to_check.bound_direction == BoundDirection.LOWER
+                and metric_to_check.value > reported_metric.value
+            ):
                 if metric_to_check.bound_direction == BoundDirection.LOWER:
                     self.logger.error(
                         f"Metric {metric_to_check.metric_name} in {metric_to_check.test_name} with thread_level of {metric_to_check.thread_level} has failed the threshold check. The reported value of {reported_metric.value} is lower than the set threshold of {metric_to_check.value}"
@@ -247,8 +289,9 @@ class CheckPerfResultTestCase(interface.DynamicTestCase):
 
 
 # Capture information from a Benchmark name in a logical format.
-_BenchmarkName = collections.namedtuple("_BenchmarkName",
-                                        ["base_name", "thread_count", "statistic_type"])
+_BenchmarkName = collections.namedtuple(
+    "_BenchmarkName", ["base_name", "thread_count", "statistic_type"]
+)
 
 
 class _BenchmarkThreadsReport(object):
@@ -301,16 +344,21 @@ class _BenchmarkThreadsReport(object):
         cedar_metric_type: str
 
     BENCHMARK_METRICS_TO_GATHER = {
-        "latency":
-            BenchmarkMetricInfo(local_name="cpu_time", cedar_name="latency_per_op",
-                                cedar_metric_type="LATENCY"),
-        "instructions_per_iteration":
-            BenchmarkMetricInfo(local_name="instructions_per_iteration",
-                                cedar_name="instructions_per_iteration",
-                                cedar_metric_type="LATENCY"),
-        "cycles_per_iteration":
-            BenchmarkMetricInfo(local_name="cycles_per_iteration",
-                                cedar_name="cycles_per_iteration", cedar_metric_type="LATENCY"),
+        "latency": BenchmarkMetricInfo(
+            local_name="cpu_time",
+            cedar_name="latency_per_op",
+            cedar_metric_type="LATENCY",
+        ),
+        "instructions_per_iteration": BenchmarkMetricInfo(
+            local_name="instructions_per_iteration",
+            cedar_name="instructions_per_iteration",
+            cedar_metric_type="LATENCY",
+        ),
+        "cycles_per_iteration": BenchmarkMetricInfo(
+            local_name="cycles_per_iteration",
+            cedar_name="cycles_per_iteration",
+            cedar_metric_type="LATENCY",
+        ),
     }
 
     # Map benchmark metric type to the type in Cedar
@@ -342,7 +390,9 @@ class _BenchmarkThreadsReport(object):
 
     def __init__(self, context_dict):
         # `context_dict` was parsed from a json file and might have additional fields.
-        relevant = dict(filter(lambda e: e[0] in self.Context._fields, context_dict.items()))
+        relevant = dict(
+            filter(lambda e: e[0] in self.Context._fields, context_dict.items())
+        )
         self.context = self.Context(**relevant)
 
         # list of benchmark runs for each thread.
@@ -468,16 +518,18 @@ class _BenchmarkThreadsReport(object):
                         # cedar_type becomes `MEAN`.
 
                         metric_name = f"{metric_cedar_name}_{aggregate_name}"
-                        metric_cedar_type = self.AGGREGATE_TYPE_TO_CEDAR_METRIC_TYPE_MAP[
-                            aggregate_name]
+                        metric_cedar_type = (
+                            self.AGGREGATE_TYPE_TO_CEDAR_METRIC_TYPE_MAP[aggregate_name]
+                        )
                     else:
                         # Call out what iteration this metric came from. For example, if we are looking at iteration 2
                         # and the `latency` metric, metric_name becomes `latency_2`.
                         idx = report.get("repetition_index", 0)
                         metric_name = f"{metric_cedar_name}_{idx}"
 
-                    metric = CedarMetric(name=metric_name, type=metric_cedar_type,
-                                         value=metric_value)
+                    metric = CedarMetric(
+                        name=metric_name, type=metric_cedar_type, value=metric_value
+                    )
                     threads = report["threads"]
                     if threads in res:
                         res[threads].append(metric)
@@ -519,7 +571,7 @@ class _BenchmarkThreadsReport(object):
         statistic_type_candidate = name_str.rsplit("_", 1)[-1]
         # Remove the statistic type suffix from the name.
         if statistic_type_candidate == statistic_type:
-            name_str = name_str[:-len(statistic_type) - 1]
+            name_str = name_str[: -len(statistic_type) - 1]
 
         # Step 2: Get the thread count and name.
         thread_section = name_str.rsplit("/", 1)[-1]

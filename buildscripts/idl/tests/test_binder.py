@@ -36,6 +36,7 @@ import unittest
 if __package__ is None:
     import sys
     from os import path
+
     sys.path.append(path.dirname(path.abspath(__file__)))
     import testcase
     from context import idl
@@ -50,9 +51,9 @@ INDENT_SPACE_COUNT = 4
 def fill_spaces(count):
     # type: (int) -> str
     """Fill a string full of spaces."""
-    fill = ''
+    fill = ""
     for _ in range(count * INDENT_SPACE_COUNT):
-        fill += ' '
+        fill += " "
 
     return fill
 
@@ -62,7 +63,7 @@ def indent_text(count, unindented_text):
     """Indent each line of a multi-line string."""
     lines = unindented_text.splitlines()
     fill = fill_spaces(count)
-    return '\n'.join(fill + line for line in lines)
+    return "\n".join(fill + line for line in lines)
 
 
 class TestBinder(testcase.IDLTestcase):
@@ -141,15 +142,17 @@ class TestBinder(testcase.IDLTestcase):
             cpp_namespace: 'mongo'
             cpp_includes:
                 - 'bar'
-                - 'foo'"""))
+                - 'foo'""")
+        )
         self.assertEqual(spec.globals.cpp_namespace, "mongo")
-        self.assertListEqual(spec.globals.cpp_includes, ['bar', 'foo'])
+        self.assertListEqual(spec.globals.cpp_includes, ["bar", "foo"])
 
         spec = self.assert_bind(
             textwrap.dedent("""
         global:
             cpp_namespace: 'mongo::nested'
-        """))
+        """)
+        )
         self.assertEqual(spec.globals.cpp_namespace, "mongo::nested")
 
     def test_global_negatives(self):
@@ -159,7 +162,9 @@ class TestBinder(testcase.IDLTestcase):
             textwrap.dedent("""
         global:
             cpp_namespace: 'something'
-        """), idl.errors.ERROR_ID_BAD_CPP_NAMESPACE)
+        """),
+            idl.errors.ERROR_ID_BAD_CPP_NAMESPACE,
+        )
 
     def test_type_positive(self):
         # type: () -> None
@@ -175,15 +180,27 @@ class TestBinder(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
                 is_view: false
-            """))
+            """)
+        )
 
         # Test supported types
         for bson_type in [
-                "bool", "date", "null", "decimal", "double", "int", "long", "objectid", "regex",
-                "string", "timestamp", "undefined"
+            "bool",
+            "date",
+            "null",
+            "decimal",
+            "double",
+            "int",
+            "long",
+            "objectid",
+            "regex",
+            "string",
+            "timestamp",
+            "undefined",
         ]:
             self.assert_bind(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
         types:
             foofoo:
                 description: foo
@@ -192,19 +209,23 @@ class TestBinder(testcase.IDLTestcase):
                 default: foo
                 deserializer: BSONElement::fake
                 is_view: false
-            """ % (bson_type)))
+            """
+                    % (bson_type)
+                )
+            )
 
         # Test supported numeric types
         for cpp_type in [
-                "std::int32_t",
-                "std::uint32_t",
-                "std::int32_t",
-                "std::uint64_t",
-                "std::vector<std::uint8_t>",
-                "std::array<std::uint8_t, 16>",
+            "std::int32_t",
+            "std::uint32_t",
+            "std::int32_t",
+            "std::uint64_t",
+            "std::vector<std::uint8_t>",
+            "std::array<std::uint8_t, 16>",
         ]:
             self.assert_bind(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
                 types:
                     foofoo:
                         description: foo
@@ -212,7 +233,10 @@ class TestBinder(testcase.IDLTestcase):
                         bson_serialization_type: int
                         deserializer: BSONElement::fake
                         is_view: false
-                """ % (cpp_type)))
+                """
+                    % (cpp_type)
+                )
+            )
 
         # Test object
         self.assert_bind(
@@ -226,7 +250,8 @@ class TestBinder(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
                 is_view: false
-            """))
+            """)
+        )
 
         # Test 'any'
         self.assert_bind(
@@ -240,7 +265,8 @@ class TestBinder(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
                 is_view: false
-            """))
+            """)
+        )
 
         # Test 'chain'
         self.assert_bind(
@@ -254,12 +280,14 @@ class TestBinder(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
                 is_view: false
-            """))
+            """)
+        )
 
         # Test supported bindata_subtype
         for bindata_subtype in ["generic", "function", "uuid", "md5"]:
             self.assert_bind(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
             types:
                 foofoo:
                     description: foo
@@ -268,7 +296,10 @@ class TestBinder(testcase.IDLTestcase):
                     bindata_subtype: %s
                     deserializer: BSONElement::fake
                     is_view: false
-                """ % (bindata_subtype)))
+                """
+                    % (bindata_subtype)
+                )
+            )
 
     def test_type_negative(self):
         # type: () -> None
@@ -283,7 +314,9 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: foo
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_TYPE,
+        )
 
         # Test bad cpp_type name
         self.assert_bind_fail(
@@ -295,50 +328,53 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: string
                     deserializer: bar
                     is_view: false
-            """), idl.errors.ERROR_ID_NO_STRINGDATA)
+            """),
+            idl.errors.ERROR_ID_NO_STRINGDATA,
+        )
 
         # Test unsupported serialization
         for cpp_type in [
-                "char",
-                "signed char",
-                "unsigned char",
-                "signed short int",
-                "short int",
-                "short",
-                "signed short",
-                "unsigned short",
-                "unsigned short int",
-                "signed int",
-                "signed",
-                "unsigned int",
-                "unsigned",
-                "signed long int",
-                "signed long",
-                "int",
-                "long int",
-                "long",
-                "unsigned long int",
-                "unsigned long",
-                "signed long long int",
-                "signed long long",
-                "long long int",
-                "long long",
-                "unsigned long int",
-                "unsigned long",
-                "wchar_t",
-                "char16_t",
-                "char32_t",
-                "int8_t",
-                "int16_t",
-                "int32_t",
-                "int64_t",
-                "uint8_t",
-                "uint16_t",
-                "uint32_t",
-                "uint64_t",
+            "char",
+            "signed char",
+            "unsigned char",
+            "signed short int",
+            "short int",
+            "short",
+            "signed short",
+            "unsigned short",
+            "unsigned short int",
+            "signed int",
+            "signed",
+            "unsigned int",
+            "unsigned",
+            "signed long int",
+            "signed long",
+            "int",
+            "long int",
+            "long",
+            "unsigned long int",
+            "unsigned long",
+            "signed long long int",
+            "signed long long",
+            "long long int",
+            "long long",
+            "unsigned long int",
+            "unsigned long",
+            "wchar_t",
+            "char16_t",
+            "char32_t",
+            "int8_t",
+            "int16_t",
+            "int32_t",
+            "int64_t",
+            "uint8_t",
+            "uint16_t",
+            "uint32_t",
+            "uint64_t",
         ]:
             self.assert_bind_fail(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
                 types:
                     foofoo:
                         description: foo
@@ -346,12 +382,22 @@ class TestBinder(testcase.IDLTestcase):
                         bson_serialization_type: int
                         deserializer: BSONElement::int
                         is_view: false
-                    """ % (cpp_type)), idl.errors.ERROR_ID_BAD_NUMERIC_CPP_TYPE)
+                    """
+                    % (cpp_type)
+                ),
+                idl.errors.ERROR_ID_BAD_NUMERIC_CPP_TYPE,
+            )
 
         # Test the std prefix 8 and 16-byte integers fail
-        for std_cpp_type in ["std::int8_t", "std::int16_t", "std::uint8_t", "std::uint16_t"]:
+        for std_cpp_type in [
+            "std::int8_t",
+            "std::int16_t",
+            "std::uint8_t",
+            "std::uint16_t",
+        ]:
             self.assert_bind_fail(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
                 types:
                     foofoo:
                         description: foo
@@ -359,7 +405,11 @@ class TestBinder(testcase.IDLTestcase):
                         bson_serialization_type: int
                         deserializer: BSONElement::int
                         is_view: false
-                    """ % (std_cpp_type)), idl.errors.ERROR_ID_BAD_NUMERIC_CPP_TYPE)
+                    """
+                    % (std_cpp_type)
+                ),
+                idl.errors.ERROR_ID_BAD_NUMERIC_CPP_TYPE,
+            )
 
         # Test bindata_subtype missing
         self.assert_bind_fail(
@@ -371,7 +421,9 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: bindata
                     deserializer: BSONElement::fake
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE,
+        )
 
         # Test fake bindata_subtype is wrong
         self.assert_bind_fail(
@@ -384,7 +436,9 @@ class TestBinder(testcase.IDLTestcase):
                     bindata_subtype: foo
                     deserializer: BSONElement::fake
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE,
+        )
 
         # Test deprecated bindata_subtype 'binary', and 'uuid_old' are wrong
         self.assert_bind_fail(
@@ -396,7 +450,9 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: bindata
                     bindata_subtype: binary
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE,
+        )
 
         self.assert_bind_fail(
             textwrap.dedent("""
@@ -407,7 +463,9 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: bindata
                     bindata_subtype: uuid_old
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE,
+        )
 
         # Test bindata_subtype on wrong type
         self.assert_bind_fail(
@@ -420,7 +478,9 @@ class TestBinder(testcase.IDLTestcase):
                     bindata_subtype: generic
                     deserializer: BSONElement::fake
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_TYPE)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_TYPE,
+        )
 
         # Test bindata with default
         self.assert_bind_fail(
@@ -433,7 +493,9 @@ class TestBinder(testcase.IDLTestcase):
                     bindata_subtype: uuid
                     default: 42
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BINDATA_DEFAULT)
+            """),
+            idl.errors.ERROR_ID_BAD_BINDATA_DEFAULT,
+        )
 
         # Test bindata in list of types
         self.assert_bind_fail(
@@ -446,7 +508,9 @@ class TestBinder(testcase.IDLTestcase):
                                 - bindata
                                 - string
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_TYPE,
+        )
 
         # Test bindata in list of types
         self.assert_bind_fail(
@@ -459,7 +523,9 @@ class TestBinder(testcase.IDLTestcase):
                                 - bindata
                                 - string
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_TYPE,
+        )
 
         # Test 'any' in list of types
         self.assert_bind_fail(
@@ -472,7 +538,9 @@ class TestBinder(testcase.IDLTestcase):
                                 - any
                                 - int
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_ANY_TYPE_USE)
+            """),
+            idl.errors.ERROR_ID_BAD_ANY_TYPE_USE,
+        )
 
         # Test object in list of types
         self.assert_bind_fail(
@@ -485,7 +553,9 @@ class TestBinder(testcase.IDLTestcase):
                                 - object
                                 - int
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_TYPE_LIST)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_TYPE_LIST,
+        )
 
         # Test fake in list of types
         self.assert_bind_fail(
@@ -498,7 +568,9 @@ class TestBinder(testcase.IDLTestcase):
                                 - int
                                 - fake
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
+            """),
+            idl.errors.ERROR_ID_BAD_BSON_TYPE,
+        )
 
         # Test 'chain' in list of types
         self.assert_bind_fail(
@@ -511,15 +583,27 @@ class TestBinder(testcase.IDLTestcase):
                                 - chain
                                 - int
                     is_view: false
-            """), idl.errors.ERROR_ID_BAD_ANY_TYPE_USE)
+            """),
+            idl.errors.ERROR_ID_BAD_ANY_TYPE_USE,
+        )
 
         # Test unsupported serialization
         for bson_type in [
-                "bool", "date", "null", "decimal", "double", "int", "long", "objectid", "regex",
-                "timestamp", "undefined"
+            "bool",
+            "date",
+            "null",
+            "decimal",
+            "double",
+            "int",
+            "long",
+            "objectid",
+            "regex",
+            "timestamp",
+            "undefined",
         ]:
             self.assert_bind_fail(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
                 types:
                     foofoo:
                         description: foo
@@ -528,11 +612,15 @@ class TestBinder(testcase.IDLTestcase):
                         serializer: foo
                         deserializer: BSONElement::fake
                         is_view: false
-                    """ % (bson_type)),
-                idl.errors.ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED)
+                    """
+                    % (bson_type)
+                ),
+                idl.errors.ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED,
+            )
 
             self.assert_bind_fail(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
                 types:
                     foofoo:
                         description: foo
@@ -540,8 +628,11 @@ class TestBinder(testcase.IDLTestcase):
                         bson_serialization_type: %s
                         deserializer: foo
                         is_view: false
-                    """ % (bson_type)),
-                idl.errors.ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED)
+                    """
+                    % (bson_type)
+                ),
+                idl.errors.ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED,
+            )
 
         # Test 'any' serialization needs deserializer
         self.assert_bind_fail(
@@ -552,7 +643,9 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: any
                     is_view: false
-            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+            """),
+            idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD,
+        )
 
         # Test 'chain' serialization needs deserializer
         self.assert_bind_fail(
@@ -564,7 +657,9 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: chain
                     serializer: bar
                     is_view: false
-            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+            """),
+            idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD,
+        )
 
         # Test 'string' serialization needs deserializer
         self.assert_bind_fail(
@@ -576,7 +671,9 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: string
                     serializer: bar
                     is_view: false
-            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+            """),
+            idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD,
+        )
 
         # Test 'date' serialization needs deserializer
         self.assert_bind_fail(
@@ -587,7 +684,9 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: date
                     is_view: false
-            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+            """),
+            idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD,
+        )
 
         # Test 'chain' serialization needs serializer
         self.assert_bind_fail(
@@ -599,7 +698,9 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: chain
                     deserializer: bar
                     is_view: false
-            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+            """),
+            idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD,
+        )
 
         # Test list of bson types needs deserializer
         self.assert_bind_fail(
@@ -612,7 +713,9 @@ class TestBinder(testcase.IDLTestcase):
                                 - int
                                 - string
                     is_view: false
-            """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
+            """),
+            idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD,
+        )
 
         # Test array as name
         self.assert_bind_fail(
@@ -624,7 +727,9 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: string
                     deserializer: bar
                     is_view: false
-            """), idl.errors.ERROR_ID_ARRAY_NOT_VALID_TYPE)
+            """),
+            idl.errors.ERROR_ID_ARRAY_NOT_VALID_TYPE,
+        )
 
     def test_struct_positive(self):
         # type: () -> None
@@ -640,25 +745,32 @@ class TestBinder(testcase.IDLTestcase):
                 bson_serialization_type: int
                 deserializer: mongo::BSONElement::_numberInt
                 is_view: false
-        """))
+        """),
+        )
 
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
                     strict: true
                     fields:
                         foo: string
-            """))
+            """)
+        )
 
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
                     strict: true
                     fields:
                         foo: array<int>
-            """))
+            """)
+        )
 
     def test_struct_negative(self):
         # type: () -> None
@@ -674,27 +786,34 @@ class TestBinder(testcase.IDLTestcase):
                 bson_serialization_type: int
                 deserializer: mongo::BSONElement::_numberInt
                 is_view: false
-        """))
+        """),
+        )
 
         # Test array as name
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 array<foo>:
                     description: foo
                     strict: true
                     fields:
                         foo: string
-            """), idl.errors.ERROR_ID_ARRAY_NOT_VALID_TYPE)
+            """),
+            idl.errors.ERROR_ID_ARRAY_NOT_VALID_TYPE,
+        )
 
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
                     strict: true
                     fields:
                         foo: array<int>
-            """))
+            """)
+        )
 
     def test_variant_positive(self):
         # type: () -> None
@@ -717,9 +836,12 @@ class TestBinder(testcase.IDLTestcase):
                 cpp_type: "std::vector<std::uint8_t>"
                 deserializer: "mongo::BSONElement::_binDataVector"
                 is_view: false
-        """))
+        """),
+        )
 
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -729,9 +851,12 @@ class TestBinder(testcase.IDLTestcase):
                             variant:
                             - string
                             - int
-            """))
+            """)
+        )
 
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -741,9 +866,12 @@ class TestBinder(testcase.IDLTestcase):
                             variant:
                             - string
                             - bindata_function
-            """))
+            """)
+        )
 
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -754,10 +882,13 @@ class TestBinder(testcase.IDLTestcase):
                             - string
                             - int
                         default: 1
-            """))
+            """)
+        )
 
         # Test multiple BSON serialization type Object.
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         structs:
             insert_type:
                 description: foo
@@ -774,16 +905,19 @@ class TestBinder(testcase.IDLTestcase):
                             - insert_type
                             - update_type
                             - int
-            """))
+            """)
+        )
 
     def test_variant_negative(self):
         # type: () -> None
         """Negative variant test cases."""
 
         # Setup some common types
-        test_preamble = self.common_types + indent_text(
-            1,
-            textwrap.dedent("""
+        test_preamble = (
+            self.common_types
+            + indent_text(
+                1,
+                textwrap.dedent("""
             int:
                 description: foo
                 cpp_type: std::int32_t
@@ -800,7 +934,9 @@ class TestBinder(testcase.IDLTestcase):
                 cpp_type: "std::int32_t"
                 deserializer: "mongo::BSONElement::safeNumberInt"
                 is_view: false
-        """)) + textwrap.dedent("""
+        """),
+            )
+            + textwrap.dedent("""
         enums:
             foo_enum:
                 description: foo
@@ -809,9 +945,11 @@ class TestBinder(testcase.IDLTestcase):
                     v1: 0
                     v2: 1
         """)
+        )
 
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -820,10 +958,13 @@ class TestBinder(testcase.IDLTestcase):
                         type:
                             variant:
                             - string
-            """), idl.errors.ERROR_ID_USELESS_VARIANT)
+            """),
+            idl.errors.ERROR_ID_USELESS_VARIANT,
+        )
 
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -834,11 +975,15 @@ class TestBinder(testcase.IDLTestcase):
                             - string
                             - int
                             - not_defined
-            """), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
+            """),
+            idl.errors.ERROR_ID_UNKNOWN_TYPE,
+            True,
+        )
 
         # Enums are banned in variants for now.
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -848,10 +993,14 @@ class TestBinder(testcase.IDLTestcase):
                             variant:
                             - string
                             - foo_enum
-            """), idl.errors.ERROR_ID_NO_VARIANT_ENUM, True)
+            """),
+            idl.errors.ERROR_ID_NO_VARIANT_ENUM,
+            True,
+        )
 
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -861,10 +1010,13 @@ class TestBinder(testcase.IDLTestcase):
                             variant:
                             - string
                             - string
-            """), idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES)
+            """),
+            idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES,
+        )
 
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -874,10 +1026,13 @@ class TestBinder(testcase.IDLTestcase):
                             variant:
                             - array<string>
                             - array<string>
-            """), idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES)
+            """),
+            idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES,
+        )
 
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             struct0:
                 description: foo
@@ -891,11 +1046,14 @@ class TestBinder(testcase.IDLTestcase):
                             variant:
                             - array<struct0>
                             - array<struct1>
-            """), idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES)
+            """),
+            idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES,
+        )
 
         # At most one array can have BSON serialization type NumberInt.
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -905,10 +1063,13 @@ class TestBinder(testcase.IDLTestcase):
                             variant:
                             - array<int>
                             - array<safeInt>
-            """), idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES)
+            """),
+            idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES,
+        )
 
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             one_string:
                 description: foo
@@ -922,12 +1083,16 @@ class TestBinder(testcase.IDLTestcase):
                             - one_string
                             - one_string
                             - int
-            """), idl.errors.ERROR_ID_VARIANT_STRUCTS, True)
+            """),
+            idl.errors.ERROR_ID_VARIANT_STRUCTS,
+            True,
+        )
 
         # For multiple BSON serialization type Objects they must have different field names
         # for their first field.
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             one_string:
                 description: foo
@@ -944,11 +1109,15 @@ class TestBinder(testcase.IDLTestcase):
                             - one_string
                             - one_int
                             - int
-            """), idl.errors.ERROR_ID_VARIANT_STRUCTS, True)
+            """),
+            idl.errors.ERROR_ID_VARIANT_STRUCTS,
+            True,
+        )
 
         # At most one type can have BSON serialization type NumberInt.
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -958,7 +1127,9 @@ class TestBinder(testcase.IDLTestcase):
                             variant:
                             - safeInt
                             - int
-      """), idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES)
+      """),
+            idl.errors.ERROR_ID_VARIANT_DUPLICATE_TYPES,
+        )
 
     def test_field_positive(self):
         # type: () -> None
@@ -968,17 +1139,22 @@ class TestBinder(testcase.IDLTestcase):
         test_preamble = self.common_types
 
         # Short type
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar:
                 description: foo
                 strict: false
                 fields:
                     foo: string
-            """))
+            """)
+        )
 
         # Long type
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar:
                 description: foo
@@ -986,10 +1162,13 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo:
                         type: string
-            """))
+            """)
+        )
 
         # Long type with default
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar:
                 description: foo
@@ -998,22 +1177,28 @@ class TestBinder(testcase.IDLTestcase):
                     foo:
                         type: string
                         default: bar
-            """))
+            """)
+        )
 
         # Test array as field type
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
                     strict: true
                     fields:
                         foo: array<string>
-            """))
+            """)
+        )
 
         # Test array as field type
-        self.assert_bind(self.common_types + indent_text(
-            1,
-            textwrap.dedent("""
+        self.assert_bind(
+            self.common_types
+            + indent_text(
+                1,
+                textwrap.dedent("""
                 arrayfake:
                     description: foo
                     cpp_type: foo
@@ -1021,17 +1206,22 @@ class TestBinder(testcase.IDLTestcase):
                     serializer: foo
                     deserializer: foo
                     is_view: false
-            """)) + textwrap.dedent("""
+            """),
+            )
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
                     strict: true
                     fields:
                         arrayOfString: arrayfake
-            """))
+            """)
+        )
 
         # Test always_serialize with optional
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
@@ -1041,10 +1231,13 @@ class TestBinder(testcase.IDLTestcase):
                             type: string
                             optional: true
                             always_serialize: true
-            """))
+            """)
+        )
 
         # Test field of a struct type with default=true
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
@@ -1058,7 +1251,8 @@ class TestBinder(testcase.IDLTestcase):
                             type: foo
                             default: true
 
-            """))
+            """)
+        )
 
     def test_field_negative(self):
         # type: () -> None
@@ -1093,7 +1287,8 @@ class TestBinder(testcase.IDLTestcase):
 
         # Test field of a struct type with a non-true default
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
@@ -1107,44 +1302,57 @@ class TestBinder(testcase.IDLTestcase):
                             type: foo
                             default: foo
 
-            """), idl.errors.ERROR_ID_DEFAULT_MUST_BE_TRUE_OR_EMPTY_FOR_STRUCT)
+            """),
+            idl.errors.ERROR_ID_DEFAULT_MUST_BE_TRUE_OR_EMPTY_FOR_STRUCT,
+        )
 
         # Test array as field name
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
                     strict: true
                     fields:
                         array<foo>: string
-            """), idl.errors.ERROR_ID_ARRAY_NOT_VALID_TYPE)
+            """),
+            idl.errors.ERROR_ID_ARRAY_NOT_VALID_TYPE,
+        )
 
         # Test recursive array as field type
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
                     strict: true
                     fields:
                         foo: array<array<string>>
-            """), idl.errors.ERROR_ID_BAD_ARRAY_TYPE_NAME, True)
+            """),
+            idl.errors.ERROR_ID_BAD_ARRAY_TYPE_NAME,
+            True,
+        )
 
         # Test inherited default with array
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
                     strict: true
                     fields:
                         foo: array<string>
-            """), idl.errors.ERROR_ID_ARRAY_NO_DEFAULT)
+            """),
+            idl.errors.ERROR_ID_ARRAY_NO_DEFAULT,
+        )
 
         # Test non-inherited default with array
         self.assert_bind_fail(
-            self.common_types + textwrap.dedent("""
+            self.common_types
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
@@ -1153,11 +1361,14 @@ class TestBinder(testcase.IDLTestcase):
                         foo:
                             type: array<string>
                             default: 123
-            """), idl.errors.ERROR_ID_ARRAY_NO_DEFAULT)
+            """),
+            idl.errors.ERROR_ID_ARRAY_NO_DEFAULT,
+        )
 
         # Test bindata with default
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
@@ -1166,11 +1377,14 @@ class TestBinder(testcase.IDLTestcase):
                         foo:
                             type: bindata
                             default: 42
-            """), idl.errors.ERROR_ID_BAD_BINDATA_DEFAULT)
+            """),
+            idl.errors.ERROR_ID_BAD_BINDATA_DEFAULT,
+        )
 
         # Test default and optional for the same field
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
@@ -1180,11 +1394,14 @@ class TestBinder(testcase.IDLTestcase):
                             type: string
                             default: 42
                             optional: true
-            """), idl.errors.ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL)
+            """),
+            idl.errors.ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL,
+        )
 
         # Test always_serialize without optional for the same field
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
@@ -1194,11 +1411,14 @@ class TestBinder(testcase.IDLTestcase):
                             type: string
                             default: 42
                             always_serialize: true
-            """), idl.errors.ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL)
+            """),
+            idl.errors.ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL,
+        )
 
         # Test duplicate comparison order
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo:
                 description: foo
@@ -1211,11 +1431,14 @@ class TestBinder(testcase.IDLTestcase):
                     bar:
                         type: string
                         comparison_order: 1
-            """), idl.errors.ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER)
+            """),
+            idl.errors.ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER,
+        )
 
         # Test field marked with non_const_getter in immutable struct
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
@@ -1224,17 +1447,21 @@ class TestBinder(testcase.IDLTestcase):
                         foo:
                             type: string
                             non_const_getter: true
-            """), idl.errors.ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT)
+            """),
+            idl.errors.ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT,
+        )
 
     def test_ignored_field_negative(self):
         # type: () -> None
         """Test that if a field is marked as ignored, no other properties are set."""
         for test_value in [
-                "optional: true",
-                "default: foo",
+            "optional: true",
+            "default: foo",
         ]:
             self.assert_bind_fail(
-                self.common_types + textwrap.dedent("""
+                self.common_types
+                + textwrap.dedent(
+                    """
             structs:
                 foo:
                     description: foo
@@ -1244,7 +1471,11 @@ class TestBinder(testcase.IDLTestcase):
                             type: string
                             ignore: true
                             %s
-                """ % (test_value)), idl.errors.ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_IGNORED)
+                """
+                    % (test_value)
+                ),
+                idl.errors.ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_IGNORED,
+            )
 
     def test_chained_type_positive(self):
         # type: () -> None
@@ -1261,17 +1492,21 @@ class TestBinder(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
                 is_view: false
-        """))
+        """),
+        )
 
         # Chaining only
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar1:
                 description: foo
                 strict: false
                 chained_types:
                     foo1: alias
-        """))
+        """)
+        )
 
     def test_chained_type_negative(self):
         # type: () -> None
@@ -1287,33 +1522,41 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 is_view: false
-        """))
+        """),
+        )
 
         # Chaining with strict struct
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar1:
                 description: foo
                 strict: true
                 chained_types:
                     foo1: alias
-        """), idl.errors.ERROR_ID_CHAINED_NO_TYPE_STRICT)
+        """),
+            idl.errors.ERROR_ID_CHAINED_NO_TYPE_STRICT,
+        )
 
         # Non-'any' type as chained type
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar1:
                 description: foo
                 strict: false
                 chained_types:
                     string: alias
-        """), idl.errors.ERROR_ID_CHAINED_TYPE_WRONG_BSON_TYPE)
+        """),
+            idl.errors.ERROR_ID_CHAINED_TYPE_WRONG_BSON_TYPE,
+        )
 
         # Chaining and fields only with same name
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar1:
                 description: foo
@@ -1322,11 +1565,14 @@ class TestBinder(testcase.IDLTestcase):
                     foo1: alias
                 fields:
                     foo1: string
-        """), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
+        """),
+            idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD,
+        )
 
         # Non-existent chained type
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar1:
                 description: foo
@@ -1335,11 +1581,15 @@ class TestBinder(testcase.IDLTestcase):
                     foobar1: alias
                 fields:
                     foo1: string
-        """), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
+        """),
+            idl.errors.ERROR_ID_UNKNOWN_TYPE,
+            True,
+        )
 
         # A regular field as a chained type
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar1:
                 description: foo
@@ -1347,26 +1597,34 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo1: string
                     foo2: foobar1
-        """), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
+        """),
+            idl.errors.ERROR_ID_UNKNOWN_TYPE,
+            True,
+        )
 
         # Array of chained types
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             bar1:
                 description: foo
                 strict: true
                 fields:
                     field1: array<foo1>
-        """), idl.errors.ERROR_ID_NO_ARRAY_OF_CHAIN)
+        """),
+            idl.errors.ERROR_ID_NO_ARRAY_OF_CHAIN,
+        )
 
     def test_chained_struct_positive(self):
         # type: () -> None
         """Positive parser chaining test cases."""
         # Setup some common types
-        test_preamble = self.common_types + indent_text(
-            1,
-            textwrap.dedent("""
+        test_preamble = (
+            self.common_types
+            + indent_text(
+                1,
+                textwrap.dedent("""
             foo1:
                 description: foo
                 cpp_type: foo
@@ -1375,7 +1633,9 @@ class TestBinder(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
                 is_view: false
-        """)) + textwrap.dedent("""
+        """),
+            )
+            + textwrap.dedent("""
         structs:
             chained:
                 description: foo
@@ -1389,22 +1649,29 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     field1: string
         """)
+        )
 
         # A struct with only chaining
-        self.assert_bind(test_preamble + indent_text(
-            1,
-            textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + indent_text(
+                1,
+                textwrap.dedent("""
             bar1:
                 description: foo
                 strict: true
                 chained_structs:
                     chained2: alias
-        """)))
+        """),
+            )
+        )
 
         # Chaining struct's fields and explicit fields
-        self.assert_bind(test_preamble + indent_text(
-            1,
-            textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + indent_text(
+                1,
+                textwrap.dedent("""
             bar1:
                 description: foo
                 strict: true
@@ -1412,12 +1679,16 @@ class TestBinder(testcase.IDLTestcase):
                     chained2: alias
                 fields:
                     str1: string
-        """)))
+        """),
+            )
+        )
 
         # Chained types and structs
-        self.assert_bind(test_preamble + indent_text(
-            1,
-            textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + indent_text(
+                1,
+                textwrap.dedent("""
             bar1:
                 description: foo
                 strict: false
@@ -1427,12 +1698,16 @@ class TestBinder(testcase.IDLTestcase):
                     chained2: alias
                 fields:
                     str1: string
-        """)))
+        """),
+            )
+        )
 
         # Non-strict chained struct
-        self.assert_bind(test_preamble + indent_text(
-            1,
-            textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + indent_text(
+                1,
+                textwrap.dedent("""
             bar1:
                 description: foo
                 strict: false
@@ -1440,12 +1715,16 @@ class TestBinder(testcase.IDLTestcase):
                     chained2: alias
                 fields:
                     foo1: string
-        """)))
+        """),
+            )
+        )
 
         # Inline Chained struct with strict true
-        self.assert_bind(test_preamble + indent_text(
-            1,
-            textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + indent_text(
+                1,
+                textwrap.dedent("""
             bar1:
                 description: foo
                 strict: true
@@ -1461,12 +1740,16 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     f1: string
 
-        """)))
+        """),
+            )
+        )
 
         # Inline Chained struct with strict true and inline_chained_structs defaulted
-        self.assert_bind(test_preamble + indent_text(
-            1,
-            textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + indent_text(
+                1,
+                textwrap.dedent("""
             bar1:
                 description: foo
                 strict: true
@@ -1480,15 +1763,19 @@ class TestBinder(testcase.IDLTestcase):
                     bar1: alias
                 fields:
                     f1: string
-        """)))
+        """),
+            )
+        )
 
     def test_chained_struct_negative(self):
         # type: () -> None
         """Negative parser chaining test cases."""
         # Setup some common types
-        test_preamble = self.common_types + indent_text(
-            1,
-            textwrap.dedent("""
+        test_preamble = (
+            self.common_types
+            + indent_text(
+                1,
+                textwrap.dedent("""
             foo1:
                 description: foo
                 cpp_type: foo
@@ -1497,7 +1784,9 @@ class TestBinder(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
                 is_view: false
-        """)) + textwrap.dedent("""
+        """),
+            )
+            + textwrap.dedent("""
         structs:
             chained:
                 description: foo
@@ -1511,10 +1800,12 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     field1: string
         """)
+        )
 
         # Non-existing chained struct
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
             bar1:
@@ -1522,11 +1813,16 @@ class TestBinder(testcase.IDLTestcase):
                 strict: true
                 chained_structs:
                     foobar1: alias
-        """)), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
+        """),
+            ),
+            idl.errors.ERROR_ID_UNKNOWN_TYPE,
+            True,
+        )
 
         # Type as chained struct
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
             bar1:
@@ -1534,11 +1830,15 @@ class TestBinder(testcase.IDLTestcase):
                 strict: true
                 chained_structs:
                     foo1: alias
-        """)), idl.errors.ERROR_ID_CHAINED_STRUCT_NOT_FOUND)
+        """),
+            ),
+            idl.errors.ERROR_ID_CHAINED_STRUCT_NOT_FOUND,
+        )
 
         # Struct as chained type
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
             bar1:
@@ -1546,11 +1846,15 @@ class TestBinder(testcase.IDLTestcase):
                 strict: false
                 chained_types:
                     chained: alias
-        """)), idl.errors.ERROR_ID_CHAINED_TYPE_NOT_FOUND)
+        """),
+            ),
+            idl.errors.ERROR_ID_CHAINED_TYPE_NOT_FOUND,
+        )
 
         # Duplicated field names across chained struct's fields and fields
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
             bar1:
@@ -1560,11 +1864,15 @@ class TestBinder(testcase.IDLTestcase):
                     chained: alias
                 fields:
                     field1: string
-        """)), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
+        """),
+            ),
+            idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD,
+        )
 
         # Duplicated field names across chained structs
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
             bar1:
@@ -1573,11 +1881,15 @@ class TestBinder(testcase.IDLTestcase):
                 chained_structs:
                     chained: alias
                     chained2: alias
-        """)), idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD)
+        """),
+            ),
+            idl.errors.ERROR_ID_CHAINED_DUPLICATE_FIELD,
+        )
 
         # Chained struct with strict true
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
             bar1:
@@ -1595,11 +1907,15 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     f1: string
 
-        """)), idl.errors.ERROR_ID_CHAINED_NO_NESTED_STRUCT_STRICT)
+        """),
+            ),
+            idl.errors.ERROR_ID_CHAINED_NO_NESTED_STRUCT_STRICT,
+        )
 
         # Chained struct with nested chained struct
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
             bar1:
@@ -1616,11 +1932,15 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     f1: string
 
-        """)), idl.errors.ERROR_ID_CHAINED_NO_NESTED_CHAINED)
+        """),
+            ),
+            idl.errors.ERROR_ID_CHAINED_NO_NESTED_CHAINED,
+        )
 
         # Chained struct with nested chained type
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
             bar1:
@@ -1637,7 +1957,10 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     f1: bar1
 
-        """)), idl.errors.ERROR_ID_CHAINED_NO_NESTED_CHAINED)
+        """),
+            ),
+            idl.errors.ERROR_ID_CHAINED_NO_NESTED_CHAINED,
+        )
 
     def test_enum_positive(self):
         # type: () -> None
@@ -1654,7 +1977,8 @@ class TestBinder(testcase.IDLTestcase):
                     v1: 3
                     v2: 1
                     v3: 2
-            """))
+            """)
+        )
 
         # Test int - non continuous
         self.assert_bind(
@@ -1666,7 +1990,8 @@ class TestBinder(testcase.IDLTestcase):
                 values:
                     v1: 0
                     v3: 2
-            """))
+            """)
+        )
 
         # Test string
         self.assert_bind(
@@ -1679,7 +2004,8 @@ class TestBinder(testcase.IDLTestcase):
                     v1: 0
                     v2: 1
                     v3: 2
-            """))
+            """)
+        )
 
     def test_enum_negative(self):
         # type: () -> None
@@ -1694,7 +2020,9 @@ class TestBinder(testcase.IDLTestcase):
                 type: foo
                 values:
                     v1: 0
-            """), idl.errors.ERROR_ID_ENUM_BAD_TYPE)
+            """),
+            idl.errors.ERROR_ID_ENUM_BAD_TYPE,
+        )
 
         # Test int - dups
         self.assert_bind_fail(
@@ -1706,7 +2034,9 @@ class TestBinder(testcase.IDLTestcase):
                 values:
                     v1: 1
                     v3: 1
-            """), idl.errors.ERROR_ID_ENUM_NON_UNIQUE_VALUES)
+            """),
+            idl.errors.ERROR_ID_ENUM_NON_UNIQUE_VALUES,
+        )
 
         # Test int - non-integer value
         self.assert_bind_fail(
@@ -1718,7 +2048,9 @@ class TestBinder(testcase.IDLTestcase):
                 values:
                     v1: foo
                     v3: 1
-            """), idl.errors.ERROR_ID_ENUM_BAD_INT_VAUE)
+            """),
+            idl.errors.ERROR_ID_ENUM_BAD_INT_VAUE,
+        )
 
         # Test string - dups
         self.assert_bind_fail(
@@ -1730,7 +2062,9 @@ class TestBinder(testcase.IDLTestcase):
                 values:
                     v1: foo
                     v3: foo
-            """), idl.errors.ERROR_ID_ENUM_NON_UNIQUE_VALUES)
+            """),
+            idl.errors.ERROR_ID_ENUM_NON_UNIQUE_VALUES,
+        )
 
     def test_struct_enum_negative(self):
         # type: () -> None
@@ -1748,13 +2082,17 @@ class TestBinder(testcase.IDLTestcase):
 
         # Test array of enums
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         structs:
             foo1:
                 description: foo
                 fields:
                     foo1: array<foo>
-            """), idl.errors.ERROR_ID_NO_ARRAY_ENUM, True)
+            """),
+            idl.errors.ERROR_ID_NO_ARRAY_ENUM,
+            True,
+        )
 
     def test_command_positive(self):
         # type: () -> None
@@ -1769,7 +2107,9 @@ class TestBinder(testcase.IDLTestcase):
                     foo: string
         """)
 
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1780,7 +2120,8 @@ class TestBinder(testcase.IDLTestcase):
                     fields:
                         foo1: string
                     reply_type: reply
-            """))
+            """)
+        )
 
     def test_command_negative(self):
         # type: () -> None
@@ -1790,7 +2131,8 @@ class TestBinder(testcase.IDLTestcase):
         test_preamble = self.common_types
         # Commands cannot be fields in other commands
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1807,11 +2149,14 @@ class TestBinder(testcase.IDLTestcase):
                     api_version: ""
                     fields:
                         foo: foo
-            """), idl.errors.ERROR_ID_FIELD_NO_COMMAND)
+            """),
+            idl.errors.ERROR_ID_FIELD_NO_COMMAND,
+        )
 
         # Commands cannot be fields in structs
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1826,11 +2171,14 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     fields:
                         foo: foo
-            """), idl.errors.ERROR_ID_FIELD_NO_COMMAND)
+            """),
+            idl.errors.ERROR_ID_FIELD_NO_COMMAND,
+        )
 
         # Commands cannot have a field as the same name
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1839,11 +2187,14 @@ class TestBinder(testcase.IDLTestcase):
                     api_version: ""
                     fields:
                         foo: string
-            """), idl.errors.ERROR_ID_COMMAND_DUPLICATES_FIELD)
+            """),
+            idl.errors.ERROR_ID_COMMAND_DUPLICATES_FIELD,
+        )
 
         # Reply type must be resolvable
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1851,11 +2202,14 @@ class TestBinder(testcase.IDLTestcase):
                     namespace: ignored
                     api_version: ""
                     reply_type: not_defined
-            """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+            """),
+            idl.errors.ERROR_ID_UNKNOWN_TYPE,
+        )
 
         # Reply type must be a struct
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1863,7 +2217,9 @@ class TestBinder(testcase.IDLTestcase):
                     namespace: ignored
                     api_version: ""
                     reply_type: string
-            """), idl.errors.ERROR_ID_INVALID_REPLY_TYPE)
+            """),
+            idl.errors.ERROR_ID_INVALID_REPLY_TYPE,
+        )
 
     def test_command_doc_sequence_positive(self):
         # type: () -> None
@@ -1879,7 +2235,9 @@ class TestBinder(testcase.IDLTestcase):
                     foo: object
         """)
 
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1890,9 +2248,12 @@ class TestBinder(testcase.IDLTestcase):
                         foo1:
                             type: array<object>
                             supports_doc_sequence: true
-            """))
+            """)
+        )
 
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1903,7 +2264,8 @@ class TestBinder(testcase.IDLTestcase):
                         foo1:
                             type: array<foo_struct>
                             supports_doc_sequence: true
-            """))
+            """)
+        )
 
     def test_command_doc_sequence_negative(self):
         # type: () -> None
@@ -1923,7 +2285,8 @@ class TestBinder(testcase.IDLTestcase):
 
         # A struct
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             structs:
                 foo:
                     description: foo
@@ -1931,11 +2294,14 @@ class TestBinder(testcase.IDLTestcase):
                         foo:
                             type: array<object>
                             supports_doc_sequence: true
-            """), idl.errors.ERROR_ID_STRUCT_NO_DOC_SEQUENCE)
+            """),
+            idl.errors.ERROR_ID_STRUCT_NO_DOC_SEQUENCE,
+        )
 
         # A non-array type
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1946,11 +2312,14 @@ class TestBinder(testcase.IDLTestcase):
                         foo:
                             type: object
                             supports_doc_sequence: true
-            """), idl.errors.ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_ARRAY)
+            """),
+            idl.errors.ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_ARRAY,
+        )
 
         # An array of a scalar
         self.assert_bind_fail(
-            test_preamble2 + textwrap.dedent("""
+            test_preamble2
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1961,11 +2330,14 @@ class TestBinder(testcase.IDLTestcase):
                         foo1:
                             type: array<string>
                             supports_doc_sequence: true
-            """), idl.errors.ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT)
+            """),
+            idl.errors.ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT,
+        )
 
         # An array of 'any'
         self.assert_bind_fail(
-            test_preamble2 + textwrap.dedent("""
+            test_preamble2
+            + textwrap.dedent("""
             commands:
                 foo:
                     description: foo
@@ -1976,7 +2348,9 @@ class TestBinder(testcase.IDLTestcase):
                         foo1:
                             type: array<string>
                             supports_doc_sequence: true
-            """), idl.errors.ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT)
+            """),
+            idl.errors.ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT,
+        )
 
     def test_command_type_positive(self):
         # type: () -> None
@@ -1985,7 +2359,9 @@ class TestBinder(testcase.IDLTestcase):
         test_preamble = self.common_types
 
         # string
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         commands:
             foo:
                 description: foo
@@ -1996,10 +2372,13 @@ class TestBinder(testcase.IDLTestcase):
                 type: string
                 fields:
                     field1: string
-            """))
+            """)
+        )
 
         # array of string
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         commands:
             foo:
                 description: foo
@@ -2010,7 +2389,8 @@ class TestBinder(testcase.IDLTestcase):
                 type: array<string>
                 fields:
                     field1: string
-            """))
+            """)
+        )
 
     def test_command_type_negative(self):
         # type: () -> None
@@ -2020,7 +2400,8 @@ class TestBinder(testcase.IDLTestcase):
 
         # supports_doc_sequence must be a bool
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         commands:
             foo:
                 description: foo
@@ -2030,7 +2411,10 @@ class TestBinder(testcase.IDLTestcase):
                 type: int
                 fields:
                     field1: string
-            """), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
+            """),
+            idl.errors.ERROR_ID_UNKNOWN_TYPE,
+            True,
+        )
 
     def test_server_parameter_positive(self):
         # type: () -> None
@@ -2039,19 +2423,24 @@ class TestBinder(testcase.IDLTestcase):
         # server parameter with storage.
         # Also try valid set_at values.
         for set_at in ["startup", "runtime", "[ startup, runtime ]", "cluster"]:
-            if set_at != 'cluster':
+            if set_at != "cluster":
                 self.assert_bind(
-                    textwrap.dedent("""
+                    textwrap.dedent(
+                        """
                 server_parameters:
                     foo:
                         set_at: %s
                         description: bar
                         redact: false
                         cpp_varname: baz
-                    """ % (set_at)))
+                    """
+                        % (set_at)
+                    )
+                )
             else:
                 self.assert_bind(
-                    textwrap.dedent("""
+                    textwrap.dedent(
+                        """
                 server_parameters:
                     foo:
                         set_at: %s
@@ -2059,7 +2448,10 @@ class TestBinder(testcase.IDLTestcase):
                         redact: false
                         cpp_varname: baz
                         omit_in_ftdc: false
-                    """ % (set_at)))
+                    """
+                        % (set_at)
+                    )
+                )
 
         # server parameter with storage and optional fields.
         self.assert_bind(
@@ -2078,7 +2470,8 @@ class TestBinder(testcase.IDLTestcase):
                     lte: 999
                     lt: 1000
                     callback: qux
-            """))
+            """)
+        )
 
         # Cluster server parameter with storage.
         self.assert_bind(
@@ -2098,7 +2491,8 @@ class TestBinder(testcase.IDLTestcase):
                     lte: 999
                     lt: 1000
                     callback: qux
-            """))
+            """)
+        )
 
         # Bound setting with arbitrary expression default and validators.
         self.assert_bind(
@@ -2120,7 +2514,8 @@ class TestBinder(testcase.IDLTestcase):
                         is_constexpr: false
                     gt: 0
                     lt: 255
-            """))
+            """)
+        )
 
         # Specialized SCPs.
         self.assert_bind(
@@ -2131,7 +2526,8 @@ class TestBinder(testcase.IDLTestcase):
                 description: bar
                 redact: false
                 cpp_class: baz
-        """))
+        """)
+        )
 
         self.assert_bind(
             textwrap.dedent("""
@@ -2142,7 +2538,8 @@ class TestBinder(testcase.IDLTestcase):
                 redact: false
                 cpp_class:
                     name: baz
-        """))
+        """)
+        )
 
         self.assert_bind(
             textwrap.dedent("""
@@ -2157,7 +2554,8 @@ class TestBinder(testcase.IDLTestcase):
                     override_set: true
                     override_ctor: false
                     override_validate: true
-        """))
+        """)
+        )
 
         self.assert_bind(
             textwrap.dedent("""
@@ -2170,7 +2568,8 @@ class TestBinder(testcase.IDLTestcase):
                 redact: true
                 test_only: true
                 deprecated_name: bling
-        """))
+        """)
+        )
 
         self.assert_bind(
             textwrap.dedent("""
@@ -2186,7 +2585,8 @@ class TestBinder(testcase.IDLTestcase):
                 omit_in_ftdc: true
                 test_only: true
                 deprecated_name: bling
-        """))
+        """)
+        )
 
         # Default without data.
         self.assert_bind(
@@ -2198,7 +2598,8 @@ class TestBinder(testcase.IDLTestcase):
                 redact: false
                 cpp_class: baz
                 default: blong
-            """))
+            """)
+        )
 
     def test_server_parameter_negative(self):
         # type: () -> None
@@ -2213,7 +2614,9 @@ class TestBinder(testcase.IDLTestcase):
                     description: bar
                     redact: false
                     cpp_varname: baz
-            """), idl.errors.ERROR_ID_BAD_SETAT_SPECIFIER)
+            """),
+            idl.errors.ERROR_ID_BAD_SETAT_SPECIFIER,
+        )
 
         # Mix of specialized with bound storage.
         self.assert_bind_fail(
@@ -2225,7 +2628,9 @@ class TestBinder(testcase.IDLTestcase):
                     redact: false
                     cpp_class: baz
                     cpp_varname: bling
-            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+            """),
+            idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR,
+        )
 
         # Startup with omit_in_ftdc=true.
         self.assert_bind_fail(
@@ -2237,7 +2642,9 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: baz
                     redact: false
                     omit_in_ftdc: true
-            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+            """),
+            idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR,
+        )
 
         # Startup with omit_in_ftdc=false.
         self.assert_bind_fail(
@@ -2249,7 +2656,9 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: baz
                     redact: false
                     omit_in_ftdc: false
-            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+            """),
+            idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR,
+        )
 
         # Runtime with omit_in_ftdc=true.
         self.assert_bind_fail(
@@ -2261,7 +2670,9 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: baz
                     redact: false
                     omit_in_ftdc: true
-            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+            """),
+            idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR,
+        )
 
         # Runtime with omit_in_ftdc=false.
         self.assert_bind_fail(
@@ -2273,7 +2684,9 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: baz
                     redact: false
                     omit_in_ftdc: false
-            """), idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR)
+            """),
+            idl.errors.ERROR_ID_SERVER_PARAMETER_INVALID_ATTR,
+        )
 
         # Cluster with omit_in_ftdc unspecified.
         self.assert_bind_fail(
@@ -2292,7 +2705,9 @@ class TestBinder(testcase.IDLTestcase):
                         lte: 999
                         lt: 1000
                         callback: qux
-                """), idl.errors.ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR)
+                """),
+            idl.errors.ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR,
+        )
 
     def test_config_option_positive(self):
         # type: () -> None
@@ -2324,7 +2739,8 @@ class TestBinder(testcase.IDLTestcase):
                         gte: 1
                         lte: 99
                         callback: doSomething
-            """))
+            """)
+        )
 
         # Required fields only.
         self.assert_bind(
@@ -2334,7 +2750,8 @@ class TestBinder(testcase.IDLTestcase):
                     description: comment
                     arg_vartype: Switch
                     source: yaml
-            """))
+            """)
+        )
 
         # List and enum variants.
         self.assert_bind(
@@ -2350,12 +2767,14 @@ class TestBinder(testcase.IDLTestcase):
                     requires: [ d, e, f ]
                     hidden: true
                     duplicate_behavior: overwrite
-            """))
+            """)
+        )
 
         # Positional variants.
-        for positional in ['1', '1-', '-2', '1-2']:
+        for positional in ["1", "1-", "-2", "1-2"]:
             self.assert_bind(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
                 configs:
                     foo:
                         short_name: foo
@@ -2363,17 +2782,24 @@ class TestBinder(testcase.IDLTestcase):
                         arg_vartype: Bool
                         source: cli
                         positional: %s
-                """ % (positional)))
+                """
+                    % (positional)
+                )
+            )
             # With implicit short name.
             self.assert_bind(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
                 configs:
                     foo:
                         description: comment
                         arg_vartype: Bool
                         source: cli
                         positional: %s
-                """ % (positional)))
+                """
+                    % (positional)
+                )
+            )
 
         # Expressions in default, implicit, and validators.
         self.assert_bind(
@@ -2388,7 +2814,8 @@ class TestBinder(testcase.IDLTestcase):
                     validator:
                         gte: { expr: kMinimum }
                         lte: { expr: kMaximum }
-            """))
+            """)
+        )
 
     def test_config_option_negative(self):
         # type: () -> None
@@ -2402,7 +2829,9 @@ class TestBinder(testcase.IDLTestcase):
                     description: comment
                     arg_vartype: Long
                     source: json
-            """), idl.errors.ERROR_ID_BAD_SOURCE_SPECIFIER)
+            """),
+            idl.errors.ERROR_ID_BAD_SOURCE_SPECIFIER,
+        )
 
         self.assert_bind_fail(
             textwrap.dedent("""
@@ -2412,18 +2841,25 @@ class TestBinder(testcase.IDLTestcase):
                     arg_vartype: StringMap
                     source: [ cli, yaml ]
                     duplicate_behavior: guess
-            """), idl.errors.ERROR_ID_BAD_DUPLICATE_BEHAVIOR_SPECIFIER)
+            """),
+            idl.errors.ERROR_ID_BAD_DUPLICATE_BEHAVIOR_SPECIFIER,
+        )
 
         for positional in ["x", "1-2-3", "-2-", "1--3"]:
             self.assert_bind_fail(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
                 configs:
                     foo:
                         description: comment
                         arg_vartype: String
                         source: cli
                         positional: %s
-                """ % (positional)), idl.errors.ERROR_ID_BAD_NUMERIC_RANGE)
+                """
+                    % (positional)
+                ),
+                idl.errors.ERROR_ID_BAD_NUMERIC_RANGE,
+            )
 
         self.assert_bind_fail(
             textwrap.dedent("""
@@ -2433,7 +2869,9 @@ class TestBinder(testcase.IDLTestcase):
                     short_name: "bar.baz"
                     arg_vartype: Bool
                     source: cli
-            """), idl.errors.ERROR_ID_INVALID_SHORT_NAME)
+            """),
+            idl.errors.ERROR_ID_INVALID_SHORT_NAME,
+        )
 
         self.assert_bind_fail(
             textwrap.dedent("""
@@ -2444,7 +2882,9 @@ class TestBinder(testcase.IDLTestcase):
                     deprecated_short_name: "baz.qux"
                     arg_vartype: Long
                     source: cli
-            """), idl.errors.ERROR_ID_INVALID_SHORT_NAME)
+            """),
+            idl.errors.ERROR_ID_INVALID_SHORT_NAME,
+        )
 
         # dottedName is not valid as a shortName.
         self.assert_bind_fail(
@@ -2455,7 +2895,9 @@ class TestBinder(testcase.IDLTestcase):
                     arg_vartype: String
                     source: cli
                     positional: 1
-            """), idl.errors.ERROR_ID_MISSING_SHORTNAME_FOR_POSITIONAL)
+            """),
+            idl.errors.ERROR_ID_MISSING_SHORTNAME_FOR_POSITIONAL,
+        )
 
         # Invalid shortname using boost::po format directly.
         self.assert_bind_fail(
@@ -2466,19 +2908,26 @@ class TestBinder(testcase.IDLTestcase):
                     arg_vartype: Switch
                     description: comment
                     source: cli
-            """), idl.errors.ERROR_ID_INVALID_SHORT_NAME)
+            """),
+            idl.errors.ERROR_ID_INVALID_SHORT_NAME,
+        )
 
         # Invalid single names, must be single alpha char.
         for name in ["foo", "1", ".", ""]:
             self.assert_bind_fail(
-                textwrap.dedent("""
+                textwrap.dedent(
+                    """
                 configs:
                     foo:
                         single_name: "%s"
                         arg_vartype: Switch
                         description: comment
                         source: cli
-            """ % (name)), idl.errors.ERROR_ID_INVALID_SINGLE_NAME)
+            """
+                    % (name)
+                ),
+                idl.errors.ERROR_ID_INVALID_SINGLE_NAME,
+            )
 
         # Single names require a valid short name.
         self.assert_bind_fail(
@@ -2489,7 +2938,9 @@ class TestBinder(testcase.IDLTestcase):
                     arg_vartype: Switch
                     description: comment
                     source: cli
-            """), idl.errors.ERROR_ID_MISSING_SHORT_NAME_WITH_SINGLE_NAME)
+            """),
+            idl.errors.ERROR_ID_MISSING_SHORT_NAME_WITH_SINGLE_NAME,
+        )
 
     def test_feature_flag(self):
         # type: () -> None
@@ -2504,7 +2955,8 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: false
                     shouldBeFCVGated: false
-            """))
+            """)
+        )
 
         self.assert_bind(
             textwrap.dedent("""
@@ -2514,7 +2966,8 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: false
                     shouldBeFCVGated: true
-            """))
+            """)
+        )
 
         # if shouldBeFCVGated: true, feature flag can default to true with a version
         self.assert_bind(
@@ -2526,7 +2979,8 @@ class TestBinder(testcase.IDLTestcase):
                     default: true
                     version: 123
                     shouldBeFCVGated: true
-            """))
+            """)
+        )
 
         # if shouldBeFCVGated: false, we do not need a version
         self.assert_bind(
@@ -2537,7 +2991,8 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: true
                     shouldBeFCVGated: false
-            """))
+            """)
+        )
 
         # if shouldBeFCVGated: true and default: true, a version is required
         self.assert_bind_fail(
@@ -2548,7 +3003,9 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_varname: gToaster
                     default: true
                     shouldBeFCVGated: true
-            """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION)
+            """),
+            idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION,
+        )
 
         # false is not allowed with a version and shouldBeFCVGated: true
         self.assert_bind_fail(
@@ -2560,7 +3017,9 @@ class TestBinder(testcase.IDLTestcase):
                     default: false
                     version: 123
                     shouldBeFCVGated: true
-            """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION)
+            """),
+            idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION,
+        )
 
         # false is not allowed with a version and shouldBeFCVGated: false
         self.assert_bind_fail(
@@ -2572,7 +3031,9 @@ class TestBinder(testcase.IDLTestcase):
                     default: false
                     version: 123
                     shouldBeFCVGated: false
-            """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION)
+            """),
+            idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION,
+        )
 
         # if shouldBeFCVGated is false, a version is not allowed
         self.assert_bind_fail(
@@ -2584,7 +3045,9 @@ class TestBinder(testcase.IDLTestcase):
                     default: true
                     version: 123
                     shouldBeFCVGated: false
-            """), idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION)
+            """),
+            idl.errors.ERROR_ID_FEATURE_FLAG_SHOULD_BE_FCV_GATED_FALSE_HAS_VERSION,
+        )
 
     def test_access_check(self):
         # type: () -> None
@@ -2620,7 +3083,9 @@ class TestBinder(testcase.IDLTestcase):
         """)
 
         # Test none
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2632,10 +3097,13 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """))
+            """)
+        )
 
         # Test simple with access check
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2648,10 +3116,13 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """))
+            """)
+        )
 
         # Test simple with privilege
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2666,7 +3137,8 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """))
+            """)
+        )
 
         self.assert_parse(
             textwrap.dedent("""
@@ -2688,7 +3160,8 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: bar
                 reply_type: foo_reply_struct
-            """))
+            """)
+        )
 
     def test_access_check_negative(self):
         # type: () -> None
@@ -2724,7 +3197,8 @@ class TestBinder(testcase.IDLTestcase):
 
         # Test simple with bad access check
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2737,11 +3211,14 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """), idl.errors.ERROR_ID_UNKOWN_ENUM_VALUE)
+            """),
+            idl.errors.ERROR_ID_UNKOWN_ENUM_VALUE,
+        )
 
         # Test simple with bad access check with privilege
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2756,11 +3233,14 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """), idl.errors.ERROR_ID_UNKOWN_ENUM_VALUE)
+            """),
+            idl.errors.ERROR_ID_UNKOWN_ENUM_VALUE,
+        )
 
         # Test simple with bad access check with privilege
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2775,10 +3255,14 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """), idl.errors.ERROR_ID_UNKOWN_ENUM_VALUE)
+            """),
+            idl.errors.ERROR_ID_UNKOWN_ENUM_VALUE,
+        )
 
         # Test simple with access check and privileges
-        self.assert_bind(test_preamble + textwrap.dedent("""
+        self.assert_bind(
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2793,11 +3277,13 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """))
+            """)
+        )
 
         # Test simple with privilege with duplicate action_type
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2812,11 +3298,14 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """), idl.errors.ERROR_ID_DUPLICATE_ACTION_TYPE)
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_ACTION_TYPE,
+        )
 
         # complex with duplicate check
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2830,11 +3319,14 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """), idl.errors.ERROR_ID_DUPLICATE_ACCESS_CHECK)
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_ACCESS_CHECK,
+        )
 
         # complex with duplicate priv
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2852,11 +3344,14 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """), idl.errors.ERROR_ID_DUPLICATE_ACCESS_CHECK)
+            """),
+            idl.errors.ERROR_ID_DUPLICATE_ACCESS_CHECK,
+        )
 
         # api_version != "" but not access_check
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
         commands:
             test1:
                 description: foo
@@ -2866,10 +3361,14 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo: string
                 reply_type: reply
-            """), idl.errors.ERROR_ID_MISSING_ACCESS_CHECK)
+            """),
+            idl.errors.ERROR_ID_MISSING_ACCESS_CHECK,
+        )
 
     def test_query_shape_component_validation(self):
-        self.assert_bind(self.common_types + textwrap.dedent("""
+        self.assert_bind(
+            self.common_types
+            + textwrap.dedent("""
             structs:
                 struct1:
                     query_shape_component: true
@@ -2882,10 +3381,12 @@ class TestBinder(testcase.IDLTestcase):
                         field2:
                             type: bool
                             query_shape: parameter
-        """))
+        """)
+        )
 
         self.assert_bind_fail(
-            self.common_types + textwrap.dedent("""
+            self.common_types
+            + textwrap.dedent("""
             structs:
                 struct1:
                     query_shape_component: true
@@ -2897,10 +3398,13 @@ class TestBinder(testcase.IDLTestcase):
                         field2:
                             type: bool
                             query_shape: parameter
-        """), idl.errors.ERROR_ID_FIELD_MUST_DECLARE_SHAPE_LITERAL)
+        """),
+            idl.errors.ERROR_ID_FIELD_MUST_DECLARE_SHAPE_LITERAL,
+        )
 
         self.assert_bind_fail(
-            self.common_types + textwrap.dedent("""
+            self.common_types
+            + textwrap.dedent("""
             structs:
                 struct1:
                     strict: true
@@ -2911,7 +3415,9 @@ class TestBinder(testcase.IDLTestcase):
                         field2:
                             type: bool
                             query_shape: parameter
-        """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
+        """),
+            idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL,
+        )
 
         # Validating query_shape_anonymize relies on std::string
         basic_types = textwrap.dedent("""
@@ -2935,7 +3441,9 @@ class TestBinder(testcase.IDLTestcase):
                     internal_only: true
                     is_view: false
         """)
-        self.assert_bind(basic_types + textwrap.dedent("""
+        self.assert_bind(
+            basic_types
+            + textwrap.dedent("""
             structs:
                 struct1:
                     query_shape_component: true
@@ -2948,9 +3456,12 @@ class TestBinder(testcase.IDLTestcase):
                         field2:
                             query_shape: parameter
                             type: bool
-        """))
+        """)
+        )
 
-        self.assert_bind(basic_types + textwrap.dedent("""
+        self.assert_bind(
+            basic_types
+            + textwrap.dedent("""
             structs:
                 struct1:
                     query_shape_component: true
@@ -2963,10 +3474,12 @@ class TestBinder(testcase.IDLTestcase):
                         field2:
                             query_shape: parameter
                             type: bool
-        """))
+        """)
+        )
 
         self.assert_bind_fail(
-            basic_types + textwrap.dedent("""
+            basic_types
+            + textwrap.dedent("""
             structs:
                 struct1:
                     strict: true
@@ -2975,10 +3488,13 @@ class TestBinder(testcase.IDLTestcase):
                         field1:
                             query_shape: blah
                             type: string
-        """), idl.errors.ERROR_ID_QUERY_SHAPE_INVALID_VALUE)
+        """),
+            idl.errors.ERROR_ID_QUERY_SHAPE_INVALID_VALUE,
+        )
 
         self.assert_bind_fail(
-            basic_types + textwrap.dedent("""
+            basic_types
+            + textwrap.dedent("""
             structs:
                 struct1:
                     query_shape_component: true
@@ -2991,10 +3507,13 @@ class TestBinder(testcase.IDLTestcase):
                         field2:
                             query_shape: parameter
                             type: bool
-        """), idl.errors.ERROR_ID_INVALID_TYPE_FOR_SHAPIFY)
+        """),
+            idl.errors.ERROR_ID_INVALID_TYPE_FOR_SHAPIFY,
+        )
 
         self.assert_bind_fail(
-            basic_types + textwrap.dedent("""
+            basic_types
+            + textwrap.dedent("""
             structs:
                 struct1:
                     query_shape_component: true
@@ -3007,10 +3526,13 @@ class TestBinder(testcase.IDLTestcase):
                         field2:
                             query_shape: parameter
                             type: bool
-        """), idl.errors.ERROR_ID_INVALID_TYPE_FOR_SHAPIFY)
+        """),
+            idl.errors.ERROR_ID_INVALID_TYPE_FOR_SHAPIFY,
+        )
 
         self.assert_bind_fail(
-            basic_types + textwrap.dedent("""
+            basic_types
+            + textwrap.dedent("""
             structs:
                 StructZero:
                     strict: true
@@ -3019,10 +3541,13 @@ class TestBinder(testcase.IDLTestcase):
                         field1:
                             query_shape: literal
                             type: string
-            """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
+            """),
+            idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL,
+        )
 
         self.assert_bind_fail(
-            basic_types + textwrap.dedent("""
+            basic_types
+            + textwrap.dedent("""
             structs:
                 StructZero:
                     strict: true
@@ -3039,16 +3564,19 @@ class TestBinder(testcase.IDLTestcase):
                             type: StructZero
                             description: ""
                             query_shape: literal
-            """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
+            """),
+            idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL,
+        )
 
     # pylint: disable=invalid-name
-    def test_struct_unsafe_dangerous_disable_extra_field_duplicate_checks_negative(self):
+    def test_struct_unsafe_dangerous_disable_extra_field_duplicate_checks_negative(
+        self,
+    ):
         # type: () -> None
         """Negative struct tests for unsafe_dangerous_disable_extra_field_duplicate_checks."""
 
         # Setup some common types
-        test_preamble = self.common_types + \
-            textwrap.dedent("""
+        test_preamble = self.common_types + textwrap.dedent("""
             structs:
                 danger:
                     description: foo
@@ -3060,7 +3588,8 @@ class TestBinder(testcase.IDLTestcase):
 
         # Test strict and unsafe_dangerous_disable_extra_field_duplicate_checks are not allowed
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
                 danger1:
@@ -3069,11 +3598,15 @@ class TestBinder(testcase.IDLTestcase):
                     unsafe_dangerous_disable_extra_field_duplicate_checks: true
                     fields:
                         foo: string
-            """)), idl.errors.ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED)
+            """),
+            ),
+            idl.errors.ERROR_ID_STRICT_AND_DISABLE_CHECK_NOT_ALLOWED,
+        )
 
         # Test inheritance is prohibited through structs
         self.assert_bind_fail(
-            test_preamble + indent_text(
+            test_preamble
+            + indent_text(
                 1,
                 textwrap.dedent("""
                 danger2:
@@ -3082,11 +3615,15 @@ class TestBinder(testcase.IDLTestcase):
                     fields:
                         foo: string
                         d1: danger
-            """)), idl.errors.ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED)
+            """),
+            ),
+            idl.errors.ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED,
+        )
 
         # Test inheritance is prohibited through commands
         self.assert_bind_fail(
-            test_preamble + textwrap.dedent("""
+            test_preamble
+            + textwrap.dedent("""
             commands:
                 dangerc:
                     description: foo
@@ -3097,9 +3634,10 @@ class TestBinder(testcase.IDLTestcase):
                     fields:
                         foo: string
                         d1: danger
-            """), idl.errors.ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED)
+            """),
+            idl.errors.ERROR_ID_INHERITANCE_AND_DISABLE_CHECK_NOT_ALLOWED,
+        )
 
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     unittest.main()

@@ -33,15 +33,21 @@ class PeriodicKillSecondaries(interface.Hook):
     def __init__(self, hook_logger, rs_fixture, period_secs=DEFAULT_PERIOD_SECS):
         """Initialize PeriodicKillSecondaries."""
         if not isinstance(rs_fixture, replicaset.ReplicaSetFixture):
-            raise TypeError("{} either does not support replication or does not support writing to"
-                            " its oplog early".format(rs_fixture.__class__.__name__))
+            raise TypeError(
+                "{} either does not support replication or does not support writing to"
+                " its oplog early".format(rs_fixture.__class__.__name__)
+            )
 
         if rs_fixture.num_nodes <= 1:
-            raise ValueError("PeriodicKillSecondaries requires the replica set to contain at least"
-                             " one secondary")
+            raise ValueError(
+                "PeriodicKillSecondaries requires the replica set to contain at least"
+                " one secondary"
+            )
 
-        description = ("PeriodicKillSecondaries (kills the secondary after running tests for a"
-                       " configurable period of time)")
+        description = (
+            "PeriodicKillSecondaries (kills the secondary after running tests for a"
+            " configurable period of time)"
+        )
         interface.Hook.__init__(self, hook_logger, rs_fixture, description)
 
         self._period_secs = period_secs
@@ -85,7 +91,8 @@ class PeriodicKillSecondaries(interface.Hook):
     def _run(self, test_report):
         try:
             hook_test_case = PeriodicKillSecondariesTestCase.create_after_test(
-                self.logger, self._last_test, self, test_report)
+                self.logger, self._last_test, self, test_report
+            )
             hook_test_case.configure(self.fixture)
             hook_test_case.run_dynamic_test(test_report)
         finally:
@@ -101,13 +108,20 @@ class PeriodicKillSecondaries(interface.Hook):
         client = secondary.mongo_client()
         try:
             client.admin.command(
-                bson.SON([("configureFailPoint", "rsSyncApplyStop"), ("mode", "alwaysOn")]))
+                bson.SON(
+                    [("configureFailPoint", "rsSyncApplyStop"), ("mode", "alwaysOn")]
+                )
+            )
         except pymongo.errors.OperationFailure as err:
-            self.logger.exception("Unable to disable oplog application on the mongod on port %d",
-                                  secondary.port)
+            self.logger.exception(
+                "Unable to disable oplog application on the mongod on port %d",
+                secondary.port,
+            )
             raise errors.ServerFailure(
                 "Unable to disable oplog application on the mongod on port {}: {}".format(
-                    secondary.port, err.args[0]))
+                    secondary.port, err.args[0]
+                )
+            )
 
     def _disable_rssyncapplystop(self, secondary):
         # Disable the "rsSyncApplyStop" failpoint on the secondary to have it resume applying
@@ -115,13 +129,18 @@ class PeriodicKillSecondaries(interface.Hook):
         client = secondary.mongo_client()
         try:
             client.admin.command(
-                bson.SON([("configureFailPoint", "rsSyncApplyStop"), ("mode", "off")]))
+                bson.SON([("configureFailPoint", "rsSyncApplyStop"), ("mode", "off")])
+            )
         except pymongo.errors.OperationFailure as err:
-            self.logger.exception("Unable to re-enable oplog application on the mongod on port %d",
-                                  secondary.port)
+            self.logger.exception(
+                "Unable to re-enable oplog application on the mongod on port %d",
+                secondary.port,
+            )
             raise errors.ServerFailure(
                 "Unable to re-enable oplog application on the mongod on port {}: {}".format(
-                    secondary.port, err.args[0]))
+                    secondary.port, err.args[0]
+                )
+            )
 
 
 class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
@@ -130,10 +149,13 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
     INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
     INTERRUPTED_DUE_TO_STORAGE_CHANGE = 355
 
-    def __init__(self, logger, test_name, description, base_test_name, hook, test_report):
+    def __init__(
+        self, logger, test_name, description, base_test_name, hook, test_report
+    ):
         """Initialize PeriodicKillSecondariesTestCase."""
-        interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
-                                           hook)
+        interface.DynamicTestCase.__init__(
+            self, logger, test_name, description, base_test_name, hook
+        )
         self._test_report = test_report
 
     def run_test(self):
@@ -182,7 +204,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             if not secondary.is_running():
                 raise errors.ServerFailure(
                     "mongod on port {} was expected to be running in"
-                    " PeriodicKillSecondaries.after_test(), but wasn't.".format(secondary.port))
+                    " PeriodicKillSecondaries.after_test(), but wasn't.".format(
+                        secondary.port
+                    )
+                )
 
             self.logger.info("Killing the secondary on port %d...", secondary.port)
             secondary.mongod.stop(mode=fixture.TeardownMode.KILL)
@@ -206,9 +231,12 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             # potential consistency issues before we validate the config.system.preimages
             # collection.
             if "set_parameters" in secondary.mongod_options:
-                secondary.mongod_options["set_parameters"]["disableExpiredPreImagesRemover"] = True
                 secondary.mongod_options["set_parameters"][
-                    "disableExpiredChangeCollectionRemover"] = True
+                    "disableExpiredPreImagesRemover"
+                ] = True
+                secondary.mongod_options["set_parameters"][
+                    "disableExpiredChangeCollectionRemover"
+                ] = True
             else:
                 secondary.mongod_options["set_parameters"] = {
                     "disableExpiredPreImagesRemover": True,
@@ -217,7 +245,9 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
             self.logger.info(
                 "Restarting the secondary on port %d as a replica set node with"
-                " its data files intact...", secondary.port)
+                " its data files intact...",
+                secondary.port,
+            )
             # Start the 'secondary' mongod back up as part of the replica set and wait for it to
             # reach state SECONDARY.
             secondary.setup()
@@ -230,23 +260,29 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             except errors.ServerFailure:
                 raise errors.ServerFailure(
                     "{} did not exit cleanly after reconciling the end of its oplog".format(
-                        secondary))
+                        secondary
+                    )
+                )
 
-        self.logger.info("Starting the fixture back up again with its data files intact for final"
-                         " validation...")
+        self.logger.info(
+            "Starting the fixture back up again with its data files intact for final"
+            " validation..."
+        )
 
         try:
             self.fixture.setup()
             self.logger.info(fixture.create_fixture_table(self.fixture))
             self.fixture.await_ready()
         finally:
-            for (i, node) in enumerate(self.fixture.nodes):
+            for i, node in enumerate(self.fixture.nodes):
                 node.preserve_dbpath = preserve_dbpaths[i]
 
     def _validate_collections(self, test_report):
         validate_test_case = validate.ValidateCollections(
-            self._hook.logger, self.fixture,
-            {'global_vars': {'TestData': {'skipEnforceFastCountOnValidate': True}}})
+            self._hook.logger,
+            self.fixture,
+            {"global_vars": {"TestData": {"skipEnforceFastCountOnValidate": True}}},
+        )
         validate_test_case.before_suite(test_report)
         validate_test_case.before_test(self, test_report)
         validate_test_case.after_test(self, test_report)
@@ -268,15 +304,19 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
     def _check_pre_images_consistency(self, test_report):
         preimages_test_case = preimages_consistency.CheckReplPreImagesConsistency(
-            self._hook.logger, self.fixture)
+            self._hook.logger, self.fixture
+        )
         preimages_test_case.before_suite(test_report)
         preimages_test_case.before_test(self, test_report)
         preimages_test_case.after_test(self, test_report)
         preimages_test_case.after_suite(test_report)
 
     def _check_change_collection_consistency(self, test_report):
-        change_collection_test_case = change_collection_consistency.CheckReplChangeCollectionConsistency(
-            self._hook.logger, self.fixture)
+        change_collection_test_case = (
+            change_collection_consistency.CheckReplChangeCollectionConsistency(
+                self._hook.logger, self.fixture
+            )
+        )
         change_collection_test_case.before_suite(test_report)
         change_collection_test_case.before_test(self, test_report)
         change_collection_test_case.after_test(self, test_report)
@@ -294,13 +334,20 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             self.fixture.teardown()
         except errors.ServerFailure:
             raise errors.ServerFailure(
-                "{} did not exit cleanly after verifying data consistency".format(self.fixture))
+                "{} did not exit cleanly after verifying data consistency".format(
+                    self.fixture
+                )
+            )
 
         for secondary in self.fixture.get_secondaries():
             # We re-enable the removers for pre-images and change collections. These were disabled
             # before re-joining the replSet as a secondary during the consistency checks.
-            secondary.mongod_options["set_parameters"].pop("disableExpiredPreImagesRemover")
-            secondary.mongod_options["set_parameters"].pop("disableExpiredChangeCollectionRemover")
+            secondary.mongod_options["set_parameters"].pop(
+                "disableExpiredPreImagesRemover"
+            )
+            secondary.mongod_options["set_parameters"].pop(
+                "disableExpiredChangeCollectionRemover"
+            )
 
         self.logger.info("Starting the fixture back up again with no data...")
         self.fixture.setup()
@@ -321,7 +368,9 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
         self.logger.info(
             "Restarting the secondary on port %d as a standalone node with"
-            " its data files intact...", secondary.port)
+            " its data files intact...",
+            secondary.port,
+        )
 
         try:
             secondary.setup()
@@ -329,16 +378,22 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             secondary.await_ready()
 
             client = secondary.mongo_client()
-            oplog_truncate_after_doc = client.local["replset.oplogTruncateAfterPoint"].find_one()
-            recovery_timestamp_res = client.admin.command("replSetTest",
-                                                          getLastStableRecoveryTimestamp=True)
-            latest_oplog_doc = client.local["oplog.rs"].find_one(sort=[("$natural",
-                                                                        pymongo.DESCENDING)])
+            oplog_truncate_after_doc = client.local[
+                "replset.oplogTruncateAfterPoint"
+            ].find_one()
+            recovery_timestamp_res = client.admin.command(
+                "replSetTest", getLastStableRecoveryTimestamp=True
+            )
+            latest_oplog_doc = client.local["oplog.rs"].find_one(
+                sort=[("$natural", pymongo.DESCENDING)]
+            )
 
-            self.logger.info("Checking replication invariants. oplogTruncateAfterPoint: {},"
-                             " stable recovery timestamp: {}, latest oplog doc: {}".format(
-                                 oplog_truncate_after_doc, recovery_timestamp_res,
-                                 latest_oplog_doc))
+            self.logger.info(
+                "Checking replication invariants. oplogTruncateAfterPoint: {},"
+                " stable recovery timestamp: {}, latest oplog doc: {}".format(
+                    oplog_truncate_after_doc, recovery_timestamp_res, latest_oplog_doc
+                )
+            )
 
             null_ts = bson.Timestamp(0, 0)
 
@@ -349,45 +404,61 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             latest_oplog_entry_ts = latest_oplog_doc.get("ts")
             if latest_oplog_entry_ts is None:
                 raise errors.ServerFailure(
-                    "Latest oplog entry had no 'ts' field: {}".format(latest_oplog_doc))
+                    "Latest oplog entry had no 'ts' field: {}".format(latest_oplog_doc)
+                )
 
             # The "lastStableRecoveryTimestamp" field is present if the storage engine supports
             # "recover to a timestamp". If it's a null timestamp on a durable storage engine, that
             # means we do not yet have a stable checkpoint timestamp and must be restarting at the
             # top of the oplog. Since we wait for a stable recovery timestamp at test fixture setup,
             # we should never encounter a null timestamp here.
-            recovery_timestamp = recovery_timestamp_res.get("lastStableRecoveryTimestamp")
+            recovery_timestamp = recovery_timestamp_res.get(
+                "lastStableRecoveryTimestamp"
+            )
             if recovery_timestamp == null_ts:
                 raise errors.ServerFailure(
-                    "Received null stable recovery timestamp {}".format(recovery_timestamp_res))
+                    "Received null stable recovery timestamp {}".format(
+                        recovery_timestamp_res
+                    )
+                )
             # On a storage engine that doesn't support "recover to a timestamp", we default to null.
             if recovery_timestamp is None:
                 recovery_timestamp = null_ts
 
             # last stable recovery timestamp <= top of oplog
             if not recovery_timestamp <= latest_oplog_entry_ts:
-                raise errors.ServerFailure("The condition last stable recovery timestamp <= top"
-                                           " of oplog ({} <= {}) doesn't hold:"
-                                           " getLastStableRecoveryTimestamp result={},"
-                                           " latest oplog entry={}".format(
-                                               recovery_timestamp, latest_oplog_entry_ts,
-                                               recovery_timestamp_res, latest_oplog_doc))
+                raise errors.ServerFailure(
+                    "The condition last stable recovery timestamp <= top"
+                    " of oplog ({} <= {}) doesn't hold:"
+                    " getLastStableRecoveryTimestamp result={},"
+                    " latest oplog entry={}".format(
+                        recovery_timestamp,
+                        latest_oplog_entry_ts,
+                        recovery_timestamp_res,
+                        latest_oplog_doc,
+                    )
+                )
 
             try:
                 secondary.teardown()
             except errors.ServerFailure:
                 raise errors.ServerFailure(
                     "{} did not exit cleanly after being started up as a standalone".format(
-                        secondary))
+                        secondary
+                    )
+                )
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
                 " the last stable recovery timestamp, or the latest oplog entry from the"
-                " mongod on port %d", secondary.port)
+                " mongod on port %d",
+                secondary.port,
+            )
             raise errors.ServerFailure(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
                 " the last stable recovery timestamp, or the latest oplog entry from the"
-                " mongod on port {}: {}".format(secondary.port, err.args[0]))
+                " mongod on port {}: {}".format(secondary.port, err.args[0])
+            )
         finally:
             # Set the secondary's options back to their original values.
             if replset_name:
@@ -400,25 +471,39 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         while True:
             try:
                 client.admin.command(
-                    bson.SON([
-                        ("replSetTest", 1),
-                        ("waitForMemberState", 2),  # 2 = SECONDARY
-                        ("timeoutMillis",
-                         fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60 * 1000)
-                    ]))
+                    bson.SON(
+                        [
+                            ("replSetTest", 1),
+                            ("waitForMemberState", 2),  # 2 = SECONDARY
+                            (
+                                "timeoutMillis",
+                                fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS
+                                * 60
+                                * 1000,
+                            ),
+                        ]
+                    )
+                )
                 break
             except pymongo.errors.OperationFailure as err:
-                if err.code not in (self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
-                                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE):
+                if err.code not in (
+                    self.INTERRUPTED_DUE_TO_REPL_STATE_CHANGE,
+                    self.INTERRUPTED_DUE_TO_STORAGE_CHANGE,
+                ):
                     self.logger.exception(
                         "mongod on port %d failed to reach state SECONDARY after %d seconds",
-                        secondary.port, fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60)
+                        secondary.port,
+                        fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60,
+                    )
                     raise errors.ServerFailure(
-                        "mongod on port {} failed to reach state SECONDARY after {} seconds: {}".
-                        format(secondary.port,
-                               fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60,
-                               err.args[0]))
+                        "mongod on port {} failed to reach state SECONDARY after {} seconds: {}".format(
+                            secondary.port,
+                            fixture.ReplFixture.AWAIT_REPL_TIMEOUT_FOREVER_MINS * 60,
+                            err.args[0],
+                        )
+                    )
 
-                msg = ("Interrupted while waiting for node to reach secondary state, retrying: {}"
-                       ).format(err)
+                msg = (
+                    "Interrupted while waiting for node to reach secondary state, retrying: {}"
+                ).format(err)
                 self.logger.error(msg)

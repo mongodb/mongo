@@ -22,8 +22,14 @@ class LagOplogApplicationInBackground(jsfile.JSHook):
         """Initialize LagOplogApplicationInBackground."""
         description = "Lag a secondary's oplog application while the test is running."
         js_filename = os.path.join("jstests", "hooks", "lag_secondary_application.js")
-        jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename, description,
-                               shell_options=shell_options)
+        jsfile.JSHook.__init__(
+            self,
+            hook_logger,
+            fixture,
+            js_filename,
+            description,
+            shell_options=shell_options,
+        )
 
         self._background_job = None
 
@@ -47,10 +53,13 @@ class LagOplogApplicationInBackground(jsfile.JSHook):
             return
 
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
-            test.logger, test, self, self._js_filename, self._shell_options)
+            test.logger, test, self, self._js_filename, self._shell_options
+        )
         hook_test_case.configure(self.fixture)
 
-        self.logger.info("Resuming the background secondary oplog application lag thread.")
+        self.logger.info(
+            "Resuming the background secondary oplog application lag thread."
+        )
         self._background_job.resume(hook_test_case, test_report)
 
     def after_test(self, test, test_report):  # noqa: D205,D400
@@ -60,7 +69,9 @@ class LagOplogApplicationInBackground(jsfile.JSHook):
         if self._background_job is None:
             return
 
-        self.logger.info("Pausing the background secondary oplog application lag thread.")
+        self.logger.info(
+            "Pausing the background secondary oplog application lag thread."
+        )
         self._background_job.pause()
 
         if self._background_job.exc_info is not None:
@@ -72,5 +83,6 @@ class LagOplogApplicationInBackground(jsfile.JSHook):
             else:
                 self.logger.error(
                     "Encountered an error inside the background secondary oplog application lag thread.",
-                    exc_info=self._background_job.exc_info)
+                    exc_info=self._background_job.exc_info,
+                )
                 raise self._background_job.exc_info[1]

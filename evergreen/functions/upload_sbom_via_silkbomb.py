@@ -12,12 +12,16 @@ app = typer.Typer(
 )
 
 
-def get_changed_files_from_latest_commit(local_repo_path: str, branch_name: str = "master") -> dict:
+def get_changed_files_from_latest_commit(
+    local_repo_path: str, branch_name: str = "master"
+) -> dict:
     try:
         repo = Repo(local_repo_path)
 
         if branch_name not in repo.heads:
-            raise ValueError(f"Branch '{branch_name}' does not exist in the repository.")
+            raise ValueError(
+                f"Branch '{branch_name}' does not exist in the repository."
+            )
 
         last_commit = repo.heads[branch_name].commit
         title = last_commit.summary
@@ -104,7 +108,9 @@ def upload_sbom_via_silkbomb(
 
     try:
         print(f"Running command: {' '.join(command)}")
-        subprocess.run(command, check=True, text=True, capture_output=True, timeout=timeout_seconds)
+        subprocess.run(
+            command, check=True, text=True, capture_output=True, timeout=timeout_seconds
+        )
         print("Updated sbom.json file upload via Silkbomb successful!")
     except FileNotFoundError as e:
         print(f"Error: '{container_command}' command not found.")
@@ -126,18 +132,31 @@ def upload_sbom_via_silkbomb(
 def run(
     github_org: Annotated[
         str,
-        typer.Option(..., envvar="GITHUB_ORG", help="Name of the github organization (e.g. 10gen)"),
+        typer.Option(
+            ...,
+            envvar="GITHUB_ORG",
+            help="Name of the github organization (e.g. 10gen)",
+        ),
     ],
     github_repo: Annotated[
-        str, typer.Option(..., envvar="GITHUB_REPO", help="Repo name in 'owner/repo' format.")
+        str,
+        typer.Option(
+            ..., envvar="GITHUB_REPO", help="Repo name in 'owner/repo' format."
+        ),
     ],
     local_repo_path: Annotated[
         str,
-        typer.Option(..., envvar="LOCAL_REPO_PATH", help="Path to the local git repository."),
+        typer.Option(
+            ..., envvar="LOCAL_REPO_PATH", help="Path to the local git repository."
+        ),
     ],
     branch_name: Annotated[
         str,
-        typer.Option(..., envvar="BRANCH_NAME", help="The head branch (e.g., the PR branch name)."),
+        typer.Option(
+            ...,
+            envvar="BRANCH_NAME",
+            help="The head branch (e.g., the PR branch name).",
+        ),
     ],
     sbom_repo_path: Annotated[
         str,
@@ -159,33 +178,50 @@ def run(
     container_command: Annotated[
         str,
         typer.Option(
-            ..., envvar="CONTAINER_COMMAND", help="Container engine to use ('podman' or 'docker')."
+            ...,
+            envvar="CONTAINER_COMMAND",
+            help="Container engine to use ('podman' or 'docker').",
         ),
     ] = "podman",
     container_image: Annotated[
-        str, typer.Option(..., envvar="CONTAINER_IMAGE", help="Silkbomb container image.")
+        str,
+        typer.Option(..., envvar="CONTAINER_IMAGE", help="Silkbomb container image."),
     ] = "901841024863.dkr.ecr.us-east-1.amazonaws.com/release-infrastructure/silkbomb:2.0",
     creds_file: Annotated[
         pathlib.Path,
         typer.Option(
-            ..., envvar="CONTAINER_ENV_FILES", help="Path for the temporary credentials file."
+            ...,
+            envvar="CONTAINER_ENV_FILES",
+            help="Path for the temporary credentials file.",
         ),
     ] = pathlib.Path("kondukto_credentials.env"),
     workdir: Annotated[
-        str, typer.Option(..., envvar="WORKING_DIR", help="Path for the container volumes.")
+        str,
+        typer.Option(..., envvar="WORKING_DIR", help="Path for the container volumes."),
     ] = "/workdir",
     dry_run: Annotated[
-        bool, typer.Option("--dry-run/--run", help="Check for changes without uploading.")
+        bool,
+        typer.Option("--dry-run/--run", help="Check for changes without uploading."),
     ] = True,
     check_sbom_file_change: Annotated[
-        bool, typer.Option("--check-sbom-file-change", help="Check for changes to the SBOM file.")
+        bool,
+        typer.Option(
+            "--check-sbom-file-change", help="Check for changes to the SBOM file."
+        ),
     ] = False,
 ):
     if requester != "commit" and not dry_run:
-        print(f"Skipping: Run can only be triggered for 'commit', but requester was '{requester}'.")
+        print(
+            f"Skipping: Run can only be triggered for 'commit', but requester was '{requester}'."
+        )
         sys.exit(0)
 
-    major_branches = ["v7.0", "v8.0", "v8.1", "master"]  # Only major branches that MongoDB supports
+    major_branches = [
+        "v7.0",
+        "v8.0",
+        "v8.1",
+        "master",
+    ]  # Only major branches that MongoDB supports
     if False and branch_name not in major_branches:
         print(f"Skipping: Branch '{branch_name}' is not a major branch. Exiting.")
         sys.exit(0)
@@ -199,7 +235,9 @@ def run(
     try:
         sbom_file_changed = True
         if check_sbom_file_change:
-            commit_changed_files = get_changed_files_from_latest_commit(repo_path, branch_name)
+            commit_changed_files = get_changed_files_from_latest_commit(
+                repo_path, branch_name
+            )
             if commit_changed_files:
                 print(
                     f"Latest commit '{commit_changed_files['title']}' ({commit_changed_files['hash']}) in branch '{branch_name}' has the following changed files:"

@@ -3,7 +3,9 @@
 import yaml
 
 
-def get_config_value(attrib, cmd_line_options, config_file_data, required=False, default=None):
+def get_config_value(
+    attrib, cmd_line_options, config_file_data, required=False, default=None
+):
     """
     Get the configuration value to use.
 

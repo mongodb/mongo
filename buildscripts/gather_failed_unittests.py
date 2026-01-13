@@ -29,7 +29,9 @@ def _relink_binaries_with_symbols(failed_tests: List[str]):
     bazel_build_flags.replace("--config=strip-debug-during-link", "")
 
     relink_command = [
-        arg for arg in ["bazel", "build", *bazel_build_flags.split(" "), *failed_tests] if arg
+        arg
+        for arg in ["bazel", "build", *bazel_build_flags.split(" "), *failed_tests]
+        if arg
     ]
 
     # Enable this when/if we want to strip debug symbols during linking unit tests
@@ -39,13 +41,17 @@ def _relink_binaries_with_symbols(failed_tests: List[str]):
     #     check=True,
     # )
 
-    repro_test_command = " ".join(["test" if arg == "build" else arg for arg in relink_command])
+    repro_test_command = " ".join(
+        ["test" if arg == "build" else arg for arg in relink_command]
+    )
     with open(".failed_unittest_repro.txt", "w", encoding="utf-8") as f:
         f.write(repro_test_command)
     print(f"Repro command written to .failed_unittest_repro.txt: {repro_test_command}")
 
 
-def _copy_bins_to_upload(failed_tests: List[str], upload_bin_dir: str, upload_lib_dir: str) -> bool:
+def _copy_bins_to_upload(
+    failed_tests: List[str], upload_bin_dir: str, upload_lib_dir: str
+) -> bool:
     success = True
     bazel_bin_dir = Path("./bazel-bin")
     for failed_test in failed_tests:
@@ -80,7 +86,9 @@ def _copy_bins_to_upload(failed_tests: List[str], upload_bin_dir: str, upload_li
         dsym_dir = full_binary_path.with_suffix(".dSYM")
         if dsym_dir.is_dir():
             print(f"Copying dsym {dsym_dir} to {upload_bin_dir}")
-            shutil.copytree(dsym_dir, upload_bin_dir / dsym_dir.name, dirs_exist_ok=True)
+            shutil.copytree(
+                dsym_dir, upload_bin_dir / dsym_dir.name, dirs_exist_ok=True
+            )
 
     # Copy debug symbols for dynamic builds
     lib_dir = Path("bazel-bin/install/lib")
@@ -105,7 +113,9 @@ def main(testlog_dir: str = "bazel-testlogs"):
         print("No failed tests found.")
         exit(0)
 
-    print(f"Found {len(failed_tests)} failed tests. Gathering binaries and debug symbols.")
+    print(
+        f"Found {len(failed_tests)} failed tests. Gathering binaries and debug symbols."
+    )
     _relink_binaries_with_symbols(failed_tests)
 
     print("Copying binaries and debug symbols to upload directories.")

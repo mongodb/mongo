@@ -1,4 +1,5 @@
 """Wrapper for the ProcessControl class."""
+
 import logging
 
 import psutil
@@ -54,5 +55,7 @@ class ProcessControl(object):
                 try:
                     proc.kill()
                 except psutil.NoSuchProcess:
-                    LOGGER.info("Could not kill process with pid %d, as it no longer exists",
-                                proc.pid)
+                    LOGGER.info(
+                        "Could not kill process with pid %d, as it no longer exists",
+                        proc.pid,
+                    )

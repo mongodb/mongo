@@ -37,14 +37,17 @@ def list_idls(directory: str) -> Set[str]:
     """Find all IDL files in the current directory."""
     return {
         os.path.join(dirpath, filename)
-        for dirpath, dirnames, filenames in os.walk(directory) for filename in filenames
-        if filename.endswith('.idl')
+        for dirpath, dirnames, filenames in os.walk(directory)
+        for filename in filenames
+        if filename.endswith(".idl")
     }
 
 
 def parse_idl(idl_path: str, import_directories: List[str]) -> syntax.IDLParsedSpec:
     """Parse an IDL file or throw an error."""
-    parsed_doc = parser.parse(open(idl_path), idl_path, CompilerImportResolver(import_directories))
+    parsed_doc = parser.parse(
+        open(idl_path), idl_path, CompilerImportResolver(import_directories)
+    )
 
     if parsed_doc.errors:
         parsed_doc.errors.dump_errors()

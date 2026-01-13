@@ -74,8 +74,11 @@ class TagsConfig(object):
         with open(filename, "w") as fstream:
             if preamble:
                 print(
-                    textwrap.fill(preamble, width=100, initial_indent="# ", subsequent_indent="# "),
-                    file=fstream)
+                    textwrap.fill(
+                        preamble, width=100, initial_indent="# ", subsequent_indent="# "
+                    ),
+                    file=fstream,
+                )
 
             # We use yaml.safe_dump() in order avoid having strings being written to the file as
             # "!!python/unicode ..." and instead have them written as plain 'str' instances.

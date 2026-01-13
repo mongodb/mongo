@@ -13,7 +13,7 @@ import psutil
 from buildscripts.resmokelib import config, parser, reportfile, testing
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
 
-_IS_WINDOWS = (sys.platform == "win32")
+_IS_WINDOWS = sys.platform == "win32"
 if _IS_WINDOWS:
     import win32api
     import win32event
@@ -45,10 +45,14 @@ def register(logger, suites, start_time):
                 # Wait for task time out to dump stacks.
                 ret = win32event.WaitForSingleObject(event_handle, win32event.INFINITE)
                 if ret != win32event.WAIT_OBJECT_0:
-                    logger.error("_handle_set_event WaitForSingleObject failed: %d" % ret)
+                    logger.error(
+                        "_handle_set_event WaitForSingleObject failed: %d" % ret
+                    )
                     return
             except win32event.error as err:
-                logger.error("Exception from win32event.WaitForSingleObject with error: %s" % err)
+                logger.error(
+                    "Exception from win32event.WaitForSingleObject with error: %s" % err
+                )
             else:
                 HANG_ANALYZER_CALLED.set()
                 header_msg = "Dumping stacks due to signal from win32event.SetEvent"
@@ -62,7 +66,7 @@ def register(logger, suites, start_time):
 
         testing.suite.Suite.log_summaries(logger, suites, time.time() - start_time)
 
-        if 'is_inner_level' not in config.INTERNAL_PARAMS:
+        if "is_inner_level" not in config.INTERNAL_PARAMS:
             # Gather and analyze pids of all subprocesses.
             # Do nothing for child resmoke process started by another resmoke process
             # (e.g. backup_restore.js) The child processes of the child resmoke will be
@@ -81,8 +85,9 @@ def register(logger, suites, start_time):
             security_attributes = None
             manual_reset = False
             initial_state = False
-            task_timeout_handle = win32event.CreateEvent(security_attributes, manual_reset,
-                                                         initial_state, event_name)
+            task_timeout_handle = win32event.CreateEvent(
+                security_attributes, manual_reset, initial_state, event_name
+            )
         except win32event.error as err:
             logger.error("Exception from win32event.CreateEvent with error: %s" % err)
             return
@@ -91,9 +96,11 @@ def register(logger, suites, start_time):
         atexit.register(win32api.CloseHandle, task_timeout_handle)
 
         # Create thread.
-        event_handler_thread = threading.Thread(target=_handle_set_event,
-                                                kwargs={"event_handle": task_timeout_handle},
-                                                name="windows_event_handler_thread")
+        event_handler_thread = threading.Thread(
+            target=_handle_set_event,
+            kwargs={"event_handle": task_timeout_handle},
+            name="windows_event_handler_thread",
+        )
         event_handler_thread.daemon = True
         event_handler_thread.start()
     else:
@@ -126,7 +133,7 @@ def _get_pids():
     for child in parent.children(recursive=True):
         # Don't signal python threads. They have already been signalled in the evergreen timeout
         # section.
-        if 'python' not in child.name().lower():
+        if "python" not in child.name().lower():
             pids.append(child.pid)
 
     return pids
@@ -136,8 +143,10 @@ def _analyze_pids(logger, pids):
     """Analyze the PIDs spawned by the current resmoke process."""
     # If 'test_analysis' is specified, we will just write the pids out to a file and kill them
     # Instead of running analysis. This option will only be specified in resmoke selftests.
-    if 'test_analysis' in config.INTERNAL_PARAMS:
-        with open(os.path.join(config.DBPATH_PREFIX, "test_analysis.txt"), "w") as analysis_file:
+    if "test_analysis" in config.INTERNAL_PARAMS:
+        with open(
+            os.path.join(config.DBPATH_PREFIX, "test_analysis.txt"), "w"
+        ) as analysis_file:
             analysis_file.write("\n".join([str(pid) for pid in pids]))
             for pid in pids:
                 try:
@@ -153,8 +162,15 @@ def _analyze_pids(logger, pids):
     # See hang-analyzer argument options here:
     # https://github.com/10gen/mongo/blob/8636ede10bd70b32ff4b6cd115132ab0f22b89c7/buildscripts/resmokelib/hang_analyzer/hang_analyzer.py#L245
     hang_analyzer_args = [
-        'hang-analyzer', '-c', '-o', 'file', '-o', 'stdout', '-k', '-d',
-        ','.join([str(p) for p in pids])
+        "hang-analyzer",
+        "-c",
+        "-o",
+        "file",
+        "-o",
+        "stdout",
+        "-k",
+        "-d",
+        ",".join([str(p) for p in pids]),
     ]
     _hang_analyzer = parser.parse_command_line(hang_analyzer_args, logger=logger)
 
@@ -175,7 +191,9 @@ def _analyze_pids(logger, pids):
         logger.warning(
             "Resmoke invoked hang analyzer thread did not finish, but will continue running in the background. The thread may be disruputed and may show extraneous output."
         )
-        logger.warning("Cleaning up resmoke child processes so that resmoke can fail gracefully.")
+        logger.warning(
+            "Cleaning up resmoke child processes so that resmoke can fail gracefully."
+        )
         _hang_analyzer.kill_rogue_processes()
 
     else:

@@ -56,9 +56,14 @@ def get_git_version():
 def get_git_describe():
     """Return 'git describe --abbrev=7'."""
     with open(os.devnull, "r+") as devnull:
-        proc = subprocess.Popen("git describe --abbrev=7", stdout=subprocess.PIPE, stderr=devnull,
-                                stdin=devnull, shell=True)
-        return proc.communicate()[0].strip().decode('utf-8')
+        proc = subprocess.Popen(
+            "git describe --abbrev=7",
+            stdout=subprocess.PIPE,
+            stderr=devnull,
+            stdin=devnull,
+            shell=True,
+        )
+        return proc.communicate()[0].strip().decode("utf-8")
 
 
 def execsys(args):
@@ -96,7 +101,7 @@ def replace_with_repr(unicode_error):
     # fashion. This codec error handler will substitute the
     # repr() of the offending bytes into the decoded string
     # at the position they occurred
-    offender = unicode_error.object[unicode_error.start:unicode_error.end]
+    offender = unicode_error.object[unicode_error.start : unicode_error.end]
     return (str(repr(offender).strip("'").strip('"')), unicode_error.end)
 
 

@@ -1,4 +1,5 @@
 """Subcommands for test discovery."""
+
 from typing import List, Optional
 
 import yaml
@@ -92,12 +93,14 @@ class DiscoveryPlugin(PluginInterface):
 
         :param subparsers: argparse subparsers
         """
-        parser = subparsers.add_parser(TEST_DISCOVERY_SUBCOMMAND,
-                                       help="Discover what tests are run by a suite.")
+        parser = subparsers.add_parser(
+            TEST_DISCOVERY_SUBCOMMAND, help="Discover what tests are run by a suite."
+        )
         parser.add_argument("--suite", metavar="SUITE", help="Suite to run against.")
 
-        parser = subparsers.add_parser(SUITECONFIG_SUBCOMMAND,
-                                       help="Display configuration of a test suite.")
+        parser = subparsers.add_parser(
+            SUITECONFIG_SUBCOMMAND, help="Display configuration of a test suite."
+        )
         parser.add_argument("--suite", metavar="SUITE", help="Suite to run against.")
 
     def parse(self, subcommand, parser, parsed_args, **kwargs) -> Optional[Subcommand]:

@@ -8,7 +8,7 @@ from buildscripts import sync_repo_with_copybara
 
 
 @unittest.skipIf(
-    sys.platform in ('win32', 'darwin'),
+    sys.platform in ("win32", "darwin"),
     reason="No need to run this unittest on windows or macos",
 )
 class TestBranchFunctions(unittest.TestCase):
@@ -23,17 +23,19 @@ class TestBranchFunctions(unittest.TestCase):
         os.makedirs(mongodb_mongo_dir, exist_ok=True)
 
         # Create .git directory
-        git_dir = os.path.join(mongodb_mongo_dir, '.git')
+        git_dir = os.path.join(mongodb_mongo_dir, ".git")
         os.makedirs(git_dir, exist_ok=True)
 
         # Write contents to .git/config
-        config_path = os.path.join(git_dir, 'config')
-        with open(config_path, 'w') as f:
+        config_path = os.path.join(git_dir, "config")
+        with open(config_path, "w") as f:
             # Write contents to .git/config
             f.write(config_content)
 
     @staticmethod
-    def create_mock_repo_commits(repo_directory, num_commits, private_commit_hashes=None):
+    def create_mock_repo_commits(
+        repo_directory, num_commits, private_commit_hashes=None
+    ):
         """
         Create mock commits in a Git repository.
 
@@ -43,16 +45,18 @@ class TestBranchFunctions(unittest.TestCase):
         :return: A list of commit hashes generated for the new commits.
         """
         os.chdir(repo_directory)
-        sync_repo_with_copybara.run_command('git init')
-        sync_repo_with_copybara.run_command('git config --local user.email "test@example.com"')
+        sync_repo_with_copybara.run_command("git init")
+        sync_repo_with_copybara.run_command(
+            'git config --local user.email "test@example.com"'
+        )
         sync_repo_with_copybara.run_command('git config --local user.name "Test User"')
         # Used to store commit hashes
         commit_hashes = []
         for i in range(num_commits):
-            with open("test.txt", 'a') as f:
+            with open("test.txt", "a") as f:
                 f.write(str(i))
 
-            sync_repo_with_copybara.run_command('git add test.txt')
+            sync_repo_with_copybara.run_command("git add test.txt")
             commit_message = f"test commit {i}"
             # If there are private commit hashes need to be added in public repo commits, include them in the commit message
             if private_commit_hashes:
@@ -61,7 +65,8 @@ class TestBranchFunctions(unittest.TestCase):
             # Get the current commit hash
             sync_repo_with_copybara.run_command(f'git commit -m "{commit_message}"')
             commit_hashes.append(
-                sync_repo_with_copybara.run_command('git log --pretty=format:\"%H\" -1'))
+                sync_repo_with_copybara.run_command('git log --pretty=format:"%H" -1')
+            )
         return commit_hashes
 
     @staticmethod
@@ -85,19 +90,23 @@ class TestBranchFunctions(unittest.TestCase):
                 os.chdir(mock_10gen_dir)
                 # Create a mock private repository and get all commit hashes
                 private_hashes = TestBranchFunctions.create_mock_repo_commits(
-                    mock_10gen_dir, num_commits)
+                    mock_10gen_dir, num_commits
+                )
 
                 # Create a mock public repository and pass the list of private commit hashes
                 if matched_public_commits != 0:
                     public_hashes = TestBranchFunctions.create_mock_repo_commits(
-                        mock_mongodb_dir, matched_public_commits, private_hashes)
+                        mock_mongodb_dir, matched_public_commits, private_hashes
+                    )
                 else:
                     public_hashes = TestBranchFunctions.create_mock_repo_commits(
-                        mock_mongodb_dir, num_commits)
+                        mock_mongodb_dir, num_commits
+                    )
 
                 os.chdir(tmpdir)
-                result = sync_repo_with_copybara.find_matching_commit(mock_10gen_dir,
-                                                                      mock_mongodb_dir)
+                result = sync_repo_with_copybara.find_matching_commit(
+                    mock_10gen_dir, mock_mongodb_dir
+                )
 
                 # Check if the commit in the search result matches the last commit in the public repository
                 if result == public_hashes[-1]:
@@ -105,7 +114,9 @@ class TestBranchFunctions(unittest.TestCase):
                 else:
                     assert result is None
             except Exception as err:
-                print(f"{test_name}: FAIL!\n Exception occurred: {err}\n {traceback.format_exc()}")
+                print(
+                    f"{test_name}: FAIL!\n Exception occurred: {err}\n {traceback.format_exc()}"
+                )
                 return False
 
     def test_no_search(self):
@@ -136,7 +147,9 @@ class TestBranchFunctions(unittest.TestCase):
                 branch="v7.3",
             ),
         )
-        result = sync_repo_with_copybara.check_destination_branch_exists(copybara_config)
+        result = sync_repo_with_copybara.check_destination_branch_exists(
+            copybara_config
+        )
         self.assertTrue(result, f"{test_name}: SUCCESS!")
 
     def test_branch_not_exists(self):
@@ -149,7 +162,9 @@ class TestBranchFunctions(unittest.TestCase):
                 branch="..invalid-therefore-impossible-to-create-branch-name",
             ),
         )
-        result = sync_repo_with_copybara.check_destination_branch_exists(copybara_config)
+        result = sync_repo_with_copybara.check_destination_branch_exists(
+            copybara_config
+        )
         self.assertFalse(result, f"{test_name}: SUCCESS!")
 
     def test_only_mongodb_mongo_repo(self):
@@ -168,9 +183,13 @@ class TestBranchFunctions(unittest.TestCase):
 
             try:
                 # Check if the repository is only the MongoDB official repository
-                result = sync_repo_with_copybara.has_only_destination_repo_remote("mongodb/mongo")
+                result = sync_repo_with_copybara.has_only_destination_repo_remote(
+                    "mongodb/mongo"
+                )
             except Exception as err:
-                print(f"{test_name}: FAIL!\n Exception occurred: {err}\n {traceback.format_exc()}")
+                print(
+                    f"{test_name}: FAIL!\n Exception occurred: {err}\n {traceback.format_exc()}"
+                )
                 self.fail(f"{test_name}: FAIL!")
                 return
 
@@ -210,8 +229,10 @@ class TestBranchFunctions(unittest.TestCase):
                     branching_off_commit="",
                 )
             except Exception as err:
-                if (str(err) ==
-                        f"{mongodb_mongo_dir} git repo has not only the destination repo remote"):
+                if (
+                    str(err)
+                    == f"{mongodb_mongo_dir} git repo has not only the destination repo remote"
+                ):
                     return
 
             self.fail(f"{test_name}: FAIL!")
@@ -255,9 +276,10 @@ class TestBranchFunctions(unittest.TestCase):
                     invalid_branching_off_commit,
                 )
             except Exception as err:
-                if str(
-                        err
-                ) == "The new branch top commit does not match the branching_off_commit. Aborting push.":
+                if (
+                    str(err)
+                    == "The new branch top commit does not match the branching_off_commit. Aborting push."
+                ):
                     return
 
             self.fail(f"{test_name}: FAIL!")

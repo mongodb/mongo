@@ -37,7 +37,7 @@ from typing import List
 import yaml
 
 # Permit imports from "buildscripts".
-sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), '../../..')))
+sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), "../../..")))
 
 # pylint: disable=wrong-import-position
 from buildscripts.idl import lib
@@ -59,7 +59,7 @@ def get_all_feature_flags(idl_dirs: List[str] = None):
             # Most IDL files do not contain feature flags.
             # We can discard these quickly without expensive YAML parsing.
             with open(idl_path) as idl_file:
-                if 'feature_flags' not in idl_file.read():
+                if "feature_flags" not in idl_file.read():
                     continue
             with open(idl_path) as idl_file:
                 doc = parser.parse_file(idl_file, idl_path)
@@ -81,7 +81,9 @@ def get_all_feature_flags_turned_off_by_default(idl_dirs: List[str] = None):
     all_flags = get_all_feature_flags(idl_dirs)
     all_default_false_flags = [flag for flag in all_flags if all_flags[flag] != "true"]
 
-    with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
+    with open(
+        "buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"
+    ) as fully_disabled_ffs:
         force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
 
     return list(set(all_default_false_flags) - set(force_disabled_flags))
@@ -99,5 +101,5 @@ def main():
     gen_all_feature_flags_file()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -55,13 +55,16 @@ def main(testlog_dir: str, silent_fail: bool = False):
         end = start + int(duration)
 
         report["results"].append(
-            Result({
-                "test_file": test_file,
-                "status": status,
-                "start": start,
-                "end": end,
-                "log_raw": log_raw,
-            }))
+            Result(
+                {
+                    "test_file": test_file,
+                    "status": status,
+                    "start": start,
+                    "end": end,
+                    "log_raw": log_raw,
+                }
+            )
+        )
 
     if report["results"]:
         with open("report.json", "wt") as fh:

@@ -26,7 +26,9 @@ def process_owners(cur_dir: str) -> Tuple[Dict[re.Pattern, List[str]], bool]:
         no_parent_owners = False
         if "options" in contents:
             options = contents["options"]
-            no_parent_owners = "no_parent_owners" in options and options["no_parent_owners"]
+            no_parent_owners = (
+                "no_parent_owners" in options and options["no_parent_owners"]
+            )
 
         filters = {}
         for file_filter in contents["filters"]:
@@ -50,7 +52,9 @@ def process_owners(cur_dir: str) -> Tuple[Dict[re.Pattern, List[str]], bool]:
 
 class Owners:
     def __init__(self):
-        self.co_jira_map = yaml.safe_load(open("buildscripts/util/co_jira_map.yml", "r"))
+        self.co_jira_map = yaml.safe_load(
+            open("buildscripts/util/co_jira_map.yml", "r")
+        )
 
     def get_codeowners(self, file_path: str) -> List[str]:
         cur_dir = os.path.dirname(file_path)
@@ -74,6 +78,7 @@ class Owners:
 
     def get_jira_team_owner(self, file_path: str) -> List[str]:
         return [
-            jira_team for codeowner in self.get_codeowners(file_path)
+            jira_team
+            for codeowner in self.get_codeowners(file_path)
             for jira_team in self.get_jira_team_from_codeowner(codeowner)
         ]

@@ -52,8 +52,10 @@ class TestReport(unittest.TestResult):
 
         # TestReports that are used when running tests need a JobLogger but combined reports don't
         # use the logger.
-        combined_report = cls(logging.loggers.ROOT_EXECUTOR_LOGGER,
-                              _config.SuiteOptions.ALL_INHERITED.resolve())
+        combined_report = cls(
+            logging.loggers.ROOT_EXECUTOR_LOGGER,
+            _config.SuiteOptions.ALL_INHERITED.resolve(),
+        )
         combining_time = time.time()
 
         for report in reports:
@@ -78,7 +80,8 @@ class TestReport(unittest.TestResult):
                             if "AFTER_TIMEOUT" not in logger.name:
                                 logger.name = f"{logger.name}:AFTER_TIMEOUT"
                             logger.error(
-                                "HIT EVERGREEN TIMEOUT: Hang analyzer will kill or abort processes")
+                                "HIT EVERGREEN TIMEOUT: Hang analyzer will kill or abort processes"
+                            )
                         # Until EVG-1536 is completed, we shouldn't distinguish between failures and
                         # interrupted tests in the report.json file. In Evergreen, the behavior to
                         # sort tests with the "timeout" test status after tests with the "pass" test
@@ -131,20 +134,28 @@ class TestReport(unittest.TestResult):
                 self.num_dynamic += 1
 
         # Set up the test-specific logger.
-        (test_logger, url_endpoint) = logging.loggers.new_test_logger(test.short_name(),
-                                                                      test.basename(), command,
-                                                                      test.logger, self.job_num,
-                                                                      test.id(), self.job_logger)
+        (test_logger, url_endpoint) = logging.loggers.new_test_logger(
+            test.short_name(),
+            test.basename(),
+            command,
+            test.logger,
+            self.job_num,
+            test.id(),
+            self.job_logger,
+        )
 
         test_info.add_logger(test_logger)
         test_info.add_logger(self.job_logger)
         # Set up logging handlers to capture exceptions.
-        test_info.exception_extractors = logging.loggers.configure_exception_capture(test_logger)
+        test_info.exception_extractors = logging.loggers.configure_exception_capture(
+            test_logger
+        )
 
         test_info.log_info = {
             "log_name": logging.loggers.get_evergreen_log_name(self.job_num, test.id()),
             "logs_to_merge": [logging.loggers.get_evergreen_log_name(self.job_num)],
-            "rendering_type": "resmoke", "version": 0
+            "rendering_type": "resmoke",
+            "version": 0,
         }
         test_info.url_endpoint = url_endpoint
         if self.logging_prefix is not None:
@@ -169,11 +180,14 @@ class TestReport(unittest.TestResult):
             with self._lock:
                 test_info = self.find_test_info(test)
                 test_info.end_time = time.time()
-                test_status = "no failures detected" if test_info.status == "pass" else "failed"
+                test_status = (
+                    "no failures detected" if test_info.status == "pass" else "failed"
+                )
 
             time_taken = test_info.end_time - test_info.start_time
-            self.job_logger.info("%s ran in %0.2f seconds: %s.", test.basename(), time_taken,
-                                 test_status)
+            self.job_logger.info(
+                "%s ran in %0.2f seconds: %s.", test.basename(), time_taken, test_status
+            )
 
         finally:
             # This is a failsafe. In the event that 'stopTest' fails,
@@ -201,7 +215,7 @@ class TestReport(unittest.TestResult):
             test_info.status = "error"
             test_info.evergreen_status = "fail"
             test_info.return_code = test.return_code
-            test_info.error = self._exc_info_to_string(err, test).split('\n')
+            test_info.error = self._exc_info_to_string(err, test).split("\n")
 
     def setError(self, test, err):
         """Change the outcome of an existing test to an error."""
@@ -217,7 +231,7 @@ class TestReport(unittest.TestResult):
             test_info.status = "error"
             test_info.evergreen_status = "fail"
             test_info.return_code = 2
-            test_info.error = self._exc_info_to_string(err, test).split('\n')
+            test_info.error = self._exc_info_to_string(err, test).split("\n")
 
         # Recompute number of success, failures, and errors.
         self.num_succeeded = len(self.get_successful())
@@ -286,25 +300,37 @@ class TestReport(unittest.TestResult):
         """Return the status and timing information of the tests that executed successfully."""
 
         with self._lock:
-            return [test_info for test_info in self.test_infos if test_info.status == "pass"]
+            return [
+                test_info for test_info in self.test_infos if test_info.status == "pass"
+            ]
 
     def get_failed(self):
         """Return the status and timing information of tests that raised a failureException."""
 
         with self._lock:
-            return [test_info for test_info in self.test_infos if test_info.status == "fail"]
+            return [
+                test_info for test_info in self.test_infos if test_info.status == "fail"
+            ]
 
     def get_errored(self):
         """Return the status and timing information of tests that raised a non-failureException."""
 
         with self._lock:
-            return [test_info for test_info in self.test_infos if test_info.status == "error"]
+            return [
+                test_info
+                for test_info in self.test_infos
+                if test_info.status == "error"
+            ]
 
     def get_interrupted(self):
         """Return the status and timing information of tests that were execution interrupted."""
 
         with self._lock:
-            return [test_info for test_info in self.test_infos if test_info.status == "timeout"]
+            return [
+                test_info
+                for test_info in self.test_infos
+                if test_info.status == "timeout"
+            ]
 
     def as_dict(self):
         """Return the test result information as a dictionary.
@@ -347,11 +373,15 @@ class TestReport(unittest.TestResult):
         Used when combining reports instances.
         """
 
-        report = cls(logging.loggers.ROOT_EXECUTOR_LOGGER,
-                     _config.SuiteOptions.ALL_INHERITED.resolve())
+        report = cls(
+            logging.loggers.ROOT_EXECUTOR_LOGGER,
+            _config.SuiteOptions.ALL_INHERITED.resolve(),
+        )
         for result in report_dict["results"]:
             # By convention, dynamic tests are named "<basename>:<hook name>".
-            is_dynamic = ":" in result["test_file"] or ":" in result.get("display_test_name", "")
+            is_dynamic = ":" in result["test_file"] or ":" in result.get(
+                "display_test_name", ""
+            )
             test_file = result["test_file"]
             # Using test_file as the test id is ok here since the test id only needs to be unique
             # during suite execution.
@@ -405,12 +435,21 @@ class TestReport(unittest.TestResult):
 
     def _log_outcome_change(self, test, outcome, reason=""):
         # Recreate the test logger for this test in order to append to the existing log.
-        (logger,
-         _) = logging.loggers.new_test_logger(test.short_name(), test.basename(), None, test.logger,
-                                              self.job_num, test.id(), self.job_logger)
+        (logger, _) = logging.loggers.new_test_logger(
+            test.short_name(),
+            test.basename(),
+            None,
+            test.logger,
+            self.job_num,
+            test.id(),
+            self.job_logger,
+        )
         logger.info(
             'Sometime after completion of %s, the test outcome was changed to "%s" because: %s',
-            test.short_description(), outcome, reason if reason else ".")
+            test.short_description(),
+            outcome,
+            reason if reason else ".",
+        )
         for handler in logger.handlers:
             logging.flush.close_later(handler)
 
@@ -450,13 +489,13 @@ def test_order(test_name):
     Investigate setup/teardown errors, then hooks, then test files.
     """
 
-    if 'fixture_setup' in test_name:
+    if "fixture_setup" in test_name:
         return 1
-    elif 'fixture_teardown' in test_name:
+    elif "fixture_teardown" in test_name:
         return 2
-    elif 'fixture_abort' in test_name:
+    elif "fixture_abort" in test_name:
         return 3
-    elif ':' in test_name:
+    elif ":" in test_name:
         return 4
     else:
         return 5

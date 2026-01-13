@@ -13,7 +13,9 @@ class BenchmarkTestCase(interface.ProcessTestCase):
     def __init__(self, logger, program_executable, program_options=None):
         """Initialize the BenchmarkTestCase with the executable to run."""
 
-        interface.ProcessTestCase.__init__(self, logger, "Benchmark test", program_executable)
+        interface.ProcessTestCase.__init__(
+            self, logger, "Benchmark test", program_executable
+        )
         self.validate_benchmark_options()
 
         self.bm_executable = program_executable
@@ -26,11 +28,16 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         :return: None
         """
 
-        if _config.REPEAT_SUITES > 1 or _config.REPEAT_TESTS > 1 or _config.REPEAT_TESTS_SECS:
+        if (
+            _config.REPEAT_SUITES > 1
+            or _config.REPEAT_TESTS > 1
+            or _config.REPEAT_TESTS_SECS
+        ):
             raise ValueError(
                 "--repeatSuites/--repeatTests cannot be used with benchmark tests. "
                 "Please use --benchmarkMinTimeSecs to increase the runtime of a single benchmark "
-                "configuration.")
+                "configuration."
+            )
 
     def configure(self, fixture, *args, **kwargs):
         """Configure BenchmarkTestCase."""
@@ -44,7 +51,7 @@ class BenchmarkTestCase(interface.ProcessTestCase):
             "benchmark_repetitions": _config.DEFAULT_BENCHMARK_REPETITIONS,
             # TODO: remove the following line once we bump our Google Benchmark version to one that
             # contains the fix for https://github.com/google/benchmark/issues/559 .
-            "benchmark_color": False
+            "benchmark_color": False,
         }
 
         # 2. Override Benchmark options with options set through `program_options` in the suite
@@ -54,10 +61,11 @@ class BenchmarkTestCase(interface.ProcessTestCase):
 
         # 3. Override Benchmark options with options set through resmoke's command line.
         resmoke_bm_options = {
-            "benchmark_filter": _config.BENCHMARK_FILTER, "benchmark_list_tests":
-                _config.BENCHMARK_LIST_TESTS, "benchmark_min_time": _config.BENCHMARK_MIN_TIME,
+            "benchmark_filter": _config.BENCHMARK_FILTER,
+            "benchmark_list_tests": _config.BENCHMARK_LIST_TESTS,
+            "benchmark_min_time": _config.BENCHMARK_MIN_TIME,
             "benchmark_out_format": _config.BENCHMARK_OUT_FORMAT,
-            "benchmark_repetitions": _config.BENCHMARK_REPETITIONS
+            "benchmark_repetitions": _config.BENCHMARK_REPETITIONS,
         }
 
         for key, value in list(resmoke_bm_options.items()):
@@ -74,4 +82,6 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         return self.bm_executable + ".json"
 
     def _make_process(self):
-        return core.programs.generic_program(self.logger, [self.bm_executable], **self.bm_options)
+        return core.programs.generic_program(
+            self.logger, [self.bm_executable], **self.bm_options
+        )

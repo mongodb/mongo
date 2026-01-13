@@ -41,7 +41,9 @@ def write_file(path: str, contents: str) -> None:
         file_handle.write(contents)
 
 
-def write_file_to_dir(directory: str, file: str, contents: str, overwrite: bool = True) -> None:
+def write_file_to_dir(
+    directory: str, file: str, contents: str, overwrite: bool = True
+) -> None:
     """
     Write the contents provided to the file in the given directory.
 

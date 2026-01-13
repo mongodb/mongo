@@ -1,4 +1,5 @@
 """Unit tests for the resmokelib.testing.executor module."""
+
 import logging
 import unittest
 
@@ -53,17 +54,21 @@ class TestCreateJobs(unittest.TestCase):
 class TestCreateQueueElemForTestName(unittest.TestCase):
     @mock.patch(ns("testcases.make_test_case"))
     @mock.patch(ns("queue_elem_factory"))
-    def test_queue_elem_created_for_test_name(self, queue_elem_mock, make_test_case_mock):
+    def test_queue_elem_created_for_test_name(
+        self, queue_elem_mock, make_test_case_mock
+    ):
         num_tests = 1
         test_config = {}
         suite = mock_suite(num_tests)
         ut_executor = UnitTestExecutor(suite, test_config)
-        queue_elem = ut_executor._create_queue_elem_for_test_name('test_name')
+        queue_elem = ut_executor._create_queue_elem_for_test_name("test_name")
         self.assertEqual(queue_elem_mock.return_value, queue_elem)
-        make_test_case_mock.assert_called_with(suite.test_kind, ut_executor.test_queue_logger,
-                                               'test_name', **test_config)
-        queue_elem_mock.assert_called_with(make_test_case_mock.return_value, test_config,
-                                           suite.options)
+        make_test_case_mock.assert_called_with(
+            suite.test_kind, ut_executor.test_queue_logger, "test_name", **test_config
+        )
+        queue_elem_mock.assert_called_with(
+            make_test_case_mock.return_value, test_config, suite.options
+        )
 
 
 class TestMakeTestQueue(unittest.TestCase):

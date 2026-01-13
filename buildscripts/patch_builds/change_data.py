@@ -24,7 +24,9 @@ def _get_id_from_repo(repo: Repo) -> str:
     return os.path.basename(repo.working_dir)
 
 
-def generate_revision_map(repos: List[Repo], revisions_data: Dict[str, str]) -> RevisionMap:
+def generate_revision_map(
+    repos: List[Repo], revisions_data: Dict[str, str]
+) -> RevisionMap:
     """
     Generate a revision map for the given repositories using the revisions in the given file.
 
@@ -32,7 +34,9 @@ def generate_revision_map(repos: List[Repo], revisions_data: Dict[str, str]) -> 
     :param revisions_data: Dictionary of revisions to use for repositories.
     :return: Map of repositories to revisions
     """
-    revision_map = {repo.git_dir: revisions_data.get(_get_id_from_repo(repo)) for repo in repos}
+    revision_map = {
+        repo.git_dir: revisions_data.get(_get_id_from_repo(repo)) for repo in repos
+    }
     return {k: v for k, v in revision_map.items() if v}
 
 
@@ -72,7 +76,9 @@ def _modified_files_for_diff(diff: DiffIndex, log: Any) -> Set:
     return modified_files.union(added_files).union(renamed_files).union(deleted_files)
 
 
-def find_changed_files(repo: Repo, revision_map: Optional[RevisionMap] = None) -> Set[str]:
+def find_changed_files(
+    repo: Repo, revision_map: Optional[RevisionMap] = None
+) -> Set[str]:
     """
     Find files that were new or added to the repository between commits.
 
@@ -85,7 +91,9 @@ def find_changed_files(repo: Repo, revision_map: Optional[RevisionMap] = None) -
     if not revision_map:
         revision_map = {}
     diff = repo.index.diff(None)
-    work_tree_files = _modified_files_for_diff(diff, LOGGER.bind(diff="working tree diff"))
+    work_tree_files = _modified_files_for_diff(
+        diff, LOGGER.bind(diff="working tree diff")
+    )
 
     commit = repo.index
     diff = commit.diff(revision_map.get(repo.git_dir, repo.head.commit), R=True)
@@ -114,7 +122,9 @@ def find_changed_files_in_repos(
     :param revision_map: Map of revisions to compare against for repos.
     :return: Set of changed files.
     """
-    return set(chain.from_iterable([find_changed_files(repo, revision_map) for repo in repos]))
+    return set(
+        chain.from_iterable([find_changed_files(repo, revision_map) for repo in repos])
+    )
 
 
 def find_modified_lines_for_files(
@@ -157,14 +167,18 @@ def find_modified_lines_for_files(
                 else:
                     start_line = int(start_line_count)
                     if start_line <= len(lines):
-                        line_modifications.append((start_line, lines[start_line - 1].rstrip()))
+                        line_modifications.append(
+                            (start_line, lines[start_line - 1].rstrip())
+                        )
             modified_lines_and_content[file_path] = line_modifications
 
     return modified_lines_and_content
 
 
 def find_modified_lines_for_files_in_repos(
-    repos: Iterable[Repo], changed_files: List[str], revision_map: Optional[RevisionMap] = None
+    repos: Iterable[Repo],
+    changed_files: List[str],
+    revision_map: Optional[RevisionMap] = None,
 ) -> Dict[str, List[Tuple[int, str]]]:
     """
     Find the modified lines in files with changes.

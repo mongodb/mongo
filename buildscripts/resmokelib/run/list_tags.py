@@ -61,6 +61,6 @@ def make_output(tag_docs):
     output = ""
     for tag, doc in sorted(tag_docs.items()):
         newline = "\n"
-        wrapped_doc = textwrap.indent(doc, '\t')
+        wrapped_doc = textwrap.indent(doc, "\t")
         output = f"{output}{newline}{tag}:{newline}{wrapped_doc}"
     return output

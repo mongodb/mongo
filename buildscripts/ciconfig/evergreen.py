@@ -3,6 +3,7 @@
 The API also provides methods to access specific fields present in the mongodb/mongo
 configuration file.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -33,15 +34,19 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
 
             prev_environ = os.environ.copy()
             if sys.platform in ("win32", "cygwin"):
-                LOGGER.info(f"Previous os.environ={os.environ} before updating 'USERPROFILE'")
-                if 'HOME' in os.environ:
-                    os.environ['USERPROFILE'] = os.environ['HOME']
+                LOGGER.info(
+                    f"Previous os.environ={os.environ} before updating 'USERPROFILE'"
+                )
+                if "HOME" in os.environ:
+                    os.environ["USERPROFILE"] = os.environ["HOME"]
                 else:
                     LOGGER.warn(
                         "'HOME' enviorment variable unset. This will likely cause us to be unable to find evergreen binary."
                     )
 
-            default_evergreen_location = os.path.expanduser(os.path.join("~", "evergreen"))
+            default_evergreen_location = os.path.expanduser(
+                os.path.join("~", "evergreen")
+            )
 
             # Restore enviorment if it was modified above on windows
             os.environ.clear()
@@ -80,9 +85,12 @@ class EvergreenProjectConfig(object):
         self.tasks = [Task(task_dict) for task_dict in self._conf["tasks"]]
         self._tasks_by_name = {task.name: task for task in self.tasks}
         self.task_groups = [
-            TaskGroup(task_group_dict) for task_group_dict in self._conf.get("task_groups", [])
+            TaskGroup(task_group_dict)
+            for task_group_dict in self._conf.get("task_groups", [])
         ]
-        self._task_groups_by_name = {task_group.name: task_group for task_group in self.task_groups}
+        self._task_groups_by_name = {
+            task_group.name: task_group for task_group in self.task_groups
+        }
         self.variants = [
             Variant(variant_dict, self._tasks_by_name, self._task_groups_by_name)
             for variant_dict in self._conf["buildvariants"]
@@ -214,12 +222,17 @@ class Task(object):
 
         if self.is_run_tests_task:
             return [command_vars.get("suite", self.name)]
-        if self.is_generate_resmoke_task and not self.is_initialize_multiversion_tasks_task:
+        if (
+            self.is_generate_resmoke_task
+            and not self.is_initialize_multiversion_tasks_task
+        ):
             return [command_vars.get("suite", self.generated_task_name)]
         if self.is_initialize_multiversion_tasks_task:
             return [
                 suite
-                for suite in self.initialize_multiversion_tasks_command.get("vars", {}).keys()
+                for suite in self.initialize_multiversion_tasks_command.get(
+                    "vars", {}
+                ).keys()
             ]
 
         raise ValueError(f"{self.name} task does not run a resmoke.py test suite")
@@ -286,10 +299,18 @@ class Variant(object):
                 # A task in conf_dict may be a task_group, containing a list of tasks.
                 for task_in_group in task_group_map.get(task_name).tasks:
                     self.tasks.append(
-                        VariantTask(task_map.get(task_in_group), task.get("distros", run_on), self))
+                        VariantTask(
+                            task_map.get(task_in_group),
+                            task.get("distros", run_on),
+                            self,
+                        )
+                    )
             else:
                 self.tasks.append(
-                    VariantTask(task_map.get(task["name"]), task.get("distros", run_on), self))
+                    VariantTask(
+                        task_map.get(task["name"]), task.get("distros", run_on), self
+                    )
+                )
         self.distro_names = set(run_on)
         for task in self.tasks:
             self.distro_names.update(task.run_on)

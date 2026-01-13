@@ -24,8 +24,10 @@ def process_version(version: evergreen.Version) -> None:
 
         build_variant_name = build_variant.build_variant
         unsupported_variants = ["tsan", "asan", "aubsan", "macos"]
-        if any(unsupported_variant in build_variant_name
-               for unsupported_variant in unsupported_variants):
+        if any(
+            unsupported_variant in build_variant_name
+            for unsupported_variant in unsupported_variants
+        ):
             continue
 
         for task_id in build_variant.tasks:
@@ -53,7 +55,9 @@ def main(expansions_file: str, output_file: str) -> int:
     is_patch = expansions.get("is_patch", False)
 
     today = datetime.datetime.utcnow().date()
-    start_of_today = datetime.datetime(today.year, today.month, today.day, tzinfo=tz.UTC)
+    start_of_today = datetime.datetime(
+        today.year, today.month, today.day, tzinfo=tz.UTC
+    )
 
     # STM daily cron runs everyday at 4 AM
     # We scan the day before yesterday so we do not have to worry about in progress tasks assuming
@@ -61,7 +65,7 @@ def main(expansions_file: str, output_file: str) -> int:
     start_of_window = start_of_today - datetime.timedelta(days=2)
     end_of_window = start_of_today - datetime.timedelta(days=1)
 
-    #We only care maintaining alerts as of v7.2
+    # We only care maintaining alerts as of v7.2
     mongo_projects = ["mongodb-mongo-master", "mongodb-mongo-master-nightly"]
     for project in evg_api.all_projects():
         if not project.enabled:
@@ -79,8 +83,9 @@ def main(expansions_file: str, output_file: str) -> int:
     with concurrent.futures.ThreadPoolExecutor(max_workers=cores) as executor:
         futures = []
         for project in mongo_projects:
-            patches = evg_api.patches_by_project_time_window(project, end_of_window,
-                                                             start_of_window)
+            patches = evg_api.patches_by_project_time_window(
+                project, end_of_window, start_of_window
+            )
             # This covers all user patches generated with `evergreen patch`
             for patch in patches:
                 if not patch.activated:
@@ -91,20 +96,33 @@ def main(expansions_file: str, output_file: str) -> int:
             # This covers all automated versions that are run by crons and other stuff
             for requester in ["adhoc", "gitter_request", "github_pull_request"]:
                 for version in evg_api.versions_by_project_time_window(
-                        project, end_of_window, start_of_window, requester):
+                    project, end_of_window, start_of_window, requester
+                ):
                     futures.append(executor.submit(process_version, version=version))
 
         concurrent.futures.wait(futures)
     errors = []
     if timeouts_without_dumps:
-        errors.append("ERROR: The following tasks timed out without core dumps uploaded:")
+        errors.append(
+            "ERROR: The following tasks timed out without core dumps uploaded:"
+        )
         errors.extend(
-            [f"https://spruce.mongodb.com/task/{task_id}" for task_id in timeouts_without_dumps])
+            [
+                f"https://spruce.mongodb.com/task/{task_id}"
+                for task_id in timeouts_without_dumps
+            ]
+        )
 
     if passed_with_dumps:
-        errors.append("ERROR: The following tasks had core dumps uploaded while being successful:")
+        errors.append(
+            "ERROR: The following tasks had core dumps uploaded while being successful:"
+        )
         errors.extend(
-            [f"https://spruce.mongodb.com/task/{task_id}" for task_id in passed_with_dumps])
+            [
+                f"https://spruce.mongodb.com/task/{task_id}"
+                for task_id in passed_with_dumps
+            ]
+        )
 
     if not errors:
         return 0
@@ -124,11 +142,13 @@ def main(expansions_file: str, output_file: str) -> int:
 
     if timeouts_without_dumps:
         msg.append(
-            f"- {len(timeouts_without_dumps)} task(s) timed out without core dumps being uploaded")
+            f"- {len(timeouts_without_dumps)} task(s) timed out without core dumps being uploaded"
+        )
 
     if passed_with_dumps:
         msg.append(
-            f"- {len(passed_with_dumps)} task(s) had core dumps uploaded while being successful")
+            f"- {len(passed_with_dumps)} task(s) had core dumps uploaded while being successful"
+        )
 
     msg.append(
         f"For more details view the `Task Errors` file <https://spruce.mongodb.com/task/{current_task_id}/files|here>."
@@ -136,24 +156,33 @@ def main(expansions_file: str, output_file: str) -> int:
 
     if not is_patch:
         evg_api.send_slack_message(
-            target="#sdp-test-alerts",  #TODO SERVER-83205: change to #sdp-triager
+            target="#sdp-test-alerts",  # TODO SERVER-83205: change to #sdp-triager
             msg="\n".join(msg),
         )
 
-    #TODO SERVER-83205: change to return 1
+    # TODO SERVER-83205: change to return 1
     return 0
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog='DailyTaskScanner',
-        description='Iterates over all of the tasks in mongodb-mongo-master and '
-        'mongodb-mongo-master-nightly over a day and looks for certain errors to send '
-        'alerts of.')
+        prog="DailyTaskScanner",
+        description="Iterates over all of the tasks in mongodb-mongo-master and "
+        "mongodb-mongo-master-nightly over a day and looks for certain errors to send "
+        "alerts of.",
+    )
 
-    parser.add_argument("--expansions-file", "-e", help="Expansions file to read task info from.",
-                        default="../expansions.yml")
-    parser.add_argument("--output-file", "-f", help="File to output errors to.",
-                        default="task_errors.txt")
+    parser.add_argument(
+        "--expansions-file",
+        "-e",
+        help="Expansions file to read task info from.",
+        default="../expansions.yml",
+    )
+    parser.add_argument(
+        "--output-file",
+        "-f",
+        help="File to output errors to.",
+        default="task_errors.txt",
+    )
     args = parser.parse_args()
     sys.exit(main(args.expansions_file, args.output_file))

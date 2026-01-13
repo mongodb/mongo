@@ -14,7 +14,9 @@ class AntithesisLogging(interface.Hook):
 
     def __init__(self, hook_logger, fixture):
         """Initialize the AntithesisLogging hook."""
-        interface.Hook.__init__(self, hook_logger, fixture, AntithesisLogging.DESCRIPTION)
+        interface.Hook.__init__(
+            self, hook_logger, fixture, AntithesisLogging.DESCRIPTION
+        )
 
     def before_test(self, test, test_report):
         """Ensure the fault injector is running before a test."""

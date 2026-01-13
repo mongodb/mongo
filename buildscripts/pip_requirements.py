@@ -12,6 +12,7 @@ import sys
 
 class MissingRequirements(Exception):
     """Raised when when verify_requirements() detects missing requirements."""
+
     pass
 
 
@@ -31,9 +32,9 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
             print(*args, **kwargs)
 
     def raiseSuggestion(ex, pip_pkg):
-        raise MissingRequirements(f"{ex}\n"
-                                  f"Try running:\n"
-                                  f"    {executable} -m pip install {pip_pkg}") from ex
+        raise MissingRequirements(
+            f"{ex}\n" f"Try running:\n" f"    {executable} -m pip install {pip_pkg}"
+        ) from ex
 
     # Import poetry. If this fails then we know the next function will fail.
     # This is so the user will have an easier time diagnosing the problem
@@ -46,10 +47,22 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
 
     try:
         extras = []
-        if platform.machine() in set(["s390x", "ppc64le"]) and ".el9" not in platform.release():
+        if (
+            platform.machine() in set(["s390x", "ppc64le"])
+            and ".el9" not in platform.release()
+        ):
             extras = ["--extras", "oldcrypt"]
         poetry_dry_run_proc = subprocess.run(
-            [executable, "-m", "poetry", "install", "--no-root", "--sync", "--dry-run", *extras],
+            [
+                executable,
+                "-m",
+                "poetry",
+                "install",
+                "--no-root",
+                "--sync",
+                "--dry-run",
+                *extras,
+            ],
             check=True,
             text=True,
             capture_output=True,
@@ -63,24 +76,33 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
             "Detected one or more packages are out of date. "
             "Try running:\n"
             "    export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring\n"
-            "    python3 -m poetry install --no-root --sync")
+            "    python3 -m poetry install --no-root --sync"
+        )
 
     # String match should look like the following
     # Package operations: 2 installs, 3 updates, 0 removals, 165 skipped
-    match = re.search(r"Package operations: (\d+) \w+, (\d+) \w+, (\d+) \w+, (\d+) \w+",
-                      poetry_dry_run_proc.stdout)
+    match = re.search(
+        r"Package operations: (\d+) \w+, (\d+) \w+, (\d+) \w+, (\d+) \w+",
+        poetry_dry_run_proc.stdout,
+    )
     verbose("Requirements list:")
     verbose(poetry_dry_run_proc.stdout)
     installs = int(match[1])
     updates = int(match[2])
-    if updates == 1 and sys.platform == 'win32' and "Updating pywin32" in poetry_dry_run_proc.stdout:
+    if (
+        updates == 1
+        and sys.platform == "win32"
+        and "Updating pywin32" in poetry_dry_run_proc.stdout
+    ):
         # We have no idea why pywin32 thinks it needs to be updated
         # We could use some more investigation into this
         verbose(
-            "Windows detected a single update to pywin32 which is known to be buggy. Continuing.")
+            "Windows detected a single update to pywin32 which is known to be buggy. Continuing."
+        )
     elif installs + updates > 0:
         raise MissingRequirements(
             f"Detected one or more packages are out of date. "
             f"Try running:\n"
             f"    export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring\n"
-            f"    {executable} -m poetry install --no-root --sync")
+            f"    {executable} -m poetry install --no-root --sync"
+        )

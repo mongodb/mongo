@@ -69,7 +69,9 @@ class Historic(ABC, metaclass=registry.make_registry_metaclass(_HISTORICS, type(
 
     def unsubscribe(self, subscriber):
         """Allow a subscriber to unsubscribe from notifications."""
-        self._subscribers = [sub for sub in self._subscribers if sub.obj is not subscriber]
+        self._subscribers = [
+            sub for sub in self._subscribers if sub.obj is not subscriber
+        ]
 
     def notify_subscriber_write(self):
         """Notify the subscribers that a write has happened."""
@@ -117,8 +119,8 @@ class Historic(ABC, metaclass=registry.make_registry_metaclass(_HISTORICS, type(
 class Subscriber:
     """Class representing the subscriber to a Historic."""
 
-    obj: 'typing.Any'
-    key: 'typing.Any'
+    obj: "typing.Any"
+    key: "typing.Any"
 
 
 # 1. We only allow immutable types or types that have special logic
@@ -145,7 +147,9 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
         super(HistoryDict, self).__init__()
 
         if filename is not None and yaml_string is not None:
-            raise ValueError("Cannot construct HistoryDict from both yaml object and file.")
+            raise ValueError(
+                "Cannot construct HistoryDict from both yaml object and file."
+            )
 
         self._history_store = defaultdict(list)
         self._value_store = dict()
@@ -162,7 +166,8 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
         schema_version = raw_dict["SchemaVersion"]
         if schema_version != SCHEMA_VERSION:
             raise ValueError(
-                f"Invalid schema version. Expected {SCHEMA_VERSION} but found {schema_version}.")
+                f"Invalid schema version. Expected {SCHEMA_VERSION} but found {schema_version}."
+            )
         history_dict = raw_dict["History"]
         for key in history_dict:
             for raw_access in history_dict[key]:
@@ -205,7 +210,7 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
         output = "\n".join(processed)
 
         # Make sure SchemaVersion is at the top.
-        output = f"SchemaVersion: \"{SCHEMA_VERSION}\"\n" + output
+        output = f'SchemaVersion: "{SCHEMA_VERSION}"\n' + output
         if filename is not None:
             with open(filename, "w") as fp:
                 fp.write(output)
@@ -219,11 +224,13 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
 
         for key in self._value_store:
             our_writes = [
-                access.value_written for access in self._history_store[key]
+                access.value_written
+                for access in self._history_store[key]
                 if access.type == AccessType.WRITE
             ]
             their_writes = [
-                access.value_written for access in other_dict._history_store[key]  # pylint: disable=protected-access
+                access.value_written
+                for access in other_dict._history_store[key]  # pylint: disable=protected-access
                 if access.type == AccessType.WRITE
             ]
             if not our_writes == their_writes:
@@ -235,7 +242,10 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
         storable_dict = {}
         for key, value in self._value_store.items():
             storable_dict[key] = storable_dict_from_historic(value)
-        return {"object_class": HistoryDict.REGISTERED_NAME, "object_value": storable_dict}
+        return {
+            "object_class": HistoryDict.REGISTERED_NAME,
+            "object_value": storable_dict,
+        }
 
     @staticmethod
     def from_storable_dict(raw_dict):
@@ -246,7 +256,9 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
     def from_python_obj(obj):
         """Convert from a python object, overrides Historic."""
         if not isinstance(obj, dict):
-            raise ValueError("HistoryDict can only be converted from dict python objects.")
+            raise ValueError(
+                "HistoryDict can only be converted from dict python objects."
+            )
         history_dict = HistoryDict()
         for key, value in obj.items():
             history_dict[key] = make_historic(value)
@@ -283,8 +295,10 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
             value = make_historic(value)
 
         if not isinstance(value, ALLOWED_TYPES):
-            raise ValueError(f"HistoryDict cannot store type {type(value)}."
-                             " Please use a different type or create a Historic wrapper.")
+            raise ValueError(
+                f"HistoryDict cannot store type {type(value)}."
+                " Please use a different type or create a Historic wrapper."
+            )
         self._record_write(key, value)
         self._value_store[key] = value
         if isinstance(value, HistoryDict):
@@ -318,21 +332,29 @@ class HistoryDict(MutableMapping, Historic):  # pylint: disable=too-many-ancesto
 
     def __repr__(self):
         # eval(repr(self)) isn't valid, but this is at least useful for debugging.
-        return f'{self.__class__.__name__}({repr(self._value_store)})'
+        return f"{self.__class__.__name__}({repr(self._value_store)})"
 
     def _record_write(self, key, value):
         written = None
         if type(value) in ALLOWED_TYPES and value is not Historic:
             written = value
 
-        cur_access = Access(type=AccessType.WRITE, location=_get_location(), value_written=written,
-                            time=self._global_time)
+        cur_access = Access(
+            type=AccessType.WRITE,
+            location=_get_location(),
+            value_written=written,
+            time=self._global_time,
+        )
         self._history_store[key].append(cur_access)
         self._global_time += 1
 
     def _record_delete(self, key):
-        cur_access = Access(type=AccessType.DELETE, location=_get_location(), value_written=None,
-                            time=self._global_time)
+        cur_access = Access(
+            type=AccessType.DELETE,
+            location=_get_location(),
+            value_written=None,
+            time=self._global_time,
+        )
         self._history_store[key].append(cur_access)
         self._global_time += 1
 
@@ -364,10 +386,10 @@ class AccessType(Enum):
 class Access:
     """Class representing an access to store in the dict's history."""
 
-    type: 'AccessType'
+    type: "AccessType"
     time: int
-    location: ['traceback.FrameSummary'] = field(default_factory=list)
-    value_written: 'typing.Any' = None
+    location: ["traceback.FrameSummary"] = field(default_factory=list)
+    value_written: "typing.Any" = None
 
     def as_dict(self):
         """Convert this class into a dict (accounting for AccessType)."""
@@ -380,10 +402,13 @@ class Access:
     def from_dict(raw_dict):
         """Retrieve this class from a dict (accounting for AccessType)."""
         return Access(
-            type=AccessType[raw_dict["type"]], time=raw_dict["time"],
+            type=AccessType[raw_dict["type"]],
+            time=raw_dict["time"],
             location=raw_dict["location"] if "location" in raw_dict else list(),
             value_written=copy.deepcopy(raw_dict["value_written"])
-            if "value_written" in raw_dict else None)
+            if "value_written" in raw_dict
+            else None,
+        )
 
 
 def _get_location():
@@ -399,7 +424,7 @@ class PipeLiteral(str):
 
 def pipe_literal_representer(dumper, data):
     """Create a representer for pipe literals, used internally for pyyaml."""
-    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
 
 
 yaml.add_representer(PipeLiteral, pipe_literal_representer)

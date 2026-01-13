@@ -9,7 +9,9 @@ from pathlib import Path
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
+    sys.path.append(
+        os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
+    )
 
 # pylint: disable=wrong-import-position
 from buildscripts import simple_report
@@ -20,7 +22,10 @@ from buildscripts.linter.filediff import gather_changed_files_for_lint
 
 def is_js_file(filename: str) -> bool:
     # return True
-    return (filename.startswith("jstests") or filename.startswith("src/mongo/db/modules/enterprise/jstests")) and filename.endswith(".js")
+    return (
+        filename.startswith("jstests")
+        or filename.startswith("src/mongo/db/modules/enterprise/jstests")
+    ) and filename.endswith(".js")
 
 
 diffed_files = [Path(f) for f in gather_changed_files_for_lint(is_js_file)]
@@ -43,11 +48,23 @@ for file in diffed_files:
 OUTPUT_FULL_DIR = Path(os.getcwd()) / OUTPUT_DIR
 INPUT_FULL_DIR = Path(os.getcwd()) / INPUT_DIR
 
-subprocess.run([
-    "./src/scripts/npm_run.sh", "jstestfuzz", "--", "--jsTestsDir", INPUT_FULL_DIR, "--out",
-    OUTPUT_FULL_DIR, "--numSourceFiles",
-    str(min(num_changed_files, 250)), "--numGeneratedFiles", "250"
-], check=True, cwd="jstestfuzz")
+subprocess.run(
+    [
+        "./src/scripts/npm_run.sh",
+        "jstestfuzz",
+        "--",
+        "--jsTestsDir",
+        INPUT_FULL_DIR,
+        "--out",
+        OUTPUT_FULL_DIR,
+        "--numSourceFiles",
+        str(min(num_changed_files, 250)),
+        "--numGeneratedFiles",
+        "250",
+    ],
+    check=True,
+    cwd="jstestfuzz",
+)
 
 
 def _parse_jsfile(jsfile: Path) -> simple_report.Result:
@@ -57,9 +74,12 @@ def _parse_jsfile(jsfile: Path) -> simple_report.Result:
     """
     print(f"Trying to parse jsfile {jsfile}")
     start_time = time.time()
-    proc = subprocess.run(["./src/scripts/npm_run.sh", "parse-jsfiles", "--",
-                           str(jsfile)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                          cwd="jstestfuzz")
+    proc = subprocess.run(
+        ["./src/scripts/npm_run.sh", "parse-jsfiles", "--", str(jsfile)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        cwd="jstestfuzz",
+    )
     end_time = time.time()
     status = "pass" if proc.returncode == 0 else "fail"
     npm_run_output = proc.stdout.decode("UTF-8")
@@ -68,8 +88,14 @@ def _parse_jsfile(jsfile: Path) -> simple_report.Result:
     else:
         print(f"Failed to parsed jsfile {jsfile}")
         print(npm_run_output)
-    return simple_report.Result(status=status, exit_code=proc.returncode, start=start_time,
-                                end=end_time, test_file=jsfile.name, log_raw=npm_run_output)
+    return simple_report.Result(
+        status=status,
+        exit_code=proc.returncode,
+        start=start_time,
+        end=end_time,
+        test_file=jsfile.name,
+        log_raw=npm_run_output,
+    )
 
 
 report = simple_report.Report(failures=0, results=[])

@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-__all__ = ['Node', 'build']
+__all__ = ["Node", "build"]
 
 
 @dataclass
@@ -59,17 +59,22 @@ def parse_optimizer_node(explain_node: dict[str, any]) -> Node:
     """Recursively parse QSN from query explain's node."""
 
     children = get_children(explain_node)
-    return Node(node_type=explain_node['stage'], plan_node_id=explain_node['planNodeId'],
-                children=children)
+    return Node(
+        node_type=explain_node["stage"],
+        plan_node_id=explain_node["planNodeId"],
+        children=children,
+    )
 
 
 def get_children(explain_node: dict[str, any]) -> list[Node]:
     """Get children nodes of the QSN."""
 
-    if 'inputStage' in explain_node:
-        children = [parse_optimizer_node(explain_node['inputStage'])]
-    elif 'inputStages' in explain_node:
-        children = [parse_optimizer_node(child) for child in explain_node['inputStages']]
+    if "inputStage" in explain_node:
+        children = [parse_optimizer_node(explain_node["inputStage"])]
+    elif "inputStages" in explain_node:
+        children = [
+            parse_optimizer_node(child) for child in explain_node["inputStages"]
+        ]
     else:
         children = []
     return children
@@ -77,6 +82,7 @@ def get_children(explain_node: dict[str, any]) -> list[Node]:
 
 if __name__ == "__main__":
     import json
+
     explain = """
     {
     "explainVersion": "2",

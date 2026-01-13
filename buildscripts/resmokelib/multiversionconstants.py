@@ -1,4 +1,5 @@
 """FCV and Server binary version constants used for multiversion testing."""
+
 import http
 import os
 import shutil
@@ -37,10 +38,12 @@ def generate_mongo_version_file():
     try:
         res = check_output("git describe", shell=True, text=True)
     except CalledProcessError as exp:
-        raise ChildProcessError("Failed to run git describe to get the latest tag") from exp
+        raise ChildProcessError(
+            "Failed to run git describe to get the latest tag"
+        ) from exp
 
     # Write the current MONGO_VERSION to a data file.
-    with open(MONGO_VERSION_YAML, 'w') as mongo_version_fh:
+    with open(MONGO_VERSION_YAML, "w") as mongo_version_fh:
         # E.g. res = 'r5.1.0-alpha-597-g8c345c6693\n'
         res = res[1:]  # Remove the leading "r" character.
         mongo_version_fh.write("mongo_version: " + res)
@@ -55,11 +58,14 @@ def get_releases_file_from_remote():
             if response.status_code != http.HTTPStatus.OK:
                 raise RuntimeError(
                     f"Fetching releases.yml file returned unsuccessful status: {response.status_code}, "
-                    f"response body: {response.text}\n")
+                    f"response body: {response.text}\n"
+                )
             file.write(response.content)
         LOGGER.info(f"Got releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
     except Exception as exc:
-        LOGGER.warning(f"Could not get releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
+        LOGGER.warning(
+            f"Could not get releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}"
+        )
         raise exc
 
 
@@ -69,7 +75,9 @@ def get_releases_file_locally_or_fallback_to_remote():
         LOGGER.info(f"Found releases.yml file locally: {RELEASES_LOCAL_FILE}")
         shutil.copyfile(RELEASES_LOCAL_FILE, RELEASES_YAML)
     else:
-        LOGGER.warning(f"Could not find releases.yml file locally: {RELEASES_LOCAL_FILE}")
+        LOGGER.warning(
+            f"Could not find releases.yml file locally: {RELEASES_LOCAL_FILE}"
+        )
         get_releases_file_from_remote()
 
 
@@ -88,7 +96,8 @@ def in_git_root_dir():
         return False
 
     git_root_dir = os.path.realpath(
-        check_output("git rev-parse --show-toplevel", shell=True, text=True).strip())
+        check_output("git rev-parse --show-toplevel", shell=True, text=True).strip()
+    )
     curr_dir = os.path.realpath(os.getcwd())
     return git_root_dir == curr_dir
 
@@ -96,7 +105,9 @@ def in_git_root_dir():
 if in_git_root_dir():
     generate_mongo_version_file()
 else:
-    LOGGER.info("Skipping generating mongo version file since we're not in the root of a git repo")
+    LOGGER.info(
+        "Skipping generating mongo version file since we're not in the root of a git repo"
+    )
 
 # Avoiding regenerating the releases file if this flag is set. Should only be set if there are
 # multiple processes attempting to set up multiversion concurrently.
@@ -104,12 +115,13 @@ if not USE_EXISTING_RELEASES_FILE:
     generate_releases_file()
 else:
     LOGGER.info(
-        "Skipping generating releases file since the --useExistingReleasesFile flag has been set")
+        "Skipping generating releases file since the --useExistingReleasesFile flag has been set"
+    )
 
 
 def evg_project_str(version):
     """Return the evergreen project name for the given version."""
-    return 'mongodb-mongo-v{}.{}'.format(version.major, version.minor)
+    return "mongodb-mongo-v{}.{}".format(version.major, version.minor)
 
 
 multiversion_service = MultiversionService(
@@ -143,13 +155,17 @@ REQUIRES_FCV_TAG = version_constants.get_fcv_tag_list()
 REQUIRES_FCV_TAGS_LESS_THAN_LATEST = version_constants.get_fcv_tags_less_than_latest()
 
 # Generate evergreen project names for all FCVs less than latest.
-EVERGREEN_PROJECTS = ['mongodb-mongo-master']
-EVERGREEN_PROJECTS.extend([evg_project_str(fcv) for fcv in version_constants.fcvs_less_than_latest])
+EVERGREEN_PROJECTS = ["mongodb-mongo-master"]
+EVERGREEN_PROJECTS.extend(
+    [evg_project_str(fcv) for fcv in version_constants.fcvs_less_than_latest]
+)
 
-OLD_VERSIONS = [
-    LAST_LTS
-] if LAST_CONTINUOUS_FCV == LAST_LTS_FCV or LAST_CONTINUOUS_FCV in version_constants.get_eols(
-) else [LAST_LTS, LAST_CONTINUOUS]
+OLD_VERSIONS = (
+    [LAST_LTS]
+    if LAST_CONTINUOUS_FCV == LAST_LTS_FCV
+    or LAST_CONTINUOUS_FCV in version_constants.get_eols()
+    else [LAST_LTS, LAST_CONTINUOUS]
+)
 
 
 def log_constants(exec_log):

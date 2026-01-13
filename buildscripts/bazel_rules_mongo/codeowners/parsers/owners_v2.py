@@ -24,6 +24,8 @@ class OwnersParserV2(OwnersParserV1):
                 parsed_pattern = f"/{directory}/{pattern}"
 
         if not self.test_pattern(parsed_pattern):
-            raise (RuntimeError(f"Can not find any files that match pattern: `{pattern}`"))
+            raise (
+                RuntimeError(f"Can not find any files that match pattern: `{pattern}`")
+            )
 
         return self.get_line(parsed_pattern, owners)

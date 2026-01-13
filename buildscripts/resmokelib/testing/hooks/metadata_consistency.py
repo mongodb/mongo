@@ -15,7 +15,7 @@ from buildscripts.resmokelib.testing.hooks.background_job import (
     _ContinuousDynamicJSTestCase,
 )
 
-_IS_WINDOWS = (sys.platform == "win32")
+_IS_WINDOWS = sys.platform == "win32"
 
 
 class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook):
@@ -31,26 +31,35 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
         "bazel-bin/install/transport_integration_test",
         # Skip tests that update the internalDocumentSourceGroupMaxMemoryBytes parameter and make
         # checkMetadataConsistency fail with QueryExceededMemoryLimitNoDiskUseAllowed error.
-        "jstests/aggregation/sources/unionWith/unionWith.js"
+        "jstests/aggregation/sources/unionWith/unionWith.js",
     ]
 
     if _IS_WINDOWS:
-        SKIP_TESTS = [testname_utils.denormalize_test_file(path)[1] for path in SKIP_TESTS]
+        SKIP_TESTS = [
+            testname_utils.denormalize_test_file(path)[1] for path in SKIP_TESTS
+        ]
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckMetadataConsistencyInBackground."""
 
-        if not isinstance(fixture, shardedcluster.ShardedClusterFixture) and not isinstance(
-                fixture, multi_sharded_cluster.MultiShardedClusterFixture):
+        if not isinstance(
+            fixture, shardedcluster.ShardedClusterFixture
+        ) and not isinstance(fixture, multi_sharded_cluster.MultiShardedClusterFixture):
             raise ValueError(
                 f"'fixture' must be an instance of ShardedClusterFixture or MultiShardedClusterFixture, but got"
-                f" {fixture.__class__.__name__}")
+                f" {fixture.__class__.__name__}"
+            )
 
-        description = "Perform consistency checks between the config database and metadata " \
-                      "stored/cached in the shards"
-        js_filename = os.path.join("jstests", "hooks", "run_check_metadata_consistency.js")
-        super().__init__(hook_logger, fixture, js_filename, description,
-                         shell_options=shell_options)
+        description = (
+            "Perform consistency checks between the config database and metadata "
+            "stored/cached in the shards"
+        )
+        js_filename = os.path.join(
+            "jstests", "hooks", "run_check_metadata_consistency.js"
+        )
+        super().__init__(
+            hook_logger, fixture, js_filename, description, shell_options=shell_options
+        )
 
         self._background_job = None
 
@@ -79,21 +88,26 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
             return
 
         # TODO SERVER-75675 do not skip index consistency check
-        shell_options = self._shell_options.copy() if self._shell_options is not None else {}
+        shell_options = (
+            self._shell_options.copy() if self._shell_options is not None else {}
+        )
         if "global_vars" not in shell_options:
             shell_options["global_vars"] = {}
         if "TestData" not in shell_options["global_vars"]:
             shell_options["global_vars"]["TestData"] = {}
         shell_options["global_vars"]["TestData"][
-            "skipCheckingIndexesConsistentAcrossCluster"] = True
+            "skipCheckingIndexesConsistentAcrossCluster"
+        ] = True
 
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
-            test.logger, test, self, self._js_filename, shell_options)
+            test.logger, test, self, self._js_filename, shell_options
+        )
         hook_test_case.configure(self.fixture)
 
         if test.test_name in self.SKIP_TESTS:
-            self.logger.info("Metadata consistency check explicitely disabled for %s",
-                             test.test_name)
+            self.logger.info(
+                "Metadata consistency check explicitely disabled for %s", test.test_name
+            )
             return
 
         self.logger.info("Resuming background metadata consistency checker thread")
@@ -122,5 +136,6 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
             else:
                 self.logger.error(
                     "Encountered an error inside background metadata consistency checker thread",
-                    exc_info=self._background_job.exc_info)
+                    exc_info=self._background_job.exc_info,
+                )
                 raise self._background_job.exc_info[1]

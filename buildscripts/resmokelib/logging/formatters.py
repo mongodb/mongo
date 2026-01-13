@@ -31,4 +31,6 @@ class EvergreenLogFormatter(logging.Formatter):
     def format(self, record):
         ts = int(record.created * 1e9)
 
-        return "\n".join([f"{ts} {line}" for line in super().format(record).split("\n")])
+        return "\n".join(
+            [f"{ts} {line}" for line in super().format(record).split("\n")]
+        )

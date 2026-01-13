@@ -22,7 +22,8 @@ def _verify_s3_hash(s3_path: str, local_path: str, expected_hash: str) -> None:
     hash_string = _sha256_file(local_path)
     if hash_string != expected_hash:
         raise ValueError(
-            f"Hash mismatch for {s3_path}, expected {expected_hash} but got {hash_string}")
+            f"Hash mismatch for {s3_path}, expected {expected_hash} but got {hash_string}"
+        )
 
 
 def _download_path_with_retry(*args, **kwargs):
@@ -39,8 +40,8 @@ def _download_path_with_retry(*args, **kwargs):
 
 
 def download_s3_binary(
-        s3_path: str,
-        local_path: str = None,
+    s3_path: str,
+    local_path: str = None,
 ) -> None:
     if local_path is None:
         local_path = s3_path.split("/")[-1]

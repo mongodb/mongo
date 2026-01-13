@@ -419,13 +419,23 @@ def get_args(distros, arch_choices):
 
     parser = argparse.ArgumentParser(description="Build MongoDB Packages")
     parser.add_argument(
-        "-s", "--server-version", help="Server version to build (e.g. 2.7.8-rc0)", required=True
+        "-s",
+        "--server-version",
+        help="Server version to build (e.g. 2.7.8-rc0)",
+        required=True,
     )
     parser.add_argument(
-        "-m", "--metadata-gitspec", help="Gitspec to use for package metadata files", required=False
+        "-m",
+        "--metadata-gitspec",
+        help="Gitspec to use for package metadata files",
+        required=False,
     )
     parser.add_argument(
-        "-r", "--release-number", help="RPM release number base", type=int, required=False
+        "-r",
+        "--release-number",
+        help="RPM release number base",
+        type=int,
+        required=False,
     )
     parser.add_argument(
         "-d",
@@ -436,7 +446,9 @@ def get_args(distros, arch_choices):
         default=[],
         action="append",
     )
-    parser.add_argument("-p", "--prefix", help="Directory to build into", required=False)
+    parser.add_argument(
+        "-p", "--prefix", help="Directory to build into", required=False
+    )
     parser.add_argument(
         "-a",
         "--arches",
@@ -573,7 +585,13 @@ def unpack_binaries_into(build_os, arch, spec, where):
     try:
         sysassert(["tar", "xvzf", rootdir + "/" + tarfile(build_os, arch, spec)])
         release_dir = glob("mongodb-linux-*")[0]
-        for releasefile in "bin", "LICENSE-Community.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
+        for releasefile in (
+            "bin",
+            "LICENSE-Community.txt",
+            "README",
+            "THIRD-PARTY-NOTICES",
+            "MPL-2",
+        ):
             print("moving file: %s/%s" % (release_dir, releasefile))
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
@@ -596,13 +614,16 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # directory, so the debian directory is needed in all cases (and
     # innocuous in the debianoids' sdirs).
     for pkgdir in ["debian", "rpm"]:
-        print("Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir))
+        print(
+            "Copying packaging files from %s to %s" % ("%s/%s" % (srcdir, pkgdir), sdir)
+        )
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
         sysassert(
             [
                 "sh",
                 "-c",
-                '(cd "%s" && tar cf - %s ) | (cd "%s" && tar xvf -)' % (srcdir, pkgdir, sdir),
+                '(cd "%s" && tar cf - %s ) | (cd "%s" && tar xvf -)'
+                % (srcdir, pkgdir, sdir),
             ]
         )
     # Splat the binaries under sdir.  The "build" stages of the
@@ -737,7 +758,11 @@ Codename: %s/mongodb-org
 Architectures: amd64 arm64 s390x
 Components: %s
 Description: MongoDB packages
-""" % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
+""" % (
+        distro.repo_os_version(build_os),
+        distro.repo_os_version(build_os),
+        distro.repo_component(),
+    )
     if os.path.exists(repo + "../../Release"):
         os.unlink(repo + "../../Release")
     if os.path.exists(repo + "../../Release.gpg"):
@@ -834,7 +859,8 @@ def write_debian_changelog(path, spec, srcdir):
         # only commit changes if there are any
         if len(git_repo.index.diff("HEAD")) != 0:
             with git_repo.git.custom_environment(
-                GIT_COMMITTER_NAME="Evergreen", GIT_COMMITTER_EMAIL="evergreen@mongodb.com"
+                GIT_COMMITTER_NAME="Evergreen",
+                GIT_COMMITTER_EMAIL="evergreen@mongodb.com",
             ):
                 git_repo.git.commit("--author='Evergreen <>'", "-m", "temp commit")
 
@@ -842,7 +868,11 @@ def write_debian_changelog(path, spec, srcdir):
         # FIXME: make consistent with the rest of the code when we have more packaging testing
         print("Getting changelog for specified gitspec:", spec.metadata_gitspec())
         sb = preamble + backtick(
-            ["sh", "-c", "git archive %s debian/changelog | tar xOf -" % spec.metadata_gitspec()]
+            [
+                "sh",
+                "-c",
+                "git archive %s debian/changelog | tar xOf -" % spec.metadata_gitspec(),
+            ]
         ).decode("utf-8")
 
         # reset branch to original state
@@ -854,10 +884,14 @@ def write_debian_changelog(path, spec, srcdir):
     # If the first line starts with "mongodb", it's not a revision
     # preamble, and so frob the version number.
     lines[0] = re.sub(
-        "^mongodb \\(.*\\)", "mongodb (%s)" % (spec.pversion(Distro("debian"))), lines[0]
+        "^mongodb \\(.*\\)",
+        "mongodb (%s)" % (spec.pversion(Distro("debian"))),
+        lines[0],
     )
     # Rewrite every changelog entry starting in mongodb<space>
-    lines = [re.sub("^mongodb ", "mongodb%s " % (spec.suffix()), line) for line in lines]
+    lines = [
+        re.sub("^mongodb ", "mongodb%s " % (spec.suffix()), line) for line in lines
+    ]
     lines = [re.sub("^  --", " --", line) for line in lines]
     sb = "\n".join(lines)
     with open(path, "w") as fh:
@@ -909,7 +943,8 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
             [
                 "tar",
                 "-cpzf",
-                topdir + "SOURCES/mongodb%s-%s.tar.gz" % (suffix, spec.pversion(distro)),
+                topdir
+                + "SOURCES/mongodb%s-%s.tar.gz" % (suffix, spec.pversion(distro)),
                 os.path.basename(os.path.dirname(sdir)),
             ]
         )
@@ -949,7 +984,9 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     ensure_dir(repo_dir)
     # FIXME: see if some combination of shutil.copy<hoohah> and glob
     # can do this without shelling out.
-    sysassert(["sh", "-c", 'cp -v "%s/RPMS/%s/"*.rpm "%s"' % (topdir, distro_arch, repo_dir)])
+    sysassert(
+        ["sh", "-c", 'cp -v "%s/RPMS/%s/"*.rpm "%s"' % (topdir, distro_arch, repo_dir)]
+    )
     return repo_dir
 
 

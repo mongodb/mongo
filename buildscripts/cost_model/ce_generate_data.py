@@ -52,10 +52,15 @@ class CollectionTemplateEncoder(json.JSONEncoder):
         if isinstance(o, CollectionTemplate):
             collections = []
             for card in o.cardinalities:
-                name = f'{o.name}_{card}'
+                name = f"{o.name}_{card}"
                 collections.append(
-                    dict(collectionName=name, fields=o.fields, compoundIndexes=o.compound_indexes,
-                         cardinality=card))
+                    dict(
+                        collectionName=name,
+                        fields=o.fields,
+                        compoundIndexes=o.compound_indexes,
+                        cardinality=card,
+                    )
+                )
             return collections
         elif isinstance(o, FieldTemplate):
             return dict(fieldName=o.name, dataType=o.data_type, indexed=o.indexed)
@@ -82,11 +87,11 @@ async def dump_collection(db, dump_path, database_name, coll_name, chunk_size):
     """Dump a collection into separate files each containing at most chunk_size documents."""
 
     def open_chunk_file(chunk_id):
-        chunk_name = f'{coll_name}_{chunk_id}'
-        chunk_file_path = Path(dump_path) / f'{chunk_name}'
-        print(f'Writing chunk: {chunk_file_path}')
-        chunk_file = open(chunk_file_path, 'w', encoding="utf-8")
-        chunk_file.write('// This is a generated file.\n')
+        chunk_name = f"{coll_name}_{chunk_id}"
+        chunk_file_path = Path(dump_path) / f"{chunk_name}"
+        print(f"Writing chunk: {chunk_file_path}")
+        chunk_file = open(chunk_file_path, "w", encoding="utf-8")
+        chunk_file.write("// This is a generated file.\n")
         chunk_file.write(f'{chunk_name} = {{collName: "{coll_name}", collData: [\n')
         return chunk_file, "'" + chunk_name + "'"
 
@@ -115,7 +120,7 @@ async def dump_collection(db, dump_path, database_name, coll_name, chunk_size):
 
         chunk_file.write(json.dumps(doc, cls=OidEncoder))
         doc_pos += 1
-        chunk_file.write(',')
+        chunk_file.write(",")
         chunk_file.write("\n")
     close_chunk_file(chunk_file)
     return chunk_names
@@ -123,16 +128,17 @@ async def dump_collection(db, dump_path, database_name, coll_name, chunk_size):
 
 async def dump_collections_to_json(db, dump_path, database_name, collections):
     chunk_size = 100  # number of documents per chunk file
-    print(f'Dumping all collections into chunks of size {chunk_size}.')
+    print(f"Dumping all collections into chunks of size {chunk_size}.")
     all_chunk_names = []
     for coll_name in collections:
-        coll_chunk_names = await dump_collection(db, dump_path, database_name, coll_name,
-                                                 chunk_size)
+        coll_chunk_names = await dump_collection(
+            db, dump_path, database_name, coll_name, chunk_size
+        )
         all_chunk_names.extend(coll_chunk_names)
 
     # Generate a JS file that loads all chunk files
-    load_file = open(Path(dump_path) / f'{database_name}.data', 'w')
-    load_file.write('// This is a generated file.\n')
+    load_file = open(Path(dump_path) / f"{database_name}.data", "w")
+    load_file.write("// This is a generated file.\n")
     # Create an array named 'chunkNames' with all chunk file names to be loaded.
     load_file.write(f'const chunkNames = [{",".join(all_chunk_names)}];')
 
@@ -146,9 +152,11 @@ async def generate_histograms(coll_template, coll, dump_path):
     doc_count = await coll.count_documents({})
     for field in coll_template.fields:
         field_data = []
-        if re.match('^mixeddata_.*', field.name):
+        if re.match("^mixeddata_.*", field.name):
             continue
-        async for doc in coll.find({field.name: {"$exists": True}}, {"_id": 0, field.name: 1}):
+        async for doc in coll.find(
+            {field.name: {"$exists": True}}, {"_id": 0, field.name: 1}
+        ):
             field_val = doc[field.name]
             if isinstance(field_val, str):
                 field_val = re.escape(field_val)
@@ -157,10 +165,11 @@ async def generate_histograms(coll_template, coll, dump_path):
                 continue
             field_data.append(field_val)
         if len(field_data) > 0:
-            fig_file_name = f'{dump_path}/{coll.name}_{field.name}.png'
-            print(f'Generating histogram {fig_file_name}')
-            hist = sns.displot(data=field_data, kind="hist",
-                               bins=round(math.sqrt(doc_count))).figure
+            fig_file_name = f"{dump_path}/{coll.name}_{field.name}.png"
+            print(f"Generating histogram {fig_file_name}")
+            hist = sns.displot(
+                data=field_data, kind="hist", bins=round(math.sqrt(doc_count))
+            ).figure
             hist.savefig(fig_file_name)
             plt.close(hist)
 
@@ -173,7 +182,6 @@ async def main():
     # 1. Database Instance provides connectivity to a MongoDB instance, it loads data optionally
     # from the dump on creating and stores data optionally to the dump on closing.
     with DatabaseInstance(database_config) as database_instance:
-
         # 2. Generate random data and populate collections with it.
         old_db_collections = await database_instance.database.list_collection_names()
         for coll_name in old_db_collections:
@@ -188,27 +196,40 @@ async def main():
         # TODO: This is an alternative way to export the data. It is better than what is implemented,
         # but cannot be used until we find a way to call 'mongoimport' from the corresponding JS test.
         #
-        #for coll_name in db_collections:
+        # for coll_name in db_collections:
         # subprocess.run([
         #     'mongoexport', f'--db={database_config.database_name}', f'--collection={coll_name}',
         #     f'--out={coll_name}.dat'
         # ], cwd=database_config.dump_path, check=True)
-        await dump_collections_to_json(database_instance.database, database_config.dump_path,
-                                       database_config.database_name, db_collections)
+        await dump_collections_to_json(
+            database_instance.database,
+            database_config.dump_path,
+            database_config.database_name,
+            db_collections,
+        )
 
         # 4. Export the collection templates used to create the test collections into JSON file
-        with open(Path(database_config.dump_path) / f'{database_config.database_name}.schema',
-                  "w") as metadata_file:
+        with open(
+            Path(database_config.dump_path) / f"{database_config.database_name}.schema",
+            "w",
+        ) as metadata_file:
             collections = []
             for coll_template in data_generator_config.collection_templates:
                 for card in coll_template.cardinalities:
-                    name = f'{coll_template.name}_{card}'
+                    name = f"{coll_template.name}_{card}"
                     collections.append(
-                        dict(collectionName=name, fields=coll_template.fields,
-                             compound_indexes=coll_template.compound_indexes, cardinality=card))
+                        dict(
+                            collectionName=name,
+                            fields=coll_template.fields,
+                            compound_indexes=coll_template.compound_indexes,
+                            cardinality=card,
+                        )
+                    )
                     # Uncomment this to generate histograms in PNG format
                     # await generate_histograms(coll_template, database_instance.database[name], database_config.dump_path)
-            json_metadata = json.dumps(collections, indent=4, cls=CollectionTemplateEncoder)
+            json_metadata = json.dumps(
+                collections, indent=4, cls=CollectionTemplateEncoder
+            )
             metadata_file.write("// This is a generated file.\nconst dbMetadata = ")
             metadata_file.write(json_metadata)
             metadata_file.write(";")
@@ -216,7 +237,7 @@ async def main():
     print("DONE!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     asyncio.run(main())

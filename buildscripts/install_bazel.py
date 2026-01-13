@@ -64,8 +64,12 @@ def install_buildozer(download_location: str = "./"):
 
 def install_bazel(binary_directory: str) -> str:
     install_buildozer(binary_directory)
-    normalized_arch = (platform.machine().lower().replace("aarch64", "arm64").replace(
-        "x86_64", "amd64"))
+    normalized_arch = (
+        platform.machine()
+        .lower()
+        .replace("aarch64", "arm64")
+        .replace("x86_64", "amd64")
+    )
     normalized_os = sys.platform.replace("win32", "windows").replace("darwin", "macos")
     is_bazelisk_supported = normalized_arch not in ["ppc64le", "s390x"]
     binary_filename = "bazelisk"
@@ -95,20 +99,23 @@ def install_bazel(binary_directory: str) -> str:
 
 def _set_bazel_permissions(binary_path: str) -> None:
     # Bazel is a self-extracting zip launcher and needs read perms on the executable to read the zip from itself.
-    perms = (stat.S_IXUSR
-             | stat.S_IXGRP
-             | stat.S_IXOTH
-             | stat.S_IRUSR
-             | stat.S_IRGRP
-             | stat.S_IROTH
-             | stat.S_IWUSR
-             | stat.S_IWGRP)
+    perms = (
+        stat.S_IXUSR
+        | stat.S_IXGRP
+        | stat.S_IXOTH
+        | stat.S_IRUSR
+        | stat.S_IRGRP
+        | stat.S_IROTH
+        | stat.S_IWUSR
+        | stat.S_IWGRP
+    )
     os.chmod(binary_path, perms)
 
 
 def create_bazel_to_bazelisk_symlink(binary_directory: str) -> str:
-    bazel_symlink = os.path.join(binary_directory,
-                                 "bazel.exe" if sys.platform == "win32" else "bazel")
+    bazel_symlink = os.path.join(
+        binary_directory, "bazel.exe" if sys.platform == "win32" else "bazel"
+    )
     if os.path.exists(bazel_symlink):
         print(f"Symlink {bazel_symlink} already exists, skipping symlink creation")
         return bazel_symlink
@@ -156,13 +163,19 @@ def main():
             else:
                 print("To add it to your PATH, run: \n")
                 if os.path.exists(os.path.expanduser("~/.bashrc")):
-                    print(f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bashrc')
+                    print(
+                        f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bashrc'
+                    )
                     print("source ~/.bashrc")
                 elif os.path.exists(os.path.expanduser("~/.bash_profile")):
-                    print(f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bash_profile')
+                    print(
+                        f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.bash_profile'
+                    )
                     print("source ~/.bash_profile")
                 elif os.path.exists(os.path.expanduser("~/.zshrc")):
-                    print(f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.zshrc')
+                    print(
+                        f'echo "export PATH=\\{abs_binary_directory}:$PATH" >> ~/.zshrc'
+                    )
                     print("source ~/.zshrc")
                 else:
                     print(f"export PATH={abs_binary_directory}:$PATH")

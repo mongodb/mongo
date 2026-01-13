@@ -1,4 +1,5 @@
 """Module for syncing a repo with Copybara and setting up configurations."""
+
 from __future__ import annotations
 
 import argparse
@@ -108,8 +109,9 @@ def run_command(command):
 
     """
     try:
-        return subprocess.run(command, shell=True, check=True, text=True,
-                              capture_output=True).stdout
+        return subprocess.run(
+            command, shell=True, check=True, text=True, capture_output=True
+        ).stdout
     except subprocess.CalledProcessError as e:
         print(f"Error while executing: '{command}'.\n{e}\nStandard Error: {e.stderr}")
         raise
@@ -126,14 +128,15 @@ def create_mongodb_bot_gitconfig():
 
     gitconfig_path = os.path.expanduser("~/mongodb-bot.gitconfig")
 
-    with open(gitconfig_path, 'w') as file:
+    with open(gitconfig_path, "w") as file:
         file.write(content)
 
     print("mongodb-bot.gitconfig file created.")
 
 
-def get_installation_access_token(app_id: int, private_key: str,
-                                  installation_id: int) -> Optional[str]:  # noqa: D407,D413
+def get_installation_access_token(
+    app_id: int, private_key: str, installation_id: int
+) -> Optional[str]:  # noqa: D407,D413
     """
     Obtain an installation access token using JWT.
 
@@ -166,7 +169,8 @@ def send_failure_message_to_slack(expansions):
     error_msg = (
         "Evergreen task '* Copybara Sync Between Repos' failed\n"
         "See troubleshooting doc <http://go/copybara-troubleshoot|here>.\n"
-        f"See task log here: <https://spruce.mongodb.com/version/{current_version_id}|here>.")
+        f"See task log here: <https://spruce.mongodb.com/version/{current_version_id}|here>."
+    )
 
     evg_api = RetryingEvergreenApi.get_api(config_file=".evergreen.yml")
     evg_api.send_slack_message(
@@ -186,13 +190,14 @@ def check_destination_branch_exists(copybara_config: CopybaraConfig) -> bool:
     - bool: `True` if the branch exists in the destination repository, `False` otherwise.
     """
 
-    command = (
-        f"git ls-remote {copybara_config.destination.git_url} {copybara_config.destination.branch}")
+    command = f"git ls-remote {copybara_config.destination.git_url} {copybara_config.destination.branch}"
     output = run_command(command)
     return copybara_config.destination.branch in output
 
 
-def find_matching_commit(dir_source_repo: str, dir_destination_repo: str) -> Optional[str]:
+def find_matching_commit(
+    dir_source_repo: str, dir_destination_repo: str
+) -> Optional[str]:
     """
     Finds a matching commit in the destination repository based on the commit hash from the source repository.
 
@@ -245,8 +250,8 @@ def has_only_destination_repo_remote(repo_name: str):
     Returns
         bool: True if the repository only contains the destination repository remote URL, False otherwise.
     """
-    git_config_path = os.path.join('.git', 'config')
-    with open(git_config_path, 'r') as f:
+    git_config_path = os.path.join(".git", "config")
+    with open(git_config_path, "r") as f:
         config_content = f.read()
 
         # Define a regular expression pattern to match the '{owner}/{repo}.git'
@@ -261,8 +266,11 @@ def has_only_destination_repo_remote(repo_name: str):
     return False
 
 
-def push_branch_to_destination_repo(destination_repo_dir: str, copybara_config: CopybaraConfig,
-                                    branching_off_commit: str):
+def push_branch_to_destination_repo(
+    destination_repo_dir: str,
+    copybara_config: CopybaraConfig,
+    branching_off_commit: str,
+):
     """
     Pushes a new branch to the remote repository after ensuring it branches off the public repository.
 
@@ -279,13 +287,16 @@ def push_branch_to_destination_repo(destination_repo_dir: str, copybara_config: 
 
     # Check the current repo has only destination repository remote.
     if not has_only_destination_repo_remote(copybara_config.destination.repo_name):
-        raise Exception(f"{destination_repo_dir} git repo has not only the destination repo remote")
+        raise Exception(
+            f"{destination_repo_dir} git repo has not only the destination repo remote"
+        )
 
     # Confirm the top commit is matching the found commit before pushing
     new_branch_top_commit = run_command('git log --pretty=format:"%H" -1')
     if not new_branch_top_commit == branching_off_commit:
         raise Exception(
-            "The new branch top commit does not match the branching_off_commit. Aborting push.")
+            "The new branch top commit does not match the branching_off_commit. Aborting push."
+        )
 
     # Confirming whether the commit exists in the destination repository to ensure
     # we are not pushing anything that isn't already in the destination repository.
@@ -294,7 +305,8 @@ def push_branch_to_destination_repo(destination_repo_dir: str, copybara_config: 
 
     # Push the new branch to the destination repository
     run_command(
-        f"git push {copybara_config.destination.git_url} {copybara_config.destination.branch}")
+        f"git push {copybara_config.destination.git_url} {copybara_config.destination.branch}"
+    )
 
 
 def create_branch_from_matching_commit(copybara_config: CopybaraConfig) -> None:
@@ -311,7 +323,9 @@ def create_branch_from_matching_commit(copybara_config: CopybaraConfig) -> None:
     try:
         # Create a unique directory based on the current timestamp.
         working_dir = os.path.join(
-            original_dir, "make_branch_attempt_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+            original_dir,
+            "make_branch_attempt_" + datetime.now().strftime("%Y_%m_%d_%H_%M_%S"),
+        )
         os.makedirs(working_dir, exist_ok=True)
         os.chdir(working_dir)
 
@@ -319,13 +333,18 @@ def create_branch_from_matching_commit(copybara_config: CopybaraConfig) -> None:
         cloned_source_repo_dir = os.path.join(working_dir, "source-repo")
         cloned_destination_repo_dir = os.path.join(working_dir, "destination-repo")
 
-        run_command(f"git clone -b {copybara_config.source.branch}"
-                    f" {copybara_config.source.git_url} {cloned_source_repo_dir}")
         run_command(
-            f"git clone {copybara_config.destination.git_url} {cloned_destination_repo_dir}")
+            f"git clone -b {copybara_config.source.branch}"
+            f" {copybara_config.source.git_url} {cloned_source_repo_dir}"
+        )
+        run_command(
+            f"git clone {copybara_config.destination.git_url} {cloned_destination_repo_dir}"
+        )
 
         # Find matching commits to branching off
-        commit = find_matching_commit(cloned_source_repo_dir, cloned_destination_repo_dir)
+        commit = find_matching_commit(
+            cloned_source_repo_dir, cloned_destination_repo_dir
+        )
         if commit is not None:
             # Delete the cloned_source_repo_dir folder
             shutil.rmtree(cloned_source_repo_dir)
@@ -334,10 +353,14 @@ def create_branch_from_matching_commit(copybara_config: CopybaraConfig) -> None:
 
             # Once a matching commit is found, create a new branch based on it.
             os.chdir(cloned_destination_repo_dir)
-            run_command(f"git checkout -b {copybara_config.destination.branch} {commit}")
+            run_command(
+                f"git checkout -b {copybara_config.destination.branch} {commit}"
+            )
 
             # Push the new branch to the remote repository
-            push_branch_to_destination_repo(cloned_destination_repo_dir, copybara_config, commit)
+            push_branch_to_destination_repo(
+                cloned_destination_repo_dir, copybara_config, commit
+            )
         else:
             print(
                 f"Could not find matching commits between {copybara_config.destination.repo_name}/master"
@@ -356,13 +379,17 @@ def main():
     """Clone the Copybara repo, build its Docker image, and set up and run migrations."""
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--expansions-file", "-e", default="../expansions.yml",
-                        help="Location of expansions file generated by evergreen.")
+    parser.add_argument(
+        "--expansions-file",
+        "-e",
+        default="../expansions.yml",
+        help="Location of expansions file generated by evergreen.",
+    )
 
     args = parser.parse_args()
 
     # Check if the copybara directory already exists
-    if os.path.exists('copybara'):
+    if os.path.exists("copybara"):
         print("Copybara directory already exists.")
     else:
         run_command("git clone https://github.com/10gen/copybara.git")
@@ -430,11 +457,15 @@ def main():
     else:
         if not check_destination_branch_exists(copybara_config):
             create_branch_from_matching_commit(copybara_config)
-            print(f"New branch named '{copybara_config.destination.branch}' has been created"
-                  f" for the '{copybara_config.destination.repo_name}' repo")
+            print(
+                f"New branch named '{copybara_config.destination.branch}' has been created"
+                f" for the '{copybara_config.destination.repo_name}' repo"
+            )
         else:
-            print(f"The branch named '{copybara_config.destination.branch}' already exists"
-                  f" in the '{copybara_config.destination.repo_name}' repo.")
+            print(
+                f"The branch named '{copybara_config.destination.branch}' already exists"
+                f" in the '{copybara_config.destination.repo_name}' repo."
+            )
 
     # Set up the Docker command and execute it
     docker_cmd = [
@@ -461,8 +492,10 @@ def main():
             "Updates were rejected because the remote contains work that you do",
         ]
 
-        if any(acceptable_message in error_message
-               for acceptable_message in acceptable_error_messages):
+        if any(
+            acceptable_message in error_message
+            for acceptable_message in acceptable_error_messages
+        ):
             return
 
         # Send a failure message to #devprod-build-automation if the Copybara sync task fails.

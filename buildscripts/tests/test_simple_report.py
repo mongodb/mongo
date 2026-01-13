@@ -36,14 +36,23 @@ class TestSimpleReport(unittest.TestCase):
     @patch(ns("try_combine_reports"))
     @patch(ns("_clean_log_file"))
     @patch(ns("put_report"))
-    def _test_trivial_report(self, mock_put_report, mock_clean_log_file, _mock_try_combine_reports):
+    def _test_trivial_report(
+        self, mock_put_report, mock_clean_log_file, _mock_try_combine_reports
+    ):
         exit_code = self.rng.randint(0, 254)
         print(f"Trying exit code: {exit_code}")
         mock_clean_log_file.return_value = "I'm a little test log, short and stdout."
         runner = CliRunner()
         result = runner.invoke(
             buildscripts.simple_report.main,
-            ["--test-name", "potato", "--log-file", "test.log", "--exit-code", str(exit_code)],
+            [
+                "--test-name",
+                "potato",
+                "--log-file",
+                "test.log",
+                "--exit-code",
+                str(exit_code),
+            ],
         )
         report = mock_put_report.call_args[0][0]
         results = mock_put_report.call_args[0][0]["results"]

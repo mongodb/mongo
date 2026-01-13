@@ -25,7 +25,6 @@ import sys
 
 
 def jsToHeader(target, source):
-
     outFile = target
 
     h = [
@@ -52,8 +51,10 @@ def jsToHeader(target, source):
         h.append("0};")
         # symbols aren't exported w/o this
         h.append("extern const JSFile %s;" % objname)
-        h.append('const JSFile %s = { "%s", StringData(%s, sizeof(%s) - 1) };' %
-                 (objname, filename.replace("\\", "/"), stringname, stringname))
+        h.append(
+            'const JSFile %s = { "%s", StringData(%s, sizeof(%s) - 1) };'
+            % (objname, filename.replace("\\", "/"), stringname, stringname)
+        )
 
     h.append("} // namespace JSFiles")
     h.append("} // namespace mongo")

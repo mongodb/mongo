@@ -81,7 +81,9 @@ class TestRepeatConfig(unittest.TestCase):
         self.assertEqual(repeat_config, repeat_config.validate())
 
     def test_validate_with_both_repeat_options_specified(self):
-        repeat_config = under_test.RepeatConfig(repeat_tests_secs=10, repeat_tests_num=5)
+        repeat_config = under_test.RepeatConfig(
+            repeat_tests_secs=10, repeat_tests_num=5
+        )
 
         with self.assertRaises(ValueError):
             repeat_config.validate()
@@ -93,8 +95,9 @@ class TestRepeatConfig(unittest.TestCase):
             repeat_config.validate()
 
     def test_validate_with_repeat_min_greater_than_max(self):
-        repeat_config = under_test.RepeatConfig(repeat_tests_max=10, repeat_tests_min=100,
-                                                repeat_tests_secs=15)
+        repeat_config = under_test.RepeatConfig(
+            repeat_tests_max=10, repeat_tests_min=100, repeat_tests_secs=15
+        )
 
         with self.assertRaises(ValueError):
             repeat_config.validate()
@@ -136,8 +139,9 @@ class TestRepeatConfig(unittest.TestCase):
         self.assertNotIn("--repeatSuites", repeat_options)
 
     def test_get_resmoke_repeat_options_secs_min_max(self):
-        repeat_config = under_test.RepeatConfig(repeat_tests_secs=5, repeat_tests_min=2,
-                                                repeat_tests_max=2)
+        repeat_config = under_test.RepeatConfig(
+            repeat_tests_secs=5, repeat_tests_min=2, repeat_tests_max=2
+        )
         repeat_options = repeat_config.generate_resmoke_options()
 
         self.assertIn("--repeatTestsSecs=5", repeat_options)
@@ -177,16 +181,21 @@ class TestSetResmokeCmd(unittest.TestCase):
         repeat_config = under_test.RepeatConfig()
         resmoke_cmds = under_test._set_resmoke_cmd(repeat_config, [])
 
-        self.assertListEqual(resmoke_cmds,
-                             [sys.executable, "buildscripts/resmoke.py", "run", '--repeatSuites=2'])
+        self.assertListEqual(
+            resmoke_cmds,
+            [sys.executable, "buildscripts/resmoke.py", "run", "--repeatSuites=2"],
+        )
 
     def test__set_resmoke_cmd_no_opts(self):
         repeat_config = under_test.RepeatConfig()
         resmoke_args = ["arg1", "arg2"]
 
         resmoke_cmd = under_test._set_resmoke_cmd(repeat_config, resmoke_args)
-        expected_resmoke_cmd = [sys.executable, 'buildscripts/resmoke.py', 'run'
-                                ] + resmoke_args + ['--repeatSuites=2']
+        expected_resmoke_cmd = (
+            [sys.executable, "buildscripts/resmoke.py", "run"]
+            + resmoke_args
+            + ["--repeatSuites=2"]
+        )
 
         self.assertListEqual(expected_resmoke_cmd, resmoke_cmd)
 
@@ -195,41 +204,59 @@ class TestSetResmokeCmd(unittest.TestCase):
         resmoke_args = ["arg1", "arg2"]
 
         resmoke_cmd = under_test._set_resmoke_cmd(repeat_config, resmoke_args)
-        expected_resmoke_cmd = [sys.executable, 'buildscripts/resmoke.py', 'run'
-                                ] + resmoke_args + ['--repeatSuites=3']
+        expected_resmoke_cmd = (
+            [sys.executable, "buildscripts/resmoke.py", "run"]
+            + resmoke_args
+            + ["--repeatSuites=3"]
+        )
 
         self.assertListEqual(expected_resmoke_cmd, resmoke_cmd)
 
 
 class RunTests(unittest.TestCase):
-    @patch(ns('subprocess.check_call'))
+    @patch(ns("subprocess.check_call"))
     def test_run_tests_no_tests(self, check_call_mock):
         tests_by_task = {}
-        resmoke_cmd = ["python", "buildscripts/resmoke.py", "run", "--continueOnFailure"]
+        resmoke_cmd = [
+            "python",
+            "buildscripts/resmoke.py",
+            "run",
+            "--continueOnFailure",
+        ]
 
         under_test.run_tests(tests_by_task, resmoke_cmd)
 
         check_call_mock.assert_not_called()
 
-    @patch(ns('subprocess.check_call'))
+    @patch(ns("subprocess.check_call"))
     def test_run_tests_some_test(self, check_call_mock):
         n_tasks = 3
         tests_by_task = create_tests_by_task_mock(n_tasks, 5)
-        resmoke_cmd = ["python", "buildscripts/resmoke.py", "run", "--continueOnFailure"]
+        resmoke_cmd = [
+            "python",
+            "buildscripts/resmoke.py",
+            "run",
+            "--continueOnFailure",
+        ]
 
         under_test.run_tests(tests_by_task, resmoke_cmd)
 
         self.assertEqual(n_tasks, check_call_mock.call_count)
 
-    @patch(ns('sys.exit'))
-    @patch(ns('subprocess.check_call'))
+    @patch(ns("sys.exit"))
+    @patch(ns("subprocess.check_call"))
     def test_run_tests_tests_resmoke_failure(self, check_call_mock, exit_mock):
         error_code = 42
         n_tasks = 3
         tests_by_task = create_tests_by_task_mock(n_tasks, 5)
-        resmoke_cmd = ["python", "buildscripts/resmoke.py", "run", "--continueOnFailure"]
+        resmoke_cmd = [
+            "python",
+            "buildscripts/resmoke.py",
+            "run",
+            "--continueOnFailure",
+        ]
         check_call_mock.side_effect = subprocess.CalledProcessError(error_code, "err1")
-        exit_mock.side_effect = ValueError('exiting')
+        exit_mock.side_effect = ValueError("exiting")
 
         with self.assertRaises(ValueError):
             under_test.run_tests(tests_by_task, resmoke_cmd)
@@ -239,8 +266,11 @@ class RunTests(unittest.TestCase):
 
 
 MEMBERS_MAP = {
-    "test1.js": ["suite1", "suite2"], "test2.js": ["suite1", "suite3"], "test3.js": [],
-    "test4.js": ["suite1", "suite2", "suite3"], "test5.js": ["suite2"]
+    "test1.js": ["suite1", "suite2"],
+    "test2.js": ["suite1", "suite3"],
+    "test3.js": [],
+    "test4.js": ["suite1", "suite2", "suite3"],
+    "test5.js": ["suite2"],
 }
 
 SUITE1 = Mock()
@@ -279,7 +309,9 @@ class CreateExecutorList(unittest.TestCase):
 
     @patch(RESMOKELIB + ".testing.suite.Suite")
     @patch(RESMOKELIB + ".suitesconfig.get_named_suites")
-    def test_create_executor_list_runs_core_suite(self, mock_get_named_suites, mock_suite_class):
+    def test_create_executor_list_runs_core_suite(
+        self, mock_get_named_suites, mock_suite_class
+    ):
         mock_get_named_suites.return_value = ["core"]
 
         under_test.create_executor_list([], [])
@@ -287,8 +319,9 @@ class CreateExecutorList(unittest.TestCase):
 
     @patch(RESMOKELIB + ".testing.suite.Suite")
     @patch(RESMOKELIB + ".suitesconfig.get_named_suites")
-    def test_create_executor_list_ignores_dbtest_suite(self, mock_get_named_suites,
-                                                       mock_suite_class):
+    def test_create_executor_list_ignores_dbtest_suite(
+        self, mock_get_named_suites, mock_suite_class
+    ):
         mock_get_named_suites.return_value = ["dbtest"]
 
         under_test.create_executor_list([], [])
@@ -300,7 +333,9 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
     variant_task.name = task_name
     variant_task.generated_task_name = task_name
     variant_task.get_suite_names.return_value = [suite_name]
-    variant_task.combined_suite_to_resmoke_args_map = {suite_name: f"--suites={suite_name}"}
+    variant_task.combined_suite_to_resmoke_args_map = {
+        suite_name: f"--suites={suite_name}"
+    }
     variant_task.run_on = [distro]
     return variant_task
 
@@ -341,8 +376,9 @@ class TestCreateTaskList(unittest.TestCase):
         }
         exclude_tasks = []
 
-        task_list = under_test.create_task_list(evg_conf_mock, variant, tests_by_suite,
-                                                exclude_tasks)
+        task_list = under_test.create_task_list(
+            evg_conf_mock, variant, tests_by_suite, exclude_tasks
+        )
 
         self.assertIn("task 1", task_list)
         self.assertIn("task 2", task_list)
@@ -361,8 +397,9 @@ class TestCreateTaskList(unittest.TestCase):
         }
         exclude_tasks = []
 
-        task_list = under_test.create_task_list(evg_conf_mock, variant, tests_by_suite,
-                                                exclude_tasks)
+        task_list = under_test.create_task_list(
+            evg_conf_mock, variant, tests_by_suite, exclude_tasks
+        )
 
         self.assertIn("task 1", task_list)
         task_info = task_list["task 1"]
@@ -385,8 +422,9 @@ class TestCreateTaskList(unittest.TestCase):
         }
         exclude_tasks = ["task 2"]
 
-        task_list = under_test.create_task_list(evg_conf_mock, variant, tests_by_suite,
-                                                exclude_tasks)
+        task_list = under_test.create_task_list(
+            evg_conf_mock, variant, tests_by_suite, exclude_tasks
+        )
 
         self.assertIn("task 1", task_list)
         self.assertNotIn("task 2", task_list)
@@ -419,7 +457,9 @@ class TestCreateTestsByTask(unittest.TestCase):
         evg_conf_mock.get_variant.return_value = None
 
         with self.assertRaises(ValueError):
-            under_test.create_tests_by_task(variant, evg_conf_mock, set(), "install-dir/bin")
+            under_test.create_tests_by_task(
+                variant, evg_conf_mock, set(), "install-dir/bin"
+            )
 
 
 class TestLocalFileChangeDetector(unittest.TestCase):
@@ -481,7 +521,7 @@ class TestLocalFileChangeDetector(unittest.TestCase):
 
 
 class TestYamlBurnInExecutor(unittest.TestCase):
-    @patch('sys.stdout', new_callable=StringIO)
+    @patch("sys.stdout", new_callable=StringIO)
     def test_found_tasks_should_be_reported_as_yaml(self, stdout):
         n_tasks = 5
         n_tests = 3
@@ -493,4 +533,6 @@ class TestYamlBurnInExecutor(unittest.TestCase):
         yaml_raw = stdout.getvalue()
         results = yaml.safe_load(yaml_raw)
         self.assertEqual(n_tasks, len(results["discovered_tasks"]))
-        self.assertEqual(n_tests, len(results["discovered_tasks"][0]["suites"][0]["test_list"]))
+        self.assertEqual(
+            n_tests, len(results["discovered_tasks"][0]["suites"][0]["test_list"])
+        )

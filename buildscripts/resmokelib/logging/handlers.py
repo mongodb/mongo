@@ -71,8 +71,10 @@ class ExceptionExtractor:
                 self.exception_detected = True
                 if self.current_exception_is_truncated:
                     self.current_exception.appendleft(
-                        "[LAST Part of Exception]" if self.truncate ==
-                        Truncate.FIRST else "[FIRST Part of Exception]")
+                        "[LAST Part of Exception]"
+                        if self.truncate == Truncate.FIRST
+                        else "[FIRST Part of Exception]"
+                    )
 
     def get_exception(self):
         """Get the exception as a list of strings if it exists."""
@@ -176,7 +178,10 @@ class BufferedHandler(logging.Handler):
                 # be None after this point.
                 self.__flush_event = flush.flush_after(self, delay=self.interval_secs)
 
-            if not self.__flush_scheduled_by_emit and len(self.__emit_buffer) >= self.capacity:
+            if (
+                not self.__flush_scheduled_by_emit
+                and len(self.__emit_buffer) >= self.capacity
+            ):
                 # Attempt to flush the buffer early if we haven't already done so. We don't bother
                 # calling flush.cancel() and flush.flush_after() when 'self.__flush_event' is
                 # already scheduled to happen as soon as possible to avoid introducing unnecessary
@@ -214,8 +219,10 @@ class BufferedHandler(logging.Handler):
     def _flush_buffer_with_lock(self, buf, close_called):
         """Ensure all logging output has been flushed."""
 
-        raise NotImplementedError("_flush_buffer_with_lock must be implemented by BufferedHandler"
-                                  " subclasses")
+        raise NotImplementedError(
+            "_flush_buffer_with_lock must be implemented by BufferedHandler"
+            " subclasses"
+        )
 
     def close(self):
         """Flush the buffer and tidies up any resources used by this handler."""
@@ -269,11 +276,12 @@ class HTTPHandler(object):
             retry = urllib3_retry.Retry(
                 backoff_factor=0.1,  # Enable backoff starting at 0.1s.
                 allowed_methods=False,  # Support all HTTP verbs.
-                status_forcelist=retry_status)
+                status_forcelist=retry_status,
+            )
 
             adapter = requests.adapters.HTTPAdapter(max_retries=retry)
-            self.session.mount('http://', adapter)
-            self.session.mount('https://', adapter)
+            self.session.mount("http://", adapter)
+            self.session.mount("https://", adapter)
 
         self.url_root = url_root
 
@@ -298,7 +306,9 @@ class HTTPHandler(object):
         with warnings.catch_warnings():
             if urllib3_exceptions is not None:
                 try:
-                    warnings.simplefilter("ignore", urllib3_exceptions.InsecurePlatformWarning)
+                    warnings.simplefilter(
+                        "ignore", urllib3_exceptions.InsecurePlatformWarning
+                    )
                 except AttributeError:
                     # Versions of urllib3 prior to 1.10.3 didn't define InsecurePlatformWarning.
                     # Versions of requests prior to 2.6.0 didn't have a vendored copy of urllib3
@@ -306,15 +316,23 @@ class HTTPHandler(object):
                     pass
 
                 try:
-                    warnings.simplefilter("ignore", urllib3_exceptions.InsecureRequestWarning)
+                    warnings.simplefilter(
+                        "ignore", urllib3_exceptions.InsecureRequestWarning
+                    )
                 except AttributeError:
                     # Versions of urllib3 prior to 1.9 didn't define InsecureRequestWarning.
                     # Versions of requests prior to 2.4.0 didn't have a vendored copy of urllib3
                     # that defined InsecureRequestWarning.
                     pass
 
-            response = self.session.post(url, data=data, headers=headers, timeout=timeout_secs,
-                                         auth=self.auth_handler, verify=True)
+            response = self.session.post(
+                url,
+                data=data,
+                headers=headers,
+                timeout=timeout_secs,
+                auth=self.auth_handler,
+                verify=True,
+            )
 
         response.raise_for_status()
 

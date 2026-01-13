@@ -71,7 +71,9 @@ def merge_check_options_into_config(
     override = check_options_list_to_map(incoming_config.get("CheckOptions"))
     if override:
         base.update(override)  # later wins
-        target_config["CheckOptions"] = [{"key": k, "value": v} for k, v in sorted(base.items())]
+        target_config["CheckOptions"] = [
+            {"key": k, "value": v} for k, v in sorted(base.items())
+        ]
 
 
 def deep_merge_dicts(base: Any, override: Any) -> Any:
@@ -176,7 +178,9 @@ def main() -> None:
         # then generic merge:
         merged_config = deep_merge_dicts(merged_config, incoming_config)
 
-    merged_config["Checks"] = ",".join(split_checks_to_list(merged_config.get("Checks")))
+    merged_config["Checks"] = ",".join(
+        split_checks_to_list(merged_config.get("Checks"))
+    )
     output_path = pathlib.Path(args.out)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:

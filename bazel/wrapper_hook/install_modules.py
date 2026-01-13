@@ -14,7 +14,9 @@ from bazel.wrapper_hook.wrapper_debug import wrapper_debug
 
 
 def get_deps_dirs(deps):
-    tmp_dir = pathlib.Path(os.environ["Temp"] if platform.system() == "Windows" else "/tmp")
+    tmp_dir = pathlib.Path(
+        os.environ["Temp"] if platform.system() == "Windows" else "/tmp"
+    )
     bazel_bin = REPO_ROOT / "bazel-bin"
     for dep in deps:
         try:
@@ -41,7 +43,9 @@ def add_module_to_path(poetry_dir, modules_added):
 
 
 def setup_python_path():
-    tmp_dir = pathlib.Path(os.environ["Temp"] if platform.system() == "Windows" else "/tmp")
+    tmp_dir = pathlib.Path(
+        os.environ["Temp"] if platform.system() == "Windows" else "/tmp"
+    )
     modules_added = set()
 
     for out_dir in [
@@ -92,7 +96,9 @@ def search_for_modules(deps, deps_installed, lockfile_changed=False):
 def install_modules(bazel):
     need_to_install = False
     pwd_hash = hashlib.md5(str(REPO_ROOT).encode()).hexdigest()
-    lockfile_hash_file = pathlib.Path(tempfile.gettempdir()) / f"{pwd_hash}_lockfile_hash"
+    lockfile_hash_file = (
+        pathlib.Path(tempfile.gettempdir()) / f"{pwd_hash}_lockfile_hash"
+    )
     with open(REPO_ROOT / "poetry.lock", "rb") as f:
         current_hash = hashlib.md5(f.read()).hexdigest()
 
@@ -132,7 +138,9 @@ def install_modules(bazel):
             ]
         )
         if proc.returncode != 0:
-            print("Failed to install modules using remote exec/cache, falling back to local...")
+            print(
+                "Failed to install modules using remote exec/cache, falling back to local..."
+            )
             proc = subprocess.run(
                 cmd
                 + [

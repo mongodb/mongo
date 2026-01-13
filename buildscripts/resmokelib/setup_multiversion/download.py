@@ -1,4 +1,5 @@
 """Helper functions to download."""
+
 import contextlib
 import errno
 import glob
@@ -74,7 +75,7 @@ def download_from_s3(url):
         raise DownloadError("Download URL not found")
 
     LOGGER.info("Downloading.", url=url)
-    filename = os.path.join(mkdtemp_in_build_dir(), url.split('/')[-1].split('?')[0])
+    filename = os.path.join(mkdtemp_in_build_dir(), url.split("/")[-1].split("?")[0])
 
     arch = platform.uname().machine.lower()
 
@@ -119,7 +120,9 @@ def _rsync_move_dir(source_dir, dest_dir):
 def extract_archive(archive_file, install_dir):
     """Uncompress file and return root of extracted directory."""
 
-    LOGGER.info("Extracting archive data.", archive=archive_file, install_dir=install_dir)
+    LOGGER.info(
+        "Extracting archive data.", archive=archive_file, install_dir=install_dir
+    )
     temp_dir = mkdtemp_in_build_dir()
     archive_name = os.path.basename(archive_file)
     _, file_suffix = os.path.splitext(archive_name)
@@ -204,6 +207,7 @@ def symlink_version(suffix, installed_dir, link_dir=None):
                 def symlink_ms(source, symlink_name):
                     """Provide symlink for Windows."""
                     import ctypes
+
                     csl = ctypes.windll.kernel32.CreateSymbolicLinkW
                     csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
                     csl.restype = ctypes.c_ubyte
@@ -213,7 +217,11 @@ def symlink_version(suffix, installed_dir, link_dir=None):
 
                 link_method = symlink_ms
             link_method(executable, executable_link)
-            LOGGER.debug("Symlink created.", executable=executable, executable_link=executable_link)
+            LOGGER.debug(
+                "Symlink created.",
+                executable=executable,
+                executable_link=executable_link,
+            )
 
         except OSError as exc:
             if exc.errno == errno.EEXIST:
@@ -221,5 +229,7 @@ def symlink_version(suffix, installed_dir, link_dir=None):
             else:
                 raise
 
-    LOGGER.info("Symlinks for all executables are created in the directory.", link_dir=link_dir)
+    LOGGER.info(
+        "Symlinks for all executables are created in the directory.", link_dir=link_dir
+    )
     return link_dir

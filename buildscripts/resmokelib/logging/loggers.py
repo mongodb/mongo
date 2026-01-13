@@ -45,7 +45,9 @@ _FIXTURE_LOGGER_REGISTRY: dict = {}
 # URL of parsley logs.
 RAW_TEST_LOGS_URL = "https://evergreen.mongodb.com/rest/v2/tasks/{task_id}/build/TestLogs/job{job_num}%2F{test_id}.log?execution={execution}&print_time=true"
 RAW_JOBS_LOGS_URL = "https://evergreen.mongodb.com/rest/v2/tasks/{task_id}/build/TestLogs/job{job_num}?execution={execution}&print_time=true"
-PARSLEY_JOBS_LOGS_URL = "https://parsley.mongodb.com/test/{task_id}/{execution}/job{job_num}/all"
+PARSLEY_JOBS_LOGS_URL = (
+    "https://parsley.mongodb.com/test/{task_id}/{execution}/job{job_num}/all"
+)
 
 
 def _build_logger_server():
@@ -73,10 +75,13 @@ def _setup_redirects():
             redirect_cmds.append("mrlog")
 
         redirect_cmds.append(["tee", config.USER_FRIENDLY_OUTPUT])
-        redirect_cmds.append([
-            "grep", "-Ea",
-            r"Summary of|Running.*\.\.\.|invariant|fassert|BACKTRACE|Invalid access|Workload\(s\) started|Workload\(s\)|WiredTiger error|AddressSanitizer|threads with tids|failed to load|Completed cmd|Completed stepdown"
-        ])
+        redirect_cmds.append(
+            [
+                "grep",
+                "-Ea",
+                r"Summary of|Running.*\.\.\.|invariant|fassert|BACKTRACE|Invalid access|Workload\(s\) started|Workload\(s\)|WiredTiger error|AddressSanitizer|threads with tids|failed to load|Completed cmd|Completed stepdown",
+            ]
+        )
 
     for idx, redirect in enumerate(redirect_cmds):
         # The first redirect reads from stdout. Otherwise read from the previous redirect.
@@ -94,7 +99,8 @@ def configure_loggers():
     # The 'buildlogger' prefix is not added to the fallback logger since the prefix of the original
     # logger will be there as part of the logged message.
     buildlogger.BUILDLOGGER_FALLBACK.addHandler(
-        _fallback_buildlogger_handler(include_logger_name=False))
+        _fallback_buildlogger_handler(include_logger_name=False)
+    )
 
     global BUILDLOGGER_SERVER  # pylint: disable=global-statement
     BUILDLOGGER_SERVER = _build_logger_server()
@@ -157,7 +163,8 @@ def new_job_logger(test_kind, job_num) -> logging.Logger:
                 buildlogger.set_log_output_incomplete()
                 raise errors.LoggerRuntimeConfigError(
                     "Encountered an error configuring buildlogger for job #{:d}: Failed to get a"
-                    " new build_id".format(job_num))
+                    " new build_id".format(job_num)
+                )
 
             url = BUILDLOGGER_SERVER.get_build_log_url(build_id)
             ROOT_EXECUTOR_LOGGER.info("Writing output of job #%d to %s.", job_num, url)
@@ -239,7 +246,9 @@ def configure_exception_capture(test_logger):
     return [js_exception, py_exception]
 
 
-def new_test_logger(test_shortname, test_basename, command, parent, job_num, test_id, job_logger):
+def new_test_logger(
+    test_shortname, test_basename, command, parent, job_num, test_id, job_logger
+):
     """Create a new test logger that will be a child of the given parent."""
     name = "%s:%s" % (parent.name, test_shortname)
     logger = logging.Logger(name)
@@ -259,7 +268,8 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
                 buildlogger.set_log_output_incomplete()
                 raise errors.LoggerRuntimeConfigError(
                     "Encountered an error configuring buildlogger for test {}: Failed to get a new"
-                    " test_id".format(test_basename))
+                    " test_id".format(test_basename)
+                )
 
             url = BUILDLOGGER_SERVER.get_test_log_url(build_id, test_id)
             parsley_url = BUILDLOGGER_SERVER.get_parsley_log_url(build_id, test_id)
@@ -274,8 +284,11 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
 
 def new_test_thread_logger(parent, test_kind, thread_id, tenant_id=None):
     """Create a new test thread logger that will be the child of the given parent."""
-    name = "%s:%s:%s" % (test_kind, thread_id, tenant_id) if tenant_id else "%s:%s" % (test_kind,
-                                                                                       thread_id)
+    name = (
+        "%s:%s:%s" % (test_kind, thread_id, tenant_id)
+        if tenant_id
+        else "%s:%s" % (test_kind, thread_id)
+    )
     logger = logging.Logger(name)
     logger.parent = parent
     return logger
@@ -296,8 +309,9 @@ def _add_handler(logger, handler_info, formatter):
     """Add non-buildlogger handlers to a logger based on configuration."""
     handler_class = handler_info["class"]
     if handler_class == "logging.FileHandler":
-        handler = logging.FileHandler(filename=handler_info["filename"], mode=handler_info.get(
-            "mode", "w"))
+        handler = logging.FileHandler(
+            filename=handler_info["filename"], mode=handler_info.get("mode", "w")
+        )
     elif handler_class == "logging.NullHandler":
         handler = logging.NullHandler()
     elif handler_class == "logging.StreamHandler":
@@ -319,7 +333,9 @@ def _add_build_logger_handler(logger, job_num, test_id=None):
     handler_info = _get_buildlogger_handler_info(logger_info)
     if handler_info is not None:
         if test_id is not None:
-            handler = BUILDLOGGER_SERVER.get_test_handler(build_id, test_id, handler_info)
+            handler = BUILDLOGGER_SERVER.get_test_handler(
+                build_id, test_id, handler_info
+            )
         else:
             handler = BUILDLOGGER_SERVER.get_global_handler(build_id, handler_info)
         handler.setFormatter(_get_formatter(logger_info))
@@ -410,12 +426,17 @@ def _add_evergreen_handler(logger, job_num, test_id=None, test_name=None):
             break
 
     if evergreen_handler_info:
-        fp = f"{_get_evergreen_log_dirname()}/{get_evergreen_log_name(job_num, test_id)}"
+        fp = (
+            f"{_get_evergreen_log_dirname()}/{get_evergreen_log_name(job_num, test_id)}"
+        )
         os.makedirs(os.path.dirname(fp), exist_ok=True)
 
         handler = BufferedFileHandler(fp)
         handler.setFormatter(
-            formatters.EvergreenLogFormatter(fmt=logger_info.get("format", _DEFAULT_FORMAT)))
+            formatters.EvergreenLogFormatter(
+                fmt=logger_info.get("format", _DEFAULT_FORMAT)
+            )
+        )
         logger.addHandler(handler)
 
         if test_id:
@@ -426,7 +447,9 @@ def _add_evergreen_handler(logger, job_num, test_id=None, test_name=None):
                 execution=config.EVERGREEN_EXECUTION,
             )
             ROOT_EXECUTOR_LOGGER.info("Writing output of %s to %s.", test_id, fp)
-            ROOT_EXECUTOR_LOGGER.info("Raw logs for %s can be viewed at %s", test_name, raw_url)
+            ROOT_EXECUTOR_LOGGER.info(
+                "Raw logs for %s can be viewed at %s", test_name, raw_url
+            )
         else:
             parsley_url = PARSLEY_JOBS_LOGS_URL.format(
                 task_id=config.EVERGREEN_TASK_ID,
@@ -439,9 +462,12 @@ def _add_evergreen_handler(logger, job_num, test_id=None, test_name=None):
                 execution=config.EVERGREEN_EXECUTION,
             )
             ROOT_EXECUTOR_LOGGER.info("Writing output of job #%d to %s.", job_num, fp)
-            ROOT_EXECUTOR_LOGGER.info("Parsley logs for job #%s can be viewed at %s", job_num,
-                                      parsley_url)
-            ROOT_EXECUTOR_LOGGER.info("Raw logs for job #%s can be viewed at %s", job_num, raw_url)
+            ROOT_EXECUTOR_LOGGER.info(
+                "Parsley logs for job #%s can be viewed at %s", job_num, parsley_url
+            )
+            ROOT_EXECUTOR_LOGGER.info(
+                "Raw logs for job #%s can be viewed at %s", job_num, raw_url
+            )
 
 
 def _get_evergreen_log_dirname():

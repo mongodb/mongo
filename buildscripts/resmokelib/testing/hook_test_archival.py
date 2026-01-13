@@ -23,7 +23,7 @@ TRACER = trace.get_tracer("resmoke")
 class HookTestArchival(object):
     """Archive hooks and tests to S3."""
 
-    def __init__(self, suite: Suite, hooks, archive_instance, archive_config):  #pylint: disable=unused-argument
+    def __init__(self, suite: Suite, hooks, archive_instance, archive_config):  # pylint: disable=unused-argument
         """Initialize HookTestArchival."""
         self.archive_instance = archive_instance
         archive_config = utils.default_if_none(archive_config, {})
@@ -50,10 +50,10 @@ class HookTestArchival(object):
         self._lock = threading.Lock()
 
     def archive(
-            self,
-            logger: logging.Logger,
-            result: 'TestResult',
-            manager: 'FixtureTestCaseManager',
+        self,
+        logger: logging.Logger,
+        result: "TestResult",
+        manager: "FixtureTestCaseManager",
     ):
         """
         Archive data files for hooks or tests.
@@ -70,7 +70,9 @@ class HookTestArchival(object):
             return
 
         if result.hook and result.hook.REGISTERED_NAME in self.hooks:
-            test_name = "{}:{}".format(result.test.short_name(), result.hook.REGISTERED_NAME)
+            test_name = "{}:{}".format(
+                result.test.short_name(), result.hook.REGISTERED_NAME
+            )
             should_archive = True
         else:
             test_name = result.test.test_name
@@ -89,20 +91,24 @@ class HookTestArchival(object):
 
     @TRACER.start_as_current_span("hook_test_archival._archive_hook_or_test")
     def _archive_hook_or_test(
-            self,
-            logger: logging.Logger,
-            test_name: str,
-            test: TestCase,
-            manager: 'FixtureTestCaseManager',
+        self,
+        logger: logging.Logger,
+        test_name: str,
+        test: TestCase,
+        manager: "FixtureTestCaseManager",
     ):
         """Trigger archive of data files for a test or hook."""
 
         archive_hook_or_test_span = trace.get_current_span()
-        archive_hook_or_test_span.set_attributes(attributes=test.get_test_otel_attributes())
+        archive_hook_or_test_span.set_attributes(
+            attributes=test.get_test_otel_attributes()
+        )
 
         # We can still attempt archiving even if the teardown fails.
         if not manager.teardown_fixture(logger, abort=True):
-            logger.warning("Error while aborting test fixtures; data files may be invalid.")
+            logger.warning(
+                "Error while aborting test fixtures; data files may be invalid."
+            )
         with self._lock:
             # Test repeat number is how many times the particular test has been archived.
             if test_name not in self._tests_repeat:
@@ -110,30 +116,47 @@ class HookTestArchival(object):
             else:
                 self._tests_repeat[test_name] += 1
         # Normalize test path from a test or hook name.
-        test_path = \
-            test_name.replace("/", "_").replace("\\", "_").replace(".", "_").replace(":", "_")
-        file_name = "mongo-data-{}-{}-{}-{}.tgz".format(config.EVERGREEN_TASK_ID, test_path,
-                                                        config.EVERGREEN_EXECUTION,
-                                                        self._tests_repeat[test_name])
+        test_path = (
+            test_name.replace("/", "_")
+            .replace("\\", "_")
+            .replace(".", "_")
+            .replace(":", "_")
+        )
+        file_name = "mongo-data-{}-{}-{}-{}.tgz".format(
+            config.EVERGREEN_TASK_ID,
+            test_path,
+            config.EVERGREEN_EXECUTION,
+            self._tests_repeat[test_name],
+        )
         # Retrieve root directory for all dbPaths from fixture.
         input_files = test.fixture.get_path_for_archival()
         s3_bucket = config.ARCHIVE_BUCKET
-        s3_path = "{}/{}/{}/datafiles/{}".format(config.EVERGREEN_PROJECT_NAME,
-                                                 config.EVERGREEN_VARIANT_NAME,
-                                                 config.EVERGREEN_REVISION, file_name)
+        s3_path = "{}/{}/{}/datafiles/{}".format(
+            config.EVERGREEN_PROJECT_NAME,
+            config.EVERGREEN_VARIANT_NAME,
+            config.EVERGREEN_REVISION,
+            file_name,
+        )
         display_name = "Data files {} - Execution {} Repetition {}".format(
-            test_name, config.EVERGREEN_EXECUTION, self._tests_repeat[test_name])
+            test_name, config.EVERGREEN_EXECUTION, self._tests_repeat[test_name]
+        )
         logger.info("Archiving data files for test %s from %s", test_name, input_files)
-        status, message = self.archive_instance.archive_files_to_s3(display_name, input_files,
-                                                                    s3_bucket, s3_path)
+        status, message = self.archive_instance.archive_files_to_s3(
+            display_name, input_files, s3_bucket, s3_path
+        )
         if status:
             logger.warning("Archive failed for %s: %s", test_name, message)
         else:
             logger.info("Archive succeeded for %s: %s", test_name, message)
 
         if HANG_ANALYZER_CALLED.is_set():
-            logger.info("Hang Analyzer has been called. Fixtures will not be restarted.")
+            logger.info(
+                "Hang Analyzer has been called. Fixtures will not be restarted."
+            )
             raise errors.StopExecution(
-                "Hang analyzer has been called. Stopping further execution of tests.")
+                "Hang analyzer has been called. Stopping further execution of tests."
+            )
         elif not manager.setup_fixture(logger):
-            raise errors.StopExecution("Error while restarting test fixtures after archiving.")
+            raise errors.StopExecution(
+                "Error while restarting test fixtures after archiving."
+            )

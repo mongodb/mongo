@@ -20,4 +20,6 @@ class TestSuitesConfigurations(unittest.TestCase):
                 if err.filename in config.EXTERNAL_SUITE_SELECTORS:
                     continue
             except Exception as ex:
-                self.fail(f"While validating `{suite.get_name()}` suite got an error: {str(ex)}")
+                self.fail(
+                    f"While validating `{suite.get_name()}` suite got an error: {str(ex)}"
+                )

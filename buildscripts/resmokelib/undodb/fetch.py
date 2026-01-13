@@ -1,4 +1,5 @@
 """Subcommand for fetching UndoDB recordings from Evergreen."""
+
 import os
 import tarfile
 import tempfile
@@ -35,7 +36,9 @@ class Fetch(Subcommand):
         :return: None
         """
         if self._ticket:
-            raise NotImplementedError("Fetching recordings from JIRA tickets not yet implemented")
+            raise NotImplementedError(
+                "Fetching recordings from JIRA tickets not yet implemented"
+            )
 
         assert self._task_id
 
@@ -57,7 +60,9 @@ class Fetch(Subcommand):
         _cleanup(local_file)
 
 
-def _find_undodb_artifact_url(artifacts: List[evergreen.task.Artifact]) -> Optional[str]:
+def _find_undodb_artifact_url(
+    artifacts: List[evergreen.task.Artifact],
+) -> Optional[str]:
     for artifact in artifacts:
         if artifact.name.startswith("UndoDB Recordings - Execution "):
             return artifact.url

@@ -62,9 +62,13 @@ if __name__ == "__main__":
 
     if os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR"):
         undeclared_output_dir = os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
-        resmoke_args.append(f"--dbpathPrefix={os.path.join(undeclared_output_dir,'data')}")
+        resmoke_args.append(
+            f"--dbpathPrefix={os.path.join(undeclared_output_dir,'data')}"
+        )
         resmoke_args.append(f"--taskWorkDir={undeclared_output_dir}")
-        resmoke_args.append(f"--reportFile={os.path.join(undeclared_output_dir,'report.json')}")
+        resmoke_args.append(
+            f"--reportFile={os.path.join(undeclared_output_dir,'report.json')}"
+        )
 
     if os.environ.get("TEST_SRCDIR"):
         test_srcdir = os.environ.get("TEST_SRCDIR")

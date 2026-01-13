@@ -22,6 +22,8 @@ def compare_start_time(cur_time_secs):
         cur_timefile = utils.load_yaml_file(_START_TIME_FILE)
         start_time_secs = cur_timefile["start_time"]
     except (FileNotFoundError, KeyError) as erros:
-        raise FileNotFoundError("resmoke.py did not successfully record its start time") from erros
+        raise FileNotFoundError(
+            "resmoke.py did not successfully record its start time"
+        ) from erros
 
     return cur_time_secs - start_time_secs

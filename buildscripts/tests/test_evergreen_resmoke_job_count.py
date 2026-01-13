@@ -13,11 +13,15 @@ class DetermineJobsTest(unittest.TestCase):
     regex = "regexthatmatches"
     mytask_factor = 0.5
     regex_factor = 0.25
-    task_factors = [{"task": mytask, "factor": mytask_factor},
-                    {"task": "regex.*", "factor": regex_factor}]
+    task_factors = [
+        {"task": mytask, "factor": mytask_factor},
+        {"task": "regex.*", "factor": regex_factor},
+    ]
 
     def test_determine_jobs_no_matching_task(self):
-        jobs = under_test.determine_jobs("_no_match_", "_no_variant_", "_no_distro_", 0, 1)
+        jobs = under_test.determine_jobs(
+            "_no_match_", "_no_variant_", "_no_distro_", 0, 1
+        )
         self.assertEqual(self.cpu_count, jobs)
 
     def test_determine_jobs_matching_variant(self):
@@ -83,12 +87,18 @@ class DetermineJobsTest(unittest.TestCase):
         under_test.SYS_PLATFORM = "myplatform"
         mytask_factor_min = 0.5
         regex_factor_min = 0.25
-        task_factors1 = [{"task": "mytask", "factor": mytask_factor_min + .5},
-                         {"task": "regex.*", "factor": regex_factor_min + .5}]
-        task_factors2 = [{"task": "mytask", "factor": mytask_factor_min + .25},
-                         {"task": "regex.*", "factor": regex_factor_min + .25}]
-        task_factors3 = [{"task": "mytask", "factor": mytask_factor_min},
-                         {"task": "regex.*", "factor": regex_factor_min}]
+        task_factors1 = [
+            {"task": "mytask", "factor": mytask_factor_min + 0.5},
+            {"task": "regex.*", "factor": regex_factor_min + 0.5},
+        ]
+        task_factors2 = [
+            {"task": "mytask", "factor": mytask_factor_min + 0.25},
+            {"task": "regex.*", "factor": regex_factor_min + 0.25},
+        ]
+        task_factors3 = [
+            {"task": "mytask", "factor": mytask_factor_min},
+            {"task": "regex.*", "factor": regex_factor_min},
+        ]
         under_test.VARIANT_TASK_FACTOR_OVERRIDES = {"myvariant": task_factors1}
         under_test.MACHINE_TASK_FACTOR_OVERRIDES = {"mymachine": task_factors2}
         under_test.PLATFORM_TASK_FACTOR_OVERRIDES = {"myplatform": task_factors3}
@@ -99,15 +109,21 @@ class DetermineJobsTest(unittest.TestCase):
 
     def test_determine_jobs_factor(self):
         factor = 0.4
-        jobs = under_test.determine_jobs("_no_match_", "_no_variant_", "_no_distro_", 0, factor)
+        jobs = under_test.determine_jobs(
+            "_no_match_", "_no_variant_", "_no_distro_", 0, factor
+        )
         self.assertEqual(int(round(self.cpu_count * factor)), jobs)
 
     def test_determine_jobs_jobs_max(self):
         jobs_max = 3
-        jobs = under_test.determine_jobs("_no_match_", "_no_variant_", "_no_distro_", jobs_max, 1)
+        jobs = under_test.determine_jobs(
+            "_no_match_", "_no_variant_", "_no_distro_", jobs_max, 1
+        )
         self.assertEqual(min(jobs_max, jobs), jobs)
         jobs_max = 30
-        jobs = under_test.determine_jobs("_no_match_", "_no_variant_", "_no_distro_", jobs_max, 1)
+        jobs = under_test.determine_jobs(
+            "_no_match_", "_no_variant_", "_no_distro_", jobs_max, 1
+        )
         self.assertEqual(min(jobs_max, jobs), jobs)
 
     def test_determine_jobs_with_global_specification(self):
@@ -120,7 +136,9 @@ class DetermineJobsTest(unittest.TestCase):
         }
         variant = "a_build_variant"
         distro = "a_distro"
-        job_count_matching = under_test.determine_jobs(task, variant, distro, jobs_max=jobs_default)
+        job_count_matching = under_test.determine_jobs(
+            task, variant, distro, jobs_max=jobs_default
+        )
         self.assertEqual(jobs_default * target_factor, job_count_matching)
 
     def test_determine_jobs_without_global_specification(self):
@@ -134,5 +152,7 @@ class DetermineJobsTest(unittest.TestCase):
         variant = "a_build_variant"
         distro = "a_distro"
 
-        job_count_matching = under_test.determine_jobs(task, variant, distro, jobs_max=jobs_default)
+        job_count_matching = under_test.determine_jobs(
+            task, variant, distro, jobs_max=jobs_default
+        )
         self.assertEqual(jobs_default, job_count_matching)

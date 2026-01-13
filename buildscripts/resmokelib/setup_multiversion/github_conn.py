@@ -1,4 +1,5 @@
 """Helper functions to interact with github."""
+
 from github import Github, GithubException
 
 
@@ -30,4 +31,6 @@ def get_git_tag_and_commit(github_oauth_token, version):
             return None, git_commit.sha
 
     except GithubException as gh_exception:
-        raise GithubConnError(f"Commit hash for {version} not found. Error: {str(gh_exception)}")
+        raise GithubConnError(
+            f"Commit hash for {version} not found. Error: {str(gh_exception)}"
+        )

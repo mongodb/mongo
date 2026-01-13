@@ -16,7 +16,9 @@ class SetUpEC2Instance(PowercycleCommand):
         """:return: None."""
 
         default_retry_count = 2
-        retry_count = int(self.expansions.get("set_up_retry_count", default_retry_count))
+        retry_count = int(
+            self.expansions.get("set_up_retry_count", default_retry_count)
+        )
 
         # First operation -
         # Create remote_dir.
@@ -34,35 +36,49 @@ class SetUpEC2Instance(PowercycleCommand):
         cmds = f"{self.sudo} mkdir -p {remote_dir}; {self.sudo} chown -R {user_group} {remote_dir}; {set_permission_stmt} {remote_dir}; ls -ld {remote_dir}"
         cmds = f"{cmds}; {self.sudo} mkdir -p {db_path}; {self.sudo} chown -R {user_group} {db_path}; {set_permission_stmt} {db_path}; ls -ld {db_path}"
 
-        self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count)
+        self.remote_op.operation(
+            SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count
+        )
 
         # Second operation -
         # Copy buildscripts and mongoDB executables to the remote host.
-        files = ["etc", "buildscripts", "dist-test/bin", "poetry.lock", "pyproject.toml"]
+        files = [
+            "etc",
+            "buildscripts",
+            "dist-test/bin",
+            "poetry.lock",
+            "pyproject.toml",
+        ]
 
         shared_libs = "dist-test/lib"
         if os.path.isdir(shared_libs):
             files.append(shared_libs)
 
-        self.remote_op.operation(SSHOperation.COPY_TO, files, remote_dir, retry=True,
-                                 retry_count=retry_count)
+        self.remote_op.operation(
+            SSHOperation.COPY_TO, files, remote_dir, retry=True, retry_count=retry_count
+        )
 
         # Third operation -
         # Set up virtualenv on remote.
         venv = powercycle_constants.VIRTUALENV_DIR
-        python = "/opt/mongodbtoolchain/v4/bin/python3" if "python" not in self.expansions else self.expansions[
-            "python"]
+        python = (
+            "/opt/mongodbtoolchain/v4/bin/python3"
+            if "python" not in self.expansions
+            else self.expansions["python"]
+        )
 
         cmds = f"python_loc=$(which {python})"
         cmds = f"{cmds}; remote_dir={remote_dir}"
-        cmds = f"{cmds}; if [ \"Windows_NT\" = \"$OS\" ]; then python_loc=$(cygpath -w $python_loc); remote_dir=$(cygpath -w $remote_dir); fi"
+        cmds = f'{cmds}; if [ "Windows_NT" = "$OS" ]; then python_loc=$(cygpath -w $python_loc); remote_dir=$(cygpath -w $remote_dir); fi'
         cmds = f"{cmds}; $python_loc -m venv --system-site-packages {venv}"
         cmds = f"{cmds}; activate=$(find {venv} -name 'activate')"
         cmds = f"{cmds}; . $activate"
         cmds = f"{cmds}; python3 -m pip install 'poetry==2.0.0'"
         cmds = f"{cmds}; pushd $remote_dir && python3 -m poetry install --no-root --sync && popd"
 
-        self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count)
+        self.remote_op.operation(
+            SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count
+        )
 
         # Operation below that enables core dumps is commented out since it causes failures on Ubuntu 18.04.
         # It might be a race condition, so `nohup reboot` command is likely a culprit here.
@@ -113,7 +129,9 @@ class SetUpEC2Instance(PowercycleCommand):
         monitor_proc_file = powercycle_constants.MONITOR_PROC_FILE
         if self.is_windows():
             # Since curator runs as SYSTEM user, ensure the output files can be accessed.
-            cmds = f"{cmds}; touch {monitor_system_file}; chmod 777 {monitor_system_file}"
+            cmds = (
+                f"{cmds}; touch {monitor_system_file}; chmod 777 {monitor_system_file}"
+            )
             cmds = f"{cmds}; cygrunsrv --install curator_sys --path curator --chdir $HOME --args 'stat system --file {monitor_system_file}'"
             cmds = f"{cmds}; touch {monitor_proc_file}; chmod 777 {monitor_proc_file}"
             cmds = f"{cmds}; cygrunsrv --install curator_proc --path curator --chdir $HOME --args 'stat process-all --file {monitor_proc_file}'"
@@ -121,14 +139,16 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"{cmds}; cygrunsrv --start curator_proc"
         else:
             cmds = f"{cmds}; touch {monitor_system_file} {monitor_proc_file}"
-            cmds = f"{cmds}; cmd=\"@reboot cd $HOME && {self.sudo} ./curator stat system >> {monitor_system_file}\""
-            cmds = f"{cmds}; (crontab -l ; echo \"$cmd\") | crontab -"
-            cmds = f"{cmds}; cmd=\"@reboot cd $HOME && $sudo ./curator stat process-all >> {monitor_proc_file}\""
-            cmds = f"{cmds}; (crontab -l ; echo \"$cmd\") | crontab -"
+            cmds = f'{cmds}; cmd="@reboot cd $HOME && {self.sudo} ./curator stat system >> {monitor_system_file}"'
+            cmds = f'{cmds}; (crontab -l ; echo "$cmd") | crontab -'
+            cmds = f'{cmds}; cmd="@reboot cd $HOME && $sudo ./curator stat process-all >> {monitor_proc_file}"'
+            cmds = f'{cmds}; (crontab -l ; echo "$cmd") | crontab -'
             cmds = f"{cmds}; crontab -l"
             cmds = f"{cmds}; {{ {self.sudo} $HOME/curator stat system --file {monitor_system_file} > /dev/null 2>&1 & {self.sudo} $HOME/curator stat process-all --file {monitor_proc_file} > /dev/null 2>&1 & }} & disown"
 
-        self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count)
+        self.remote_op.operation(
+            SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count
+        )
 
         # Seventh operation -
         # Install NotMyFault, used to crash Windows.
@@ -140,4 +160,6 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"curl -s -o {windows_crash_zip} {windows_crash_dl}"
             cmds = f"{cmds}; unzip -q {windows_crash_zip} -d {windows_crash_dir}"
             cmds = f"{cmds}; chmod +x {windows_crash_dir}/*.exe"
-            self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count)
+            self.remote_op.operation(
+                SSHOperation.SHELL, cmds, retry=True, retry_count=retry_count
+            )

@@ -48,13 +48,17 @@ def get_replacements_to_apply(fixes_file) -> dict:
         fixes_data = json.load(fin)
         for clang_tidy_check in fixes_data:
             for main_source_file in fixes_data[clang_tidy_check]:
-                for violation_instance in fixes_data[clang_tidy_check][main_source_file]:
+                for violation_instance in fixes_data[clang_tidy_check][
+                    main_source_file
+                ]:
                     replacements = fixes_data[clang_tidy_check][main_source_file][
                         violation_instance
                     ]["replacements"]
                     if can_replacements_be_applied(replacements):
                         for replacement in replacements:
-                            replacements_to_apply[replacement["FilePath"]].append(replacement)
+                            replacements_to_apply[replacement["FilePath"]].append(
+                                replacement
+                            )
                     else:
                         print(
                             f"""WARNING: not applying replacements for {clang_tidy_check} in {main_source_file} at offset {violation_instance}, at least one file that is part of the automatic replacement has changed since clang-tidy was run, or is not writeable."""
@@ -88,7 +92,9 @@ def _combine_errors(dir: str) -> str:
             if "Notes" in fix:
                 fix_msg = fix["Notes"][0]
                 if len(fix["Notes"]) > 1:
-                    print(f'Warning: this script may be missing values in [{fix["Notes"]}]')
+                    print(
+                        f'Warning: this script may be missing values in [{fix["Notes"]}]'
+                    )
             else:
                 fix_msg = fix["DiagnosticMessage"]
             fix_data = (
@@ -105,7 +111,9 @@ def _combine_errors(dir: str) -> str:
                 .setdefault(
                     str(fix_msg.get("FileOffset", "FileOffset Not Found")),
                     {
-                        "replacements": fix_msg.get("Replacements", "Replacements not found"),
+                        "replacements": fix_msg.get(
+                            "Replacements", "Replacements not found"
+                        ),
                         "message": fix_msg.get("Message", "Message not found"),
                         "count": 0,
                         "source_files": [],
@@ -171,7 +179,9 @@ def main(argv=sys.argv[1:]):
             ] = replacement["ReplacementText"].encode()
 
             if replacement["Length"] != len(replacement["ReplacementText"]):
-                adjustments += len(replacement["ReplacementText"]) - replacement["Length"]
+                adjustments += (
+                    len(replacement["ReplacementText"]) - replacement["Length"]
+                )
 
         with open(file, "wb") as fout:
             fout.write(bytes(file_bytes))

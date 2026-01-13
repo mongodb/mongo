@@ -23,11 +23,13 @@ class RemoteOperationsTestCase(unittest.TestCase):
         self.temp_remote_dir = tempfile.mkdtemp()
         self.rop = rop.RemoteOperations(user_host="localhost")
         self.rop_use_shell = rop.RemoteOperations(user_host="localhost", use_shell=True)
-        self.rop_sh_shell_binary = rop.RemoteOperations(user_host="localhost",
-                                                        shell_binary="/bin/sh")
+        self.rop_sh_shell_binary = rop.RemoteOperations(
+            user_host="localhost", shell_binary="/bin/sh"
+        )
         self.rop_ssh_opts = rop.RemoteOperations(
             user_host="localhost",
-            ssh_connection_options="-v -o ConnectTimeout=10 -o ConnectionAttempts=10")
+            ssh_connection_options="-v -o ConnectTimeout=10 -o ConnectionAttempts=10",
+        )
 
     def tearDown(self):
         shutil.rmtree(self.temp_local_dir, ignore_errors=True)
@@ -37,7 +39,6 @@ class RemoteOperationsTestCase(unittest.TestCase):
 class RemoteOperationConnection(RemoteOperationsTestCase):
     @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def runTest(self):
-
         self.assertTrue(self.rop.access_established())
         ret, buff = self.rop.access_info()
         self.assertEqual(0, ret)
@@ -51,8 +52,9 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
 
         # Valid host with invalid ssh options
         ssh_connection_options = "-o invalid"
-        remote_op = rop.RemoteOperations(user_host="localhost",
-                                         ssh_connection_options=ssh_connection_options)
+        remote_op = rop.RemoteOperations(
+            user_host="localhost", ssh_connection_options=ssh_connection_options
+        )
         ret, buff = remote_op.access_info()
         self.assertFalse(remote_op.access_established())
         self.assertNotEqual(0, ret)
@@ -67,8 +69,9 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
 
         # Valid host with valid ssh options
         ssh_connection_options = "-v -o ConnectTimeout=10 -o ConnectionAttempts=10"
-        remote_op = rop.RemoteOperations(user_host="localhost",
-                                         ssh_connection_options=ssh_connection_options)
+        remote_op = rop.RemoteOperations(
+            user_host="localhost", ssh_connection_options=ssh_connection_options
+        )
         ret, buff = remote_op.access_info()
         self.assertTrue(remote_op.access_established())
         self.assertEqual(0, ret)
@@ -83,9 +86,11 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
 
         ssh_connection_options = "-v -o ConnectTimeout=10 -o ConnectionAttempts=10"
         ssh_options = "-t"
-        remote_op = rop.RemoteOperations(user_host="localhost",
-                                         ssh_connection_options=ssh_connection_options,
-                                         ssh_options=ssh_options)
+        remote_op = rop.RemoteOperations(
+            user_host="localhost",
+            ssh_connection_options=ssh_connection_options,
+            ssh_options=ssh_options,
+        )
         ret, buff = remote_op.access_info()
         self.assertTrue(remote_op.access_established())
         self.assertEqual(0, ret)
@@ -95,7 +100,6 @@ class RemoteOperationConnection(RemoteOperationsTestCase):
 class RemoteOperationShell(RemoteOperationsTestCase):
     @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def runTest(self):
-
         # Shell connect
         ret, buff = self.rop.shell("uname")
         self.assertEqual(0, ret)
@@ -145,32 +149,41 @@ class RemoteOperationShell(RemoteOperationsTestCase):
         self.assertIsNotNone(buff)
 
         # Multiple commands with escaped single quotes
-        ret, buff = self.rop.shell("echo \"hello \'dolly\'\"; pwd; echo \"goodbye \'charlie\'\"")
+        ret, buff = self.rop.shell(
+            "echo \"hello 'dolly'\"; pwd; echo \"goodbye 'charlie'\""
+        )
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 
         ret, buff = self.rop_use_shell.shell(
-            "echo \"hello \'dolly\'\"; pwd; echo \"goodbye \'charlie\'\"")
+            "echo \"hello 'dolly'\"; pwd; echo \"goodbye 'charlie'\""
+        )
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 
         # Command with escaped double quotes
-        ret, buff = self.rop.shell("echo \"hello there\" | grep \"hello\"")
+        ret, buff = self.rop.shell('echo "hello there" | grep "hello"')
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 
-        ret, buff = self.rop_use_shell.shell("echo \"hello there\" | grep \"hello\"")
+        ret, buff = self.rop_use_shell.shell('echo "hello there" | grep "hello"')
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 
         # Command with directory and pipe
-        ret, buff = self.rop.shell("touch {dir}/{file}; ls {dir} | grep {file}".format(
-            file=time.time(), dir="/tmp"))
+        ret, buff = self.rop.shell(
+            "touch {dir}/{file}; ls {dir} | grep {file}".format(
+                file=time.time(), dir="/tmp"
+            )
+        )
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 
-        ret, buff = self.rop_use_shell.shell("touch {dir}/{file}; ls {dir} | grep {file}".format(
-            file=time.time(), dir="/tmp"))
+        ret, buff = self.rop_use_shell.shell(
+            "touch {dir}/{file}; ls {dir} | grep {file}".format(
+                file=time.time(), dir="/tmp"
+            )
+        )
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
 
@@ -178,7 +191,6 @@ class RemoteOperationShell(RemoteOperationsTestCase):
 class RemoteOperationCopyTo(RemoteOperationsTestCase):
     @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def runTest(self):
-
         # Copy to remote
         l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
         l_temp_file = os.path.basename(l_temp_path)
@@ -205,7 +217,9 @@ class RemoteOperationCopyTo(RemoteOperationsTestCase):
 
         l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
         l_temp_file = os.path.basename(l_temp_path)
-        ret, buff = self.rop_ssh_opts.operation("copy_to", l_temp_path, self.temp_remote_dir)
+        ret, buff = self.rop_ssh_opts.operation(
+            "copy_to", l_temp_path, self.temp_remote_dir
+        )
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
         self.assertTrue(os.path.isfile(r_temp_path))
@@ -221,7 +235,9 @@ class RemoteOperationCopyTo(RemoteOperationsTestCase):
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
         for i in range(num_files):
-            r_temp_path = os.path.join(self.temp_remote_dir, os.path.basename(l_temp_files[i]))
+            r_temp_path = os.path.join(
+                self.temp_remote_dir, os.path.basename(l_temp_files[i])
+            )
             self.assertTrue(os.path.isfile(r_temp_path))
 
         num_files = 3
@@ -230,11 +246,15 @@ class RemoteOperationCopyTo(RemoteOperationsTestCase):
             l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir)[1]
             l_temp_file = os.path.basename(l_temp_path)
             l_temp_files.append(l_temp_path)
-        ret, buff = self.rop_use_shell.copy_to(" ".join(l_temp_files), self.temp_remote_dir)
+        ret, buff = self.rop_use_shell.copy_to(
+            " ".join(l_temp_files), self.temp_remote_dir
+        )
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
         for i in range(num_files):
-            r_temp_path = os.path.join(self.temp_remote_dir, os.path.basename(l_temp_files[i]))
+            r_temp_path = os.path.join(
+                self.temp_remote_dir, os.path.basename(l_temp_files[i])
+            )
             self.assertTrue(os.path.isfile(r_temp_path))
 
         # Copy to remote without directory
@@ -257,7 +277,9 @@ class RemoteOperationCopyTo(RemoteOperationsTestCase):
         os.remove(r_temp_path)
 
         # Copy to remote with space in file name, note it must be quoted.
-        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir, prefix="filename with space")[1]
+        l_temp_path = tempfile.mkstemp(
+            dir=self.temp_local_dir, prefix="filename with space"
+        )[1]
         l_temp_file = os.path.basename(l_temp_path)
         ret, buff = self.rop.copy_to("'{}'".format(l_temp_path))
         self.assertEqual(0, ret)
@@ -266,7 +288,9 @@ class RemoteOperationCopyTo(RemoteOperationsTestCase):
         self.assertTrue(os.path.isfile(r_temp_path))
         os.remove(r_temp_path)
 
-        l_temp_path = tempfile.mkstemp(dir=self.temp_local_dir, prefix="filename with space")[1]
+        l_temp_path = tempfile.mkstemp(
+            dir=self.temp_local_dir, prefix="filename with space"
+        )[1]
         l_temp_file = os.path.basename(l_temp_path)
         ret, buff = self.rop_use_shell.copy_to("'{}'".format(l_temp_path))
         self.assertEqual(0, ret)
@@ -298,7 +322,6 @@ class RemoteOperationCopyTo(RemoteOperationsTestCase):
 class RemoteOperationCopyFrom(RemoteOperationsTestCase):
     @unittest.skip("Known broken. SERVER-48969 tracks re-enabling.")
     def runTest(self):
-
         # Copy from remote
         r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
         r_temp_file = os.path.basename(r_temp_path)
@@ -342,7 +365,9 @@ class RemoteOperationCopyFrom(RemoteOperationsTestCase):
         os.remove(r_temp_file)
 
         # Copy from remote with space in file name, note it must be quoted.
-        r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir, prefix="filename with space")[1]
+        r_temp_path = tempfile.mkstemp(
+            dir=self.temp_remote_dir, prefix="filename with space"
+        )[1]
         r_temp_file = os.path.basename(r_temp_path)
         ret, buff = self.rop.copy_from("'{}'".format(r_temp_path))
         self.assertEqual(0, ret)
@@ -371,7 +396,9 @@ class RemoteOperationCopyFrom(RemoteOperationsTestCase):
             r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]
             r_temp_file = os.path.basename(r_temp_path)
             r_temp_files.append(r_temp_path)
-        ret, buff = self.rop_use_shell.copy_from(" ".join(r_temp_files), self.temp_local_dir)
+        ret, buff = self.rop_use_shell.copy_from(
+            " ".join(r_temp_files), self.temp_local_dir
+        )
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
         for i in range(num_files):
@@ -391,7 +418,9 @@ class RemoteOperationCopyFrom(RemoteOperationsTestCase):
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
         for i in range(num_files):
-            l_temp_path = os.path.join(self.temp_local_dir, os.path.basename(r_temp_files[i]))
+            l_temp_path = os.path.join(
+                self.temp_local_dir, os.path.basename(r_temp_files[i])
+            )
             self.assertTrue(os.path.isfile(l_temp_path))
 
         num_files = 3
@@ -405,11 +434,15 @@ class RemoteOperationCopyFrom(RemoteOperationsTestCase):
         self.assertEqual(0, ret)
         self.assertIsNotNone(buff)
         for i in range(num_files):
-            l_temp_path = os.path.join(self.temp_local_dir, os.path.basename(r_temp_files[i]))
+            l_temp_path = os.path.join(
+                self.temp_local_dir, os.path.basename(r_temp_files[i])
+            )
             self.assertTrue(os.path.isfile(l_temp_path))
 
         # Local directory does not exist.
-        self.assertRaises(ValueError, lambda: self.rop_use_shell.copy_from(r_temp_path, "bad_dir"))
+        self.assertRaises(
+            ValueError, lambda: self.rop_use_shell.copy_from(r_temp_path, "bad_dir")
+        )
 
         # Valid scp options
         r_temp_path = tempfile.mkstemp(dir=self.temp_remote_dir)[1]

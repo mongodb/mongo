@@ -10,13 +10,19 @@ from datetime import datetime
 
 def log_subprocess_run(*args, **kwargs):
     arg_list_or_string = kwargs["args"] if "args" in kwargs else args[0]
-    print(" ".join(arg_list_or_string) if type(arg_list_or_string) == list else arg_list_or_string)
+    print(
+        " ".join(arg_list_or_string)
+        if type(arg_list_or_string) == list
+        else arg_list_or_string
+    )
     return subprocess.run(*args, **kwargs)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--distro", type=str, help="Restrict to only update a single distro.")
+    parser.add_argument(
+        "--distro", type=str, help="Restrict to only update a single distro."
+    )
     parser.add_argument(
         "--skip-cleanup",
         action="store_true",
@@ -42,14 +48,18 @@ Your docker images, volumes and containers will be purged if you continue. Enter
         code = compile(f.read(), container_file_path, "exec")
         exec(code, {}, remote_execution_containers)
 
-    for distro, re_container in remote_execution_containers["REMOTE_EXECUTION_CONTAINERS"].items():
+    for distro, re_container in remote_execution_containers[
+        "REMOTE_EXECUTION_CONTAINERS"
+    ].items():
         if args.distro is not None:
             if distro != args.distro:
                 continue
 
         if not args.skip_cleanup:
             # Clean host system between container builds to avoid running into disk space issues.
-            print("Cleaning host system's docker images, containers, volumes, and networks...")
+            print(
+                "Cleaning host system's docker images, containers, volumes, and networks..."
+            )
             for command in [
                 "docker stop $(docker ps -a -q)",  # Stop all running containers
                 "docker rm $(docker ps -a -q)",  # Remove all containers
@@ -65,7 +75,9 @@ Your docker images, volumes and containers will be purged if you continue. Enter
         print(f"Using dockerfile: {dockerfile}")
         print(f"Using tag: {tag}\n")
 
-        log_subprocess_run(["docker", "buildx", "create", "--use", "default"], check=True)
+        log_subprocess_run(
+            ["docker", "buildx", "create", "--use", "default"], check=True
+        )
         log_subprocess_run(
             [
                 "docker",

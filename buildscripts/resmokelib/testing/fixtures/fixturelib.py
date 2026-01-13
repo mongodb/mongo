@@ -1,4 +1,5 @@
 """Facade wrapping the resmokelib dependencies used by fixtures."""
+
 from logging import Handler, Logger
 from typing import Dict
 
@@ -30,7 +31,9 @@ class FixtureLib:
 
     def new_fixture_node_logger(self, fixture_class, job_num, node_name):
         """Create a logger for a particular element in a multi-process fixture."""
-        return logging.loggers.new_fixture_node_logger(fixture_class, job_num, node_name)
+        return logging.loggers.new_fixture_node_logger(
+            fixture_class, job_num, node_name
+        )
 
     ############
     # Programs #
@@ -40,7 +43,9 @@ class FixtureLib:
         """Build fixtures by calling builder API."""
         return _builder.make_fixture(class_name, logger, job_num, *args, **kwargs)
 
-    def mongod_program(self, logger, job_num, executable, process_kwargs, mongod_options):
+    def mongod_program(
+        self, logger, job_num, executable, process_kwargs, mongod_options
+    ):
         """
         Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 
@@ -49,20 +54,25 @@ class FixtureLib:
         @param process_kwargs - A dict of key-value pairs to pass to the process.
         @param mongod_options - A HistoryDict describing the various options to pass to the mongod.
         """
-        return core.programs.mongod_program(logger, job_num, executable, process_kwargs,
-                                            mongod_options)
+        return core.programs.mongod_program(
+            logger, job_num, executable, process_kwargs, mongod_options
+        )
 
-    def mongos_program(self, logger, job_num, executable=None, process_kwargs=None,
-                       mongos_options=None):
+    def mongos_program(
+        self, logger, job_num, executable=None, process_kwargs=None, mongos_options=None
+    ):
         """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
-        return core.programs.mongos_program(logger, job_num, executable, process_kwargs,
-                                            mongos_options)
+        return core.programs.mongos_program(
+            logger, job_num, executable, process_kwargs, mongos_options
+        )
 
-    def mongot_program(self, logger, job_num, executable=None, process_kwargs=None,
-                       mongot_options=None):
+    def mongot_program(
+        self, logger, job_num, executable=None, process_kwargs=None, mongot_options=None
+    ):
         """Return a Process instance that starts a mongot with arguments constructed from 'kwargs'."""
-        return core.programs.mongot_program(logger, job_num, executable, process_kwargs,
-                                            mongot_options)
+        return core.programs.mongot_program(
+            logger, job_num, executable, process_kwargs, mongot_options
+        )
 
     def generic_program(self, logger, args, process_kwargs=None, **kwargs):
         """Return a Process instance that starts an arbitrary executable.
@@ -106,7 +116,9 @@ class FixtureLib:
         original_set_parameters = original.get(self.SET_PARAMETERS_KEY, {})
         override_set_parameters = override.get(self.SET_PARAMETERS_KEY, {})
 
-        merged_set_parameters = merge_dicts(original_set_parameters, override_set_parameters)
+        merged_set_parameters = merge_dicts(
+            original_set_parameters, override_set_parameters
+        )
         original.update(override)
         original[self.SET_PARAMETERS_KEY] = merged_set_parameters
 

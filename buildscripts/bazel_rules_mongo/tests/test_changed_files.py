@@ -19,8 +19,10 @@ def write_file(repo: Repo, file_name: str) -> None:
         file.write("change\n")
 
 
-@unittest.skipIf(sys.platform == "win32",
-                 reason="This test breaks on windows and only needs to work on linux")
+@unittest.skipIf(
+    sys.platform == "win32",
+    reason="This test breaks on windows and only needs to work on linux",
+)
 class TestChangedFiles(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -37,7 +39,8 @@ class TestChangedFiles(unittest.TestCase):
 
         # get tracked files that have been changed that are tracked by git
         diff_output = root_repo.git.execute(
-            ["git", "diff", "--name-only", "--diff-filter=d", commit])
+            ["git", "diff", "--name-only", "--diff-filter=d", commit]
+        )
         files_to_copy.update(diff_output.split("\n"))
 
         # gets all the untracked changes in the current repo
@@ -86,7 +89,9 @@ class TestChangedFiles(unittest.TestCase):
         # make a new file that has not been commited yet
         write_file(self.repo, new_file_name)
 
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", delete=False
+        ) as tmp:
             tmp.write("fake_expansion: true\n")
             self.expansions_file = tmp.name
 
@@ -98,12 +103,18 @@ class TestChangedFiles(unittest.TestCase):
     def test_local_unchanged_files(self):
         evergreen_git.get_remote_branch_ref = MagicMock(return_value=self.base_revision)
         new_files = evergreen_git.get_new_files()
-        self.assertEqual(new_files, [],
-                         msg="New files list was not empty when no new files were added to git.")
+        self.assertEqual(
+            new_files,
+            [],
+            msg="New files list was not empty when no new files were added to git.",
+        )
 
         changed_files = evergreen_git.get_changed_files()
-        self.assertEqual(changed_files, [changed_file_name],
-                         msg="Changed file list was not as expected.")
+        self.assertEqual(
+            changed_files,
+            [changed_file_name],
+            msg="Changed file list was not as expected.",
+        )
 
         self.repo.git.execute(["git", "add", "."])
 
@@ -131,10 +142,15 @@ class TestChangedFiles(unittest.TestCase):
             tmp.write(f"revision: {self.base_revision}\n")
         self.repo.git.execute(["git", "add", "."])
         new_files = evergreen_git.get_new_files(expansions_file=self.expansions_file)
-        self.assertEqual(new_files, [new_file_name],
-                         msg="New file list did not contain the new file.")
+        self.assertEqual(
+            new_files,
+            [new_file_name],
+            msg="New file list did not contain the new file.",
+        )
 
-        changed_files = evergreen_git.get_changed_files(expansions_file=self.expansions_file)
+        changed_files = evergreen_git.get_changed_files(
+            expansions_file=self.expansions_file
+        )
         self.assertEqual(
             changed_files,
             [changed_file_name, new_file_name],
@@ -146,10 +162,15 @@ class TestChangedFiles(unittest.TestCase):
         self.repo.git.execute(["git", "add", "."])
         self.repo.git.execute(["git", "commit", "-m", "Fake waterfall changes"])
         new_files = evergreen_git.get_new_files(expansions_file=self.expansions_file)
-        self.assertEqual(new_files, [new_file_name],
-                         msg="New file list did not contain the new file.")
+        self.assertEqual(
+            new_files,
+            [new_file_name],
+            msg="New file list did not contain the new file.",
+        )
 
-        changed_files = evergreen_git.get_changed_files(expansions_file=self.expansions_file)
+        changed_files = evergreen_git.get_changed_files(
+            expansions_file=self.expansions_file
+        )
         self.assertEqual(
             changed_files,
             [changed_file_name, new_file_name],

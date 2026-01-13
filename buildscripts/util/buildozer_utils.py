@@ -3,7 +3,9 @@ from typing import List
 
 
 def _bd_command(cmd: str, labels: List[str]):
-    print(f"buildozer '{cmd}' " + " ".join(labels), )
+    print(
+        f"buildozer '{cmd}' " + " ".join(labels),
+    )
     p = subprocess.run(
         f"buildozer '{cmd}' " + " ".join(labels),
         capture_output=True,
@@ -33,7 +35,9 @@ def bd_new(package: str, rule_kind: str, rule_name: str) -> None:
     _bd_command(f"new {rule_kind} {rule_name}", [package])
 
 
-def bd_comment(labels: List[str], comment: str, attr: str = "", value: str = "") -> None:
+def bd_comment(
+    labels: List[str], comment: str, attr: str = "", value: str = ""
+) -> None:
     _bd_command(f"comment {attr} {value} {comment}", labels)
 
 

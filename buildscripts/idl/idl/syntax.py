@@ -45,8 +45,9 @@ class IDLParsedSpec(object):
     def __init__(self, spec, error_collection):
         # type: (IDLSpec, errors.ParserErrorCollection) -> None
         """Must specify either an IDL document or errors, not both."""
-        assert (spec is None and error_collection is not None) or (spec is not None
-                                                                   and error_collection is None)
+        assert (spec is None and error_collection is not None) or (
+            spec is not None and error_collection is None
+        )
         self.spec = spec
         self.errors = error_collection
 
@@ -75,11 +76,11 @@ def parse_array_variant_types(name):
     if not name.startswith("array<variant<") and not name.endswith(">>"):
         return None
 
-    name = name[len("array<variant<"):]
+    name = name[len("array<variant<") :]
     name = name[:-2]
 
     variant_types = []
-    for variant_type in name.split(','):
+    for variant_type in name.split(","):
         variant_type = variant_type.strip()
         # Ban array<variant<..., array<...>, ...>> types.
         if variant_type.startswith("array<") and variant_type.endswith(">"):
@@ -95,7 +96,7 @@ def parse_array_type(name):
     if not name.startswith("array<") and not name.endswith(">"):
         return None
 
-    name = name[len("array<"):]
+    name = name[len("array<") :]
     name = name[:-1]
 
     # V1 restriction, ban nested array types to reduce scope.
@@ -114,7 +115,9 @@ def _zip_scalar(items, obj):
 def _item_and_type(dic):
     # type: (Dict[Any, List[Any]]) -> Iterator[Tuple[Any, Any]]
     """Return an Iterator of (key, value) pairs from a dictionary."""
-    return itertools.chain.from_iterable((_zip_scalar(value, key) for (key, value) in dic.items()))
+    return itertools.chain.from_iterable(
+        (_zip_scalar(value, key) for (key, value) in dic.items())
+    )
 
 
 class SymbolTable(object):
@@ -138,19 +141,27 @@ class SymbolTable(object):
     def _is_duplicate(self, ctxt, location, name, duplicate_class_name):
         # type: (errors.ParserContext, common.SourceLocation, str, str) -> bool
         """Return true if the given item already exist in the symbol table."""
-        for (item, entity_type) in _item_and_type({
+        for item, entity_type in _item_and_type(
+            {
                 "command": self.commands,
                 "enum": self.enums,
                 "struct": self.structs,
                 "type": self.types,
-        }):
+            }
+        ):
             if item.name == name:
-                ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name, entity_type)
+                ctxt.add_duplicate_symbol_error(
+                    location, name, duplicate_class_name, entity_type
+                )
                 return True
             if entity_type == "command":
-                if name in [item.command_name, item.command_alias if item.command_alias else '']:
-                    ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name,
-                                                    entity_type)
+                if name in [
+                    item.command_name,
+                    item.command_alias if item.command_alias else "",
+                ]:
+                    ctxt.add_duplicate_symbol_error(
+                        location, name, duplicate_class_name, entity_type
+                    )
                     return True
 
         return False
@@ -176,8 +187,9 @@ class SymbolTable(object):
     def add_command(self, ctxt, command):
         # type: (errors.ParserContext, Command) -> None
         """Add an IDL command to the symbol table and check for duplicates."""
-        if (not self._is_duplicate(ctxt, command, command.name, "command")
-                and not self._is_duplicate(ctxt, command, command.command_alias, "command")):
+        if not self._is_duplicate(
+            ctxt, command, command.name, "command"
+        ) and not self._is_duplicate(ctxt, command, command.command_alias, "command"):
             self.commands.append(command)
 
     def add_generic_argument_list(self, field_list):
@@ -251,16 +263,22 @@ class SymbolTable(object):
         """Find the type or struct a field refers to or log an error."""
 
         if isinstance(field_type, FieldTypeVariant):
-            variant = VariantType(field_type.file_name, field_type.line, field_type.column)
+            variant = VariantType(
+                field_type.file_name, field_type.line, field_type.column
+            )
             variant.bson_serialization_type = []
             for alternative in field_type.variant:
-                alternative_type = self.resolve_field_type(ctxt, location, field_name, alternative)
+                alternative_type = self.resolve_field_type(
+                    ctxt, location, field_name, alternative
+                )
                 if not alternative_type:
                     # There was an error.
                     return None
 
                 if isinstance(alternative_type, Enum):
-                    ctxt.add_variant_enum_error(location, field_name, alternative_type.name)
+                    ctxt.add_variant_enum_error(
+                        location, field_name, alternative_type.name
+                    )
                     return None
 
                 if isinstance(alternative_type, Struct):
@@ -269,7 +287,7 @@ class SymbolTable(object):
                         # cause parsing ambiguity.
                         first_element = alternative_type.fields[0].name
                         if first_element in [
-                                elem.fields[0].name for elem in variant.variant_struct_types
+                            elem.fields[0].name for elem in variant.variant_struct_types
                         ]:
                             ctxt.add_variant_structs_error(location, field_name)
                             continue
@@ -285,18 +303,22 @@ class SymbolTable(object):
                     bson_serialization_type = []
                     # If alternative_type is an array, element type could be Struct or Type.
                     if isinstance(base_type, Type):
-                        bson_serialization_type = cast(Type, base_type).bson_serialization_type
+                        bson_serialization_type = cast(
+                            Type, base_type
+                        ).bson_serialization_type
 
                 variant.bson_serialization_type.extend(bson_serialization_type)
 
             return variant
 
         if isinstance(field_type, FieldTypeArray):
-            element_type = self.resolve_field_type(ctxt, location, field_name,
-                                                   field_type.element_type)
+            element_type = self.resolve_field_type(
+                ctxt, location, field_name, field_type.element_type
+            )
             if not element_type:
-                ctxt.add_unknown_type_error(location, field_name,
-                                            field_type.element_type.debug_string())
+                ctxt.add_unknown_type_error(
+                    location, field_name, field_type.element_type.debug_string()
+                )
                 return None
 
             if isinstance(element_type, Enum):
@@ -307,7 +329,7 @@ class SymbolTable(object):
 
         assert isinstance(field_type, FieldTypeSingle)
         type_name = field_type.type_name
-        if type_name.startswith('array<'):
+        if type_name.startswith("array<"):
             # The caller should've already stripped "array<...>" from type_name, this may be an
             # illegal nested array like "array<array<...>>".
             ctxt.add_bad_array_type_name_error(location, field_name, type_name)
@@ -404,13 +426,14 @@ class ArrayType(Type):
     def __init__(self, element_type):
         # type: (Union[Struct, Type]) -> None
         """Construct an ArrayType."""
-        super(ArrayType, self).__init__(element_type.file_name, element_type.line,
-                                        element_type.column)
-        self.name = f'array<{element_type.name}>'
+        super(ArrayType, self).__init__(
+            element_type.file_name, element_type.line, element_type.column
+        )
+        self.name = f"array<{element_type.name}>"
         self.element_type = element_type
         if isinstance(element_type, Type):
             if element_type.cpp_type:
-                self.cpp_type = f'std::vector<{element_type.cpp_type}>'
+                self.cpp_type = f"std::vector<{element_type.cpp_type}>"
             else:
                 assert isinstance(element_type, VariantType)
                 # cpp_type can't be set here for array of variants as element_type.cpp_type is not set yet.
@@ -423,7 +446,7 @@ class VariantType(Type):
         # type: (str, int, int) -> None
         """Construct a VariantType."""
         super(VariantType, self).__init__(file_name, line, column)
-        self.name = 'variant'
+        self.name = "variant"
         self.variant_types = []  # type: List[Type]
         self.variant_struct_types = []  # type: List[Struct]
 
@@ -450,9 +473,14 @@ class Validator(common.SourceLocation):
         super(Validator, self).__init__(file_name, line, column)
 
     def __eq__(self, other):
-        return (isinstance(other, Validator) and self.gt == other.gt and self.lt == other.lt
-                and self.gte == other.gte and self.lte == other.lte
-                and self.callback == other.callback)
+        return (
+            isinstance(other, Validator)
+            and self.gt == other.gt
+            and self.lt == other.lt
+            and self.gte == other.gte
+            and self.lte == other.lte
+            and self.callback == other.callback
+        )
 
     def __ne__(self, other):
         return not self == other
@@ -601,7 +629,11 @@ class Privilege(common.SourceLocation):
         """
         location = super(Privilege, self).__str__()
         msg = "location: %s, resource_pattern: %s, action_type: %s, agg_stage: %s" % (
-            location, self.resource_pattern, self.action_type, self.agg_stage)
+            location,
+            self.resource_pattern,
+            self.action_type,
+            self.agg_stage,
+        )
         return msg  # type: ignore
 
 
@@ -626,7 +658,11 @@ class AccessCheck(common.SourceLocation):
         location: test.idl: (17, 4), check: get_single_user, privilege: (location: test.idl: (18, 6), resource_pattern: exact_namespace, action_type: ['find', 'insert', 'update', 'remove'], agg_stage: None
         """
         location = super(AccessCheck, self).__str__()
-        msg = "location: %s, check: %s, privilege: %s" % (location, self.check, self.privilege)
+        msg = "location: %s, check: %s, privilege: %s" % (
+            location,
+            self.check,
+            self.privilege,
+        )
         return msg  # type: ignore
 
 
@@ -708,8 +744,11 @@ class EnumValue(common.SourceLocation):
         super(EnumValue, self).__init__(file_name, line, column)
 
     def __eq__(self, other):
-        return (isinstance(other, EnumValue) and self.name == other.name
-                and self.value == other.value)
+        return (
+            isinstance(other, EnumValue)
+            and self.name == other.name
+            and self.value == other.value
+        )
 
     def __ne__(self, other):
         return not self == other
@@ -789,12 +828,13 @@ class FieldTypeArray(FieldType):
         """Construct a FieldTypeArray."""
         self.element_type = element_type  # type: Union[FieldTypeSingle, FieldTypeVariant]
 
-        super(FieldTypeArray, self).__init__(element_type.file_name, element_type.line,
-                                             element_type.column)
+        super(FieldTypeArray, self).__init__(
+            element_type.file_name, element_type.line, element_type.column
+        )
 
     def debug_string(self):
         """Display this field type in error messages."""
-        return f'array<{self.element_type.type_name}>'
+        return f"array<{self.element_type.type_name}>"
 
 
 class FieldTypeVariant(FieldType):
@@ -809,7 +849,7 @@ class FieldTypeVariant(FieldType):
 
     def debug_string(self):
         """Display this field type in error messages."""
-        return 'variant<%s>' % (', '.join(v.debug_string() for v in self.variant))
+        return "variant<%s>" % (", ".join(v.debug_string() for v in self.variant))
 
 
 class Expression(common.SourceLocation):
@@ -826,8 +866,12 @@ class Expression(common.SourceLocation):
         super(Expression, self).__init__(file_name, line, column)
 
     def __eq__(self, other):
-        return (isinstance(other, Expression) and self.literal == other.literal
-                and self.expr == other.expr and self.is_constexpr == other.is_constexpr)
+        return (
+            isinstance(other, Expression)
+            and self.literal == other.literal
+            and self.expr == other.expr
+            and self.is_constexpr == other.is_constexpr
+        )
 
     def __ne__(self, other):
         return not self == other

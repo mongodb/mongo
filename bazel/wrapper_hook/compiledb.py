@@ -45,7 +45,6 @@ def run_pty_command(cmd):
 
 
 def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
-
     # compiledb ignores command line args so just make a version rc file in anycase
     write_mongo_variables_bazelrc([])
     if persistent_compdb:
@@ -165,7 +164,8 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
         if external_link.exists():
             os.unlink(external_link)
         os.symlink(
-            pathlib.Path(os.readlink(REPO_ROOT / "bazel-out")).parent.parent.parent / "external",
+            pathlib.Path(os.readlink(REPO_ROOT / "bazel-out")).parent.parent.parent
+            / "external",
             external_link,
             target_is_directory=True,
         )
@@ -199,7 +199,9 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
                 os.chmod(config, 0o744)
                 with fileinput.FileInput(config, inplace=True) as file:
                     for line in file:
-                        print(line.replace("bazel-out/", f"{symlink_prefix}out/"), end="")
+                        print(
+                            line.replace("bazel-out/", f"{symlink_prefix}out/"), end=""
+                        )
             shutil.copyfile(configs[1], clang_tidy_file)
             with open(".mongo_checks_module_path", "w") as f:
                 f.write(
@@ -216,10 +218,14 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise):
             shutil.copyfile(pathlib.Path("bazel-bin") / ".clang-tidy", clang_tidy_file)
     if persistent_compdb:
         shutdown_proc = subprocess.run(
-            [bazel_bin, f"--output_base={output_base}", "shutdown"], capture_output=True, text=True
+            [bazel_bin, f"--output_base={output_base}", "shutdown"],
+            capture_output=True,
+            text=True,
         )
         if shutdown_proc.returncode != 0:
-            print(f"Failed to shutdown compiledb output_base: {shutdown_proc.returncode}")
+            print(
+                f"Failed to shutdown compiledb output_base: {shutdown_proc.returncode}"
+            )
             print("--- stdout ---:")
             print(shutdown_proc.stdout)
             print("--- stderr ---:")

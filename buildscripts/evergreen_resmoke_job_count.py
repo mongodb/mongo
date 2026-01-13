@@ -30,40 +30,54 @@ SYS_PLATFORM = sys.platform
 
 # Apply factor for a task based on the build variant it is running on.
 VARIANT_TASK_FACTOR_OVERRIDES = {
-    "enterprise-rhel-8-64-bit": [{"task": r"logical_session_cache_replication.*", "factor": 0.75}],
+    "enterprise-rhel-8-64-bit": [
+        {"task": r"logical_session_cache_replication.*", "factor": 0.75}
+    ],
     "enterprise-rhel-8-64-bit-inmem": [
         {"task": "secondary_reads_passthrough", "factor": 0.3},
         {"task": "multi_stmt_txn_jscore_passthrough_with_migration", "factor": 0.3},
     ],
-    "enterprise-rhel8-debug-tsan": [{
-        "task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125
-    }],
-    "rhel8-debug-aubsan-classic-engine": [{
-        "task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25
-    }],
-    "rhel8-debug-aubsan-all-feature-flags": [{
-        "task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25
-    }],
+    "enterprise-rhel8-debug-tsan": [
+        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.125}
+    ],
+    "rhel8-debug-aubsan-classic-engine": [
+        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
+    ],
+    "rhel8-debug-aubsan-all-feature-flags": [
+        {"task": r"shard.*uninitialized_fcv_jscore_passthrough.*", "factor": 0.25}
+    ],
     # TODO(SERVER-91466): figure out why noPassthrough tests are taking up more memory after switching
     # from Windows Server 2019 to Windows Server 2022
-    "enterprise-windows-all-feature-flags-required": [{"task": "noPassthrough", "factor": 0.5}],
+    "enterprise-windows-all-feature-flags-required": [
+        {"task": "noPassthrough", "factor": 0.5}
+    ],
     "enterprise-windows": [{"task": "noPassthrough", "factor": 0.5}],
     "windows-debug-suggested": [{"task": "noPassthrough", "factor": 0.5}],
     "windows": [{"task": "noPassthrough", "factor": 0.5}],
 }
 
-TASKS_FACTORS = [{"task": r"replica_sets.*", "factor": 0.5}, {"task": r"sharding.*", "factor": 0.5}]
+TASKS_FACTORS = [
+    {"task": r"replica_sets.*", "factor": 0.5},
+    {"task": r"sharding.*", "factor": 0.5},
+]
 
 DISTRO_MULTIPLIERS = {"rhel8.8-large": 1.618}
 
 # Apply factor for a task based on the machine type it is running on.
 MACHINE_TASK_FACTOR_OVERRIDES = {
-    "aarch64":
-        TASKS_FACTORS,
+    "aarch64": TASKS_FACTORS,
     "ppc64le": [
-        dict(task=r"causally_consistent_hedged_reads_jscore_passthrough.*", factor=0.125),
-        dict(task=r"causally_consistent_read_concern_snapshot_passthrough.*", factor=0.125),
-        dict(task=r"sharded_causally_consistent_read_concern_snapshot_passthrough.*", factor=0.125),
+        dict(
+            task=r"causally_consistent_hedged_reads_jscore_passthrough.*", factor=0.125
+        ),
+        dict(
+            task=r"causally_consistent_read_concern_snapshot_passthrough.*",
+            factor=0.125,
+        ),
+        dict(
+            task=r"sharded_causally_consistent_read_concern_snapshot_passthrough.*",
+            factor=0.125,
+        ),
     ],
 }
 
@@ -117,8 +131,12 @@ def determine_final_multiplier(distro):
 def determine_factor(task_name, variant, distro, factor):
     """Determine the job factor."""
     factors = [
-        get_task_factor(task_name, MACHINE_TASK_FACTOR_OVERRIDES, PLATFORM_MACHINE, factor),
-        get_task_factor(task_name, PLATFORM_TASK_FACTOR_OVERRIDES, SYS_PLATFORM, factor),
+        get_task_factor(
+            task_name, MACHINE_TASK_FACTOR_OVERRIDES, PLATFORM_MACHINE, factor
+        ),
+        get_task_factor(
+            task_name, PLATFORM_TASK_FACTOR_OVERRIDES, SYS_PLATFORM, factor
+        ),
         get_task_factor(task_name, VARIANT_TASK_FACTOR_OVERRIDES, variant, factor),
         global_task_factor(task_name, GLOBAL_TASK_FACTOR_OVERRIDES, factor),
     ]
@@ -153,34 +171,71 @@ def main():
     """Determine the resmoke jobs value a task should use in Evergreen."""
     parser = argparse.ArgumentParser(description=main.__doc__)
 
-    parser.add_argument("--taskName", dest="task", required=True, help="Task being executed.")
-    parser.add_argument("--buildVariant", dest="variant", required=True,
-                        help="Build variant task is being executed on.")
-    parser.add_argument("--distro", dest="distro", required=True,
-                        help="Distro task is being executed on.")
     parser.add_argument(
-        "--jobFactor", dest="jobs_factor", type=float, default=1.0,
-        help=("Job factor to use as a mulitplier with the number of CPUs. Defaults"
-              " to %(default)s."))
+        "--taskName", dest="task", required=True, help="Task being executed."
+    )
     parser.add_argument(
-        "--jobsMax", dest="jobs_max", type=int, default=0,
-        help=("Maximum number of jobs to use. Specify 0 to indicate the number of"
-              " jobs is determined by --jobFactor and the number of CPUs. Defaults"
-              " to %(default)s."))
+        "--buildVariant",
+        dest="variant",
+        required=True,
+        help="Build variant task is being executed on.",
+    )
     parser.add_argument(
-        "--outFile", dest="outfile", help=("File to write configuration to. If"
-                                           " unspecified no file is generated."))
+        "--distro",
+        dest="distro",
+        required=True,
+        help="Distro task is being executed on.",
+    )
+    parser.add_argument(
+        "--jobFactor",
+        dest="jobs_factor",
+        type=float,
+        default=1.0,
+        help=(
+            "Job factor to use as a mulitplier with the number of CPUs. Defaults"
+            " to %(default)s."
+        ),
+    )
+    parser.add_argument(
+        "--jobsMax",
+        dest="jobs_max",
+        type=int,
+        default=0,
+        help=(
+            "Maximum number of jobs to use. Specify 0 to indicate the number of"
+            " jobs is determined by --jobFactor and the number of CPUs. Defaults"
+            " to %(default)s."
+        ),
+    )
+    parser.add_argument(
+        "--outFile",
+        dest="outfile",
+        help=(
+            "File to write configuration to. If" " unspecified no file is generated."
+        ),
+    )
 
     options = parser.parse_args()
 
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
 
-    LOGGER.info("Finding job count", task=options.task, variant=options.variant,
-                platform=PLATFORM_MACHINE, sys=SYS_PLATFORM, cpu_count=CPU_COUNT)
+    LOGGER.info(
+        "Finding job count",
+        task=options.task,
+        variant=options.variant,
+        platform=PLATFORM_MACHINE,
+        sys=SYS_PLATFORM,
+        cpu_count=CPU_COUNT,
+    )
 
-    jobs = determine_jobs(options.task, options.variant, options.distro, options.jobs_max,
-                          options.jobs_factor)
+    jobs = determine_jobs(
+        options.task,
+        options.variant,
+        options.distro,
+        options.jobs_max,
+        options.jobs_factor,
+    )
     if jobs < CPU_COUNT:
         print("Reducing number of jobs to run from {} to {}".format(CPU_COUNT, jobs))
     output_jobs(jobs, options.outfile)

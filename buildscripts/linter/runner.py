@@ -21,30 +21,41 @@ def _check_version(linter, cmd_path, args):
     try:
         cmd = cmd_path + args
         logging.info(str(cmd))
-        process_handle = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process_handle = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         output, stderr = process_handle.communicate()
-        decoded_output = output.decode('utf-8')
+        decoded_output = output.decode("utf-8")
 
         if process_handle.returncode:
             logging.info(
                 "Version check failed for [%s], return code '%d'."
-                "Standard Output:\n%s\nStandard Error:\n%s", cmd, process_handle.returncode,
-                decoded_output, stderr)
+                "Standard Output:\n%s\nStandard Error:\n%s",
+                cmd,
+                process_handle.returncode,
+                decoded_output,
+                stderr,
+            )
 
         pattern = r"\b(?:(%s) )?(?P<version>\S+)\b" % (linter.cmd_name)
         required_version = pkg_resources.parse_version(linter.required_version)
 
         match = re.search(pattern, decoded_output)
         if match:
-            found_version = match.group('version')
+            found_version = match.group("version")
         else:
-            found_version = '0.0'
+            found_version = "0.0"
 
         if pkg_resources.parse_version(found_version) < required_version:
             logging.info(
                 "Linter %s has wrong version for '%s'. Expected >= '%s',"
-                "Standard Output:\n'%s'\nStandard Error:\n%s", linter.cmd_name, cmd,
-                required_version, decoded_output, stderr)
+                "Standard Output:\n'%s'\nStandard Error:\n%s",
+                linter.cmd_name,
+                cmd,
+                required_version,
+                decoded_output,
+                stderr,
+            )
             return False
 
     except OSError as os_error:
@@ -89,8 +100,8 @@ def _find_linter(linter, config_dict):
         cmd = [cmd_str]
     else:
         # On Mac and with Homebrew, check for the binaries in /usr/local instead of sys.executable.
-        if sys.platform == 'darwin' and python_dir.startswith('/usr/local/opt'):
-            python_dir = '/usr/local/bin'
+        if sys.platform == "darwin" and python_dir.startswith("/usr/local/opt"):
+            python_dir = "/usr/local/bin"
 
         # On Linux, these scripts are installed in %PYTHONDIR%\bin like
         # '/opt/mongodbtoolchain/v4/bin', but they may point to the wrong interpreter.
@@ -101,8 +112,10 @@ def _find_linter(linter, config_dict):
     if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
         return base.LinterInstance(linter, cmd)
 
-    logging.info("First version check failed for linter '%s', trying a different location.",
-                 linter.cmd_name)
+    logging.info(
+        "First version check failed for linter '%s', trying a different location.",
+        linter.cmd_name,
+    )
 
     # Check 2: Check USERBASE
     cmd = [os.path.join(site.getuserbase(), "bin", linter.cmd_name)]
@@ -116,7 +129,10 @@ def _find_linter(linter, config_dict):
 
     # Check 4: When a virtualenv is setup the linter modules are not installed, so we need
     # to use the linters installed in '/opt/mongodbtoolchain/v4/bin'.
-    cmd = [sys.executable, os.path.join('/opt/mongodbtoolchain/v4/bin', linter.cmd_name)]
+    cmd = [
+        sys.executable,
+        os.path.join("/opt/mongodbtoolchain/v4/bin", linter.cmd_name),
+    ]
     if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
         return base.LinterInstance(linter, cmd)
 
@@ -141,7 +157,10 @@ To fix, install the needed python modules for Python 3.x:
 
 These commands are typically available via packages with names like python-pip,
 or python3-pip. See your OS documentation for help.
-""", linter.cmd_name, linter.required_version)
+""",
+                linter.cmd_name,
+                linter.required_version,
+            )
             return None
 
         linter_instances.append(linter_instance)
@@ -167,8 +186,13 @@ class LintRunner(object):
         with self.print_lock:
             print(line)
 
-    def run_lint(self, linter: base.LinterInstance, file_name: str, mongo_path: str,
-                 fix_command: str) -> bool:
+    def run_lint(
+        self,
+        linter: base.LinterInstance,
+        file_name: str,
+        mongo_path: str,
+        fix_command: str,
+    ) -> bool:
         """Run the specified linter for the file."""
 
         linter_args = linter.linter.get_lint_cmd_args(file_name)
@@ -182,17 +206,17 @@ class LintRunner(object):
 
         cmd = linter.cmd_path + linter_args
 
-        logging.debug(' '.join(cmd))
+        logging.debug(" ".join(cmd))
 
         no_lint_errors = True
 
         try:
             if linter.linter.needs_file_diff():
                 # Need a file diff
-                with open(file_name, 'rb') as original_text:
-                    original_file = original_text.read().decode('utf-8')
+                with open(file_name, "rb") as original_text:
+                    original_file = original_text.read().decode("utf-8")
 
-                formatted_file = subprocess.check_output(cmd).decode('utf-8')
+                formatted_file = subprocess.check_output(cmd).decode("utf-8")
                 if original_file != formatted_file:
                     original_lines = original_file.splitlines()
                     formatted_lines = formatted_file.splitlines()
@@ -212,14 +236,18 @@ class LintRunner(object):
                             count += 1
 
                         if count == 0:
-                            print("ERROR: The files only differ in trailing whitespace? LF vs CRLF")
+                            print(
+                                "ERROR: The files only differ in trailing whitespace? LF vs CRLF"
+                            )
 
                     no_lint_errors = False
             else:
-                subprocess.check_output(cmd).decode('utf-8')
+                subprocess.check_output(cmd).decode("utf-8")
 
         except subprocess.CalledProcessError as cpe:
-            self._safe_print("CMD [%s] failed:\n%s" % (' '.join(cmd), cpe.output.decode('utf-8')))
+            self._safe_print(
+                "CMD [%s] failed:\n%s" % (" ".join(cmd), cpe.output.decode("utf-8"))
+            )
             no_lint_errors = False
 
         return no_lint_errors
@@ -231,9 +259,9 @@ class LintRunner(object):
         logging.debug(str(cmd))
 
         try:
-            subprocess.check_output(cmd).decode('utf-8')
+            subprocess.check_output(cmd).decode("utf-8")
         except subprocess.CalledProcessError as cpe:
-            self._safe_print("CMD [%s] failed:\n%s" % (' '.join(cmd), cpe.output))
+            self._safe_print("CMD [%s] failed:\n%s" % (" ".join(cmd), cpe.output))
             return False
 
         return True

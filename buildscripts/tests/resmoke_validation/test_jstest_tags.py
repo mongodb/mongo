@@ -36,8 +36,8 @@ class JstestTagRule:
 class FeatureFlagIncompatibleTagRule(JstestTagRule):
     def __init__(self):
         super().__init__(
-            failure_message=
-            "The following tags are not allowed for feature flags that default to true")
+            failure_message="The following tags are not allowed for feature flags that default to true"
+        )
         self.disallowed_tags = {
             f"{flag}_incompatible"
             for flag in get_all_feature_flags_turned_on_by_default()
@@ -50,8 +50,12 @@ class FeatureFlagIncompatibleTagRule(JstestTagRule):
 class RequiresFcvTagRule(JstestTagRule):
     def __init__(self):
         super().__init__(
-            failure_message="The following tags reference FCV version that is not available")
-        self.allowed_tags = [*REQUIRES_FCV_TAGS_LESS_THAN_LATEST, REQUIRES_FCV_TAG_LATEST]
+            failure_message="The following tags reference FCV version that is not available"
+        )
+        self.allowed_tags = [
+            *REQUIRES_FCV_TAGS_LESS_THAN_LATEST,
+            REQUIRES_FCV_TAG_LATEST,
+        ]
 
     def _tag_failed(self, file: str, tag: str) -> bool:
         return tag.startswith("requires_fcv_") and tag not in self.allowed_tags

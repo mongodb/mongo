@@ -67,7 +67,9 @@ def get_half_cpu_mask():
 
 def count_running_clang_tidy(cmd_path):
     try:
-        output = subprocess.check_output(["ps", "-axww", "-o", "pid=,command="], text=True)
+        output = subprocess.check_output(
+            ["ps", "-axww", "-o", "pid=,command="], text=True
+        )
         return sum(1 for line in output.splitlines() if cmd_path in line)
     except Exception as e:
         print(f"WARNING: failed to check running clang-tidy processes: {e}")
@@ -110,7 +112,9 @@ def main():
             if (
                 (arg.endswith(".cpp") or arg.endswith(".h"))
                 and rel.startswith("src/mongo")
-                and not rel.startswith("src/mongo/db/modules/enterprise/src/streams/third_party")
+                and not rel.startswith(
+                    "src/mongo/db/modules/enterprise/src/streams/third_party"
+                )
             ):
                 files_to_check.append(rel)
         else:
@@ -125,7 +129,9 @@ def main():
         )
 
     if not os.path.exists("compile_commands.json"):
-        print("ERROR: failed to find compile_commands.json, run 'bazel build compiledb'")
+        print(
+            "ERROR: failed to find compile_commands.json, run 'bazel build compiledb'"
+        )
         sys.exit(1)
 
     with open("compile_commands.json") as f:
@@ -168,7 +174,9 @@ def main():
 
     # probably a header, skip caching and let clang-tidy do its thing:
     else:
-        proc = subprocess.run(clang_tidy_cmd + files_to_check + other_args, capture_output=True)
+        proc = subprocess.run(
+            clang_tidy_cmd + files_to_check + other_args, capture_output=True
+        )
 
     sys.stdout.buffer.write(proc.stdout)
     sys.stderr.buffer.write(proc.stderr)

@@ -39,17 +39,23 @@ def main():
     operating_system = determine_platform()
     architechture = determine_architecture()
     if operating_system == "windows" and architechture == "arm64":
-        raise RuntimeError("There are no published arm windows releases for buildifier.")
+        raise RuntimeError(
+            "There are no published arm windows releases for buildifier."
+        )
 
     parser = argparse.ArgumentParser(
-        prog='DownloadBuildifier',
-        description='This downloads buildifier, it is intended for use in evergreen.'
-        'This is our temperary solution to get bazel linting while we determine a '
-        'long-term solution for getting buildifier on evergreen/development hosts.')
+        prog="DownloadBuildifier",
+        description="This downloads buildifier, it is intended for use in evergreen."
+        "This is our temperary solution to get bazel linting while we determine a "
+        "long-term solution for getting buildifier on evergreen/development hosts.",
+    )
 
-    parser.add_argument("--download-location", "-f",
-                        help="Name of directory to download the buildifier binary to.",
-                        default="./")
+    parser.add_argument(
+        "--download-location",
+        "-f",
+        help="Name of directory to download the buildifier binary to.",
+        default="./",
+    )
 
     args = parser.parse_args()
 

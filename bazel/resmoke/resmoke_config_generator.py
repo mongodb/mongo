@@ -18,7 +18,12 @@ def main(
     with open(base_config, "rt") as fh:
         base_config_content = yaml.safe_load(fh)
         if "selector" in base_config_content:
-            for x in ["roots", "exclude_files", "exclude_with_any_tags", "include_with_any_tags"]:
+            for x in [
+                "roots",
+                "exclude_files",
+                "exclude_with_any_tags",
+                "include_with_any_tags",
+            ]:
                 base_config_content["selector"].pop(x, None)
 
     content = base_config_content

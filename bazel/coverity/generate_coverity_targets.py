@@ -17,11 +17,15 @@ bazel_cache = os.path.expanduser(args.bazel_cache)
 # the cc_library and cc_binaries in our build. There is not a good way from
 # within the build to get all those targets, so we will generate the list via query
 # https://sig-product-docs.synopsys.com/bundle/coverity-docs/page/coverity-analysis/topics/building_with_bazel.html#build_with_bazel
-cmd = [
+cmd = (
+    [
         bazel_executable,
         bazel_cache,
         "aquery",
-    ] + bazel_cmd_args + [args.bazel_query]
+    ]
+    + bazel_cmd_args
+    + [args.bazel_query]
+)
 print(f"Running command: {cmd}")
 proc = subprocess.run(
     cmd,
@@ -33,9 +37,7 @@ proc = subprocess.run(
 print(proc.stderr)
 
 targets = set()
-with open('coverity_targets.list', 'w') as f: 
+with open("coverity_targets.list", "w") as f:
     for line in proc.stdout.splitlines():
         if line.startswith("  Target: "):
             f.write(line.split()[-1] + "\n")
-
-

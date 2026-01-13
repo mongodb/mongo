@@ -13,7 +13,9 @@ import textwrap
 from typing import Dict
 
 
-def write_config_header(input_path: str, output_path: str, definitions: Dict[str, str]) -> None:
+def write_config_header(
+    input_path: str, output_path: str, definitions: Dict[str, str]
+) -> None:
     with open(input_path) as in_file:
         content = in_file.read()
 
@@ -27,18 +29,28 @@ def write_config_header(input_path: str, output_path: str, definitions: Dict[str
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a config header file")
-    parser.add_argument("--compiler-path", help="Path to the compiler executable", required=True)
-    parser.add_argument("--compiler-args", help="Extra compiler arguments", required=True)
+    parser.add_argument(
+        "--compiler-path", help="Path to the compiler executable", required=True
+    )
+    parser.add_argument(
+        "--compiler-args", help="Extra compiler arguments", required=True
+    )
     parser.add_argument("--env-vars", help="Extra environment variables", required=True)
     parser.add_argument(
         "--output-path", help="Path to the output config header file", required=True
     )
     parser.add_argument(
-        "--template-path", help="Path to the config header's template file", required=True
+        "--template-path",
+        help="Path to the config header's template file",
+        required=True,
     )
     parser.add_argument("--extra-definitions", help="Extra header definitions")
-    parser.add_argument("--check-path", help="Path to the suppored configure checks", required=True)
-    parser.add_argument("--log-path", help="Path to the suppored configure checks", required=True)
+    parser.add_argument(
+        "--check-path", help="Path to the suppored configure checks", required=True
+    )
+    parser.add_argument(
+        "--log-path", help="Path to the suppored configure checks", required=True
+    )
     parser.add_argument("--additional-input", help="extra files", action="append")
 
     args = parser.parse_args()
@@ -72,7 +84,11 @@ if __name__ == "__main__":
                     %s
             
             """
-                % (generate_config_module, called_args, list(generate_config_header_args.keys()))
+                % (
+                    generate_config_module,
+                    called_args,
+                    list(generate_config_header_args.keys()),
+                )
             )
         )
 
