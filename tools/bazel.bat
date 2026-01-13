@@ -104,9 +104,9 @@ if exist "%REPO_ROOT%\bazel-%cur_dir%" (
 if not defined python (
     (
         echo python prereq missing, using bazel to install python...
-        "%BAZEL_REAL%" build --bes_backend= --bes_results_url= --workspace_status_command= @py_windows_x86_64//:all
+        "%BAZEL_REAL%" build --bes_backend= --bes_results_url= --workspace_status_command= @py_host//:all
         if !ERRORLEVEL! NEQ 0 (
-            "%BAZEL_REAL%" build --config=local --workspace_status_command= @py_windows_x86_64//:all
+            "%BAZEL_REAL%" build --config=local --workspace_status_command= @py_host//:all
             if !ERRORLEVEL! NEQ 0 (
                 if "%CI%"=="" if "%MONGO_BAZEL_WRAPPER_FALLBACK%"=="" (
                     call :cleanup_logfile
@@ -226,7 +226,7 @@ dir %REPO_ROOT% | C:\Windows\System32\find.exe "bazel-%cur_dir%" > %REPO_ROOT%\t
 for /f "tokens=2 delims=[" %%i in (%REPO_ROOT%\tmp_bazel_symlink_dir.txt) do set bazel_real_dir=%%i
 del %REPO_ROOT%\tmp_bazel_symlink_dir.txt
 set bazel_real_dir=!bazel_real_dir:~0,-1!
-set "python=!bazel_real_dir!\..\..\external\_main~setup_mongo_python_toolchains~py_windows_x86_64\dist\python.exe"
+set "python=!bazel_real_dir!\..\..\external\_main~setup_mongo_python_toolchains~py_host\dist\python.exe"
 exit /b 0  
 
 :cleanup_logfile

@@ -206,19 +206,19 @@ fi
 cur_dir=$(basename $REPO_ROOT)
 python=""
 if [ -d $REPO_ROOT/bazel-$cur_dir ]; then
-  python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
+  python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
 else
   if [ -d $REPO_ROOT/.compiledb/compiledb-$cur_dir ]; then
-    python="$(readlink "$REPO_ROOT/.compiledb/compiledb-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
+    python="$(readlink "$REPO_ROOT/.compiledb/compiledb-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
   fi
 fi
 
 # if no python use bazel to install one
 if [[ "$python" = "" ]] || [ ! -f $python ]; then
   >&2 echo "python prereq missing, using bazel to install python..."
-  >&2 $bazel_real build --bes_backend= --bes_results_url= --workspace_status_command= @py_${os}_${ARCH}//:all
+  >&2 $bazel_real build --bes_backend= --bes_results_url= --workspace_status_command= @py_host//:all 
   if [[ $? != 0 ]]; then
-    >&2 $bazel_real build --config=local --workspace_status_command= @py_${os}_${ARCH}//:all
+    >&2 $bazel_real build --config=local --workspace_status_command= @py_host//:all 
     if [[ $? != 0 ]]; then
       if [[ ! -z "$CI" ]] || [[ $MONGO_BAZEL_WRAPPER_FALLBACK == 1 ]]; then
         >&2 echo "wrapper script failed to install python! falling back to normal bazel call..."
@@ -233,7 +233,7 @@ fi
 
 # update python location if it was missing and we had to install it
 if [[ "$python" = "" ]] || [ ! -f $python ]; then
-  python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_${os}_${ARCH}/dist/bin/python3"
+  python="$(readlink "$REPO_ROOT/bazel-$cur_dir")/../../external/_main~setup_mongo_python_toolchains~py_host/dist/bin/python3"
 fi
 
 autocomplete_query=0

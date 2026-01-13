@@ -27,7 +27,7 @@ URLS_MAP = {
     "windows_amd64": {
         "sha": "3933545e6d41462dd6a47e44133ea40995bc6efeed8c2e4cbdf1a699303e95ea",
         "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
-        "interpreter_path": "dist/python3.exe",
+        "interpreter_path": "dist/python.exe",
     },
     "macos_aarch64": {
         "sha": "916c35125b5d8323a21526d7a9154ca626453f63d0878e95b9f613a95006c990",
