@@ -40,7 +40,7 @@ namespace mongo {
  * Represents a robustness level of the change stream reader with regards to required but removed
  * from the system data shards.
  */
-enum class ChangeStreamReadMode {
+enum class MONGO_MOD_PUBLIC ChangeStreamReadMode {
     // A removed shard causes the change stream reading process to fail.
     kStrict,
 

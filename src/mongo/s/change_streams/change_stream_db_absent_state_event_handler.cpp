@@ -31,6 +31,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/pipeline/change_stream.h"
+#include "mongo/s/change_streams/shard_targeter_helper.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
@@ -57,9 +58,10 @@ ShardTargeterDecision ChangeStreamShardTargeterDbAbsentStateEventHandler::handle
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return ShardTargeterDecision::kSwitchToV1;
     }
-    tassert(10915200,
-            "HistoricalPlacementStatus can not be in the future",
-            placement.getStatus() != HistoricalPlacementStatus::FutureClusterTime);
+
+    // Validate status and other fields of historical placement result.
+    change_streams::assertHistoricalPlacementStatusOK(placement);
+    change_streams::assertHistoricalPlacementHasNoSegment(placement);
 
     const auto& shards = placement.getShards();
     tassert(10915201,
@@ -69,7 +71,8 @@ ShardTargeterDecision ChangeStreamShardTargeterDbAbsentStateEventHandler::handle
 
     // Close the cursor on the configsvr and open the cursor(s) on the data shards.
     readerCtx.closeCursorOnConfigServer();
-    stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
+    stdx::unordered_set<ShardId> shardSet(std::make_move_iterator(shards.begin()),
+                                          std::make_move_iterator(shards.end()));
     readerCtx.openCursorsOnDataShards(clusterTime + 1, shardSet);
 
     // Since the database is now present, change the state event handler.
@@ -83,10 +86,7 @@ ShardTargeterDecision ChangeStreamShardTargeterDbAbsentStateEventHandler::handle
     const ControlEvent& event,
     ChangeStreamShardTargeterStateEventHandlingContext& ctx,
     ChangeStreamReaderContext& readerCtx) {
-    tasserted(ErrorCodes::IllegalOperation,
-              str::stream() << "change stream over collection "
-                            << readerCtx.getChangeStream().getNamespace()->toStringForErrorMsg()
-                            << " can not be in degraded mode when database is absent");
+    tasserted(10922908, "Cannot call 'handleEventInDegradedMode()' with DbAbsentStateEventHandler");
 }
 
 }  // namespace mongo

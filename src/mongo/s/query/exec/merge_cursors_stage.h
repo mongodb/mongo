@@ -73,21 +73,23 @@ public:
 
     /**
      * Enables buffering of the last returned result in the underlying results merger. This is used
-     * by v2 change stream readers.
+     * by v2 change stream readers in ignoreRemovedShards mode.
      */
     void enableUndoNextMode();
 
     /**
      * Disables buffering of the last returned result in the underlying results merger. This is used
-     * by v2 change stream readers.
+     * by v2 change stream readers in ignoreRemovedShards mode.
      */
     void disableUndoNextMode();
 
     /**
      * Undoes the effect of fetching the last returned result via 'next()' from the underlying
-     * results merger. This is used by v2 change stream readers.
+     * results merger. Uses the 'highWaterMark' parameter to restore the results merger's high
+     * watermark only when the last returned result was an EOF.
+     * This method is used by v2 change stream readers in ignoreRemovedShards mode.
      */
-    void undoNext();
+    void undoNext(BSONObj highWaterMark);
 
     /**
      * Adds the specified, already opened cursors for remote shards or the config server.

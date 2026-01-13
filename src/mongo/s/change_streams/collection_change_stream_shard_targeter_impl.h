@@ -50,16 +50,16 @@ public:
 
     ShardTargeterDecision initialize(OperationContext* opCtx,
                                      Timestamp atClusterTime,
-                                     ChangeStreamReaderContext& context) override;
+                                     ChangeStreamReaderContext& readerContext) override;
 
     std::pair<ShardTargeterDecision, boost::optional<Timestamp>> startChangeStreamSegment(
         OperationContext* opCtx,
         Timestamp atClusterTime,
-        ChangeStreamReaderContext& context) override;
+        ChangeStreamReaderContext& readerContext) override;
 
     ShardTargeterDecision handleEvent(OperationContext* opCtx,
                                       const Document& event,
-                                      ChangeStreamReaderContext& context) override;
+                                      ChangeStreamReaderContext& readerContext) override;
 
     HistoricalPlacementFetcher& getHistoricalPlacementFetcher() const override;
 

@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/agg/change_stream_handle_topology_change_v2_stage.h"
-#include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -76,10 +75,49 @@ const stdx::unordered_set<ShardId> kNoShards = {};
 
 constexpr int kDefaultMinAllocationToShardsPollPeriodSecs = 1;
 
+// Simple mock aggregation stage that supports an "undo" operation. Needed because the
+// 'DocumentSourceMock' agg stage does not support undoing of already returned results.
+class MockWithUndoStage : public exec::agg::Stage {
+public:
+    MockWithUndoStage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                      std::deque<exec::agg::GetNextResult> results)
+        : Stage("DocumentSourceWithUndoMock"_sd, expCtx), _queue(std::move(results)) {}
+
+    static boost::intrusive_ptr<MockWithUndoStage> createForTest(
+        std::deque<exec::agg::GetNextResult> results,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return make_intrusive<MockWithUndoStage>(expCtx, std::move(results));
+    }
+
+    void undo() {
+        invariant(_undoResult);
+        _queue.push_front(std::move(*_undoResult));
+        _undoResult.reset();
+    }
+
+protected:
+    exec::agg::GetNextResult doGetNext() override {
+        exec::agg::GetNextResult next = exec::agg::GetNextResult::makeEOF();
+        if (!_queue.empty()) {
+            next = std::move(_queue.front());
+            _queue.pop_front();
+        }
+        _undoResult = next;
+        return next;
+    }
+
+private:
+    std::deque<exec::agg::GetNextResult> _queue;
+    boost::optional<exec::agg::GetNextResult> _undoResult;
+};
+
 class CursorManagerMock : public V2Stage::CursorManager {
 public:
-    CursorManagerMock(const ChangeStream& changeStream, ChangeStreamReaderBuilder* readerBuilder)
-        : _changeStream(changeStream), _readerBuilder(readerBuilder) {}
+    CursorManagerMock(
+        const ChangeStream& changeStream,
+        ChangeStreamReaderBuilder* readerBuilder,
+        boost::optional<boost::intrusive_ptr<MockWithUndoStage>> stageForUndo = boost::none)
+        : _changeStream(changeStream), _readerBuilder(readerBuilder), _stageForUndo(stageForUndo) {}
 
     void initialize(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                     V2Stage* stage,
@@ -131,6 +169,8 @@ public:
     }
 
     void undoGetNextAndSetHighWaterMark(Timestamp highWaterMark) override {
+        invariant(_stageForUndo);
+        (*_stageForUndo)->undo();
         _undoNextHighWaterMark.emplace(highWaterMark);
     }
 
@@ -197,6 +237,10 @@ private:
 
     // The timestamp used in a call to 'undoGetNextAndSetHighWaterMark()' will be recorded here.
     boost::optional<Timestamp> _undoNextHighWaterMark;
+
+    // The aggregation stage that is used as input for the v2 stage. Necessary here so we can
+    // perform an "undo" operation it if necessary.
+    boost::optional<boost::intrusive_ptr<MockWithUndoStage>> _stageForUndo;
 };
 
 class DeadlineWaiterMock : public V2Stage::DeadlineWaiter {
@@ -243,14 +287,15 @@ std::shared_ptr<V2Stage::Parameters> buildParametersForTest(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     int minAllocationToShardsPollPeriodSecs,
     ChangeStreamReaderBuilder* changeStreamReaderBuilder,
-    DataToShardsAllocationQueryService* dataToShardsAllocationQueryService) {
+    DataToShardsAllocationQueryService* dataToShardsAllocationQueryService,
+    boost::optional<boost::intrusive_ptr<MockWithUndoStage>> stageForUndo = boost::none) {
     ChangeStream changeStream = ChangeStream::buildFromExpressionContext(expCtx);
     return std::make_shared<V2Stage::Parameters>(
         changeStream,
         change_stream::resolveResumeTokenFromSpec(expCtx, *expCtx->getChangeStreamSpec()),
         minAllocationToShardsPollPeriodSecs,
         std::make_unique<DeadlineWaiterMock>(),
-        std::make_unique<CursorManagerMock>(changeStream, changeStreamReaderBuilder),
+        std::make_unique<CursorManagerMock>(changeStream, changeStreamReaderBuilder, stageForUndo),
         changeStreamReaderBuilder,
         dataToShardsAllocationQueryService);
 }
@@ -318,18 +363,6 @@ TEST_F(ChangeStreamStageTest, DSV2HandleInputs) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    // Prepare DataToShardsAllocationQueryServiceMock.
-    std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
-    mockResponses.push_back(std::make_pair(ts, AllocationToShardsStatus::kOk));
-    getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
-
-    auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-
     // Test that the stage returns all inputs as they are.
     const BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar");
     const BSONObj doc2 = BSON("operationType" << "test2" << "test" << "value");
@@ -342,7 +375,20 @@ TEST_F(ChangeStreamStageTest, DSV2HandleInputs) {
         DocumentSource::GetNextResult::makeEOF(),
     };
 
-    auto stage = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto stage = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         stage);
+
+    // Prepare DataToShardsAllocationQueryServiceMock.
+    std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
+    mockResponses.push_back(std::make_pair(ts, AllocationToShardsStatus::kOk));
+    getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
+
+    auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
     handleTopologyChangeStage->setSource(stage.get());
 
     auto next = handleTopologyChangeStage->getNext();
@@ -1161,14 +1207,6 @@ TEST_F(DSV2StageTest, StateFetchingInitializationStrictModeGettingChangeEventNon
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
-                                false /* validateStateTransition */);
 
     // Test that the stage returns all inputs as they are.
     const BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar");
@@ -1182,8 +1220,19 @@ TEST_F(DSV2StageTest, StateFetchingInitializationStrictModeGettingChangeEventNon
         DocumentSource::GetNextResult::makeEOF(),
     };
 
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
+                                false /* validateStateTransition */);
 
     // Check return value 1 (pause).
     auto result = docSource->runGetNextStateMachine_forTest();
@@ -1242,21 +1291,23 @@ TEST_F(DSV2StageTest, StateFetchingInitializationStrictModeGettingChangeEventWit
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
-                                false /* validateStateTransition */);
-
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         DocumentSource::GetNextResult::makeAdvancedControlDocument(
             Document::fromBsonWithMetaData(event))};
 
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingGettingChangeEvent,
+                                false /* validateStateTransition */);
 
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
@@ -1634,15 +1685,6 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventNonControlEvents) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
-
     // Test that the stage returns all inputs as they are.
     const BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar");
     const BSONObj doc2 = BSON("operationType" << "test2" << "test" << "value");
@@ -1655,8 +1697,19 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventNonControlEvents) {
         DocumentSource::GetNextResult::makeEOF(),
     };
 
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
+                                false /* validateStateTransition */);
 
     // Check return value 1 (pause).
     auto result = docSource->runGetNextStateMachine_forTest();
@@ -1716,21 +1769,23 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventControlEvent) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
-
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         DocumentSource::GetNextResult::makeAdvancedControlDocument(
             Document::fromBsonWithMetaData(event))};
 
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
+                                false /* validateStateTransition */);
 
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
@@ -1765,6 +1820,8 @@ TEST_F(DSV2StageTest,
                 V2Stage::extractTimestampFromDocument(std::get<Document>(tsOrDoc)),
                 stdx::unordered_set<ShardId>{{"shardA"}});
         });
+    shardTargeterResponses.emplace_back(
+        Timestamp(23, 2), ShardTargeterDecision::kContinue, boost::none);
 
     auto changeStreamReaderBuilder = std::make_shared<ChangeStreamReaderBuilderMock>(
         [=](OperationContext* opCtx, const ChangeStream& changeStream) {
@@ -1775,22 +1832,25 @@ TEST_F(DSV2StageTest,
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
-
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         DocumentSource::GetNextResult::makeAdvancedControlDocument(
             Document::fromBsonWithMetaData(event))};
 
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
 
+    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
+                                false /* validateStateTransition */);
+
+    // Enable 'ShardNotFound' exceptions, which makes the stage go into degraded fetching mode.
     getCursorManagerMock(params)->setThrowShardNotFoundException(true);
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
@@ -1804,10 +1864,21 @@ TEST_F(DSV2StageTest,
     // Disable exceptions again. Calling the state machine will start a new segment.
     getCursorManagerMock(params)->setThrowShardNotFoundException(false);
     getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 3));
+
+    result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_FALSE(result.has_value());
+    ASSERT_EQ(V2Stage::State::kFetchingStartingChangeStreamSegment, docSource->getState_forTest());
+    ASSERT_EQ(Timestamp(23, 2), *docSource->getSegmentStartTimestamp_forTest());
+    ASSERT_EQ(boost::optional<Timestamp>(), docSource->getSegmentEndTimestamp_forTest());
+
+    result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_FALSE(result.has_value());
+    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->isEOF());
-    ASSERT_EQ(V2Stage::State::kFetchingStartingChangeStreamSegment, docSource->getState_forTest());
+    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
     ASSERT_EQ(Timestamp(23, 2), *docSource->getSegmentStartTimestamp_forTest());
     ASSERT_EQ(boost::optional<Timestamp>(), docSource->getSegmentEndTimestamp_forTest());
 }
@@ -1844,20 +1915,22 @@ TEST_F(DSV2StageTest, StateFetchingNormalGettingChangeEventShardTargeterReturnsD
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
-                                false /* validateStateTransition */);
-
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         DocumentSource::GetNextResult::makeAdvancedControlDocument(std::move(doc))};
 
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingNormalGettingChangeEvent,
+                                false /* validateStateTransition */);
 
     auto result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
@@ -1895,15 +1968,6 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
-
     // Test that the stage returns all inputs as they are.
     const BSONObj doc1 = BSON("operationType" << "test1" << "foo" << "bar" << "_id"
                                               << buildHighWaterMarkToken(Timestamp(23, 1)));
@@ -1921,8 +1985,19 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
         DocumentSource::GetNextResult::makeEOF(),
     };
 
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
+                                false /* validateStateTransition */);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -1956,10 +2031,18 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
     // Check return value 4 (doc2). This also transitions the state.
     getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(42, 1));
     result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_FALSE(result.has_value());
+    ASSERT_EQ(V2Stage::State::kFetchingStartingChangeStreamSegment, docSource->getState_forTest());
+
+    result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_FALSE(result.has_value());
+    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+
+    result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->isAdvanced());
     ASSERT_BSONOBJ_EQ(doc2, result->getDocument().toBson());
-    ASSERT_EQ(V2Stage::State::kFetchingStartingChangeStreamSegment, docSource->getState_forTest());
+    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
 
     // Segment start timestamp should change here.
     ASSERT_EQ(Timestamp(42, 1), *docSource->getSegmentStartTimestamp_forTest());
@@ -1970,12 +2053,6 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventNonControlEvents) {
 
     // Undo mode must have been turned off when exiting the degraded fetching state.
     ASSERT_FALSE(*getCursorManagerMock(params)->getUndoNextMode());
-
-    result = docSource->runGetNextStateMachine_forTest();
-    ASSERT_FALSE(result.has_value());
-    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
-    ASSERT_EQ(Timestamp(42, 1), *docSource->getSegmentStartTimestamp_forTest());
-    ASSERT_EQ(boost::optional<Timestamp>{}, docSource->getSegmentEndTimestamp_forTest());
 
     // Check return value 5 (doc3).
     result = docSource->runGetNextStateMachine_forTest();
@@ -2020,30 +2097,31 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventPauseAndEOFEvents) 
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
-
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         DocumentSource::GetNextResult::makePauseExecution(),
         DocumentSource::GetNextResult::makeEOF(),
     };
 
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
+                                false /* validateStateTransition */);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
     // Check return value 1 (pause).
     getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 1));
     auto result = docSource->runGetNextStateMachine_forTest();
-    ASSERT_TRUE(result.has_value());
-    ASSERT_TRUE(result->isPaused());
+    ASSERT_FALSE(result.has_value());
     ASSERT_EQ(V2Stage::State::kFetchingStartingChangeStreamSegment, docSource->getState_forTest());
 
     // Segment start timestamp should change here.
@@ -2051,24 +2129,34 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventPauseAndEOFEvents) 
     ASSERT_EQ(boost::optional<Timestamp>(), docSource->getSegmentEndTimestamp_forTest());
 
     // 'undoNextReady()' should have been called on the 'CursorManager' for this transition.
-    ASSERT_EQ(Timestamp(23, 1), *getCursorManagerMock(params)->getUndoGetNextHighWaterMark());
+    ASSERT_EQ(Timestamp(23, 1), getCursorManagerMock(params)->getUndoGetNextHighWaterMark());
 
     // Undo mode must have been turned off when exiting the degraded fetching state.
     ASSERT_FALSE(*getCursorManagerMock(params)->getUndoNextMode());
 
-    getCursorManagerMock(params)->setTimestampForCurrentHighWaterMark(Timestamp(23, 2));
-    // Transitions from starting change stream segment to degraded mode.
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_FALSE(result.has_value());
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+
+    result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->isPaused());
+    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+    ASSERT_EQ(Timestamp(23, 1), *docSource->getSegmentStartTimestamp_forTest());
+    ASSERT_EQ(boost::optional<Timestamp>{}, docSource->getSegmentEndTimestamp_forTest());
 
     // Check return value 2 (eof).
     result = docSource->runGetNextStateMachine_forTest();
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->isEOF());
+
     ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
-    ASSERT_EQ(Timestamp(23, 1), *docSource->getSegmentStartTimestamp_forTest());
-    ASSERT_EQ(boost::optional<Timestamp>{}, docSource->getSegmentEndTimestamp_forTest());
+
+    // No more results.
+    result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->isEOF());
+    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
 }
 
 // Tests state machine for input state kFetchingDegradedGettingChangeEvent for control events.
@@ -2099,13 +2187,11 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventControlEvent) {
                                         ShardTargeterDecision::kContinue,
                                         boost::optional<Timestamp>{},
                                         kEmptyShardTargeterCallback);
-
-    shardTargeterResponses.emplace_back(doc2,
+    shardTargeterResponses.emplace_back(Timestamp(23, 99),
                                         ShardTargeterDecision::kContinue,
                                         boost::optional<Timestamp>{},
                                         kEmptyShardTargeterCallback);
-
-    shardTargeterResponses.emplace_back(Timestamp(23, 99),
+    shardTargeterResponses.emplace_back(doc2,
                                         ShardTargeterDecision::kContinue,
                                         boost::optional<Timestamp>{},
                                         kEmptyShardTargeterCallback);
@@ -2119,21 +2205,23 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventControlEvent) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        DocumentSource::GetNextResult::makeAdvancedControlDocument(std::move(doc1)),
+        DocumentSource::GetNextResult::makeAdvancedControlDocument(std::move(doc2)),
+        DocumentSource::GetNextResult::makeEOF()};
+
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
     auto params = buildParametersForTest(getExpCtx(),
                                          kDefaultMinAllocationToShardsPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
 
     auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
+    docSource->setSource(source.get());
+
     docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
                                 false /* validateStateTransition */);
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        DocumentSource::GetNextResult::makeAdvancedControlDocument(std::move(doc1)),
-        DocumentSource::GetNextResult::makeAdvancedControlDocument(std::move(doc2))};
-
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
-    docSource->setSource(source.get());
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
@@ -2162,13 +2250,20 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventControlEvent) {
     ASSERT_EQ(boost::optional<Timestamp>{}, docSource->getSegmentEndTimestamp_forTest());
 
     result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
+    ASSERT_FALSE(result.has_value());
+
+    result = docSource->runGetNextStateMachine_forTest();
+    ASSERT_EQ(V2Stage::State::kFetchingNormalGettingChangeEvent, docSource->getState_forTest());
     ASSERT_TRUE(result.has_value());
     ASSERT_TRUE(result->isEOF());
 }
 
 // Tests state machine for input state kFetchingDegradedGettingChangeEvent and the shard targeter
-// returning 'kSwitchToV1'.
-TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventShardTargeterReturnsDowngrading) {
+// returning 'kSwitchToV1', which it shouldn't.
+DEATH_TEST_REGEX_F(DSV2StageTestDeathTest,
+                   StateFetchingDegradedGettingChangeEventShardTargeterReturnsDowngrading,
+                   "Tripwire assertion.*10922904") {
     const Timestamp ts = Timestamp(23, 0);
     const Timestamp segmentEndTimestamp = Timestamp(23, 99);
 
@@ -2198,37 +2293,26 @@ TEST_F(DSV2StageTest, StateFetchingDegradedGettingChangeEventShardTargeterReturn
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
-    auto params = buildParametersForTest(getExpCtx(),
-                                         kDefaultMinAllocationToShardsPollPeriodSecs,
-                                         changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
-
-    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
-    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
-                                false /* validateStateTransition */);
-
     std::deque<DocumentSource::GetNextResult> inputDocs = {
         DocumentSource::GetNextResult::makeAdvancedControlDocument(std::move(doc))};
 
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
+    auto params = buildParametersForTest(getExpCtx(),
+                                         kDefaultMinAllocationToShardsPollPeriodSecs,
+                                         changeStreamReaderBuilder.get(),
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
+
+    auto docSource = make_intrusive<V2Stage>(getExpCtx(), params);
     docSource->setSource(source.get());
+
+    docSource->setState_forTest(V2Stage::State::kFetchingDegradedGettingChangeEvent,
+                                false /* validateStateTransition */);
     docSource->setSegmentStartTimestamp_forTest(ts);
     docSource->setSegmentEndTimestamp_forTest(segmentEndTimestamp);
 
-    auto result = docSource->runGetNextStateMachine_forTest();
-    ASSERT_TRUE(result.has_value());
-    ASSERT_TRUE(result->isEOF());
-    ASSERT_EQ(V2Stage::State::kDowngrading, docSource->getState_forTest());
-    ASSERT_EQ(ts, *docSource->getSegmentStartTimestamp_forTest());
-    ASSERT_EQ(segmentEndTimestamp, *docSource->getSegmentEndTimestamp_forTest());
-
-    // Undo mode must have been turned off when exiting the degraded fetching state.
-    ASSERT_FALSE(*getCursorManagerMock(params)->getUndoNextMode());
-
-    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(),
-                       AssertionException,
-                       ErrorCodes::RetryChangeStream);
-    ASSERT_EQ(V2Stage::State::kFinal, docSource->getState_forTest());
+    ASSERT_THROWS_CODE(docSource->runGetNextStateMachine_forTest(), AssertionException, 10922904);
 }
 
 // Tests state machine for input state kDowngrading. The change stream is expected to fail with an
@@ -2285,10 +2369,18 @@ TEST_F(DSV2StageTest, OpenCursorOnConfigServer) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
+    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        Document::fromBsonWithMetaData(doc),
+    };
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
     auto params = buildParametersForTest(getExpCtx(),
                                          kDefaultMinAllocationToShardsPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
 
     // Prepare DataToShardsAllocationQueryServiceMock.
     std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
@@ -2296,13 +2388,6 @@ TEST_F(DSV2StageTest, OpenCursorOnConfigServer) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-
-    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        Document::fromBsonWithMetaData(doc),
-    };
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
     handleTopologyChangeStage->setSource(source.get());
 
     ASSERT_FALSE(getCursorManagerMock(params)->cursorOpenedOnConfigServer());
@@ -2341,10 +2426,18 @@ TEST_F(DSV2StageTest, CloseCursorOnConfigServer) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
+    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        Document::fromBsonWithMetaData(doc),
+    };
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
     auto params = buildParametersForTest(getExpCtx(),
                                          kDefaultMinAllocationToShardsPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
 
     // Prepare DataToShardsAllocationQueryServiceMock.
     std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
@@ -2352,13 +2445,6 @@ TEST_F(DSV2StageTest, CloseCursorOnConfigServer) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-
-    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        Document::fromBsonWithMetaData(doc),
-    };
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
     handleTopologyChangeStage->setSource(source.get());
 
     getCursorManagerMock(params)->openCursorOnConfigServer(getExpCtx(), getOpCtx(), ts);
@@ -2401,10 +2487,18 @@ TEST_F(DSV2StageTest, OpenCursorsOnDataShards) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
+    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        Document::fromBsonWithMetaData(doc),
+    };
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
     auto params = buildParametersForTest(getExpCtx(),
                                          kDefaultMinAllocationToShardsPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
 
     // Prepare DataToShardsAllocationQueryServiceMock.
     std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
@@ -2412,13 +2506,6 @@ TEST_F(DSV2StageTest, OpenCursorsOnDataShards) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-
-    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        Document::fromBsonWithMetaData(doc),
-    };
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
     handleTopologyChangeStage->setSource(source.get());
 
     ASSERT_FALSE(getCursorManagerMock(params)->cursorOpenedOnConfigServer());
@@ -2458,10 +2545,18 @@ TEST_F(DSV2StageTest, CloseCursorsOnDataShards) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
+    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        Document::fromBsonWithMetaData(doc),
+    };
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
     auto params = buildParametersForTest(getExpCtx(),
                                          kDefaultMinAllocationToShardsPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
 
     // Prepare DataToShardsAllocationQueryServiceMock.
     std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
@@ -2469,14 +2564,8 @@ TEST_F(DSV2StageTest, CloseCursorsOnDataShards) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-
-    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        Document::fromBsonWithMetaData(doc),
-    };
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
     handleTopologyChangeStage->setSource(source.get());
+
     getCursorManagerMock(params)->openCursorsOnDataShards(getExpCtx(), getOpCtx(), ts, shardSet);
 
     ASSERT_FALSE(getCursorManagerMock(params)->cursorOpenedOnConfigServer());
@@ -2516,10 +2605,18 @@ TEST_F(DSV2StageTest, ShardNotFoundErrorIsConvertedToShardRemovedErrorInStrictMo
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
+    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        Document::fromBsonWithMetaData(doc),
+    };
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
     auto params = buildParametersForTest(getExpCtx(),
                                          kDefaultMinAllocationToShardsPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
 
     // Prepare DataToShardsAllocationQueryServiceMock.
     std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
@@ -2527,13 +2624,6 @@ TEST_F(DSV2StageTest, ShardNotFoundErrorIsConvertedToShardRemovedErrorInStrictMo
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-
-    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        Document::fromBsonWithMetaData(doc),
-    };
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
     handleTopologyChangeStage->setSource(source.get());
 
     // 'ShardNotFound' error must be translated into 'ShardRemovedError'.
@@ -2575,10 +2665,18 @@ TEST_F(DSV2StageTest, ShardNotFoundErrorIsConvertedToRetryChangeStreamInIgnoreRe
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
+    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        Document::fromBsonWithMetaData(doc),
+    };
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
     auto params = buildParametersForTest(getExpCtx(),
                                          kDefaultMinAllocationToShardsPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
 
     // Prepare DataToShardsAllocationQueryServiceMock.
     std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
@@ -2586,13 +2684,6 @@ TEST_F(DSV2StageTest, ShardNotFoundErrorIsConvertedToRetryChangeStreamInIgnoreRe
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-
-    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        Document::fromBsonWithMetaData(doc),
-    };
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
     handleTopologyChangeStage->setSource(source.get());
 
     // 'ShardNotFound' error must be translated into 'RetryChangeStream' error.
@@ -2632,10 +2723,18 @@ TEST_F(DSV2StageTest, ErrorOtherThanShardNotFoundErrorIsRethrownInStrictMode) {
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
+    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        Document::fromBsonWithMetaData(doc),
+    };
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
     auto params = buildParametersForTest(getExpCtx(),
                                          kDefaultMinAllocationToShardsPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
 
     // Prepare DataToShardsAllocationQueryServiceMock.
     std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
@@ -2643,13 +2742,6 @@ TEST_F(DSV2StageTest, ErrorOtherThanShardNotFoundErrorIsRethrownInStrictMode) {
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-
-    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        Document::fromBsonWithMetaData(doc),
-    };
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
     handleTopologyChangeStage->setSource(source.get());
 
     // The expect error code should be returned as-is.
@@ -2688,10 +2780,18 @@ TEST_F(DSV2StageTest, ErrorOtherThanShardNotFoundErrorIsRethrownInIgnoreRemovedS
     auto dataToShardsAllocationQueryService =
         std::make_unique<DataToShardsAllocationQueryServiceMock>();
 
+    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
+
+    std::deque<DocumentSource::GetNextResult> inputDocs = {
+        Document::fromBsonWithMetaData(doc),
+    };
+    auto source = MockWithUndoStage::createForTest(inputDocs, getExpCtx());
+
     auto params = buildParametersForTest(getExpCtx(),
                                          kDefaultMinAllocationToShardsPollPeriodSecs,
                                          changeStreamReaderBuilder.get(),
-                                         dataToShardsAllocationQueryService.get());
+                                         dataToShardsAllocationQueryService.get(),
+                                         source);
 
     // Prepare DataToShardsAllocationQueryServiceMock.
     std::vector<DataToShardsAllocationQueryServiceMock::Response> mockResponses;
@@ -2699,13 +2799,6 @@ TEST_F(DSV2StageTest, ErrorOtherThanShardNotFoundErrorIsRethrownInIgnoreRemovedS
     getDataToShardsAllocationQueryServiceMock(params)->bufferResponses(mockResponses);
 
     auto handleTopologyChangeStage = make_intrusive<V2Stage>(getExpCtx(), params);
-
-    const BSONObj doc = BSON("operationType" << "test1" << "foo" << "bar");
-
-    std::deque<DocumentSource::GetNextResult> inputDocs = {
-        Document::fromBsonWithMetaData(doc),
-    };
-    auto source = exec::agg::MockStage::createForTest(inputDocs, getExpCtx());
     handleTopologyChangeStage->setSource(source.get());
 
     // The expect error code should be returned as-is.

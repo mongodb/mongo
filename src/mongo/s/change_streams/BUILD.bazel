@@ -24,6 +24,7 @@ mongo_cc_library(
         "database_change_stream_db_present_state_event_handler.cpp",
         "database_change_stream_shard_targeter_impl.cpp",
         "historical_placement_fetcher_impl.cpp",
+        "shard_targeter_helper.cpp",
     ],
     deps = [
         ":change_streams_control_events",

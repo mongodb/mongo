@@ -29,6 +29,7 @@
 
 #include "mongo/s/change_streams/collection_change_stream_db_absent_state_event_handler.h"
 
+#include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/change_stream_reader_context_mock.h"
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -46,6 +47,7 @@ NamespaceString makeTestNss() {
     return NamespaceString::createNamespaceString_forTest("testDb.testColl");
 }
 
+template <ChangeStreamReadMode ReadMode>
 class CollectionDbAbsentStateEventHandlerFixture : public ServiceContextTest {
 public:
     void setUp() override {
@@ -54,8 +56,15 @@ public:
         _opCtx = makeOperationContext();
         _ctx = std::make_unique<ChangeStreamShardTargeterStateEventHandlingContextMock>(
             std::make_unique<HistoricalPlacementFetcherMock>());
-        _readerCtx = std::make_unique<ChangeStreamReaderContextMock>(ChangeStream(
-            ChangeStreamReadMode::kStrict, ChangeStreamType::kCollection, makeTestNss()));
+        if constexpr (ReadMode == ChangeStreamReadMode::kStrict) {
+            _readerCtx = std::make_unique<ChangeStreamReaderContextMock>(ChangeStream(
+                ChangeStreamReadMode::kStrict, ChangeStreamType::kCollection, makeTestNss()));
+        } else {
+            _readerCtx = std::make_unique<ChangeStreamReaderContextMock>(
+                ChangeStream(ChangeStreamReadMode::kIgnoreRemovedShards,
+                             ChangeStreamType::kCollection,
+                             makeTestNss()));
+        }
     }
 
     OperationContext* opCtx() {
@@ -85,28 +94,39 @@ private:
     std::unique_ptr<ChangeStreamReaderContextMock> _readerCtx;
 };
 
-using CollectionDbAbsentStateEventHandlerFixtureDeathTest =
-    CollectionDbAbsentStateEventHandlerFixture;
-DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixtureDeathTest,
+using CollectionDbAbsentStateEventHandlerStrictModeFixture =
+    CollectionDbAbsentStateEventHandlerFixture<ChangeStreamReadMode::kStrict>;
+using CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixture =
+    CollectionDbAbsentStateEventHandlerFixture<ChangeStreamReadMode::kIgnoreRemovedShards>;
+
+using CollectionDbAbsentStateEventHandlerStrictModeFixtureDeathTest =
+    CollectionDbAbsentStateEventHandlerStrictModeFixture;
+using CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest =
+    CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixture;
+
+// Tests for strict mode.
+// ----------------------
+
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
                    Given_MovePrimaryControlEvent_When_HandleEventIsCalled_Then_Throws,
                    "Tripwire assertion.*IllegalOperation") {
     handler().handleEvent(opCtx(), MovePrimaryControlEvent{}, ctx(), readerCtx());
 }
 
-DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixtureDeathTest,
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
                    Given_MoveChunkControlEvent_When_HandleEventIsCalled_Then_Throws,
                    "Tripwire assertion.*IllegalOperation") {
     handler().handleEvent(opCtx(), MoveChunkControlEvent{}, ctx(), readerCtx());
 }
 
-DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixtureDeathTest,
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
                    Given_NamespacePlacementChangedControlEvent_When_HandleEventIsCalled_Then_Throws,
                    "Tripwire assertion.*IllegalOperation") {
     handler().handleEvent(opCtx(), NamespacePlacementChangedControlEvent{}, ctx(), readerCtx());
 }
 
 TEST_F(
-    CollectionDbAbsentStateEventHandlerFixture,
+    CollectionDbAbsentStateEventHandlerStrictModeFixture,
     Given_DatabaseCreatedControlEventWithPlacementNotAvailable_When_HandleEventIsCalled_Then_ReturnSwitchToV1) {
     Timestamp clusterTime(10, 2);
     DatabaseCreatedControlEvent event;
@@ -119,15 +139,15 @@ TEST_F(
     auto result = handler().handleEvent(opCtx(), event, ctx(), readerCtx());
 
     ASSERT_EQ(result, ShardTargeterDecision::kSwitchToV1);
-    ASSERT_TRUE(readerCtx().closeCursorOnConfigServerCount == 0);
+    ASSERT_EQ(readerCtx().closeCursorOnConfigServerCount, 0);
     ASSERT_TRUE(readerCtx().openCursorsOnDataShardsCalls.empty());
     ASSERT_TRUE(ctx().setHandlerCalls.empty());
 }
 
 DEATH_TEST_REGEX_F(
-    CollectionDbAbsentStateEventHandlerFixtureDeathTest,
+    CollectionDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
     Given_DatabaseCreatedControlEventWithPlacementInFuture_When_HandleEventIsCalled_Then_Throws,
-    "Tripwire assertion.*10915200") {
+    "Tripwire assertion.*10917001") {
     Timestamp clusterTime(100, 0);
     DatabaseCreatedControlEvent event;
     event.clusterTime = clusterTime;
@@ -140,7 +160,7 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(
-    CollectionDbAbsentStateEventHandlerFixtureDeathTest,
+    CollectionDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
     Given_DatabaseCreatedControlEventWithEmptyPlacement_When_HandleEventIsCalled_Then_Throws,
     "Tripwire assertion.*10915201") {
     Timestamp clusterTime(50, 1);
@@ -155,7 +175,7 @@ DEATH_TEST_REGEX_F(
 }
 
 TEST_F(
-    CollectionDbAbsentStateEventHandlerFixture,
+    CollectionDbAbsentStateEventHandlerStrictModeFixture,
     Given_DatabaseCreatedControlEventWithShards_When_HandleEventIsCalled_Then_ConfigsvrCursorClosedDataShardCursorsOpenedAndHandlerIsSet) {
     Timestamp clusterTime(77, 0);
     DatabaseCreatedControlEvent event;
@@ -180,9 +200,70 @@ TEST_F(
         ctx().lastSetEventHandler()));
 }
 
-DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerFixtureDeathTest,
-                   When_HandleEventInDegradedModeIsCalled_Then_AlwaysThrows,
+// Tests for ignoreRemovedShards mode.
+// -----------------------------------
+
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
+                   Given_MovePrimaryControlEvent_When_HandleEventIsCalled_Then_Throws,
                    "Tripwire assertion.*IllegalOperation") {
+    handler().handleEvent(opCtx(), MovePrimaryControlEvent{}, ctx(), readerCtx());
+}
+
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
+                   Given_MoveChunkControlEvent_When_HandleEventIsCalled_Then_Throws,
+                   "Tripwire assertion.*IllegalOperation") {
+    handler().handleEvent(opCtx(), MoveChunkControlEvent{}, ctx(), readerCtx());
+}
+
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
+                   Given_NamespacePlacementChangedControlEvent_When_HandleEventIsCalled_Then_Throws,
+                   "Tripwire assertion.*IllegalOperation") {
+    handler().handleEvent(opCtx(), NamespacePlacementChangedControlEvent{}, ctx(), readerCtx());
+}
+
+DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
+                   Given_NonDegradedMode_When_HandleEventInDegradedModeIsCalled_Then_Throws,
+                   "Tripwire assertion.*10922908") {
+    Timestamp clusterTime(101, 0);
+    MovePrimaryControlEvent event;
+    event.clusterTime = clusterTime;
+
+    readerCtx().setDegradedMode(false);
+    handler().handleEventInDegradedMode(opCtx(), event, ctx(), readerCtx());
+}
+
+TEST_F(
+    CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixture,
+    Given_DatabaseCreatedControlEventWithShards_When_HandleEventIsCalled_Then_ConfigsvrCursorClosedDataShardCursorsOpenedAndHandlerIsSet) {
+    Timestamp clusterTime(77, 0);
+    DatabaseCreatedControlEvent event;
+    event.clusterTime = clusterTime;
+    std::vector<ShardId> shards = {ShardId("shardA"), ShardId("shardB")};
+    stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
+
+    std::vector<HistoricalPlacementFetcherMock::Response> responses{
+        {clusterTime, HistoricalPlacement(shards, HistoricalPlacementStatus::OK)}};
+    fetcher().bufferResponses(responses);
+
+    readerCtx().setDegradedMode(true);
+    auto result = handler().handleEvent(opCtx(), event, ctx(), readerCtx());
+    ASSERT_EQ(result, ShardTargeterDecision::kContinue);
+
+    ASSERT_EQ(readerCtx().closeCursorOnConfigServerCount, 1);
+    ASSERT_EQ(readerCtx().openCursorsOnDataShardsCalls.size(), 1);
+    ASSERT_EQ(readerCtx().openCursorsOnDataShardsCalls[0].atClusterTime, clusterTime + 1);
+    ASSERT_EQ(readerCtx().openCursorsOnDataShardsCalls[0].shardSet, shardSet);
+
+    ASSERT_EQ(ctx().setHandlerCalls.size(), 1);
+    ASSERT_TRUE(dynamic_cast<CollectionChangeStreamShardTargeterDbPresentStateEventHandler*>(
+        ctx().lastSetEventHandler()));
+}
+
+DEATH_TEST_REGEX_F(
+    CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
+    When_HandleEventInDegradedModeIsCalledForDatabaseCreated_Then_DoesNotModifyCursors,
+    "Tripwire assertion.*10922908") {
+    readerCtx().setDegradedMode(true);
     handler().handleEventInDegradedMode(opCtx(), DatabaseCreatedControlEvent{}, ctx(), readerCtx());
 }
 

@@ -144,6 +144,27 @@ struct TargetingResults {
     Timestamp shardRegistryReloadTime;
 };
 
+// Check that no shard has been removed since the change stream open time to detect a possible event
+// loss. It is important to execute it after retrieving the most recent list of shards:
+// anyShardRemovedSince() performs a snapshot read that might miss the effects of a removeShard(sId)
+// being committed in parallel; when this happens, the change stream opening is expected to fail at
+// a later stage with a ShardNotFound error which will be returned to the client; upon retry,
+// anyShardRemovedSince() will return an accurate response.
+void ensureNoRemovedShardsForChangeStreamV1(const ExpressionContext& expCtx) {
+    if (!expCtx.getInRouter() || expCtx.isChangeStreamV2()) {
+        return;
+    }
+
+    const auto changeStreamOpeningTime =
+        ResumeToken::parse(expCtx.getInitialPostBatchResumeToken()).getData().clusterTime;
+    uassert(ErrorCodes::ChangeStreamHistoryLost,
+            "Change stream events no longer available due to removed shard",
+            !Grid::get(expCtx.getOperationContext())
+                 ->catalogClient()
+                 ->anyShardRemovedSince(expCtx.getOperationContext(), changeStreamOpeningTime));
+}
+
+
 /**
  * Given a document representing an aggregation command such as
  * {aggregate: "myCollection", pipeline: [], ...},
@@ -743,10 +764,11 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
         return boost::none;
     }
 
-    // Aquire a RoutingContext for the output ns of the merge stage and discard it at the end of the
-    // scope without validating that a versioned request was sent to the shard. This is permissible
-    // because the routing table acquisition here is used for a performance optimization, not a
-    // query correctness decision, so it is okay if the routing tables are stale.
+    // Acquire a RoutingContext for the output ns of the merge stage and discard it at the end of
+    // the scope without validating that a versioned request was sent to the shard. This is
+    // permissible because the routing table acquisition here is used for a performance
+    // optimization, not a query correctness decision, so it is okay if the routing tables are
+    // stale.
     auto routingCtx =
         uassertStatusOK(getRoutingContextForTxnCmd(opCtx, {mergeStage->getOutputNs()}));
     const auto& cri = routingCtx->getCollectionRoutingInfo(mergeStage->getOutputNs());
@@ -963,27 +985,11 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
             ->shardRegistry()
             ->reload(expCtx->getOperationContext());
 
+        ensureNoRemovedShardsForChangeStreamV1(*expCtx);
+
         // Rebuild the set of shards as the shard registry might have changed.
         shardIds = getTargetedShards(
             expCtx, pipelineDataSource, cri, shardQuery, shardTargetingCollation, mergeShardId);
-
-        // Check that no shard has been removed since the change stream open time to detect a
-        // possible event loss. It is important to execute it after retrieving the most recent list
-        // of shards: anyShardRemovedSince() performs a snapshot read that might miss the effects of
-        // a removeShard(sId) being committed in parallel; when this happens, the change stream
-        // opening is expected to fail at a later stage with a ShardNotFound error which will be
-        // returned to the client; upon retry, anyShardRemovedSince() will return an accurate
-        // response.
-        if (expCtx->getInRouter()) {
-            const auto changeStreamOpeningTime =
-                ResumeToken::parse(expCtx->getInitialPostBatchResumeToken()).getData().clusterTime;
-            uassert(ErrorCodes::ChangeStreamHistoryLost,
-                    "Change stream events no more available due to removed shard",
-                    !Grid::get(expCtx->getOperationContext())
-                         ->catalogClient()
-                         ->anyShardRemovedSince(expCtx->getOperationContext(),
-                                                changeStreamOpeningTime));
-        }
     }
 
     return {std::move(shardQuery),

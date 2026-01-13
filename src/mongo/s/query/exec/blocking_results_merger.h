@@ -108,7 +108,7 @@ public:
 
     /**
      * Enables buffering of the last returned result in the underlying 'AsyncResultsMerger'. This is
-     * used by v2 change stream readers.
+     * used by v2 change stream readers in ignoreRemovedShardsMode.
      */
     void enableUndoNextMode() {
         _arm->enableUndoNextReadyMode();
@@ -116,7 +116,7 @@ public:
 
     /**
      * Disables buffering of the last returned result in the underlying 'AsyncResultsMerger'. This
-     * is used by v2 change stream readers.
+     * is used by v2 change stream readers in ignoreRemovedShardsMode.
      */
     void disableUndoNextMode() {
         _arm->disableUndoNextReadyMode();
@@ -124,11 +124,12 @@ public:
 
     /**
      * Undoes the effect of fetching the last returned result via 'next()' from the underlying
-     * 'AsyncResultsMerger'. For a more detailed description refer to the code comments for
-     * 'AsyncResultsMerger::undoNextReady()'. This is used by v2 change stream readers.
+     * 'AsyncResultsMerger'. This is used by v2 change stream readers in ignoreRemovedShards mode.
+     * For a more detailed description refer to the code comments for
+     * 'AsyncResultsMerger::undoNextReady()'.
      */
-    void undoNext() {
-        _arm->undoNextReady();
+    void undoNext(BSONObj highWaterMark) {
+        _arm->undoNextReady(std::move(highWaterMark));
     }
 
     /**
@@ -157,6 +158,10 @@ public:
         _arm->setHighWaterMark(highWaterMark);
     }
 
+    /**
+     * Adds the already opened cursors and their potential results to the underlying
+     * 'AsyncResultsMerger'.
+     */
     void addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
                             const ShardTag& tag = ShardTag::kDefault) {
         _arm->addNewShardCursors(std::move(newCursors), tag);

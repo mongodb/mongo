@@ -7,12 +7,18 @@
  *
  * @tags: [
  *   featureFlagChangeStreamPreciseShardTargeting,
+ *   requires_sharding,
+ *   uses_change_streams,
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {describe, it, before, afterEach, after, beforeEach} from "jstests/libs/mochalite.js";
 import {assertCreateCollection, assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
-import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
+import {
+    ChangeStreamTest,
+    distributeCollectionDataOverShards,
+    getClusterTime,
+} from "jstests/libs/query/change_stream_util.js";
 
 describe("$changeStream v2", function () {
     let st;
@@ -58,23 +64,8 @@ describe("$changeStream v2", function () {
         }
     }
 
-    function distributeCollDataOverShards(coll, distributionConfig) {
-        assert.commandWorked(
-            st.s.adminCommand({
-                split: coll.getFullName(),
-                middle: distributionConfig.middle,
-            }),
-        );
-        for (const chunkConfig of distributionConfig.chunks) {
-            assert.commandWorked(
-                st.s.adminCommand({
-                    moveChunk: coll.getFullName(),
-                    find: chunkConfig.find,
-                    to: chunkConfig.to,
-                    _waitForDelete: true,
-                }),
-            );
-        }
+    function ensureShardDistribution(coll, distributionConfig) {
+        distributeCollectionDataOverShards(db, coll, distributionConfig);
         assertCollDataDistribution(distributionConfig.expectedCounts);
     }
 
@@ -86,7 +77,7 @@ describe("$changeStream v2", function () {
             {_id: -1, a: -1},
             {_id: 1, a: 1},
         ]);
-        distributeCollDataOverShards(coll, {
+        ensureShardDistribution(coll, {
             middle: {_id: 0},
             chunks: [
                 {find: {_id: -1}, to: st.shard0.shardName},
@@ -118,7 +109,7 @@ describe("$changeStream v2", function () {
         assert.commandWorked(
             st.s.adminCommand({reshardCollection: coll.getFullName(), key: {a: 1}, numInitialChunks: 1}),
         );
-        distributeCollDataOverShards(coll, {
+        ensureShardDistribution(coll, {
             middle: {a: 2},
             chunks: [
                 {find: {a: 1}, to: st.shard1.shardName},
@@ -230,7 +221,7 @@ describe("$changeStream v2", function () {
         assertCreateCollection(db, coll.getName());
 
         // Open a change stream on 'coll' 3 seconds in the future.
-        const testStartTime = db.adminCommand({hello: 1}).$clusterTime.clusterTime;
+        const testStartTime = getClusterTime(db);
         testStartTime.t += 3;
         csTest = new ChangeStreamTest(db);
         let csCursor = csTest.startWatchingChanges({

@@ -30,37 +30,16 @@
 #include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
 
 #include "mongo/db/pipeline/change_stream.h"
+#include "mongo/logv2/log.h"
+#include "mongo/s/change_streams/shard_targeter_helper.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
+#include <variant>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
-namespace {
-void updateActiveShardCursors(Timestamp atClusterTime,
-                              const stdx::unordered_set<ShardId>& newActiveShardSet,
-                              ChangeStreamReaderContext& readerCtx) {
-    const auto& currentActiveShardSet = readerCtx.getCurrentlyTargetedDataShards();
-    stdx::unordered_set<ShardId> shardsToCloseCursors;
-    for (const auto& currentActiveShard : currentActiveShardSet) {
-        if (!newActiveShardSet.contains(currentActiveShard)) {
-            shardsToCloseCursors.insert(currentActiveShard);
-        }
-    }
-
-    if (!shardsToCloseCursors.empty()) {
-        readerCtx.closeCursorsOnDataShards(shardsToCloseCursors);
-    }
-
-    stdx::unordered_set<ShardId> shardsToOpenCursors;
-    for (const auto& newActiveShard : newActiveShardSet) {
-        if (!currentActiveShardSet.contains(newActiveShard)) {
-            shardsToOpenCursors.insert(newActiveShard);
-        }
-    }
-
-    if (!shardsToOpenCursors.empty()) {
-        readerCtx.openCursorsOnDataShards(atClusterTime, shardsToOpenCursors);
-    }
-}
-}  // namespace
 
 ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handleEvent(
     OperationContext* opCtx,
@@ -92,7 +71,19 @@ ChangeStreamShardTargeterDbPresentStateEventHandler::handleEventInDegradedMode(
     const ControlEvent& event,
     ChangeStreamShardTargeterStateEventHandlingContext& ctx,
     ChangeStreamReaderContext& readerCtx) {
-    MONGO_UNIMPLEMENTED_TASSERT(10917000);
+    tassert(
+        10922909,
+        "Change stream reader must be in degraded mode when calling 'handleEventInDegradedMode()'",
+        readerCtx.inDegradedMode());
+
+    // In degraded mode, requests to open and/or close cursors cannot be made - the set of tracked
+    // shards for a bounded change stream segment is fixed.
+    // We also cannot assume that a specific event type is fed in here, as we may have missed
+    // certain events on removed shards in ignoreRemovedShards mode.
+    // There is also no need to set the event handler here, because the only relevant state that can
+    // be reached after degraded fetching is to start a new change stream segment, which will always
+    // install a new event handler.
+    return ShardTargeterDecision::kContinue;
 }
 
 ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handlePlacementRefresh(
@@ -100,6 +91,12 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
     Timestamp clusterTime,
     ChangeStreamShardTargeterStateEventHandlingContext& ctx,
     ChangeStreamReaderContext& readerCtx) {
+    // The placement history query here uses ignoreRemovedShards=false. This should work because the
+    // set of cursors will ultimately be opened by the 'ChangeStreamHandleTopologyChangeV2' stage in
+    // normal fetching mode state, and this state will catch any 'ShardRemoved' exceptions. In case
+    // a cursor is opened on a shard that has been removed, the v2 stage will start a new change
+    // stream segment.
+    // TODO SERVER-114863 SERVER-115212: verify that this is sensible.
     auto placement =
         ctx.getHistoricalPlacementFetcher().fetch(opCtx,
                                                   readerCtx.getChangeStream().getNamespace(),
@@ -109,13 +106,28 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
     if (placement.getStatus() == HistoricalPlacementStatus::NotAvailable) {
         return ShardTargeterDecision::kSwitchToV1;
     }
-    tassert(10917001,
-            "HistoricalPlacementStatus can not be in the future",
-            placement.getStatus() != HistoricalPlacementStatus::FutureClusterTime);
 
     const auto& shards = placement.getShards();
-    stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
-    updateActiveShardCursors(clusterTime + 1, shardSet, readerCtx);
+
+    LOGV2_DEBUG(10922912,
+                3,
+                "Handling placement refresh",
+                "atClusterTime"_attr = clusterTime,
+                "anyRemovedShardDetected"_attr =
+                    placement.getAnyRemovedShardDetected().value_or(false),
+                "openCursorAt"_attr = placement.getOpenCursorAt(),
+                "nextPlacementChangedAt"_attr = placement.getNextPlacementChangedAt(),
+                "currentActiveShards"_attr = readerCtx.getCurrentlyTargetedDataShards(),
+                "shards"_attr = shards);
+
+    // Validate status and other fields of historical placement result.
+    change_streams::assertHistoricalPlacementStatusOK(placement);
+
+    // TODO SERVER-114863 SERVER-115212: adjust the invariants checked here if it turns out to be
+    // necessary when running more exhaustive tests.
+    change_streams::assertHistoricalPlacementHasNoSegment(placement);
+
+    change_streams::updateActiveShardCursors(clusterTime + 1, shards, readerCtx);
 
     // In case the set of shards is empty, it means the underlying database is no longer present.
     // We open a cursor on the configsvr and change the event handler to the database absent state.

@@ -29,29 +29,33 @@
 
 #pragma once
 
-#include "mongo/s/change_streams/change_stream_db_present_state_event_handler.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/global_catalog/ddl/placement_history_commands_gen.h"
+#include "mongo/db/pipeline/change_stream_reader_context.h"
+#include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/util/modules.h"
 
-namespace mongo {
-class CollectionChangeStreamShardTargeterDbPresentStateEventHandler
-    : public ChangeStreamShardTargeterDbPresentStateEventHandler {
-protected:
-    /**
-     * Opens a cursor on the destination shard if needed and closes the cursor on the donor shard
-     * if all its chunks have been migrated away.
-     */
-    ShardTargeterDecision handleMoveChunk(OperationContext* opCtx,
-                                          const MoveChunkControlEvent& event,
-                                          ChangeStreamShardTargeterStateEventHandlingContext& ctx,
-                                          ChangeStreamReaderContext& readerCtx) override;
+#include <vector>
 
-    /**
-     * Returns CollectionChangeStreamShardTargeterDbAbsentStateEventHandler.
-     */
-    std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> buildDbAbsentStateEventHandler()
-        const override;
+namespace mongo::change_streams {
+/**
+ * Issues the required cursor open/close requests on the change stream reader context based on the
+ * difference between 'newActiveShards' and the set of cursors currently tracked by the reader
+ * context.
+ */
+void updateActiveShardCursors(Timestamp atClusterTime,
+                              const std::vector<ShardId>& newActiveShards,
+                              ChangeStreamReaderContext& readerCtx);
 
-    std::string toString() const override;
-};
+/**
+ * Validates that the status of the historical placement result is 'OK', and tasserts otherwise.
+ */
+void assertHistoricalPlacementStatusOK(const HistoricalPlacement& placement);
 
-}  // namespace mongo
+/**
+ * Validates that the 'openCursorAt' and 'nextPlacementChangedAt' fields of the historical
+ * placement result are not set, and tasserts otherwise.
+ */
+void assertHistoricalPlacementHasNoSegment(const HistoricalPlacement& placement);
+
+}  // namespace mongo::change_streams

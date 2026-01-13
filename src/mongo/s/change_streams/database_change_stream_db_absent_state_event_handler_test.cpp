@@ -128,7 +128,7 @@ TEST_F(
 DEATH_TEST_REGEX_F(
     DatabaseDbAbsentStateEventHandlerFixtureDeathTest,
     Given_DatabaseCreatedControlEventWithPlacementInFuture_When_HandleEventIsCalled_Then_Throws,
-    "Tripwire assertion.*10915200") {
+    "Tripwire assertion.*10917001") {
     Timestamp clusterTime(100, 0);
     DatabaseCreatedControlEvent event;
     event.clusterTime = clusterTime;
@@ -183,7 +183,7 @@ TEST_F(
 
 DEATH_TEST_REGEX_F(DatabaseDbAbsentStateEventHandlerFixtureDeathTest,
                    When_HandleEventInDegradedModeIsCalled_Then_AlwaysThrows,
-                   "Tripwire assertion.*IllegalOperation") {
+                   "Tripwire assertion.*10922908") {
     handler().handleEventInDegradedMode(opCtx(), DatabaseCreatedControlEvent{}, ctx(), readerCtx());
 }
 

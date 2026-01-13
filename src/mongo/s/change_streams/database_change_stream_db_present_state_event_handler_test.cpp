@@ -81,6 +81,13 @@ public:
         return dynamic_cast<HistoricalPlacementFetcherMock&>(_ctx->getHistoricalPlacementFetcher());
     }
 
+    void assertNoCursorOperations() {
+        ASSERT_EQ(readerCtx().closeCursorOnConfigServerCount, 0);
+        ASSERT_TRUE(readerCtx().closeCursorsOnDataShardsCalls.empty());
+        ASSERT_TRUE(readerCtx().openCursorOnConfigServerCalls.empty());
+        ASSERT_TRUE(readerCtx().openCursorsOnDataShardsCalls.empty());
+    }
+
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     DatabaseChangeStreamShardTargeterDbPresentStateEventHandler _handler;
@@ -113,8 +120,7 @@ TEST_F(
 
         auto result = handler().handleEvent(opCtx(), event, ctx(), readerCtx());
         ASSERT_EQ(result, ShardTargeterDecision::kSwitchToV1);
-        ASSERT_TRUE(readerCtx().closeCursorsOnDataShardsCalls.empty());
-        ASSERT_TRUE(readerCtx().openCursorsOnDataShardsCalls.empty());
+        assertNoCursorOperations();
         ASSERT_TRUE(ctx().setHandlerCalls.empty());
     }
 }
@@ -229,9 +235,7 @@ TEST_F(
 
     auto result = handler().handleEvent(opCtx(), event, ctx(), readerCtx());
     ASSERT_EQ(result, ShardTargeterDecision::kContinue);
-
-    ASSERT_TRUE(readerCtx().openCursorsOnDataShardsCalls.empty());
-    ASSERT_TRUE(readerCtx().closeCursorsOnDataShardsCalls.empty());
+    assertNoCursorOperations();
 }
 
 TEST_F(
@@ -246,8 +250,7 @@ TEST_F(
 
     auto result = handler().handleEvent(opCtx(), event, ctx(), readerCtx());
     ASSERT_EQ(result, ShardTargeterDecision::kSwitchToV1);
-    ASSERT_TRUE(readerCtx().closeCursorsOnDataShardsCalls.empty());
-    ASSERT_TRUE(readerCtx().openCursorsOnDataShardsCalls.empty());
+    assertNoCursorOperations();
     ASSERT_TRUE(ctx().setHandlerCalls.empty());
 }
 
@@ -307,8 +310,7 @@ TEST_F(
 
     auto result = handler().handleEvent(opCtx(), event, ctx(), readerCtx());
     ASSERT_EQ(result, ShardTargeterDecision::kSwitchToV1);
-    ASSERT_TRUE(readerCtx().closeCursorsOnDataShardsCalls.empty());
-    ASSERT_TRUE(readerCtx().openCursorsOnDataShardsCalls.empty());
+    assertNoCursorOperations();
     ASSERT_TRUE(ctx().setHandlerCalls.empty());
 }
 
@@ -350,7 +352,7 @@ TEST_F(
 
 DEATH_TEST_REGEX_F(DatabaseDbPresentStateEventHandlerFixtureDeathTest,
                    When_HandleEventInDegradedModeIsCalled_Then_AlwaysThrows,
-                   "Tripwire assertion.*10917000") {
+                   "Tripwire assertion.*10922909") {
     handler().handleEventInDegradedMode(opCtx(), MovePrimaryControlEvent{}, ctx(), readerCtx());
 }
 

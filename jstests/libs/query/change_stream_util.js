@@ -866,3 +866,41 @@ export function assertPreImagesCollectionExists(db) {
     const clusteredIndexDescription = preImagesCollectionDescription.options.clusteredIndex;
     assert(clusteredIndexDescription, preImagesCollectionDescription);
 }
+
+/**
+ * Returns the current cluster time by issuing a 'hello' command to the server and extracting
+ * the cluster time from it.
+ */
+export function getClusterTime(db) {
+    return db.hello().$clusterTime.clusterTime;
+}
+
+/**
+ * Distributes collection data across multiple shards by splitting and moving chunks.
+ *
+ * @param {Object} db - The database object to execute admin commands on
+ * @param {Object} collection - The collection to distribute data for
+ * @param {Object} distributionConfig - Configuration object for data distribution
+ * @param {*} distributionConfig.middle - The split point for creating initial chunks
+ * @param {Array<Object>} distributionConfig.chunks - Array of chunk configurations to move
+ * @param {*} distributionConfig.chunks[].find - Query to identify the chunk to move
+ * @param {string} distributionConfig.chunks[].to - Target shard name to move the chunk to
+ */
+export function distributeCollectionDataOverShards(db, collection, distributionConfig) {
+    assert.commandWorked(
+        db.adminCommand({
+            split: collection.getFullName(),
+            middle: distributionConfig.middle,
+        }),
+    );
+    for (const chunkConfig of distributionConfig.chunks) {
+        assert.commandWorked(
+            db.adminCommand({
+                moveChunk: collection.getFullName(),
+                find: chunkConfig.find,
+                to: chunkConfig.to,
+                _waitForDelete: true,
+            }),
+        );
+    }
+}

@@ -53,7 +53,6 @@
 #include "mongo/db/topology/shard_registry.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/s/change_streams/change_stream_reader_builder_impl.h"
 #include "mongo/s/query/exec/establish_cursors.h"
 #include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/util/assert_util.h"
@@ -236,19 +235,19 @@ public:
     }
 
     void undoGetNextAndSetHighWaterMark(Timestamp highWaterMark) override {
-        _mergeCursors->undoNext();
-        _mergeCursors->setHighWaterMark(ResumeToken::makeHighWaterMarkToken(
-                                            highWaterMark, ResumeTokenData::kDefaultTokenVersion)
-                                            .toDocument()
-                                            .toBson());
+        // The high water mark token created here is only used in case the 'AsyncResultsMerger' has
+        // nothing to undo.
+        _mergeCursors->undoNext(ResumeToken::makeHighWaterMarkToken(
+                                    highWaterMark, ResumeTokenData::kDefaultTokenVersion)
+                                    .toDocument()
+                                    .toBson());
     }
 
     Timestamp getTimestampFromCurrentHighWaterMark() const override {
+        // The high water mark returned by the 'AsyncResultsMerger' has the format
+        // {"_data":"..."}, so we can parse it directly.
         BSONObj highWaterMark = _mergeCursors->getHighWaterMark();
-        tassert(10657533,
-                "Expected high-water mark to be an object",
-                highWaterMark.firstElement().type() == BSONType::object);
-        return ResumeToken::parse(highWaterMark.firstElement().Obj()).getData().clusterTime;
+        return ResumeToken::parse(highWaterMark).getData().clusterTime;
     }
 
 private:
@@ -626,7 +625,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamHandleTopologyC
     ChangeStream changeStream = ChangeStream::buildFromExpressionContext(expCtx);
 
     auto* serviceContext = expCtx->getOperationContext()->getServiceContext();
-    auto readerBuilder = ChangeStreamReaderBuilderImpl::get(serviceContext);
+    auto readerBuilder = ChangeStreamReaderBuilder::get(serviceContext);
     auto dataToShardsAllocationQueryService =
         DataToShardsAllocationQueryService::get(serviceContext);
 
@@ -1289,6 +1288,26 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
         }
     });
 
+    // Callback to clear the undo buffer of the underlying 'AsyncResultsMerger' instance. Note that
+    // there is no specific API to flush the undo buffer, but effectively it can be cleared by
+    // disabling and then re-enabling undo mode.
+    // The undo mode is always enabled when we enter this method. This is guaranteed by the state
+    // machine.
+    auto clearUndoBuffer = [&]() {
+        _params->cursorManager->disableUndoNextMode();
+        _params->cursorManager->enableUndoNextMode();
+    };
+
+    // Fetch next result from the predecessor $mergeCursors stage. The $mergeCursors stage itself
+    // will fetch the result from its 'BlockingResultsMerger' instance. The 'BlockingResultsMerger'
+    // can either retrieve a result from its underlying 'AsyncResultsMerger' if a result is ready,
+    // or return an ad-hoc "EOF" event in case the 'AsyncResultsMerger' is not ready to return a
+    // result.
+    // Because the 'getNext()' call here may not actually translate to a 'nextReady()' call in the
+    // underlying 'AsyncResultsMerger', we need to flush the 'AsyncResultsMerger's undo buffer
+    // first, so that a potential undo in case we reached the end of the change stream segment does
+    // not undo an already returned event.
+    clearUndoBuffer();
     auto input = pSource->getNext();
 
     Timestamp eventTimestamp = [&]() {
@@ -1304,16 +1323,36 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
     }();
 
     if (eventTimestamp >= *_segmentEndTimestamp) {
+        // End of change stream segment reached, and data was "overfetched". This means the result
+        // of the 'getNext()' call above needs to be undone.
         _segmentStartTimestamp = _segmentEndTimestamp;
         _segmentEndTimestamp.reset();
-
-        // Undo the effects of fetching the last event in the underlying results merger.
-        _params->cursorManager->undoGetNextAndSetHighWaterMark(*_segmentStartTimestamp);
 
         // Reset failure counter.
         _shardNotFoundFailuresInARow = 0;
         _setState(State::kFetchingStartingChangeStreamSegment);
+
+        // Undo the effects of fetching the last event in the underlying results merger.
+        // In case the above 'getNext()' call did not actually fetch a result from the
+        // 'AsyncResultsMerger', this will only reset the 'AsyncResultsMerger's high watermark. In
+        // case the above 'getNext()' pulled a proper result from the 'AsyncResultsMerger', the
+        // result will be put back into the 'AsyncResultsMerger' and the high watermark token will
+        // be reset to the previous value.
+        _params->cursorManager->undoGetNextAndSetHighWaterMark(*_segmentStartTimestamp);
+
+        // Return here without returning the event we just pulled, because we have already stashed
+        // it back into the underlying results merger. Returning the event from here as well would
+        // lead to the event being returned twice: once here, and once we when pull the next result
+        // from the underlying results merger (as this would return the "undone" result).
+        // The event just stashed will be handled by follow-up operations of the state machine,
+        // which will pull it from the merger again.
+        return boost::none;
     }
+
+    // Whenever we get here, the fetched event will be returned to consumers, so we will not be able
+    // to undo it. Clear the undo buffer here so that if it was buffered, we cannot undo it by
+    // mistake.
+    clearUndoBuffer();
 
     if (!input.isAdvancedControlDocument()) {
         return input;
@@ -1344,8 +1383,9 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
                     !readerContext.hasBufferedCursorRequests());
             return boost::none;
         case ShardTargeterDecision::kSwitchToV1:
-            _setState(State::kDowngrading);
-            return DocumentSource::GetNextResult::makeEOF();
+            tasserted(
+                10922904,
+                "shard targeter in ignoreRemovedShards mode should always return 'kContinue'");
     }
 
     MONGO_UNREACHABLE_TASSERT(10657522);
