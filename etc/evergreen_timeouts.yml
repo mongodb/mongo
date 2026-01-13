@@ -316,3 +316,11 @@ overrides:
       exec_timeout: 150 # 2.5 hours
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 600 # 10 hours
+
+  enterprise-rhel8-debug-tsan-all-feature-flags:
+    - task: concurrency_simultaneous
+      exec_timeout: 180 # 3 hours
+
+  enterprise-rhel8-debug-tsan-all-non-rollback-feature-flags:
+    - task: concurrency_simultaneous
+      exec_timeout: 180 # 3 hours
