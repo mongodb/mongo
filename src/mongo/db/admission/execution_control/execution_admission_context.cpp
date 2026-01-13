@@ -60,7 +60,10 @@ ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionCon
       _shortRunningFinalStats(other._shortRunningFinalStats),
       _longRunningFinalStats(other._longRunningFinalStats),
       _priorityLowered(other._priorityLowered.loadRelaxed()),
-      _opType(other._opType) {}
+      _opType(other._opType),
+      _statsFinalized(other._statsFinalized.loadRelaxed()),
+      _inMultiDocTxn(other._inMultiDocTxn.loadRelaxed()),
+      _wasInMultiDocTxn(other._wasInMultiDocTxn.loadRelaxed()) {}
 
 ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     const ExecutionAdmissionContext& other) {
@@ -75,11 +78,20 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     _longRunningFinalStats = other._longRunningFinalStats;
     _priorityLowered.store(other._priorityLowered.loadRelaxed());
     _opType = other._opType;
+    _statsFinalized.store(other._statsFinalized.loadRelaxed());
+    _inMultiDocTxn.store(other._inMultiDocTxn.loadRelaxed());
+    _wasInMultiDocTxn.store(other._wasInMultiDocTxn.loadRelaxed());
     return *this;
 }
 
-ExecutionAdmissionContext::FinalizedStats ExecutionAdmissionContext::finalizeStats(
+boost::optional<ExecutionAdmissionContext::FinalizedStats> ExecutionAdmissionContext::finalizeStats(
     int64_t cpuUsageMicros, int64_t elapsedMicros) {
+    bool expectedNotFinalized = false;
+    if (!_statsFinalized.compareAndSwap(&expectedNotFinalized, true)) {
+        // Stats have already been finalized, return none to indicate no action needed.
+        return boost::none;
+    }
+
     // Append CPU, elapsed time, and load-shed stats only if the operation is not composed solely of
     // exempted admissions.
     if (getAdmissions() > getExemptedAdmissions()) {
@@ -89,6 +101,7 @@ ExecutionAdmissionContext::FinalizedStats ExecutionAdmissionContext::finalizeSta
         auto& stats = _isLongRunning(true /* isFinalization */) ? _longRunningFinalStats
                                                                 : _shortRunningFinalStats;
 
+        stats.totalOpsFinished.fetchAndAddRelaxed(1);
         stats.totalCPUUsageMicros.fetchAndAddRelaxed(cpuUsageMicros);
         stats.totalElapsedTimeMicros.fetchAndAddRelaxed(elapsedMicros);
 
@@ -113,6 +126,7 @@ ExecutionAdmissionContext::FinalizedStats ExecutionAdmissionContext::finalizeSta
     result.readDelinquency = _readDelinquencyStats;
     result.writeDelinquency = _writeDelinquencyStats;
     result.wasDeprioritized = getPriorityLowered();
+    result.wasInMultiDocTxn = _wasInMultiDocTxn.loadRelaxed();
 
     return result;
 }
@@ -163,16 +177,24 @@ void ExecutionAdmissionContext::recordDelinquentAcquisition(Milliseconds delay) 
 }
 
 bool ExecutionAdmissionContext::_isLongRunning(bool isFinalization) const {
-    // An operation is considered "long running" if any of these conditions are true:
-    //   1. The deprioritization heuristic says it should be deprioritized (based on admissions).
-    //      Note that this is called AFTER the number of admissions was successfully accounted for,
-    //      so we need to decrease the number of admissions to match the state at decision time.
-    //   2. The operation was heuristically demoted at some point (priorityLowered flag).
-    //   3. The operation has an inherently low priority.
+    // Multi-document txns are never classified as "long running" because they are exempt from
+    // deprioritization.
+    if (_inMultiDocTxn.loadRelaxed()) {
+        return false;
+    }
+
+    // Calculate the admission count at decision time. When holding a ticket or during finalization,
+    // we decrement by 1 because the current admission has already been counted but the
+    // deprioritization decision was made before this admission.
     int32_t admissions = getAdmissions();
     if (isHoldingTicket() || isFinalization) {
         admissions -= 1;
     }
+
+    // An operation is considered "long running" if any of these conditions are true:
+    //   1. It exceeded the admission threshold (heuristic deprioritization).
+    //   2. It was explicitly deprioritized at some point (priorityLowered flag).
+    //   3. It has an inherently low priority.
     return shouldDeprioritize(admissions) || getPriorityLowered() ||
         getPriority() == AdmissionContext::Priority::kLow;
 }

@@ -599,9 +599,22 @@ int32_t TicketingSystem::numOfTicketsUsed() const {
 void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
                                              int64_t elapsedMicros,
                                              int64_t cpuUsageMicros) {
-    auto finalizedStats =
+    auto maybeFinalizedStats =
         ExecutionAdmissionContext::get(opCtx).finalizeStats(cpuUsageMicros, elapsedMicros);
+
+    // If stats were already finalized, skip to avoid double-counting.
+    if (!maybeFinalizedStats) {
+        return;
+    }
+
+    auto& finalizedStats = *maybeFinalizedStats;
     bool wasDeprioritized = finalizedStats.wasDeprioritized;
+
+    // Multi-document transactions are exempt from deprioritization and hold resources for extended
+    // periods by design. Exclude their delinquency stats to avoid inflating counters with noise.
+    if (finalizedStats.wasInMultiDocTxn) {
+        finalizedStats.clearDelinquencyStats();
+    }
 
     // Increment ticket holder (normal and low priority) statistics counters.
     auto priority =
@@ -626,20 +639,6 @@ void TicketingSystem::finalizeOperationStats(OperationContext* opCtx,
         _opsDeprioritized.fetchAndAddRelaxed(1);
     }
 
-    bool hadReadAdmissions = finalizedStats.readShort.totalAdmissions.loadRelaxed() > 0 ||
-        finalizedStats.readLong.totalAdmissions.loadRelaxed() > 0;
-    if (hadReadAdmissions) {
-        auto& bucket = wasDeprioritized ? _operationStats.readLong : _operationStats.readShort;
-        bucket.totalOpsFinished.fetchAndAddRelaxed(1);
-    }
-
-    bool hadWriteAdmissions = finalizedStats.writeShort.totalAdmissions.loadRelaxed() > 0 ||
-        finalizedStats.writeLong.totalAdmissions.loadRelaxed() > 0;
-    if (hadWriteAdmissions) {
-        auto& bucket = wasDeprioritized ? _operationStats.writeLong : _operationStats.writeShort;
-        bucket.totalOpsFinished.fetchAndAddRelaxed(1);
-    }
-
     _admissionsHistogram.record(ExecutionAdmissionContext::get(opCtx).getAdmissions());
 }
 
@@ -647,6 +646,9 @@ boost::optional<Ticket> TicketingSystem::waitForTicketUntil(OperationContext* op
                                                             OperationType o,
                                                             Date_t until) const {
     ExecutionAdmissionContext* admCtx = &ExecutionAdmissionContext::get(opCtx);
+
+    // Capture the multi-document transaction state at ticket acquisition.
+    admCtx->setInMultiDocTxn(opCtx->inMultiDocumentTransaction());
 
     boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> executionPriority;
 

@@ -32,6 +32,8 @@
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/modules.h"
 
+#include <boost/optional.hpp>
+
 namespace mongo {
 
 class OperationContext;
@@ -157,13 +159,36 @@ public:
 
         // Whether this operation was deprioritized.
         bool wasDeprioritized = false;
+
+        // Whether this operation was in a multi-document transaction.
+        bool wasInMultiDocTxn = false;
+
+        void clearDelinquencyStats() {
+            readDelinquency = ec::DelinquencyStats{};
+            writeDelinquency = ec::DelinquencyStats{};
+            readShort.delinquencyStats = ec::DelinquencyStats{};
+            readLong.delinquencyStats = ec::DelinquencyStats{};
+            writeShort.delinquencyStats = ec::DelinquencyStats{};
+            writeLong.delinquencyStats = ec::DelinquencyStats{};
+        }
     };
 
     /**
      * Finalizes the operation's stats by recording CPU/elapsed time and returning a snapshot of all
-     * accumulated stats.
+     * accumulated stats. Returns boost::none if stats have already been finalized.
      */
-    FinalizedStats finalizeStats(int64_t cpuUsageMicros, int64_t elapsedMicros);
+    boost::optional<FinalizedStats> finalizeStats(int64_t cpuUsageMicros, int64_t elapsedMicros);
+
+    /**
+     * Sets the inMultiDocTxn flag to the provided value.
+     */
+    void setInMultiDocTxn(bool inMultiDocTxn) {
+        _inMultiDocTxn.store(inMultiDocTxn);
+
+        if (inMultiDocTxn) {
+            _wasInMultiDocTxn.store(true);
+        }
+    }
 
 private:
     /**
@@ -215,6 +240,16 @@ private:
 
     // Current operation type (read or write).
     ec::OperationType _opType{ec::OperationType::kRead};
+
+    // True if finalizeStats() has been called. Prevents double-counting stats.
+    Atomic<bool> _statsFinalized{false};
+
+    // True if the operation was in a multi-document transaction at the time of the ticket
+    // acquisition.
+    Atomic<bool> _inMultiDocTxn{false};
+
+    // True if the operation was ever in a multi-document transaction. Once set to true, stays true.
+    Atomic<bool> _wasInMultiDocTxn{false};
 };
 
 }  // namespace mongo

@@ -103,6 +103,7 @@ OperationFinalizedStats::OperationFinalizedStats(const OperationFinalizedStats& 
 OperationFinalizedStats& OperationFinalizedStats::operator=(const OperationFinalizedStats& other) {
     totalCPUUsageMicros.storeRelaxed(other.totalCPUUsageMicros.loadRelaxed());
     totalElapsedTimeMicros.storeRelaxed(other.totalElapsedTimeMicros.loadRelaxed());
+    totalOpsFinished.storeRelaxed(other.totalOpsFinished.loadRelaxed());
     totalOpsLoadShed.storeRelaxed(other.totalOpsLoadShed.loadRelaxed());
     totalCPUUsageLoadShed.storeRelaxed(other.totalCPUUsageLoadShed.loadRelaxed());
     totalElapsedTimeMicrosLoadShed.storeRelaxed(other.totalElapsedTimeMicrosLoadShed.loadRelaxed());
@@ -114,6 +115,7 @@ OperationFinalizedStats& OperationFinalizedStats::operator=(const OperationFinal
 OperationFinalizedStats& OperationFinalizedStats::operator+=(const OperationFinalizedStats& other) {
     totalCPUUsageMicros.fetchAndAddRelaxed(other.totalCPUUsageMicros.loadRelaxed());
     totalElapsedTimeMicros.fetchAndAddRelaxed(other.totalElapsedTimeMicros.loadRelaxed());
+    totalOpsFinished.fetchAndAddRelaxed(other.totalOpsFinished.loadRelaxed());
     totalOpsLoadShed.fetchAndAddRelaxed(other.totalOpsLoadShed.loadRelaxed());
     totalCPUUsageLoadShed.fetchAndAddRelaxed(other.totalCPUUsageLoadShed.loadRelaxed());
     totalElapsedTimeMicrosLoadShed.fetchAndAddRelaxed(
@@ -127,6 +129,7 @@ OperationFinalizedStats& OperationFinalizedStats::operator+=(const OperationFina
 void OperationFinalizedStats::appendStats(BSONObjBuilder& b) const {
     b.append("totalCPUUsageMicros", totalCPUUsageMicros.loadRelaxed());
     b.append("totalElapsedTimeMicros", totalElapsedTimeMicros.loadRelaxed());
+    b.append("totalOpsFinished", totalOpsFinished.loadRelaxed());
     b.append("totalOpsLoadShed", totalOpsLoadShed.loadRelaxed());
     b.append("totalCPUUsageLoadShed", totalCPUUsageLoadShed.loadRelaxed());
     b.append("totalElapsedTimeMicrosLoadShed", totalElapsedTimeMicrosLoadShed.loadRelaxed());
@@ -142,7 +145,6 @@ OperationExecutionStats& OperationExecutionStats::operator=(const OperationExecu
     totalTimeQueuedMicros.storeRelaxed(other.totalTimeQueuedMicros.loadRelaxed());
     totalTimeProcessingMicros.storeRelaxed(other.totalTimeProcessingMicros.loadRelaxed());
     totalAdmissions.storeRelaxed(other.totalAdmissions.loadRelaxed());
-    totalOpsFinished.storeRelaxed(other.totalOpsFinished.loadRelaxed());
     delinquencyStats = other.delinquencyStats;
     return *this;
 }
@@ -151,7 +153,6 @@ OperationExecutionStats& OperationExecutionStats::operator+=(const OperationExec
     totalTimeQueuedMicros.fetchAndAddRelaxed(other.totalTimeQueuedMicros.loadRelaxed());
     totalTimeProcessingMicros.fetchAndAddRelaxed(other.totalTimeProcessingMicros.loadRelaxed());
     totalAdmissions.fetchAndAddRelaxed(other.totalAdmissions.loadRelaxed());
-    totalOpsFinished.fetchAndAddRelaxed(other.totalOpsFinished.loadRelaxed());
     delinquencyStats += other.delinquencyStats;
     return *this;
 }
@@ -160,7 +161,6 @@ void OperationExecutionStats::appendStats(BSONObjBuilder& b) const {
     b.append("totalTimeProcessingMicros", totalTimeProcessingMicros.loadRelaxed());
     b.append("totalTimeQueuedMicros", totalTimeQueuedMicros.loadRelaxed());
     b.append("totalAdmissions", totalAdmissions.loadRelaxed());
-    b.append("totalOpsFinished", totalOpsFinished.loadRelaxed());
     delinquencyStats.appendStats(b);
 }
 }  // namespace mongo::admission::execution_control

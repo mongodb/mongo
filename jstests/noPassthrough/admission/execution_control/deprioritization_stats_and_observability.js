@@ -520,6 +520,7 @@ describe("Execution control statistics and observability", function () {
     describe("Short/long running operation statistics", function () {
         const dbName = jsTestName();
         const collName = "testcoll";
+        const findComment = "short_long_running_test";
 
         const kNumDocs = 1000;
         const kNumReadTickets = 5;
@@ -533,7 +534,6 @@ describe("Execution control statistics and observability", function () {
             "totalTimeProcessingMicros",
             "totalTimeQueuedMicros",
             "totalAdmissions",
-            "totalOpsFinished",
             "totalDelinquentAcquisitions",
             "totalAcquisitionDelinquencyMillis",
             "maxAcquisitionDelinquencyMillis",
@@ -543,6 +543,7 @@ describe("Execution control statistics and observability", function () {
         const finalizedStatsKeys = [
             "totalCPUUsageMicros",
             "totalElapsedTimeMicros",
+            "totalOpsFinished",
             "totalOpsLoadShed",
             "totalCPUUsageLoadShed",
             "totalElapsedTimeMicrosLoadShed",
@@ -726,16 +727,23 @@ describe("Execution control statistics and observability", function () {
         });
 
         it("should increment shortRunning stats for a single read", function () {
-            const beforeStats = getExecutionControlStats(mongod).read.shortRunning;
+            const beforeStats = getExecutionControlStats(mongod).shortRunning;
             coll.find({_id: 1}).toArray();
-            const afterStats = getExecutionControlStats(mongod).read.shortRunning;
+            const afterStats = getExecutionControlStats(mongod).shortRunning;
             assert.gt(afterStats.totalOpsFinished, beforeStats.totalOpsFinished);
         });
 
         it("should increment shortRunning stats for a single write", function () {
-            const beforeStats = getExecutionControlStats(mongod).write.shortRunning;
+            const beforeStats = getExecutionControlStats(mongod).shortRunning;
             coll.insertOne({x: 1});
-            const afterStats = getExecutionControlStats(mongod).write.shortRunning;
+            const afterStats = getExecutionControlStats(mongod).shortRunning;
+            assert.gt(afterStats.totalOpsFinished, beforeStats.totalOpsFinished);
+        });
+
+        it("should increment longRunning stats for a long running read", function () {
+            const beforeStats = getExecutionControlStats(mongod).longRunning;
+            runDeprioritizedFind(coll, findComment);
+            const afterStats = getExecutionControlStats(mongod).longRunning;
             assert.gt(afterStats.totalOpsFinished, beforeStats.totalOpsFinished);
         });
 
