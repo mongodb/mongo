@@ -274,10 +274,18 @@ CreateCollCatalogIdentifier acquireCatalogIdentifierForCreate(
         catalogIdentifiers.idIndexIdent = storageEngine->generateNewIndexIdent(nss.dbName());
     }
 
+    auto mdbCatalog = storageEngine->getMDBCatalog();
+    invariant(mdbCatalog,
+              fmt::format("MDB catalog unavailable - unable to create collection {}; "
+                          "collection ident: {}; _id index ident: {}; (idents auto-generated?: {})",
+                          nss.toStringForErrorMsg(),
+                          catalogIdentifiers.ident,
+                          catalogIdentifiers.idIndexIdent.value_or("(no _id index ident)"),
+                          !providedIdentifier));
+
     // The acquired catalogId can be different than one specified in the 'providedIdentifier' unless
     // disaggregated storage is enabled.
-    catalogIdentifiers.catalogId =
-        acquireCatalogId(opCtx, providedIdentifier, storageEngine->getMDBCatalog());
+    catalogIdentifiers.catalogId = acquireCatalogId(opCtx, providedIdentifier, mdbCatalog);
     return catalogIdentifiers;
 }
 
