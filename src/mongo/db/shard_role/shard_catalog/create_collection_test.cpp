@@ -815,6 +815,70 @@ TEST_F(CreateCollectionTest, TestCollectionCreationChecks) {
         createCollectionTestCase(
             opCtx.get(), systemNss, options, ErrorCodes::OperationNotSupportedInTransaction);
     }
+
+    // Cannot create a timeseries collection with $-prefixed metafield
+    {
+        auto opCtx = makeOpCtx();
+        CollectionOptions options;
+        options.timeseries = TimeseriesOptions("ts");
+        options.timeseries->setMetaField("$meta"_sd);
+        createCollectionTestCase(opCtx.get(), nss, options, ErrorCodes::BadValue);
+    }
+
+    // Cannot create a timeseries collection with $-prefixed timefield
+    {
+        auto opCtx = makeOpCtx();
+        CollectionOptions options;
+        options.timeseries = TimeseriesOptions("$time");
+        createCollectionTestCase(opCtx.get(), nss, options, ErrorCodes::BadValue);
+    }
 }
+
+TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsTimeseries) {
+    NamespaceString newNss = NamespaceString::createNamespaceString_forTest("test.newColl");
+
+    auto opCtx = makeOpCtx();
+    ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
+
+    auto uuid = UUID::gen();
+    Lock::DBLock lock(opCtx.get(), newNss.dbName(), MODE_IX);
+
+    const auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(newNss);
+    cmd.getCreateCollectionRequest().setTimeseries(tsOptions);
+
+    ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                          newNss.dbName(),
+                                          uuid,
+                                          cmd.toBSON(),
+                                          /*allowRenameOutOfTheWay*/ false));
+
+    ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
+}
+
+// In the ApplyOps path, $-prefixed timeField or metaField should be allowed
+TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsTimeseriesDollarPrefix) {
+    NamespaceString newNss = NamespaceString::createNamespaceString_forTest("test.newColl");
+
+    auto opCtx = makeOpCtx();
+    ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
+
+    auto uuid = UUID::gen();
+    Lock::DBLock lock(opCtx.get(), newNss.dbName(), MODE_IX);
+
+    auto tsOptions = TimeseriesOptions("$ts");
+    tsOptions.setMetaField("$meta"_sd);
+    CreateCommand cmd = CreateCommand(newNss);
+    cmd.getCreateCollectionRequest().setTimeseries(tsOptions);
+
+    ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                          newNss.dbName(),
+                                          uuid,
+                                          cmd.toBSON(),
+                                          /*allowRenameOutOfTheWay*/ false));
+
+    ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
+}
+
 }  // namespace
 }  // namespace mongo

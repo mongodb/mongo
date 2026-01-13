@@ -1136,6 +1136,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-integration-search/OWNERS.yml
 /jstests/multiVersion/genericBinVersion/query-integration-search/ @10gen/query-integration-search @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-integration-timeseries/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/query-integration-timeseries/ @10gen/query-integration-timeseries @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-optimization/OWNERS.yml
 /jstests/multiVersion/genericBinVersion/query-optimization/ @10gen/query-optimization @svc-auto-approve-bot
 

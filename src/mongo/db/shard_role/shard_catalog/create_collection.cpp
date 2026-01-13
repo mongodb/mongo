@@ -413,6 +413,12 @@ Status _performCollectionCreationChecks(OperationContext* opCtx,
                           << " within a transaction.",
             !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
 
+    uassert(ErrorCodes::BadValue,
+            "The 'timeField' or 'metaField' cannot start with '$'",
+            !options.timeseries.has_value() ||
+                (!options.timeseries->getTimeField().starts_with('$') &&
+                 !options.timeseries->getMetaField().value_or("").starts_with('$')));
+
     return Status::OK();
 }
 
