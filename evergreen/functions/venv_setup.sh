@@ -112,6 +112,18 @@ fi
 
 cd src
 
+# Fix for Python 3.13+ on Windows: Python 3.11.4+ converts VIRTUAL_ENV to Cygwin path format
+# (e.g., /cygdrive/c/path) when running under Cygwin/MSYS bash, but sys.prefix remains a
+# Windows path (e.g., C:\path). This breaks Poetry's venv detection since it compares these
+# paths. Normalize VIRTUAL_ENV back to Windows format so Poetry can detect the venv correctly.
+# See: https://github.com/python/cpython/issues/103088
+if [ "Windows_NT" = "$OS" ] && [ -n "$VIRTUAL_ENV" ]; then
+    if [[ "$VIRTUAL_ENV" == /cygdrive/* ]] || [[ "$VIRTUAL_ENV" == /[a-z]/* ]]; then
+        VIRTUAL_ENV=$(cygpath -w "$VIRTUAL_ENV")
+        export VIRTUAL_ENV
+    fi
+fi
+
 # Loop 5 times to retry full venv install
 # We have seen weird network errors that can sometimes mess up the pip install
 # By retrying we would like to only see errors that happen consistently
