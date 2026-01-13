@@ -21,13 +21,6 @@ const ignoredParams = [
     "cwspTestNeedsLatestFCV",
 ];
 
-// The maxAnchorCompactionSize field was added in 7.1.
-function cleanFleCompactionOptions(param) {
-    if ("maxAnchorCompactionSize" in param) {
-        delete param.maxAnchorCompactionSize;
-    }
-}
-
 // TODO SERVER-116449: Remove this function.
 // The default value of 'internalVectorSearchStoredSource' changed from false to true in 8.3.
 function cleanInternalVectorSearchStoredSource(param) {
@@ -40,7 +33,6 @@ function cleanInternalVectorSearchStoredSource(param) {
 // that parameter in any valid FCV version to remove any version inconsistencies between FCVs.
 // If a cluster parameter is changed between versions, a new entry should be added to this map.
 const changedParamsMap = {
-    "fleCompactionOptions": cleanFleCompactionOptions,
     // TODO SERVER-116449: Remove `internalVectorSearchStoredSource` from this map.
     "internalVectorSearchStoredSource": cleanInternalVectorSearchStoredSource,
 };

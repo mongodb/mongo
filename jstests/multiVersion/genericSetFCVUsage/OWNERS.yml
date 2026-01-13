@@ -99,3 +99,7 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "cluster_parameters_disabled_correctly_after_downgrade.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
+      - 10gen/server-fcv
