@@ -62,9 +62,11 @@
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/session_establishment_rate_limiter_utils.h"
 #include "mongo/transport/session_workflow.h"
+#include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/cidr.h"
+#include "mongo/util/processinfo.h"
 
 #if !defined(_WIN32)
 #include <sys/resource.h>
@@ -84,6 +86,21 @@ using namespace fmt::literals;
 namespace {
 bool quiet() {
     return serverGlobalParams.quiet.load();
+}
+
+boost::optional<std::size_t> calculateSafeConnectionLimit() {
+    invariant(transport::gMemoryCapPercentageForPreAuthBuffers > 0 &&
+              transport::gMemoryCapPercentageForPreAuthBuffers <= 100);
+    if (transport::gMemoryCapPercentageForPreAuthBuffers == 100) {
+        return {};
+    }
+
+    const auto maxPreAuthBufferSizeBytes = transport::gPreAuthMaximumMessageSizeBytes.load();
+    const auto totalMemoryBytes = ProcessInfo::getMemSizeMB() * 1024 * 1024;
+    const auto maxMemoryForPreAuthBuffersBytes =
+        (totalMemoryBytes * transport::gMemoryCapPercentageForPreAuthBuffers) / 100;
+
+    return maxMemoryForPreAuthBuffersBytes / maxPreAuthBufferSizeBytes;
 }
 
 /** Some diagnostic data that we will want to log about a Client after its death. */
@@ -145,6 +162,15 @@ size_t getSupportedMax() {
               " --maxConns too high, can only handle {limit}",
               " --maxConns too high",
               "limit"_attr = supportedMax);
+    }
+
+    const auto safeConnectionLimit = calculateSafeConnectionLimit();
+    if (safeConnectionLimit && *safeConnectionLimit < supportedMax) {
+        LOGV2_WARNING(
+            11621101,
+            "Overriding max connections to honor `capMemoryConsumptionForPreAuthBuffers` settings",
+            "limit"_attr = *safeConnectionLimit);
+        return *safeConnectionLimit;
     }
 
     return supportedMax;

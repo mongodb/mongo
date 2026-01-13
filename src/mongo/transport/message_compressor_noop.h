@@ -39,6 +39,10 @@ public:
         return inputSize;
     }
 
+    boost::optional<std::size_t> getMaxDecompressedSize(ConstDataRange input) override {
+        return boost::none;
+    }
+
     StatusWith<std::size_t> compressData(ConstDataRange input, DataRange output) override try {
         output.write(input);
         counterHitCompress(input.length(), input.length());

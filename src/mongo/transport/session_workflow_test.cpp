@@ -41,9 +41,13 @@
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
@@ -53,8 +57,12 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/message_compressor_registry.h"
+#include "mongo/transport/message_compressor_snappy.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl.h"
@@ -67,6 +75,7 @@
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -944,6 +953,43 @@ TEST_F(SessionWorkflowWithBorrowedThreadsTest, ExhaustLoop) {
 
 TEST_F(SessionWorkflowWithBorrowedThreadsTest, MoreToComeLoop) {
     runSteps(convertStepsToBorrowed(moreToComeLoop()));
+}
+
+TEST_F(SessionWorkflowTest, OversizedDecompressedMessage) {
+    auto* authzManager = AuthorizationManager::get(getServiceContext());
+    authzManager->setAuthEnabled(true);
+    ScopeGuard resetAuth([authzManager] { authzManager->setAuthEnabled(false); });
+
+    auto& registry = MessageCompressorRegistry::get();
+    const auto& compressorNames = registry.getCompressorNames();
+    if (std::ranges::find(compressorNames, "snappy") == compressorNames.end()) {
+        registry.setSupportedCompressors({"snappy"});
+        registry.registerImplementation(std::make_unique<SnappyMessageCompressor>());
+        uassertStatusOK(registry.finalizeSupportedCompressors());
+    }
+
+    RAIIServerParameterControllerForTest maxSizeController{"preAuthMaximumMessageSizeBytes", 1024};
+
+    startSession();
+
+    const size_t bufferSize =
+        MsgData::MsgDataHeaderSize + MessageCompressorManager::CompressionHeader::size();
+    auto buffer = SharedBuffer::allocate(bufferSize);
+    MsgData::View msgView(buffer.get());
+    msgView.setId(1);
+    msgView.setResponseToMsgId(0);
+    msgView.setOperation(dbCompressed);
+    msgView.setLen(bufferSize);
+
+    DataRangeCursor cursor(msgView.data(), msgView.data() + msgView.dataLen());
+    const auto snappyId = static_cast<MessageCompressorId>(MessageCompressor::kSnappy);
+    MessageCompressorManager::CompressionHeader header(dbMsg, 2048, snappyId);
+    header.serialize(&cursor);
+
+    expect<Event::sessionSourceMessage>(StatusWith{Message(buffer)});
+
+    expect<Event::sepEndSession>();
+    joinSessions();
 }
 
 }  // namespace

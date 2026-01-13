@@ -41,6 +41,7 @@
 
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/config.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -112,6 +113,18 @@ void ping(SyncClient& client) {
     msg.header().setId(0);
     OpMsg::appendChecksum(&msg);
     ASSERT_EQ(client.write(msg.buf(), msg.size()), std::error_code{});
+}
+
+/**
+ * Returns the current value of a network metric by name.
+ * The metricName should be the field name under metrics.network (e.g.,
+ * "totalMessageSizeErrorPreAuth").
+ */
+long long getNetworkMetric(StringData metricName) {
+    BSONObjBuilder bob;
+    globalMetricTree()->appendTo(bob);
+    auto obj = bob.obj();
+    return obj["metrics"]["network"][metricName].Long();
 }
 
 transport::AsioTransportLayer::Options defaultTLAOptions() {
@@ -435,6 +448,153 @@ TEST(AsioTransportLayer, SourceSyncTimeoutSucceeds) {
     SyncClient conn(tf.tla().listenerPort());
     ping(conn);  // This time we send a message
     ASSERT_OK(received.get().getStatus());
+}
+
+/**
+ * Test that when the session is in restricted mode (pre-auth), messages with a size
+ * larger than preAuthMaximumMessageSizeBytes are rejected with a ProtocolError.
+ */
+TEST(AsioTransportLayer, UnauthenticatedConnectionRejectsOversizedMessage) {
+    // Set pre-auth max message size to a small value for testing (1024 bytes).
+    // We also disable the post-header timeout to isolate message size validation.
+    RAIIServerParameterControllerForTest maxSizeController{"preAuthMaximumMessageSizeBytes", 1024};
+
+    TestFixture tf;
+    Notification<StatusWith<Message>> received;
+    tf.sep().setOnStartSession([&](transport::test::SessionThread& st) {
+        st.schedule([&](auto& session) {
+            // Put the session in restricted mode (pre-auth).
+            session.setRestrictedMode(true);
+            received.set(session.sourceMessage());
+        });
+    });
+
+    SyncClient conn(tf.tla().listenerPort());
+
+    const auto errorsBefore = getNetworkMetric("totalMessageSizeErrorPreAuth");
+
+    static constexpr size_t kHeaderSize = sizeof(MSGHEADER::Value);
+    // Claim a message size larger than our configured preAuthMaximumMessageSizeBytes (1024).
+    static constexpr int32_t kOversizedMessageSize = 2048;
+
+    char headerBuffer[kHeaderSize];
+    MSGHEADER::View header(headerBuffer);
+    header.setMessageLength(kOversizedMessageSize);
+    header.setRequestMsgId(0);
+    header.setResponseToMsgId(0);
+    header.setOpCode(dbMsg);
+
+    // Send the header with an oversized message length. The server should reject this
+    // immediately after reading the header due to the pre-auth message size limit.
+    auto ec = conn.write(headerBuffer, kHeaderSize);
+    ASSERT_FALSE(ec) << errorMessage(ec);
+
+    auto result = received.get();
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::ProtocolError)
+        << "Expected ProtocolError when message size exceeds preAuthMaximumMessageSizeBytes, got: "
+        << result.getStatus();
+
+    // Verify the pre-auth message size error metric was incremented.
+    ASSERT_EQ(getNetworkMetric("totalMessageSizeErrorPreAuth"), errorsBefore + 1)
+        << "totalMessageSizeErrorPreAuth metric should increment on oversized pre-auth message";
+}
+
+/**
+ * Test that when the session is NOT in restricted mode (post-auth), messages larger than
+ * preAuthMaximumMessageSizeBytes are allowed (up to MaxMessageSizeBytes).
+ */
+TEST(AsioTransportLayer, AuthenticatedConnectionAllowsLargerMessages) {
+    // Set pre-auth max message size to a small value for testing (1024 bytes).
+    const auto preAuthMaxMsgSize = 1024;
+    RAIIServerParameterControllerForTest maxSizeController{"preAuthMaximumMessageSizeBytes",
+                                                           preAuthMaxMsgSize};
+
+    TestFixture tf;
+    Notification<transport::test::SessionThread*> mockSessionCreated;
+    tf.sep().setOnStartSession(
+        [&](transport::test::SessionThread& st) { mockSessionCreated.set(&st); });
+
+    SyncClient conn(tf.tla().listenerPort());
+    auto& st = *mockSessionCreated.get();
+
+    const auto preAuthErrorsBefore = getNetworkMetric("totalMessageSizeErrorPreAuth");
+    const auto postAuthErrorsBefore = getNetworkMetric("totalMessageSizeErrorPostAuth");
+
+    Notification<StatusWith<Message>> done;
+    st.schedule([&](auto& session) {
+        // NOT in restricted mode - simulates an authenticated connection.
+        session.setRestrictedMode(false);
+        done.set(session.sourceMessage());
+    });
+
+    // Build and send a message that is larger than preAuthMaximumMessageSizeBytes (1024)
+    // but valid for an authenticated connection.
+    OpMsgBuilder builder;
+    builder.setBody(BSON("ping" << 1 << "padding" << std::string(1024, 'x')));
+    Message msg = builder.finish();
+    msg.header().setResponseToMsgId(0);
+    msg.header().setId(0);
+    OpMsg::appendChecksum(&msg);
+
+    // Verify the message size is larger than our configured pre-auth limit.
+    ASSERT_GT(msg.size(), preAuthMaxMsgSize)
+        << "Test message should be larger than preAuthMaximumMessageSizeBytes";
+
+    auto ec = conn.write(msg.buf(), msg.size());
+    ASSERT_FALSE(ec) << errorMessage(ec);
+
+    // Should succeed since we're not in restricted mode.
+    ASSERT_OK(done.get().getStatus()) << "Authenticated connections should accept messages larger "
+                                         "than preAuthMaximumMessageSizeBytes";
+
+    // Verify neither message size error metric was incremented.
+    ASSERT_EQ(getNetworkMetric("totalMessageSizeErrorPreAuth"), preAuthErrorsBefore)
+        << "totalMessageSizeErrorPreAuth should not increment for authenticated connections";
+    ASSERT_EQ(getNetworkMetric("totalMessageSizeErrorPostAuth"), postAuthErrorsBefore)
+        << "totalMessageSizeErrorPostAuth should not increment for valid messages";
+}
+
+/**
+ * Test that pre-auth message size validation correctly accepts messages within the limit.
+ */
+TEST(AsioTransportLayer, UnauthenticatedConnectionAcceptsValidSizedMessage) {
+    // Set pre-auth max message size large enough to accept our test message.
+    RAIIServerParameterControllerForTest maxSizeController{"preAuthMaximumMessageSizeBytes", 16384};
+
+    TestFixture tf;
+    Notification<StatusWith<Message>> received;
+    tf.sep().setOnStartSession([&](transport::test::SessionThread& st) {
+        st.schedule([&](auto& session) {
+            session.setRestrictedMode(true);
+            received.set(session.sourceMessage());
+        });
+    });
+
+    SyncClient conn(tf.tla().listenerPort());
+
+    const auto errorsBefore = getNetworkMetric("totalMessageSizeErrorPreAuth");
+
+    // Build and send a valid message smaller than preAuthMaximumMessageSizeBytes.
+    OpMsgBuilder builder;
+    builder.setBody(BSON("ping" << 1));
+    Message msg = builder.finish();
+    msg.header().setResponseToMsgId(0);
+    msg.header().setId(0);
+    OpMsg::appendChecksum(&msg);
+
+    // Verify the message size is within our configured pre-auth limit.
+    ASSERT_LT(msg.size(), 16384) << "Test message should be within preAuthMaximumMessageSizeBytes";
+
+    auto ec = conn.write(msg.buf(), msg.size());
+    ASSERT_FALSE(ec) << errorMessage(ec);
+
+    // Should succeed since message is within the pre-auth limit.
+    ASSERT_OK(received.get().getStatus())
+        << "Pre-auth connections should accept messages within preAuthMaximumMessageSizeBytes";
+
+    // Verify no error metrics were incremented.
+    ASSERT_EQ(getNetworkMetric("totalMessageSizeErrorPreAuth"), errorsBefore)
+        << "totalMessageSizeErrorPreAuth should not increment for valid-sized pre-auth messages";
 }
 
 /** Switching from timeouts to no timeouts must reset the timeout to unlimited. */

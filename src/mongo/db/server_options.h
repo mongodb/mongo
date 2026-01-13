@@ -84,8 +84,10 @@ struct ServerGlobalParams {
     int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
     bool moveParanoia = false;             // for move chunk paranoia
 
-    bool noUnixSocket = false;    // --nounixsocket
-    bool doFork = false;          // --fork
+    bool noUnixSocket = false;  // --nounixsocket
+    bool doFork = false;        // --fork
+    bool isMongoBridge = false;
+
     std::string socket = "/tmp";  // UNIX domain socket directory
     std::string transportLayer;   // --transportLayer (must be either "asio" or "legacy")
 

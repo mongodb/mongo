@@ -129,6 +129,8 @@ def generate_independent_parameters(rng, mode):
     ret["minSnapshotHistoryWindowInSeconds"] = rng.choice([300, rng.randint(5, 600)])
     # TODO (SERVER-75632): Uncomment this to enable passthrough testing.
     # ret["lockCodeSegmentsInMemory"] = rng.choice([True, False])
+    ret["preAuthMaximumMessageSizeBytes"] = rng.randint(65536, 16777216)
+    ret["capMemoryConsumptionForPreAuthBuffers"] = rng.randint(80, 100)
 
     return ret
 
