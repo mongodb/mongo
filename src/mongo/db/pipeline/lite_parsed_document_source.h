@@ -590,8 +590,8 @@ private:
     static const ParserMap& getParserMap();
 
     std::string _parseTimeName;
-    AllowedWithApiStrict _apiStrict;
-    AllowedWithClientType _clientType;
+    AllowedWithApiStrict _apiStrict = AllowedWithApiStrict::kAlways;
+    AllowedWithClientType _clientType = AllowedWithClientType::kAny;
 };
 
 /**
