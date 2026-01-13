@@ -1817,7 +1817,7 @@ last-lts:
   - test_file: jstests/sharding/resharding_commit_monitor_repl_lag.js
     ticket: SERVER-103932
   - test_file: jstests/sharding/txn_lookup_hits_migration_conflict_all_colls_local.js
-    ticket: SERVER-107535    
+    ticket: SERVER-107535
   - test_file: jstests/replsets/insert_documents_close_to_size_limit.js
     ticket: SERVER-113532
   - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
