@@ -79,7 +79,13 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
         }
 
         try {
-            scopedShardRoles.emplace_back(opCtx, nss, shardVersion, dbVersion);
+            // Versioning checks are safely disabled for UNTRACKED collections when no
+            // DatabaseVersion is set, as the resulting query plan remains correct in case of stale
+            // routing info. For more details, see comment above regarding UNTRACKED collections.
+            const auto disableCheckVersioningCorrectness =
+                !dbVersion && shardVersion == ShardVersion::UNTRACKED() ? true : false;
+            scopedShardRoles.emplace_back(
+                opCtx, nss, shardVersion, dbVersion, disableCheckVersioningCorrectness);
         } catch (const ExceptionFor<ErrorCodes::IllegalChangeToExpectedDatabaseVersion>&) {
             // Only one can be correct. Check css and the new one.
             const auto scopedDss = DatabaseShardingState::acquire(opCtx, nss.dbName());

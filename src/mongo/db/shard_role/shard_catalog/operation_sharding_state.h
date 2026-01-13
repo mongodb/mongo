@@ -55,7 +55,8 @@ public:
     ScopedSetShardRole(OperationContext* opCtx,
                        NamespaceString nss,
                        boost::optional<ShardVersion> shardVersion,
-                       boost::optional<DatabaseVersion> databaseVersion);
+                       boost::optional<DatabaseVersion> databaseVersion,
+                       bool disableCheckVersioningCorrectness = false);
     ScopedSetShardRole(const ScopedSetShardRole&) = delete;
     ScopedSetShardRole(ScopedSetShardRole&&);
     ~ScopedSetShardRole();
@@ -155,7 +156,8 @@ public:
     static void setShardRole(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<ShardVersion>& shardVersion,
-                             const boost::optional<DatabaseVersion>& dbVersion);
+                             const boost::optional<DatabaseVersion>& dbVersion,
+                             bool disableCheckVersioningCorrectness = false);
 
     /**
      * Returns the shard version (i.e. maximum chunk version) of a namespace being used by the

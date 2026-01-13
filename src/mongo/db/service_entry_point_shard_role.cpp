@@ -1921,7 +1921,16 @@ void ExecCommandDatabase::_initiateCommand() {
                 auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
 
                 if (coll && coll->getTimeseriesOptions()) {
-                    OperationShardingState::setShardRole(opCtx, bucketNss, shardVersion, {});
+                    // To guard against stale mongos instances, we intentionally enter the shard
+                    // role with an invalid <dbVersion, shardVersion> combination. This forces the
+                    // shard to go through the shard versioning protocol rather than bypassing it.
+                    // As a result, we must disable the versioning correctness check.
+                    OperationShardingState::setShardRole(
+                        opCtx,
+                        bucketNss,
+                        shardVersion,
+                        {},
+                        true /* disableCheckVersioningCorrectness */);
                 }
             }
         }

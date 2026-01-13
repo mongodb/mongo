@@ -87,12 +87,49 @@ bool OperationShardingState::shouldBeTreatedAsFromRouter(OperationContext* opCtx
 void OperationShardingState::setShardRole(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const boost::optional<ShardVersion>& shardVersion,
+                                          const boost::optional<DatabaseVersion>& databaseVersion,
+                                          bool disableCheckVersioningCorrectness) {
+    auto checkVersioningCorrectness = [opCtx, &nss](
+                                          const boost::optional<ShardVersion>& shardVersion,
                                           const boost::optional<DatabaseVersion>& databaseVersion) {
+        if (shardVersion || databaseVersion) {
+            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            if (feature_flags::gFeatureFlagCheckVersioningCorrectness.isEnabled(
+                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+                const bool isIgnoredPlacementVersion =
+                    shardVersion && ShardVersion::isPlacementVersionIgnored(*shardVersion);
+                const bool isShardVersionUntracked =
+                    shardVersion && *shardVersion == ShardVersion::UNTRACKED();
+                const bool hasDbVersion = databaseVersion.has_value();
+                const bool hasShardVersion = shardVersion.has_value();
+                const bool isValidCombination = isIgnoredPlacementVersion ||
+                    (hasDbVersion && (!hasShardVersion || isShardVersionUntracked)) ||
+                    (!hasDbVersion && !isShardVersionUntracked);
+                tassert(10169100,
+                        fmt::format("Violation of the database/shard "
+                                    "versioning protocol for {}. Found combination: <{}, {}>, "
+                                    "valid combinations: "
+                                    "[<dbVersion, none>, <dbVersion, UNTRACKED>, "
+                                    "<none/dbVersion, IGNORED>, "
+                                    "<none, shardVersion>].",
+                                    nss.toStringForErrorMsg(),
+                                    hasDbVersion ? databaseVersion->toString() : "none",
+                                    hasShardVersion ? shardVersion->toString() : "none"),
+                        isValidCombination);
+            }
+        }
+    };
+
     auto& oss = OperationShardingState::get(opCtx);
 
     if (shardVersion && shardVersion != ShardVersion::UNTRACKED()) {
         tassert(
             6300900, "Attaching a shard version requires a non db-only namespace", !nss.isDbOnly());
+    }
+
+    if (!disableCheckVersioningCorrectness) {
+        // Ensure that command requests are sent with a valid <dbVersion, shardVersion> combination
+        checkVersioningCorrectness(shardVersion, databaseVersion);
     }
 
     bool shardVersionInserted = false;
@@ -247,7 +284,8 @@ ScopedAllowImplicitCollectionCreate_UNSAFE::~ScopedAllowImplicitCollectionCreate
 ScopedSetShardRole::ScopedSetShardRole(OperationContext* opCtx,
                                        NamespaceString nss,
                                        boost::optional<ShardVersion> shardVersion,
-                                       boost::optional<DatabaseVersion> databaseVersion)
+                                       boost::optional<DatabaseVersion> databaseVersion,
+                                       const bool disableCheckVersioningCorrectness)
     : _opCtx(opCtx),
       _nss(std::move(nss)),
       _shardVersion(std::move(shardVersion)),
@@ -263,7 +301,8 @@ ScopedSetShardRole::ScopedSetShardRole(OperationContext* opCtx,
         _shardVersion.reset();
     }
 
-    OperationShardingState::setShardRole(_opCtx, _nss, _shardVersion, _databaseVersion);
+    OperationShardingState::setShardRole(
+        _opCtx, _nss, _shardVersion, _databaseVersion, disableCheckVersioningCorrectness);
 }
 
 ScopedSetShardRole::ScopedSetShardRole(ScopedSetShardRole&& other)
