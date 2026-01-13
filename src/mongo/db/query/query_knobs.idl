@@ -644,7 +644,7 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: "AtomicWord<long long>"
         cpp_varname: gInternalMaxGroupAccumulatorsInSbe
-        default: 16
+        default: 25
         validator:
             gte: 0
         redact: false

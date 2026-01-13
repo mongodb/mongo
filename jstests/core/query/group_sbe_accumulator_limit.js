@@ -34,10 +34,10 @@ import {getAllNodeExplains, getPlanStages} from "jstests/libs/query/analyze_plan
 import {checkSbeStatus, kFeatureFlagSbeFullEnabled, kSbeDisabled} from "jstests/libs/query/sbe_util.js";
 
 /*
- * The 'internalMaxGroupAccumulatorsInSbe' query knob is 16 by default. Check that nothing in the
+ * The 'internalMaxGroupAccumulatorsInSbe' query knob is 25 by default. Check that nothing in the
  * environment has modified it.
  */
-const expectedMaxGroupAccumulatorsInSbe = 16;
+const expectedMaxGroupAccumulatorsInSbe = 25;
 
 const maxGroupAccumulatorsInSbeParameterValues = FixtureHelpers.mapOnEachShardNode({
     db: db.getSiblingDB("admin"),
