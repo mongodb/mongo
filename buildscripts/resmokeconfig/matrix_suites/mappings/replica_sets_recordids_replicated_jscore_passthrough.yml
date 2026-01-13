@@ -1,6 +1,3 @@
 base_suite: replica_sets_jscore_passthrough
-eval:
+overrides:
   - "recordids_replicated.enable"
-
-excludes:
-  - "recordids_replicated.excluded_files"
