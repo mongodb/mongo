@@ -42,10 +42,15 @@ BSONObj extractLetShape(BSONObj letSpec,
 
     BSONObjBuilder bob;
     for (BSONElement elem : letSpec) {
-        auto expr = Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState);
-        auto redactedValue = expr->serialize(opts);
-        // Note that this will throw on deeply nested let variables.
-        redactedValue.addToBsonObj(&bob, opts.serializeFieldPathFromString(elem.fieldName()));
+        // Exclude built in variables in let expressions. Let expressions with system variables are
+        // only added by a router and have known reparse errors. The variables will appear in the
+        // query shape on the node where the command originated.
+        if (!Variables::isBuiltin(elem.fieldName())) {
+            auto expr = Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState);
+            auto redactedValue = expr->serialize(opts);
+            // Note that this will throw on deeply nested let variables.
+            redactedValue.addToBsonObj(&bob, opts.serializeFieldPathFromString(elem.fieldName()));
+        }
     }
     return bob.obj();
 }

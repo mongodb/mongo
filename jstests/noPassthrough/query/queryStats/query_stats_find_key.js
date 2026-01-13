@@ -82,13 +82,12 @@ const findKeyFields = [
 /**
  * Regression test for SERVER-85532: $hint syntax will not be validated if the collection does not
  * exist. Make sure that query stats can still handle an invalid hint. See SERVER-85500.
- *
- * @param testDB
  */
-function validateInvalidHint(testDB) {
+function validateInvalidHint(coll) {
     const collName = "invalid_hint_coll";
-    let coll = testDB[collName];
-    coll.drop();
+    const testDB = coll.getDB();
+    let hintColl = testDB[collName];
+    hintColl.drop();
     // $hint is supposed to be a string or object, but this works:
     assert.commandWorked(
         testDB.runCommand({
@@ -98,6 +97,27 @@ function validateInvalidHint(testDB) {
     );
     const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: collName});
     assert.eq(entry.key.hint, {$hint: "?number"});
+}
+
+function validateSystemVariables(coll) {
+    const collName = "system_var";
+    const testDB = coll.getDB();
+    let varColl = testDB[collName];
+    varColl.drop();
+    // Insert one document, so find has to do some work.
+    assert.commandWorked(varColl.insertOne({document: 1}));
+    assert.commandWorked(
+        testDB.runCommand({
+            find: collName,
+            filter: {$expr: {$and: [{$eq: ["$document", "$$ROOT"]}, {$gte: ["$$NOW", ISODate("2000-01-01")]}]}},
+            // This will be correctly treated as a string and not an internal system variable.
+            projection: {"NOW": 0},
+        }),
+    );
+    const entry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: collName});
+    const queryShape = entry.key.queryShape;
+    assert.eq(queryShape.filter, {$expr: {$and: [{$eq: ["$document", "$$ROOT"]}, {$gte: ["$$NOW", "?date"]}]}});
+    assert.eq(queryShape.projection, {"NOW": false});
 }
 
 withQueryStatsEnabled(collName, (coll) => {
@@ -113,4 +133,5 @@ withQueryStatsEnabled(collName, (coll) => {
     });
 
     validateInvalidHint(coll);
+    validateSystemVariables(coll);
 });

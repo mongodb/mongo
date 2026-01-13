@@ -41,7 +41,21 @@ class RunQueryStats(Hook):
                     assert "metrics" in operation
                     assert "asOf" in operation
         except pymongo.errors.OperationFailure as err:
-            if self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES:
+            errMsg = err.details.get("errmsg")
+            # The analyze command cannot be re-parsed (see SERVER-85374). Since this is a test only
+            # command, it is low priority to fix this issue, and therefore we ignore the reparse
+            # errors in this hook. The analyze command desugars into an aggregation pipeline that
+            # includes the "system.statistics" collection and the '$_internalConstructStats'
+            # accumulator. Since the aggregation pipeline can be slightly different based on user
+            # inputs, we do a best guess here that we are running analyze.
+            analyzeCmdReparseErr = (
+                "Failed to re-parse query" in errMsg
+                and "$_internalConstructStats" in errMsg
+                and "system.statistics" in errMsg
+            )
+            if analyzeCmdReparseErr or (
+                self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES
+            ):
                 self.logger.info(
                     "Encountered an error while running $queryStats. "
                     "$queryStats will not be run for this test."

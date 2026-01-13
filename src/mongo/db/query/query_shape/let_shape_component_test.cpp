@@ -60,5 +60,14 @@ TEST(CmdWithLetShapeTest, SizeOfComponentWithAndWithoutLet) {
     ASSERT_LT(componentsWithNoLet->size(), componentsWithLet->size());
 }
 
+TEST(CmdWithLetShapeTest, SizeOfComponentWithSystemVarLet) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto let = fromjson(R"({ROOT: 4})");
+    auto componentsWithLet = std::make_unique<LetShapeComponent>(let, expCtx);
+    auto componentsWithNoLet = std::make_unique<LetShapeComponent>(boost::none, expCtx);
+
+    ASSERT_EQ(componentsWithNoLet->size(), componentsWithLet->size());
+}
+
 }  // namespace
 }  // namespace mongo::query_shape

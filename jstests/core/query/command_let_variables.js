@@ -369,34 +369,28 @@ result = assert.commandWorked(testDB.runCommand({find: coll.getName(), filter: {
 assert.eq(result.length, 0);
 
 // Test that reserved names are not allowed as let variable names.
-assert.commandFailedWithCode(
-    testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, let: {Reserved: "failure"}}),
-    ErrorCodes.FailedToParse,
-);
-assert.commandFailedWithCode(
-    testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, let: {NOW: "failure"}}),
-    4738901,
-);
-assert.commandFailedWithCode(
-    testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, let: {CLUSTER_TIME: "failure"}}),
-    4738901,
-);
-assert.commandFailedWithCode(
-    testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, let: {IS_MR: "failure"}}),
-    4738901,
-);
-assert.commandFailedWithCode(
-    testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, let: {JS_SCOPE: "failure"}}),
-    4738901,
-);
-assert.commandFailedWithCode(
-    testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, let: {ROOT: "failure"}}),
-    ErrorCodes.FailedToParse,
-);
-assert.commandFailedWithCode(
-    testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, let: {REMOVE: "failure"}}),
-    ErrorCodes.FailedToParse,
-);
+[
+    {name: "Reserved", errorCode: ErrorCodes.FailedToParse},
+    {name: "REMOVE", errorCode: ErrorCodes.FailedToParse},
+    {name: "ROOT", errorCode: ErrorCodes.FailedToParse},
+    {name: "NOW", errorCode: 4738901},
+    {name: "CLUSTER_TIME", errorCode: 4738901},
+    {name: "IS_MR", errorCode: 4738901},
+    {name: "JS_SCOPE", errorCode: 4738901},
+].forEach((caseInfo) => {
+    const reservedName = caseInfo.name;
+    const expectedError = caseInfo.errorCode;
+    assert.commandFailedWithCode(
+        testDB.runCommand({aggregate: coll.getName(), pipeline: [], cursor: {}, let: {[reservedName]: "failure"}}),
+        expectedError,
+        `Expected an aggregate with the variable ${reservedName} to fail.`,
+    );
+    assert.commandFailedWithCode(
+        testDB.runCommand({update: coll.getName(), updates: [{q: {}, u: []}], let: {[reservedName]: "failure"}}),
+        expectedError,
+        `Expected a pipeline style update with the variable ${reservedName} to fail.`,
+    );
+});
 
 // Test that let variables can be used within views.
 assert.commandWorked(

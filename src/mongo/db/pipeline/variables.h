@@ -254,6 +254,13 @@ public:
     }
 
     /**
+     * Return true if the passed-in variable name belongs to a builtin variable.
+     */
+    static auto isBuiltin(const char* name) {
+        return kBuiltinVarNameToId.find(name) != kBuiltinVarNameToId.end();
+    }
+
+    /**
      * Define the value of the $$USER_ROLES variable.
      */
     void defineUserRoles(OperationContext* opCtx);

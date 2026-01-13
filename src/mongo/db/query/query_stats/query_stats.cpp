@@ -373,8 +373,13 @@ void registerRequest(OperationContext* opCtx,
         return;
     }
 
-    // Don't record queries from internal clients.
-    if (opCtx->getClient()->isInternalClient()) {
+    // Don't record queries from internal clients if the feature flag is disabled.
+    if (!feature_flags::gFeatureFlagQueryStatsForInternalClients.isEnabled() &&
+        opCtx->getClient()->isInternalClient()) {
+        LOGV2_DEBUG(11434101,
+                    5,
+                    "not collecting query stats for this internal request",
+                    "collection"_attr = collection);
         return;
     }
 

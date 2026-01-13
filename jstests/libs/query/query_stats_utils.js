@@ -293,6 +293,7 @@ export function getQueryStatsWithTransform(
 export function getQueryStatsAggCmd(
     db,
     options = {
+        collName: "",
         transformIdentifiers: false,
         hmacKey: kDefaultQueryStatsHmacKey,
     },
@@ -310,16 +311,20 @@ export function getQueryStatsAggCmd(
         };
     }
 
+    let matchExpr = {
+        "key.queryShape.command": "aggregate",
+        "key.queryShape.pipeline.0.$queryStats": {$exists: false},
+        "key.client.application.name": kShellApplicationName,
+    };
+
+    if (options.collName) {
+        matchExpr["key.queryShape.cmdNs.coll"] = options.collName;
+    }
+
     pipeline = [
         queryStatsStage,
         // Filter out find queries and $queryStats aggregations.
-        {
-            $match: {
-                "key.queryShape.command": "aggregate",
-                "key.queryShape.pipeline.0.$queryStats": {$exists: false},
-                "key.client.application.name": kShellApplicationName,
-            },
-        },
+        {$match: matchExpr},
         // Sort on key so entries are in a deterministic order.
         {$sort: {key: 1}},
     ];

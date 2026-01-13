@@ -355,3 +355,9 @@ feature_flags:
         cpp_varname: gFeatureFlagMergeStageInsertWithUpdateBackup
         default: true
         fcv_gated: false
+
+    featureFlagQueryStatsForInternalClients:
+        description: "Feature flag to enable collecting query stats for queries from internal clients."
+        cpp_varname: gFeatureFlagQueryStatsForInternalClients
+        default: false
+        fcv_gated: false
