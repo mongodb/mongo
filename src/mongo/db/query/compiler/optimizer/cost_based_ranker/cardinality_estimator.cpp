@@ -477,19 +477,6 @@ EqualityPrefix equalityPrefix(const IndexBounds* node) {
     return EqualityPrefix{std::move(eqPrefix), isEqPrefix};
 }
 
-/**
- * Given IndexBounds, returns true if the bounds contain a range interval that intersects with the
- * null point interval.
- */
-bool boundsRangeIncludingNull(const IndexBounds& bounds) {
-    for (const auto& oil : bounds.fields) {
-        if (!oil.isPoint() && oil.intersectsInterval(IndexBoundsBuilder::kNullPointInterval)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     if (!isIndexScanSupported(*node)) {
         // Fallback to multiplanning
@@ -529,11 +516,8 @@ CEResult CardinalityEstimator::estimate(const IndexScanNode* node) {
     // Estimate the number of keys in the index scan interval.
     // We can avoid computing input selectivity for sampling CE on point queries over non-multikey
     // fields without residual filter, as input cardinality is equal to output cardinality.
-    // We exclude from this optimization bounds that include range intervals that include the
-    // null value, due to the mismatch in evaluating null values and missing fields over index and
-    // sample.
     if (_rankerMode != QueryPlanRankerModeEnum::kSamplingCE || node->index.multikey ||
-        node->filter || boundsRangeIncludingNull(node->bounds)) {
+        node->filter) {
         auto ceRes1 = estimate(&node->bounds);
         if (!ceRes1.isOK()) {
             return ceRes1;

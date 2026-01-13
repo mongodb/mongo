@@ -20,6 +20,11 @@ assert.commandWorked(coll.insert({a: 2, b: 2}));
 assert.commandWorked(coll.insert({a: 2, b: 1}));
 assert.commandWorked(coll.insert({a: 1, b: 2}));
 assert.commandWorked(coll.insert({a: 20, b: 20}));
+assert.commandWorked(coll.insert({a: 1, b: null}));
+assert.commandWorked(coll.insert({a: null, b: 20}));
+assert.commandWorked(coll.insert({b: 20}));
+assert.commandWorked(coll.insert({b: 21}));
+assert.commandWorked(coll.insert({a: null}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: -1}));
 
@@ -37,17 +42,17 @@ try {
      * The index is read forwards because the sort predicate specifies ascending order and thus the
      * index interval bounds are ascending.
      */
-    runTest({}, {a: 1}, 5, {a: ["[MinKey, MaxKey]"]}, "forward");
+    runTest({}, {a: 1}, 10, {a: ["[MinKey, MaxKey]"]}, "forward");
     /**
      * The index is read backwards because the sort predicate specifies descending order and thus
      * the index interval bounds are descending.
      */
-    runTest({}, {a: -1}, 5, {a: ["[MaxKey, MinKey]"]}, "backward");
+    runTest({}, {a: -1}, 10, {a: ["[MaxKey, MinKey]"]}, "backward");
     /**
      * The index is defined with descending order so the index is technically read forwards, but
      * the important part is that the index interval bounds are descending.
      */
-    runTest({}, {b: -1}, 5, {b: ["[MaxKey, MinKey]"]}, "forward");
+    runTest({}, {b: -1}, 10, {b: ["[MaxKey, MinKey]"]}, "forward");
     /**
      * The index is read forwards because the sort predicate specifies ascending order and thus the
      * index interval bounds are ascending.
@@ -73,6 +78,18 @@ try {
      * the index interval bounds are descending.
      */
     runTest({a: {$gt: 1}, b: {$lte: 20}}, {a: -1}, 3, {a: ["[inf, 1.0)"]}, "backward");
+    /**
+     * Test that intervals containing null are estimated correctly.
+     */
+    runTest({a: {$ne: 1}}, {a: 1}, 7, {a: ["[MinKey, 1.0)", "(1.0, MaxKey]"]}, "forward");
+    runTest({a: {$ne: 1}}, {a: -1}, 7, {a: ["[MaxKey, 1.0)", "(1.0, MinKey]"]}, "backward");
+    runTest({b: {$ne: 1}}, {b: 1}, 8, {b: ["[MinKey, 1.0)", "(1.0, MaxKey]"]}, "backward");
+    runTest({b: {$ne: 1}}, {b: -1}, 8, {b: ["[MaxKey, 1.0)", "(1.0, MinKey]"]}, "forward");
+    /**
+     * Test that {$exists: false} is estimated correctly.
+     */
+    runTest({a: {$exists: false}}, {}, 2, {a: ["[null, null]"]}, "forward");
+    runTest({b: {$exists: false}}, {}, 1, {b: ["[null, null]"]}, "forward");
 } finally {
     /** Ensure that query knob doesn't leak into other testcases in the suite. */
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
