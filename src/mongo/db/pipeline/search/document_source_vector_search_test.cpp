@@ -33,10 +33,13 @@
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/query/search/mongot_options.h"
+#include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/death_test.h"
 
 
 namespace mongo {
@@ -290,6 +293,38 @@ TEST_F(DocumentSourceVectorSearchTest, BadInputsRedactCorrectly) {
             }
         })",
         redact(*vectorStage));
+}
+
+using DocumentSourceVectorSearchDeathTest = DocumentSourceVectorSearchTest;
+
+DEATH_TEST_F(DocumentSourceVectorSearchDeathTest,
+             TassertsWhenRouterSendsExtensionFlagButExtensionNotLoaded,
+             "11632200") {
+    auto opCtx = getExpCtx()->getOperationContext();
+
+    // Set shard role to simulate request coming from mongos.
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx, nss, ShardVersion::UNTRACKED(), boost::none /* databaseVersion */};
+
+    // Simulate router sending featureFlagVectorSearchExtension=true.
+    auto& flag = feature_flags::gFeatureFlagVectorSearchExtension;
+    std::vector<BSONObj> flagValues{BSON("name" << flag.getName() << "value" << true)};
+    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>(flagValues);
+
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            queryVector: [1.0, 2.0],
+            path: "x",
+            numCandidates: 100,
+            limit: 10
+        }
+    })");
+
+    // Parse the $vectorSearch stage. Since the extension is not loaded (only the fallback parser
+    // is registered), this should trigger the tassert when the router sent the flag as true.
+    LiteParsedDocumentSource::parse(
+        nss, spec, LiteParserOptions{.ifrContext = ifrContext, .opCtx = opCtx});
 }
 
 }  // namespace

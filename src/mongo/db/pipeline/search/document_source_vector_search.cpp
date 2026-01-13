@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/search/vector_search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_index_view_validation.h"
@@ -52,11 +53,23 @@ using boost::intrusive_ptr;
 
 // Register the legacy parser as a fallback. This parser will be used when
 // featureFlagVectorSearchExtension is disabled or when the vector search extension has not been
-// loaded.
-REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(vectorSearch,
-                                              VectorSearchLiteParsed::parse,
-                                              AllowedWithApiStrict::kNeverInVersion1,
-                                              &feature_flags::gFeatureFlagVectorSearchExtension);
+// loaded. Errors if the router sent the flag as true but the extension is not loaded.
+REGISTER_LITE_PARSED_DOCUMENT_SOURCE_FALLBACK(
+    vectorSearch,
+    [](const NamespaceString& nss,
+       const BSONElement& spec,
+       const LiteParserOptions& options) -> std::unique_ptr<LiteParsedDocumentSource> {
+        tassert(11632200,
+                "Router sent featureFlagVectorSearchExtension=true but the extension is not loaded "
+                "on this shard.",
+                !(options.opCtx && OperationShardingState::isComingFromRouter(options.opCtx) &&
+                  options.ifrContext &&
+                  options.ifrContext->getSavedFlagValue(
+                      feature_flags::gFeatureFlagVectorSearchExtension)));
+        return VectorSearchLiteParsed::parse(nss, spec, options);
+    },
+    AllowedWithApiStrict::kNeverInVersion1,
+    &feature_flags::gFeatureFlagVectorSearchExtension);
 
 REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(vectorSearch,
                                                    DocumentSourceVectorSearch,

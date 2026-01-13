@@ -131,7 +131,7 @@ public:
                     !aggregationRequest.getQuerySettings().has_value());
 
         return std::make_unique<Invocation>(
-            this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
+            this, opMsgRequest, std::move(aggregationRequest), std::move(privileges), opCtx);
     }
 
     bool allowedWithSecurityToken() const final {
@@ -167,7 +167,8 @@ public:
         Invocation(Command* cmd,
                    const OpMsgRequest& request,
                    AggregateCommandRequest aggregationRequest,
-                   PrivilegeVector privileges)
+                   PrivilegeVector privileges,
+                   OperationContext* opCtx)
             : CommandInvocation(cmd),
               _request(request),
               _dbName(aggregationRequest.getDbName()),
@@ -178,7 +179,8 @@ public:
                   }
                   return std::make_shared<IncrementalFeatureRolloutContext>();
               }()),
-              _liteParsedPipeline(_aggregationRequest, false, {.ifrContext = _ifrContext}),
+              _liteParsedPipeline(
+                  _aggregationRequest, false, {.ifrContext = _ifrContext, .opCtx = opCtx}),
               _privileges(std::move(privileges)) {
             auto externalDataSources = _aggregationRequest.getExternalDataSources();
             // Support collection-less aggregate commands without $_externalDataSources.

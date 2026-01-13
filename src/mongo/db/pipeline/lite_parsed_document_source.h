@@ -76,6 +76,8 @@ struct LiteParserOptions {
     // consistent parser selection across the query execution, especially when flag values are
     // modified mid-query.
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr;
+
+    OperationContext* opCtx = nullptr;
 };
 
 namespace exec::agg {
