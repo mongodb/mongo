@@ -31,16 +31,15 @@
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/mongo_uri.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/mutex.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <fstream>
+#include <ios>
 #include <vector>
 
 namespace mongo {
@@ -76,7 +75,7 @@ PerformanceReporter::~PerformanceReporter() {
 }
 
 void PerformanceReporter::open(StringData uri, const std::string& filename) {
-    _outFile.open(filename, std::ios::binary | std::ios::out);
+    _outFile.open(filename, std::ios::binary | std::ios::out | std::ios_base::trunc);
     uassert(ErrorCodes::ReplayClientInternalError,
             "Impossible to create performance report file for MongoR. Be sure that "
             "permissions have been set correctly.",
@@ -88,6 +87,7 @@ void PerformanceReporter::open(StringData uri, const std::string& filename) {
 void PerformanceReporter::close() {
     if (isPerfRecordingEnabled()) {
         write(_packets);
+        _packets.clear();
         _outFile.close();
     }
 }
@@ -139,7 +139,7 @@ void PerformanceReporter::write(const std::vector<PerformancePacket>& packets) {
 PerformanceRecording PerformanceReporter::read(const std::string& fileName) {
     std::ifstream inputFile(fileName, std::ios::binary | std::ios::in);
     uassert(ErrorCodes::ReplayClientInternalError,
-            fmt::format("Impossible to read the content for the file: {}", fileName),
+            fmt::format("Failed to open perf file: {}", fileName),
             inputFile);
 
     // A recording perf file is stored in this format:
@@ -168,17 +168,21 @@ void PerformanceReporter::writePacket(const PerformancePacket& packet) {
 }
 
 PerformancePacket PerformanceReporter::readPacket(std::ifstream& inFile) {
-    const auto messageLen = sizeof(PerformancePacket);
-    std::array<char, messageLen> buf;  // Stack-based array
-    inFile.read(buf.data(), messageLen);
+    static const auto kMessageLen = sizeof(PerformancePacket);
+    std::array<char, kMessageLen> buf;  // Stack-based array
+    inFile.read(buf.data(), kMessageLen);
     uassert(ErrorCodes::ReplayClientInternalError,
-            "Reading perf record from disk has failed (invalid input file).",
-            inFile);
+            fmt::format("Reading perf record failed at offset:{}", (size_t)inFile.tellg()),
+            !(inFile.fail() || inFile.eof()));
     ConstDataRangeCursor cdr(buf.data(), buf.data() + buf.size());
     uint64_t sessionId = cdr.readAndAdvance<LittleEndian<uint64_t>>();
     uint64_t messageId = cdr.readAndAdvance<LittleEndian<uint64_t>>();
     int64_t time = cdr.readAndAdvance<LittleEndian<int64_t>>();
     uint64_t ncount = cdr.readAndAdvance<LittleEndian<uint64_t>>();
+
+    // Reminder to update readPacket/writePacket if fields are added to PerformancePacket.
+    static_assert(sizeof(PerformancePacket) == sizeof(uint64_t) * 4);
+
     return PerformancePacket{sessionId, messageId, time, ncount};
 }
 
@@ -197,19 +201,21 @@ uint64_t PerformanceReporter::extractNumberOfDocuments(const BSONObj& response) 
 }
 
 std::string PerformanceReporter::readURI(std::ifstream& inFile) {
-    StringData::size_type uriLen;
+    StringData::size_type uriLen = 0;
     inFile.read((char*)(&uriLen), sizeof(uriLen));
     uassert(ErrorCodes::ReplayClientInternalError,
-            "Reading perf record from disk has failed (invalid uri len).",
-            uriLen != 0);
+            "Reading perf file URI length header failed",
+            !(inFile.fail() || inFile.eof()));
+    if (!uriLen) {
+        return {};
+    }
     std::string buf;
     buf.resize(uriLen);
     inFile.read(buf.data(), uriLen);
-    auto uri = ConstDataRangeCursor(buf.data(), buf.data() + uriLen).readAndAdvance<StringData>();
     uassert(ErrorCodes::ReplayClientInternalError,
-            "Reading perf record from disk has failed (mongo uri is not correct).",
-            uri.size() == uriLen);
-    return std::string(uri);
+            "Reading perf file URI failed",
+            !(inFile.fail() || inFile.eof()));
+    return buf;
 }
 
 void PerformanceReporter::writeURI(StringData uri) {

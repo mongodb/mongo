@@ -29,12 +29,8 @@
 
 #include "mongo/replay/performance_reporter.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/replay/test_packet.h"
 #include "mongo/unittest/unittest.h"
 
-#include <fstream>
 #include <string>
 #include <vector>
 

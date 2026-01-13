@@ -30,14 +30,11 @@
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/platform/atomic.h"
 #include "mongo/replay/replay_command.h"
 #include "mongo/replay/session_scheduler.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 
 #include <fstream>
-#include <tuple>
 
 namespace mongo {
 
@@ -87,7 +84,6 @@ private:
     void writePacket(const PerformancePacket&);
     void writeURI(StringData);
     bool isPerfRecordingEnabled() const;
-    static std::string toFileName(StringData);
     static PerformancePacket readPacket(std::ifstream& inFile);
     static std::string readURI(std::ifstream& inFile);
     static uint64_t extractNumberOfDocuments(const BSONObj& response);
