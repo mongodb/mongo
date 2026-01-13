@@ -410,4 +410,117 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
               sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
 }
 
+/**
+ * A parse node that expands to multiple stages (3 stages) for testing multi-stage expansion
+ * in the DPL merging pipeline.
+ */
+class MultiExpandMergingParseNode : public sdk::AggStageParseNode {
+public:
+    static constexpr std::string_view kStageName = "$multiExpandMerging";
+    static constexpr size_t kExpansionSize = 3;
+
+    MultiExpandMergingParseNode() : sdk::AggStageParseNode(kStageName) {}
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<VariantNodeHandle> expand() const override {
+        std::vector<VariantNodeHandle> out;
+        out.reserve(kExpansionSize);
+
+        // Expands to 3 stages:
+        // 1) Extension AST node -> DocumentSourceExtensionOptimizable.
+        out.emplace_back(new sdk::ExtensionAggStageAstNode(
+            sdk::shared_test_stages::TransformAggStageAstNode::make()));
+
+        // 2) Host $match -> DocumentSourceMatch.
+        out.emplace_back(
+            new host::HostAggStageParseNode(sdk::shared_test_stages::TransformHostParseNode::make(
+                BSON("$match" << BSON("merged" << true)))));
+
+        // 3) Host $limit -> DocumentSourceLimit.
+        out.emplace_back(new host::HostAggStageParseNode(
+            sdk::shared_test_stages::TransformHostParseNode::make(BSON("$limit" << 10))));
+
+        return out;
+    }
+
+    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+        return BSON(std::string(kStageName) << BSONObj());
+    }
+
+    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
+        return std::make_unique<MultiExpandMergingParseNode>();
+    }
+};
+
+/**
+ * A logical stage that returns DPL with a merging pipeline containing a single parse node
+ * that expands to multiple DocumentSources.
+ */
+class MultiExpandDPLLogicalStage : public sdk::shared_test_stages::TransformLogicalAggStage {
+public:
+    static constexpr std::string_view kStageName = "$multiExpandDPL";
+
+    MultiExpandDPLLogicalStage()
+        : sdk::shared_test_stages::TransformLogicalAggStage(kStageName, BSONObj()) {}
+
+    boost::optional<sdk::DistributedPlanLogic> getDistributedPlanLogic() const override {
+        sdk::DistributedPlanLogic dpl;
+
+        // Merging pipeline: a single parse node that expands to 3 DocumentSources.
+        std::vector<VariantDPLHandle> mergingElements;
+        mergingElements.emplace_back(
+            new sdk::ExtensionAggStageParseNode(std::make_unique<MultiExpandMergingParseNode>()));
+        dpl.mergingPipeline = sdk::DPLArrayContainer(std::move(mergingElements));
+
+        return dpl;
+    }
+
+    static std::unique_ptr<sdk::LogicalAggStage> make() {
+        return std::make_unique<MultiExpandDPLLogicalStage>();
+    }
+};
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       distributedPlanLogicExpandsParseNodeToMultipleStages) {
+    // Create a stage whose DPL merging pipeline contains a single parse node that expands to 3
+    // DocumentSources.
+    auto logicalStage =
+        new sdk::ExtensionLogicalAggStage(std::make_unique<MultiExpandDPLLogicalStage>());
+    auto logicalStageHandle = LogicalAggStageHandle(logicalStage);
+
+    auto optimizable = host::DocumentSourceExtensionOptimizable::create(
+        getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
+
+    auto dpl = optimizable->distributedPlanLogic();
+    ASSERT_TRUE(dpl.has_value());
+
+    const auto& logic = dpl.get();
+
+    // Verify shards pipeline is empty.
+    ASSERT_EQ(logic.shardsStage, nullptr);
+
+    // Verify merging pipeline has 3 stages from the single parse node that expanded.
+    ASSERT_EQ(logic.mergingStages.size(), 3U);
+
+    auto it = logic.mergingStages.begin();
+
+    // First stage: extension DocumentSourceExtensionOptimizable ($transformStage).
+    ASSERT_NE(*it, nullptr);
+    ASSERT_EQ(std::string((*it)->getSourceName()),
+              sdk::shared_test_stages::TransformAggStageDescriptor::kStageName);
+
+    // Second stage: host $match.
+    ++it;
+    ASSERT_NE(*it, nullptr);
+    ASSERT_EQ(std::string((*it)->getSourceName()), "$match");
+
+    // Third stage: host $limit.
+    ++it;
+    ASSERT_NE(*it, nullptr);
+    ASSERT_EQ(std::string((*it)->getSourceName()), "$limit");
+}
+
 }  // namespace mongo::extension
