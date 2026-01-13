@@ -42,6 +42,9 @@ filters:
       - 10gen/query-execution-query-settings
       - 10gen/server-replication-reviewers
       - 10gen/server-catalog-and-routing-routing-and-topology
+  - "implicitly_retry_on_shard_transition_errors.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "implicit_identity_views.js":
     approvers:
       - 10gen/query-optimization
