@@ -658,18 +658,11 @@ protected:
     std::unique_ptr<SorterStorage<Key, Value>> _storage;
 
 private:
-    std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(const SortOptions& opts,
-                                                            const Settings& settings,
-                                                            std::span<std::pair<Key, Value>> data,
-                                                            uint32_t idx = 0) {
-        std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
-            _storage->makeWriter(opts, settings);
-
-        for (size_t i = idx; i < data.size(); ++i) {
-            writer->addAlreadySorted(data[i].first, data[i].second);
-        }
-        return std::move(writer);
-    }
+    virtual std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(
+        const SortOptions& opts,
+        const Settings& settings,
+        std::span<std::pair<Key, Value>> data,
+        uint32_t idx) = 0;
 };
 
 /**
@@ -713,6 +706,19 @@ public:
         std::size_t numParallelSpills) override;
 
 private:
+    std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(const SortOptions& opts,
+                                                            const Settings& settings,
+                                                            std::span<std::pair<Key, Value>> data,
+                                                            uint32_t idx) override {
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer =
+            this->_storage->makeWriter(opts, settings);
+
+        for (size_t i = idx; i < data.size(); ++i) {
+            writer->addAlreadySorted(data[i].first, data[i].second);
+        }
+        return std::move(writer);
+    }
+
     SorterFileStats* _fileStats;
 };
 
