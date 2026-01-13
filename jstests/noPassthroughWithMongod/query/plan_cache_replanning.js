@@ -5,10 +5,9 @@
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
-    getCachedPlan,
-    getPlanCacheKeyFromShape,
     getPlanCacheShapeHashFromObject,
-    getPlanStage,
+    getCachedPlanForQuery,
+    assertPlanHasIxScanStage,
 } from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 
@@ -30,39 +29,6 @@ function getInactiveCachedPlansReplacedMetric() {
     const planCacheType = isSbePlanCacheEnabled ? "sbe" : "classic";
     return assert.commandWorked(db.serverStatus()).metrics.query.planCache[planCacheType]
         .inactive_cached_plans_replaced;
-}
-
-function getCachedPlanForQuery(filter) {
-    const planCacheKey = getPlanCacheKeyFromShape({query: filter, collection: coll, db: db});
-    const matchingCacheEntries = coll.getPlanCache().list([{$match: {planCacheKey: planCacheKey}}]);
-    assert.eq(matchingCacheEntries.length, 1, coll.getPlanCache().list());
-    return matchingCacheEntries[0];
-}
-
-/**
- * Asserts that the plan contained in the plan cache 'entry' is an index scan plan over the index
- * with the given 'indexName'.
- *
- * Also verifies that the 'planCacheShapeHash' matches the provided 'expectedPlanCacheShapeHash'.
- */
-function assertPlanHasIxScanStage(entry, indexName, expectedPlanCacheShapeHash) {
-    assert.eq(entry.planCacheShapeHash, expectedPlanCacheShapeHash, entry);
-
-    const cachedPlan = getCachedPlan(entry.cachedPlan);
-    if (isSbePlanCacheEnabled) {
-        // The $planCacheStats output for the SBE plan cache only contains an debug string
-        // representation of the execution plan. Rather than parse this string, we just check that
-        // the index name appears somewhere in the plan.
-        assert.eq(entry.version, "2", entry);
-        assert(cachedPlan.hasOwnProperty("stages"));
-        const planDebugString = cachedPlan.stages;
-        assert(planDebugString.includes(indexName), entry);
-    } else {
-        assert.eq(entry.version, "1", entry);
-        const stage = getPlanStage(cachedPlan, "IXSCAN");
-        assert.neq(stage, null, entry);
-        assert.eq(indexName, stage.indexName, entry);
-    }
 }
 
 // Carefully construct a collection so that some queries will do well with an {a: 1} index and
@@ -96,18 +62,18 @@ assert.commandWorked(coll.createIndex({b: 1}));
 assert.eq(1, coll.find(bIndexQuery).itcount());
 
 // The plan cache should now hold an inactive entry.
-let entry = getCachedPlanForQuery(bIndexQuery);
+let entry = getCachedPlanForQuery(db, coll, bIndexQuery);
 let planCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
 let entryWorks = entry.works;
 assert.eq(entry.isActive, false);
-assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
+assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "b_1", planCacheShapeHash);
 
 // Re-run the query. The inactive cache entry should be promoted to an active entry.
 assert.eq(1, coll.find(bIndexQuery).itcount());
-entry = getCachedPlanForQuery(bIndexQuery);
+entry = getCachedPlanForQuery(db, coll, bIndexQuery);
 assert.eq(entry.isActive, true);
 assert.eq(entry.works, entryWorks);
-assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
+assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "b_1", planCacheShapeHash);
 
 // Now we will attempt to oscillate the cache entry by interleaving queries which should use the
 // {a:1} and {b:1} index. When the plan using the {b: 1} index is in the cache, running a query
@@ -121,35 +87,35 @@ let replannedMetric = getReplannedMetric();
 // Replans in this test should never produce the same plan as the currently cached plan.
 const replannedPlanIsCachedPlanMetric = getReplannedPlanIsCachedPlanMetric();
 assert.eq(1, coll.find(aIndexQuery).itcount());
-entry = getCachedPlanForQuery(aIndexQuery);
+entry = getCachedPlanForQuery(db, coll, aIndexQuery);
 assert.eq(entry.isActive, true);
-assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
+assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "a_1", planCacheShapeHash);
 assert.eq(replannedMetric + 1, getReplannedMetric());
 assert.eq(replannedPlanIsCachedPlanMetric, getReplannedPlanIsCachedPlanMetric());
 
 // Run the query which should use the {b: 1} index.
 assert.eq(1, coll.find(bIndexQuery).itcount());
-entry = getCachedPlanForQuery(bIndexQuery);
+entry = getCachedPlanForQuery(db, coll, bIndexQuery);
 assert.eq(entry.isActive, true);
-assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
+assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "b_1", planCacheShapeHash);
 assert.eq(replannedMetric + 2, getReplannedMetric());
 assert.eq(replannedPlanIsCachedPlanMetric, getReplannedPlanIsCachedPlanMetric());
 
 // The {b: 1} plan is again in the cache. Run the query which should use the {a: 1} index.
 assert.eq(1, coll.find(aIndexQuery).itcount());
-entry = getCachedPlanForQuery(aIndexQuery);
+entry = getCachedPlanForQuery(db, coll, aIndexQuery);
 assert.eq(entry.isActive, true);
-assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
+assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "a_1", planCacheShapeHash);
 assert.eq(replannedMetric + 3, getReplannedMetric());
 assert.eq(replannedPlanIsCachedPlanMetric, getReplannedPlanIsCachedPlanMetric());
 
 // The {a: 1} plan is back in the cache. Run the query which would perform better on the plan using
 // the {b: 1} index, and ensure that plan gets written to the cache.
 assert.eq(1, coll.find(bIndexQuery).itcount());
-entry = getCachedPlanForQuery(bIndexQuery);
+entry = getCachedPlanForQuery(db, coll, bIndexQuery);
 entryWorks = entry.works;
 assert.eq(entry.isActive, true);
-assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
+assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "b_1", planCacheShapeHash);
 assert.eq(replannedMetric + 4, getReplannedMetric());
 assert.eq(replannedPlanIsCachedPlanMetric, getReplannedPlanIsCachedPlanMetric());
 
@@ -163,9 +129,9 @@ for (let i = 0; i < 500; i++) {
 assert.eq(500, coll.find({a: 3, b: 3}).itcount());
 
 // The cache entry should have been deactivated.
-entry = getCachedPlanForQuery({a: 3, b: 3});
+entry = getCachedPlanForQuery(db, coll, {a: 3, b: 3});
 assert.eq(entry.isActive, false);
-assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
+assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "a_1", planCacheShapeHash);
 
 // The works value should have doubled.
 assert.eq(entry.works, entryWorks * 2);
@@ -181,19 +147,19 @@ assert.eq(entry.works, entryWorks * 2);
     assert.eq(1, coll.find(bIndexQuery).itcount());
 
     // The plan cache should now hold an inactive entry.
-    let entry = getCachedPlanForQuery(bIndexQuery);
+    let entry = getCachedPlanForQuery(db, coll, bIndexQuery);
     let planCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
     assert.eq(entry.isActive, false);
-    assertPlanHasIxScanStage(entry, "b_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "b_1", planCacheShapeHash);
     assert.eq(baseReplacedMetric, getInactiveCachedPlansReplacedMetric());
 
     // Now run a query where the {a: 1} index will win. This is faster than the previous plan so we
     // expect it to replace the inactive entry. The new entry is expected to become active
     // immediately.
     assert.eq(1, coll.find(aIndexQuery).itcount());
-    entry = getCachedPlanForQuery(aIndexQuery);
+    entry = getCachedPlanForQuery(db, coll, aIndexQuery);
     assert.eq(entry.isActive, true);
-    assertPlanHasIxScanStage(entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "a_1", planCacheShapeHash);
     assert.eq(baseReplacedMetric + 1, getInactiveCachedPlansReplacedMetric());
 }
 
@@ -250,7 +216,7 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     }
 
     // Now look at the cache entry and store the values for works, keysExamined.
-    entry = getCachedPlanForQuery(filterOnSelectiveKeySpecialValue);
+    entry = getCachedPlanForQuery(db, coll, filterOnSelectiveKeySpecialValue);
     planCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
     const specialValueCacheEntryWorks = entry.works;
 
@@ -262,7 +228,7 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     }
 
     assert.eq(entry.isActive, true, entry);
-    assertPlanHasIxScanStage(entry, "selectiveKey_1_tiebreak_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "selectiveKey_1_tiebreak_1", planCacheShapeHash);
 
     // Clear the plan cache for the collection.
     coll.getPlanCache().clear();
@@ -272,9 +238,9 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
         assert.eq(110, coll.find(filterOnSelectiveKey).itcount());
     }
 
-    entry = getCachedPlanForQuery(filterOnSelectiveKey);
+    entry = getCachedPlanForQuery(db, coll, filterOnSelectiveKey);
     assert.eq(entry.isActive, true, entry);
-    assertPlanHasIxScanStage(entry, "selectiveKey_1_tiebreak_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "selectiveKey_1_tiebreak_1", planCacheShapeHash);
 
     // The new cache entry's plan should have used fewer works (and examined fewer keys) compared
     // to the old cache entry's, since the query on the special value is slightly less efficient.
@@ -288,9 +254,9 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     assert.eq(110, coll.find(filterOnSelectiveKeySpecialValue).itcount());
 
     // Check that the cache entry hasn't changed.
-    const entryAfterRunningSpecialQuery = getCachedPlanForQuery(filterOnSelectiveKey);
+    const entryAfterRunningSpecialQuery = getCachedPlanForQuery(db, coll, filterOnSelectiveKey);
     assert.eq(entryAfterRunningSpecialQuery.isActive, true);
-    assertPlanHasIxScanStage(entry, "selectiveKey_1_tiebreak_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "selectiveKey_1_tiebreak_1", planCacheShapeHash);
 
     assert.eq(entry.works, entryAfterRunningSpecialQuery.works, entryAfterRunningSpecialQuery);
     if (!isSbePlanCacheEnabled) {

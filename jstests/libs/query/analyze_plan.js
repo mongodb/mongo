@@ -1389,3 +1389,39 @@ export function hasMergeCursors(explain) {
     }
     return false;
 }
+
+/**
+ * Given a query, asserts that there is an entry in the plan cache for it and returns that entry.
+ */
+export function getCachedPlanForQuery(db, coll, filter) {
+    const planCacheKey = getPlanCacheKeyFromShape({query: filter, collection: coll, db: db});
+    const matchingCacheEntries = coll.getPlanCache().list([{$match: {planCacheKey: planCacheKey}}]);
+    assert.eq(matchingCacheEntries.length, 1, coll.getPlanCache().list());
+    return matchingCacheEntries[0];
+}
+
+/**
+ * Asserts that the plan contained in the plan cache 'entry' is an index scan plan over the index
+ * with the given 'indexName'.
+ *
+ * Also verifies that the 'planCacheShapeHash' matches the provided 'expectedPlanCacheShapeHash'.
+ */
+export function assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, indexName, expectedPlanCacheShapeHash) {
+    assert.eq(entry.planCacheShapeHash, expectedPlanCacheShapeHash, entry);
+
+    const cachedPlan = getCachedPlan(entry.cachedPlan);
+    if (isSbePlanCacheEnabled) {
+        // The $planCacheStats output for the SBE plan cache only contains an debug string
+        // representation of the execution plan. Rather than parse this string, we just check that
+        // the index name appears somewhere in the plan.
+        assert.eq(entry.version, "2", entry);
+        assert(cachedPlan.hasOwnProperty("stages"));
+        const planDebugString = cachedPlan.stages;
+        assert(planDebugString.includes(indexName), entry);
+    } else {
+        assert.eq(entry.version, "1", entry);
+        const stage = getPlanStage(cachedPlan, "IXSCAN");
+        assert.neq(stage, null, entry);
+        assert.eq(indexName, stage.indexName, entry);
+    }
+}
