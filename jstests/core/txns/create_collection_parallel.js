@@ -5,6 +5,8 @@
  *   # The test runs commands that are not allowed with security token: endSession.
  *   not_allowed_with_signed_security_token,
  *   uses_transactions,
+ *   # The test requires strict control over the timing of operations inside/outside transactions.
+ *   assumes_no_implicit_collection_creation_after_drop,
  * ]
  */
 import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";

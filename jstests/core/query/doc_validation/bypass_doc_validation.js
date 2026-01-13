@@ -27,6 +27,8 @@
  *   assumes_balancer_off,
  *   # Uses mapReduce
  *   requires_scripting,
+ *   # $out to a sharded collection is not allowed
+ *   assumes_no_implicit_collection_creation_after_drop,
  * ]
  */
 

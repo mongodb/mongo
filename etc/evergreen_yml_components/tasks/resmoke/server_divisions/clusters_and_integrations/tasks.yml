@@ -3043,6 +3043,23 @@ tasks:
         vars:
           use_large_distro: "true"
 
+  - <<: *gen_task_template
+    name: disagg_sharded_colls_jscore_passthrough_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "large",
+        "clustered_collections",
+        "requires_extra_system_deps",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          suite: disagg_sharded_colls_jscore_passthrough
+          use_large_distro: "true"
+          resmoke_jobs_max: 10
+
 ################################################
 #                 Task Groups                  #
 ################################################

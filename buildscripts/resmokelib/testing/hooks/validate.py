@@ -11,7 +11,6 @@ import pymongo.mongo_client
 from pymongo.collection import Collection
 from pymongo.database import Database
 
-from buildscripts.resmokelib.testing.fixtures import replicaset, shardedcluster
 from buildscripts.resmokelib.testing.fixtures.external import ExternalFixture
 from buildscripts.resmokelib.testing.fixtures.interface import build_client
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
@@ -117,10 +116,8 @@ class ValidateCollectionsTestCase(jsfile.DynamicJSTestCase):
                     if result is not True:
                         raise RuntimeError("Collection validation failed.")
 
-            # Perform inter-node validation.
-            if isinstance(self.fixture, replicaset.ReplicaSetFixture) or isinstance(
-                self.fixture, shardedcluster.ShardedClusterFixture
-            ):
+            # Perform inter-node validation (if the running fixture provides a method to run it).
+            if getattr(self.fixture, "internode_validation", None):
                 self.fixture.internode_validation()
         except:
             self.logger.exception("Uncaught exception while validating collections")
