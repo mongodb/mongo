@@ -12,7 +12,6 @@
 - featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
 - featureFlagUpdateDocumentShardKeyUsingTransactionApi
 - featureFlagAllMongodsAreSharded
-- featureFlagGRPC
 - featureFlagReplicaSetEndpoint
 - featureFlagCreateCollectionInPreparedTransactions
 - featureFlagMongodProxyProcolSupport

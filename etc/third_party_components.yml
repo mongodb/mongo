@@ -172,14 +172,6 @@ components:
     # TODO - fix the version number in Black Duck
     upgrade_suppression: TODO SERVER-67432
 
-  grpc:
-    homepage_url: https://grpc.io/
-    open_hub_url: https://www.openhub.net/p/grpc
-    release_monitoring_id: 19117
-    local_directory_path: src/third_party/grpc
-    team_owner: "Service Architecture"
-    upgrade_suppression: TODO SERVER-75761
-
   "ICU for C/C++ (ICU4C)":
     homepage_url: http://site.icu-project.org/
     open_hub_url: https://www.openhub.net/p/icu4c

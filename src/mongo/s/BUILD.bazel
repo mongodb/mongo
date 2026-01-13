@@ -637,9 +637,6 @@ mongo_cc_library(
         "@platforms//os:windows": ["//src/mongo/db:windows_options_idl"],
         "//conditions:default": [],
     }) + select({
-        "//bazel/config:build_grpc_enabled": ["//src/mongo/transport/grpc:grpc_parameters_idl"],
-        "//conditions:default": [],
-    }) + select({
         "//bazel/config:ssl_enabled": ["//src/mongo/util/net:ssl_options_server"],
         "//conditions:default": [],
     }) + select({

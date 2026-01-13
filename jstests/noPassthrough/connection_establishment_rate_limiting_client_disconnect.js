@@ -2,10 +2,7 @@
  * Test for the ingressConnectionEstablishment rate limiter behavior when the client side
  * disconnects while queued.
  *
- * The default baton, which is used for gRPC, doesn't get marked as disconnected when the
- * client disconnects without an additional read or write on the socket.
  * @tags: [
- *      grpc_incompatible,
  * ]
  */
 

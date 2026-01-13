@@ -264,12 +264,6 @@ public:
         _helloOk.emplace(helloOk);
     }
 
-    // TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
-#ifdef MONGO_CONFIG_GRPC
-    bool isGRPC() const {
-        return _gRPC.get_value_or(false);
-    }
-#endif
 
     // If you are trying to clone a URI (including its options/auth information) for a single
     // server (say a member of a replica-set), you can pass in its HostAndPort information to
@@ -319,28 +313,6 @@ private:
           _helloOk(helloOk),
           _options(std::move(options)) {}
 
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
-#ifdef MONGO_CONFIG_GRPC
-    MongoURI(ConnectionString connectString,
-             const std::string& user,
-             const std::string& password,
-             const std::string& database,
-             boost::optional<bool> retryWrites,
-             transport::ConnectSSLMode sslMode,
-             boost::optional<bool> helloOk,
-             boost::optional<bool> grpc,
-             OptionsMap options)
-        : _connectString(std::move(connectString)),
-          _user(user),
-          _password(password),
-          _database(database),
-          _retryWrites(std::move(retryWrites)),
-          _sslMode(sslMode),
-          _helloOk(helloOk),
-          _gRPC(grpc),
-          _options(std::move(options)) {}
-#endif
-
     static MongoURI parseImpl(StringData url);
 
     ConnectionString _connectString;
@@ -350,10 +322,6 @@ private:
     boost::optional<bool> _retryWrites;
     transport::ConnectSSLMode _sslMode = transport::kGlobalSSLMode;
     boost::optional<bool> _helloOk;
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
-#ifdef MONGO_CONFIG_GRPC
-    boost::optional<bool> _gRPC;
-#endif
     OptionsMap _options;
 };
 

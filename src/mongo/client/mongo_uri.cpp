@@ -507,10 +507,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
 
     const auto retryWrites = extractBooleanOption("retryWrites");
     const auto helloOk = extractBooleanOption("helloOk");
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
-#ifdef MONGO_CONFIG_GRPC
-    const auto gRPC = extractBooleanOption("gRPC");
-#endif
+
     auto tlsEnabled = extractBooleanOption("tls");
     if (!tlsEnabled.has_value()) {
         tlsEnabled = extractBooleanOption("ssl");
@@ -532,10 +529,6 @@ MongoURI MongoURI::parseImpl(StringData url) {
                     retryWrites,
                     tlsMode,
                     helloOk,
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
-#ifdef MONGO_CONFIG_GRPC
-                    gRPC,
-#endif
                     std::move(options));
 }
 

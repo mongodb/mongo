@@ -679,10 +679,6 @@ public:
     }
 #endif
 
-    virtual bool isGRPC() {
-        return false;
-    }
-
     const ClientAPIVersionParameters& getApiParameters() const {
         return _apiParameters;
     }

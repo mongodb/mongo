@@ -245,10 +245,7 @@ mongo_cc_library(
         "transport_layer",
         "//src/mongo/db:server_base",
         "//src/third_party/asio-master:asio",
-    ] + select({
-        "//bazel/config:build_grpc_enabled": ["//src/mongo/transport/grpc:grpc_transport_layer"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 mongo_idl_library(
@@ -297,9 +294,6 @@ mongo_cc_unit_test(
         "//src/mongo/transport/asio:asio_utils_test.cpp",
     ] + select({
         "@platforms//os:linux": ["session_manager_common_test.cpp"],
-        "//conditions:default": [],
-    }) + select({
-        "//bazel/config:build_grpc_enabled": ["transport_layer_manager_grpc_test.cpp"],
         "//conditions:default": [],
     }),
     data = ["//jstests/libs:test_pem_files"],

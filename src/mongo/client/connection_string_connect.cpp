@@ -57,10 +57,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_options.h"
 
-#ifdef MONGO_CONFIG_GRPC
-#include "mongo/client/dbclient_grpc_stream.h"
-#endif
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
 
@@ -87,17 +83,7 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                        "Invalid standalone connection string with empty server list.");
             for (const auto& server : _servers) {
                 std::unique_ptr<DBClientSession> c;
-#ifdef MONGO_CONFIG_GRPC
-                if (newURI.isGRPC()) {
-                    c = std::make_unique<DBClientGRPCStream>(
-                        /* authToken */ boost::none,
-                        /* autoReconnect */ true,
-                        /* socket timeout */ 0,
-                        newURI,
-                        DBClientGRPCStream::HandshakeValidationHook(),
-                        apiParameters);
-                } else
-#endif
+
                 {
                     c = std::make_unique<DBClientConnection>(
                         /* autoReconnect */ true,
@@ -108,15 +94,7 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                     c->setSoTimeout(socketTimeout);
                 }
 
-#ifdef MONGO_CONFIG_GRPC
-                LOGV2_DEBUG(8050201,
-                            1,
-                            "Creating new connection",
-                            "hostAndPort"_attr = server,
-                            "gRPC"_attr = newURI.isGRPC());
-#else
                 LOGV2_DEBUG(20109, 1, "Creating new connection", "hostAndPort"_attr = server);
-#endif
 
                 try {
                     c->connect(server,

@@ -500,59 +500,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/c-ares/c-ares@cares-1_27_0",
-      "supplier": {
-        "name": "The c-ares Project",
-        "url": [
-          "https://c-ares.org/"
-        ]
-      },
-      "author": "Daniel Stenberg",
-      "group": "c-ares",
-      "name": "c-ares",
-      "version": "1.27.0",
-      "description": "A C library for asynchronous DNS requests",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT"
-          }
-        }
-      ],
-      "copyright": "Copyright (c) 2007 - 2023 Daniel Stenberg with many contributors, see AUTHORS file.",
-      "cpe": "cpe:2.3:a:c-ares:c-ares:1.27.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/c-ares/c-ares@cares-1_27_0",
-      "externalReferences": [
-        {
-          "url": "https://github.com/c-ares/c-ares.git",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/cares/scripts/import.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/cares"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
       "author": "Christopher M. Kohlhoff",
       "group": "chriskohlhoff",
@@ -992,59 +939,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/google/re2@2023-11-01",
-      "supplier": {
-        "name": "Google LLC",
-        "url": [
-          "https://opensource.google/"
-        ]
-      },
-      "author": "The RE2 Authors",
-      "group": "google.opensource",
-      "name": "re2",
-      "version": "2023-11-01",
-      "description": "RE2 is a fast, safe, thread-friendly alternative to backtracking regular expression engines like those used in PCRE, Perl, and Python. It is a C++ library.",
-      "licenses": [
-        {
-          "license": {
-            "id": "BSD-3-Clause"
-          }
-        }
-      ],
-      "copyright": "Copyright (c) 2009 The RE2 Authors. All rights reserved.",
-      "cpe": "cpe:2.3:h:google:re2:2023-11-01:*:*:*:*:*:*:*",
-      "purl": "pkg:github/google/re2@2023-11-01",
-      "externalReferences": [
-        {
-          "url": "https://github.com/google/re2.git",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Server Programmability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/re2/scripts/import.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/re2"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
       "supplier": {
         "name": "Google LLC",
@@ -1263,59 +1157,6 @@
         "occurrences": [
           {
             "location": "src/third_party/gperftools"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "type": "library",
-      "bom-ref": "pkg:github/grpc/grpc@1.59.5",
-      "supplier": {
-        "name": "Google LLC",
-        "url": [
-          "https://opensource.google/"
-        ]
-      },
-      "author": "gRPC authors",
-      "group": "google.opensource",
-      "name": "gRPC (C++)",
-      "version": "1.59.5",
-      "description": "gRPC is a modern, open source, high-performance remote procedure call (RPC) framework that can run anywhere. gRPC enables client and server applications to communicate transparently, and simplifies the building of connected systems.",
-      "licenses": [
-        {
-          "license": {
-            "id": "Apache-2.0"
-          }
-        }
-      ],
-      "copyright": "Copyright 2015 gRPC authors",
-      "cpe": "cpe:2.3:a:grpc:grpc:1.59.5:*:*:*:*:*:*:*",
-      "purl": "pkg:github/grpc/grpc@1.59.5",
-      "externalReferences": [
-        {
-          "url": "https://github.com/grpc/grpc.git",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/grpc/scripts/import.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/grpc"
           }
         ]
       },
@@ -1734,59 +1575,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/protocolbuffers/protobuf@v25.0",
-      "supplier": {
-        "name": "Google LLC",
-        "url": [
-          "https://protobuf.dev/"
-        ]
-      },
-      "author": "Google LLC",
-      "group": "google.opensource",
-      "name": "Protobuf",
-      "version": "v25.0",
-      "description": "Protocol Buffers - Google's data interchange format",
-      "licenses": [
-        {
-          "license": {
-            "id": "BSD-3-Clause"
-          }
-        }
-      ],
-      "copyright": "Copyright 2008 Google Inc. Copyright 2023 Google LLC. All rights reserved.",
-      "cpe": "cpe:2.3:a:google:protobuf:v25.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/protocolbuffers/protobuf@v25.0",
-      "externalReferences": [
-        {
-          "url": "https://github.com/protocolbuffers/protobuf.git",
-          "type": "distribution"
-        }
-      ],
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "Networking & Observability"
-        },
-        {
-          "name": "emits_persisted_data",
-          "value": "false"
-        },
-        {
-          "name": "import_script_path",
-          "value": "src/third_party/protobuf/scripts/import.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/protobuf"
-          }
-        ]
-      },
-      "scope": "required"
-    },
-    {
-      "type": "library",
       "bom-ref": "pkg:github/roaringbitmap/croaring@v2.1.2",
       "supplier": {
         "name": "Roaring Bitmaps",
@@ -2140,7 +1928,6 @@
         "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
         "pkg:github/arximboldi/immer@0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
         "pkg:github/boostorg/boost@boost-{{VERSION}}",
-        "pkg:github/c-ares/c-ares@cares-1_27_0",
         "pkg:github/chriskohlhoff/asio@asio-1-12-2",
         "pkg:github/confluentinc/librdkafka@v2.0.2-RC2",
         "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
@@ -2150,12 +1937,10 @@
         "pkg:github/facebook/zstd@v1.5.5",
         "pkg:github/fmtlib/fmt@7.1.3",
         "pkg:github/google/benchmark@v1.5.2",
-        "pkg:github/google/re2@2023-11-01",
         "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
         "pkg:github/google/snappy@1.1.10",
         "pkg:github/google/tcmalloc@f3b20f9a07e175c5d897df7b49d9830d4efa6110",
         "pkg:github/gperftools/gperftools@gperftools-2.9.1",
-        "pkg:github/grpc/grpc@1.59.5",
         "pkg:github/jbeder/yaml-cpp@yaml-cpp-0.6.3",
         "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
         "pkg:github/libtom/libtomcrypt@v1.18.2",
@@ -2164,7 +1949,6 @@
         "pkg:github/mongodb/libmongocrypt@1.8.4",
         "pkg:github/mongodb/mongo-c-driver@1.27.6",
         "pkg:github/pcre2project/pcre2@pcre2-10.40",
-        "pkg:github/protocolbuffers/protobuf@v25.0",
         "pkg:github/roaringbitmap/croaring@v2.1.2",
         "pkg:github/schemastore/schemastore@6847cfc3a17a04a7664474212db50c627e1e3408",
         "pkg:github/snowballstem/snowball@1.0.0",
@@ -2209,10 +1993,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/c-ares/c-ares@cares-1_27_0",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/chriskohlhoff/asio@asio-1-12-2",
       "dependsOn": []
     },
@@ -2249,10 +2029,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/re2@2023-11-01",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
       "dependsOn": []
     },
@@ -2266,10 +2042,6 @@
     },
     {
       "ref": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/grpc/grpc@1.59.5",
       "dependsOn": []
     },
     {
@@ -2302,10 +2074,6 @@
     },
     {
       "ref": "pkg:github/pcre2project/pcre2@pcre2-10.40",
-      "dependsOn": []
-    },
-    {
-      "ref": "pkg:github/protocolbuffers/protobuf@v25.0",
       "dependsOn": []
     },
     {

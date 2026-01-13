@@ -738,8 +738,6 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         self.mongos = None
         self.port = fixturelib.get_next_port(job_num)
         self.mongos_options["port"] = self.port
-        if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS:
-            self.mongos_options["grpcPort"] = fixturelib.get_next_port(job_num)
 
         self._dbpath_prefix = dbpath_prefix
 
@@ -864,7 +862,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         return f"{self._get_hostname()}:{self.port}"
 
     def get_shell_connection_url(self):
-        port = self.port if not self.config.SHELL_GRPC else self.grpcPort
+        port = self.port
         return f"{self._get_hostname()}:{port}"
 
     def get_driver_connection_url(self):

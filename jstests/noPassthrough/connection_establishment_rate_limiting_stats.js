@@ -1,9 +1,7 @@
 /**
  * Tests for the ingressConnectionEstablishment rate limiter metrics.
  *
- * gRPC outputs different metrics from the metrics we assert on here.
  * @tags: [
- *      grpc_incompatible,
  * ]
  */
 

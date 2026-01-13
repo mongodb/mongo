@@ -2,9 +2,7 @@
  * Tests that the connection establishment rate-limiter exemptions are respected for exempt IPs if
  * the proxy protocol is in use and the sourceClient IP is different from the load balancer IP.
  *
- * IP-based overrides are not implemented for gRPC.
  * @tags: [
- *      grpc_incompatible,
  * ]
  */
 

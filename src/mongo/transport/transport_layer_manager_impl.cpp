@@ -40,9 +40,6 @@
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/util/assert_util.h"
 
-#ifdef MONGO_CONFIG_GRPC
-#include "mongo/transport/grpc/grpc_transport_layer_impl.h"
-#endif
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_options.h"
@@ -160,19 +157,6 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
         retVector.push_back(std::move(tl));
     }
 
-#ifdef MONGO_CONFIG_GRPC
-#ifdef MONGO_CONFIG_SSL
-    if (!sslGlobalParams.sslPEMKeyFile.empty()) {
-        using GRPCTL = grpc::GRPCTransportLayerImpl;
-        retVector.push_back(
-            GRPCTL::createWithConfig(svcCtx, GRPCTL::Options(*config), std::move(observers)));
-    } else {
-        LOGV2(8076800, "Unable to start gRPC transport without tlsCertificateKeyFile");
-    }
-#else
-    LOGV2(8076801, "Unable to start gRPC transport in a build without SSL enabled");
-#endif
-#endif
 
     auto egress = retVector[0].get();
     return std::make_unique<TransportLayerManagerImpl>(std::move(retVector), egress);

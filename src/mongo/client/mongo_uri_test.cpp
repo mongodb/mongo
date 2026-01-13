@@ -77,10 +77,6 @@ struct URITestCase {
     MongoURI::OptionsMap options;
     std::string database;
     ConnectSSLMode sslMode;
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
-#ifdef MONGO_CONFIG_GRPC
-    bool gRPC = false;
-#endif
 };
 
 struct InvalidURITestCase {
@@ -513,30 +509,6 @@ const URITestCase validCases[] = {
     {"mongodb://localhost/?ssl=false", "", "", kMaster, "", 1, {{"ssl", "false"}}, "", kDisableSSL},
     {"mongodb://localhost/?tls=true", "", "", kMaster, "", 1, {{"tls", "true"}}, "", kEnableSSL},
     {"mongodb://localhost/?tls=false", "", "", kMaster, "", 1, {{"tls", "false"}}, "", kDisableSSL},
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
-#ifdef MONGO_CONFIG_GRPC
-    {"mongodb://localhost", "", "", kMaster, "", 1, {}, "", kDisableSSL, false},
-    {"mongodb://localhost/?grpc=false",
-     "",
-     "",
-     kMaster,
-     "",
-     1,
-     {{"grpc", "false"}},
-     "",
-     kGlobalSSLMode,
-     false},
-    {"mongodb://localhost/?grpc=true",
-     "",
-     "",
-     kMaster,
-     "",
-     1,
-     {{"grpc", "true"}},
-     "",
-     kGlobalSSLMode,
-     true},
-#endif
 };
 
 const InvalidURITestCase invalidCases[] = {
@@ -612,10 +584,6 @@ const InvalidURITestCase invalidCases[] = {
     {"mongodb://127.0.0.1:1234/dbName?ssl=blah", ErrorCodes::FailedToParse},
     {"mongodb://127.0.0.1:1234/dbName?tls=blah", ErrorCodes::FailedToParse},
 
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
-#ifdef MONGO_CONFIG_GRPC
-    {"mongodb://127.0.0.1:1234/dbName?gRPC=blah", ErrorCodes::FailedToParse},
-#endif
 };
 
 // Helper Method to take a filename for a json file and return the array of tests inside of it

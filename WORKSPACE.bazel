@@ -141,35 +141,6 @@ load("@npm//:repositories.bzl", "npm_repositories")
 
 npm_repositories()
 
-# Sub in the system openssl for boringssl since we don't want two implementations of
-# ssl in the same address space.
-new_local_repository(
-    name = "boringssl",
-    build_file_content = """
-cc_library(
-  name = "crypto",
-  linkopts = ["-lcrypto"],
-  visibility = ["//visibility:public"],
-)
-cc_library(
-  name = "ssl",
-  linkopts = ["-lssl"],
-  visibility = ["//visibility:public"],
-)
-""",
-    path = "bazel/_openssl_placeholder_for_grpc",
-)
-
-# Overloads for the vendored repositories.
-#
-# WARNING: Don't change the order of the deps() calls and local_repositories.
-#          They're read linearly dependencies that come first override later
-#          ones. Dependency updates might change the correct order, though it's
-#          unlikely. This is obviously a temporary solution and will no longer
-#          be necessary once migration to bzlmod is complete.
-
-# Note: rules_python is implicitly loaded with a grpc-compatible version.
-
 load("//bazel/install_rules:pigz.bzl", "setup_pigz")
 
 setup_pigz(

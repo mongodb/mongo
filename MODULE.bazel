@@ -111,18 +111,6 @@ local_path_override(
     path = "src/third_party/abseil-cpp/dist",
 )
 
-bazel_dep(name = "protobuf", version = "", repo_name = "com_google_protobuf")
-local_path_override(
-    module_name = "protobuf",
-    path = "src/third_party/protobuf/dist",
-)
-
-bazel_dep(name = "grpc", version = "", repo_name = "com_github_grpc_grpc")
-local_path_override(
-    module_name = "grpc",
-    path = "src/third_party/grpc/dist",
-)
-
 bazel_dep(name = "buildifier_prebuilt", version = "6.4.0", dev_dependency = True)
 single_version_override(
     module_name = "buildifier_prebuilt",

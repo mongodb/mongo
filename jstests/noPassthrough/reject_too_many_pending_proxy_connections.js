@@ -1,7 +1,6 @@
 /**
  * @tags: [
  *    requires_fcv_80,
- *    grpc_incompatible,
  * ]
  */
 

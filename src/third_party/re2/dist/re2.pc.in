@@ -1,9 +1,0 @@
-includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
-libdir=@CMAKE_INSTALL_FULL_LIBDIR@
-
-Name: re2
-Description: RE2 is a fast, safe, thread-friendly regular expression engine.
-Requires: @REQUIRES@
-Version: @SONAME@.0.0
-Cflags: -pthread -I${includedir}
-Libs: -pthread -L${libdir} -lre2

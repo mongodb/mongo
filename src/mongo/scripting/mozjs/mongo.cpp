@@ -118,7 +118,6 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetMember, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isMongos, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isTLS, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isGRPC, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getApiParameters, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_getCompactionTokens, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_runCommandImpl, MongoExternalInfo),
@@ -754,17 +753,6 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
             }
         }
     }
-#ifdef MONGO_CONFIG_GRPC
-    if (cs.isGRPC()) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot enable gRPC mode when connecting to a replica set",
-                cs.type() != ConnectionString::ConnectionType::kReplicaSet);
-
-        uassert(ErrorCodes::InvalidOptions,
-                "Authentication is not currently supported when gRPC mode is enabled",
-                cs.getUser().empty());
-    }
-#endif
 
     boost::optional<std::string> appname = cs.getAppName();
     std::string errmsg;
@@ -843,12 +831,6 @@ void MongoBase::Functions::isTLS::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     args.rval().setBoolean(conn->isTLS());
-}
-
-void MongoBase::Functions::isGRPC::call(JSContext* cx, JS::CallArgs args) {
-    auto conn = getConnection(args);
-
-    args.rval().setBoolean(conn->isGRPC());
 }
 
 void MongoBase::Functions::getApiParameters::call(JSContext* cx, JS::CallArgs args) {

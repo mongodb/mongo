@@ -100,7 +100,6 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(isReplicaSetMember);
         MONGO_DECLARE_JS_FUNCTION(isMongos);
         MONGO_DECLARE_JS_FUNCTION(isTLS);
-        MONGO_DECLARE_JS_FUNCTION(isGRPC);
         MONGO_DECLARE_JS_FUNCTION(getApiParameters);
         MONGO_DECLARE_JS_FUNCTION(_getCompactionTokens);
         MONGO_DECLARE_JS_FUNCTION(_runCommandImpl);
@@ -110,7 +109,7 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(getShellPort);
     };
 
-    static const JSFunctionSpec methods[32];
+    static const JSFunctionSpec methods[31];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_RESERVED_SLOTS(MongoBaseSlotCount);

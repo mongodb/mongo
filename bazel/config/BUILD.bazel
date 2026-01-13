@@ -9,8 +9,6 @@ load(
     "allocator",
     "asan",
     "build_enterprise",
-    "build_grpc",
-    "build_otel",
     "compiler_type",
     "compress_debug_compile",
     "create_dwp",
@@ -1260,45 +1258,6 @@ selects.config_setting_group(
         ":use_glibcxx_debug_enabled",
         ":dbg_enabled",
     ],
-)
-
-# --------------------------------------
-# grpc options
-# --------------------------------------
-
-build_grpc(
-    name = "build_grpc",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "build_grpc_enabled",
-    constraint_values = [
-        "@platforms//os:linux",
-    ],
-    flag_values = {
-        "//bazel/config:build_grpc": "True",
-    },
-)
-
-# --------------------------------------
-# otel options
-# --------------------------------------
-
-build_otel(
-    name = "build_otel",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "build_otel_enabled",
-    constraint_values = [
-        "@platforms//os:linux",
-    ],
-    flag_values = {
-        "//bazel/config:build_otel": "True",
-        "//bazel/config:release": "False",
-    },
 )
 
 # --------------------------------------

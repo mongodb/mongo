@@ -206,10 +206,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/client:native_sasl_client",
         "//src/mongo/util/options_parser",
-    ] + select({
-        "//bazel/config:build_grpc_enabled": ["shell_options_grpc_idl"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 mongo_cc_library(
@@ -431,17 +428,6 @@ mongo_cc_binary(
         "mongo_main",
         "//src/mongo/db:server_base",
         "mongo_res",
-    ],
-)
-
-mongo_idl_library(
-    name = "shell_options_grpc_idl",
-    src = "shell_options_grpc.idl",
-    idl_deps = [
-        "//src/mongo/db:basic_types_idl_gen",
-    ],
-    deps = [
-        "//src/mongo/db:basic_types_idl",
     ],
 )
 

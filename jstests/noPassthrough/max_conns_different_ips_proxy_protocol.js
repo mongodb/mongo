@@ -2,9 +2,7 @@
  * Tests that the max connections overrides are respected for exempt IPs if the sourceClient IP is
  * different from the load balancer IP.
  *
- * Maximum connection overrides are not implemented for gRPC.
  * @tags: [
- *      grpc_incompatible,
  * ]
  */
 if (_isWindows()) {

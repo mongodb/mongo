@@ -372,21 +372,6 @@ mongo_cc_unit_test(
     ],
 )
 
-mongo_cc_unit_test(
-    name = "dbclient_grpc_stream_test",
-    srcs = [
-        "//src/mongo/client:dbclient_grpc_stream_test.cpp",
-    ],
-    tags = ["mongo_unittest_fourth_group"],
-    deps = [
-        "//src/mongo/client:clientdriver_network",
-        "//src/mongo/db:service_context_non_d",
-        "//src/mongo/db:service_context_test_fixture",
-        "//src/mongo/transport/grpc:grpc_transport_mock",
-        "//src/mongo/util:version_impl",
-    ],
-)
-
 mongo_cc_library(
     name = "native_sasl_client",
     srcs = [
@@ -474,10 +459,7 @@ mongo_cc_library(
         "streamable_replica_set_monitor_discovery_time_processor.cpp",
         "streamable_replica_set_monitor_error_handler.cpp",
         "streamable_replica_set_monitor_query_processor.cpp",
-    ] + select({
-        "//bazel/config:build_grpc_enabled": ["dbclient_grpc_stream.cpp"],
-        "//conditions:default": [],
-    }),
+    ],
     deps = [
         "clientdriver_minimal",
         "global_conn_pool_idl",
@@ -499,10 +481,7 @@ mongo_cc_library(
         "//src/mongo/util:md5",
         "//src/mongo/util/net:network",
         "//src/mongo/util/net:ssl_manager",
-    ] + select({
-        "//bazel/config:build_grpc_enabled": ["//src/mongo/transport/grpc:grpc_transport_layer"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 mongo_idl_library(

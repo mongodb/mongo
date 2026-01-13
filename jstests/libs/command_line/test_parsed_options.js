@@ -100,14 +100,7 @@ export function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
         delete getCmdLineOptsExpected.parsed.net.port;
         delete getCmdLineOptsResult.parsed.net.port;
     }
-    if (!_containsNestedKey(expectedResult, "parsed", "net", "grpc", "port")) {
-        if (_containsNestedKey(getCmdLineOptsExpected, "parsed", "net", "grpc", "port")) {
-            delete getCmdLineOptsExpected.parsed.net.grpc.port;
-        }
-        if (_containsNestedKey(getCmdLineOptsResult, "parsed", "net", "grpc", "port")) {
-            delete getCmdLineOptsResult.parsed.net.grpc.port;
-        }
-    }
+    
     if (!_containsNestedKey(expectedResult, "parsed", "storage", "dbPath")) {
         delete getCmdLineOptsExpected.parsed.storage.dbPath;
         delete getCmdLineOptsResult.parsed.storage.dbPath;
@@ -195,14 +188,6 @@ export function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
     if (!_containsNestedKey(expectedResult, "parsed", "net", "port")) {
         delete getCmdLineOptsResult.parsed.net.port;
         delete getCmdLineOptsExpected.parsed.net.port;
-    }
-    if (!_containsNestedKey(expectedResult, "parsed", "net", "grpc", "port")) {
-        if (_containsNestedKey(getCmdLineOptsResult, "parsed", "net", "grpc", "port")) {
-            delete getCmdLineOptsResult.parsed.net.grpc.port;
-        }
-        if (_containsNestedKey(getCmdLineOptsExpected, "parsed", "net", "grpc", "port")) {
-            delete getCmdLineOptsExpected.parsed.net.grpc.port;
-        }
     }
 
     // Merge with the result that we expect

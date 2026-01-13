@@ -121,8 +121,6 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     remove_set_parameter_if_before_version(suite_set_parameters, "defaultConfigCommandTimeoutMS",
                                            bin_version, "7.3.0")
 
-    if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
-        mongod_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
 
     remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
                                            bin_version, "7.3.0")
@@ -131,8 +129,6 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     remove_set_parameter_if_before_version(suite_set_parameters, "enableAutoCompaction",
                                            bin_version, "7.3.0")
 
-    if "grpcPort" not in mongod_options and suite_set_parameters.get("featureFlagGRPC"):
-        mongod_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
 
     _apply_set_parameters(args, suite_set_parameters)
     final_mongod_options = mongod_options.copy()
@@ -184,16 +180,12 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     remove_set_parameter_if_before_version(suite_set_parameters, "defaultConfigCommandTimeoutMS",
                                            bin_version, "7.3.0")
 
-    if "grpcPort" not in mongos_options and suite_set_parameters.get("featureFlagGRPC"):
-        mongos_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
 
     remove_set_parameter_if_before_version(suite_set_parameters, "internalQueryStatsRateLimit",
                                            bin_version, "7.3.0")
     remove_set_parameter_if_before_version(
         suite_set_parameters, "internalQueryStatsErrorsAreCommandFatal", bin_version, "7.3.0")
 
-    if "grpcPort" not in mongos_options and suite_set_parameters.get("featureFlagGRPC"):
-        mongos_options["grpcPort"] = network.PortAllocator.next_fixture_port(job_num)
 
     _apply_set_parameters(args, suite_set_parameters)
     final_mongos_options = mongos_options.copy()
@@ -281,8 +273,6 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
         if config.SHELL_TLS_CERTIFICATE_KEY_FILE:
             test_data["shellTlsCertificateKeyFile"] = config.SHELL_TLS_CERTIFICATE_KEY_FILE
 
-    if config.SHELL_GRPC:
-        test_data["shellGRPC"] = True
 
     if config.TLS_CA_FILE:
         test_data["tlsCAFile"] = config.TLS_CA_FILE
@@ -450,8 +440,6 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
         if config.SHELL_TLS_CERTIFICATE_KEY_FILE:
             kwargs["tlsCertificateKeyFile"] = config.SHELL_TLS_CERTIFICATE_KEY_FILE
 
-    if config.SHELL_GRPC:
-        args.append("--gRPC")
 
     if connection_string is not None:
         # The --host and --port options are ignored by the mongo shell when an explicit connection

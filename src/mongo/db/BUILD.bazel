@@ -2925,9 +2925,6 @@ mongo_cc_library(
         "//bazel/config:use_wiredtiger_enabled": ["//src/mongo/db/storage/wiredtiger:storage_wiredtiger"],
         "//conditions:default": [],
     }) + select({
-        "//bazel/config:build_grpc_enabled": ["//src/mongo/transport/grpc:grpc_parameters_idl"],
-        "//conditions:default": [],
-    }) + select({
         "//bazel/config:tcmalloc_google_enabled": ["//src/mongo/util:tcmalloc_set_parameter"],
         "//bazel/config:tcmalloc_gperf_enabled": ["//src/mongo/util:tcmalloc_set_parameter"],
         "//conditions:default": [],

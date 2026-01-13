@@ -1,9 +1,0 @@
-
-GIT-INFO
-
-This file is only present in git - never in release archives. It is used as a
-sentinel file in buildconf.bat in order to differentiate a git checkout from
-release and daily snapshot archives.
-
-On *nix-like systems, run the ./buildconf script first to generate a fresh
-configure script.  This requires autotools to be installed locally.

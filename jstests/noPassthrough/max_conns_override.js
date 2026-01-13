@@ -1,9 +1,7 @@
 /**
  * Tests that the max connections overrides are respected for exempt IPs.
  *
- * Maximum connection overrides are not implemented for gRPC.
  * @tags: [
- *      grpc_incompatible,
  *      requires_sharding,
  * ]
  */

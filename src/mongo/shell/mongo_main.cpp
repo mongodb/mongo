@@ -127,11 +127,6 @@
 #include "mongo/util/version.h"
 #include "mongo/util/version/releases.h"
 
-#ifdef MONGO_CONFIG_GRPC
-#include "mongo/transport/grpc/grpc_transport_layer.h"
-#include "mongo/transport/grpc/grpc_transport_layer_impl.h"
-#endif
-
 #ifdef _WIN32
 #include <io.h>
 #include <shlobj.h>
@@ -824,29 +819,10 @@ int mongo_main(int argc, char* argv[]) {
         parsedURI.setOptionIfNecessary("authSource"s, shellGlobalParams.authenticationDatabase);
         parsedURI.setOptionIfNecessary("gssapiServiceName"s, shellGlobalParams.gssapiServiceName);
         parsedURI.setOptionIfNecessary("gssapiHostName"s, shellGlobalParams.gssapiHostName);
-// TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
-#ifdef MONGO_CONFIG_GRPC
-        parsedURI.setOptionIfNecessary("gRPC"s, shellGlobalParams.gRPC ? "true" : "false");
-#endif
 
         // Configure the correct TL based on URI options.
         std::unique_ptr<transport::TransportLayer> tl;
-#ifdef MONGO_CONFIG_GRPC
-        if (parsedURI.isGRPC() || shellGlobalParams.gRPC) {
-            // Create the client metadata.
-            boost::optional<std::string> appname = parsedURI.getAppName();
-            BSONObjBuilder bob;
-            uassertStatusOK(DBClientSession::appendClientMetadata(
-                appname.value_or(MongoURI::kDefaultTestRunnerAppName), &bob));
-            auto metadataDoc = bob.obj();
 
-            transport::grpc::GRPCTransportLayer::Options grpcOpts;
-            grpcOpts.enableEgress = true;
-            grpcOpts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
-            tl = std::make_unique<transport::grpc::GRPCTransportLayerImpl>(
-                serviceContext, grpcOpts, nullptr);
-        } else
-#endif
         {
             transport::AsioTransportLayer::Options opts;
             opts.enableIPv6 = shellGlobalParams.enableIPv6;

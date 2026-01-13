@@ -13,7 +13,6 @@ load(
     "get_linkopts",
 )
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
-load("@com_github_grpc_grpc//bazel:generate_cc.bzl", "generate_cc")
 load("@poetry//:dependencies.bzl", "dependency")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
@@ -249,7 +248,6 @@ MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/SafeInt:headers",
     "//src/third_party/sasl:windows_sasl",
     "//src/third_party/valgrind:headers",
-    "//src/third_party/abseil-cpp:absl_local_repo_deps",
 ]
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
@@ -737,13 +735,10 @@ def _mongo_cc_binary_and_test(
 
     # This is used as a tool in part of the shared archive build, so it needs to be marked
     # as compatible with a shared archive build.
-    if name in ["grpc_cpp_plugin", "protobuf_compiler"]:
-        features = features + ["-pie", "pic"]
-    else:
-        target_compatible_with += select({
-            "//bazel/config:shared_archive_enabled": ["@platforms//:incompatible"],
-            "//conditions:default": [],
-        })
+    target_compatible_with += select({
+        "//bazel/config:shared_archive_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    })
 
     args = {
         "name": name + WITH_DEBUG_SUFFIX,
@@ -1229,64 +1224,6 @@ def mongo_cc_proto_library(
         name = name,
         input = name + "_raw",
         tags = tags + ["gen_source"],
-    )
-
-def mongo_cc_grpc_library(
-        name,
-        srcs,
-        cc_proto,
-        deps = [],
-        grpc_only = True,
-        proto_only = False,
-        well_known_protos = False,
-        generate_mocks = False,
-        tags = [],
-        no_undefined_ref_DO_NOT_USE = True,
-        **kwargs):
-    codegen_grpc_target = "_" + name + "_grpc_codegen"
-
-    # TODO(SERVER-100148): Re-enable sandboxing on protobuf compilation
-    # once we can rely on //external:grpc_cpp_plugin.
-    #
-    # TSAN is currently being applied to protoc which is failing to run
-    # under Bazel's sandbox due to the system call to disable ASLR
-    # failing.
-    #
-    # To workaround this issue, disable the sandbox only when compiling
-    # protobufs, since we don't care about threading issues in the
-    # proto compiler itself.
-    generate_cc(
-        name = codegen_grpc_target,
-        srcs = srcs,
-        plugin = "//src/third_party/grpc:grpc_cpp_plugin",
-        well_known_protos = well_known_protos,
-        generate_mocks = generate_mocks,
-        tags = tags + ["gen_source"],
-        disable_sandbox = select({
-            "//bazel/config:tsan_enabled": True,
-            "//conditions:default": False,
-        }),
-        **kwargs
-    )
-
-    # cc_proto_library tacks on unnecessary link-time dependencies to
-    # @com_google_protobuf and @com_google_absl, forcefully remove them
-    # to avoid intefering with thin targets link line generation.
-    cc_proto_target = "_" + name + "_cc_proto_stripped_deps"
-    strip_deps(
-        name = cc_proto_target,
-        input = cc_proto,
-    )
-
-    mongo_cc_library(
-        name = name,
-        srcs = [":" + codegen_grpc_target],
-        hdrs = [":" + codegen_grpc_target],
-        deps = deps +
-               ["//src/third_party/grpc:grpc++_codegen_proto"],
-        cc_deps = [":" + cc_proto_target],
-        no_undefined_ref_DO_NOT_USE = no_undefined_ref_DO_NOT_USE,
-        **kwargs
     )
 
 def mongo_idl_library(

@@ -74,10 +74,6 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.router_port = fixturelib.get_next_port(job_num)
             mongod_options["routerPort"] = self.router_port
 
-        if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS:
-            self.grpcPort = fixturelib.get_next_port(job_num)
-            self.mongod_options["grpcPort"] = self.grpcPort
-
         # Always log backtraces to a file in the dbpath in our testing.
         backtrace_log_file_name = os.path.join(self.get_dbpath_prefix(),
                                                uuid.uuid4().hex + ".stacktrace")
@@ -245,7 +241,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         return f"{self._get_hostname()}:{self.port}"
 
     def get_shell_connection_url(self):
-        port = self.port if not self.config.SHELL_GRPC else self.grpcPort
+        port = self.port
         return f"{self._get_hostname()}:{port}"
 
     def get_driver_connection_url(self):

@@ -1,10 +1,7 @@
 /**
  * Tests for the ingressConnectionEstablishment rate limiter IP-based exemptions.
  *
- * The ip-based exemptions tests are complicated by the gRPC testing logic, and so it is
- * excluded for now.
  * @tags: [
- *      grpc_incompatible,
  * ]
  */
 

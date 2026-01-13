@@ -27,13 +27,11 @@ a notice will be included in
 | [Asio C++ Library]                                   | BSL-1.0                           | 1.12.2                                   |                      | ✗                               |
 | [benchmark]                                          | Apache-2.0                        | 1.5.2                                    |                      |                                 |
 | [Boost C++ Libraries]                                | BSL-1.0                           | 1.79.0                                   |                      | ✗                               |
-| [c-ares]                                             | MIT                               | 1.27.0                                   |                      | ✗                               |
 | [CRoaring]                                           | Apache-2.0 OR MIT                 | 2.1.2                                    |                      | ✗                               |
 | [Cyrus SASL]                                         | BSD-Attribution-HPND-disclaimer   | 2.1.28                                   |                      |                                 |
 | [fmt]                                                | MIT                               | 7.1.3                                    |                      | ✗                               |
 | [folly]                                              | Apache-2.0                        | 2025.04.21.00                            |                      | ✗                               |
 | [gperftools]                                         | BSD-3-Clause                      | 2.9.1                                    |                      | ✗                               |
-| [gRPC (C++)]                                         | Apache-2.0                        | 1.59.5                                   |                      | ✗                               |
 | [ICU4C - International Components for Unicode C/C++] | Unicode-3.0                       | 57.1                                     | ✗                    | ✗                               |
 | [immer]                                              | BSL-1.0                           | 0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3 |                      | ✗                               |
 | [Intel® Decimal Floating-Point Math Library]         | BSD-3-Clause                      | 2.0.1                                    |                      | ✗                               |
@@ -48,10 +46,8 @@ a notice will be included in
 | [Mozilla Firefox ESR]                                | MPL-2.0                           | 128.11.0esr                              |                      | ✗                               |
 | [MurmurHash3]                                        | Public Domain                     | a6bd3ce7be8ad147ea820a7cf6229a975c0c96bb |                      | ✗                               |
 | [PCRE2 - Perl-Compatible Regular Expressions]        | BSD-3-Clause WITH PCRE2-exception | 10.40                                    |                      | ✗                               |
-| [Protobuf]                                           | BSD-3-Clause                      | v25.0                                    |                      | ✗                               |
 | [pypi/ocspbuilder]                                   | MIT                               | 0.10.2                                   |                      |                                 |
 | [pypi/ocspresponder]                                 | Apache-2.0                        | 0.5.0                                    |                      |                                 |
-| [re2]                                                | BSD-3-Clause                      | 2023-11-01                               |                      | ✗                               |
 | [S2 Geometry Library]                                | Apache-2.0                        | a25c502bda9d7e0274b9e2b7825fbddf13cc0306 | ✗                    | ✗                               |
 | [SafeInt]                                            | MIT                               | 3.0.26                                   |                      | ✗                               |
 | [snappy]                                             | BSD-3-Clause                      | 1.1.10                                   | ✗                    | ✗                               |
@@ -79,7 +75,6 @@ a notice will be included in
 [Mozilla Firefox ESR]: https://github.com/mozilla-firefox/firefox.git
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
 [PCRE2 - Perl-Compatible Regular Expressions]: https://github.com/pcre2project/pcre2.git
-[Protobuf]: https://github.com/protocolbuffers/protobuf.git
 [S2 Geometry Library]: https://github.com/google/s2geometry.git
 [SafeInt]: https://github.com/dcleblanc/safeint.git
 [Snowball Stemming Algorithms (libstemmer)]: http://github.com/snowballstem/snowball.git
@@ -87,19 +82,16 @@ a notice will be included in
 [WiredTiger]: https://github.com/wiredtiger/wiredtiger.git
 [Zstandard (zstd)]: https://github.com/facebook/zstd.git
 [benchmark]: https://github.com/google/benchmark.git
-[c-ares]: https://github.com/c-ares/c-ares.git
 [fmt]: https://github.com/fmtlib/fmt.git
 [folly]: https://github.com/facebook/folly.git
-[gRPC (C++)]: https://github.com/grpc/grpc.git
 [gperftools]: https://github.com/gperftools/gperftools.git
 [immer]: https://github.com/arximboldi/immer.git
 [libmongocrypt]: https://github.com/mongodb/libmongocrypt.git
 [librdkafka - The Apache Kafka C/C++ library]: https://github.com/confluentinc/librdkafka.git
 [libunwind]: https://github.com/libunwind/libunwind.git
 [linenoise]: https://github.com/antirez/linenoise
-[pypi/ocspbuilder]: https://pypi.org/project/ocspbuilder/
-[pypi/ocspresponder]: https://pypi.org/project/ocspresponder/
-[re2]: https://github.com/google/re2.git
+[pypi/ocspbuilder]: https://github.com/wbond/ocspbuilder
+[pypi/ocspresponder]: https://github.com/threema-ch/ocspresponder
 [snappy]: https://github.com/google/tcmalloc.git
 [tcmalloc]: https://github.com/google/tcmalloc.git
 [timelib]: https://github.com/derickr/timelib.git
