@@ -179,13 +179,14 @@ BSONObj JoinPlanNodeRegistry::joinPlanNodeToBSON(JoinPlanNodeId nodeId,
                                      << joinPlanNodeToBSON(join.right, numNodesToPrint));
             },
             [numNodesToPrint](const INLJRHSNode& ip) {
-                return BSON("subset" << nodeSetToString(ip.node, numNodesToPrint) << "accessPath"
+                return BSON("subset" << nodeSetToString(NodeSet().set(ip.node), numNodesToPrint)
+                                     << "accessPath"
                                      << (str::stream() << "INDEX_PROBE "
                                                        << ip.entry->descriptor()->keyPattern()));
             },
             [numNodesToPrint](const BaseNode& base) {
-                return BSON("subset" << nodeSetToString(base.node, numNodesToPrint) << "accessPath"
-                                     << base.soln->summaryString());
+                return BSON("subset" << nodeSetToString(NodeSet().set(base.node), numNodesToPrint)
+                                     << "accessPath" << base.soln->summaryString());
             }},
         get(nodeId));
 }

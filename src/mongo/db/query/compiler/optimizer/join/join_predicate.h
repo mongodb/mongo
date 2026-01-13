@@ -45,7 +45,7 @@ struct QSNJoinPredicate {
     // The left and right fields of the equality predicate. The order of left and right fields is
     // important as it corresponds to the children of a join node. The field may correspond directly
     // to a collection, in which case the namespace of the field is implicit in the structure of the
-    // QSN, or to a stream of documetns which themselves represent the result of a join, in which
+    // QSN, or to a stream of documents which themselves represent the result of a join, in which
     // case the field will have a prefix representing the "as" field of a $lookup.
     FieldPath leftField;
     FieldPath rightField;

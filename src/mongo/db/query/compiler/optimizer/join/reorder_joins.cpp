@@ -36,9 +36,11 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/random_utils.h"
-#include "mongo/db/query/util/bitset_util.h"
 #include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::join_ordering {
 
@@ -376,6 +378,8 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
 
     auto ret = std::make_unique<QuerySolution>();
     ret->setRoot(std::move(soln));
+
+    LOGV2_DEBUG(11179801, 5, "QSN for winning plan", "qsn"_attr = ret->toString());
     return {.soln = std::move(ret), .baseNode = baseId};
 }
 
@@ -388,11 +392,19 @@ ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx
     peCtx.enumerateJoinSubsets(shape);
     auto bestPlanNodeId = peCtx.getBestFinalPlan();
 
+    const auto& registry = peCtx.registry();
+    LOGV2_DEBUG(11179802,
+                5,
+                "Winning join plan",
+                "plan"_attr =
+                    registry.joinPlanNodeToBSON(bestPlanNodeId, ctx.joinGraph.numNodes()));
+
     // Build QSN based on best plan.
     auto ret = std::make_unique<QuerySolution>();
-    const auto& registry = peCtx.registry();
     auto baseNodeId = getLeftmostNodeIdOfJoinPlan(ctx, bestPlanNodeId, registry);
     ret->setRoot(buildQSNFromJoinPlan(ctx, bestPlanNodeId, registry));
+
+    LOGV2_DEBUG(11179803, 5, "QSN for winning plan", "qsn"_attr = ret->toString());
     return {.soln = std::move(ret), .baseNode = baseNodeId};
 }
 
