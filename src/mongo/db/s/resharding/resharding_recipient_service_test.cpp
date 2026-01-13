@@ -564,72 +564,81 @@ bool shouldDataReplicationBeRunningIn(const TestOptions& testOptions, RecipientS
 
 std::vector<TestOptions> makeBasicTestOptions() {
     std::vector<TestOptions> testOptions;
-    for (bool isAlsoDonor : {false, true}) {
-        for (bool skipCloningAndApplying : {false, true}) {
-            for (bool skipCloning : {false, true}) {
-                for (bool driveCloneNoRefresh : {false, true}) {
-                    RAIIServerParameterControllerForTest cloneNoRefreshFeatureFlagController(
-                        "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
 
-                    bool noChunksToCopy = skipCloningAndApplying || skipCloning;
+    // Base case: all options false.
+    // {isAlsoDonor, skipCloningAndApplying, skipCloning, skipBuildingIndexes, noChunksToCopy,
+    //  storeOplogFetcherProgress, performVerification, driveCloneNoRefresh}
+    testOptions.push_back({false, false, false, false, false, false, false, false});
 
-                    // TODO (SERVER-115222): skipBuildingIndexes is false unless
-                    // explicitly set to true in unit tests. Leaving it off so that unit test
-                    // time doesn't grow unnecessarily. Update this once we audit necessary
-                    // test combinations.
-                    bool skipBuildingIndexes = false;
-                    testOptions.push_back({isAlsoDonor,
-                                           skipCloningAndApplying,
-                                           skipCloning,
-                                           skipBuildingIndexes,
-                                           noChunksToCopy,
-                                           driveCloneNoRefresh});
-                }
-            }
-        }
-    }
+    // Test each option individually set to true.
+
+    // isAlsoDonor = true
+    testOptions.push_back({true, false, false, false, false, false, false, false});
+
+    // skipCloningAndApplying = true (requires noChunksToCopy = true)
+    testOptions.push_back({false, true, false, false, true, false, false, false});
+
+    // skipCloning = true (requires noChunksToCopy = true)
+    testOptions.push_back({false, false, true, false, true, false, false, false});
+
+    // driveCloneNoRefresh = true
+    RAIIServerParameterControllerForTest cloneNoRefreshFeatureFlagController(
+        "featureFlagReshardingCloneNoRefresh", true);
+    testOptions.push_back({false, false, false, false, false, false, false, true});
+
     return testOptions;
 }
 
 std::vector<TestOptions> makeAllTestOptions() {
     std::vector<TestOptions> testOptions;
-    for (bool isAlsoDonor : {false, true}) {
-        for (bool skipCloningAndApplying : {false, true}) {
-            for (bool skipCloning : {false, true}) {
-                for (bool noChunksToCopy : {false, true}) {
-                    for (bool storeOplogFetcherProgress : {false, true}) {
-                        for (bool performVerification : {false, true}) {
-                            for (bool driveCloneNoRefresh : {false, true}) {
-                                if ((skipCloningAndApplying || skipCloning) && !noChunksToCopy) {
-                                    // This is an invalid combination.
-                                    continue;
-                                }
 
-                                RAIIServerParameterControllerForTest
-                                    cloneNoRefreshFeatureFlagController(
-                                        "featureFlagReshardingCloneNoRefresh", driveCloneNoRefresh);
-
-                                // TODO (SERVER-115222): skipBuildingIndexes is false unless
-                                // explicitly set to true in unit tests. Leaving it off so that unit
-                                // tests time doesn't grow unnecessarily. Update this once we audit
-                                // necessary test combinations.
-                                bool skipBuildingIndexes = false;
-
-                                testOptions.push_back({isAlsoDonor,
-                                                       skipCloningAndApplying,
-                                                       skipCloning,
-                                                       skipBuildingIndexes,
-                                                       noChunksToCopy,
-                                                       storeOplogFetcherProgress,
-                                                       performVerification,
-                                                       driveCloneNoRefresh});
-                            }
-                        }
-                    }
-                }
-            }
+    // Helper to add test options with both performVerification values.
+    auto addWithBothPerformVerificationValues = [&](TestOptions opts) {
+        // Check for invalid combination.
+        if ((opts.skipCloningAndApplying || opts.skipCloning) && !opts.noChunksToCopy) {
+            return;
         }
-    }
+        for (bool performVerification : {false, true}) {
+            opts.performVerification = performVerification;
+            testOptions.push_back(opts);
+        }
+    };
+
+    // Base case: all options false.
+    // {isAlsoDonor, skipCloningAndApplying, skipCloning, skipBuildingIndexes, noChunksToCopy,
+    //  storeOplogFetcherProgress, performVerification, driveCloneNoRefresh}
+    addWithBothPerformVerificationValues(
+        {false, false, false, false, false, false, false /*performVerification*/, false});
+
+    // Test each option individually set to true (except performVerification which is
+    // tested via combinations in the helper above).
+
+    // isAlsoDonor = true
+    addWithBothPerformVerificationValues(
+        {true, false, false, false, false, false, false /*performVerification*/, false});
+
+    // skipCloningAndApplying = true (requires noChunksToCopy = true for valid combination)
+    addWithBothPerformVerificationValues(
+        {false, true, false, false, true, false, false /*performVerification*/, false});
+
+    // skipCloning = true (requires noChunksToCopy = true for valid combination)
+    addWithBothPerformVerificationValues(
+        {false, false, true, false, true, false, false /*performVerification*/, false});
+
+    // noChunksToCopy = true
+    addWithBothPerformVerificationValues(
+        {false, false, false, false, true, false, false /*performVerification*/, false});
+
+    // storeOplogFetcherProgress = true
+    addWithBothPerformVerificationValues(
+        {false, false, false, false, false, true, false /*performVerification*/, false});
+
+    // driveCloneNoRefresh = true
+    RAIIServerParameterControllerForTest cloneNoRefreshFeatureFlagController(
+        "featureFlagReshardingCloneNoRefresh", true);
+    addWithBothPerformVerificationValues(
+        {false, false, false, false, false, false, false /*performVerification*/, true});
+
     return testOptions;
 }
 
@@ -1483,7 +1492,6 @@ TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         auto removeRecipientDocFailpoint =
             globalFailPointRegistry().find("removeRecipientDocFailpoint");
         auto timesEnteredFailPoint = removeRecipientDocFailpoint->setMode(FailPoint::alwaysOn);
@@ -1583,7 +1591,6 @@ TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
         auto doc = makeRecipientDocument(testOptions);
         auto instanceId =
@@ -1683,7 +1690,6 @@ TEST_F(ReshardingRecipientServiceTest, ReportForCurrentOpAfterCompletion) {
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         const auto recipientState = RecipientStateEnum::kCreatingCollection;
 
         PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientState};
@@ -1741,7 +1747,6 @@ TEST_F(ReshardingRecipientServiceTest, OpCtxKilledWhileRestoringMetrics) {
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         // Initialize recipient.
         auto doc = makeRecipientDocument(testOptions);
         auto instanceId =
@@ -2047,7 +2052,6 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         PauseDuringStateTransitions stateTransitionsGuard{
             controller(), {RecipientStateEnum::kStrictConsistency, RecipientStateEnum::kDone}};
 
@@ -2173,7 +2177,6 @@ TEST_F(ReshardingRecipientServiceTest, TruncatesXLErrorOnRecipientDocument) {
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         std::string xlErrMsg(6000, 'x');
         FailPointEnableBlock failpoint("reshardingRecipientFailsAfterTransitionToCloning",
                                        BSON("errmsg" << xlErrMsg));
@@ -2664,7 +2667,6 @@ TEST_F(ReshardingRecipientServiceTest, AbortWhileWaitingForCriticalSectionStarte
                   "Running case",
                   "test"_attr = unittest::getTestName(),
                   "testOptions"_attr = testOptions);
-
             auto waitForCriticalSectionFailPoint = globalFailPointRegistry().find(
                 "reshardingPauseRecipientBeforeWaitingForCriticalSection");
             auto timesEnteredFailPoint =
@@ -2711,7 +2713,6 @@ TEST_F(ReshardingRecipientServiceTest, AbortAfterStepUpWithAbortReasonFromCoordi
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         auto removeRecipientDocFailpoint =
             globalFailPointRegistry().find("removeRecipientDocFailpoint");
         auto timesEnteredFailPoint = removeRecipientDocFailpoint->setMode(FailPoint::alwaysOn);
@@ -2771,7 +2772,6 @@ TEST_F(ReshardingRecipientServiceTest, FailoverDuringErrorState) {
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         std::string errMsg("Simulating an unrecoverable error for testing");
         FailPointEnableBlock failpoint("reshardingRecipientFailsAfterTransitionToCloning",
                                        BSON("errmsg" << errMsg));
@@ -2824,7 +2824,6 @@ TEST_F(ReshardingRecipientServiceTest, TestVerifyCollectionOptionsHappyPath) {
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         PauseDuringStateTransitions stateTransitionsGuard{controller(),
                                                           RecipientStateEnum::kStrictConsistency};
         auto doc = makeRecipientDocument(testOptions);
@@ -2858,7 +2857,6 @@ TEST_F(ReshardingRecipientServiceTest,
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         auto doc = makeRecipientDocument(testOptions);
         auto instanceId =
             BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
@@ -2900,7 +2898,6 @@ TEST_F(ReshardingRecipientServiceTest,
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         PauseDuringStateTransitions stateTransitionsGuard{controller(),
                                                           RecipientStateEnum::kStrictConsistency};
         auto doc = makeRecipientDocument(testOptions);
@@ -2943,7 +2940,6 @@ TEST_F(ReshardingRecipientServiceTest, VerifyRecipientRetriesOnLockTimeoutError)
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         PauseDuringStateTransitions phaseTransitionsGuard{controller(), {recipientPhases}};
         auto doc = makeRecipientDocument(testOptions);
         auto instanceId =
@@ -2986,7 +2982,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCreatingCollectio
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         runUnrecoverableErrorTest(
             testOptions, RecipientStateEnum::kCreatingCollection, kRefreshCatalogCache);
     }
@@ -2998,7 +2993,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringCloning) {
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         runUnrecoverableErrorTest(testOptions, RecipientStateEnum::kCloning, kMakeDataReplication);
     }
 }
@@ -3009,7 +3003,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringBuildingIndex) {
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         runUnrecoverableErrorTest(
             testOptions, RecipientStateEnum::kBuildingIndex, kGetCollectionIndexes);
     }
@@ -3021,7 +3014,6 @@ TEST_F(ReshardingRecipientServiceTest, UnrecoverableErrorDuringApplying) {
               "Running case",
               "test"_attr = unittest::getTestName(),
               "testOptions"_attr = testOptions);
-
         runUnrecoverableErrorTest(
             testOptions, RecipientStateEnum::kApplying, kEnsureReshardingStashCollectionsEmpty);
     }
