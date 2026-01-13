@@ -204,44 +204,46 @@ public:
 
 private:
     /**
-     * Similar to std::priority_queue, but allows us clear() the queue without changing capacity,
-     * which helps performance when rules are being requeued over and over again.
+     * Similar to std::priority_queue but does a linear search on pop() instead of maintaining a
+     * heap. This is faster given that only a handful of rules are ever queued at the same time.
      */
     class RuleQueue {
     public:
         const Rule<Context>* pop() {
-            std::pop_heap(_queue.begin(), _queue.end(), _compare);
-            auto& result = _queue.back();
-            _queue.pop_back();
-            return result;
+            tassert(11695601, "Can't pop from empty queue", !_rules.empty());
+
+            auto it = std::max_element(_rules.begin(), _rules.end(), compareRules);
+            auto* rule = *it;
+            std::swap(*it, _rules.back());
+            _rules.pop_back();
+            return rule;
         }
 
         void push(const Rule<Context>* rule) {
-            _queue.push_back(rule);
-            std::push_heap(_queue.begin(), _queue.end(), _compare);
+            _rules.push_back(rule);
         }
 
         bool empty() const {
-            return _queue.empty();
+            return _rules.empty();
         }
 
         void clear() {
-            _queue.clear();
+            _rules.clear();
         }
 
         size_t size() const {
-            return _queue.size();
+            return _rules.size();
         }
 
     private:
-        struct HighestPriorityFirst {
-            bool operator()(const Rule<Context>* a, const Rule<Context>* b) const {
-                return a->priority < b->priority;
-            }
-        };
+        // We typically don't expect more than this many rules to be queued at the same time.
+        static constexpr size_t kFewRules = 8;
 
-        HighestPriorityFirst _compare{};
-        std::vector<const Rule<Context>*> _queue;
+        static bool compareRules(const Rule<Context>* a, const Rule<Context>* b) {
+            return a->priority < b->priority;
+        }
+
+        boost::container::small_vector<const Rule<Context>*, kFewRules> _rules;
     };
 
     enum class NextAction {
