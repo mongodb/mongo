@@ -67,3 +67,6 @@ filters:
   - "replica_set_to_csrs_promotion.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "shard_identity_rollback.js":
+    approvers:
+      - 10gen/server-catalog-and-routing
