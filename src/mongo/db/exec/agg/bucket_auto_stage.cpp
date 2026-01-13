@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"  // IWYU pragma: keep
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
@@ -108,7 +109,7 @@ GetNextResult BucketAutoStage::populateSorter() {
         _sorter = Sorter<Value, Document>::make(
             opts,
             comparator,
-            (opts.tempDir) ? std::make_shared<FileBasedSorterSpiller<Value, Document>>(
+            (opts.tempDir) ? std::make_shared<sorter::FileBasedSorterSpiller<Value, Document>>(
                                  *opts.tempDir, &_sorterFileStats)
                            : nullptr);
     }

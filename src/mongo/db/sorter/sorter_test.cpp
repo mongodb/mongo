@@ -31,6 +31,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/stdx/thread.h"  // IWYU pragma: keep

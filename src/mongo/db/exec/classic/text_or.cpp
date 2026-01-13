@@ -42,6 +42,7 @@
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
@@ -466,7 +467,7 @@ void TextOrStage::initSorter() {
     _sorter = Sorter<RecordId, TextRecordDataForSorter>::make(
         opts,
         comparator,
-        std::make_shared<FileBasedSorterSpiller<RecordId, TextRecordDataForSorter>>(
+        std::make_shared<sorter::FileBasedSorterSpiller<RecordId, TextRecordDataForSorter>>(
             *opts.tempDir, _sorterStats.get()));
 }
 

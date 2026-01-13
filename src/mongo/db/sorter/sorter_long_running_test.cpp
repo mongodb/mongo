@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/platform/random.h"

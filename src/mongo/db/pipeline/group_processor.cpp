@@ -241,7 +241,7 @@ void GroupProcessor::spill() {
         _file = std::make_shared<SorterFile>(sorter::nextFileName(_expCtx->getTempDir()),
                                              _spillStats.get());
     }
-    FileBasedSorterStorage<Value, Value> sorterStorage(_file, _expCtx->getTempDir());
+    sorter::FileBasedSorterStorage<Value, Value> sorterStorage(_file, _expCtx->getTempDir());
     std::unique_ptr<SortedStorageWriter<Value, Value>> writer =
         sorterStorage.makeWriter(SortOptions().TempDir(_expCtx->getTempDir()));
     switch (_accumulatedFields.size()) {  // same as ptrs[i]->second.size() for all i.

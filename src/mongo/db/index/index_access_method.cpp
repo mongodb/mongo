@@ -56,6 +56,7 @@
 #include "mongo/db/shard_role/shard_catalog/index_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/index_descriptor.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/sorter/file_based_spiller.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_template_defs.h"
 #include "mongo/db/storage/index_entry_comparison.h"
@@ -1556,7 +1557,7 @@ std::unique_ptr<HybridBulkBuilder::Sorter> HybridBulkBuilder::_makeSorter(
               *ranges,
               makeSortOptions(maxMemoryUsageBytes, dbName),
               comparator,
-              std::make_shared<FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
+              std::make_shared<sorter::FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
                   std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, fileStats),
                   tmpPath,
                   dbName),
@@ -1564,7 +1565,7 @@ std::unique_ptr<HybridBulkBuilder::Sorter> HybridBulkBuilder::_makeSorter(
         : Sorter::make(
               makeSortOptions(maxMemoryUsageBytes, dbName),
               comparator,
-              std::make_shared<FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
+              std::make_shared<sorter::FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
                   tmpPath, fileStats, dbName),
               _makeSorterSettings());
 }
