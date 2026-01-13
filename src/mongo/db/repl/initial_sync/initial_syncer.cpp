@@ -145,6 +145,10 @@ MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterFinish);
 // Failpoint which causes the initial sync function to hang after resetting the in-memory FCV.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterResettingFCV);
 
+// Failpoint which caused the initial sync function to hang after getting the begin applying
+// timestamp.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterGettingBeginApplyingTimestamp);
+
 // Failpoints for synchronization, shared with cloners.
 extern FailPoint initialSyncFuzzerSynchronizationPoint1;
 extern FailPoint initialSyncFuzzerSynchronizationPoint2;
@@ -1056,6 +1060,8 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
     std::string logMsg = str::stream()
         << "Initial Syncer got the beginApplyingTimestamp: " << lastOpTime.toString();
     pauseAtInitialSyncFuzzerSyncronizationPoints(logMsg);
+
+    initialSyncHangAfterGettingBeginApplyingTimestamp.pauseWhileSet();
 
     BSONObjBuilder queryBob;
     queryBob.append("find", NamespaceString::kServerConfigurationNamespace.coll());

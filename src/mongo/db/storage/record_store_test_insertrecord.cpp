@@ -28,12 +28,12 @@
  */
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -113,6 +113,54 @@ TEST(RecordStoreTest, InsertMultipleRecords) {
     }
 
     ASSERT_EQUALS(nToInsert, rs->numRecords());
+}
+
+// Insert a record with duplicated key and verify we got a DuplicateKeyError when allowOverwrite is
+// false
+TEST(RecordStoreTest, InsertRecordDuplicateKey) {
+    const auto harnessHelper(newRecordStoreHarnessHelper());
+    unique_ptr<RecordStore> rs(
+        harnessHelper->newRecordStore(RecordStore::Options{.allowOverwrite = false}));
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
+
+    ASSERT_EQUALS(0, rs->numRecords());
+
+    // Insert an initial record
+    auto data = BSON("_id" << 1);
+    RecordId loc;
+    {
+        StorageWriteTransaction txn(ru);
+        StatusWith<RecordId> res =
+            rs->insertRecord(opCtx.get(), ru, data.objdata(), data.objsize(), Timestamp());
+        ASSERT_OK(res.getStatus());
+        loc = res.getValue();
+        txn.commit();
+    }
+    ASSERT_EQUALS(1, rs->numRecords());
+
+    // Insert another record with the same record id
+    auto newData = BSON("_id" << 2);
+    {
+        StorageWriteTransaction txn(ru);
+        StatusWith<RecordId> res =
+            rs->insertRecord(opCtx.get(),
+                             ru,
+                             loc,  // We are reusing the same record id as the previous insert
+                             newData.objdata(),
+                             newData.objsize(),
+                             Timestamp());
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey, res.getStatus());
+        txn.abort();
+    }
+    ASSERT_EQUALS(1, rs->numRecords());
+
+    // Verify that the data was unchanged
+    auto cursor = rs->getCursor(opCtx.get(), ru);
+    auto record = cursor->next();
+    ASSERT(record);
+    ASSERT_EQUALS(0, record->data.toBson().woCompare(data));
+    ASSERT(!cursor->next());
 }
 
 }  // namespace
