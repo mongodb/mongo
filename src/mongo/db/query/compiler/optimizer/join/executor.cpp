@@ -172,12 +172,6 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         return status;
     }
 
-    // TODO SERVER-111798: Support cycles in the join graph.
-    if (swModel.getValue().graph.numEdges() >= swModel.getValue().graph.numNodes()) {
-        return Status(ErrorCodes::QueryFeatureNotAllowed,
-                      "Join reordering does not support cycles");
-    }
-
     // Validate we have all the collection acquisitions we need here.
     bool missingAcquisitions = std::any_of(swModel.getValue().prefix->getSources().begin(),
                                            swModel.getValue().prefix->getSources().end(),

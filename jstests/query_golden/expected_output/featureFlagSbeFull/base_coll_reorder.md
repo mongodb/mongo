@@ -432,7 +432,7 @@ Execution Engine: sbe
 
 ### Random reordering with seed 0
 ```
-HASH_JOIN_EMBEDDING [base = base]
+HASH_JOIN_EMBEDDING [base = base,y.base = base]
 leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
@@ -451,7 +451,7 @@ rightEmbeddingField: "x"
 ```
 ### Random reordering with seed 1
 ```
-HASH_JOIN_EMBEDDING [base = base]
+HASH_JOIN_EMBEDDING [base = base,x.base = base]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
@@ -470,7 +470,7 @@ rightEmbeddingField: "y"
 ```
 ### Random reordering with seed 2
 ```
-HASH_JOIN_EMBEDDING [base = base]
+HASH_JOIN_EMBEDDING [base = base,x.base = base]
 leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
@@ -487,9 +487,47 @@ rightEmbeddingField: "y"
   COLLSCAN [test.base_coll_reorder_md_base]
   direction: "forward"
 ```
+### Random reordering with seed 3
+```
+HASH_JOIN_EMBEDDING [x.base = base,y.base = base]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [base = base]
+  leftEmbeddingField: "x"
+  rightEmbeddingField: "y"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_b]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_a]
+  direction: "forward"
+```
+### Random reordering with seed 5
+```
+HASH_JOIN_EMBEDDING [x.base = base,y.base = base]
+leftEmbeddingField: "none"
+rightEmbeddingField: "none"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_base]
+  |  direction: "forward"
+  |
+  HASH_JOIN_EMBEDDING [base = base]
+  leftEmbeddingField: "y"
+  rightEmbeddingField: "x"
+  |  |
+  |  COLLSCAN [test.base_coll_reorder_md_a]
+  |  direction: "forward"
+  |
+  COLLSCAN [test.base_coll_reorder_md_b]
+  direction: "forward"
+```
 ### Random reordering with seed 7
 ```
-HASH_JOIN_EMBEDDING [base = base]
+HASH_JOIN_EMBEDDING [base = base,y.base = base]
 leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |

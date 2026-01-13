@@ -150,13 +150,15 @@ QSNJoinPredicate makePhysicalPredicate(const JoinReorderingContext& ctx,
 }
 
 std::vector<QSNJoinPredicate> makeJoinPreds(const JoinReorderingContext& ctx,
-                                            const JoinEdge& edge,
+                                            const std::vector<JoinEdge>& edges,
                                             bool expandLeftPath,
                                             bool expandRightPath) {
     std::vector<QSNJoinPredicate> preds;
-    preds.reserve(edge.predicates.size());
-    for (auto pred : edge.predicates) {
-        preds.push_back(makePhysicalPredicate(ctx, pred, expandLeftPath, expandRightPath));
+    preds.reserve(edges.size());
+    for (const auto& edge : edges) {
+        for (const auto& pred : edge.predicates) {
+            preds.push_back(makePhysicalPredicate(ctx, pred, expandLeftPath, expandRightPath));
+        }
     }
     return preds;
 }
@@ -203,28 +205,37 @@ NodeId getLeftmostNodeIdOfJoinPlan(const JoinReorderingContext& ctx,
                       registry.get(nodeId));
 }
 
-JoinEdge getEdge(const JoinGraph& joinGraph, NodeSet left, NodeSet right) {
+/**
+ * Retrieve all edges between the left and right node sets, oriented so that the right side of the
+ * edge corresponds to the right side of the join.
+ *
+ * This order is important for generating the 'QSNJoinPredicate' which is order sensitive. Note this
+ * is "cheating" a little bit because 'JoinEdge' is logically an undirected edge in the graph but
+ * implemented with left/right ordered members. We are exploiting this implementation detail to
+ * avoid doing duplicate work of determining the orientation in making the 'IndexedJoinPredicate'
+ * and 'QSNJoinPredicate' below.
+ *
+ * For example, given nodes A, B, C, D with edges A-C and C-D, calling getEdges(joinGraph, {A, B,
+ * D}, {C}) will return edges A-C and C-D (note the orientation).
+ */
+std::vector<JoinEdge> getEdges(const JoinGraph& joinGraph, NodeSet left, NodeSet right) {
     auto edges = joinGraph.getJoinEdges(left, right);
+    tassert(11179800,
+            "Must have at least one join edge as cross products are not currently supported",
+            !edges.empty());
 
-    // TODO SERVER-111798: Support join graphs with cycles & multiple predicates.
-    tassert(11233801,
-            "expecting a single edge between visted set and current node. random reorderer "
-            "does not support cycles yet",
-            edges.size() == 1);
-    auto edge = joinGraph.getEdge(edges[0]);
-
-    // Ensure that edge is oriented the same way as the join (right side corresponds to
-    // Index Probe side). This order is important for generating the 'QSNJoinPredicate'
-    // which is order sensitive. Note that is a "cheating" a little bit because 'JoinEdge'
-    // is logically an undirected edge in the graph but implemented with left/right ordered
-    // members. We are exploiting this implementation detail to avoid doing duplicate work
-    // of determining the orientation in making the 'IndexedJoinPredicate' and the
-    // 'QSNJoinPredicate' below.
-    if (right.test(edge.left)) {
-        edge = edge.reverseEdge();
+    std::vector<JoinEdge> res;
+    res.reserve(edges.size());
+    for (auto edgeId : edges) {
+        const JoinEdge& edge = joinGraph.getEdge(edgeId);
+        // Ensure that edge is oriented so that 'right' side corresponds to right side of join.
+        if (right.test(edge.left)) {
+            res.push_back(edge.reverseEdge());
+        } else {
+            res.push_back(edge);
+        }
     }
-
-    return edge;
+    return res;
 }
 
 const JoinNode& findFirstNode(const JoinGraph& joinGraph, NodeSet set) {
@@ -245,9 +256,6 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(const JoinReorderingC
     const auto& leftSubset = registry.getBitset(join.left);
     const auto& rightSubset = registry.getBitset(join.right);
 
-    // TODO SERVER-111798: Support join graphs with cycles & multiple predicates.
-    auto edge = getEdge(ctx.joinGraph, leftSubset, rightSubset);
-
     const bool isLeftBaseNode = leftSubset.count() == 1;
     const bool isRightBaseNode = rightSubset.count() == 1;
 
@@ -263,10 +271,12 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(const JoinReorderingC
         rightEmbedding = rightNode.embedPath;
     }
 
+    auto edges = getEdges(ctx.joinGraph, leftSubset, rightSubset);
+
     // Only expand predicates for non-base nodes.
     bool expandLeftPath = !isLeftBaseNode;
     bool expandRightPath = !isRightBaseNode;
-    auto joinPreds = makeJoinPreds(ctx, edge, expandLeftPath, expandRightPath);
+    auto joinPreds = makeJoinPreds(ctx, edges, expandLeftPath, expandRightPath);
 
     return makeBinaryJoinEmbeddingQSN(join.method,
                                       std::move(joinPreds),
@@ -299,6 +309,12 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
         auto current = frontier.back();
         auto& currentNode = ctx.joinGraph.getNode(current);
 
+        // In the case of a cycle, we may have already seen this node. Skip it.
+        if (visited.test(current)) {
+            frontier.pop_back();
+            continue;
+        }
+
         // Update solution to join the current node.
         if (!soln) {
             // This is the first node we encountered.
@@ -313,8 +329,7 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
 
             NodeSet currentNodeSet{};
             currentNodeSet.set(current);
-            // TODO SERVER-111798: Support join graphs with cycles & multiple predicates.
-            auto edge = getEdge(ctx.joinGraph, visited, currentNodeSet);
+            auto edges = getEdges(ctx.joinGraph, visited, currentNodeSet);
 
             boost::optional<FieldPath> lhsEmbedPath;
             bool expandLeftPredicate;
@@ -332,19 +347,25 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
                 expandLeftPredicate = true;
             }
 
-            auto joinPreds = makeJoinPreds(
-                ctx, edge, expandLeftPredicate, false /* Left-deep => never expand RHS. */);
+
+            // At this point, there may be multiple edges connecting left and right. Take a random
+            // one to use for finding the best index to use for INLJ.
+            // TODO SERVER-XXX: Pick best index from all edges, not just the first one.
+            size_t joiningEdge = rand.generateUniformInt(0, (int)(edges.size() - 1));
 
             // Attempt to use INLJ if possible, otherwise fallback to NLJ or HJ depending on the
             // query knob.
             JoinMethod method = JoinMethod::NLJ;
-            if (auto ice = bestIndexSatisfyingJoinPredicates(ctx, current, edge); ice) {
+            if (auto ice = bestIndexSatisfyingJoinPredicates(ctx, current, edges[joiningEdge]);
+                ice) {
                 rhs = createIndexProbeQSN(currentNode, ice);
                 method = JoinMethod::INLJ;
             } else if (defaultHJ) {
                 method = JoinMethod::HJ;
             }
 
+            auto joinPreds = makeJoinPreds(
+                ctx, edges, expandLeftPredicate, false /* Left-deep => never expand RHS. */);
             soln = makeBinaryJoinEmbeddingQSN(method,
                                               std::move(joinPreds),
                                               std::move(soln),
@@ -373,8 +394,6 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
             frontier.push_back(n);
         }
     }
-
-    // TODO SERVER-111798: detect cycle and ensure that we apply all the join predicates.
 
     auto ret = std::make_unique<QuerySolution>();
     ret->setRoot(std::move(soln));

@@ -92,9 +92,6 @@ assert.commandWorked(
 );
 assert.commandWorked(regionColl.insertMany([{r_regionkey: 1}, {r_regionkey: 2}]));
 
-// TODO SERVER-111798: Update assertions in this test file once join opt supports true cycles and
-// pseudo-cycles.
-
 function runAllTestCases(additionalJoinParams = {}) {
     // Query with implicit cycle of length 3, specified with join predicates A -- B, B -- C on the same
     // field (joinField1). The inferred cycle is A -- B -- C.
@@ -137,7 +134,7 @@ function runAllTestCases(additionalJoinParams = {}) {
                 c_docs: {_id: 0, joinField1: 0, joinField2: 1, joinField3: 0},
             },
         ],
-        expectedUsedJoinOptimization: false,
+        expectedUsedJoinOptimization: true,
     });
 
     // Query with implicit cycle of length 4. Similar to above, but with more collections. Also, the
@@ -192,7 +189,7 @@ function runAllTestCases(additionalJoinParams = {}) {
                 d_docs: {_id: 0, joinField1: 0, joinField2: 0},
             },
         ],
-        expectedUsedJoinOptimization: false,
+        expectedUsedJoinOptimization: true,
     });
 
     // Query with explicit cycle, specified with join predicates A -- B, B -- C, C--A on the same field
@@ -239,7 +236,7 @@ function runAllTestCases(additionalJoinParams = {}) {
                 c_docs: {_id: 0, joinField1: 0, joinField2: 1, joinField3: 0},
             },
         ],
-        expectedUsedJoinOptimization: false,
+        expectedUsedJoinOptimization: true,
     });
 
     // Query with a pseudo-cycle. The join predicates are A -- B on joinField1, B -- C on joinField2,
@@ -285,7 +282,7 @@ function runAllTestCases(additionalJoinParams = {}) {
                 c_docs: {_id: 1, joinField1: 1, joinField2: 0, joinField3: 0},
             },
         ],
-        expectedUsedJoinOptimization: false,
+        expectedUsedJoinOptimization: true,
     });
 
     // Query with a mix of true cycles and pseudo-cycles. This query is based on TPC-H Q5. Here, the
@@ -372,7 +369,7 @@ function runAllTestCases(additionalJoinParams = {}) {
                 region: {r_regionkey: 1},
             },
         ],
-        expectedUsedJoinOptimization: false,
+        expectedUsedJoinOptimization: true,
     });
 }
 
