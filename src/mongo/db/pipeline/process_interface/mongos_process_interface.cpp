@@ -458,6 +458,14 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
             "Received unexpected 'targetCollectionPlacementVersion' on mongos",
             !targetCollectionPlacementVersion);
 
+    // Skip the listIndexes check when the query won't be executed.
+    // TODO SERVER-117000: Remove this conditional once this validation is off of the parsing path.
+    if (!expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        return {fieldPaths.value_or(std::set<FieldPath>{"_id"}),
+                boost::none,
+                SupportingUniqueIndex::Full};
+    }
+
     if (fieldPaths) {
         auto supportingUniqueIndex = fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths);
         uassert(51190,

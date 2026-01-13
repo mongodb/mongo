@@ -178,6 +178,15 @@ parseMongotResponseCursors(std::vector<std::unique_ptr<executor::TaskExecutorCur
 
 void planShardedSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        InternalSearchMongotRemoteSpec* remoteSpec) {
+    // The parsed pipeline won't be executed so we don't need the planShardedSearch result.
+    if (!expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        LOGV2_DEBUG(11507801,
+                    5,
+                    "Skipping planShardedSearch while parsing only for query shape",
+                    "ns"_attr = expCtx->getNamespaceString().coll());
+        return;
+    }
+
     LOGV2_DEBUG(9497008,
                 5,
                 "planShardedSearch",

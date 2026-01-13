@@ -105,12 +105,15 @@ public:
     /**
      * Like parse, but takes a LiteParsedPipeline instead of raw BSONObjs.
      * If 'isFacetPipeline' is true, skips top-level validators.
+     * If `useStubInterface` is true, a StubMongoProcessInterface will be used during parsing,
+     * then restored with the original interface after parsing.
      */
     static std::unique_ptr<Pipeline> parseFromLiteParsed(
         const LiteParsedPipeline& liteParsedPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         PipelineValidatorCallback validator = nullptr,
-        bool isFacetPipeline = false);
+        bool isFacetPipeline = false,
+        bool useStubInterface = false);
 
     /**
      * Creates a Pipeline from an existing DocumentSourceContainer.

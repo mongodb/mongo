@@ -30,6 +30,7 @@
 #include "mongo/db/pipeline/pipeline_factory.h"
 
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
@@ -67,6 +68,11 @@ std::unique_ptr<Pipeline> makePipeline(const std::vector<BSONObj>& rawPipeline,
                                        MakePipelineOptions opts) {
     LiteParsedPipeline liteParsedPipeline =
         LiteParsedPipeline(expCtx->getNamespaceString(), rawPipeline);
+
+    if (opts.desugar) {
+        LiteParsedDesugarer::desugar(&liteParsedPipeline);
+    }
+
     auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
 
     expCtx->initializeReferencedSystemVariables();
@@ -120,6 +126,11 @@ std::unique_ptr<Pipeline> makePipeline(AggregateCommandRequest& aggRequest,
 
     LiteParsedPipeline liteParsedPipeline =
         LiteParsedPipeline(expCtx->getNamespaceString(), aggRequest.getPipeline());
+
+    if (opts.desugar) {
+        LiteParsedDesugarer::desugar(&liteParsedPipeline);
+    }
+
     auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, opts.validator);
     if (opts.optimize) {
         pipeline_optimization::optimizePipeline(*pipeline);

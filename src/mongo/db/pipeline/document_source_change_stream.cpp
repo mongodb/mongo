@@ -313,7 +313,10 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromB
     // Save a copy of the spec on the expression context. Used when building the oplog filter.
     expCtx->setChangeStreamSpec(spec);
 
-    changeStreamsShowExpandedEvents.increment(spec.getShowExpandedEvents());
+    // Only increment counter during actual execution, not during query shape parsing.
+    if (expCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        changeStreamsShowExpandedEvents.increment(spec.getShowExpandedEvents());
+    }
 
     return change_stream::pipeline_helpers::buildPipeline(expCtx, spec, resumeToken);
 }

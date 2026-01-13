@@ -52,12 +52,12 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_hint_translation.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/pipeline/desugarer.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/expression_context_diagnostic_printer.h"
+#include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -564,16 +564,18 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         }
     }
 
-    auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx);
-    if (cri && cri->hasRoutingTable()) {
-        pipeline->validateWithCollectionMetadata(cri.get());
-    }
+    // Clone and desugar the pipeline. If the pipeline is modified by the desugar, a second
+    // parse is required. Otherwise, we can optimize out the second parse.
+    LiteParsedPipeline clonedLPP = liteParsedPipeline.clone();
+    bool needsSecondParse = LiteParsedDesugarer::desugar(&clonedLPP);
 
-    if (request.getTranslatedForViewlessTimeseries()) {
-        pipeline->setTranslated();
-    }
+    // Parse the user's original pipeline pre-desugar to capture query stats. Passing through
+    // needsSecondParse will determine whether a StubMongoProcessInterface will be attached to this
+    // parse or not.
+    auto pipeline =
+        Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, nullptr, false, needsSecondParse);
 
-    // Compute QueryShapeHash and record it in CurOp.
+    // Compute QueryShapeHash pre-desugar and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
         return shape_helpers::tryMakeShape<query_shape::AggCmdShape>(
             request,
@@ -612,9 +614,17 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
             hasChangeStream);
     }
 
-    // Find stages with stage expanders and desugar. We desugar after registering query stats to
-    // ensure that the query shape is representative of the user's original query.
-    Desugarer(pipeline.get())();
+    if (needsSecondParse) {
+        pipeline = Pipeline::parseFromLiteParsed(clonedLPP, expCtx);
+    }
+
+    if (cri && cri->hasRoutingTable()) {
+        pipeline->validateWithCollectionMetadata(cri.get());
+    }
+
+    if (request.getTranslatedForViewlessTimeseries()) {
+        pipeline->setTranslated();
+    }
 
     return pipeline;
 }

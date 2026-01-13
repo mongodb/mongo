@@ -84,31 +84,4 @@ DocumentSource::Id DocumentSourceExtensionExpandable::getId() const {
     return id;
 }
 
-Desugarer::StageExpander DocumentSourceExtensionExpandable::stageExpander =
-    [](Desugarer* desugarer, DocumentSourceContainer::iterator itr, const DocumentSource& stage) {
-        tassert(10978001, "Desugarer iterator does not match current stage", itr->get() == &stage);
-
-        const auto& expandable = static_cast<const DocumentSourceExtensionExpandable&>(stage);
-        std::list<boost::intrusive_ptr<DocumentSource>> expandedExtension = expandable.expand();
-        tassert(10978002, "Expanded extension pipeline is empty", !expandedExtension.empty());
-
-        // Replaces the extension stage with its expanded form and moves the iterator to *after* the
-        // new stages added.
-        return desugarer->replaceStageWith(itr, std::move(expandedExtension));
-    };
-
-/**
- * Register the stage expander only after DocumentSource ID allocation is complete. This ensures
- * that the expander is not registered under kUnallocatedId (0).
- */
-MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForExtensionExpandable,
-                                     ("EndDocumentSourceIdAllocation"))
-(InitializerContext*) {
-    tassert(11368000,
-            "DocumentSourceExtensionExpandable::id must be allocated before registering expander",
-            DocumentSourceExtensionExpandable::id != DocumentSource::kUnallocatedId);
-    Desugarer::registerStageExpander(DocumentSourceExtensionExpandable::id,
-                                     DocumentSourceExtensionExpandable::stageExpander);
-}
-
 }  // namespace mongo::extension::host

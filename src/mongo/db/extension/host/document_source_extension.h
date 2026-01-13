@@ -34,7 +34,6 @@
 #include "mongo/db/extension/host/static_properties_util.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
-#include "mongo/db/pipeline/desugarer.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 #include "mongo/stdx/unordered_set.h"

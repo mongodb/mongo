@@ -65,7 +65,7 @@ mongo_cc_library(
         "//src/mongo/db/extension/host_connector/handle:host_handles",
         "//src/mongo/db/extension/shared/handle/aggregation_stage",
         "//src/mongo/db/pipeline",
-        "//src/mongo/db/pipeline:desugarer",
+        "//src/mongo/db/pipeline:lite_parsed_desugarer",
     ],
 )
 

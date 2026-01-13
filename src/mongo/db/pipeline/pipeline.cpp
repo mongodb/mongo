@@ -53,6 +53,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/stage_constraints.h"
@@ -67,6 +68,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -202,7 +204,17 @@ std::unique_ptr<Pipeline> Pipeline::parseFromLiteParsed(
     const LiteParsedPipeline& liteParsedPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     PipelineValidatorCallback validator,
-    bool isFacetPipeline) {
+    bool isFacetPipeline,
+    bool useStubInterface) {
+    boost::optional<ScopeGuard<std::function<void()>>> restore;
+
+    if (useStubInterface) {
+        auto originalInterface = expCtx->getMongoProcessInterface();
+        expCtx->setMongoProcessInterface(std::make_shared<StubMongoProcessInterface>());
+        restore.emplace(
+            [expCtx, originalInterface] { expCtx->setMongoProcessInterface(originalInterface); });
+    }
+
     const auto& rawPipeline = liteParsedPipeline.getStages();
 
     // Before parsing the pipeline, make sure it's not so long that it will make us run out of

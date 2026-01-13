@@ -59,11 +59,17 @@ class MongosProcessInterfaceTest : public AggregationContextFixture {
 public:
     MongosProcessInterfaceTest() {
         getExpCtx()->setInRouter(true);
+        _processInterface = std::make_shared<MongosProcessInterfaceForTest>(nullptr);
+        // Set the process interface on expCtx so isExpectedToExecuteQueries() returns true.
+        getExpCtx()->setMongoProcessInterface(_processInterface);
     }
 
-    auto makeProcessInterface() {
-        return std::make_unique<MongosProcessInterfaceForTest>(nullptr);
+    auto getProcessInterface() {
+        return _processInterface;
     }
+
+private:
+    std::shared_ptr<MongosProcessInterfaceForTest> _processInterface;
 };
 
 TEST_F(MongosProcessInterfaceTest,
@@ -71,7 +77,7 @@ TEST_F(MongosProcessInterfaceTest,
     auto expCtx = getExpCtx();
     auto targetCollectionPlacementVersion =
         boost::make_optional(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {0, 0}));
-    auto processInterface = makeProcessInterface();
+    auto processInterface = getProcessInterface();
 
     ASSERT_THROWS_CODE(
         processInterface->ensureFieldsUniqueOrResolveDocumentKey(
@@ -83,7 +89,7 @@ TEST_F(MongosProcessInterfaceTest,
 TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfNotSupportedByIndex) {
     auto expCtx = getExpCtx();
     auto targetCollectionPlacementVersion = boost::none;
-    auto processInterface = makeProcessInterface();
+    auto processInterface = getProcessInterface();
 
     processInterface->hasSupportingIndexForFields =
         MongoProcessInterface::SupportingUniqueIndex::None;

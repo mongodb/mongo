@@ -74,9 +74,6 @@ public:
                   "to Optimizable stages before calling distributedPlanLogic()");
     }
 
-    // Define how to desugar a DocumentSourceExtensionExpandable.
-    static Desugarer::StageExpander stageExpander;
-
 protected:
     DocumentSourceExtensionExpandable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       AggStageParseNodeHandle parseNode)

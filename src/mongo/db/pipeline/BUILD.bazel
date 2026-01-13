@@ -526,10 +526,10 @@ mongo_cc_library(
         ":accumulator",
         ":change_stream_error_extra_info",
         ":change_stream_helpers",
-        ":desugarer",
         ":document_path_support",
         ":document_sources_idl",
         ":granularity_rounder",
+        ":lite_parsed_desugarer",
         ":lite_parsed_document_source",
         "//src/mongo/bson/dotted_path:dotted_path_support",
         "//src/mongo/client:clientdriver_minimal",
@@ -1118,7 +1118,6 @@ mongo_cc_unit_test(
         "change_stream_test.cpp",
         "data_to_shards_allocation_query_service_test.cpp",
         "dependencies_test.cpp",
-        "desugarer_test.cpp",
         "dispatch_shard_pipeline_test.cpp",
         "document_path_support_test.cpp",
         "document_source_add_fields_test.cpp",
@@ -1486,9 +1485,8 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "desugarer",
+    name = "lite_parsed_desugarer",
     srcs = [
-        "desugarer.cpp",
         "lite_parsed_desugarer.cpp",
     ],
     visibility = ["//visibility:public"],

@@ -261,7 +261,11 @@ using AddFruitsToDocumentsWithMetadataTransformStageDescriptor =
  */
 class AddFruitsToDocumentsExecStage : public TestExecStage {
 public:
-    AddFruitsToDocumentsExecStage() : AddFruitsToDocumentsExecStage(kTransformName, BSONObj()) {}
+    // Use the registered stage name for consistency with AddFruitsToDocumentsAstNode.
+    static constexpr char kAddFruitsToDocumentsName[] = "$addFruitsToDocuments";
+
+    AddFruitsToDocumentsExecStage()
+        : AddFruitsToDocumentsExecStage(kAddFruitsToDocumentsName, BSONObj()) {}
 
     AddFruitsToDocumentsExecStage(std::string_view stageName, const mongo::BSONObj& arguments)
         : sdk::TestExecStage(stageName, BSONObj()) {}
@@ -326,8 +330,13 @@ DEFAULT_LOGICAL_STAGE(AddFruitsToDocuments);
 
 class AddFruitsToDocumentsAstNode : public sdk::TestAstNode<AddFruitsToDocumentsLogicalStage> {
 public:
+    // Use the registered stage name to ensure  the serialized form can be parsed on shards in a
+    // sharded cluster.
+    static constexpr char kAddFruitsToDocumentsName[] = "$addFruitsToDocuments";
+
     AddFruitsToDocumentsAstNode()
-        : sdk::TestAstNode<AddFruitsToDocumentsLogicalStage>(kTransformName, BSONObj()) {};
+        : sdk::TestAstNode<AddFruitsToDocumentsLogicalStage>(kAddFruitsToDocumentsName, BSONObj()) {
+          };
 
     AddFruitsToDocumentsAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
         : sdk::TestAstNode<AddFruitsToDocumentsLogicalStage>(stageName, arguments) {}

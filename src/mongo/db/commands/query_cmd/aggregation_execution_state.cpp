@@ -678,11 +678,16 @@ std::unique_ptr<Pipeline> ResolvedViewAggExState::applyViewToPipeline(
         return pipeline;
     }
 
-    // Parse the view pipeline, then stitch the user pipeline and view pipeline together
-    // to build the total aggregation pipeline.
+    // Parse and desugar the view pipeline, then stitch the user pipeline and full-parsed view
+    // pipeline together to build the total aggregation pipeline.
     auto userPipeline = std::move(pipeline);
-    pipeline = pipeline_factory::makePipeline(
-        getResolvedView().getPipeline(), expCtx, pipeline_factory::kOptionsMinimal);
+    pipeline = pipeline_factory::makePipeline(getResolvedView().getPipeline(),
+                                              expCtx,
+                                              {.optimize = false,
+                                               .alreadyOptimized = false,
+                                               .attachCursorSource = false,
+                                               .desugar = true});
+
     pipeline->appendPipeline(std::move(userPipeline));
     return pipeline;
 }

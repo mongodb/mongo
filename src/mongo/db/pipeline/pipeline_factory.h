@@ -45,9 +45,10 @@ struct MakePipelineOptions {
     // alreadyOptimized to false.
     bool alreadyOptimized = true;
     bool attachCursorSource = true;
+    bool desugar = true;
 
-    // When set to true, ensures that default collection collator will be attached to the pipeline.
-    // Needs 'attachCursorSource' set to true, in order to be applied.
+    // When set to true, ensures that default collection collator will be attached to the
+    // pipeline. Needs 'attachCursorSource' set to true, in order to be applied.
     bool useCollectionDefaultCollator = false;
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed;
     PipelineValidatorCallback validator = nullptr;
@@ -55,7 +56,7 @@ struct MakePipelineOptions {
 };
 
 static const MakePipelineOptions kOptionsMinimal{
-    .optimize = false, .alreadyOptimized = false, .attachCursorSource = false};
+    .optimize = false, .alreadyOptimized = false, .attachCursorSource = false, .desugar = false};
 
 /**
  * Factory functions for creating Pipeline objects from various input formats.
@@ -66,6 +67,7 @@ static const MakePipelineOptions kOptionsMinimal{
  *   add an initial cursor source.
  * - opts.alreadyOptimized: Indicates whether the pipeline has already been optimized. This
  *   affects validation rules applied to the pipeline.
+ * - opts.desugar: If true, the pipeline will be desugared before being returned.
  * - Other options control shard targeting, collation, read concern, and validation callbacks.
  */
 

@@ -204,6 +204,14 @@ struct DisallowViewsPolicy : public ViewPolicy {
  *
  * This is the non-template base class for polymorphism. Derived classes should inherit from the
  * templates below which provide a default clone() implementation.
+ *
+ * Instances of this class can be unowned or owned with respect to their BSON data:
+ *
+ * - Unowned (default): The instance holds a BSONElement view into external BSON data. The caller
+ * must ensure the source BSONObj's lifetime exceeds that of this instance.
+ *
+ * - Owned: The instance owns BSON data via '_ownedBson'. Call makeOwned() to transition from
+ * unowned to owned when the source BSON lifetime cannot be guaranteed.
  */
 class MONGO_MOD_UNFORTUNATELY_OPEN LiteParsedDocumentSource {
 public:
@@ -285,6 +293,15 @@ public:
     LiteParsedDocumentSource(const BSONElement& originalBson)
         : _originalBson(originalBson), _parseTimeName(originalBson.fieldNameStringData()) {}
 
+    /**
+     * Copy constructor. When the source is owned, the copy shares ownership of the underlying BSON
+     * buffer via BSONObj's shared pointer semantics. This ensures the copy's '_originalBson'
+     * remains valid even if the source is destroyed.
+     */
+    LiteParsedDocumentSource(const LiteParsedDocumentSource& other) = default;
+
+    LiteParsedDocumentSource& operator=(const LiteParsedDocumentSource&) = delete;
+
     virtual ~LiteParsedDocumentSource() = default;
 
     /**
@@ -301,6 +318,23 @@ public:
     static void registerFallbackParser(const std::string& name,
                                        FeatureFlag* parserFeatureFlag,
                                        LiteParserInfo);
+
+
+    /**
+     * Constructs a LiteParsedDocumentSource from the user-supplied BSON, or throws an
+     * AssertionException.
+     *
+     * Extracts the first field name from 'spec', and delegates to the parser that was registered
+     * with that field name using registerParser() above.
+     *
+     * NOTE: The returned instance holds an UNOWNED reference to 'spec'. The caller must ensure
+     * 'spec' remains valid for the lifetime of the returned LiteParsedDocumentSource. If the BSON
+     * lifetime cannot be guaranteed, call makeOwned() on the returned instance.
+     */
+    static std::unique_ptr<LiteParsedDocumentSource> parse(
+        const NamespaceString& nss,
+        const BSONObj& spec,
+        const LiteParserOptions& options = LiteParserOptions{});
 
     /**
      * Function that will be used as an alternate parser for a document source that has been
@@ -331,18 +365,6 @@ public:
     const AllowedWithClientType& getClientType() {
         return _clientType;
     };
-
-    /**
-     * Constructs a LiteParsedDocumentSource from the user-supplied BSON, or throws a
-     * AssertionException.
-     *
-     * Extracts the first field name from 'spec', and delegates to the parser that was registered
-     * with that field name using registerParser() above.
-     */
-    static std::unique_ptr<LiteParsedDocumentSource> parse(
-        const NamespaceString& nss,
-        const BSONObj& spec,
-        const LiteParserOptions& options = LiteParserOptions{});
 
     /**
      * Returns the foreign collection(s) referenced by this stage (that is, any collection that
@@ -519,10 +541,38 @@ public:
 
     /**
      * Returns a copy of the current LiteParsedDocumentSource.
+     *
+     * Cloning behavior depends on the ownership state of the original:
+     * - If the original is unowned, the clone also references the same external BSON.
+     * - If the original is owned, the clone shares ownership of the BSON buffer via BSONObj's
+     * shared pointer semantics. This means the clone's data remains valid even after the original
+     * is destroyed.
+     *
+     * Call makeOwned() on an unowned clone if the external BSON lifetime cannot be guaranteed.
      */
     virtual std::unique_ptr<LiteParsedDocumentSource> clone() const = 0;
 
+    /**
+     * Converts the LiteParsedDocumentSource to own the BSON it holds, similar to
+     * BSONObj::getOwned(). This should be called when the source BSONObj's lifetime cannot be
+     * guaranteed to exceed that of this instance.
+     *
+     * If '_ownedBson' already has a value, this is a no-op since the BSON data is already
+     * guaranteed to remain valid.
+     */
+    void makeOwned() {
+        if (_originalBson.eoo() || _ownedBson) {
+            // Nothing to own, or already owned.
+            return;
+        }
+
+        _ownedBson = _originalBson.wrap();
+        _originalBson = _ownedBson->firstElement();
+    }
+
 protected:
+    boost::optional<BSONObj> _ownedBson;
+
     BSONElement _originalBson;
 
     void transactionNotSupported(StringData stageName) const {

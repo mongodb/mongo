@@ -112,12 +112,16 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
             "$queryStats must be run against the 'admin' database with {aggregate: 1}",
             nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
-    LOGV2_DEBUG_OPTIONS(7808300,
-                        1,
-                        {logv2::LogTruncation::Disabled},
-                        "Logging invocation $queryStats",
-                        "commandSpec"_attr =
-                            spec.Obj().redact(BSONObj::RedactLevel::sensitiveOnly));
+    // Prevent logging during a pipeline parse that won't execute a query.
+    if (pExpCtx->getMongoProcessInterface()->isExpectedToExecuteQueries()) {
+        LOGV2_DEBUG_OPTIONS(7808300,
+                            1,
+                            {logv2::LogTruncation::Disabled},
+                            "Logging invocation $queryStats",
+                            "commandSpec"_attr =
+                                spec.Obj().redact(BSONObj::RedactLevel::sensitiveOnly));
+    }
+
     return parseSpec(spec, [&](TransformAlgorithmEnum algorithm, std::string hmacKey) {
         return new DocumentSourceQueryStats(pExpCtx, algorithm, hmacKey);
     });

@@ -107,9 +107,13 @@ protected:
     static std::vector<BSONObj> desugarAndSerialize(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& stageSpec) {
         std::vector<BSONObj> spec{stageSpec};
-        auto pipe = pipeline_factory::makePipeline(spec, expCtx, pipeline_factory::kOptionsMinimal);
+        auto pipe = pipeline_factory::makePipeline(spec,
+                                                   expCtx,
+                                                   {.optimize = false,
+                                                    .alreadyOptimized = false,
+                                                    .attachCursorSource = false,
+                                                    .desugar = true});
         ASSERT_TRUE(pipe);
-        Desugarer(pipe.get())();
         return pipe->serializeToBson();
     }
 

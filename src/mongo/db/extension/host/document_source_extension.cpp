@@ -45,8 +45,17 @@ DocumentSourceContainer expandableStageParamsToDocumentSourceFn(
     const std::unique_ptr<StageParams>& stageParams,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto* expandableParams = static_cast<ExpandableStageParams*>(stageParams.get());
-    return {
-        DocumentSourceExtensionExpandable::create(expCtx, expandableParams->releaseParseNode())};
+    auto parseNode = expandableParams->releaseParseNode();
+
+    if (expCtx->getFromRouter()) {
+        // Because run_aggregate prevents a re-desugar when coming from mongos, it's necessary to
+        // directly construct a DocumentSourceExtensionOptimizable from the parse node. This is
+        // allowed because the desugar has been performed on the mongos already, meaning that the
+        // BSON serialized and sent to the shards is from DocumentSourceExtensionOptimizable.
+        return {DocumentSourceExtensionOptimizable::create(expCtx, std::move(parseNode))};
+    }
+
+    return {DocumentSourceExtensionExpandable::create(expCtx, std::move(parseNode))};
 }
 
 REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(expandable,
@@ -141,7 +150,9 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
         expanded,
         [&](const HostAggStageParseNode& hostParse) {
             const auto& spec = hostParse.getBsonSpec();
-            outExpanded.emplace_back(LiteParsedDocumentSource::parse(nss, spec, options));
+            auto lpds = LiteParsedDocumentSource::parse(nss, spec, options);
+            lpds->makeOwned();
+            outExpanded.emplace_back(std::move(lpds));
         },
         [&](const AggStageParseNodeHandle& handle) {
             const auto stageName = std::string(handle->getName());
@@ -151,7 +162,9 @@ LiteParsedList DocumentSourceExtension::LiteParsedExpandable::expandImpl(
         },
         [&](const HostAggStageAstNode& hostAst) {
             const auto& spec = hostAst.getIdLookupSpec();
-            outExpanded.emplace_back(LiteParsedDocumentSource::parse(nss, spec, options));
+            auto lpds = LiteParsedDocumentSource::parse(nss, spec, options);
+            lpds->makeOwned();
+            outExpanded.emplace_back(std::move(lpds));
         },
         [&](AggStageAstNodeHandle handle) {
             outExpanded.emplace_back(std::make_unique<LiteParsedExpanded>(
