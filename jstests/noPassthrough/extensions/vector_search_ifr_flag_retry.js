@@ -332,4 +332,4 @@ function runTests(conn, mongotMock, shardingTest = null) {
     runViewVectorSearchTests(conn, mongotMock, false, shardingTest);
 }
 
-withExtensionsAndMongot({"libvector_search_extension.so": {}}, runTests, ["sharded"], kNumShards);
+withExtensionsAndMongot({"libvector_search_extension.so": {}}, runTests, ["standalone", "sharded"], kNumShards);

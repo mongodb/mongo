@@ -1338,28 +1338,6 @@ Status runAggregate(
     }
 
     stdx::unordered_set<IncrementalRolloutFeatureFlag*> initialFlagsToDisable;
-
-    // If there is no value for the feature flag passed on the request, that either means we have
-    // a direct user request (so we should check the node's flag value), or it means we have a
-    // request from a router where the value of the flag is false (so we should also commit to flag
-    // value false). We rely on OperationShardingState::isComingFromRouter() to differentiate
-    // between these situations.
-    // TODO SERVER-116472 Remove this when the router sends all IFRContext flags, regardless of flag
-    // value.
-    auto ifrFlags = request.getIfrFlags();
-    bool ifrContextProvidedVectorSearchFeatureFlag =
-        ifrFlags.has_value() &&
-        std::any_of(ifrFlags.value().begin(), ifrFlags.value().end(), [](const BSONObj& obj) {
-            const auto& name = obj["name"];
-            const auto flagName = name.valueStringData();
-            return flagName == feature_flags::gFeatureFlagVectorSearchExtension.getName();
-        });
-
-    if (!ifrContextProvidedVectorSearchFeatureFlag &&
-        OperationShardingState::isComingFromRouter(opCtx)) {
-        initialFlagsToDisable.insert(&feature_flags::gFeatureFlagVectorSearchExtension);
-    }
-
     std::unique_ptr<LiteParsedPipeline> updatedLiteParsed;
     auto body =
         [&](stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {

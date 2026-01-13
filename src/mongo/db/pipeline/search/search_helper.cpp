@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
+#include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/pipeline/search/plan_sharded_search_gen.h"
 #include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/pipeline/variables.h"
@@ -306,7 +307,8 @@ bool isMongotStage(DocumentSource* stage) {
 
 // TODO SERVER-116021 Remove this function when the extension can do this through ViewPolicy.
 bool isExtensionVectorSearchStage(std::string stageName) {
-    return stageName == kExtensionVectorSearchStageName;
+    return stageName == kExtensionVectorSearchStageName ||
+        stageName == DocumentSourceVectorSearch::kStageName;
 }
 
 void assertSearchMetaAccessValid(const DocumentSourceContainer& pipeline,
