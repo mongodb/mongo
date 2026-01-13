@@ -6,7 +6,7 @@
  * ]
  */
 
-import {runTest} from "jstests/libs/query/join_utils.js";
+import {runTestWithUnorderedComparison} from "jstests/libs/query/join_utils.js";
 
 try {
     const baseColl = db[jsTestName()];
@@ -42,7 +42,7 @@ try {
         ]),
     );
 
-    runTest({
+    runTestWithUnorderedComparison({
         description: "Join optimization should not be used with local/foreignField syntax and additional filter",
         coll: baseColl,
         pipeline: [
@@ -66,7 +66,7 @@ try {
     });
 
     // Same as above, without project.
-    runTest({
+    runTestWithUnorderedComparison({
         description:
             "Join optimization should not be used with local/foreignField syntax and additional filter without project",
         coll: baseColl,
@@ -89,7 +89,7 @@ try {
         expectedUsedJoinOptimization: false,
     });
 
-    runTest({
+    runTestWithUnorderedComparison({
         description: "Join optimization should not be used with let/pipeline syntax and additional filter",
         coll: baseColl,
         pipeline: [
@@ -112,7 +112,7 @@ try {
         expectedUsedJoinOptimization: false,
     });
 
-    runTest({
+    runTestWithUnorderedComparison({
         description: "Join optimization should not be used with field syntax and pipeline syntax and additional filter",
         coll: baseColl,
         pipeline: [
@@ -134,7 +134,7 @@ try {
         expectedUsedJoinOptimization: false,
     });
 
-    runTest({
+    runTestWithUnorderedComparison({
         description: "Join optimization can be used on a prefix even when the suffix has absorbed an additional filter",
         coll: baseColl,
         pipeline: [

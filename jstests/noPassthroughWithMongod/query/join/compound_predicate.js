@@ -6,7 +6,7 @@
  * ]
  */
 
-import {runTest} from "jstests/libs/query/join_utils.js";
+import {runTestWithUnorderedComparison} from "jstests/libs/query/join_utils.js";
 
 try {
     const baseColl = db[jsTestName()];
@@ -33,7 +33,7 @@ try {
         ]),
     );
 
-    runTest({
+    runTestWithUnorderedComparison({
         description: "Join optimization should be used with compound equality predicates",
         coll: baseColl,
         pipeline: [
@@ -57,7 +57,7 @@ try {
         expectedUsedJoinOptimization: true,
     });
 
-    runTest({
+    runTestWithUnorderedComparison({
         description: "Join optimization should be used with mix of local/foreignField and pipeline",
         coll: baseColl,
         pipeline: [
@@ -83,7 +83,7 @@ try {
         expectedUsedJoinOptimization: true,
     });
 
-    runTest({
+    runTestWithUnorderedComparison({
         description: "Join optimization should work with $$ROOT",
         coll: baseColl,
         pipeline: [
