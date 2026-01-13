@@ -127,7 +127,7 @@ def get_assignable_user(ticket):
 def get_issue_key_from_line(line):
     """Given a string of text, find and return any issue keys from relevent projects."""
     match = re.search(
-        "(BUILD|SERVER|WT|SPM|TOOLS|TIG|PERF|BF|REP|BACKPORT|WRITING|STAR)-[0-9]+",
+        "(BUILD|SERVER|WT|SPM|TOOLS|TIG|PERF|BF|REP|BACKPORT|WRITING|STAR|SLS)-[0-9]+",
         line,
         re.IGNORECASE,
     )
