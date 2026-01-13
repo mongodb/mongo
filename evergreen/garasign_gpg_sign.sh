@@ -15,6 +15,7 @@ if [ "$long_ext" == "tgz" ]; then
 fi
 
 mv mongo-binaries.tgz mongodb-${push_name}-${push_arch}-${suffix}.${ext}
+mv mongo-dist-test.tgz mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext}
 mv mongo-cryptd.tgz mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext} || true
 mv mh.tgz mh-${push_name}-${push_arch}-${suffix}.${ext} || true
 mv mongo-debugsymbols.tgz mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext} || true
@@ -32,6 +33,7 @@ function gen_checksums() {
 }
 
 gen_checksums mongodb-$push_name-$push_arch-$suffix.$ext
+gen_checksums mongodb-dist-test-$push_name-$push_arch-$suffix.$ext
 gen_checksums mongodb-$push_name-$push_arch-debugsymbols-$suffix.$ext
 gen_checksums mongodb-src-$src_suffix.$long_ext
 gen_checksums mongodb-cryptd-$push_name-$push_arch-$suffix.$ext
@@ -52,6 +54,7 @@ EOF
 
 cat <<EOF >>gpg_signing_commands.sh
 sign mongodb-$push_name-$push_arch-$suffix.$ext
+sign mongodb-dist-test-$push_name-$push_arch-$suffix.$ext
 sign mongodb-$push_name-$push_arch-debugsymbols-$suffix.$ext
 sign mongodb-src-$src_suffix.$long_ext
 sign mongodb-cryptd-$push_name-$push_arch-$suffix.$ext
