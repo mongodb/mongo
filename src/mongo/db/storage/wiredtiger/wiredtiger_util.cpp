@@ -403,7 +403,7 @@ StatusWith<int64_t> WiredTigerUtil::getStatisticsValue_DoNotUse(WT_SESSION* sess
 
 int64_t WiredTigerUtil::getIdentSize(WiredTigerSession& s, const std::string& uri) {
     StatusWith<int64_t> result = WiredTigerUtil::getStatisticsValue(
-        s, "statistics:" + uri, "statistics=(fast)", WT_STAT_DSRC_BLOCK_SIZE);
+        s, "statistics:" + uri, "statistics=(size)", WT_STAT_DSRC_BLOCK_SIZE);
     const Status& status = result.getStatus();
     if (!status.isOK()) {
         if (status.code() == ErrorCodes::CursorNotFound) {
