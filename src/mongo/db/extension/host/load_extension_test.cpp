@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -66,6 +67,13 @@ protected:
         ExtensionLoader::unload_forTest("foo");
         LiteParsedDocumentSource::unregisterParser_forTest(kMatchTopNStageName);
         ExtensionLoader::unload_forTest("matchTopN");
+        LiteParsedDocumentSource::unregisterParser_forTest("$optionA");
+        ExtensionLoader::unload_forTest("test_options");
+        LiteParsedDocumentSource::unregisterParser_forTest("$checkNum");
+        ExtensionLoader::unload_forTest("parse_options");
+        // TODO SERVER-115137: Remove.
+        LiteParsedDocumentSource::unregisterParser_forTest("$mongotHostVerified");
+        ExtensionLoader::unload_forTest("mongotHostTest");
     }
 
     ExtensionConfig makeTestFooConfig() {
@@ -525,4 +533,51 @@ DEATH_TEST_REGEX_F(ExtensionErrorsTestDeathTest, ExtensionTasserts, "98765.*anot
     [[maybe_unused]] auto parsedPipeline =
         pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
 }
+
+// TODO SERVER-115137: Remove these tests.
+class MongotHostInjectionTest : public LoadExtensionsTest {
+protected:
+    static inline const std::string kTestMongotHost = "localhost:27027";
+
+    void setUp() override {
+        globalMongotParams.host = kTestMongotHost;
+    }
+
+    ExtensionConfig makeMongotHostTestConfig(const std::string& extOptions) {
+        return {.sharedLibraryPath =
+                    test_util::getExtensionPath("libmongothost_extension.so").string(),
+                .extOptions = YAML::Load(extOptions)};
+    }
+};
+
+TEST_F(MongotHostInjectionTest, ExtensionLoadsMongotHostValue) {
+    auto config = makeMongotHostTestConfig("expectedMongotHost: " + kTestMongotHost);
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("mongotHostTest", config));
+    ASSERT_TRUE(ExtensionLoader::isLoaded("mongotHostTest"));
+
+    // Verify mongotHost was injected by checking $mongotHostVerified is registered.
+    std::vector<BSONObj> pipeline = {BSON("$mongotHostVerified" << BSONObj())};
+    auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
+    ASSERT_TRUE(parsedPipeline != nullptr);
+    ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
+}
+
+TEST_F(MongotHostInjectionTest, ExtensionOverridesMongotHostValue) {
+    auto config = makeMongotHostTestConfig(
+        "mongotHost: some-invalid-value\n"
+        "expectedMongotHost: " +
+        kTestMongotHost);
+    ASSERT_DOES_NOT_THROW(ExtensionLoader::load("mongotHostTest", config));
+    ASSERT_TRUE(ExtensionLoader::isLoaded("mongotHostTest"));
+
+    // Verify the server's value was used (not the config's value) by checking that
+    // $mongotHostVerified is registered.
+    std::vector<BSONObj> pipeline = {BSON("$mongotHostVerified" << BSONObj())};
+    auto parsedPipeline =
+        pipeline_factory::makePipeline(pipeline, expCtx, pipeline_factory::kOptionsMinimal);
+    ASSERT_TRUE(parsedPipeline != nullptr);
+    ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
+}
+
 }  // namespace mongo::extension::host

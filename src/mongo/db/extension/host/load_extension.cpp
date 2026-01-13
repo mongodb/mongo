@@ -37,6 +37,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/shared/extension_status.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
@@ -228,10 +229,14 @@ void ExtensionLoader::load(const std::string& name, const ExtensionConfig& confi
                .getIncomingInternalClient()
                .maxWireVersion);
 
+    // TODO SERVER-115137: Remove mongotHost config override hack.
+    auto extOptionsWithMongotHost = YAML::Clone(config.extOptions);
+    extOptionsWithMongotHost["mongotHost"] = globalMongotParams.host;
+
     std::unique_ptr<HostPortal> hostPortal = std::make_unique<HostPortal>();
     host_connector::HostPortalAdapter portal{extHandle->getVersion(),
                                              maxWireVersion,
-                                             YAML::Dump(config.extOptions),
+                                             YAML::Dump(extOptionsWithMongotHost),
                                              std::move(hostPortal)};
     extHandle->initialize(&portal, &host_connector::HostServicesAdapter::get());
 }

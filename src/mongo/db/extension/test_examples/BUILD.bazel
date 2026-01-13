@@ -196,3 +196,8 @@ mongo_cc_extension_shared_library(
     name = "vector_search_extension",
     srcs = ["vector_search.cpp"],
 )
+
+mongo_cc_extension_shared_library(
+    name = "mongothost_extension",
+    srcs = [pkg_name + "extension_options:mongothost.cpp"],
+)
