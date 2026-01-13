@@ -29,18 +29,17 @@
 
 #include "mongo/db/query/plan_ranking/cbr_for_no_mp_results.h"
 
-#include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
-#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 
 namespace mongo {
 namespace plan_ranking {
+
 
 StatusWith<QueryPlanner::PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
     CanonicalQuery& query,
@@ -54,16 +53,6 @@ StatusWith<QueryPlanner::PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans
         return statusWithMultiPlanSolns.getStatus();
     }
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
-
-    // TODO: SERVER-115496: move the check below to wherever we enumerate plans.
-    // If this is a rooted $or query and there are more than kMaxNumberOrPlans plans, use the
-    // subplanner.
-    if (SubplanStage::needsSubplanning(query) && solutions.size() > kMaxNumberOrPlans) {
-        _ws = std::move(plannerData.workingSet);
-        return Status(ErrorCodes::MaxNumberOrPlansExceeded,
-                      str::stream()
-                          << "exceeded " << kMaxNumberOrPlans << " plans. Switch to subplanner");
-    }
     if (solutions.size() == 1) {
         // TODO SERVER-115496. Make sure this short circuit logic is also taken to main plan_ranking
         // so it applies everywhere. Only one solution, no need to rank.
@@ -125,5 +114,6 @@ std::unique_ptr<WorkingSet> CBRForNoMPResultsStrategy::extractWorkingSet() {
     _ws = nullptr;
     return result;
 }
+
 }  // namespace plan_ranking
 }  // namespace mongo

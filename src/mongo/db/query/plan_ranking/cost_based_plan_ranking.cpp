@@ -30,12 +30,10 @@
 #include "mongo/db/query/plan_ranking/cost_based_plan_ranking.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/exec/classic/subplan.h"
 #include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
-#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -128,16 +126,6 @@ StatusWith<QueryPlanner::PlanRankingResult> CostBasedPlanRankingStrategy::rankPl
     std::vector<std::unique_ptr<QuerySolution>> solutions =
         std::move(statusWithMultiPlanSolns.getValue());
     size_t numSolutions = solutions.size();
-
-    // TODO: SERVER-115496: move the check below to wherever we enumerate plans.
-    // If this is a rooted $or query and there are more than kMaxNumberOrPlans plans, use the
-    // subplanner.
-    if (SubplanStage::needsSubplanning(query) && numSolutions > kMaxNumberOrPlans) {
-        _ws = std::move(plannerData.workingSet);
-        return Status(ErrorCodes::MaxNumberOrPlansExceeded,
-                      str::stream()
-                          << "exceeded " << kMaxNumberOrPlans << " plans. Switch to subplanner");
-    }
 
     if (solutions.size() == 1) {
         // TODO SERVER-115496 Make sure this short circuit logic is also taken to main plan_ranking

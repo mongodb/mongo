@@ -125,25 +125,5 @@ std::unique_ptr<WorkingSet> PlanRanker::extractWorkingSet() {
     return result;
 }
 
-bool delayOrSkipSubplanner(CanonicalQuery& query, QueryPlanRankerModeEnum planRankerMode) {
-    if (planRankerMode != QueryPlanRankerModeEnum::kAutomaticCE) {
-        return false;
-    }
-
-    auto autoPlanRankingStrategy = query.getExpCtx()
-                                       ->getQueryKnobConfiguration()
-                                       .getPlanRankingStrategyForAutomaticQueryPlanRankerMode();
-    switch (autoPlanRankingStrategy) {
-        case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
-            kCBRForNoMultiplanningResults:
-        case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::kCBRCostBasedRankerChoice:
-            return true;
-        case QueryPlanRankingStrategyForAutomaticQueryPlanRankerModeEnum::
-            kHistogramCEWithHeuristicFallback:
-            return false;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
 }  // namespace plan_ranking
 }  // namespace mongo

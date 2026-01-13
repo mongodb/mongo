@@ -42,20 +42,6 @@ namespace mongo {
 namespace plan_ranking {
 
 /**
- * Maximum number of plans of $or queries for which the automatic ranking strategy uses whole query
- * planning. For a larger number of plans switch to the subplanner to plan $or branches
- * individually.
- */
-static constexpr size_t kMaxNumberOrPlans = 16;
-
-/**
- * Check if the optimizer should delay calling of the Subplanner for rooted $or queries until we
- * know the number of plans. The subplanner can be completely skipped if the number of plans is
- * smaller than the kMaxNumberOrPlans.
- */
-bool delayOrSkipSubplanner(CanonicalQuery& query, QueryPlanRankerModeEnum planRankerMode);
-
-/**
  * The PlanRanker is responsible for ranking candidate query plans and selecting the best plan(s)
  * to be executed.
  *

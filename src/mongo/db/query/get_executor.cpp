@@ -423,11 +423,7 @@ public:
     }
 
     StatusWith<std::unique_ptr<ResultType>> finishPrepare() {
-        // Delay the call to the subplanner in some plan ranking modes until we know the number of
-        // plans.
-        auto needsSubplanning = SubplanStage::needsSubplanning(*_cq);
-        if (needsSubplanning &&
-            !plan_ranking::delayOrSkipSubplanner(*_cq, _plannerParams->planRankerMode)) {
+        if (SubplanStage::needsSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",
@@ -446,19 +442,7 @@ public:
         auto rankerResult = planRanker.rankPlans(
             _opCtx, *_cq, *_plannerParams, _yieldPolicy, getCollections(), makePlannerData());
         if (!rankerResult.isOK()) {
-            // In case the plan ranker failed to return a result, distinguish two cases:
-            // - a rooted $or query exceeded kMaxNumberOrPlans plans, in which case we need to call
-            // the subplanner;
-            // - other error, in which case we return the status to the caller.
-            if (rankerResult.getStatus().code() != ErrorCodes::MaxNumberOrPlansExceeded) {
-                return rankerResult.getStatus();
-            }
-            tassert(11260301, "incorrect use of the subplanner", needsSubplanning);
-            uassert(ErrorCodes::IllegalOperation,
-                    "Use of forcedPlanSolutionHash not permitted for rooted $or queries.",
-                    !_cq->getForcedPlanSolutionHash());
-            _ws = planRanker.extractWorkingSet();
-            return buildSubPlan();
+            return rankerResult.getStatus();
         }
         _ws = planRanker.extractWorkingSet();
         std::vector<std::unique_ptr<QuerySolution>> solutions =
