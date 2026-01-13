@@ -40,6 +40,10 @@ if (!TestData.testingReplicaSetEndpoint) {
     // sharded cluster.
     runTest(session.getDatabase("config"));
 }
-runTest(session.getDatabase("local"));
+
+if (!TestData.notASC) {
+    // Only test local database in attached storage cluster.
+    runTest(session.getDatabase("local"));
+}
 
 session.endSession();

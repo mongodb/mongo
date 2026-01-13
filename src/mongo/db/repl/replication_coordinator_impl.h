@@ -1995,7 +1995,6 @@ private:
     // changes.
     WriteConcernTagChangesImpl _writeConcernTagChanges;
 
-    // Pointer to the SplitPrepareSessionManager owned by this ReplicationCoordinator.
     SplitPrepareSessionManager _splitSessionManager;  // (S)
 
     // Whether data writes are being done on a consistent copy of the data. The value is false until
