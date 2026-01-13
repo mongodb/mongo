@@ -1012,13 +1012,8 @@ std::vector<AsyncRequestsSender::Request> buildShardRequests(
                 "Shards part for collectionless aggregate must be executed on a single node",
                 shardIds.size() == 1);
 
-        // Attach the IGNORED chunk version to the command. On the shard, this will skip the actual
-        // version check but will nonetheless mark the operation as versioned.
-        auto versionedCmd =
-            appendShardVersion(targetedCommand, ShardVersionFactory::make(ChunkVersion::IGNORED()));
-
         requests.reserve(shardIds.size());
-        requests.emplace_back(*shardIds.begin(), std::move(versionedCmd));
+        requests.emplace_back(*shardIds.begin(), targetedCommand);
     } else if (const auto needsVersionedRequests = !mustRunOnAllShards && !targetAllHosts;
                needsVersionedRequests) {
         tassert(7742700,

@@ -369,11 +369,6 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
         mergeCmd.remove(GenericArguments::kRawDataFieldName);
     }
 
-    // Attach the IGNORED chunk version to the command. On the shard, this will skip the actual
-    // version check but will nonetheless mark the operation as versioned.
-    auto mergeCmdObj = appendShardVersion(mergeCmd.freeze().toBson(),
-                                          ShardVersionFactory::make(ChunkVersion::IGNORED()));
-
     // Attach query settings to the command.
     if (auto querySettingsBSON = mergeCtx->getQuerySettings().toBSON();
         !querySettingsBSON.isEmpty()) {
@@ -384,7 +379,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     return applyReadWriteConcern(mergeCtx->getOperationContext(),
                                  !(txnRouter && mergingShardContributesData), /* appendRC */
                                  !mergeCtx->getExplain(),                     /* appendWC */
-                                 mergeCmdObj);
+                                 mergeCmd.freeze().toBson());
 }
 
 Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
