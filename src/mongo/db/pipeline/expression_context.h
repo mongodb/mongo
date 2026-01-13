@@ -185,6 +185,12 @@ public:
         bool where = false;
     };
 
+    enum class PlanCacheOptions {
+        kDisablePlanCache,  // Query is not being cached
+        kEnablePlanCache,   // Query is being cached if it has alternative plans
+        kForcePlanCache,    // Query is being cached even if it has a single plan
+    };
+
     // TODO: variables are heavily used everywhere, move these inside ExpressionContextParams at
     // some point
     Variables variables;
@@ -743,11 +749,15 @@ public:
     }
 
     bool getForcePlanCache() const {
-        return _params.forcePlanCache;
+        return _params.planCache == PlanCacheOptions::kForcePlanCache;
     }
 
-    void setForcePlanCache(bool forcePlanCache) {
-        _params.forcePlanCache = forcePlanCache;
+    PlanCacheOptions getPlanCache() const {
+        return _params.planCache;
+    }
+
+    void setPlanCache(PlanCacheOptions planCache) {
+        _params.planCache = planCache;
     }
 
     bool getAllowGenericForeignDbLookup() const {
@@ -1147,9 +1157,9 @@ protected:
         // False if another context is created for the same pipeline. Used to disable duplicate
         // expression counting.
         bool enabledCounters = true;
-        // Forces the plan cache to be used even if there's only one solution available. Queries
-        // that are ineligible will still not be cached.
-        bool forcePlanCache = false;
+        // Indicates if the plan cache will be used. Queries that are ineligible will still not be
+        // cached.
+        PlanCacheOptions planCache = PlanCacheOptions::kEnablePlanCache;
 
         // Indicates if query is IDHACK query.
         bool isIdHackQuery = false;

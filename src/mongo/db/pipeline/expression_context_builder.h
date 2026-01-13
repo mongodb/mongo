@@ -86,7 +86,7 @@ public:
     ExpressionContextBuilder& exprUnstableForApiV1(bool);
     ExpressionContextBuilder& exprDeprecatedForApiV1(bool);
     ExpressionContextBuilder& enabledCounters(bool);
-    ExpressionContextBuilder& forcePlanCache(bool);
+    ExpressionContextBuilder& planCache(ExpressionContext::PlanCacheOptions);
     ExpressionContextBuilder& allowGenericForeignDbLookup(bool);
     ExpressionContextBuilder& requiresTimeseriesExtendedRangeSupport(bool);
     ExpressionContextBuilder& jsHeapLimitMB(boost::optional<int>);

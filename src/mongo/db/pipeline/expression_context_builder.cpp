@@ -218,8 +218,9 @@ ExpressionContextBuilder& ExpressionContextBuilder::enabledCounters(bool enabled
     return *this;
 }
 
-ExpressionContextBuilder& ExpressionContextBuilder::forcePlanCache(bool forcePlanCache) {
-    params.forcePlanCache = forcePlanCache;
+ExpressionContextBuilder& ExpressionContextBuilder::planCache(
+    ExpressionContext::PlanCacheOptions planCache) {
+    params.planCache = planCache;
     return *this;
 }
 

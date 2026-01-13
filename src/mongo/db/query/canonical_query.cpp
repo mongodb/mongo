@@ -221,7 +221,8 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     _isSearchQuery = isSearchQuery;
 
     // Perform SBE auto-parameterization if there is not already a reason not to.
-    _disablePlanCache = internalQueryDisablePlanCache.load();
+    _disablePlanCache = internalQueryDisablePlanCache.load() ||
+        _expCtx->getPlanCache() == ExpressionContext::PlanCacheOptions::kDisablePlanCache;
     _maxMatchExpressionParams = loadMaxMatchExpressionParams();
     if (expCtx->getSbeCompatibility() != SbeCompatibility::notCompatible &&
         shouldParameterizeSbe(_primaryMatchExpression.get())) {

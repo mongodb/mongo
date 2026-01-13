@@ -61,17 +61,21 @@ std::unique_ptr<CanonicalQuery> makeFullScanCQ(boost::intrusive_ptr<ExpressionCo
         .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{.findCommand = std::move(fcr)}});
 }
 
-StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
+StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQueryFromSingleMatchExpression(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     NamespaceString nss,
     std::unique_ptr<MatchExpression> expr) {
+    ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
+    expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
     auto pfc = ParsedFindCommand::withExistingFilter(expCtx,
                                                      nullptr,
                                                      std::move(expr),
                                                      std::make_unique<FindCommandRequest>(nss),
                                                      ProjectionPolicies::findProjectionPolicies());
     CanonicalQueryParams params{.expCtx = expCtx, .parsedFind = std::move(pfc.getValue())};
-    return CanonicalQuery::make(std::move(params));
+    auto cq = CanonicalQuery::make(std::move(params));
+    expCtx->setPlanCache(oldPlanCache);
+    return cq;
 }
 
 struct Predicates {
@@ -79,8 +83,7 @@ struct Predicates {
     std::vector<boost::intrusive_ptr<const Expression>> joinPredicates;
 };
 
-StatusWith<Predicates> extractPredicatesFromLookup(
-    DocumentSourceLookUp* stage, boost::intrusive_ptr<ExpressionContext> pipelineExpCtx) {
+StatusWith<Predicates> extractPredicatesFromLookup(DocumentSourceLookUp* stage) {
     auto expCtx = stage->getSubpipelineExpCtx();
     if (stage->hasPipeline()) {
         stage = dynamic_cast<DocumentSourceLookUp*>(stage);
@@ -98,8 +101,8 @@ StatusWith<Predicates> extractPredicatesFromLookup(
 
         std::unique_ptr<CanonicalQuery> cq;
         if (splitRes->singleTablePredicates) {
-            auto swCq = createCanonicalQuery(
-                pipelineExpCtx, stage->getFromNs(), std::move(splitRes->singleTablePredicates));
+            auto swCq = createCanonicalQueryFromSingleMatchExpression(
+                expCtx, stage->getFromNs(), std::move(splitRes->singleTablePredicates));
             if (!swCq.isOK()) {
                 return swCq.getStatus();
             }
@@ -283,7 +286,11 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
     auto clonedExpCtx = makeCopyFromExpressionContext(expCtx, nss);
     auto suffix = pipeline.clone(clonedExpCtx);
 
+    ExpressionContext::PlanCacheOptions oldPlanCache = expCtx->getPlanCache();
+    expCtx->setPlanCache(ExpressionContext::PlanCacheOptions::kDisablePlanCache);
     auto swCQ = createCanonicalQuery(expCtx, nss, *suffix);
+    expCtx->setPlanCache(oldPlanCache);
+
     if (!swCQ.isOK()) {
         // Bail out & return the failure status- we failed to generate a CanonicalQuery from a
         // pipeline prefix.
@@ -319,8 +326,8 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             // Attempt to extract join predicates and single table predicates from the $lookup
             // expressed as $expr in $match stage. If there is no subpipeline, this returns no join
             // predicates and a CanonicalQuery with empty predicate. If this returns a bad status,
-            // then this extraction failed due to an inelgible stage/expression.
-            auto swPreds = extractPredicatesFromLookup(lookup, lookup->getSubpipelineExpCtx());
+            // then this extraction failed due to an ineligible stage/expression.
+            auto swPreds = extractPredicatesFromLookup(lookup);
             if (!swPreds.isOK()) {
                 break;
             }
