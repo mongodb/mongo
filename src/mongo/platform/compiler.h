@@ -229,9 +229,15 @@
  * substitued to prevent ABI-breaking changes and maintain backwards compatibility when
  * compiling with MSVC. Older versions of MSVC will not take action based on the attribute,
  * since the MSVC compiler ignores attributes it does not recognize.
+ * MSVC versions 19.42 up to (at least) 19.44 have a bug with this attribute, so it's disabled
+ * in MSVC builds to mitigate any potential risk. This can be revisted after upgrading to a
+ * version where the bug is fixed. The bug is tracked here:
+ * https://developercommunity.visualstudio.com/t/Incorrect-result-when-struct-contains-a/11026048
  */
 #define MONGO_COMPILER_NO_UNIQUE_ADDRESS MONGO_COMPILER_NO_UNIQUE_ADDRESS_
-#if MONGO_COMPILER_HAS_ATTRIBUTE(msvc::no_unique_address)  // Use 'msvc::' if avail.
+#if defined(_MSC_VER)
+#define MONGO_COMPILER_NO_UNIQUE_ADDRESS_
+#elif MONGO_COMPILER_HAS_ATTRIBUTE(msvc::no_unique_address)  // Use 'msvc::' if avail.
 #define MONGO_COMPILER_NO_UNIQUE_ADDRESS_ [[msvc::no_unique_address]]
 #elif MONGO_COMPILER_HAS_ATTRIBUTE(no_unique_address)
 #define MONGO_COMPILER_NO_UNIQUE_ADDRESS_ [[no_unique_address]]

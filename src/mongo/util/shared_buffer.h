@@ -65,17 +65,18 @@ public:
 
     SharedBuffer() = default;
 
-    explicit SharedBuffer(const Allocator& allocator) : _allocator(allocator) {}
+    explicit SharedBuffer(const Allocator& allocator) : _holderAndAllocator(allocator) {}
 
-    explicit SharedBuffer(size_t size, const Allocator& allocator = {}) : _allocator(allocator) {
-        *this =
-            takeOwnership(ByteAllocator{_allocator}.allocate(kHolderSize + size), size, _allocator);
+    explicit SharedBuffer(size_t size, const Allocator& allocator = {})
+        : _holderAndAllocator(allocator) {
+        *this = takeOwnership(
+            ByteAllocator{getAllocator()}.allocate(kHolderSize + size), size, getAllocator());
     }
 
     explicit SharedBuffer(UniqueBuffer<Allocator>&& uniqueBuf);
 
     void swap(SharedBuffer& other) {
-        _holder.swap(other._holder);
+        getHolder().swap(other.getHolder());
     }
 
     static SharedBuffer allocate(size_t bytes, const Allocator& allocator = {}) {
@@ -91,35 +92,37 @@ public:
      * they wouldn't be updated and would still try to delete the original buffer.
      */
     void realloc(size_t size) {
-        invariant(!_holder || !_holder->isShared());
+        auto& holder = getHolder();
+        invariant(!holder || !holder->isShared());
 
-        void* newPtr = ByteAllocator{_allocator}.allocate(kHolderSize + size);
-        if (_holder) {
-            void* oldPtr = _holder.get();
-            auto oldCapacity = static_cast<size_t>(_holder->_capacity);
+        void* newPtr = ByteAllocator{getAllocator()}.allocate(kHolderSize + size);
+        if (holder) {
+            void* oldPtr = holder.get();
+            auto oldCapacity = static_cast<size_t>(holder->_capacity);
             std::memcpy(newPtr, oldPtr, kHolderSize + std::min(size, oldCapacity));
-            ByteAllocator{_allocator}.deallocate(reinterpret_cast<std::byte*>(oldPtr),
-                                                 kHolderSize + oldCapacity);
+            ByteAllocator{getAllocator()}.deallocate(reinterpret_cast<std::byte*>(oldPtr),
+                                                     kHolderSize + oldCapacity);
         }
 
         // Get newPtr into _holder with a ref-count of 1 without touching the current pointee of
         // _holder which is now invalid.
-        auto tmp = SharedBuffer::takeOwnership(newPtr, size, _allocator);
-        _holder.detach();
-        _holder = std::move(tmp._holder);
+        auto tmp = SharedBuffer::takeOwnership(newPtr, size, getAllocator());
+        holder.detach();
+        holder = std::move(tmp.getHolder());
     }
 
     /**
      * Resizes the buffer, copying the current contents. If shared, an exclusive copy is made.
      */
     void reallocOrCopy(size_t size) {
+        auto& holder = getHolder();
         if (isShared()) {
             auto tmp = SharedBuffer::allocate(size);
-            memcpy(tmp._holder->data(),
-                   _holder->data(),
-                   std::min(size, static_cast<size_t>(_holder->_capacity)));
+            memcpy(tmp.getHolder()->data(),
+                   holder->data(),
+                   std::min(size, static_cast<size_t>(holder->_capacity)));
             swap(tmp);
-        } else if (_holder) {
+        } else if (holder) {
             realloc(size);
         } else {
             *this = SharedBuffer::allocate(size);
@@ -127,11 +130,12 @@ public:
     }
 
     char* get() const {
-        return _holder ? _holder->data() : nullptr;
+        auto& holder = getHolder();
+        return holder ? holder->data() : nullptr;
     }
 
     explicit operator bool() const {
-        return bool(_holder);
+        return bool(getHolder());
     }
 
     /**
@@ -139,7 +143,8 @@ public:
      * (That is, reference count == 1).
      */
     bool isShared() const {
-        return _holder && _holder->isShared();
+        auto& holder = getHolder();
+        return holder && holder->isShared();
     }
 
     /**
@@ -147,11 +152,12 @@ public:
      * Users of this type must maintain the "used" size separately.
      */
     size_t capacity() const {
-        return _holder ? _holder->_capacity : 0;
+        auto& holder = getHolder();
+        return holder ? holder->_capacity : 0;
     }
 
     Allocator allocator() const {
-        return _allocator;
+        return _holderAndAllocator;
     }
 
 private:
@@ -200,7 +206,7 @@ private:
     };
 
     explicit SharedBuffer(Holder* holder, const Allocator& allocator)
-        : _allocator(allocator), _holder(holder, /*add_ref=*/false) {
+        : _holderAndAllocator(allocator, holder, /*add_ref=*/false) {
         // NOTE: The 'false' above is because we have already initialized the Holder with a
         // refcount of '1' in takeOwnership below. This avoids an atomic increment.
     }
@@ -226,8 +232,33 @@ private:
         return SharedBuffer(reinterpret_cast<Holder*>(holderPrefixedData), allocator);
     }
 
-    MONGO_COMPILER_NO_UNIQUE_ADDRESS Allocator _allocator;
-    boost::intrusive_ptr<Holder> _holder;
+    /**
+     * Downstream users of SharedBuffer may rely on its Allocator taking up zero bytes of
+     * storage (assuming that's possible for the Allocator type). Stuffing the Holder and Allocator
+     * into this class (Allocator as a base class, Holder as a member) allows EBCO to ensure that
+     * happens reliably.
+     */
+    struct HolderAndAllocator : Allocator {
+        boost::intrusive_ptr<Holder> holder;
+
+        HolderAndAllocator() = default;
+        explicit HolderAndAllocator(const Allocator& allocator,
+                                    Holder* holder = nullptr,
+                                    bool add_ref = true)
+            : Allocator(allocator), holder(holder, add_ref) {}
+    };
+
+    boost::intrusive_ptr<Holder>& getHolder() {
+        return _holderAndAllocator.holder;
+    }
+    const boost::intrusive_ptr<Holder>& getHolder() const {
+        return _holderAndAllocator.holder;
+    }
+    Allocator& getAllocator() {
+        return _holderAndAllocator;
+    }
+
+    HolderAndAllocator _holderAndAllocator;
 
 public:
     // Declared here so definition of 'Holder' is available.
@@ -416,7 +447,7 @@ private:
 
 template <class Allocator>
 inline SharedBuffer<Allocator>::SharedBuffer(UniqueBuffer<Allocator>&& other) {
-    *this = takeOwnership(other._data, other.capacity(), _allocator);
+    *this = takeOwnership(other._data, other.capacity(), getAllocator());
     other._data = nullptr;
 }
 
