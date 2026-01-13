@@ -2002,21 +2002,10 @@ private:
         if ((isReplSet || isConfigsvr) &&
             feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(requestedVersion)) {
             auto& service = query_settings::QuerySettingsService::get(opCtx);
-            try {
-                service.createQueryShapeRepresentativeQueriesCollection(opCtx);
-                service
-                    .migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
-                        opCtx);
-            } catch (const ExceptionFor<ErrorCodes::Interrupted>&) {
-                throw;
-            } catch (const ExceptionFor<ErrorCodes::InterruptedDueToOverload>&) {
-                throw;
-            } catch (const DBException& ex) {
-                uasserted(ErrorCodes::TemporarilyUnavailable,
-                          str::stream()
-                              << "Cannot upgrade to the new FCV due to QuerySettingsService issue: "
-                              << ex.reason());
-            }
+            service.createQueryShapeRepresentativeQueriesCollection(opCtx);
+            service
+                .migrateRepresentativeQueriesFromQuerySettingsClusterParameterToDedicatedCollection(
+                    opCtx);
         }
     }
 
@@ -2062,20 +2051,10 @@ private:
         if ((isReplSet || isConfigsvr) &&
             !feature_flags::gFeatureFlagPQSBackfill.isEnabledOnVersion(requestedVersion)) {
             auto& service = query_settings::QuerySettingsService::get(opCtx);
-            try {
-                service
-                    .migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
-                        opCtx);
-                service.dropQueryShapeRepresentativeQueriesCollection(opCtx);
-            } catch (const ExceptionFor<ErrorCodes::Interrupted>&) {
-                throw;
-            } catch (const DBException& ex) {
-                uasserted(
-                    ErrorCodes::TemporarilyUnavailable,
-                    str::stream()
-                        << "Cannot downgrade to the old FCV due to QuerySettingsService issue: "
-                        << ex.reason());
-            }
+            service
+                .migrateRepresentativeQueriesFromDedicatedCollectionToQuerySettingsClusterParameter(
+                    opCtx);
+            service.dropQueryShapeRepresentativeQueriesCollection(opCtx);
         }
     }
     void _forwardDryRunRequestToShards(OperationContext* opCtx,
