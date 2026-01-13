@@ -77,7 +77,6 @@ private:
 
 typedef std::pair<IntWrapper, IntWrapper> IWPair;
 typedef sorter::Iterator<IntWrapper, IntWrapper> IWIterator;
-typedef sorter::IteratorBase<IntWrapper, IntWrapper> IWIteratorBase;
 typedef Sorter<IntWrapper, IntWrapper> IWSorter;
 
 enum Direction { ASC = 1, DESC = -1 };
@@ -96,7 +95,7 @@ private:
     Direction _dir;
 };
 
-class IntIterator : public IWIteratorBase {
+class IntIterator : public IWIterator {
 public:
     IntIterator(int start = 0, int stop = INT_MAX, int increment = 1)
         : _current(start), _increment(increment), _stop(stop) {}
@@ -121,6 +120,17 @@ public:
     const IntWrapper& peek() override {
         MONGO_UNREACHABLE;
     }
+    SorterRange getRange() const override {
+        MONGO_UNREACHABLE;
+    }
+    bool spillable() const override {
+        return false;
+    }
+    [[nodiscard]] std::unique_ptr<Iterator<IntWrapper, IntWrapper>> spill(
+        const SortOptions& opts,
+        const typename Sorter<IntWrapper, IntWrapper>::Settings& settings) override {
+        MONGO_UNREACHABLE;
+    }
 
 private:
     int _current;
@@ -128,7 +138,7 @@ private:
     int _stop;
 };
 
-class EmptyIterator : public IWIteratorBase {
+class EmptyIterator : public IWIterator {
 public:
     bool more() override {
         return false;
@@ -145,9 +155,20 @@ public:
     const IntWrapper& peek() override {
         MONGO_UNREACHABLE;
     }
+    SorterRange getRange() const override {
+        MONGO_UNREACHABLE;
+    }
+    bool spillable() const override {
+        return false;
+    }
+    [[nodiscard]] std::unique_ptr<Iterator<IntWrapper, IntWrapper>> spill(
+        const SortOptions& opts,
+        const typename Sorter<IntWrapper, IntWrapper>::Settings& settings) override {
+        MONGO_UNREACHABLE;
+    }
 };
 
-class LimitIterator : public IWIteratorBase {
+class LimitIterator : public IWIterator {
 public:
     LimitIterator(long long limit, std::shared_ptr<IWIterator> source)
         : _remaining(limit), _source(source) {
@@ -169,6 +190,17 @@ public:
         MONGO_UNREACHABLE;
     }
     const IntWrapper& peek() override {
+        MONGO_UNREACHABLE;
+    }
+    SorterRange getRange() const override {
+        MONGO_UNREACHABLE;
+    }
+    bool spillable() const override {
+        return false;
+    }
+    [[nodiscard]] std::unique_ptr<Iterator<IntWrapper, IntWrapper>> spill(
+        const SortOptions& opts,
+        const typename Sorter<IntWrapper, IntWrapper>::Settings& settings) override {
         MONGO_UNREACHABLE;
     }
 

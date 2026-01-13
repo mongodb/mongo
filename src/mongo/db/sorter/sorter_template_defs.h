@@ -144,28 +144,11 @@ void dassertCompIsSane(const std::function<int(const Key&, const Key&)>& comp,
 // Iterators
 //
 
-template <typename Key, typename Value>
-class IteratorBase : public Iterator<Key, Value> {
-public:
-    SorterRange getRange() const override {
-        MONGO_UNREACHABLE_TASSERT(11617000);
-    }
-
-    bool spillable() const override {
-        return false;
-    }
-
-    [[nodiscard]] std::unique_ptr<Iterator<Key, Value>> spill(
-        const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) override {
-        MONGO_UNREACHABLE_TASSERT(9917200);
-    }
-};
-
 /**
  * Returns results from sorted in-memory storage.
  */
 template <typename Key, typename Value>
-class InMemIterator : public sorter::IteratorBase<Key, Value> {
+class InMemIterator : public sorter::Iterator<Key, Value> {
 public:
     typedef std::pair<Key, Value> Data;
 
@@ -207,6 +190,10 @@ public:
 
     const Key& peek() override {
         return _data[_index].first;
+    }
+
+    SorterRange getRange() const override {
+        MONGO_UNREACHABLE_TASSERT(11703800);
     }
 
     bool spillable() const override {
@@ -253,7 +240,7 @@ private:
  * storage.
  */
 template <typename Key, typename Value, typename Container>
-class InMemReadOnlyIterator : public sorter::IteratorBase<Key, Value> {
+class InMemReadOnlyIterator : public sorter::Iterator<Key, Value> {
 public:
     typedef std::pair<Key, Value> Data;
 
@@ -282,6 +269,19 @@ public:
         return std::prev(_iterator)->first;
     }
 
+    SorterRange getRange() const override {
+        MONGO_UNREACHABLE_TASSERT(11703801);
+    }
+
+    bool spillable() const override {
+        return false;
+    }
+
+    [[nodiscard]] std::unique_ptr<Iterator<Key, Value>> spill(
+        const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) override {
+        MONGO_UNREACHABLE_TASSERT(11703802);
+    }
+
 private:
     const Container& _data;
     typename Container::const_iterator _iterator;
@@ -292,7 +292,7 @@ private:
  * and end offsets.
  */
 template <typename Key, typename Value>
-class FileIterator final : public sorter::IteratorBase<Key, Value> {
+class FileIterator final : public sorter::Iterator<Key, Value> {
 public:
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
@@ -355,6 +355,15 @@ public:
             range.setChecksumVersion(_afterReadChecksumCalculator.version());
         }
         return range;
+    }
+
+    bool spillable() const override {
+        return false;
+    }
+
+    [[nodiscard]] std::unique_ptr<Iterator<Key, Value>> spill(
+        const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) override {
+        MONGO_UNREACHABLE_TASSERT(11703803);
     }
 
 private:
@@ -485,7 +494,7 @@ private:
  * responsible for deleting the data source file upon destruction.
  */
 template <typename Key, typename Value>
-class MergeIterator final : public sorter::IteratorBase<Key, Value> {
+class MergeIterator final : public sorter::Iterator<Key, Value> {
 public:
     typedef sorter::Iterator<Key, Value> Input;
     typedef std::pair<Key, Value> Data;
@@ -576,6 +585,19 @@ public:
 
     Value getDeferredValue() override {
         MONGO_UNREACHABLE;
+    }
+
+    SorterRange getRange() const override {
+        MONGO_UNREACHABLE_TASSERT(11703804);
+    }
+
+    bool spillable() const override {
+        return false;
+    }
+
+    [[nodiscard]] std::unique_ptr<Iterator<Key, Value>> spill(
+        const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) override {
+        MONGO_UNREACHABLE_TASSERT(11703805);
     }
 
     void advance() {

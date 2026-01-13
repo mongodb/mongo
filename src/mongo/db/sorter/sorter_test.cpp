@@ -78,7 +78,7 @@ TEST_F(InMemIterTest, Sorted) {
 
 TEST_F(InMemIterTest, DoesNoReorderGivenInput) {
     static const int unsorted[] = {6, 3, 7, 4, 0, 9, 5, 7, 1, 8};
-    class UnsortedIter : public IWIteratorBase {
+    class UnsortedIter : public IWIterator {
     public:
         UnsortedIter() : _pos(0) {}
         bool more() override {
@@ -96,6 +96,17 @@ TEST_F(InMemIterTest, DoesNoReorderGivenInput) {
             MONGO_UNREACHABLE;
         }
         const IntWrapper& peek() override {
+            MONGO_UNREACHABLE;
+        }
+        SorterRange getRange() const override {
+            MONGO_UNREACHABLE;
+        }
+        bool spillable() const override {
+            return false;
+        }
+        [[nodiscard]] std::unique_ptr<Iterator<IntWrapper, IntWrapper>> spill(
+            const SortOptions& opts,
+            const typename Sorter<IntWrapper, IntWrapper>::Settings& settings) override {
             MONGO_UNREACHABLE;
         }
         size_t _pos;
