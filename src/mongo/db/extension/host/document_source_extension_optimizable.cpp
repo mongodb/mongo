@@ -29,9 +29,207 @@
 
 #include "mongo/db/extension/host/document_source_extension_optimizable.h"
 
-#include "mongo/db/extension/host/document_source_extension_expandable.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
+#include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/pipeline/search/search_helper.h"
 
 namespace mongo::extension::host {
+
+ALLOCATE_STAGE_PARAMS_ID(expandable, ExpandableStageParams::id);
+
+ALLOCATE_STAGE_PARAMS_ID(expanded, ExpandedStageParams::id);
+
+DocumentSourceContainer expandableStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* expandableParams = static_cast<ExpandableStageParams*>(stageParams.get());
+    auto parseNode = expandableParams->releaseParseNode();
+
+    if (expCtx->getFromRouter()) {
+        // Because run_aggregate prevents a re-desugar when coming from mongos, it's necessary to
+        // directly construct a DocumentSourceExtensionOptimizable from the parse node. This is
+        // allowed because the desugar has been performed on the mongos already, meaning that the
+        // BSON serialized and sent to the shards is from DocumentSourceExtensionOptimizable.
+        return {DocumentSourceExtensionOptimizable::create(expCtx, std::move(parseNode))};
+    }
+
+    return {DocumentSourceExtensionForQueryShape::create(expCtx, std::move(parseNode))};
+}
+
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(expandable,
+                                                 ExpandableStageParams::id,
+                                                 expandableStageParamsToDocumentSourceFn);
+
+DocumentSourceContainer expandedStageParamsToDocumentSourceFn(
+    const std::unique_ptr<StageParams>& stageParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto* extensionParams = static_cast<ExpandedStageParams*>(stageParams.get());
+    return {DocumentSourceExtensionOptimizable::create(expCtx, extensionParams->releaseAstNode())};
+}
+
+REGISTER_STAGE_PARAMS_TO_DOCUMENT_SOURCE_MAPPING(expanded,
+                                                 ExpandedStageParams::id,
+                                                 expandedStageParamsToDocumentSourceFn);
+
+class DocumentSourceExtensionOptimizable::LiteParsedExpandable::ExpansionValidationFrame {
+public:
+    ExpansionValidationFrame(ExpansionState& state, std::string stageName)
+        : _state(state), _stageName(std::move(stageName)) {
+        const auto newDepth = _state.currDepth + 1;
+        tassert(10955800,
+                str::stream() << "Stage expansion exceeded maximum depth of " << kMaxExpansionDepth,
+                newDepth <= kMaxExpansionDepth);
+
+        const auto inserted = _state.seenStages.insert(_stageName).second;
+        tassert(10955801,
+                str::stream() << "Cycle detected during stage expansion for stage " << _stageName
+                              << ": " << _formatCyclePath(_state, _stageName),
+                inserted);
+
+        _state.expansionPath.push_back(_stageName);
+        _state.currDepth = newDepth;
+    }
+
+    ~ExpansionValidationFrame() noexcept {
+        _state.seenStages.erase(_stageName);
+        _state.expansionPath.pop_back();
+        _state.currDepth--;
+    }
+
+    // Non-copyable, non-movable.
+    ExpansionValidationFrame(const ExpansionValidationFrame&) = delete;
+    ExpansionValidationFrame& operator=(const ExpansionValidationFrame&) = delete;
+
+private:
+    /**
+     * Format the cyclical slice for an informative error message (e.g. A -> B -> A).
+     */
+    static std::string _formatCyclePath(const ExpansionState& state, const std::string& stageName) {
+        size_t start = 0;
+        // Find the position of the first occurrence of the cyclical stage.
+        for (; start < state.expansionPath.size(); ++start) {
+            if (state.expansionPath[start] == stageName) {
+                break;
+            }
+        }
+
+        StringBuilder sb;
+        constexpr StringData arrow = " -> "_sd;
+        // Construct the path starting from the first occurrence.
+        for (size_t i = start; i < state.expansionPath.size(); ++i) {
+            if (i > start) {
+                sb << arrow;
+            }
+            sb << state.expansionPath[i];
+        }
+        // Close the loop with the cyclical stage.
+        sb << arrow << stageName;
+        return sb.str();
+    }
+
+    ExpansionState& _state;
+    std::string _stageName;
+};
+
+LiteParsedList DocumentSourceExtensionOptimizable::LiteParsedExpandable::expand() {
+    ExpansionState state;
+    return expandImpl(_parseNode, state, _nss, _options);
+}
+
+LiteParsedList DocumentSourceExtensionOptimizable::LiteParsedExpandable::expandImpl(
+    const AggStageParseNodeHandle& parseNodeHandle,
+    ExpansionState& state,
+    const NamespaceString& nss,
+    const LiteParserOptions& options) {
+    LiteParsedList outExpanded;
+    auto expanded = parseNodeHandle->expand();
+
+    helper::visitExpandedNodes(
+        expanded,
+        [&](const HostAggStageParseNode& hostParse) {
+            const auto& spec = hostParse.getBsonSpec();
+            auto lpds = LiteParsedDocumentSource::parse(nss, spec, options);
+            lpds->makeOwned();
+            outExpanded.emplace_back(std::move(lpds));
+        },
+        [&](const AggStageParseNodeHandle& handle) {
+            const auto stageName = std::string(handle->getName());
+            ExpansionValidationFrame frame{state, stageName};
+            auto children = expandImpl(handle, state, nss, options);
+            outExpanded.splice(outExpanded.end(), children);
+        },
+        [&](const HostAggStageAstNode& hostAst) {
+            const auto& spec = hostAst.getIdLookupSpec();
+            auto lpds = LiteParsedDocumentSource::parse(nss, spec, options);
+            lpds->makeOwned();
+            outExpanded.emplace_back(std::move(lpds));
+        },
+        [&](AggStageAstNodeHandle handle) {
+            outExpanded.emplace_back(std::make_unique<LiteParsedExpanded>(
+                std::string(handle->getName()), std::move(handle), nss));
+        });
+
+    return outExpanded;
+}
+
+LiteParsedDesugarer::StageExpander
+    DocumentSourceExtensionOptimizable::LiteParsedExpandable::stageExpander =
+        [](LiteParsedPipeline* pipeline, size_t index, LiteParsedDocumentSource& stage) {
+            auto& expandable =
+                static_cast<DocumentSourceExtensionOptimizable::LiteParsedExpandable&>(stage);
+            auto expanded = expandable.getExpandedPipeline();
+
+            // Replace the one LPDS with its desugared form; return next index.
+            return pipeline->replaceStageWith(index, std::move(expanded));
+        };
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(RegisterStageExpanderForLiteParsedExtensionExpandable,
+                                     ("EndStageIdAllocation"))
+(InitializerContext*) {
+    tassert(11533001,
+            "ExpandableStageParams::id must be allocated before registering expander",
+            ExpandableStageParams::id != StageParams::kUnallocatedId);
+    LiteParsedDesugarer::registerStageExpander(
+        ExpandableStageParams::id,
+        DocumentSourceExtensionOptimizable::LiteParsedExpandable::stageExpander);
+}
+
+// TODO SERVER-116021 Remove this check when the extension can do this through ViewPolicy.
+bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::isExtensionVectorSearchStage()
+    const {
+    return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
+}
+
+// TODO SERVER-116021 Remove this check when the extension can do this through ViewPolicy.
+bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isExtensionVectorSearchStage() const {
+    return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
+}
+
+// static
+void DocumentSourceExtensionOptimizable::registerStage(AggStageDescriptorHandle descriptor) {
+    auto nameStringData = descriptor->getName();
+    auto stageName = std::string(nameStringData);
+
+    using LiteParseFn = std::function<std::unique_ptr<LiteParsedDocumentSource>(
+        const NamespaceString&, const BSONElement&, const LiteParserOptions&)>;
+
+    auto parser = [&]() -> LiteParseFn {
+        return [descriptor](const NamespaceString& nss,
+                            const BSONElement& spec,
+                            const LiteParserOptions& opts) {
+            return DocumentSourceExtensionOptimizable::LiteParsedExpandable::parse(
+                descriptor, nss, spec, opts);
+        };
+    }();
+
+    LiteParsedDocumentSource::registerParser(
+        stageName,
+        {.parser = std::move(parser),
+         .fromExtension = true,
+         .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+         .allowedWithClientType = AllowedWithClientType::kAny});
+}
 
 ALLOCATE_DOCUMENT_SOURCE_ID(extensionOptimizable, DocumentSourceExtensionOptimizable::id);
 
@@ -51,8 +249,16 @@ Value DocumentSourceExtensionOptimizable::serialize(const SerializationOptions& 
 
 StageConstraints DocumentSourceExtensionOptimizable::constraints(
     PipelineSplitState pipeState) const {
-    // Default properties if unset.
-    auto constraints = DocumentSourceExtension::constraints(pipeState);
+    auto constraints = StageConstraints(StreamType::kStreaming,
+                                        PositionRequirement::kNone,
+                                        HostTypeRequirement::kNone,
+                                        DiskUseRequirement::kNoDiskUse,
+                                        FacetRequirement::kAllowed,
+                                        TransactionRequirement::kNotAllowed,
+                                        LookupRequirement::kAllowed,
+                                        UnionRequirement::kAllowed,
+                                        ChangeStreamRequirement::kDenylist);
+    constraints.canRunOnTimeseries = false;
 
     // Apply potential overrides from static properties.
     if (!_properties.getRequiresInputDocSource()) {
@@ -129,8 +335,7 @@ DocumentSourceExtensionOptimizable::distributedPlanLogic() {
                         return DocumentSource::parse(getExpCtx(), hostParse.getBsonSpec());
                     } else {
                         // Extension-allocated: expand the parse node.
-                        return DocumentSourceExtensionExpandable::expandParseNode(getExpCtx(),
-                                                                                  dplElement);
+                        return expandParseNode(getExpCtx(), dplElement);
                     }
                 },
                 [&](LogicalAggStageHandle& dplLogicalStage) {
@@ -206,6 +411,35 @@ boost::intrusive_ptr<DocumentSourceExtensionOptimizable> DocumentSourceExtension
         });
 
     return optimizable;
+}
+
+std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionOptimizable::expandParseNode(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const AggStageParseNodeHandle& parseNodeHandle) {
+    std::list<boost::intrusive_ptr<DocumentSource>> outExpanded;
+    std::vector<VariantNodeHandle> expanded = parseNodeHandle->expand();
+
+    helper::visitExpandedNodes(
+        expanded,
+        [&](const HostAggStageParseNode& host) {
+            const BSONObj& bsonSpec = host.getBsonSpec();
+            outExpanded.splice(outExpanded.end(), DocumentSource::parse(expCtx, bsonSpec));
+        },
+        [&](const AggStageParseNodeHandle& handle) {
+            std::list<boost::intrusive_ptr<DocumentSource>> children =
+                expandParseNode(expCtx, handle);
+            outExpanded.splice(outExpanded.end(), children);
+        },
+        [&](const HostAggStageAstNode& hostAst) {
+            const BSONObj& bsonSpec = hostAst.getIdLookupSpec();
+            outExpanded.splice(outExpanded.end(), DocumentSource::parse(expCtx, bsonSpec));
+        },
+        [&](AggStageAstNodeHandle handle) {
+            outExpanded.emplace_back(
+                DocumentSourceExtensionOptimizable::create(expCtx, std::move(handle)));
+        });
+
+    return outExpanded;
 }
 
 }  // namespace mongo::extension::host

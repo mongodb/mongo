@@ -28,7 +28,7 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host/document_source_extension.h"
+#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host_connector/adapter/host_portal_adapter.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/util/assert_util.h"
@@ -43,7 +43,8 @@ public:
         tassert(10596400,
                 "Got null stage descriptor during extension registration",
                 descriptor != nullptr);
-        host::DocumentSourceExtension::registerStage(AggStageDescriptorHandle(descriptor));
+        host::DocumentSourceExtensionOptimizable::registerStage(
+            AggStageDescriptorHandle(descriptor));
     };
 };
 

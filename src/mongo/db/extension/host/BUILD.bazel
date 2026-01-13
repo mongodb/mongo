@@ -3,9 +3,8 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 package(default_visibility = ["//visibility:public"])
 
 exports_files([
-    "document_source_extension_test.cpp",
     "document_source_extension_optimizable_test.cpp",
-    "document_source_extension_expandable_test.cpp",
+    "document_source_extension_for_query_shape_test.cpp",
 ])
 
 exports_files(
@@ -48,8 +47,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "extension_host",
     srcs = [
-        "document_source_extension.cpp",
-        "document_source_extension_expandable.cpp",
+        "document_source_extension_for_query_shape.cpp",
         "document_source_extension_optimizable.cpp",
         "extension_stage.cpp",
     ],

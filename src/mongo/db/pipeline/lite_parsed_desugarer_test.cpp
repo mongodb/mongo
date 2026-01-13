@@ -29,7 +29,7 @@
 
 #include "mongo/db/pipeline/lite_parsed_desugarer.h"
 
-#include "mongo/db/extension/host/document_source_extension.h"
+#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -49,7 +49,8 @@ public:
         : AggregationContextFixture(std::move(nsString)) {
         LiteParsedDesugarer::registerStageExpander(
             extension::host::ExpandableStageParams::id,
-            extension::host::DocumentSourceExtension::LiteParsedExpandable::stageExpander);
+            extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpandable::
+                stageExpander);
     }
 
     void registerParser(extension::AggStageDescriptorHandle descriptor) {
@@ -63,8 +64,8 @@ public:
             return [descriptor](const NamespaceString& nss,
                                 const BSONElement& spec,
                                 const LiteParserOptions& opts) {
-                return extension::host::DocumentSourceExtension::LiteParsedExpandable::parse(
-                    descriptor, nss, spec, opts);
+                return extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpandable::
+                    parse(descriptor, nss, spec, opts);
             };
         }();
 
@@ -233,8 +234,9 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandToExtAst) {
         auto& stages = lpp.getStages();
         ASSERT_EQ(stages.size(), 1);
 
-        ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
-            stages[0].get()));
+        ASSERT(
+            dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
+                stages[0].get()));
         ASSERT_EQ(stages[0]->getParseTimeName(),
                   extension::sdk::shared_test_stages::kTransformName);
     }
@@ -255,7 +257,8 @@ TEST_F(LiteParsedDesugarerTest, ExpandsExpandToExtAst) {
 
             ASSERT(dynamic_cast<ProjectLiteParsed*>(stages[0].get()));
 
-            ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+            ASSERT(dynamic_cast<
+                   extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
                 stages[1].get()));
             ASSERT_EQ(stages[1]->getParseTimeName(),
                       extension::sdk::shared_test_stages::kTransformName);
@@ -290,7 +293,7 @@ TEST_F(LiteParsedDesugarerTest, ExpandsSingleExpandToExtParseOnly) {
     auto& stages = lpp.getStages();
     ASSERT_EQ(stages.size(), 1);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[0].get()));
     ASSERT_EQ(stages[0]->getParseTimeName(), extension::sdk::shared_test_stages::kTransformName);
 
@@ -314,19 +317,19 @@ TEST_F(LiteParsedDesugarerTest, ExpandsRecursiveTopToLeaves) {
     auto& stages = lpp.getStages();
     ASSERT_EQ(stages.size(), 4);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[0].get()));
     ASSERT_EQ(stages[0]->getParseTimeName(), extension::sdk::shared_test_stages::kLeafAName);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[1].get()));
     ASSERT_EQ(stages[1]->getParseTimeName(), extension::sdk::shared_test_stages::kLeafBName);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[2].get()));
     ASSERT_EQ(stages[2]->getParseTimeName(), extension::sdk::shared_test_stages::kLeafCName);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[3].get()));
     ASSERT_EQ(stages[3]->getParseTimeName(), extension::sdk::shared_test_stages::kLeafDName);
 
@@ -355,11 +358,11 @@ TEST_F(LiteParsedDesugarerTest, ExpandsMixedToMultipleStagesSplicingIntoPipeline
 
     ASSERT(dynamic_cast<ProjectLiteParsed*>(stages[0].get()));
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[1].get()));
     ASSERT_EQ(stages[1]->getParseTimeName(), extension::sdk::shared_test_stages::kTransformName);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[2].get()));
     ASSERT_EQ(stages[2]->getParseTimeName(), extension::sdk::shared_test_stages::kTransformName);
 
@@ -392,19 +395,19 @@ TEST_F(LiteParsedDesugarerTest, ExpandsMultipleExpandablesSequentially) {
     auto& stages = lpp.getStages();
     ASSERT_EQ(stages.size(), 4);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[0].get()));
     ASSERT_EQ(stages[0]->getParseTimeName(), extension::sdk::shared_test_stages::kLeafCName);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[1].get()));
     ASSERT_EQ(stages[1]->getParseTimeName(), extension::sdk::shared_test_stages::kLeafDName);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[2].get()));
     ASSERT_EQ(stages[2]->getParseTimeName(), extension::sdk::shared_test_stages::kLeafAName);
 
-    ASSERT(dynamic_cast<extension::host::DocumentSourceExtension::LiteParsedExpanded*>(
+    ASSERT(dynamic_cast<extension::host::DocumentSourceExtensionOptimizable::LiteParsedExpanded*>(
         stages[3].get()));
     ASSERT_EQ(stages[3]->getParseTimeName(), extension::sdk::shared_test_stages::kLeafBName);
 

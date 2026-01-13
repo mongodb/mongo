@@ -28,64 +28,72 @@
  */
 #pragma once
 
-#include "mongo/db/extension/host/document_source_extension.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::extension::host {
 
-class DocumentSourceExtensionExpandable : public DocumentSourceExtension {
+/**
+ * A DocumentSource implementation for pre-desugar extension stages. This object holds a parse node
+ * for query shape serialization.
+ */
+class DocumentSourceExtensionForQueryShape : public DocumentSource {
 public:
-    static boost::intrusive_ptr<DocumentSourceExtensionExpandable> create(
+    static boost::intrusive_ptr<DocumentSourceExtensionForQueryShape> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONObj rawStage,
         AggStageDescriptorHandle staticDescriptor) {
-        return boost::intrusive_ptr<DocumentSourceExtensionExpandable>(
-            new DocumentSourceExtensionExpandable(expCtx, rawStage, staticDescriptor));
+        return boost::intrusive_ptr<DocumentSourceExtensionForQueryShape>(
+            new DocumentSourceExtensionForQueryShape(expCtx, rawStage, staticDescriptor));
     }
 
     // Needed by the StageParams -> DS map.
-    static boost::intrusive_ptr<DocumentSourceExtensionExpandable> create(
+    static boost::intrusive_ptr<DocumentSourceExtensionForQueryShape> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, AggStageParseNodeHandle parseNode) {
-        return boost::intrusive_ptr<DocumentSourceExtensionExpandable>(
-            new DocumentSourceExtensionExpandable(expCtx, std::move(parseNode)));
+        return boost::intrusive_ptr<DocumentSourceExtensionForQueryShape>(
+            new DocumentSourceExtensionForQueryShape(expCtx, std::move(parseNode)));
     }
+
+    const char* getSourceName() const override {
+        return _stageName.c_str();
+    }
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const override {}
+
+    StageConstraints constraints(PipelineSplitState pipeState) const override;
 
     Value serialize(const SerializationOptions& opts) const override;
-
-    std::list<boost::intrusive_ptr<DocumentSource>> expand() const {
-        return expandParseNode(getExpCtx(), _parseNode);
-    }
-
-    // Recursive helper for expand().
-    static std::list<boost::intrusive_ptr<DocumentSource>> expandParseNode(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const AggStageParseNodeHandle& parseNodeHandle);
 
     static const Id& id;
 
     Id getId() const override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
-        tasserted(11420600,
-                  "distributedPlanLogic() should not be called on "
-                  "DocumentSourceExtensionExpandable. Expandable stages should have been desugared "
-                  "to Optimizable stages before calling distributedPlanLogic()");
+        tasserted(
+            11420600,
+            "distributedPlanLogic() should not be called on "
+            "DocumentSourceExtensionForQueryShape. Expandable stages should have been desugared "
+            "to Optimizable stages before calling distributedPlanLogic()");
     }
 
 protected:
-    DocumentSourceExtensionExpandable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                      AggStageParseNodeHandle parseNode)
-        : DocumentSourceExtension(parseNode->getName(), expCtx), _parseNode(std::move(parseNode)) {}
+    DocumentSourceExtensionForQueryShape(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         AggStageParseNodeHandle parseNode)
+        : DocumentSource(parseNode->getName(), expCtx),
+          _stageName(std::string(parseNode->getName())),
+          _parseNode(std::move(parseNode)) {}
 
 private:
+    const std::string _stageName;
     const AggStageParseNodeHandle _parseNode;
 
-    DocumentSourceExtensionExpandable(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                      BSONObj rawStage,
-                                      extension::AggStageDescriptorHandle staticDescriptor)
-        : DocumentSourceExtension(staticDescriptor->getName(), expCtx),
+    DocumentSourceExtensionForQueryShape(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         BSONObj rawStage,
+                                         extension::AggStageDescriptorHandle staticDescriptor)
+        : DocumentSource(staticDescriptor->getName(), expCtx),
+          _stageName(std::string(staticDescriptor->getName())),
           _parseNode(staticDescriptor->parse(rawStage)) {}
 };
 

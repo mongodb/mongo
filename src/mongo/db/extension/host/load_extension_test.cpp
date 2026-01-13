@@ -29,7 +29,8 @@
 
 #include "mongo/db/extension/host/load_extension.h"
 
-#include "mongo/db/extension/host/document_source_extension.h"
+#include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
+#include "mongo/db/extension/host/document_source_extension_optimizable.h"
 #include "mongo/db/extension/host/load_extension_test_util.h"
 #include "mongo/db/extension/host/load_stub_parsers.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -210,7 +211,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
     auto sourceList = DocumentSource::parse(expCtx, stageSpec);
     ASSERT_EQUALS(sourceList.size(), 1U);
 
-    auto extensionStage = dynamic_cast<DocumentSourceExtension*>(sourceList.front().get());
+    auto extensionStage =
+        dynamic_cast<DocumentSourceExtensionForQueryShape*>(sourceList.front().get());
     ASSERT_TRUE(extensionStage != nullptr);
     ASSERT_EQUALS(std::string(extensionStage->getSourceName()), kTestFooStageName);
 
@@ -222,8 +224,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionSucceeds) {
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 2U);
 
-    auto firstStage =
-        dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+    auto firstStage = dynamic_cast<DocumentSourceExtensionForQueryShape*>(
+        parsedPipeline->getSources().front().get());
     ASSERT_TRUE(firstStage != nullptr);
     ASSERT_EQUALS(std::string(firstStage->getSourceName()), std::string(kTestFooStageName));
 }
@@ -242,7 +244,8 @@ TEST_F(LoadExtensionsTest, LoadMatchTopNDesugarExtensionSucceeds) {
     {
         auto liteParsed = LiteParsedDocumentSource::parse(nss, stageSpec);
         auto liteParsedExpandable =
-            dynamic_cast<DocumentSourceExtension::LiteParsedExpandable*>(liteParsed.get());
+            dynamic_cast<DocumentSourceExtensionOptimizable::LiteParsedExpandable*>(
+                liteParsed.get());
         ASSERT_TRUE(liteParsedExpandable != nullptr);
         const auto& expanded = liteParsedExpandable->getExpandedPipeline();
         ASSERT_EQ(expanded.size(), 3U);
@@ -263,7 +266,8 @@ TEST_F(LoadExtensionsTest, LoadMatchTopNDesugarExtensionSucceeds) {
     auto sourceList = DocumentSource::parse(expCtx, stageSpec);
     ASSERT_EQUALS(sourceList.size(), 1U);
 
-    auto extensionStage = dynamic_cast<DocumentSourceExtension*>(sourceList.front().get());
+    auto extensionStage =
+        dynamic_cast<DocumentSourceExtensionForQueryShape*>(sourceList.front().get());
     ASSERT(extensionStage);
     ASSERT_EQUALS(std::string(extensionStage->getSourceName()), kMatchTopNStageName);
 
@@ -275,8 +279,8 @@ TEST_F(LoadExtensionsTest, LoadMatchTopNDesugarExtensionSucceeds) {
     ASSERT(parsedPipeline);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 2U);
 
-    auto firstStage =
-        dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+    auto firstStage = dynamic_cast<DocumentSourceExtensionForQueryShape*>(
+        parsedPipeline->getSources().front().get());
     ASSERT(firstStage);
     ASSERT_EQUALS(std::string(firstStage->getSourceName()), kMatchTopNStageName);
 
@@ -313,7 +317,8 @@ TEST_F(LoadExtensionsTest, InitializationFunctionPopulatesParserMap) {
     auto sourceList = DocumentSource::parse(expCtx, stageSpec);
     ASSERT_EQUALS(sourceList.size(), 1U);
 
-    auto extensionStage = dynamic_cast<DocumentSourceExtension*>(sourceList.front().get());
+    auto extensionStage =
+        dynamic_cast<DocumentSourceExtensionForQueryShape*>(sourceList.front().get());
     ASSERT_TRUE(extensionStage != nullptr);
     ASSERT_EQUALS(std::string(extensionStage->getSourceName()), std::string(kTestFooStageName));
 }
@@ -357,10 +362,10 @@ TEST_F(LoadExtensionsTest, LoadExtensionTwoStagesSucceeds) {
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 2U);
 
-    auto fooStage =
-        dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
-    auto barStage =
-        dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().back().get());
+    auto fooStage = dynamic_cast<DocumentSourceExtensionForQueryShape*>(
+        parsedPipeline->getSources().front().get());
+    auto barStage = dynamic_cast<DocumentSourceExtensionForQueryShape*>(
+        parsedPipeline->getSources().back().get());
 
     ASSERT_TRUE(fooStage != nullptr && barStage != nullptr);
     ASSERT_EQUALS(std::string(fooStage->getSourceName()), "$foo");
@@ -379,8 +384,8 @@ TEST_F(LoadExtensionsTest, LoadHighestCompatibleVersionSucceeds) {
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
 
-    auto extensionStage =
-        dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+    auto extensionStage = dynamic_cast<DocumentSourceExtensionForQueryShape*>(
+        parsedPipeline->getSources().front().get());
 
     ASSERT_TRUE(extensionStage != nullptr);
     ASSERT_EQUALS(std::string(extensionStage->getSourceName()), "$extensionV1");
@@ -412,7 +417,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionBothOptionsSucceed) {
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
 
-    auto stage = dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+    auto stage = dynamic_cast<DocumentSourceExtensionForQueryShape*>(
+        parsedPipeline->getSources().front().get());
     ASSERT_TRUE(stage != nullptr);
     ASSERT_EQUALS(std::string(stage->getSourceName()), "$optionA");
 
@@ -438,7 +444,8 @@ TEST_F(LoadExtensionsTest, LoadExtensionParseWithExtensionOptions) {
     ASSERT_TRUE(parsedPipeline != nullptr);
     ASSERT_EQUALS(parsedPipeline->getSources().size(), 1U);
 
-    auto stage = dynamic_cast<DocumentSourceExtension*>(parsedPipeline->getSources().front().get());
+    auto stage = dynamic_cast<DocumentSourceExtensionForQueryShape*>(
+        parsedPipeline->getSources().front().get());
     ASSERT_TRUE(stage != nullptr);
     ASSERT_EQUALS(std::string(stage->getSourceName()), "$checkNum");
 

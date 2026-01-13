@@ -50,7 +50,7 @@ private:
     // Associate a stage expander for each stage that should desugar.
     // NOTE: this map is *not* thread safe. LiteParsedDocumentSources should register their
     // stageExpander using MONGO_INITIALIZER to ensure thread safety. See
-    // DocumentSourceExtension::LiteParsedExpandable for an example.
+    // DocumentSourceExtensionOptimizable::LiteParsedExpandable for an example.
     inline static stdx::unordered_map<StageParams::Id, StageExpander> _stageExpanders{};
 };
 
