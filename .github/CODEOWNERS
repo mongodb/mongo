@@ -1261,7 +1261,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthrough/crud/**/bulk_write_currentop.js @10gen/query-integration-observability @svc-auto-approve-bot
 /jstests/noPassthrough/crud/**/*capped_deletes* @10gen/server-collection-write-path @svc-auto-approve-bot
 /jstests/noPassthrough/crud/**/replset_writes_during_restarts_keep_fast_count_correct.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
-/jstests/noPassthrough/crud/**/insert_docs_larger_than_max_user_size_standalone.js @10gen/query-optimization-parsers @svc-auto-approve-bot
+/jstests/noPassthrough/crud/**/insert_docs_larger_than_max_user_size_standalone.js @10gen/query-optimization @svc-auto-approve-bot
 /jstests/noPassthrough/crud/**/vectored_insert_no_oplog_hole.js @10gen/server-replication-reviewers @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/data_consistency/OWNERS.yml

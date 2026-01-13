@@ -17,7 +17,7 @@ filters:
       - 10gen/server-storage-engine-integration
   - "insert_docs_larger_than_max_user_size_standalone.js":
     approvers:
-      - 10gen/query-optimization-parsers
+      - 10gen/query-optimization
   - "vectored_insert_no_oplog_hole.js":
     approvers:
       - 10gen/server-replication-reviewers
