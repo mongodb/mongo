@@ -243,7 +243,6 @@ mongo_cc_unit_test(
     name = "db_timeseries_test",
     srcs = [
         "bucket_compression_test.cpp",
-        "catalog_helper_test.cpp",
         "collection_pre_conditions_util_test.cpp",
         "timeseries_collmod_test.cpp",
         "timeseries_dotted_path_support_test.cpp",
