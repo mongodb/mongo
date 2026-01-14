@@ -69,7 +69,7 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             // Cross-database renames not supported for sharded collections.
             [Action.UNSHARD_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
-            [Action.RESHARD_COLLECTION_TO_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
+            // Only allow resharding to different key type (no range→range since we use same key).
             [Action.RESHARD_COLLECTION_TO_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED_RANGE],
             [Action.MOVE_CHUNK, State.COLLECTION_PRESENT_SHARDED_RANGE],
@@ -85,8 +85,8 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             // Cross-database renames not supported for sharded collections.
             [Action.UNSHARD_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
+            // Only allow resharding to different key type (no hashed→hashed since we use same key).
             [Action.RESHARD_COLLECTION_TO_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
-            [Action.RESHARD_COLLECTION_TO_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.MOVE_CHUNK, State.COLLECTION_PRESENT_SHARDED_HASHED],
             // MOVE_COLLECTION only works on unsharded collections.

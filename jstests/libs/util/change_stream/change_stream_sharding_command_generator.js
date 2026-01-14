@@ -68,11 +68,25 @@ class ShardingCommandGenerator {
      * @param {number} action - The action ID.
      * @param {ShardingCommandGeneratorParams} params - The generator parameters.
      * @param {Object} collectionCtx - The collection context with sharding config.
+     * @param {Object} targetShardKey - Optional target shard key for sharding operations.
      * @returns {Command} The command instance.
      */
-    createCommand(action, params, collectionCtx) {
+    createCommand(action, params, collectionCtx, targetShardKey = null) {
         const CommandClass = ShardingCommandGenerator.actionToCommandClass[action];
         assert(CommandClass !== undefined, `No command class found for action ${action}`);
+
+        // Commands that need the target shard key as a separate parameter.
+        if (CommandClass === ShardCollectionCommand || CommandClass === ReshardCollectionCommand) {
+            assert(targetShardKey, `${CommandClass.name} requires targetShardKey`);
+            return new CommandClass(
+                params.getDbName(),
+                params.getCollName(),
+                params.getShardSet(),
+                {...collectionCtx},
+                targetShardKey,
+            );
+        }
+
         return new CommandClass(params.getDbName(), params.getCollName(), params.getShardSet(), {...collectionCtx});
     }
 
@@ -271,61 +285,62 @@ class ShardingCommandGenerator {
 
     /**
      * Create an empty collection context (collection does not exist).
+     * shardKeySpec represents the collection's CURRENT shard key (state).
      */
     static _emptyCollectionCtx() {
         return {
             exists: false,
             nonEmpty: false,
-            shardKeySpec: null,
-            existingIndexes: [],
+            shardKeySpec: null, // Collection's current shard key (null if not sharded)
+            isSharded: false,
         };
     }
 
     /**
      * Initialize collection context based on the starting state.
-     * collectionCtx tracks: exists, nonEmpty, shardKeySpec, existingIndexes.
+     * collectionCtx tracks: exists, nonEmpty, shardKeySpec, isSharded.
+     * shardKeySpec represents the collection's CURRENT shard key.
      * Note: Even if starting from a collection-present state, we assume the collection
      * is empty (nonEmpty: false) since we don't know its actual contents.
      */
     _initialCollectionCtxForState(state) {
-        const collectionPresent = [
-            State.COLLECTION_PRESENT_SHARDED_RANGE,
-            State.COLLECTION_PRESENT_SHARDED_HASHED,
-            State.COLLECTION_PRESENT_UNSPLITTABLE,
-            State.COLLECTION_PRESENT_UNTRACKED,
-        ];
         const ctx = ShardingCommandGenerator._emptyCollectionCtx();
-        ctx.exists = collectionPresent.includes(state);
-        return ctx;
-    }
 
-    /**
-     * Check if an index exists in the context.
-     */
-    _indexExists(ctx, indexSpec) {
-        return ctx.existingIndexes.some((idx) => bsonWoCompare(idx, indexSpec) === 0);
-    }
-
-    /**
-     * Add an index to the context's existing indexes.
-     */
-    _addIndex(ctx, indexSpec) {
-        if (!this._indexExists(ctx, indexSpec)) {
-            ctx.existingIndexes.push(indexSpec);
+        switch (state) {
+            case State.DATABASE_ABSENT:
+                // Nothing exists.
+                break;
+            case State.DATABASE_PRESENT:
+                // Database exists but no collection.
+                break;
+            case State.COLLECTION_PRESENT_UNTRACKED:
+                ctx.exists = true;
+                break;
+            case State.COLLECTION_PRESENT_UNSPLITTABLE:
+                ctx.exists = true;
+                // Unsplittable collections are tracked but not sharded in the traditional sense.
+                break;
+            case State.COLLECTION_PRESENT_SHARDED_RANGE:
+                ctx.exists = true;
+                ctx.isSharded = true;
+                ctx.shardKeySpec = getShardKeySpec(ShardingType.RANGE);
+                break;
+            case State.COLLECTION_PRESENT_SHARDED_HASHED:
+                ctx.exists = true;
+                ctx.isSharded = true;
+                ctx.shardKeySpec = getShardKeySpec(ShardingType.HASHED);
+                break;
+            default:
+                assert(false, `Unknown state: ${state}. Add handling for this state.`);
         }
-    }
 
-    /**
-     * Remove an index from the context's existing indexes.
-     * Uses bsonWoCompare for proper BSON object comparison.
-     */
-    _removeIndex(ctx, indexSpec) {
-        ctx.existingIndexes = ctx.existingIndexes.filter((idx) => bsonWoCompare(idx, indexSpec) !== 0);
+        return ctx;
     }
 
     /**
      * Update collection context after executing an action.
      * Sharding type is determined by the action itself.
+     * Updates shardKeySpec to reflect the collection's new shard key after the action.
      */
     _updateCollectionCtxForAction(action, ctx) {
         switch (action) {
@@ -337,37 +352,37 @@ class ShardingCommandGenerator {
             case Action.SHARD_COLLECTION_RANGE:
                 ctx.exists = true;
                 ctx.shardKeySpec = getShardKeySpec(ShardingType.RANGE);
-                this._addIndex(ctx, getShardKeySpec(ShardingType.RANGE));
+                ctx.isSharded = true;
                 break;
             case Action.CREATE_SHARDED_COLLECTION_HASHED:
             case Action.SHARD_COLLECTION_HASHED:
                 ctx.exists = true;
                 ctx.shardKeySpec = getShardKeySpec(ShardingType.HASHED);
-                this._addIndex(ctx, getShardKeySpec(ShardingType.HASHED));
+                ctx.isSharded = true;
                 break;
             case Action.RESHARD_COLLECTION_TO_RANGE:
             case Action.RESHARD_COLLECTION_TO_HASHED: {
-                // Remove old shard key index, add new one.
+                // Reshard: old index is explicitly dropped in _appendAction, new index is explicitly created.
                 assert(ctx.shardKeySpec, "Reshard requires existing shard key");
-                this._removeIndex(ctx, ctx.shardKeySpec);
-                const newShardKeySpec =
+                const newShardKey =
                     action === Action.RESHARD_COLLECTION_TO_RANGE
                         ? getShardKeySpec(ShardingType.RANGE)
                         : getShardKeySpec(ShardingType.HASHED);
-                ctx.shardKeySpec = newShardKeySpec;
-                this._addIndex(ctx, newShardKeySpec);
+                ctx.shardKeySpec = newShardKey;
+                ctx.isSharded = true;
                 break;
             }
             case Action.CREATE_UNSPLITTABLE_COLLECTION:
             case Action.CREATE_UNTRACKED_COLLECTION:
                 ctx.exists = true;
                 ctx.nonEmpty = false;
+                ctx.isSharded = false;
+                ctx.shardKeySpec = null;
                 break;
             case Action.UNSHARD_COLLECTION:
                 // Collection becomes unsplittable (single-shard) but still exists.
-                // Remove old shard key index since collection is no longer sharded.
+                // Old shard key index is explicitly dropped in _appendAction.
                 assert(ctx.shardKeySpec, "Unshard requires existing shard key");
-                this._removeIndex(ctx, ctx.shardKeySpec);
                 ctx.shardKeySpec = null;
                 ctx.isSharded = false;
                 break;
@@ -397,6 +412,8 @@ class ShardingCommandGenerator {
     };
 
     // Actions that require shard key index to exist before execution.
+    // NOTE: CREATE_SHARDED_COLLECTION_* is NOT included because shardCollection on a
+    // non-existent collection implicitly creates both the collection and the shard key index.
     static actionsRequiringIndex = new Set([
         Action.SHARD_COLLECTION_RANGE,
         Action.SHARD_COLLECTION_HASHED,
@@ -416,45 +433,100 @@ class ShardingCommandGenerator {
      * Some actions require prerequisite commands (e.g., index creation before sharding).
      */
     _appendAction(commands, action, params, collectionCtx) {
-        // Step 1: Determine target shard key spec from action mapping.
+        // Step 1: Determine target shard key from action mapping.
+        // This is the shard key for the OPERATION, not the collection's current state.
         const shardingType = ShardingCommandGenerator.actionToShardingType[action];
-        const targetShardKeySpec = shardingType ? getShardKeySpec(shardingType) : null;
+        const targetShardKey = shardingType ? getShardKeySpec(shardingType) : null;
 
-        // Step 2: Build collection context copy with appropriate shard key spec.
+        // Step 2: Build collection context copy.
+        // collectionCtx.shardKeySpec represents the collection's CURRENT shard key (state).
         const ctx = {...collectionCtx};
-        if (targetShardKeySpec) {
-            ctx.shardKeySpec = targetShardKeySpec;
+
+        // Step 3: Pre-commands.
+
+        // For actions requiring index on non-existent collection: create sharded collection directly.
+        // ShardCollectionCommand implicitly creates collection + shard key index.
+        // This avoids the redundant path: CreateUntrackedCollection -> CreateIndex -> ShardCollection
+        if (ShardingCommandGenerator.actionsRequiringIndex.has(action) && !collectionCtx.exists) {
+            // Only SHARD_COLLECTION_* actions can reach here when collection doesn't exist.
+            // RESHARD_COLLECTION_* requires an existing sharded collection (enforced by state machine).
+            // We return early because ShardCollectionCommand handles everything (create + index + shard).
+            assert(
+                action === Action.SHARD_COLLECTION_RANGE || action === Action.SHARD_COLLECTION_HASHED,
+                `Unexpected action ${action} on non-existent collection - only SHARD_COLLECTION_* allowed`,
+            );
+
+            const shardCtx = {...ctx, exists: false};
+            commands.push(
+                new ShardCollectionCommand(
+                    params.getDbName(),
+                    params.getCollName(),
+                    params.getShardSet(),
+                    shardCtx,
+                    targetShardKey,
+                ),
+            );
+            // Update context - collection is now sharded
+            ctx.exists = true;
+            ctx.isSharded = true;
+            ctx.shardKeySpec = targetShardKey;
+            return; // Skip index creation and main command - already done
         }
 
-        // Step 3: Pre-commands
-        // Create shard key index if action requires it and index doesn't exist.
-        if (
-            ShardingCommandGenerator.actionsRequiringIndex.has(action) &&
-            !this._indexExists(collectionCtx, targetShardKeySpec)
-        ) {
-            commands.push(new CreateIndexCommand(params.getDbName(), params.getCollName(), params.getShardSet(), ctx));
-        }
-        // Drop collection before dropping database (simplifies change event matching).
-        if (action === Action.DROP_DATABASE && collectionCtx.exists) {
+        // Create shard key index if action requires it (collection must already exist).
+        if (ShardingCommandGenerator.actionsRequiringIndex.has(action)) {
             commands.push(
-                new DropCollectionCommand(params.getDbName(), params.getCollName(), params.getShardSet(), ctx),
+                new CreateIndexCommand(
+                    params.getDbName(),
+                    params.getCollName(),
+                    params.getShardSet(),
+                    ctx,
+                    targetShardKey,
+                ),
             );
         }
+        // NOTE: We intentionally do NOT drop indexes before dropping collections.
+        // While MongoDB silently removes indexes when dropping a collection (no 'dropIndexes' events),
+        // we already get 'dropIndexes' coverage from the post-reshard/unshard cleanup (Step 5).
+        // Explicitly dropping here would be redundant and add unnecessary complexity.
+        // Drop collection before dropping database (simplifies change event matching).
+        if (action === Action.DROP_DATABASE && collectionCtx.exists) {
+            // NOTE: We do NOT drop indexes here - see comment above about dropIndexes coverage.
+            // Pass a COPY to DropCollectionCommand so it sees exists:true.
+            // We'll set ctx.exists = false for the subsequent DropDatabaseCommand.
+            commands.push(
+                new DropCollectionCommand(params.getDbName(), params.getCollName(), params.getShardSet(), {...ctx}),
+            );
+            // After dropping collection, update context for DropDatabaseCommand to reflect that collection no longer exists.
+            ctx.exists = false;
+        }
 
-        // Step 4: Main command
-        commands.push(this.createCommand(action, params, ctx));
+        // Step 4: Main command.
+        commands.push(this.createCommand(action, params, ctx, targetShardKey));
 
-        // Step 5: Post-commands - drop old shard key index after resharding/unsharding.
+        // Step 5: Post-commands.
+        // Drop old shard key index AFTER resharding/unsharding.
+        // For reshard: MongoDB won't allow dropping while still using it.
+        // For unshard: drop the old shard key index since collection is no longer sharded.
         if (ShardingCommandGenerator.actionsRequiringIndexCleanup.has(action)) {
-            const oldShardKeySpec = collectionCtx.shardKeySpec;
+            const oldShardKey = collectionCtx.shardKeySpec;
             // For reshard: only drop old index if it's different from the new one.
-            // For unshard: always drop the old shard key index (no new shard key).
+            // For unshard: always drop the old shard key index (targetShardKey is null).
             const shouldDropIndex =
-                action === Action.UNSHARD_COLLECTION || bsonWoCompare(oldShardKeySpec, targetShardKeySpec) !== 0;
-            if (shouldDropIndex && oldShardKeySpec) {
-                const dropCtx = {...ctx, shardKeySpec: oldShardKeySpec};
+                action === Action.UNSHARD_COLLECTION || bsonWoCompare(oldShardKey, targetShardKey) !== 0;
+            if (shouldDropIndex && oldShardKey) {
+                // Update context for DropIndexCommand's event count calculation:
+                // - After reshard: shardKeySpec = new shard key (collection still sharded)
+                // - After unshard: shardKeySpec = null (collection is now untracked, no shard key)
+                const postActionCtx = {...ctx, shardKeySpec: targetShardKey};
                 commands.push(
-                    new DropIndexCommand(params.getDbName(), params.getCollName(), params.getShardSet(), dropCtx),
+                    new DropIndexCommand(
+                        params.getDbName(),
+                        params.getCollName(),
+                        params.getShardSet(),
+                        postActionCtx,
+                        oldShardKey,
+                    ),
                 );
             }
         }

@@ -60,7 +60,8 @@
  * keys stay on one shard. In reality, data distribution can change via moveChunk/balancer.
  * TODO SERVER-114858: Track actual data distribution instead of inferring from shard key type.
  *
- * The generator tracks `currentShardKeySpec` to predict event counts based on current state.
+ * The generator passes `collectionCtx.shardKeySpec` (the collection's current shard key)
+ * to commands for predicting event counts based on current data distribution.
  * ================================================================================
  */
 
@@ -171,6 +172,11 @@ class CreateDatabaseCommand extends Command {
 
     toString() {
         return "CreateDatabaseCommand";
+    }
+
+    getChangeEvents(watchMode) {
+        // enableSharding does not emit change stream events.
+        return [];
     }
 }
 
@@ -457,24 +463,30 @@ function _configureZonesForShardSet(connection, ns, shardKeySpec, shardSet) {
  * (via zones), so each shard emits its own createIndexes event. Range shard keys start with a
  * single chunk on one shard, so only one event is emitted.
  *
- * NOTE: The 'wasResharded' flag does NOT affect event count - only shard key type matters.
- *
  * Precondition (guaranteed by FSM): collection exists.
  */
 class CreateIndexCommand extends Command {
-    constructor(dbName, collName, shardSet, collectionCtx) {
+    /**
+     * @param {string} dbName - Database name.
+     * @param {string} collName - Collection name.
+     * @param {Array} shardSet - Array of shard objects.
+     * @param {Object} collectionCtx - Collection state (shardKeySpec = current shard key).
+     * @param {Object} indexSpec - The index specification to create.
+     */
+    constructor(dbName, collName, shardSet, collectionCtx, indexSpec) {
         super(dbName, collName, shardSet, collectionCtx);
-        assert(collectionCtx.shardKeySpec, "shardKeySpec must be provided to CreateIndexCommand");
+        assert(indexSpec, "indexSpec must be provided to CreateIndexCommand");
+        this.indexSpec = indexSpec;
     }
 
     execute(connection) {
         const coll = connection.getDB(this.dbName).getCollection(this.collName);
         // createIndex is idempotent - succeeds silently if index already exists.
-        assert.commandWorked(coll.createIndex(this.collectionCtx.shardKeySpec));
+        assert.commandWorked(coll.createIndex(this.indexSpec));
     }
 
     toString() {
-        return `CreateIndexCommand(${JSON.stringify(this.collectionCtx.shardKeySpec)})`;
+        return `CreateIndexCommand(${JSON.stringify(this.indexSpec)})`;
     }
 
     getChangeEvents(watchMode) {
@@ -483,7 +495,7 @@ class CreateIndexCommand extends Command {
             this.dbName,
             this.collName,
             this.collectionCtx.isSharded || false,
-            this.collectionCtx.currentShardKeySpec || null,
+            this.collectionCtx.shardKeySpec || null,
             this.shardSet,
         );
     }
@@ -509,24 +521,32 @@ class CreateIndexCommand extends Command {
  * so each shard emits a dropIndexes event when removing the old index. If the new key is
  * range, data starts on a single shard, resulting in one event.
  *
- * IMPORTANT: The generator passes `currentShardKeySpec = targetShardKeySpec` (the NEW
- * shard key after reshard) to this command, not the old key being dropped.
+ * IMPORTANT: The generator passes `collectionCtx.shardKeySpec` as the NEW shard key
+ * (after reshard) for event count calculation, and `indexSpec` as the old index to drop.
  *
  * Preconditions (guaranteed by generator): collection exists, index exists.
  */
 class DropIndexCommand extends Command {
-    constructor(dbName, collName, shardSet, collectionCtx) {
+    /**
+     * @param {string} dbName - Database name.
+     * @param {string} collName - Collection name.
+     * @param {Array} shardSet - Array of shard objects.
+     * @param {Object} collectionCtx - Collection state (shardKeySpec = current shard key).
+     * @param {Object} indexSpec - The index specification to drop.
+     */
+    constructor(dbName, collName, shardSet, collectionCtx, indexSpec) {
         super(dbName, collName, shardSet, collectionCtx);
-        assert(collectionCtx.shardKeySpec, "shardKeySpec must be provided to DropIndexCommand");
+        assert(indexSpec, "indexSpec must be provided to DropIndexCommand");
+        this.indexSpec = indexSpec;
     }
 
     execute(connection) {
         const coll = connection.getDB(this.dbName).getCollection(this.collName);
-        assert.commandWorked(coll.dropIndex(this.collectionCtx.shardKeySpec));
+        assert.commandWorked(coll.dropIndex(this.indexSpec));
     }
 
     toString() {
-        return `DropIndexCommand(${JSON.stringify(this.collectionCtx.shardKeySpec)})`;
+        return `DropIndexCommand(${JSON.stringify(this.indexSpec)})`;
     }
 
     getChangeEvents(watchMode) {
@@ -535,7 +555,7 @@ class DropIndexCommand extends Command {
             this.dbName,
             this.collName,
             this.collectionCtx.isSharded || false,
-            this.collectionCtx.currentShardKeySpec || null,
+            this.collectionCtx.shardKeySpec || null,
             this.shardSet,
         );
     }
@@ -560,44 +580,66 @@ class DropIndexCommand extends Command {
  * Preconditions (guaranteed by FSM): collection exists, shard key index exists.
  */
 class ShardCollectionCommand extends Command {
-    constructor(dbName, collName, shardSet, collectionCtx) {
+    /**
+     * @param {string} dbName - Database name.
+     * @param {string} collName - Collection name.
+     * @param {Array} shardSet - Array of shard objects.
+     * @param {Object} collectionCtx - Collection state.
+     * @param {Object} shardKey - The shard key to use for sharding.
+     */
+    constructor(dbName, collName, shardSet, collectionCtx, shardKey) {
         super(dbName, collName, shardSet, collectionCtx);
-        assert(collectionCtx.shardKeySpec, "shardKeySpec must be provided to ShardCollectionCommand");
+        assert(shardKey, "shardKey must be provided to ShardCollectionCommand");
+        this.shardKey = shardKey;
     }
 
     execute(connection) {
         const ns = `${this.dbName}.${this.collName}`;
-        const shardKeySpec = this.collectionCtx.shardKeySpec;
 
         // Configure zones to restrict data to shardSet shards only.
-        _configureZonesForShardSet(connection, ns, shardKeySpec, this.shardSet);
+        _configureZonesForShardSet(connection, ns, this.shardKey, this.shardSet);
 
         // Shard the collection with presplitHashedZones for hashed keys.
         // Note: presplitHashedZones only works when collection is empty.
         const shardCmd = {
             shardCollection: ns,
-            key: shardKeySpec,
+            key: this.shardKey,
         };
-        if (isHashedShardKey(shardKeySpec) && !this.collectionCtx.nonEmpty) {
+        if (isHashedShardKey(this.shardKey) && !this.collectionCtx.nonEmpty) {
             shardCmd.presplitHashedZones = true;
         }
         assert.commandWorked(connection.adminCommand(shardCmd));
     }
 
     toString() {
-        const type = isHashedShardKey(this.collectionCtx.shardKeySpec) ? "hashed" : "range";
+        const type = isHashedShardKey(this.shardKey) ? "hashed" : "range";
         return `ShardCollectionCommand(${type})`;
     }
 
     getChangeEvents(watchMode) {
-        // shardCollection emits only shardCollection event.
-        // Index creation is handled by separate CreateIndexCommand.
-        return [
-            {
-                operationType: "shardCollection",
+        const events = [];
+
+        // When sharding a non-existent collection, MongoDB implicitly:
+        // 1. Creates the collection (emits 'create')
+        // 2. Creates the shard key index (emits 'createIndexes')
+        // 3. Shards the collection (emits 'shardCollection')
+        if (!this.collectionCtx.exists) {
+            events.push({
+                operationType: "create",
                 ns: {db: this.dbName, coll: this.collName},
-            },
-        ];
+            });
+            events.push({
+                operationType: "createIndexes",
+                ns: {db: this.dbName, coll: this.collName},
+            });
+        }
+
+        events.push({
+            operationType: "shardCollection",
+            ns: {db: this.dbName, coll: this.collName},
+        });
+
+        return events;
     }
 }
 
@@ -678,21 +720,32 @@ class UnshardCollectionCommand extends Command {
  * Precondition (guaranteed by FSM): collection exists and is sharded, index exists.
  */
 class ReshardCollectionCommand extends Command {
-    constructor(dbName, collName, shardSet, collectionCtx) {
+    // Number of initial chunks for resharding. Set to low value (1) for testing to avoid
+    // cardinality errors with minimal test data. Can be modified externally if needed.
+    static numInitialChunks = 1;
+
+    /**
+     * @param {string} dbName - Database name.
+     * @param {string} collName - Collection name.
+     * @param {Array} shardSet - Array of shard objects.
+     * @param {Object} collectionCtx - Collection state.
+     * @param {Object} newShardKey - The new shard key to reshard to.
+     */
+    constructor(dbName, collName, shardSet, collectionCtx, newShardKey) {
         super(dbName, collName, shardSet, collectionCtx);
-        assert(collectionCtx.shardKeySpec, "shardKeySpec must be provided to ReshardCollectionCommand");
+        assert(newShardKey, "newShardKey must be provided to ReshardCollectionCommand");
+        this.newShardKey = newShardKey;
     }
 
     execute(connection) {
         const ns = `${this.dbName}.${this.collName}`;
-        const shardKeySpec = this.collectionCtx.shardKeySpec;
 
         // Update zones for the new shard key to restrict data to shardSet shards.
-        _configureZonesForShardSet(connection, ns, shardKeySpec, this.shardSet);
+        _configureZonesForShardSet(connection, ns, this.newShardKey, this.shardSet);
 
         // Build the zones array for reshardCollection.
         const zoneName = _getZoneName(ns);
-        const shardKeyField = Object.keys(shardKeySpec)[0];
+        const shardKeyField = Object.keys(this.newShardKey)[0];
         const zones = [
             {
                 zone: zoneName,
@@ -701,19 +754,19 @@ class ReshardCollectionCommand extends Command {
             },
         ];
 
-        // Use numInitialChunks: 1 to avoid cardinality errors in test environments with little data.
+        // Reshard with zones. numInitialChunks requires zones parameter to be passed directly.
         assert.commandWorked(
             connection.adminCommand({
                 reshardCollection: ns,
-                key: shardKeySpec,
-                numInitialChunks: 1,
+                key: this.newShardKey,
+                numInitialChunks: ReshardCollectionCommand.numInitialChunks,
                 zones: zones,
             }),
         );
     }
 
     toString() {
-        const type = isHashedShardKey(this.collectionCtx.shardKeySpec) ? "hashed" : "range";
+        const type = isHashedShardKey(this.newShardKey) ? "hashed" : "range";
         return `ReshardCollectionCommand(${type})`;
     }
 
@@ -853,7 +906,7 @@ class MoveCommandBase extends Command {
     }
 
     execute(connection) {
-        // No-op: Move operations are not critical for state machine testing since
+        // No-op: Move operations are not critical for state machine testing since.
         // sharding is not actually set up.
         // In a real implementation, this would execute:
         //   const targetShardId = this._getTargetShard(connection);
@@ -889,6 +942,11 @@ class MovePrimaryCommand extends MoveCommandBase {
     toString() {
         return "MovePrimaryCommand";
     }
+
+    getChangeEvents(watchMode) {
+        // movePrimary does not emit change stream events.
+        return [];
+    }
 }
 
 /**
@@ -910,6 +968,11 @@ class MoveCollectionCommand extends MoveCommandBase {
 
     toString() {
         return "MoveCollectionCommand";
+    }
+
+    getChangeEvents(watchMode) {
+        // moveCollection does not emit change stream events (it's a no-op in tests).
+        return [];
     }
 }
 
@@ -934,6 +997,12 @@ class MoveChunkCommand extends MoveCommandBase {
 
     toString() {
         return "MoveChunkCommand";
+    }
+
+    getChangeEvents(watchMode) {
+        // TODO SERVER-114858: moveChunk only emits change stream events in showSystemEvents mode,
+        // which we don't use in our tests. For normal change streams, it's invisible.
+        return [];
     }
 }
 

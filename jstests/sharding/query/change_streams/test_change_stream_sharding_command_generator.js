@@ -7,7 +7,16 @@
  */
 import {Action} from "jstests/libs/util/change_stream/change_stream_action.js";
 import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream_collection_test_model.js";
-import {InsertDocCommand, DropCollectionCommand} from "jstests/libs/util/change_stream/change_stream_commands.js";
+import {
+    InsertDocCommand,
+    DropCollectionCommand,
+    CreateIndexCommand,
+    ShardCollectionCommand,
+    ReshardCollectionCommand,
+    RenameToNonExistentSameDbCommand,
+    UnshardCollectionCommand,
+    CreateUntrackedCollectionCommand,
+} from "jstests/libs/util/change_stream/change_stream_commands.js";
 import {ShardingCommandGenerator} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator.js";
 import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator_params.js";
 import {State} from "jstests/libs/util/change_stream/change_stream_state.js";
@@ -49,6 +58,19 @@ function setupWriterConfig(seed, params, instanceName) {
 function getClusterTime(conn, dbName) {
     const serverStatus = conn.getDB(dbName).adminCommand({serverStatus: 1});
     return serverStatus.operationTime;
+}
+
+/**
+ * Get a cluster time that is strictly after the current server time.
+ * This is useful for starting change streams that should not include any
+ * events that have already occurred, since startAtClusterTime is inclusive.
+ */
+function getClusterTimeAfterNow(conn, dbName) {
+    const currentTime = getClusterTime(conn, dbName);
+    // Increment the cluster time by 1 to be strictly after the current time.
+    // Cluster time is Timestamp(seconds, increment), so incrementing 'i' by 1
+    // gives us a time that is guaranteed to be after all current operations.
+    return Timestamp(currentTime.t, currentTime.i + 1);
 }
 
 describe("ShardingCommandGenerator", function () {
@@ -248,8 +270,8 @@ describe("ChangeEventMatcher helpers", function () {
             operationType: "insert",
             ns: {db: "testDb", coll: "testColl"},
             fullDocument: {_id: 1},
-            clusterTime: new Timestamp(1, 1), // ignored because not in expected
-            _id: {_data: "opaqueResumeToken"}, // ignored because not in expected
+            clusterTime: new Timestamp(1, 1), // Ignored because not in expected.
+            _id: {_data: "opaqueResumeToken"}, // Ignored because not in expected.
         };
 
         const matcher = new ChangeEventMatcher(expected);
@@ -283,13 +305,13 @@ describe("ChangeEventMatcher helpers", function () {
     });
 
     it("matches interleaved events across multiple streams with MultipleChangeStreamMatcher", () => {
-        // Stream 1 expects: insert _id:1, then insert _id:3
+        // Stream 1 expects: insert _id:1, then insert _id:3.
         const stream1 = new SingleChangeStreamMatcher([
             new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 1}}),
             new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 3}}),
         ]);
 
-        // Stream 2 expects: insert _id:2, then insert _id:4
+        // Stream 2 expects: insert _id:2, then insert _id:4.
         const stream2 = new SingleChangeStreamMatcher([
             new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 2}}),
             new ChangeEventMatcher({operationType: "insert", fullDocument: {_id: 4}}),
@@ -297,7 +319,7 @@ describe("ChangeEventMatcher helpers", function () {
 
         const multiMatcher = new MultipleChangeStreamMatcher([stream1, stream2]);
 
-        // Events arrive interleaved: 1, 2, 3, 4
+        // Events arrive interleaved: 1, 2, 3, 4.
         assert(multiMatcher.matches({operationType: "insert", fullDocument: {_id: 1}}));
         assert(!multiMatcher.isDone());
 
@@ -376,8 +398,9 @@ describe("ChangeStreamReader integration", function () {
         db.dropDatabase();
         assert.commandWorked(db.createCollection(collName));
 
-        // Get cluster time BEFORE Writer runs.
-        const clusterTime = getClusterTime(ctx.st.s, dbName);
+        // Get cluster time strictly AFTER the create event so the change stream
+        // only captures the subsequent insert events.
+        const clusterTime = getClusterTimeAfterNow(ctx.st.s, dbName);
 
         // Execute inserts using Writer.
         const numInserts = 3;
@@ -500,8 +523,8 @@ describe("ChangeStreamReader integration", function () {
         setupCollection();
         const db = this.st.s.getDB(dbName);
 
-        // Get cluster time BEFORE operations.
-        const startTime = getClusterTime(this.st.s, dbName);
+        // Get cluster time strictly AFTER setup so change stream only captures test operations.
+        const startTime = getClusterTimeAfterNow(this.st.s, dbName);
         jsTest.log.info(`Start time: ${tojson(startTime)}`);
 
         executeCommands();
@@ -598,7 +621,8 @@ describe("ChangeStreamReader integration", function () {
         setupCollection();
         const db = this.st.s.getDB(dbName);
 
-        const startTime = getClusterTime(this.st.s, dbName);
+        // Get cluster time strictly AFTER setup so change stream only captures test operations.
+        const startTime = getClusterTimeAfterNow(this.st.s, dbName);
 
         executeCommands();
 
@@ -658,7 +682,8 @@ describe("ChangeStreamReader integration", function () {
         assert.commandWorked(db.createCollection(collName1));
         assert.commandWorked(db.createCollection(collName2));
 
-        const startTime = getClusterTime(this.st.s, dbName);
+        // Get cluster time strictly AFTER setup so change stream only captures test operations.
+        const startTime = getClusterTimeAfterNow(this.st.s, dbName);
 
         // Execute commands using Writer.
         const writerConfig = {
@@ -671,7 +696,7 @@ describe("ChangeStreamReader integration", function () {
             instanceName: readerInstanceName,
             watchMode: ChangeStreamWatchMode.kDb,
             dbName: dbName,
-            collName: null, // Not needed for db-level watch
+            collName: null, // Not needed for db-level watch.
             numberOfEventsToRead: expectedEventTypes.length,
             readingMode: ChangeStreamReadingMode.kContinuous,
             showExpandedEvents: false,
@@ -706,5 +731,299 @@ describe("ChangeStreamReader integration", function () {
         assert(collsWithEvents.has(collName2), `Should have events from ${collName2}`);
 
         jsTest.log.info(`✓ Database-level watch test passed`);
+    });
+
+    /**
+     * Helper to run a DDL command and verify its change stream events.
+     * @param {Object} ctx - Test context (this).
+     * @param {string} testName - Unique test name (used for db/instance naming).
+     * @param {Array} setupCommands - Commands to run before the test command.
+     * @param {Command} testCommand - The command to test.
+     * @param {Array<string>} expectedOperationTypes - Expected operationTypes for all events.
+     */
+    function runDDLTest(ctx, testName, setupCommands, testCommand, expectedOperationTypes) {
+        const dbName = `test_ddl_${testName}`;
+        const collName = "test_coll";
+        const readerInstanceName = `reader_ddl_${testName}`;
+
+        ctx.databasesToCleanup.add(dbName);
+        ctx.instanceNamesToCleanup.push(readerInstanceName);
+
+        const db = ctx.st.s.getDB(dbName);
+        db.dropDatabase();
+
+        // Run setup commands.
+        for (const cmd of setupCommands) {
+            cmd.execute(ctx.st.s);
+        }
+
+        // Get cluster time strictly after setup.
+        const startTime = getClusterTimeAfterNow(ctx.st.s, dbName);
+
+        // Execute test command.
+        testCommand.execute(ctx.st.s);
+
+        // Read change stream events.
+        const readerConfig = {
+            instanceName: readerInstanceName,
+            watchMode: ChangeStreamWatchMode.kCollection,
+            dbName: dbName,
+            collName: collName,
+            numberOfEventsToRead: expectedOperationTypes.length,
+            readingMode: ChangeStreamReadingMode.kContinuous,
+            startAtClusterTime: startTime,
+        };
+
+        ChangeStreamReader.run(ctx.st.s, readerConfig);
+
+        const capturedRecords = Connector.readAllChangeEvents(ctx.st.s, readerInstanceName);
+        const capturedEvents = capturedRecords.map((r) => r.changeEvent);
+
+        // Verify event count.
+        assert.eq(
+            capturedEvents.length,
+            expectedOperationTypes.length,
+            `Expected ${expectedOperationTypes.length} events for ${testName}, got ${capturedEvents.length}: ${tojson(capturedEvents)}`,
+        );
+
+        // Verify all event types.
+        for (let i = 0; i < expectedOperationTypes.length; i++) {
+            assert.eq(
+                capturedEvents[i].operationType,
+                expectedOperationTypes[i],
+                `Event ${i} should be '${expectedOperationTypes[i]}' for ${testName}, got '${capturedEvents[i].operationType}'`,
+            );
+        }
+
+        return capturedEvents;
+    }
+
+    // =========================================================================
+    // Operation Tests - Verify change stream events for DML and DDL operations.
+    // =========================================================================
+
+    describe("DML", function () {
+        it("insert emits insert event", function () {
+            const setupCommands = [
+                new CreateUntrackedCollectionCommand("test_ddl_insert", "test_coll", this.shards, {}),
+            ];
+            const testCommand = new InsertDocCommand("test_ddl_insert", "test_coll", this.shards, {
+                exists: true,
+                nonEmpty: false,
+            });
+            runDDLTest(this, "insert", setupCommands, testCommand, ["insert"]);
+        });
+    });
+
+    describe("Index", function () {
+        it("createIndex emits createIndexes event", function () {
+            const setupCommands = [
+                new CreateUntrackedCollectionCommand("test_ddl_create_index", "test_coll", this.shards, {}),
+            ];
+            const testCommand = new CreateIndexCommand(
+                "test_ddl_create_index",
+                "test_coll",
+                this.shards,
+                {exists: true},
+                {data: 1}, // indexSpec
+            );
+            runDDLTest(this, "create_index", setupCommands, testCommand, ["createIndexes"]);
+        });
+    });
+
+    describe("Sharding", function () {
+        it("shardCollection (range) emits shardCollection event", function () {
+            const setupCommands = [
+                new CreateIndexCommand(
+                    "test_ddl_shard_coll_range",
+                    "test_coll",
+                    this.shards,
+                    {exists: false},
+                    {data: 1}, // indexSpec
+                ),
+            ];
+            const testCommand = new ShardCollectionCommand(
+                "test_ddl_shard_coll_range",
+                "test_coll",
+                this.shards,
+                {exists: true},
+                {data: 1}, // shardKey
+            );
+            runDDLTest(this, "shard_coll_range", setupCommands, testCommand, ["shardCollection"]);
+        });
+
+        it("shardCollection (hashed) emits shardCollection event", function () {
+            const setupCommands = [
+                new CreateIndexCommand(
+                    "test_ddl_shard_coll_hashed",
+                    "test_coll",
+                    this.shards,
+                    {exists: false},
+                    {data: "hashed"}, // indexSpec
+                ),
+            ];
+            const testCommand = new ShardCollectionCommand(
+                "test_ddl_shard_coll_hashed",
+                "test_coll",
+                this.shards,
+                {exists: true},
+                {data: "hashed"}, // shardKey
+            );
+            runDDLTest(this, "shard_coll_hashed", setupCommands, testCommand, ["shardCollection"]);
+        });
+
+        it("reshardCollection emits reshardCollection event", function () {
+            const setupCommands = [
+                new CreateIndexCommand(
+                    "test_ddl_reshard",
+                    "test_coll",
+                    this.shards,
+                    {exists: false},
+                    {data: 1}, // indexSpec
+                ),
+                new ShardCollectionCommand(
+                    "test_ddl_reshard",
+                    "test_coll",
+                    this.shards,
+                    {exists: true},
+                    {data: 1}, // shardKey
+                ),
+                new CreateIndexCommand(
+                    "test_ddl_reshard",
+                    "test_coll",
+                    this.shards,
+                    {exists: true, shardKeySpec: {data: 1}, isSharded: true},
+                    {data: "hashed"}, // indexSpec for new shard key
+                ),
+            ];
+            const testCommand = new ReshardCollectionCommand(
+                "test_ddl_reshard",
+                "test_coll",
+                this.shards,
+                {exists: true, shardKeySpec: {data: 1}, isSharded: true},
+                {data: "hashed"}, // newShardKey
+            );
+            runDDLTest(this, "reshard", setupCommands, testCommand, ["reshardCollection"]);
+        });
+
+        it("unshardCollection emits reshardCollection event", function () {
+            const setupCommands = [
+                new CreateIndexCommand(
+                    "test_ddl_unshard",
+                    "test_coll",
+                    this.shards,
+                    {exists: false},
+                    {data: 1}, // indexSpec
+                ),
+                new ShardCollectionCommand(
+                    "test_ddl_unshard",
+                    "test_coll",
+                    this.shards,
+                    {exists: true},
+                    {data: 1}, // shardKey
+                ),
+            ];
+            const testCommand = new UnshardCollectionCommand("test_ddl_unshard", "test_coll", this.shards, {
+                exists: true,
+                isSharded: true,
+                shardKeySpec: {data: 1},
+            });
+            runDDLTest(this, "unshard", setupCommands, testCommand, ["reshardCollection"]);
+        });
+    });
+
+    describe("Rename", function () {
+        it("rename emits rename + invalidate", function () {
+            const setupCommands = [
+                new CreateIndexCommand("test_ddl_rename", "test_coll", this.shards, {exists: false}, {data: 1}),
+                new ShardCollectionCommand("test_ddl_rename", "test_coll", this.shards, {exists: true}, {data: 1}),
+            ];
+            const testCommand = new RenameToNonExistentSameDbCommand("test_ddl_rename", "test_coll", this.shards, {
+                exists: true,
+            });
+            runDDLTest(this, "rename", setupCommands, testCommand, ["rename", "invalidate"]);
+        });
+
+        it("rename (resharded collection) emits rename + invalidate", function () {
+            const setupCommands = [
+                new CreateIndexCommand(
+                    "test_ddl_resharded_rename",
+                    "test_coll",
+                    this.shards,
+                    {exists: false},
+                    {data: 1},
+                ),
+                new ShardCollectionCommand(
+                    "test_ddl_resharded_rename",
+                    "test_coll",
+                    this.shards,
+                    {exists: true},
+                    {data: 1},
+                ),
+                new CreateIndexCommand(
+                    "test_ddl_resharded_rename",
+                    "test_coll",
+                    this.shards,
+                    {exists: true, shardKeySpec: {data: 1}, isSharded: true},
+                    {data: "hashed"},
+                ),
+                new ReshardCollectionCommand(
+                    "test_ddl_resharded_rename",
+                    "test_coll",
+                    this.shards,
+                    {exists: true, shardKeySpec: {data: 1}, isSharded: true},
+                    {data: "hashed"},
+                ),
+            ];
+            const testCommand = new RenameToNonExistentSameDbCommand(
+                "test_ddl_resharded_rename",
+                "test_coll",
+                this.shards,
+                {exists: true},
+            );
+            runDDLTest(this, "resharded_rename", setupCommands, testCommand, ["rename", "invalidate"]);
+        });
+    });
+
+    describe("Drop", function () {
+        it("drop emits drop + invalidate", function () {
+            const setupCommands = [
+                new CreateIndexCommand("test_ddl_drop", "test_coll", this.shards, {exists: false}, {data: 1}),
+                new ShardCollectionCommand("test_ddl_drop", "test_coll", this.shards, {exists: true}, {data: 1}),
+            ];
+            const testCommand = new DropCollectionCommand("test_ddl_drop", "test_coll", this.shards, {exists: true});
+            runDDLTest(this, "drop", setupCommands, testCommand, ["drop", "invalidate"]);
+        });
+
+        it("drop (resharded collection) emits drop + invalidate", function () {
+            const setupCommands = [
+                new CreateIndexCommand("test_ddl_resharded_drop", "test_coll", this.shards, {exists: false}, {data: 1}),
+                new ShardCollectionCommand(
+                    "test_ddl_resharded_drop",
+                    "test_coll",
+                    this.shards,
+                    {exists: true},
+                    {data: 1},
+                ),
+                new CreateIndexCommand(
+                    "test_ddl_resharded_drop",
+                    "test_coll",
+                    this.shards,
+                    {exists: true, shardKeySpec: {data: 1}, isSharded: true},
+                    {data: "hashed"},
+                ),
+                new ReshardCollectionCommand(
+                    "test_ddl_resharded_drop",
+                    "test_coll",
+                    this.shards,
+                    {exists: true, shardKeySpec: {data: 1}, isSharded: true},
+                    {data: "hashed"},
+                ),
+            ];
+            const testCommand = new DropCollectionCommand("test_ddl_resharded_drop", "test_coll", this.shards, {
+                exists: true,
+            });
+            runDDLTest(this, "resharded_drop", setupCommands, testCommand, ["drop", "invalidate"]);
+        });
     });
 });
