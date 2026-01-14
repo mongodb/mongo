@@ -61,17 +61,13 @@ if (!FixtureHelpers.isMongos(db)) {
     // results assertion for that case.
     // TODO SERVER-114234 Remove these relaxed assertions once we can run this properly as a collectionless aggregate.
     results = coll.aggregate([{$toast: {temp: 425.0, numSlices: 4}}]).toArray();
-    assert.gt(results.length, 0, results);
+    assert.gte(results.length, 4, results);
 }
 
-// TODO SERVER-113930 Enable tests for $lookup and $unionWith.
+// TODO SERVER-113930 Enable tests for $lookup.
 // Source stage in $lookup.
 // results = coll.aggregate([{$lookup: {from: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}], as: "slices"}}]).toArray();
 // assert.eq(results, [{breadType: "sourdough", slices: [{slice: 0, isBurnt: false}, {slice: 1, isBurnt: false}]}]);
-
-// Source stage in $unionWith.
-// results = coll.aggregate([{$unionWith: {coll: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}]}}]).toArray();
-// assert.eq(results, [{breadType: "sourdough"}, {slice: 0, isBurnt: false}, {slice: 1, isBurnt: false}]);
 
 // TODO SERVER-115918 Enable this test.
 // Source stage is not allowed in $facet.
@@ -84,7 +80,19 @@ if (!FixtureHelpers.isMongos(db)) {
 //     40600,
 // );
 
-// TODO SERVER-113930 Enable this test.
 // Two source stages in the pipeline.
-// results = coll.aggregate([{$toast: {temp: 100.0, numSlices: 1}}, {$unionWith: {coll: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}]}}]).toArray();
-// assert.eq(results, [{slice: 0, notToasted: true}, {slice: 0, isBurnt: false}, {slice: 1, isBurnt: false}]);
+const twoSourceStagePipeline = [
+    {$toast: {temp: 100.0, numSlices: 1}},
+    {$unionWith: {coll: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}]}},
+];
+if (!FixtureHelpers.isMongos(db)) {
+    results = coll.aggregate(twoSourceStagePipeline).toArray();
+    assert.eq(results, [
+        {slice: 0, notToasted: true},
+        {slice: 0, isBurnt: false},
+        {slice: 1, isBurnt: false},
+    ]);
+} else {
+    results = coll.aggregate(twoSourceStagePipeline).toArray();
+    assert.gte(results.length, 3);
+}

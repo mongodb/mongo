@@ -78,7 +78,8 @@ public:
      *
      * IMPORTANT: Each stage will store the BSONElement view into the original BSONObj, so the
      * caller is responsible for ensuring the lifetime of the original BSONObj exceeds that of this
-     * LiteParsedPipeline.
+     * LiteParsedPipeline. If the original BSON's lifetime cannot be guaranteed, the BSON can be
+     * owned by the LiteParsedPipeline by calling makeOwned() after construction.
      */
     LiteParsedPipeline(const NamespaceString& nss,
                        const std::vector<BSONObj>& pipelineStages,
@@ -360,6 +361,17 @@ public:
         _hasChangeStream = Deferred<bool (*)(const StageSpecs&)>(&computeHasChangeStream);
         _involvedNamespaces = Deferred<stdx::unordered_set<NamespaceString> (*)(const StageSpecs&)>(
             &computeInvolvedNamespaces);
+    }
+
+    /**
+     * Converts all child LiteParsedDocumentSources to own the BSON they hold, similar to
+     * BSONObj::getOwned(). This should be called when the source BSONObjs' lifetimes cannot be
+     * guaranteed to exceed that of this instance.
+     */
+    void makeOwned() {
+        for (auto& stage : _stageSpecs) {
+            stage->makeOwned();
+        }
     }
 
 private:

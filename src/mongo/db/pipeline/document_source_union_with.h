@@ -87,9 +87,9 @@ struct UnionWithSharedState {
                          std::unique_ptr<exec::agg::Pipeline> execPipeline,
                          ExecutionProgress executionState = ExecutionProgress::kIteratingSource);
 
-    // This pipeline will not be translated nor optimized, but the view will be resolved.
-    // Pre-optimization rewrites and optimizations will happen right before the subpipeline is
-    // executed in 'UnionWithStage::doGetNext'.
+    // This pipeline will not be translated nor optimized, but the view will be resolved and stages
+    // desugared. Pre-optimization rewrites and optimizations will happen right before the
+    // subpipeline is executed in 'UnionWithStage::doGetNext'.
     std::unique_ptr<Pipeline> _pipeline;
     std::unique_ptr<exec::agg::Pipeline> _execPipeline;
     // The aggregation pipeline defined with the user request, prior to optimization and view

@@ -276,8 +276,12 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
         }
 
         // Recursively lite parse the nested pipeline, if one exists.
-        if (unionWithSpec.getPipeline()) {
-            liteParsedPipeline = LiteParsedPipeline(unionNss, *unionWithSpec.getPipeline());
+        if (auto pipeline = unionWithSpec.getPipeline()) {
+            // The pipeline returned to us by the IDL is owned by us, but since it is a local
+            // variable, it will not be saved after parse() returns. We call makeOwned() so that the
+            // LiteParsedPipeline will own the BSON after this point.
+            liteParsedPipeline = LiteParsedPipeline(unionNss, *pipeline);
+            liteParsedPipeline->makeOwned();
         }
     }
 
@@ -445,9 +449,10 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                     std::move(recoveredPipeline),
                     _userNss);
             } else {
-                pipeCopy = pipeline_factory::makePipeline(recoveredPipeline,
-                                                          _sharedState->_pipeline->getContext(),
-                                                          pipeline_factory::kOptionsMinimal);
+                pipeline_factory::MakePipelineOptions opts = pipeline_factory::kOptionsMinimal;
+                opts.desugar = true;
+                pipeCopy = pipeline_factory::makePipeline(
+                    recoveredPipeline, _sharedState->_pipeline->getContext(), opts);
             }
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
@@ -650,6 +655,7 @@ std::unique_ptr<Pipeline> DocumentSourceUnionWith::parsePipelineWithMaybeViewDef
     // We will call optimize() when finalizing the pipeline in 'doGetNext()'.
     opts.optimize = false;
     opts.validator = validatorCallback;
+    opts.desugar = true;
 
     boost::intrusive_ptr<ExpressionContext> subExpCtx = makeCopyForSubPipelineFromExpressionContext(
         expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
