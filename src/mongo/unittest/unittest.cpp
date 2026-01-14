@@ -91,4 +91,12 @@ AutoUpdateConfig& getAutoUpdateConfig() {
     return config;
 }
 
+MockBehavior getDefaultMockBehavior() {
+    return static_cast<MockBehavior>(GMOCK_FLAG_GET(default_mock_behavior));
+}
+
+void setDefaultMockBehavior(MockBehavior behavior) {
+    GMOCK_FLAG_SET(default_mock_behavior, static_cast<int>(behavior));
+}
+
 }  // namespace mongo::unittest

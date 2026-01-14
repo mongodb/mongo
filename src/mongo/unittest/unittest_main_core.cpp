@@ -271,6 +271,7 @@ std::string gtestFilterForSelection(const std::vector<SelectedTest>& selection) 
 }
 
 void MainProgress::initialize() {
+    setDefaultMockBehavior(MockBehavior::nice);
     callInitGoogleTest(_argVec);
 
     // Colorize when explicitly asked to. If no position is taken, colorize when we are writing

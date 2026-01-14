@@ -304,4 +304,51 @@ ASSERT_DOES_NOT_COMPILE(DoesNotCompileCheckEnableIf, bool B = false, std::enable
 // *std::declval<Char*>()); ASSERT_DOES_NOT_COMPILE(DoesNotCompileCheckEnableIfFail, bool B = true,
 // std::enable_if_t<B, int>{});
 
+class MockNicenessTest : public mongo::unittest::Test {
+public:
+    using MockBehavior = mongo::unittest::MockBehavior;
+
+    class Actor {
+    public:
+        virtual ~Actor() = default;
+        virtual int action() = 0;
+    };
+
+    class MockActor : public Actor {
+    public:
+        MOCK_METHOD(int, action, (), ());
+    };
+
+    static std::unique_ptr<MockActor> makeActor(boost::optional<MockBehavior> behavior = {}) {
+        if (behavior) {
+            switch (*behavior) {
+                case MockBehavior::nice:
+                    return std::make_unique<testing::NiceMock<MockActor>>();
+                case MockBehavior::naggy:
+                    return std::make_unique<testing::NaggyMock<MockActor>>();
+                case MockBehavior::strict:
+                    return std::make_unique<testing::StrictMock<MockActor>>();
+            }
+        }
+        return std::make_unique<MockActor>();
+    }
+};
+
+TEST_F(MockNicenessTest, NicenessFlagDefaultValue) {
+    ASSERT_EQ(mongo::unittest::getDefaultMockBehavior(), MockBehavior::nice);
+}
+
+TEST_F(MockNicenessTest, MockDefaultsToFlagBehavior) {
+    setDefaultMockBehavior(MockBehavior::nice);
+    ASSERT_EQ(makeActor()->action(), 0);
+}
+
+TEST_F(MockNicenessTest, TryFlagsVsMockWrappers) {
+    for (auto&& flag : {MockBehavior::nice, MockBehavior::naggy, MockBehavior::strict}) {
+        setDefaultMockBehavior(flag);  // Wrappers ignore the default.
+        for (auto&& b : {MockBehavior::nice, MockBehavior::naggy})
+            ASSERT_EQ(makeActor(b)->action(), 0);
+    }
+}
+
 }  // namespace
