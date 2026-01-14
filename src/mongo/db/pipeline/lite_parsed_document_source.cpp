@@ -212,6 +212,10 @@ const ParserMap& LiteParsedDocumentSource::getParserMap() {
     return parserMap;
 }
 
+ViewInfo::~ViewInfo() = default;
+ViewInfo::ViewInfo(ViewInfo&&) noexcept = default;
+ViewInfo& ViewInfo::operator=(ViewInfo&&) noexcept = default;
+
 ViewInfo::ViewInfo(NamespaceString pViewName,
                    NamespaceString pResolvedNss,
                    std::vector<BSONObj> pViewPipeBson,
@@ -219,18 +223,41 @@ ViewInfo::ViewInfo(NamespaceString pViewName,
     : viewName(std::move(pViewName)),
       resolvedNss(std::move(pResolvedNss)),
       _ownedOriginalBsonPipeline(std::move(pViewPipeBson)) {
-    viewPipeline.reserve(_ownedOriginalBsonPipeline.size());
-    for (const auto& stage : _ownedOriginalBsonPipeline) {
-        viewPipeline.push_back(LiteParsedDocumentSource::parse(viewName, stage, pOptions));
+    // Ensure all BSONObj objects in _ownedOriginalBsonPipeline are owned.
+    // This is a no-op if they're already owned, but ensures ownership if they're not.
+    for (auto& bson : _ownedOriginalBsonPipeline) {
+        bson = bson.getOwned();
     }
+
+    viewPipeline = std::make_unique<LiteParsedPipeline>(
+        resolvedNss, _ownedOriginalBsonPipeline, false, pOptions);
+
+    // Ensure all stages in the view pipeline own their backing BSON.
+    viewPipeline->makeOwned();
 }
 
 std::vector<BSONObj> ViewInfo::getOriginalBson() const {
     return _ownedOriginalBsonPipeline;
 }
 
+LiteParsedPipeline ViewInfo::getViewPipeline() const {
+    tassert(11506600, "A ViewInfo being cloned must have a view pipeline.", viewPipeline);
+
+    // Ownership should be preserved because the original stages own their BSON, and the default
+    // copy constructor copies _ownedBson, which uses BSONObj's shared ownership. Still, we call
+    // makeOwned() defensively here. This is a no-op if the stages already own their BSON.
+    auto out = viewPipeline->clone();
+    out.makeOwned();
+    return out;
+}
+
 ViewInfo ViewInfo::clone() const {
-    return ViewInfo{viewName, resolvedNss, getOriginalBson()};
+    ViewInfo out;
+    out.viewName = viewName;
+    out.resolvedNss = resolvedNss;
+    out._ownedOriginalBsonPipeline = _ownedOriginalBsonPipeline;
+    out.viewPipeline = std::make_unique<LiteParsedPipeline>(getViewPipeline());
+    return out;
 }
 
 DisallowViewsPolicy::DisallowViewsPolicy()

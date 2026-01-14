@@ -96,13 +96,13 @@ class LiteParsedDocumentSource;
  * desugared view pipeline from ResolvedView.
  */
 struct MONGO_MOD_PUBLIC ViewInfo {
-    using LiteParsedVec = std::vector<std::unique_ptr<LiteParsedDocumentSource>>;
-
     ViewInfo() = default;
+    ~ViewInfo();
 
     // Move-only semantics (viewPipeline contains unique_ptrs which are non-copyable).
-    ViewInfo(ViewInfo&&) noexcept = default;
-    ViewInfo& operator=(ViewInfo&&) noexcept = default;
+    ViewInfo(ViewInfo&&) noexcept;
+    ViewInfo& operator=(ViewInfo&&) noexcept;
+
     ViewInfo(const ViewInfo&) = delete;
     ViewInfo& operator=(const ViewInfo&) = delete;
 
@@ -123,22 +123,27 @@ struct MONGO_MOD_PUBLIC ViewInfo {
      */
     std::vector<BSONObj> getOriginalBson() const;
 
+    /**
+     * Returns a cloned instance of the view pipeline with all stages owning their BSON.
+     */
+    LiteParsedPipeline getViewPipeline() const;
+
     ViewInfo clone() const;
 
     NamespaceString viewName;     // Unresolved view namespace.
     NamespaceString resolvedNss;  // Underlying collection that the view runs.
 
 private:
-    // Owns the BSON data that viewPipeline's LiteParsedDocumentSource objects reference.
+    // Stores the original pre-desugar BSON view pipeline and owns the underlying BSON.
     // Must be declared before viewPipeline so it is destroyed after viewPipeline (C++ destroys
     // members in reverse declaration order, and LiteParsedDocumentSource holds BSONElement
     // references into this data).
     std::vector<BSONObj> _ownedOriginalBsonPipeline;
 
 public:
-    // The desugared view pipeline as a vector of LiteParsedDocumentSources. This vector can be
-    // added to existing pipelines to apply a view to a pipeline.
-    LiteParsedVec viewPipeline;
+    // The desugared view pipeline, represented as a LiteParsedPipeline so it can be cloned and
+    // applied repeatedly.
+    std::unique_ptr<LiteParsedPipeline> viewPipeline;
 };
 
 using ViewPolicyCallbackFn = std::function<void(const ViewInfo&, StringData)>;
@@ -612,6 +617,7 @@ private:
      */
     friend class LiteParserRegistrationTest;
     friend class LiteParsedDocumentSourceParseTest;
+    friend class LiteParsedPipelineViewPolicyTest;
     friend class extension::host::LoadExtensionsTest;
     friend class extension::host::LoadNativeVectorSearchTest;
     friend class LiteParsedDesugarerTest;

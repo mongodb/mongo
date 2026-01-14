@@ -215,10 +215,11 @@ TEST_F(ExpressionContextTest, CanBuildWithView) {
 
     ASSERT_TRUE(expCtxWithView->getView().has_value());
     ASSERT_EQUALS(expCtxWithView->getView()->viewName, viewNss);
-    ASSERT_EQUALS(expCtxWithView->getView()->viewPipeline.size(), viewPipeline.size());
-    ASSERT(expCtxWithView->getView()->viewPipeline[0] != nullptr);
-    ASSERT_BSONOBJ_EQ(expCtxWithView->getView()->viewPipeline[0]->getOriginalBson().wrap(),
-                      viewPipeline[0]);
+
+    const auto& expCtxViewPipeStages = expCtxWithView->getView()->viewPipeline->getStages();
+    ASSERT_EQUALS(expCtxViewPipeStages.size(), viewPipeline.size());
+    ASSERT(expCtxViewPipeStages[0] != nullptr);
+    ASSERT_BSONOBJ_EQ(expCtxViewPipeStages[0]->getOriginalBson().wrap(), viewPipeline[0]);
 }
 
 TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
@@ -244,10 +245,11 @@ TEST_F(ExpressionContextTest, CopyWithDoesNotInitializeViewByDefault) {
     // expCtxOriginal isn't affected by the copy.
     ASSERT_TRUE(expCtxOriginal->getView().has_value());
     ASSERT_EQUALS(expCtxOriginal->getView()->viewName, viewNss);
-    ASSERT_EQUALS(expCtxOriginal->getView()->viewPipeline.size(), viewPipeline.size());
-    ASSERT(expCtxOriginal->getView()->viewPipeline[0] != nullptr);
-    ASSERT_BSONOBJ_EQ(expCtxOriginal->getView()->viewPipeline[0]->getOriginalBson().wrap(),
-                      viewPipeline[0]);
+
+    const auto& expCtxOriginalViewPipeStages = expCtxOriginal->getView()->viewPipeline->getStages();
+    ASSERT_EQUALS(expCtxOriginalViewPipeStages.size(), viewPipeline.size());
+    ASSERT(expCtxOriginalViewPipeStages[0] != nullptr);
+    ASSERT_BSONOBJ_EQ(expCtxOriginalViewPipeStages[0]->getOriginalBson().wrap(), viewPipeline[0]);
 }
 
 TEST_F(ExpressionContextTest, CopyWithInitializesViewWhenSpecified) {
@@ -272,10 +274,11 @@ TEST_F(ExpressionContextTest, CopyWithInitializesViewWhenSpecified) {
     // expCtxCopy has a view.
     ASSERT_TRUE(expCtxCopy->getView().has_value());
     ASSERT_EQUALS(expCtxCopy->getView()->viewName, viewNss);
-    ASSERT_EQUALS(expCtxCopy->getView()->viewPipeline.size(), viewPipeline.size());
-    ASSERT(expCtxCopy->getView()->viewPipeline[0] != nullptr);
-    ASSERT_BSONOBJ_EQ(expCtxCopy->getView()->viewPipeline[0]->getOriginalBson().wrap(),
-                      viewPipeline[0]);
+
+    const auto& expCtxCopyViewPipeStages = expCtxCopy->getView()->viewPipeline->getStages();
+    ASSERT_EQUALS(expCtxCopyViewPipeStages.size(), viewPipeline.size());
+    ASSERT(expCtxCopyViewPipeStages[0] != nullptr);
+    ASSERT_BSONOBJ_EQ(expCtxCopyViewPipeStages[0]->getOriginalBson().wrap(), viewPipeline[0]);
 }
 
 struct AddCmdTestCase {

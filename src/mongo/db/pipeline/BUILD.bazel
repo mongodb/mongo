@@ -630,6 +630,22 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "lite_parsed_test",
+    srcs = [
+        "lite_parsed_document_source_test.cpp",
+        "lite_parsed_pipeline_test.cpp",
+    ],
+    tags = ["mongo_unittest_sixth_group"],
+    deps = [
+        ":lite_parsed_document_source",
+        ":pipeline",
+        ":stage_params",
+        "//src/mongo:base",
+        "//src/mongo/unittest",
+    ],
+)
+
 idl_generator(
     name = "document_source_current_op_gen",
     src = "document_source_current_op.idl",
@@ -1201,7 +1217,6 @@ mongo_cc_unit_test(
         "granularity_rounder_powers_of_two_test.cpp",
         "granularity_rounder_preferred_numbers_test.cpp",
         "lite_parsed_desugarer_test.cpp",
-        "lite_parsed_document_source_test.cpp",
         "lookup_set_cache_test.cpp",
         "monotonic_expression_test.cpp",
         "partition_key_comparator_test.cpp",

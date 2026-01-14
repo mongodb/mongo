@@ -206,4 +206,44 @@ size_t LiteParsedPipeline::replaceStageWith(
     return index + numInserted;
 }
 
+void LiteParsedPipeline::_stitchFront(LiteParsedPipeline&& prefix) {
+    std::vector<std::unique_ptr<LiteParsedDocumentSource>> newStages;
+    newStages.reserve(prefix._stageSpecs.size() + _stageSpecs.size());
+
+    // Move prefix stages first.
+    for (auto& stage : prefix._stageSpecs) {
+        newStages.push_back(std::move(stage));
+    }
+
+    // Move current stages after.
+    for (auto& stage : _stageSpecs) {
+        newStages.push_back(std::move(stage));
+    }
+
+    _stageSpecs = std::move(newStages);
+    resetDeferredCaches();
+}
+
+void LiteParsedPipeline::handleView(const ViewInfo& viewInfo) {
+    for (const auto& stage : _stageSpecs) {
+        // Let each stage bind to the view info.
+        auto thisPolicy = stage->getViewPolicy();
+        thisPolicy.callback(viewInfo, stage->getParseTimeName());
+    }
+
+    // Determine whether the pipeline should automatically prepend the view pipeline. This decision
+    // is made solely by the first stage, if any. Other stages' first-stage policies are not
+    // consulted here.
+    const auto firstStagePolicy = _stageSpecs.empty()
+        ? ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend
+        : _stageSpecs.front()->getViewPolicy().policy;
+
+    if (firstStagePolicy == ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend) {
+        // If the first stage doesn't explicitly disallow it, clone and prepend the desugared view
+        // pipeline to the current pipeline.
+        auto clonedViewPipe = viewInfo.getViewPipeline();
+        _stitchFront(std::move(clonedViewPipe));
+    }
+}
+
 }  // namespace mongo

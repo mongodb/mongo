@@ -374,7 +374,21 @@ public:
         }
     }
 
+    /**
+     * Applies view semantics to this pipeline.
+     *
+     * Each stage is given a chance to validate the view or modify itself with the view via its
+     * ViewPolicy callback. Whether the view pipeline is automatically prepended is determined
+     * solely by the first stage: if its policy is kDefaultPrepend (or the pipeline is empty), the
+     * desugared view pipeline is cloned and prepended; otherwise it is not.
+     *
+     * The provided ViewInfo is not mutated.
+     */
+    void handleView(const ViewInfo& viewInfo);
+
 private:
+    friend struct ViewInfo;
+
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.
     StageSpecs _stageSpecs;
@@ -383,6 +397,12 @@ private:
     // currently needed for $rankFusion/$scoreFusion positional validation.
     // TODO SERVER-101722: Remove this once the validation is changed.
     bool _isRunningAgainstView_ForHybridSearch = false;
+
+    /**
+     * Prepend 'prefix' stages in front of this pipeline, taking ownership of prefix.
+     * Resets any derived caches.
+     */
+    void _stitchFront(LiteParsedPipeline&& prefix);
 
     static bool computeHasChangeStream(const StageSpecs& stageSpecs) {
         return std::any_of(stageSpecs.begin(), stageSpecs.end(), [](const auto& spec) {

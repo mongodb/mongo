@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/stage_params.h"
+#include "mongo/db/pipeline/test_lite_parsed.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
@@ -311,39 +312,8 @@ DEATH_TEST_F(LiteParsedDocumentSourceParseDeathTest, IFRFlagIsRequired, "1139510
     registerFallbackParser(&mockFlag);
 }
 
-/**
- * A dummy test stage parameters class used for testing. It just allocates an ID.
- */
-DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(Test);
+// Allocate StageParams ID for TestLiteParsed.
 ALLOCATE_STAGE_PARAMS_ID(test, TestStageParams::id);
-
-/**
- * A dummy LiteParsedDocumentSource that implements just enough functionality to test select
- * functionality.
- */
-class TestLiteParsed final : public LiteParsedDocumentSourceDefault<TestLiteParsed> {
-public:
-    TestLiteParsed(const BSONElement& originalBson, ViewPolicy viewPolicy = DefaultViewPolicy{})
-        : LiteParsedDocumentSourceDefault(originalBson), _viewPolicy(viewPolicy) {}
-
-    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
-        return stdx::unordered_set<NamespaceString>();
-    }
-
-    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
-        return {};
-    }
-
-    std::unique_ptr<StageParams> getStageParams() const final {
-        return std::make_unique<TestStageParams>(_originalBson);
-    }
-
-    ViewPolicy getViewPolicy() const final {
-        return _viewPolicy;
-    }
-
-    ViewPolicy _viewPolicy;
-};
 
 /**
  * Verifies that LiteParsedDocumentSource can return StageParams via getStageParams().
