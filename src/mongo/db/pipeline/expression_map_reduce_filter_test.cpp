@@ -63,14 +63,20 @@ public:
 
     // Parse 'json' into an expression of type T.
     template <class T>
-    boost::intrusive_ptr<Expression> parse(StringData json) {
+    boost::intrusive_ptr<T> parse(StringData json) {
         return parse<T>(fromjson(json));
     }
 
     // Parse 'bson' into an expression of type T.
     template <class T>
-    boost::intrusive_ptr<Expression> parse(BSONObj bson) {
-        return T::parse(&getExpCtx(), bson.firstElement(), getExpCtx().variablesParseState);
+    boost::intrusive_ptr<T> parse(BSONObj bson) {
+        return boost::static_pointer_cast<T>(
+            T::parse(&getExpCtx(), bson.firstElement(), getExpCtx().variablesParseState));
+    }
+
+    template <class T>
+    void inplace_optimize(boost::intrusive_ptr<T>& ptr) {
+        ptr = boost::dynamic_pointer_cast<T>(ptr->optimize());
     }
 
 private:
@@ -283,6 +289,73 @@ TEST(ExpressionMapTest, MapIndicesAPIStrictFeatureDisabled) {
         16879);
 }
 
+TEST_F(ExpressionMapReduceFilterTest, MapRemoveUnusedVar) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagExposeArrayIndexInMapFilterReduce", true);
+    boost::intrusive_ptr<ExpressionMap> map;
+
+    //
+    // Used variables.
+    //
+
+    // User variable in an immediate FieldPath.
+    map = parse<ExpressionMap>("{ $map: {input: [1, 2, 3], arrayIndexAs: 'i', in: '$$i'}}");
+    inplace_optimize(map);
+    ASSERT_TRUE(map->getIndexVariableId());
+
+    // User variable in a nested expression.
+    map = parse<ExpressionMap>(
+        "{ $map: { input: [1, 2, 3], arrayIndexAs: 'i', in: { $add: ['$$i', 1]} } }");
+    inplace_optimize(map);
+    ASSERT_TRUE(map->getIndexVariableId());
+
+    // Default variable in an immediate FieldPath.
+    map = parse<ExpressionMap>("{ $map: {input: [1, 2, 3], in: '$$IDX'}}");
+    inplace_optimize(map);
+    ASSERT_TRUE(map->getIndexVariableId());
+
+    // Default variable in a nested expression.
+    map = parse<ExpressionMap>("{ $map: { input: [1, 2, 3], in: { $add: ['$$IDX', 1]} } }");
+    inplace_optimize(map);
+    ASSERT_TRUE(map->getIndexVariableId());
+
+    //
+    // Unused variables.
+    //
+
+    // User variable with an immediate FieldPath.
+    map =
+        parse<ExpressionMap>("{ $map: {input: [1, 2, 3], as: 'v', arrayIndexAs: 'i', in: '$$v'}}");
+    inplace_optimize(map);
+    ASSERT_FALSE(map->getIndexVariableId());
+
+    // User variable with a nested expression.
+    map = parse<ExpressionMap>(
+        "{ $map: { input: [1, 2, 3], as: 'v', arrayIndexAs: 'i', in: { $add: ['$$v', 1]} } }");
+    inplace_optimize(map);
+    ASSERT_FALSE(map->getIndexVariableId());
+
+    // User variable with a literal.
+    map = parse<ExpressionMap>("{ $map: { input: [1, 2, 3], arrayIndexAs: 'i', in: 1 } }");
+    inplace_optimize(map);
+    ASSERT_FALSE(map->getIndexVariableId());
+
+    // Default variable with an immediate FieldPath.
+    map = parse<ExpressionMap>("{ $map: {input: [1, 2, 3], as: 'v', in: '$$v'}}");
+    inplace_optimize(map);
+    ASSERT_FALSE(map->getIndexVariableId());
+
+    // Default variable with a nested expression.
+    map = parse<ExpressionMap>("{ $map: { input: [1, 2, 3], as: 'v', in: { $add: ['$$v', 1]} } }");
+    inplace_optimize(map);
+    ASSERT_FALSE(map->getIndexVariableId());
+
+    // Default variable with a literal.
+    map = parse<ExpressionMap>("{ $map: { input: [1, 2, 3], in: 1 } }");
+    inplace_optimize(map);
+    ASSERT_FALSE(map->getIndexVariableId());
+}
+
 /* ------------------------- ExpressionReduce -------------------------- */
 
 // Test several parsing errors.
@@ -477,6 +550,81 @@ TEST(ExpressionReduceTest, ReduceIndicesAPIStrictFeatureDisabled) {
         ExpressionReduce::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState),
         AssertionException,
         40076);
+}
+
+TEST_F(ExpressionMapReduceFilterTest, ReduceRemoveUnusedVar) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagExposeArrayIndexInMapFilterReduce", true);
+    boost::intrusive_ptr<ExpressionReduce> reduce;
+
+    //
+    // Used variables.
+    //
+
+    // User variable in an immediate FieldPath.
+    reduce = parse<ExpressionReduce>(
+        "{ $reduce: {input: [1, 2, 3], initialValue: 0, arrayIndexAs: 'i', in: '$$i' }}");
+    inplace_optimize(reduce);
+    ASSERT_TRUE(reduce->getIndexVariableId());
+
+    // User variable in a nested expression.
+    reduce = parse<ExpressionReduce>(
+        "{ $reduce: {input: [1, 2, 3], initialValue: 0, arrayIndexAs: 'i', in: {$add: ['$$value', "
+        "'$$i']} }}");
+    inplace_optimize(reduce);
+    ASSERT_TRUE(reduce->getIndexVariableId());
+
+    // Default variable in an immediate FieldPath.
+    reduce =
+        parse<ExpressionReduce>("{ $reduce: {input: [1, 2, 3], initialValue: 0, in: '$$IDX' }}");
+    inplace_optimize(reduce);
+    ASSERT_TRUE(reduce->getIndexVariableId());
+
+    // Default variable in a nested expression.
+    reduce = parse<ExpressionReduce>(
+        "{ $reduce: {input: [1, 2, 3], initialValue: 0, in: {$add: ['$$value', '$$IDX']} }}");
+    inplace_optimize(reduce);
+    ASSERT_TRUE(reduce->getIndexVariableId());
+
+    //
+    // Unused variables.
+    //
+
+    // User variable with an immediate FieldPath.
+    reduce = parse<ExpressionReduce>(
+        "{ $reduce: {input: [1, 2, 3], initialValue: 0, as: 'v', arrayIndexAs: 'i', in: '$$v' }}");
+    inplace_optimize(reduce);
+    ASSERT_FALSE(reduce->getIndexVariableId());
+
+    // User variable with a nested expression.
+    reduce = parse<ExpressionReduce>(
+        "{ $reduce: {input: [1, 2, 3], initialValue: 0, as: 'v', arrayIndexAs: 'i', in: { $add: "
+        "['$$v', 1]} } }");
+    inplace_optimize(reduce);
+    ASSERT_FALSE(reduce->getIndexVariableId());
+
+    // User variable with a literal.
+    reduce = parse<ExpressionReduce>(
+        "{ $reduce: {input: [1, 2, 3], initialValue: 0, arrayIndexAs: 'i', in: 1 }}");
+    inplace_optimize(reduce);
+    ASSERT_FALSE(reduce->getIndexVariableId());
+
+    // Default variable with an immediate FieldPath.
+    reduce = parse<ExpressionReduce>(
+        "{ $reduce: {input: [1, 2, 3], initialValue: 0, as: 'v', in: '$$v' }}");
+    inplace_optimize(reduce);
+    ASSERT_FALSE(reduce->getIndexVariableId());
+
+    // Default variable with a nested expression.
+    reduce = parse<ExpressionReduce>(
+        "{ $reduce: {input: [1, 2, 3], initialValue: 0, as: 'v', in: { $add: ['$$v', 1]} } }");
+    inplace_optimize(reduce);
+    ASSERT_FALSE(reduce->getIndexVariableId());
+
+    // Default variable with a literal.
+    reduce = parse<ExpressionReduce>("{ $reduce: {input: [1, 2, 3], initialValue: 0, in: 1 }}");
+    inplace_optimize(reduce);
+    ASSERT_FALSE(reduce->getIndexVariableId());
 }
 
 /* ------------------------- ExpressionFilter -------------------------- */
@@ -782,6 +930,55 @@ TEST(ExpressionFilterTest, FilterIndicesAPIStrictFeatureDisabled) {
         ExpressionFilter::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState),
         AssertionException,
         28647);
+}
+
+TEST_F(ExpressionMapReduceFilterTest, FilterRemoveUnusedVar) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagExposeArrayIndexInMapFilterReduce", true);
+    boost::intrusive_ptr<ExpressionFilter> filter;
+
+    //
+    // Used variables.
+    //
+
+    // User variable in a nested expression.
+    filter = parse<ExpressionFilter>(
+        "{ $filter: {input: [1, 2, 3], arrayIndexAs: 'i', cond: { $eq: ['$$this', '$$i'] }}}");
+    inplace_optimize(filter);
+    ASSERT_TRUE(filter->getIndexVariableId());
+
+    // Default variable in a nested expression.
+    filter = parse<ExpressionFilter>(
+        "{ $filter: {input: [1, 2, 3], cond: { $eq: ['$$this', '$$IDX'] }}}");
+    inplace_optimize(filter);
+    ASSERT_TRUE(filter->getIndexVariableId());
+
+    //
+    // Unused variables.
+    //
+
+    // User variable with a nested expression.
+    filter = parse<ExpressionFilter>(
+        "{ $filter: {input: [1, 2, 3], arrayIndexAs: 'i', cond: { $eq: ['$$this', 1] }}}");
+    inplace_optimize(filter);
+    ASSERT_FALSE(filter->getIndexVariableId());
+
+    // User variable with a literal.
+    filter =
+        parse<ExpressionFilter>("{ $filter: {input: [1, 2, 3], arrayIndexAs: 'i', cond: true }}");
+    inplace_optimize(filter);
+    ASSERT_FALSE(filter->getIndexVariableId());
+
+    // Default variable with a nested expression.
+    filter = parse<ExpressionFilter>(
+        "{ $filter: {input: [1, 2, 3], arrayIndexAs: 'i', cond: { $eq: ['$$this', 1] }}}");
+    inplace_optimize(filter);
+    ASSERT_FALSE(filter->getIndexVariableId());
+
+    // Default variable with a literal.
+    filter = parse<ExpressionFilter>("{ $filter: {input: [1, 2, 3], cond: true }}");
+    inplace_optimize(filter);
+    ASSERT_FALSE(filter->getIndexVariableId());
 }
 
 }  // namespace ExpressionTests

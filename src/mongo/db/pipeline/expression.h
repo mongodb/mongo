@@ -2166,9 +2166,8 @@ private:
     // The name of the variable provided in the 'arrayIndexAs' argument, boost::none if not
     // provided.
     boost::optional<std::string> _idxName;
-    // The ID of the variable that represents the array index, boost::none if the feature is not
-    // enabled.
-    // TODO(SERVER-90514): make this non-optional when the feature flag is removed.
+    // ID of the variable that represents the array index, boost::none if it was optimized away or
+    // the feature flag is disabled.
     boost::optional<Variables::Id> _idxId;
 
     // The optional expression determining how many elements should be present in the result array.
@@ -2670,9 +2669,8 @@ private:
     Variables::Id _varId;
     // Name of the variable provided in the 'arrayIndexAs' argument, boost::none if not provided.
     boost::optional<std::string> _idxName;
-    // ID of the variable that represents the array index, boost::none if the feature is not
-    // enabled.
-    // TODO(SERVER-90514): make this non-optional when the feature flag is removed.
+    // ID of the variable that represents the array index, boost::none if it was optimized away or
+    // the feature flag is disabled.
     boost::optional<Variables::Id> _idxId;
 
     template <typename H>
@@ -3195,9 +3193,8 @@ private:
 
     // Name of the variable provided in the 'arrayIndexAs' argument, boost::none if not provided.
     boost::optional<std::string> _idxName;
-    // ID of the variable that represents the array index, boost::none if the feature is not
-    // enabled.
-    // TODO(SERVER-90514): make this non-optional when the feature flag is removed.
+    // ID of the variable that represents the array index, boost::none if it was optimized away or
+    // the feature flag is disabled.
     boost::optional<Variables::Id> _idxId;
 
     const size_t _accumulatedValueDepthCheckInterval =

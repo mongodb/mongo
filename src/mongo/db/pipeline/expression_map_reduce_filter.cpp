@@ -29,10 +29,38 @@
 
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
+
+namespace {
+
+template <typename VisitorType>
+class ExpressionWalker final {
+public:
+    ExpressionWalker(VisitorType* visitor) : _visitor{visitor} {}
+
+    void postVisit(const Expression* expr) {
+        expr->acceptVisitor(_visitor);
+    }
+
+private:
+    VisitorType* _visitor;
+};
+
+// Traverse Expression sub-tree and fill usedVariables set with ids of all used variables.
+// This is used later to remove unused variable declarations.
+void findUsedVariables(const boost::intrusive_ptr<Expression>& root,
+                       std::set<Variables::Id>& usedVariables) {
+    FieldPathVisitor visitor(
+        [&](const ExpressionFieldPath* expr) { usedVariables.insert(expr->getVariableId()); });
+    ExpressionWalker walker(&visitor);
+    expression_walker::walk(root.get(), &walker);
+}
+
+}  // namespace
 
 /* ------------------------- ExpressionMap ----------------------------- */
 
@@ -128,6 +156,13 @@ ExpressionMap::ExpressionMap(ExpressionContext* const expCtx,
 }
 
 boost::intrusive_ptr<Expression> ExpressionMap::optimize() {
+    if (_idxId) {
+        std::set<Variables::Id> usedVariables;
+        findUsedVariables(_children[_kEach], usedVariables);
+        if (!usedVariables.contains(*_idxId))
+            _idxId.reset();
+    }
+
     // TODO(SERVER-111215) handle when _input is constant
     _children[_kInput] = _children[_kInput]->optimize();
     _children[_kEach] = _children[_kEach]->optimize();
@@ -275,6 +310,13 @@ Value ExpressionReduce::evaluate(const Document& root, Variables* variables) con
 }
 
 boost::intrusive_ptr<Expression> ExpressionReduce::optimize() {
+    if (_idxId) {
+        std::set<Variables::Id> usedVariables;
+        findUsedVariables(_children[_kIn], usedVariables);
+        if (!usedVariables.contains(*_idxId))
+            _idxId.reset();
+    }
+
     _children[_kInput] = _children[_kInput]->optimize();
     _children[_kInitial] = _children[_kInitial]->optimize();
     _children[_kIn] = _children[_kIn]->optimize();
@@ -362,9 +404,8 @@ boost::intrusive_ptr<Expression> ExpressionFilter::parse(ExpressionContext* cons
             idxName = arrayIndexAsElem.str();
             variableValidation::validateNameForUserWrite(*idxName);
 
-            uassert(9375802,
-                    "Can't redefine variable specified in 'as' and 'arrayIndexAs' parameters",
-                    varName != idxName);
+            uassert(
+                9375802, "'as' and 'arrayIndexAs' cannot have the same name", varName != idxName);
         }
         idxId = vpsSub.defineVariable(!idxName ? "IDX" : *idxName);
     }
@@ -404,6 +445,13 @@ ExpressionFilter::ExpressionFilter(ExpressionContext* const expCtx,
 }
 
 boost::intrusive_ptr<Expression> ExpressionFilter::optimize() {
+    if (_idxId) {
+        std::set<Variables::Id> usedVariables;
+        findUsedVariables(_children[_kCond], usedVariables);
+        if (!usedVariables.contains(*_idxId))
+            _idxId.reset();
+    }
+
     // TODO(SERVER-111215) handle when _input is constant.
     _children[_kInput] = _children[_kInput]->optimize();
     _children[_kCond] = _children[_kCond]->optimize();
