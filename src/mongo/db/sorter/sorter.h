@@ -335,8 +335,8 @@ public:
 
 protected:
     const Settings _settings;
-    // Keeps track of the hash of all data objects spilled to disk. Passed to the FileIterator
-    // to ensure data has not been corrupted after reading from disk.
+    // Keeps track of the hash of all data objects spilled to disk. Passed to the corresponding
+    // storage's iterator to ensure data has not been corrupted after reading from disk.
     SorterChecksumCalculator _checksumCalculator;
 
     SortOptions _opts;

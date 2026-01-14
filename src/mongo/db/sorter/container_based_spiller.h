@@ -59,8 +59,15 @@ public:
     ContainerIterator(std::shared_ptr<IntegerKeyedContainer::Cursor> cursor,
                       int64_t start,
                       int64_t end,
-                      Iterator<Key, Value>::Settings settings)
-        : _cursor(std::move(cursor)), _position(start), _end(end), _settings(std::move(settings)) {}
+                      Iterator<Key, Value>::Settings settings,
+                      const size_t checksum,
+                      const SorterChecksumVersion checksumVersion)
+        : _cursor(std::move(cursor)),
+          _position(start),
+          _end(end),
+          _settings(std::move(settings)),
+          _checksumCalculator(checksumVersion),
+          _originalChecksum(checksum) {}
 
     bool more() override {
         return _position < _end;
@@ -74,6 +81,9 @@ public:
         ++_position;
 
         BufReader reader{result->data(), static_cast<unsigned>(result->size())};
+        _checksumCalculator.addData(result->data(), result->size());
+        _compareChecksums();
+
         return {Key::deserializeForSorter(reader, _settings.first),
                 Value::deserializeForSorter(reader, _settings.second)};
     }
@@ -87,6 +97,9 @@ public:
                 result);
 
         BufReader reader{result->data(), static_cast<unsigned>(result->size())};
+        _checksumCalculator.addData(result->data(), result->size());
+        _compareChecksums();
+
         auto key = Key::deserializeForSorter(reader, _settings.first);
         _keySize = reader.offset();
 
@@ -126,11 +139,30 @@ public:
     }
 
 private:
+    void _compareChecksums() {
+        if (_position >= _end && _originalChecksum != _checksumCalculator.checksum()) {
+            fassert(11605900,
+                    Status(ErrorCodes::Error::ChecksumMismatch,
+                           "Data read from container does not match what was written to container. "
+                           "Possible corruption of data."));
+        }
+    }
+
     std::shared_ptr<IntegerKeyedContainer::Cursor> _cursor;
     int64_t _position;
     int64_t _end;
     Iterator<Key, Value>::Settings _settings;
     boost::optional<size_t> _keySize;
+
+    // Checksum value that is updated with each read of a data object from a container. We can
+    // compare this value with _originalChecksum to check for data corruption if and only if the
+    // ContainerIterator is exhausted.
+    SorterChecksumCalculator _checksumCalculator;
+
+    // Checksum value retrieved from SortedContainerWriter that was calculated as data was spilled
+    // to disk. This is not modified, and is only used for comparison against _afterReadChecksum
+    // when the ContainerIterator is exhausted to ensure no data corruption.
+    const size_t _originalChecksum;
 };
 
 /**
@@ -185,12 +217,20 @@ public:
     }
 
     std::shared_ptr<Iterator> done() override {
-        return std::make_shared<ContainerIterator<Key, Value>>(
-            _container.getSharedCursor(_ru), _rangeStartKey, _nextKey, this->_settings);
+        return std::make_shared<ContainerIterator<Key, Value>>(_container.getSharedCursor(_ru),
+                                                               _rangeStartKey,
+                                                               _nextKey,
+                                                               this->_settings,
+                                                               this->_checksumCalculator.checksum(),
+                                                               this->_checksumCalculator.version());
     }
     std::unique_ptr<Iterator> doneUnique() override {
-        return std::make_unique<ContainerIterator<Key, Value>>(
-            _container.getSharedCursor(_ru), _rangeStartKey, _nextKey, this->_settings);
+        return std::make_unique<ContainerIterator<Key, Value>>(_container.getSharedCursor(_ru),
+                                                               _rangeStartKey,
+                                                               _nextKey,
+                                                               this->_settings,
+                                                               this->_checksumCalculator.checksum(),
+                                                               this->_checksumCalculator.version());
     }
 
     void writeChunk() override {};

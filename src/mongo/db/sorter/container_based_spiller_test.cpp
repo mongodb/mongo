@@ -38,6 +38,7 @@
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -160,11 +161,12 @@ TEST(ContainerIteratorTest, Iterate) {
     ASSERT_OK(container.insert(
         ru, containerKey5, {containerValue5.buf(), static_cast<size_t>(containerValue5.len())}));
 
-    ContainerIterator<IntWrapper, IntWrapper> iterator{
-        container.getSharedCursor(ru),
-        containerKey1,
-        containerKey5 + 1,
-        Iterator<IntWrapper, IntWrapper>::Settings{}};
+    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getSharedCursor(ru),
+                                                       containerKey1,
+                                                       containerKey5 + 1,
+                                                       Iterator<IntWrapper, IntWrapper>::Settings{},
+                                                       /*_checksumCalculator=*/3272515249,
+                                                       SorterChecksumVersion::v2};
 
     ASSERT_TRUE(iterator.more());
     auto next = iterator.next();
@@ -237,9 +239,19 @@ TEST(ContainerIteratorTest, SharedCursor) {
 
     auto cursor = container.getSharedCursor(ru);
     ContainerIterator<IntWrapper, IntWrapper> iterator1{
-        cursor, containerKey1, containerKey2 + 1, Iterator<IntWrapper, IntWrapper>::Settings{}};
+        cursor,
+        containerKey1,
+        containerKey2 + 1,
+        Iterator<IntWrapper, IntWrapper>::Settings{},
+        /*_checksumCalculator=*/71873048,
+        SorterChecksumVersion::v2};
     ContainerIterator<IntWrapper, IntWrapper> iterator2{
-        cursor, containerKey3, containerKey4 + 1, Iterator<IntWrapper, IntWrapper>::Settings{}};
+        cursor,
+        containerKey3,
+        containerKey4 + 1,
+        Iterator<IntWrapper, IntWrapper>::Settings{},
+        /*_checksumCalculator=*/2815298670,
+        SorterChecksumVersion::v2};
 
     ASSERT_TRUE(iterator1.more());
     ASSERT_TRUE(iterator2.more());
@@ -273,11 +285,12 @@ TEST(ContainerIteratorTest, ContainerMissingKey) {
     key1.serializeForSorter(containerValue1);
     value1.serializeForSorter(containerValue1);
 
-    ContainerIterator<IntWrapper, IntWrapper> iterator{
-        container.getSharedCursor(ru),
-        containerKey1,
-        containerKey1 + 1,
-        Iterator<IntWrapper, IntWrapper>::Settings{}};
+    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getSharedCursor(ru),
+                                                       containerKey1,
+                                                       containerKey1 + 1,
+                                                       Iterator<IntWrapper, IntWrapper>::Settings{},
+                                                       /*_checksumCalculator=*/0,
+                                                       SorterChecksumVersion::v2};
 
     ASSERT_TRUE(iterator.more());
     EXPECT_THROW(iterator.next(), DBException);
@@ -307,11 +320,12 @@ TEST(ContainerIteratorTest, InvalidDeferredValueUsage) {
     ASSERT_OK(container.insert(
         ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
 
-    ContainerIterator<IntWrapper, IntWrapper> iterator{
-        container.getSharedCursor(ru),
-        containerKey1,
-        containerKey1 + 1,
-        Iterator<IntWrapper, IntWrapper>::Settings{}};
+    ContainerIterator<IntWrapper, IntWrapper> iterator{container.getSharedCursor(ru),
+                                                       containerKey1,
+                                                       containerKey1 + 1,
+                                                       Iterator<IntWrapper, IntWrapper>::Settings{},
+                                                       /*_checksumCalculator=*/0,
+                                                       SorterChecksumVersion::v2};
 
     ASSERT_TRUE(iterator.more());
     EXPECT_THROW(iterator.getDeferredValue(), DBException);
@@ -321,9 +335,115 @@ TEST(ContainerIteratorTest, InvalidDeferredValueUsage) {
     EXPECT_THROW(iterator.getDeferredValue(), DBException);
 }
 
+DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV1Fails, "11605900") {
+    RecoveryUnitNoop ru;
+    ViewableIntegerKeyedContainer container;
+
+    int64_t containerKey1 = 1;
+    IntWrapper key1{100};
+    IntWrapper value1{100};
+
+    BufBuilder containerValue1;
+    key1.serializeForSorter(containerValue1);
+    value1.serializeForSorter(containerValue1);
+
+    ASSERT_OK(container.insert(
+        ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
+
+    auto cursor = container.getSharedCursor(ru);
+    ContainerIterator<IntWrapper, IntWrapper> iterator{cursor,
+                                                       containerKey1,
+                                                       containerKey1 + 1,
+                                                       Iterator<IntWrapper, IntWrapper>::Settings{},
+                                                       /*_checksumCalculator=*/0,
+                                                       SorterChecksumVersion::v1};
+
+    ASSERT_TRUE(iterator.more());
+    iterator.next();
+}
+
+
+DEATH_TEST(ContainerIteratorChecksumDeathTest, IncorrectChecksumV2Fails, "11605900") {
+    RecoveryUnitNoop ru;
+    ViewableIntegerKeyedContainer container;
+
+    int64_t containerKey1 = 1;
+    IntWrapper key1{100};
+    IntWrapper value1{100};
+
+    BufBuilder containerValue1;
+    key1.serializeForSorter(containerValue1);
+    value1.serializeForSorter(containerValue1);
+
+    ASSERT_OK(container.insert(
+        ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
+
+    auto cursor = container.getSharedCursor(ru);
+    ContainerIterator<IntWrapper, IntWrapper> iterator{cursor,
+                                                       containerKey1,
+                                                       containerKey1 + 1,
+                                                       Iterator<IntWrapper, IntWrapper>::Settings{},
+                                                       /*_checksumCalculator=*/0,
+                                                       SorterChecksumVersion::v2};
+
+    ASSERT_TRUE(iterator.more());
+    iterator.next();
+}
+
+class ContainerIteratorTest : public testing::TestWithParam<SorterChecksumVersion> {};
+
+INSTANTIATE_TEST_SUITE_P(ContainerIteratorTestSuite,
+                         ContainerIteratorTest,
+                         testing::Values(SorterChecksumVersion::v1, SorterChecksumVersion::v2));
+
+TEST_P(ContainerIteratorTest, EmptyIteratorHasZeroChecksum) {
+    RecoveryUnitNoop ru;
+    ViewableIntegerKeyedContainer container;
+
+    auto cursor = container.getSharedCursor(ru);
+    ContainerIterator<IntWrapper, IntWrapper> iterator{cursor,
+                                                       /*start=*/0,
+                                                       /*end=*/1,
+                                                       Iterator<IntWrapper, IntWrapper>::Settings{},
+                                                       /*_checksumCalculator=*/0,
+                                                       ContainerIteratorTest::GetParam()};
+}
+
 class SortedContainerWriterTest : public ServiceContextMongoDTest {
 public:
     SorterTracker sorterTracker;
+
+    /**
+     * Creates and exhausts iterators created from the writer to ensure that the final checksum
+     * matches between the writer and the iterator.
+     */
+    template <typename Key, typename Value>
+    void exhaustIterators(SortedContainerWriter<Key, Value>& writer) {
+        // Exhausting the cursor with next() calls.
+        std::shared_ptr<Iterator<Key, Value>> iterator1 = writer.done();
+        while (iterator1->more()) {
+            iterator1->next();
+        }
+
+        // Exhausting the cursor with nextWithDeferredValue()/getDeferredValue() calls.
+        std::shared_ptr<Iterator<Key, Value>> iterator2 = writer.done();
+        while (iterator2->more()) {
+            iterator2->nextWithDeferredValue();
+            iterator2->getDeferredValue();
+        }
+
+        // Exhausting the cursor with alternating calls with next() and
+        // nextWithDeferredValue()/getDeferredValue() calls.
+        std::shared_ptr<Iterator<Key, Value>> iterator3 = writer.done();
+        for (auto i = 0; iterator3->more(); ++i) {
+            if (i % 2 == 0) {
+                iterator3->next();
+            } else {
+                iterator3->nextWithDeferredValue();
+                iterator3->getDeferredValue();
+            }
+        }
+    }
 };
 
 TEST_F(SortedContainerWriterTest, ContainerWriterUsesNextKeyForContainerEntries) {
@@ -374,6 +494,8 @@ TEST_F(SortedContainerWriterTest, ContainerWriterUsesNextKeyForContainerEntries)
     k2.serializeForSorter(expected);
     v2.serializeForSorter(expected);
     ASSERT_EQ(container.entries()[1].second, std::string(expected.buf(), expected.len()));
+
+    exhaustIterators<IntWrapper, IntWrapper>(writer);
 }
 
 TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSerialization) {
@@ -407,6 +529,8 @@ TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSe
     ASSERT_EQ(container.entries().size(), 1U);
     ASSERT_EQ(container.entries()[0].first, startingKey);
     ASSERT_TRUE(container.entries()[0].second.empty());
+
+    exhaustIterators<NullValue, NullValue>(writer);
 }
 
 TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) {
@@ -446,6 +570,8 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
     key.serializeForSorter(expected);
     NullValue{}.serializeForSorter(expected);
     ASSERT_EQ(container.entries()[0].second, std::string(expected.buf(), expected.len()));
+
+    exhaustIterators<IntWrapper, NullValue>(writer);
 }
 
 }  // namespace
