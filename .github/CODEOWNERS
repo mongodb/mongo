@@ -3210,8 +3210,11 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/scripting/OWNERS.yml
 /src/mongo/scripting/**/* @10gen/query-integration-features @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/scripting/mozjs/OWNERS.yml
-/src/mongo/scripting/mozjs/**/* @10gen/query-integration-features @svc-auto-approve-bot
+# The following patterns are parsed from ./src/mongo/scripting/mozjs/common/OWNERS.yml
+/src/mongo/scripting/mozjs/common/**/* @10gen/query-integration-features @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/scripting/mozjs/shell/OWNERS.yml
+/src/mongo/scripting/mozjs/shell/**/* @10gen/query-integration-features @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/shell/OWNERS.yml
 /src/mongo/shell/**/* @10gen/devprod-correctness @svc-auto-approve-bot

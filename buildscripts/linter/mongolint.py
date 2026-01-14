@@ -231,7 +231,7 @@ class Linter:
             # in src/third_party/ because their copyright does not belong to MongoDB.
             files_to_ignore = set(
                 [
-                    "src/mongo/scripting/mozjs/PosixNSPR.cpp",
+                    "src/mongo/scripting/mozjs/shell/PosixNSPR.cpp",
                     "src/mongo/shell/linenoise.cpp",
                     "src/mongo/shell/linenoise.h",
                     "src/mongo/shell/mk_wcwidth.cpp",

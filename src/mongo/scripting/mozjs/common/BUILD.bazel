@@ -1,0 +1,50 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+        "*.defs",
+    ]),
+)
+
+mongo_cc_library(
+    name = "mozjs_common",
+    srcs = glob(["*.cpp"]) + [
+        "//src/mongo/scripting/mozjs/common/types:bindata.cpp",
+        "//src/mongo/scripting/mozjs/common/types:bson.cpp",
+        "//src/mongo/scripting/mozjs/common/types:code.cpp",
+        "//src/mongo/scripting/mozjs/common/types:dbpointer.cpp",
+        "//src/mongo/scripting/mozjs/common/types:dbref.cpp",
+        "//src/mongo/scripting/mozjs/common/types:maxkey.cpp",
+        "//src/mongo/scripting/mozjs/common/types:minkey.cpp",
+        "//src/mongo/scripting/mozjs/common/types:nativefunction.cpp",
+        "//src/mongo/scripting/mozjs/common/types:numberdecimal.cpp",
+        "//src/mongo/scripting/mozjs/common/types:numberint.cpp",
+        "//src/mongo/scripting/mozjs/common/types:numberlong.cpp",
+        "//src/mongo/scripting/mozjs/common/types:object.cpp",
+        "//src/mongo/scripting/mozjs/common/types:oid.cpp",
+        "//src/mongo/scripting/mozjs/common/types:regexp.cpp",
+        "//src/mongo/scripting/mozjs/common/types:status.cpp",
+        "//src/mongo/scripting/mozjs/common/types:timestamp.cpp",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            # The default MSVC preprocessor elides commas in some cases as a
+            # convenience, but this behavior breaks compilation of jspubtd.h.
+            # Enabling the newer preprocessor fixes the problem.
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    textual_hdrs = glob(["*.defs"]),
+    deps = [
+        "//src/mongo/scripting:scripting_common",
+        "//src/mongo/util:buildinfo",
+        "//src/third_party/mozjs",
+    ],
+)
