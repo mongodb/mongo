@@ -541,14 +541,14 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const Names
 Status StorageInterfaceImpl::dropCollectionsWithPrefix(OperationContext* opCtx,
                                                        const DatabaseName& dbName,
                                                        const std::string& collectionNamePrefix) {
-    return writeConflictRetry(
-        opCtx,
-        "StorageInterfaceImpl::dropCollectionsWithPrefix",
-        NamespaceString::createNamespaceString_forTest(dbName, collectionNamePrefix),
-        [&] {
-            AutoGetDb autoDB(opCtx, dbName, MODE_X);
-            return catalog::dropCollectionsWithPrefix(opCtx, dbName, collectionNamePrefix);
-        });
+    return writeConflictRetry(opCtx,
+                              "StorageInterfaceImpl::dropCollectionsWithPrefix",
+                              NamespaceStringUtil::deserialize(dbName, collectionNamePrefix),
+                              [&] {
+                                  AutoGetDb autoDB(opCtx, dbName, MODE_X);
+                                  return catalog::dropCollectionsWithPrefix(
+                                      opCtx, dbName, collectionNamePrefix);
+                              });
 }
 
 Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,
