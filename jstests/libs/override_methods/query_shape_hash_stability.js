@@ -63,6 +63,10 @@ function getAllMongosConnections(conn) {
 export function assertQueryShapeHashStability(conn, dbName, explainCmd) {
     let explainResults;
     try {
+        // Ensure replication has completed before running explain on all nodes. This prevents race
+        // conditions where indexes created on the primary haven't replicated to secondaries yet.
+        FixtureHelpers.awaitReplication(conn.getDB("admin"));
+
         // We run explain on all connections in the topology and assert that the query shape hash is
         // the same on all nodes.
         explainResults = getTopologyConnections(conn)
