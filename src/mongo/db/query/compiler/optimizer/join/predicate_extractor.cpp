@@ -221,6 +221,119 @@ struct PredicateExtractor {
 
     stdx::unordered_set<Variables::Id> _variables;
 };
+
+class ExtractExprPredicatesHelper {
+public:
+    explicit ExtractExprPredicatesHelper(PathResolver& pathResolver)
+        : _pathResolver(pathResolver) {}
+
+    ExprPredicatesResult extract(const MatchExpression* expr) {
+        _expressionIsFullyAbsorbed = true;
+        _predicates.clear();
+        extractMatch(expr);
+
+        return {
+            .expressionIsFullyAbsorbed = _expressionIsFullyAbsorbed,
+            .predicates = std::move(_predicates),
+        };
+    }
+
+private:
+    class ExpressionVisitor : public SelectiveConstExpressionVisitorBase {
+    public:
+        explicit ExpressionVisitor(ExtractExprPredicatesHelper& helper) : _helper(helper) {}
+
+        using SelectiveConstExpressionVisitorBase::visit;
+
+        void visit(const ExpressionAnd* expr) final {
+            ++_visited;
+            _helper.extractExpressionAnd(expr);
+        }
+
+        void visit(const ExpressionCompare* expr) final {
+            ++_visited;
+            _helper.extractExpressionCompare(expr);
+        }
+
+        size_t numVisitedNodes() const {
+            return _visited;
+        }
+
+    private:
+        ExtractExprPredicatesHelper& _helper;
+
+        size_t _visited{};
+    };
+
+    void extractMatch(const MatchExpression* expr) {
+        switch (expr->matchType()) {
+            case MatchExpression::AND:
+                extractMatchAnd(static_cast<const AndMatchExpression*>(expr));
+                break;
+            case MatchExpression::EXPRESSION:
+                extractMatchExpr(static_cast<const ExprMatchExpression*>(expr));
+                break;
+            default:
+                _expressionIsFullyAbsorbed = false;
+                // ignore
+                break;
+        }
+    }
+
+    void extractMatchAnd(const AndMatchExpression* expr) {
+        for (size_t i = 0; i < expr->numChildren(); ++i) {
+            extractMatch(expr->getChild(i));
+        }
+    }
+
+    void extractMatchExpr(const ExprMatchExpression* expr) {
+        ExpressionVisitor visitor{*this};
+        expr->getExpression()->acceptVisitor(&visitor);
+        _expressionIsFullyAbsorbed &= (visitor.numVisitedNodes() == 1);
+    }
+
+    void extractExpressionAnd(const ExpressionAnd* expr) {
+        ExpressionVisitor visitor{*this};
+        for (const auto& child : expr->getChildren()) {
+            child->acceptVisitor(&visitor);
+        }
+        _expressionIsFullyAbsorbed &= (visitor.numVisitedNodes() == expr->getChildren().size());
+    }
+
+    void extractExpressionCompare(const ExpressionCompare* expr) {
+        const auto& children = expr->getChildren();
+        if (expr->getOp() != ExpressionCompare::EQ || children.size() != 2) {
+            // 1. Extract equality predicates only.
+            _expressionIsFullyAbsorbed = false;
+            return;
+        }
+
+        auto left = dynamic_cast<const ExpressionFieldPath*>(children[0].get());
+        auto right = dynamic_cast<const ExpressionFieldPath*>(children[1].get());
+
+        if (left == nullptr || right == nullptr) {
+            // 2. Both sides of the equality predicate must be field paths.
+            _expressionIsFullyAbsorbed = false;
+            return;
+        }
+
+        auto leftPathId = _pathResolver.resolve(left->getFieldPathWithoutCurrentPrefix());
+        auto rightPathId = _pathResolver.resolve(right->getFieldPathWithoutCurrentPrefix());
+
+        if (_pathResolver[leftPathId].nodeId == _pathResolver[rightPathId].nodeId) {
+            // 3. To be a proper join predicate the field paths must be from different collections.
+            _expressionIsFullyAbsorbed = false;
+            return;
+        }
+
+        // TODO SERVER-112608: Change the operator to $expr eq.
+        _predicates.push_back({.op = JoinPredicate::Eq, .left = leftPathId, .right = rightPathId});
+    }
+
+    PathResolver& _pathResolver;
+    std::vector<JoinPredicate> _predicates;
+    bool _expressionIsFullyAbsorbed;
+};
 }  // namespace
 
 boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
@@ -243,4 +356,9 @@ boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
     return PredicateExtractor{variables}.splitJoinAndSingleCollectionPredicates(matchExpr);
 }
 
+ExprPredicatesResult extractExprPredicates(PathResolver& pathResolver,
+                                           const MatchExpression* expr) {
+    ExtractExprPredicatesHelper helper{pathResolver};
+    return helper.extract(expr);
+}
 };  // namespace mongo::join_ordering

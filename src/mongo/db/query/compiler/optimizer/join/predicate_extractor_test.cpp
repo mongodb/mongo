@@ -427,4 +427,175 @@ TEST_F(PredicateExtractorTest, JoinPredicatesOverDottedFields) {
     });
 }
 
+/**
+ * Test suite for extractExprPredicates.
+ */
+class ExtractExprPredicatesTest : public unittest::Test {
+public:
+    ExtractExprPredicatesTest()
+        : _expCtx(new ExpressionContextForTest()), _pathResolver{_baseNodeId, _resolvedPaths} {
+        _pathResolver.addNode(_firstNodeId, "first");
+        _pathResolver.addNode(_secondNodeId, "second");
+    }
+
+    auto createMatcher(const BSONObj& matchExpr) {
+        return uassertStatusOK(
+            MatchExpressionParser::parse(matchExpr,
+                                         _expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures));
+    }
+
+    ExprPredicatesResult extract(StringData json) {
+        auto bson = fromjson(json);
+        auto matchExpr = createMatcher(bson);
+        return extractExprPredicates(_pathResolver, matchExpr.get());
+    }
+
+protected:
+    static constexpr NodeId _baseNodeId = 0;
+    static constexpr NodeId _firstNodeId = 1;
+    static constexpr NodeId _secondNodeId = 2;
+
+    const boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
+    std::vector<ResolvedPath> _resolvedPaths;
+    PathResolver _pathResolver;
+};
+
+/**
+ * A join predicate extracted from a single $expr equality expression.
+ */
+TEST_F(ExtractExprPredicatesTest, SimpleEquality) {
+    static constexpr StringData json = "{$expr: {$eq: ['$first.a', '$second.b']}}";
+    auto result = extract(json);
+    ASSERT_TRUE(result.expressionIsFullyAbsorbed);
+    ASSERT_EQ(1, result.predicates.size());
+}
+
+/**
+ * A join predicate cannot be extracted from an equality of the same collection fields.
+ */
+TEST_F(ExtractExprPredicatesTest, SameCollectionEquality) {
+    static constexpr StringData json = "{$expr: {$eq: ['$first.a', '$first.b']}}";
+    auto result = extract(json);
+    ASSERT_FALSE(result.expressionIsFullyAbsorbed);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * Join predicates extracted from conjuction of $expr equalities.
+ */
+TEST_F(ExtractExprPredicatesTest, ExpressionAnd) {
+    static constexpr StringData json =
+        "{$expr: {$and: [{$eq: ['$a', '$second.a']}, {$eq: ['$first.b', '$second.b']}]}}";
+    auto result = extract(json);
+    ASSERT_TRUE(result.expressionIsFullyAbsorbed);
+    ASSERT_EQ(2, result.predicates.size());
+}
+
+/**
+ * No join predicates can be extracted from rooted $or.
+ */
+TEST_F(ExtractExprPredicatesTest, RootedOr) {
+    static constexpr StringData json = R"(
+        {
+            $or: [
+                { $expr: { $eq: ["$second.b", "$first.a"] } },
+                { $and: [{ $expr: { $eq: ["$second.b", "$a"] } }, 
+                         { $expr: { $eq: ["$second.c", "$b"] } } ] 
+                },
+                { $expr: { $eq: ["$b", "$first.a"] } }
+            ]
+        })";
+    auto result = extract(json);
+    ASSERT_FALSE(result.expressionIsFullyAbsorbed);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * No join predicates can be extracted from rooted $or expression.
+ */
+TEST_F(ExtractExprPredicatesTest, ExpressionOr) {
+    static constexpr StringData json =
+        "{$expr: {$or: [{$eq: ['$a', '$second.a']}, {$eq: ['$first.b', '$second.b']}]}}";
+    auto result = extract(json);
+    ASSERT_FALSE(result.expressionIsFullyAbsorbed);
+    ASSERT_EQ(0, result.predicates.size());
+}
+
+/**
+ * Join predicates can be extracted with rooted $and and $nested $or.
+ * The whole expression cannot be fully absorbed though.
+ */
+TEST_F(ExtractExprPredicatesTest, NestedOr) {
+    static constexpr StringData json = R"(
+        {
+            $and: [
+                { $expr: { $eq: ["$second.b", "$first.a"] } },
+                { $or: [{ $expr: { $eq: ["$second.b", "$a"] } }, 
+                        { $expr: { $eq: ["$second.c", "$b"] } },
+                        { $expr: { $eq: ["$second.d", "$d"] } } ] 
+                }
+            ]
+        })";
+    auto result = extract(json);
+    ASSERT_FALSE(result.expressionIsFullyAbsorbed);
+    ASSERT_EQ(1, result.predicates.size());
+}
+
+/**
+ * Join predicates extracted from nested conjunctions.
+ * This case is possible in a fuzzer with optimization off.
+ */
+TEST_F(ExtractExprPredicatesTest, NestedAnd) {
+    static constexpr StringData json = R"(
+        {
+            $and: [
+                { $expr: { $eq: ["$second.b", "$first.a"] } },
+                { $and: [{ $expr: { $eq: ["$second.b", "$a"] } }, 
+                         { $expr: { $eq: ["$second.c", "$b"] } } ] 
+                },
+                { $expr: { $eq: ["$b", "$first.a"] } }
+            ]
+        })";
+    auto result = extract(json);
+    ASSERT_TRUE(result.expressionIsFullyAbsorbed);
+    ASSERT_EQ(4, result.predicates.size());
+}
+
+/**
+ * An expressions constains non-equality predicate cannot be fully absorbed.
+ */
+TEST_F(ExtractExprPredicatesTest, ExpressionAndWithGt) {
+    static constexpr StringData json = R"(
+        {
+            $expr: {
+                $and: [
+                { $eq: ["$second.b", "$first.b"] },
+                { $gt: ["$second.e", "$first.e"] },
+                { $eq: ["$a", "$second.a"] }
+                ]
+            }
+        })";
+    auto result = extract(json);
+    ASSERT_FALSE(result.expressionIsFullyAbsorbed);
+    ASSERT_EQ(2, result.predicates.size());
+}
+
+/**
+ * An expression that constains non-expr $eq predicate cannot be fully absorbed.
+ */
+TEST_F(ExtractExprPredicatesTest, MatchNonExprEquality) {
+    static constexpr StringData json = R"(
+        {
+            $and: [
+                { $expr: { $eq: ["$second.b", "$first.a"] } },
+                { a: 2 },
+                { $expr: { $eq: ["$b", "$first.a"] } }
+            ]
+        })";
+    auto result = extract(json);
+    ASSERT_FALSE(result.expressionIsFullyAbsorbed);
+    ASSERT_EQ(2, result.predicates.size());
+}
 }  // namespace mongo::join_ordering

@@ -29,6 +29,8 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/compiler/optimizer/join/join_graph.h"
+#include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
@@ -60,4 +62,23 @@ struct SplitPredicatesResult {
 boost::optional<SplitPredicatesResult> splitJoinAndSingleCollectionPredicates(
     const MatchExpression* matchExpr, const std::vector<LetVariable>& variables);
 
+
+struct ExprPredicatesResult {
+    bool expressionIsFullyAbsorbed;
+
+    // Extracted join predicates.
+    std::vector<JoinPredicate> predicates;
+};
+
+/**
+ * Extract join equality predicates from the given MatchExpression 'expr'.
+ * A predicate can be qualified as a proper join equality predicate only if satisfies the following
+ * conditions: it must be a $expr equality predicate which contains two field paths belonging to
+ * different collections.
+ * The 'expr' can be fully absorbed into join graph if it contains only proper join equality
+ * predicates and $and's.
+ * The function returns 'ExprPredicatesResult' which contains a list of join predicates and a
+ * boolean value identifying whether the 'expr' was fully absorbed.
+ */
+ExprPredicatesResult extractExprPredicates(PathResolver& pathResolver, const MatchExpression* expr);
 }  // namespace mongo::join_ordering
