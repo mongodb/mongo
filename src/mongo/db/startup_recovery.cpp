@@ -760,6 +760,10 @@ bool offlineValidateDb(OperationContext* opCtx, DatabaseName dbName) {
 // Perform collection validation for all collections in all databases
 void offlineValidate(OperationContext* opCtx) {
     invariant(!storageGlobalParams.queryableBackupMode);
+
+    auto& serviceLifecycle = rss::ReplicatedStorageService::get(opCtx).getServiceLifecycle();
+    serviceLifecycle.initializeStateRequiredForOfflineValidation(opCtx->getServiceContext());
+
     bool allResultsValid = true;
 
     if (!gValidateDbName.empty()) {

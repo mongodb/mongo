@@ -67,6 +67,11 @@ public:
     bool initializedUsingDefaultSyncDelay() const override;
 
     /**
+     * There is no additional state required for offline validation.
+     */
+    void initializeStateRequiredForOfflineValidation(ServiceContext*) override;
+
+    /**
      * There are no specific persistence threads that must outlive the storage engine.
      */
     bool shouldKeepThreadAliveUntilStorageEngineHasShutDown(StringData) const override;

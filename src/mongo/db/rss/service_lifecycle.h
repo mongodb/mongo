@@ -88,6 +88,17 @@ public:
     virtual bool initializedUsingDefaultSyncDelay() const = 0;
 
     /**
+     * Initializes any state required to run offline validation, also referred to as modal
+     * validation. This is a special mode where the server validates its collections upon
+     * startup and proceeds to shut down once the validation is complete. The validation
+     * results are written to the logs. No user connections are accepted in this mode.
+     *
+     * This method is not called when the node is part of a replica set or handling user
+     * requests as a standalone.
+     */
+    virtual void initializeStateRequiredForOfflineValidation(ServiceContext*) = 0;
+
+    /**
      * If true, the named thread must be kept alive until the storage engine has shut down.
      */
     virtual bool shouldKeepThreadAliveUntilStorageEngineHasShutDown(
