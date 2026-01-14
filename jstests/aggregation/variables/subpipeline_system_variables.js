@@ -1,6 +1,7 @@
 /**
  * Tests that $$NOW and $$CLUSTER_TIME have the same value in subpipelines as in the parent pipeline.
  * @tags: [
+ *   requires_fcv_83,
  *   do_not_wrap_aggregations_in_facets,
  *   assumes_unsharded_collection,
  * ]
@@ -10,11 +11,10 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 db.dropDatabase();
-const coll = db[jsTestName()];
-assert.commandWorked(coll.insertOne({a: 1}));
+db.test.insertOne({a: 1});
 
 function testSystemTimeVariable(pipeline) {
-    const docs = coll.aggregate(pipeline).toArray();
+    const docs = db.test.aggregate(pipeline).toArray();
     for (const doc of docs) {
         const variableMainPipeline = doc["variableMainPipeline"];
         const variableSubPipeline = doc["variableSubPipeline"];
@@ -100,14 +100,13 @@ const isStandalone = FixtureHelpers.isStandalone(db);
 // Run parallel shell to continuously tick cluster time.
 const latch = new CountDownLatch(1);
 const updateThread = new Thread((latch) => {
-    const background_update_coll = db[jsTestName() + "background_update"];
-    background_update_coll.drop();
+    db.background_update.drop();
     let count = 0;
     while (true) {
-        background_update_coll.insertOne({_id: count});
+        db.background_update.insertOne({_id: count});
         count++;
         for (let id = 0; id < count; ++id) {
-            background_update_coll.updateOne({_id: id}, {$inc: {u: 1}});
+            db.background_update.updateOne({_id: id}, {$inc: {u: 1}});
         }
         if (latch.getCount() === 0) {
             break;
