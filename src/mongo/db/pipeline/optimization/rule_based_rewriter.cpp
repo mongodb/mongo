@@ -151,6 +151,12 @@ std::string PipelineRewriteContext::debugString() const {
     return ss;
 }
 
+void Transforms::replaceCurrentStage(PipelineRewriteContext& ctx,
+                                     boost::intrusive_ptr<DocumentSource> ds) {
+    Transforms::insertAfter(ctx, *ds);
+    Transforms::eraseCurrent(ctx);
+}
+
 bool Transforms::swapStageWithNext(PipelineRewriteContext& ctx) {
     tassert(11010009, "Already at the end of the container", ctx.hasMore());
     ctx._itr = swapStages(ctx._container, ctx._itr, std::next(ctx._itr));

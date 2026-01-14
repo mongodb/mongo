@@ -772,7 +772,6 @@ boost::intrusive_ptr<ExpressionContext> AggCatalogState::createExpressionContext
     const auto& resolvedNamespaces = uassertStatusOK(_aggExState.resolveInvolvedNamespaces());
     auto requiresExtendedRange = requiresExtendedRangeSupportForTimeseries(resolvedNamespaces);
 
-
     ExpressionContextBuilder builder;
     builder
         .fromRequest(_aggExState.getOpCtx(), _aggExState.getRequest(), allowDiskUseByDefault.load())

@@ -64,6 +64,13 @@ void optimizePipeline(Pipeline& pipeline) {
     if (MONGO_unlikely(disablePipelineOptimization.shouldFail())) {
         return;
     }
+
+    if (pipeline.getContext()->getOptionalQuerySettings() &&
+        pipeline.getContext()
+            ->getQueryKnobConfiguration()
+            .getEnablePipelineOptimizationAdditionalTestingRules()) {
+        applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::Testing);
+    }
     applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::Reordering);
     applyRuleBasedRewrites(rbr::PipelineRewriteContext(pipeline), Tags::InPlace);
 }

@@ -222,6 +222,71 @@ bool pushMatchBeforeCurrentStage(PipelineRewriteContext& ctx) {
     auto& match = checked_cast<DocumentSourceMatch&>(*ctx.nextStage());
     return pushdownMatch<true>(ctx, prev, match);
 }
+
+/**
+ * Checks whether a specific match operator is a "testing" match expresions for path arrayness.
+ * Specifically,
+ * i. predicate on field "test",
+ * ii. does not include a $and with $type predicate.
+ */
+bool matchContainsTestingField(PipelineRewriteContext& ctx) {
+    auto& match = checked_cast<DocumentSourceMatch&>(ctx.current());
+    auto me = match.getMatchExpression();
+
+    if (!me->path().contains("test")) {
+        return false;
+    }
+
+    if (me->matchType() == MatchExpression::MatchType::AND) {
+        auto andME = checked_cast<AndMatchExpression*>(me);
+        if (andME != nullptr) {
+            for (const std::unique_ptr<MatchExpression>& andChildME : andME->getChildren()) {
+                if (checked_cast<TypeMatchExpression*>(andChildME.get()) != nullptr) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
+ * For a match operator, replace the original DocumentSourceMatch with a composite $and operator
+ * including:
+ * i. the original predicate,
+ * ii. an additional predicate filtering on the type of predicate field comparing to array type.
+ */
+bool introduceArrayTypeFilteringToMatch(PipelineRewriteContext& ctx) {
+    auto& match = checked_cast<DocumentSourceMatch&>(ctx.current());
+    auto bsonObj = match.getMatchExpression()->serialize();
+
+    auto additionalFilter = std::make_unique<AndMatchExpression>();
+    {
+        StatusWithMatchExpression copyME = MatchExpressionParser::parse(bsonObj, &ctx.getExpCtx());
+        std::unique_ptr<MatchExpression> me(std::move(copyME.getValue()));
+
+        auto pathArrayness = ctx.getPathArrayness();
+        auto query = match.getQuery();
+        for (const auto& elem : query) {
+            auto typeExpr = std::make_unique<TypeMatchExpression>(
+                StringData(elem.fieldNameStringData()), MatcherTypeSet(BSONType::array));
+            if (pathArrayness.isPathArray(elem.fieldNameStringData())) {
+                additionalFilter->add(std::move(typeExpr));
+            } else {
+                additionalFilter->add(std::make_unique<NotMatchExpression>(std::move(typeExpr)));
+            }
+        }
+        additionalFilter->add(std::move(me));
+    }
+
+    BSONObjBuilder out;
+    additionalFilter->serialize(&out);
+    Transforms::replaceCurrentStage(ctx, DocumentSourceMatch::create(out.obj(), &ctx.getExpCtx()));
+
+    return false;
+}
+
 }  // namespace
 
 REGISTER_RULES(DocumentSourceMatch,
@@ -257,4 +322,14 @@ REGISTER_RULES(DocumentSourceInternalUnpackBucket,
                    .priority = kDefaultPushdownPriority,
                    .tags = PipelineRewriteContext::Tags::Reordering,
                });
+
+// Testing rule hidden behind i. the feature flag and ii. Testing tag failpoint.
+// Tests whether Aggregation pipelines are accessing correctly the PathArrayness datastructure.
+REGISTER_RULES_WITH_FEATURE_FLAG(DocumentSourceMatch,
+                                 &feature_flags::gFeatureFlagEnableTestingAggregateRewriteRules,
+                                 {"DUMMY_MATCH_CHECK_ARRAYNESS",
+                                  matchContainsTestingField,
+                                  introduceArrayTypeFilteringToMatch,
+                                  1.0,
+                                  PipelineRewriteContext::Tags::Testing});
 }  // namespace mongo::rule_based_rewrites::pipeline

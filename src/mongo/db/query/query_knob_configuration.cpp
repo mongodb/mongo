@@ -100,6 +100,9 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
         internalMaxNumberNodesConsideredForImplicitEdges.load();
     _internalMaxGroupAccumulatorsInSbe = gInternalMaxGroupAccumulatorsInSbe.loadRelaxed();
     _enableJoinEnumerationHJOrderPruning = internalEnableJoinEnumerationHJOrderPruning.load();
+
+    _enablePipelineOptimizationAdditionalTestingRules =
+        internalEnablePipelineOptimizationAdditionalTestingRules.loadRelaxed();
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
@@ -234,6 +237,10 @@ bool QueryKnobConfiguration::getUseMultiplannerForSingleSolutions() const {
 
 int64_t QueryKnobConfiguration::getMaxGroupAccumulatorsInSbe() const {
     return _internalMaxGroupAccumulatorsInSbe;
+}
+
+bool QueryKnobConfiguration::getEnablePipelineOptimizationAdditionalTestingRules() const {
+    return _enablePipelineOptimizationAdditionalTestingRules;
 }
 
 }  // namespace mongo

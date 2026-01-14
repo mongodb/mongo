@@ -343,6 +343,12 @@ feature_flags:
         version: 8.3
         fcv_gated: true
 
+    featureFlagEnableTestingAggregateRewriteRules:
+        description: "Feature flag to enable testing of specific aggregation re-write rules."
+        cpp_varname: gFeatureFlagEnableTestingAggregateRewriteRules
+        default: false
+        fcv_gated: false
+
     featureFlagVectorSearchExtension:
         description: "Feature flag to enable vector search extension functionality."
         cpp_varname: gFeatureFlagVectorSearchExtension

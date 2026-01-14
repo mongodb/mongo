@@ -21,6 +21,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/pipeline",
+        "//src/mongo/db/query/compiler/metadata:path_arrayness",
     ],
 )
 

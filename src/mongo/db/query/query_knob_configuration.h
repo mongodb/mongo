@@ -101,6 +101,11 @@ public:
      */
     int64_t getMaxGroupAccumulatorsInSbe() const;
 
+    /**
+     * Returns whether to apply experimental testing aggregation pipeline rules.
+     */
+    bool getEnablePipelineOptimizationAdditionalTestingRules() const;
+
 private:
     QueryFrameworkControlEnum _queryFrameworkControlValue;
     QueryPlanRankerModeEnum _planRankerMode;
@@ -135,5 +140,7 @@ private:
 
     int64_t _internalQuerySpillingMinAvailableDiskSpaceBytes;
     int64_t _internalMaxGroupAccumulatorsInSbe;
+
+    bool _enablePipelineOptimizationAdditionalTestingRules;
 };
 }  // namespace mongo

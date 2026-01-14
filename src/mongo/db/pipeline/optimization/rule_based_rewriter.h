@@ -128,6 +128,9 @@ public:
         InPlace = 1 << 0,
         // Rules that may e.g. reorder, combine or remove stages.
         Reordering = 1 << 1,
+        // Rules that will be applied for testing.
+        // Protected by 'enablePipelineOptimizationAdditionalTestingRules' query knob.
+        Testing = 1 << 2,
     };
 
     PipelineRewriteContext(Pipeline& pipeline);
@@ -183,6 +186,14 @@ public:
         return std::next(_itr) == _container.end();
     }
 
+    const PathArrayness& getPathArrayness() {
+        return _expCtx.getMainCollPathArrayness();
+    }
+
+    ExpressionContext& getExpCtx() {
+        return _expCtx;
+    }
+
     std::string debugString() const;
 
 private:
@@ -203,6 +214,8 @@ using PipelineRewriteEngine = RewriteEngine<PipelineRewriteContext>;
  * transforms to manipulate the pipeline.
  */
 struct Transforms {
+    static void replaceCurrentStage(PipelineRewriteContext& ctx,
+                                    boost::intrusive_ptr<DocumentSource> ds);
     static bool swapStageWithPrev(PipelineRewriteContext& ctx);
     static bool swapStageWithNext(PipelineRewriteContext& ctx);
     static bool insertBefore(PipelineRewriteContext& ctx, DocumentSource& d);
