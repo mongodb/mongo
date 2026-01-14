@@ -36,10 +36,101 @@
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
 #include "mongo/util/modules.h"
+
+#include <memory>
+#include <utility>
+
+#include <boost/optional.hpp>
 
 MONGO_MOD_PUB;
 namespace mongo::sorter {
+
+template <typename Key, typename Value>
+class ContainerIterator : public Iterator<Key, Value> {
+public:
+    /**
+     * Constructs an iterator using the given cursor, from `start` (inclusive) up to `end`
+     * (exclusive).
+     */
+    ContainerIterator(std::shared_ptr<IntegerKeyedContainer::Cursor> cursor,
+                      int64_t start,
+                      int64_t end,
+                      Iterator<Key, Value>::Settings settings)
+        : _cursor(std::move(cursor)), _position(start), _end(end), _settings(std::move(settings)) {}
+
+    bool more() override {
+        return _position < _end;
+    }
+
+    std::pair<Key, Value> next() override {
+        auto result = _cursor->find(_position);
+        uassert(10896300,
+                fmt::format("Sorter container unexpectedly missing key {}", _position),
+                result);
+        ++_position;
+
+        BufReader reader{result->data(), static_cast<unsigned>(result->size())};
+        return {Key::deserializeForSorter(reader, _settings.first),
+                Value::deserializeForSorter(reader, _settings.second)};
+    }
+
+    Key nextWithDeferredValue() override {
+        uassert(10896301, "Must follow nextWithDeferredValue with getDeferredValue", !_keySize);
+
+        auto result = _cursor->find(_position);
+        uassert(10896302,
+                fmt::format("Sorter container unexpectedly missing key {}", _position),
+                result);
+
+        BufReader reader{result->data(), static_cast<unsigned>(result->size())};
+        auto key = Key::deserializeForSorter(reader, _settings.first);
+        _keySize = reader.offset();
+
+        return std::move(key);
+    }
+
+    Value getDeferredValue() override {
+        uassert(10896303, "Must precede getDeferredValue with nextWithDeferredValue", _keySize);
+
+        auto result = _cursor->find(_position);
+        uassert(10896304,
+                fmt::format("Sorter container unexpectedly missing key {}", _position),
+                result);
+        ++_position;
+
+        BufReader reader{result->data(), static_cast<unsigned>(result->size())};
+        reader.skip(*std::exchange(_keySize, boost::none));
+
+        return Value::deserializeForSorter(reader, _settings.second);
+    }
+
+    const Key& peek() override {
+        MONGO_UNREACHABLE_TASSERT(10896305);
+    }
+
+    SorterRange getRange() const override {
+        MONGO_UNREACHABLE_TASSERT(10896306);
+    }
+
+    bool spillable() const override {
+        return false;
+    }
+
+    std::unique_ptr<Iterator<Key, Value>> spill(
+        const SortOptions& opts, const typename Sorter<Key, Value>::Settings& settings) override {
+        MONGO_UNREACHABLE_TASSERT(10896307);
+    }
+
+private:
+    std::shared_ptr<IntegerKeyedContainer::Cursor> _cursor;
+    int64_t _position;
+    int64_t _end;
+    Iterator<Key, Value>::Settings _settings;
+    boost::optional<size_t> _keySize;
+};
 
 /**
  * Appends a pre-sorted range of data to a container and hands back an Iterator over the range.
@@ -95,14 +186,12 @@ public:
     }
 
     std::shared_ptr<Iterator> done() override {
-        // TODO SERVER-108963: Construct a ContainerIterator.
-        MONGO_UNIMPLEMENTED_TASSERT(10895401);
-        return {};
+        return std::make_shared<ContainerIterator<Key, Value>>(
+            _container.getSharedCursor(_ru), _rangeStartKey, _nextKey, this->_settings);
     }
     std::unique_ptr<Iterator> doneUnique() override {
-        // TODO SERVER-108963: Construct a ContainerIterator.
-        MONGO_UNIMPLEMENTED_TASSERT(10895402);
-        return {};
+        return std::make_unique<ContainerIterator<Key, Value>>(
+            _container.getSharedCursor(_ru), _rangeStartKey, _nextKey, this->_settings);
     }
 
     void writeChunk() override {};

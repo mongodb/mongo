@@ -37,6 +37,7 @@
 #include "mongo/db/sorter/sorter_test_utils.h"
 #include "mongo/db/storage/container.h"
 #include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/unittest/unittest.h"
 
 #include <memory>
@@ -52,6 +53,24 @@ class ViewableIntegerKeyedContainer final : public IntegerKeyedContainer {
 public:
     using Entry = std::pair<int64_t, std::string>;
 
+    class Cursor : public IntegerKeyedContainer::Cursor {
+    public:
+        explicit Cursor(const std::vector<ViewableIntegerKeyedContainer::Entry>& entries)
+            : _entries(entries) {}
+
+        boost::optional<std::span<const char>> find(int64_t key) override {
+            for (auto&& [entryKey, entryValue] : _entries) {
+                if (entryKey == key) {
+                    return {{entryValue.data(), entryValue.size()}};
+                }
+            }
+            return boost::none;
+        }
+
+    private:
+        const std::vector<ViewableIntegerKeyedContainer::Entry>& _entries;
+    };
+
     std::shared_ptr<Ident> ident() const override {
         return _ident;
     }
@@ -65,16 +84,19 @@ public:
         return Status::OK();
     }
 
-    Status remove(RecoveryUnit&, int64_t) override {
+    Status remove(RecoveryUnit&, int64_t key) override {
+        _entries.erase(std::find_if(_entries.begin(), _entries.end(), [key](const Entry& entry) {
+            return entry.first == key;
+        }));
         return Status::OK();
     }
 
     std::unique_ptr<IntegerKeyedContainer::Cursor> getCursor(RecoveryUnit&) const override {
-        return nullptr;
+        return std::make_unique<Cursor>(_entries);
     }
 
     std::shared_ptr<IntegerKeyedContainer::Cursor> getSharedCursor(RecoveryUnit&) const override {
-        return nullptr;
+        return std::make_shared<Cursor>(_entries);
     }
 
     const std::vector<Entry>& entries() const {
@@ -85,6 +107,219 @@ private:
     std::shared_ptr<Ident> _ident;
     std::vector<Entry> _entries;
 };
+
+TEST(ContainerIteratorTest, Iterate) {
+    RecoveryUnitNoop ru;
+    ViewableIntegerKeyedContainer container;
+
+    int64_t containerKey1 = 1;
+    int64_t containerKey2 = 2;
+    int64_t containerKey3 = 3;
+    int64_t containerKey4 = 4;
+    int64_t containerKey5 = 5;
+
+    IntWrapper key1{101};
+    IntWrapper key2{102};
+    IntWrapper key3{103};
+    IntWrapper key4{104};
+    IntWrapper key5{105};
+    IntWrapper value1{100};
+    IntWrapper value2{90};
+    IntWrapper value3{80};
+    IntWrapper value4{70};
+    IntWrapper value5{60};
+
+    BufBuilder containerValue1;
+    key1.serializeForSorter(containerValue1);
+    value1.serializeForSorter(containerValue1);
+
+    BufBuilder containerValue2;
+    key2.serializeForSorter(containerValue2);
+    value2.serializeForSorter(containerValue2);
+
+    BufBuilder containerValue3;
+    key3.serializeForSorter(containerValue3);
+    value3.serializeForSorter(containerValue3);
+
+    BufBuilder containerValue4;
+    key4.serializeForSorter(containerValue4);
+    value4.serializeForSorter(containerValue4);
+
+    BufBuilder containerValue5;
+    key5.serializeForSorter(containerValue5);
+    value5.serializeForSorter(containerValue5);
+
+    ASSERT_OK(container.insert(
+        ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
+    ASSERT_OK(container.insert(
+        ru, containerKey2, {containerValue2.buf(), static_cast<size_t>(containerValue2.len())}));
+    ASSERT_OK(container.insert(
+        ru, containerKey3, {containerValue3.buf(), static_cast<size_t>(containerValue3.len())}));
+    ASSERT_OK(container.insert(
+        ru, containerKey4, {containerValue4.buf(), static_cast<size_t>(containerValue4.len())}));
+    ASSERT_OK(container.insert(
+        ru, containerKey5, {containerValue5.buf(), static_cast<size_t>(containerValue5.len())}));
+
+    ContainerIterator<IntWrapper, IntWrapper> iterator{
+        container.getSharedCursor(ru),
+        containerKey1,
+        containerKey5 + 1,
+        Iterator<IntWrapper, IntWrapper>::Settings{}};
+
+    ASSERT_TRUE(iterator.more());
+    auto next = iterator.next();
+    EXPECT_EQ(next.first, key1);
+    EXPECT_EQ(next.second, value1);
+
+    ASSERT_TRUE(iterator.more());
+    next = iterator.next();
+    EXPECT_EQ(next.first, key2);
+    EXPECT_EQ(next.second, value2);
+
+    ASSERT_TRUE(iterator.more());
+    EXPECT_EQ(iterator.nextWithDeferredValue(), key3);
+    EXPECT_EQ(iterator.getDeferredValue(), value3);
+
+    ASSERT_TRUE(iterator.more());
+    EXPECT_EQ(iterator.nextWithDeferredValue(), key4);
+    EXPECT_EQ(iterator.getDeferredValue(), value4);
+
+    ASSERT_TRUE(iterator.more());
+    next = iterator.next();
+    EXPECT_EQ(next.first, key5);
+    EXPECT_EQ(next.second, value5);
+
+    EXPECT_FALSE(iterator.more());
+}
+
+TEST(ContainerIteratorTest, SharedCursor) {
+    RecoveryUnitNoop ru;
+    ViewableIntegerKeyedContainer container;
+
+    int64_t containerKey1 = 1;
+    int64_t containerKey2 = 2;
+    int64_t containerKey3 = 3;
+    int64_t containerKey4 = 4;
+
+    IntWrapper key1{100};
+    IntWrapper key2{200};
+    IntWrapper key3{150};
+    IntWrapper key4{250};
+    IntWrapper value1{100};
+    IntWrapper value2{90};
+    IntWrapper value3{80};
+    IntWrapper value4{70};
+
+    BufBuilder containerValue1;
+    key1.serializeForSorter(containerValue1);
+    value1.serializeForSorter(containerValue1);
+
+    BufBuilder containerValue2;
+    key2.serializeForSorter(containerValue2);
+    value2.serializeForSorter(containerValue2);
+
+    BufBuilder containerValue3;
+    key3.serializeForSorter(containerValue3);
+    value3.serializeForSorter(containerValue3);
+
+    BufBuilder containerValue4;
+    key4.serializeForSorter(containerValue4);
+    value4.serializeForSorter(containerValue4);
+
+    ASSERT_OK(container.insert(
+        ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
+    ASSERT_OK(container.insert(
+        ru, containerKey2, {containerValue2.buf(), static_cast<size_t>(containerValue2.len())}));
+    ASSERT_OK(container.insert(
+        ru, containerKey3, {containerValue3.buf(), static_cast<size_t>(containerValue3.len())}));
+    ASSERT_OK(container.insert(
+        ru, containerKey4, {containerValue4.buf(), static_cast<size_t>(containerValue4.len())}));
+
+    auto cursor = container.getSharedCursor(ru);
+    ContainerIterator<IntWrapper, IntWrapper> iterator1{
+        cursor, containerKey1, containerKey2 + 1, Iterator<IntWrapper, IntWrapper>::Settings{}};
+    ContainerIterator<IntWrapper, IntWrapper> iterator2{
+        cursor, containerKey3, containerKey4 + 1, Iterator<IntWrapper, IntWrapper>::Settings{}};
+
+    ASSERT_TRUE(iterator1.more());
+    ASSERT_TRUE(iterator2.more());
+    EXPECT_EQ(iterator1.nextWithDeferredValue(), key1);
+    EXPECT_EQ(iterator2.nextWithDeferredValue(), key3);
+    EXPECT_EQ(iterator1.getDeferredValue(), value1);
+    EXPECT_EQ(iterator2.getDeferredValue(), value3);
+
+    ASSERT_TRUE(iterator1.more());
+    ASSERT_TRUE(iterator2.more());
+    EXPECT_EQ(iterator1.nextWithDeferredValue(), key2);
+    auto next = iterator2.next();
+    EXPECT_EQ(next.first, key4);
+    EXPECT_EQ(next.second, value4);
+    EXPECT_EQ(iterator1.getDeferredValue(), value2);
+
+    EXPECT_FALSE(iterator1.more());
+    EXPECT_FALSE(iterator2.more());
+}
+
+TEST(ContainerIteratorTest, ContainerMissingKey) {
+    RecoveryUnitNoop ru;
+    ViewableIntegerKeyedContainer container;
+
+    int64_t containerKey1 = 1;
+
+    IntWrapper key1{101};
+    IntWrapper value1{100};
+
+    BufBuilder containerValue1;
+    key1.serializeForSorter(containerValue1);
+    value1.serializeForSorter(containerValue1);
+
+    ContainerIterator<IntWrapper, IntWrapper> iterator{
+        container.getSharedCursor(ru),
+        containerKey1,
+        containerKey1 + 1,
+        Iterator<IntWrapper, IntWrapper>::Settings{}};
+
+    ASSERT_TRUE(iterator.more());
+    EXPECT_THROW(iterator.next(), DBException);
+    EXPECT_THROW(iterator.nextWithDeferredValue(), DBException);
+
+    ASSERT_OK(container.insert(
+        ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
+    EXPECT_EQ(iterator.nextWithDeferredValue(), key1);
+
+    ASSERT_OK(container.remove(ru, containerKey1));
+    EXPECT_THROW(iterator.getDeferredValue(), DBException);
+}
+
+TEST(ContainerIteratorTest, InvalidDeferredValueUsage) {
+    RecoveryUnitNoop ru;
+    ViewableIntegerKeyedContainer container;
+
+    int64_t containerKey1 = 1;
+
+    IntWrapper key1{101};
+    IntWrapper value1{100};
+
+    BufBuilder containerValue1;
+    key1.serializeForSorter(containerValue1);
+    value1.serializeForSorter(containerValue1);
+
+    ASSERT_OK(container.insert(
+        ru, containerKey1, {containerValue1.buf(), static_cast<size_t>(containerValue1.len())}));
+
+    ContainerIterator<IntWrapper, IntWrapper> iterator{
+        container.getSharedCursor(ru),
+        containerKey1,
+        containerKey1 + 1,
+        Iterator<IntWrapper, IntWrapper>::Settings{}};
+
+    ASSERT_TRUE(iterator.more());
+    EXPECT_THROW(iterator.getDeferredValue(), DBException);
+    EXPECT_EQ(iterator.nextWithDeferredValue(), key1);
+    EXPECT_THROW(iterator.nextWithDeferredValue(), DBException);
+    EXPECT_EQ(iterator.getDeferredValue(), value1);
+    EXPECT_THROW(iterator.getDeferredValue(), DBException);
+}
 
 class SortedContainerWriterTest : public ServiceContextMongoDTest {
 public:
