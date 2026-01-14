@@ -92,7 +92,7 @@ public:
           _fileCurrentOffset(fileStartOffset),
           _fileEndOffset(fileEndOffset),
           _dbName(dbName),
-          _afterReadChecksumCalculator(checksumVersion),
+          _checksumCalculator(checksumVersion),
           _originalChecksum(checksum) {}
 
 
@@ -131,8 +131,8 @@ public:
     SorterRange getRange() const override {
         SorterRange range{
             _fileStartOffset, _fileEndOffset, static_cast<int64_t>(_originalChecksum)};
-        if (_afterReadChecksumCalculator.version() != SorterChecksumVersion::v1) {
-            range.setChecksumVersion(_afterReadChecksumCalculator.version());
+        if (_checksumCalculator.version() != SorterChecksumVersion::v1) {
+            range.setChecksumVersion(_checksumCalculator.version());
         }
         return range;
     }
@@ -156,7 +156,7 @@ private:
         if (!_bufferReader || _bufferReader->atEof()) {
             _fillBufferFromDisk();
         }
-        if (_done && _originalChecksum != _afterReadChecksumCalculator.checksum()) {
+        if (_done && _originalChecksum != _checksumCalculator.checksum()) {
             fassert(31182,
                     Status(ErrorCodes::Error::ChecksumMismatch,
                            "Data read from disk does not match what was written to disk. Possible "
@@ -202,7 +202,7 @@ private:
 
         if (!compressed) {
             _bufferReader = std::make_unique<BufReader>(_buffer.get(), blockSize);
-            _afterReadChecksumCalculator.addData(_buffer.get(), blockSize);
+            _checksumCalculator.addData(_buffer.get(), blockSize);
             return;
         }
 
@@ -221,7 +221,7 @@ private:
         // hold on to decompressed data and throw out compressed data at block exit
         _buffer.swap(decompressionBuffer);
         _bufferReader = std::make_unique<BufReader>(_buffer.get(), uncompressedSize);
-        _afterReadChecksumCalculator.addData(_buffer.get(), uncompressedSize);
+        _checksumCalculator.addData(_buffer.get(), uncompressedSize);
     }
 
     /**
@@ -259,7 +259,7 @@ private:
     // Checksum value that is updated with each read of a data object from disk. We can compare
     // this value with _originalChecksum to check for data corruption if and only if the
     // FileIterator is exhausted.
-    SorterChecksumCalculator _afterReadChecksumCalculator;
+    SorterChecksumCalculator _checksumCalculator;
 
     // Checksum value retrieved from SortedFileWriter that was calculated as data was spilled
     // to disk. This is not modified, and is only used for comparison against _afterReadChecksum
