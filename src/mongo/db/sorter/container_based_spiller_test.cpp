@@ -344,7 +344,14 @@ TEST_F(SortedContainerWriterTest, ContainerWriterUsesNextKeyForContainerEntries)
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     SorterContainerStats stats(&this->sorterTracker);
     SortedContainerWriter<IntWrapper, IntWrapper> writer(
-        *opCtx, ru, collPtr, container, stats, opts, startingKey);
+        *opCtx,
+        ru,
+        collPtr,
+        container,
+        stats,
+        opts,
+        startingKey,
+        SortedContainerWriter<IntWrapper, IntWrapper>::Settings{});
 
     const IntWrapper k1{1};
     const IntWrapper v1{2};
@@ -387,7 +394,14 @@ TEST_F(SortedContainerWriterTest, ContainerWriterStoresEmptyValueForZeroLengthSe
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     SorterContainerStats stats(&this->sorterTracker);
     SortedContainerWriter<NullValue, NullValue> writer(
-        *opCtx, ru, collPtr, container, stats, opts, startingKey);
+        *opCtx,
+        ru,
+        collPtr,
+        container,
+        stats,
+        opts,
+        startingKey,
+        SortedContainerWriter<NullValue, NullValue>::Settings{});
     writer.addAlreadySorted(NullValue{}, NullValue{});
 
     ASSERT_EQ(container.entries().size(), 1U);
@@ -413,7 +427,14 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
     auto& ru = *shard_role_details::getRecoveryUnit(opCtx.get());
     SorterContainerStats stats(&this->sorterTracker);
     SortedContainerWriter<IntWrapper, NullValue> writer(
-        *opCtx, ru, collPtr, container, stats, opts, startingKey);
+        *opCtx,
+        ru,
+        collPtr,
+        container,
+        stats,
+        opts,
+        startingKey,
+        SortedContainerWriter<IntWrapper, NullValue>::Settings{});
 
     const IntWrapper key{123};
     writer.addAlreadySorted(key, NullValue{});

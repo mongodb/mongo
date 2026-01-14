@@ -34,6 +34,7 @@
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/storage/container.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/assert_util.h"
@@ -139,9 +140,7 @@ template <typename Key, typename Value>
 class SortedContainerWriter final : public SortedStorageWriter<Key, Value> {
 public:
     typedef sorter::Iterator<Key, Value> Iterator;
-    typedef std::pair<typename Key::SorterDeserializeSettings,
-                      typename Value::SorterDeserializeSettings>
-        Settings;
+    using Settings = SortedStorageWriter<Key, Value>::Settings;
 
     SortedContainerWriter(OperationContext& opCtx,
                           RecoveryUnit& ru,
@@ -150,7 +149,7 @@ public:
                           SorterContainerStats& containerStats,
                           const SortOptions& opts,
                           int64_t nextKey,
-                          const Settings& settings = Settings())
+                          const Settings& settings)
         : SortedStorageWriter<Key, Value>(opts, settings),
           _opCtx(opCtx),
           _ru(ru),
@@ -204,6 +203,75 @@ private:
     SorterContainerStats& _containerStats;
     int64_t _nextKey;
     int64_t _rangeStartKey;
+};
+
+template <typename Key, typename Value>
+class ContainerBasedSorterStorage : public SorterStorageBase<Key, Value> {
+public:
+    using Settings = SorterStorageBase<Key, Value>::Settings;
+
+    ContainerBasedSorterStorage(OperationContext& opCtx,
+                                RecoveryUnit& ru,
+                                const CollectionPtr& collection,
+                                IntegerKeyedContainer& container,
+                                int64_t currKey,
+                                boost::optional<DatabaseName> dbName = boost::none,
+                                SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
+        : SorterStorageBase<Key, Value>(std::move(dbName), checksumVersion),
+          _opCtx(opCtx),
+          _ru(ru),
+          _collection(collection),
+          _container(container),
+          _currKey(currKey) {}
+
+    std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(const SortOptions& opts,
+                                                                const Settings& settings) override {
+        return std::make_unique<sorter::SortedContainerWriter<Key, Value>>(
+            _opCtx, _ru, _collection, _container, opts, _currKey, settings);
+    };
+
+    std::shared_ptr<sorter::Iterator<Key, Value>> makeIterator(
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override {
+        return writer->doneUnique();
+    }
+
+    std::unique_ptr<sorter::Iterator<Key, Value>> makeIteratorUnique(
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override;
+
+    size_t getIteratorSize() override {
+        return sizeof(sorter::ContainerIterator<Key, Value>);
+    };
+
+    std::shared_ptr<sorter::Iterator<Key, Value>> getSortedIterator(
+        const SorterRange& range, const Settings& settings) override {
+        MONGO_UNIMPLEMENTED_TASSERT(11374700);
+    };
+
+    std::string getStorageIdentifier() override {
+        MONGO_UNIMPLEMENTED_TASSERT(11374701);
+    };
+
+    void keep() override {
+        MONGO_UNIMPLEMENTED_TASSERT(11374702);
+    };
+
+    boost::optional<boost::filesystem::path> getSpillDirPath() override {
+        return boost::filesystem::path(ident::getDirectory(_container.ident()->getIdent()));
+    };
+
+    /**
+     * Updates the key assigned for a KV pair for SortedContainerWriter creation.
+     */
+    void updateCurrKey(int64_t newKey) {
+        _currKey = newKey;
+    }
+
+private:
+    OperationContext& _opCtx;
+    RecoveryUnit& _ru;
+    const CollectionPtr& _collection;
+    IntegerKeyedContainer& _container;
+    int64_t _currKey;
 };
 
 }  // namespace mongo::sorter
