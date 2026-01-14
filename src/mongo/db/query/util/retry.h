@@ -161,7 +161,7 @@ bool tryHandleWithAny(State& state,
     try {
         throw;
     } catch (ExceptionFor<E>& ex) {
-        if (attempt == maxNumRetries) {
+        if (attempt >= maxNumRetries) {
             ex.addContext(str::stream()
                           << "Exhausted max retries (" << maxNumRetries << ") for " << opName);
             throw;
@@ -189,11 +189,13 @@ bool tryHandleWithAny(State& state,
 template <typename State, typename Fn, typename... ErrorHandlers>
 auto retryOnWithStateMultiLoop(
     StringData opName, State& state, Fn&& fn, size_t maxNumRetries, ErrorHandlers... handlers) {
-    for (size_t attempt = 0; attempt <= maxNumRetries; ++attempt) {
+    size_t attempt = 0;
+    while (true) {
         try {
             return fn(state);
         } catch (...) {
             if (tryHandleWithAny(state, attempt, maxNumRetries, opName, handlers...)) {
+                ++attempt;
                 continue;
             }
             throw;
