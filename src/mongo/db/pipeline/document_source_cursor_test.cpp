@@ -358,17 +358,17 @@ TEST_F(DSCursorTest, TestSaveAndRestoreThrowing) {
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> execWithDeleter(
                 std::move(exec).release(), PlanExecutor::Deleter{getOpCtx()});
 
-            auto catalogResourceHandle =
-                make_intrusive<MockDSCursorCatalogResourceHandle>(holdsStorageEngineStateBool);
-
             try {
                 MultipleCollectionAccessor collections;  // Intentionally empty.
+                auto stasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
                 auto cursor =
-                    DocumentSourceCursor::create(collections,
-                                                 std::move(execWithDeleter),
-                                                 catalogResourceHandle,
+                    DocumentSourceCursor::create(std::move(execWithDeleter),
                                                  getExpCtx(),
                                                  DocumentSourceCursor::CursorType::kRegular);
+                cursor->bindCatalogInfo(collections, stasher);
+                // Overwrite the exisitng catalogResourceHandle with our test version.
+                cursor->setCatalogResourceHandle_forTest(
+                    make_intrusive<MockDSCursorCatalogResourceHandle>(holdsStorageEngineStateBool));
                 auto cursorStage = exec::agg::buildStage(cursor);
 
                 for (const auto& expectedBson : bsons) {

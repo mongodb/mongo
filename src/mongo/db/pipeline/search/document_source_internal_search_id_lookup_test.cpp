@@ -127,14 +127,13 @@ public:
 
         const boost::intrusive_ptr<ExpressionContext>& expCtx = pipeline->getContext();
 
-        auto cursorCatalogResourceHandle =
-            make_intrusive<DSCursorCatalogResourceHandle>(catalogResourceHandle->getStasher());
-        PipelineD::buildAndAttachInnerQueryExecutorToPipeline(collections,
-                                                              expCtx->getNamespaceString(),
-                                                              nullptr /*resolvedAggRequest*/,
-                                                              pipeline.get(),
-                                                              cursorCatalogResourceHandle);
-
+        auto stasher = catalogResourceHandle->getStasher();
+        PipelineD::buildAndAttachInnerQueryExecutorAndBindCatalogInfoToPipeline(
+            collections,
+            expCtx->getNamespaceString(),
+            nullptr /*resolvedAggRequest*/,
+            pipeline.get(),
+            stasher);
         return pipeline;
     }
 };

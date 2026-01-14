@@ -118,14 +118,11 @@ DocumentSourceCursor::~DocumentSourceCursor() {
 }
 
 DocumentSourceCursor::DocumentSourceCursor(
-    const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     const intrusive_ptr<ExpressionContext>& pCtx,
     CursorType cursorType,
     ResumeTrackingType resumeTrackingType)
     : DocumentSource(kStageName, pCtx),
-      _catalogResourceHandle(catalogResourceHandle),
       _resumeTrackingType(resumeTrackingType),
       _cursorType(cursorType),
       _queryFramework(exec->getQueryFramework()),
@@ -137,6 +134,12 @@ DocumentSourceCursor::DocumentSourceCursor(
             "The resumeToken is not compatible with this query",
             cursorType != CursorType::kEmptyDocuments ||
                 resumeTrackingType == ResumeTrackingType::kNone);
+}
+
+void DocumentSourceCursor::bindCatalogInfo(
+    const MultipleCollectionAccessor& collections,
+    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher) {
+    _catalogResourceHandle = make_intrusive<DSCursorCatalogResourceHandle>(stasher);
 
     // Later code in the DocumentSourceCursor lifecycle expects that '_exec' is in a saved state.
     _sharedState->exec->saveState();
@@ -173,18 +176,11 @@ DocumentSourceCursor::DocumentSourceCursor(
 }
 
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-    const MultipleCollectionAccessor& collections,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     CursorType cursorType,
     ResumeTrackingType resumeTrackingType) {
-    intrusive_ptr<DocumentSourceCursor> source(new DocumentSourceCursor(collections,
-                                                                        std::move(exec),
-                                                                        catalogResourceHandle,
-                                                                        pExpCtx,
-                                                                        cursorType,
-                                                                        resumeTrackingType));
-    return source;
+    return make_intrusive<DocumentSourceCursor>(
+        std::move(exec), pExpCtx, cursorType, resumeTrackingType);
 }
 }  // namespace mongo

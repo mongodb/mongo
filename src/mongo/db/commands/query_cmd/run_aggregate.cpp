@@ -642,6 +642,30 @@ std::vector<std::unique_ptr<Pipeline>> createExchangePipelinesIfNeeded(
     return pipelines;
 }
 
+/**
+ * Creates a new metadata pipeline for mongot queries if needed. Otherwise, return the original
+ * 'pipeline' as a single vector element.
+ */
+std::vector<std::unique_ptr<Pipeline>> createMongotMetadataPipelineIfNeeded(
+    const AggExState& aggExState,
+    AggCatalogState& aggCatalogState,
+    std::unique_ptr<Pipeline> pipeline,
+    const DocsNeededBounds& mongotBounds) {
+    std::vector<std::unique_ptr<Pipeline>> pipelines;
+    pipelines.push_back(std::move(pipeline));
+
+    auto metadataPipe = search_helpers::prepareSearchForTopLevelPipelineLegacyExecutor(
+        pipelines.back()->getContext(),
+        pipelines.back().get(),
+        mongotBounds,
+        aggExState.getRequest().getCursor().getBatchSize());
+    if (metadataPipe) {
+        pipelines.push_back(std::move(metadataPipe));
+    }
+
+    return pipelines;
+}
+
 std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutorsForPipeline(
     const AggExState& aggExState,
     AggCatalogState& aggCatalogState,
@@ -659,15 +683,7 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
         // have gotten from find command.
         execs.emplace_back(std::move(executor));
     } else {
-        // Complete creation of the initial $cursor stage, if needed.
         auto sharedStasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
-        auto catalogResourceHandle = make_intrusive<DSCursorCatalogResourceHandle>(sharedStasher);
-        PipelineD::attachInnerQueryExecutorToPipeline(aggCatalogState.getCollections(),
-                                                      attachCallback,
-                                                      std::move(executor),
-                                                      pipeline.get(),
-                                                      catalogResourceHandle);
-
         // We split up mongot setup as bindCatalogInfo() should be called on
         // a desugared search pipeline and requires catalog locks.
         bool isMongotPipeline = search_helpers::isMongotPipeline(pipeline.get());
@@ -680,27 +696,26 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecuto
             search_helpers::desugarSearchPipeline(pipeline.get());
         }
 
-        pipeline->bindCatalogInfo(aggCatalogState.getCollections(), sharedStasher);
+        // Complete creation of the initial $cursor stage and bind catalog information to stages, if
+        // needed.
+        PipelineD::attachInnerQueryExecutorAndBindCatalogInfoToPipeline(
+            aggCatalogState.getCollections(),
+            attachCallback,
+            std::move(executor),
+            pipeline.get(),
+            sharedStasher);
 
         std::vector<std::unique_ptr<Pipeline>> pipelines;
 
         // Any pipeline that relies on calls to mongot requires additional setup.
         if (isMongotPipeline) {
-            pipelines.push_back(std::move(pipeline));
             // Release locks early, before we make network calls to mongot. This is fine for search
             // setup since they are not reading any local (lock-protected) data in the main
             // pipeline. Stash the ShardRole TransactionResources on the 'sharedStasher' we shared
             // with the pipeline stages.
             aggCatalogState.stashResources(sharedStasher.get());
-
-            auto metadataPipe = search_helpers::prepareSearchForTopLevelPipelineLegacyExecutor(
-                pipelines.back()->getContext(),
-                pipelines.back().get(),
-                mongotBounds,
-                aggExState.getRequest().getCursor().getBatchSize());
-            if (metadataPipe) {
-                pipelines.push_back(std::move(metadataPipe));
-            }
+            pipelines = createMongotMetadataPipelineIfNeeded(
+                aggExState, aggCatalogState, std::move(pipeline), mongotBounds);
         } else {
             // Takes ownership of 'pipeline'.
             pipelines = createExchangePipelinesIfNeeded(aggExState, std::move(pipeline));
@@ -1193,20 +1208,15 @@ Status executeResolvedAggregate(const AggExState& aggExState,
          * that QSN tree may be unowned, so accessing them may lead to use-after-free.
          */
         auto& resForJoin = swResForJoin.getValue();
-        auto attachExecutorCallback =
-            [](const MultipleCollectionAccessor& collections,
-               std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-               Pipeline* pipeline,
-               const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
-                auto cursor =
-                    DocumentSourceCursor::create(collections,
-                                                 std::move(exec),
-                                                 catalogResourceHandle,
-                                                 pipeline->getContext(),
-                                                 DocumentSourceCursor::CursorType::kRegular,
-                                                 DocumentSourceCursor::ResumeTrackingType::kNone);
-                pipeline->addInitialSource(std::move(cursor));
-            };
+        auto attachExecutorCallback = [](std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                                         Pipeline* pipeline) {
+            auto cursor =
+                DocumentSourceCursor::create(std::move(exec),
+                                             pipeline->getContext(),
+                                             DocumentSourceCursor::CursorType::kRegular,
+                                             DocumentSourceCursor::ResumeTrackingType::kNone);
+            pipeline->addInitialSource(std::move(cursor));
+        };
 
         // Attach pipeline suffix to SBE executor for join-reordered prefix of the pipeline.
         execs = prepareExecutorsForPipeline(aggExState,

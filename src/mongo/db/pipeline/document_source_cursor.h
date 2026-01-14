@@ -103,6 +103,13 @@ public:
      */
     enum class ResumeTrackingType { kNone, kOplog, kNonOplog };
 
+    DocumentSourceCursor(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                         CursorType cursorType,
+                         ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
+
+    ~DocumentSourceCursor() override;
+
     /**
      * Create a document source based on a passed-in PlanExecutor. 'exec' must be a yielding
      * PlanExecutor, and must be registered with the associated collection's CursorManager.
@@ -112,12 +119,14 @@ public:
      * created $cursor stage can return a sequence of empty documents for the caller to count.
      */
     static boost::intrusive_ptr<DocumentSourceCursor> create(
-        const MultipleCollectionAccessor& collections,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         CursorType cursorType,
         ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
+
+    void bindCatalogInfo(
+        const MultipleCollectionAccessor& collections,
+        boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher) override;
 
     const char* getSourceName() const override;
 
@@ -178,15 +187,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-protected:
-    DocumentSourceCursor(const MultipleCollectionAccessor& collections,
-                         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                         const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle,
-                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                         CursorType cursorType,
-                         ResumeTrackingType resumeTrackingType = ResumeTrackingType::kNone);
-
-    ~DocumentSourceCursor() override;
+    void setCatalogResourceHandle_forTest(boost::intrusive_ptr<CatalogResourceHandle> handle) {
+        _catalogResourceHandle = std::move(handle);
+    }
 
 private:
     friend boost::intrusive_ptr<exec::agg::Stage> documentSourceCursorToStageFn(

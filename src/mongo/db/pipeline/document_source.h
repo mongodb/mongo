@@ -689,8 +689,6 @@ public:
      *
      * Pipeline::bindCatalogInfo() MUST be invoked on any pipeline before execution begins to
      * ensure all stages receive the necessary catalog information.
-     *
-     * TODO SERVER-113754: $cursor and $geoNearCursor should implement this function.
      */
     virtual void bindCatalogInfo(
         const MultipleCollectionAccessor& collections,

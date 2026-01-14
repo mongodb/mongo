@@ -90,10 +90,7 @@ public:
      * the new stage to the pipeline.
      */
     using AttachExecutorCallback =
-        std::function<void(const MultipleCollectionAccessor&,
-                           std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>,
-                           Pipeline*,
-                           const boost::intrusive_ptr<CatalogResourceHandle>&)>;
+        std::function<void(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>, Pipeline*)>;
 
     /**
      * A tuple to represent the result of query executors, includes a main executor, its pipeline
@@ -121,9 +118,9 @@ public:
      *
      * This method will not add a $cursor stage to the pipeline, but will create a PlanExecutor and
      * a callback function. The executor and the callback can later be used to create the $cursor
-     * stage and add it to the pipeline by calling 'attachInnerQueryExecutorToPipeline()' method.
-     * If the pipeline doesn't require a $cursor stage, the plan executor will be returned as
-     * 'nullptr'.
+     * stage and add it to the pipeline by calling
+     * 'attachInnerQueryExecutorAndBindCatalogInfoToPipeline()' method. If the pipeline doesn't
+     * require a $cursor stage, the plan executor will be returned as 'nullptr'.
      */
     static BuildQueryExecutorResult buildInnerQueryExecutor(
         const MultipleCollectionAccessor& collections,
@@ -135,33 +132,34 @@ public:
      * Completes creation of the $cursor stage using the given callback pair obtained by calling
      * 'buildInnerQueryExecutor()' method. If the callback doesn't hold a valid PlanExecutor, the
      * method does nothing. Otherwise, a new $cursor stage is created using the given PlanExecutor,
-     * and added to the pipeline. The 'collections' parameter can reference any number of
+     * and added to the pipeline. After the callback, all stages that need catalog information
+     should be in the pipeline. The 'collections' parameter can reference any number of
      * collections. 'catalogResourceHandle' must store a
      ShardRole::TransactionResourcesStasher that will hold the ShardRole::TransactionResources
      associated with 'collections' and 'exec'.
 
      */
-    static void attachInnerQueryExecutorToPipeline(
+    static void attachInnerQueryExecutorAndBindCatalogInfoToPipeline(
         const MultipleCollectionAccessor& collection,
         AttachExecutorCallback attachExecutorCallback,
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
         Pipeline* pipeline,
-        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle);
+        boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> sharedStasher);
 
     /**
-     * This method combines 'buildInnerQueryExecutor()' and 'attachInnerQueryExecutorToPipeline()'
+     * This method combines 'buildInnerQueryExecutor()' and
+     'attachInnerQueryExecutorAndBindCatalogInfoToPipeline()'
      * into a single call to support auto completion of the cursor stage creation process. Can be
      * used when the executor attachment phase doesn't need to be deferred and the $cursor stage
-     * can be created right after building the executor. 'catalogResourceHandle' must store
-     a ShardRole::TransactionResourcesStasher that will hold the ShardRole::TransactionResources
-     associated with 'collections'.
+     * can be created right after building the executor. ShardRole::TransactionResourcesStasher
+     should hold the ShardRole::TransactionResources associated with 'collections'.
      */
-    static void buildAndAttachInnerQueryExecutorToPipeline(
+    static void buildAndAttachInnerQueryExecutorAndBindCatalogInfoToPipeline(
         const MultipleCollectionAccessor& collections,
         const NamespaceString& nss,
         const AggregateCommandRequest* aggRequest,
         Pipeline* pipeline,
-        const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle);
+        boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> sharedStasher);
 
     static Timestamp getLatestOplogTimestamp(const exec::agg::Pipeline* pipeline);
 

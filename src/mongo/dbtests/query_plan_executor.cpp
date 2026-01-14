@@ -244,15 +244,10 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
         MultipleCollectionAccessor collections(collection);
         auto transactionResourcesStasher =
             make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
-        auto catalogResourceHandle =
-            make_intrusive<DSCursorCatalogResourceHandle>(transactionResourcesStasher);
-        auto cursorSource =
-            DocumentSourceCursor::create(collections,
-                                         std::move(innerExec),
-                                         catalogResourceHandle,
-                                         _expCtx,
-                                         DocumentSourceCursor::CursorType::kRegular);
+        auto cursorSource = DocumentSourceCursor::create(
+            std::move(innerExec), _expCtx, DocumentSourceCursor::CursorType::kRegular);
         auto pipeline = Pipeline::create({cursorSource}, _expCtx);
+        pipeline->bindCatalogInfo(collections, transactionResourcesStasher);
 
         // Stash the ShardRole resources.
         stashTransactionResourcesFromOperationContext(&_opCtx, transactionResourcesStasher.get());

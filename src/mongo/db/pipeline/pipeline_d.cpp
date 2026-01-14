@@ -663,18 +663,13 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSample(
         const auto cursorType = deps.hasNoRequirements()
             ? DocumentSourceCursor::CursorType::kEmptyDocuments
             : DocumentSourceCursor::CursorType::kRegular;
-        attachExecutorCallback =
-            [cursorType](const MultipleCollectionAccessor& collections,
-                         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-                         Pipeline* pipeline,
-                         const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
-                auto cursor = DocumentSourceCursor::create(collections,
-                                                           std::move(exec),
-                                                           catalogResourceHandle,
-                                                           pipeline->getContext(),
-                                                           cursorType);
-                pipeline->addInitialSource(std::move(cursor));
-            };
+        attachExecutorCallback = [cursorType](
+                                     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                                     Pipeline* pipeline) {
+            auto cursor =
+                DocumentSourceCursor::create(std::move(exec), pipeline->getContext(), cursorType);
+            pipeline->addInitialSource(std::move(cursor));
+        };
         return {std::move(exec), std::move(attachExecutorCallback), {}};
     }
     return {nullptr, std::move(attachExecutorCallback), {}};
@@ -728,32 +723,33 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutor(
     }
 }
 
-void PipelineD::attachInnerQueryExecutorToPipeline(
+void PipelineD::attachInnerQueryExecutorAndBindCatalogInfoToPipeline(
     const MultipleCollectionAccessor& collections,
     PipelineD::AttachExecutorCallback attachExecutorCallback,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
     Pipeline* pipeline,
-    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
+    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher) {
     // If the pipeline doesn't need a $cursor stage, there will be no callback function and
     // PlanExecutor provided in the 'attachExecutorCallback' object, so we don't need to do
     // anything.
     if (attachExecutorCallback && exec) {
-        attachExecutorCallback(collections, std::move(exec), pipeline, catalogResourceHandle);
+        attachExecutorCallback(std::move(exec), pipeline);
     }
+    pipeline->bindCatalogInfo(collections, stasher);
 }
 
-void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
+void PipelineD::buildAndAttachInnerQueryExecutorAndBindCatalogInfoToPipeline(
     const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     const AggregateCommandRequest* aggRequest,
     Pipeline* pipeline,
-    const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
+    boost::intrusive_ptr<ShardRoleTransactionResourcesStasherForPipeline> stasher) {
 
     auto [executor, callback, additionalExec] =
         buildInnerQueryExecutor(collections, nss, aggRequest, pipeline);
     tassert(7856010, "Unexpected additional executors", additionalExec.empty());
-    attachInnerQueryExecutorToPipeline(
-        collections, callback, std::move(executor), pipeline, catalogResourceHandle);
+    attachInnerQueryExecutorAndBindCatalogInfoToPipeline(
+        collections, callback, std::move(executor), pipeline, stasher);
 }
 
 namespace {
@@ -1850,17 +1846,10 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     }
 
     auto attachExecutorCallback =
-        [cursorType, resumeTrackingType](
-            const MultipleCollectionAccessor& collections,
-            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-            Pipeline* pipeline,
-            const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
-            auto cursor = DocumentSourceCursor::create(collections,
-                                                       std::move(exec),
-                                                       catalogResourceHandle,
-                                                       pipeline->getContext(),
-                                                       cursorType,
-                                                       resumeTrackingType);
+        [cursorType, resumeTrackingType](std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
+                                         Pipeline* pipeline) {
+            auto cursor = DocumentSourceCursor::create(
+                std::move(exec), pipeline->getContext(), cursorType, resumeTrackingType);
             pipeline->addInitialSource(std::move(cursor));
         };
     return {std::move(exec), std::move(attachExecutorCallback), {}};
@@ -1910,13 +1899,8 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
         [distanceField = geoNearStage->getDistanceField(),
          locationField = geoNearStage->getLocationField(),
          distanceMultiplier = geoNearStage->getDistanceMultiplier().value_or(1.0)](
-            const MultipleCollectionAccessor& collections,
-            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec,
-            Pipeline* pipeline,
-            const boost::intrusive_ptr<CatalogResourceHandle>& catalogResourceHandle) {
-            auto cursor = DocumentSourceGeoNearCursor::create(collections,
-                                                              std::move(exec),
-                                                              catalogResourceHandle,
+            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec, Pipeline* pipeline) {
+            auto cursor = DocumentSourceGeoNearCursor::create(std::move(exec),
                                                               pipeline->getContext(),
                                                               distanceField,
                                                               locationField,

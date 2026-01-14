@@ -121,14 +121,10 @@ protected:
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec) {
         auto transactionResourcesStasher =
             make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
-        auto catalogResourceHandle =
-            make_intrusive<DSCursorCatalogResourceHandle>(transactionResourcesStasher);
 
-        auto cursor = DocumentSourceCursor::create(collections,
-                                                   std::move(exec),
-                                                   catalogResourceHandle,
-                                                   _ctx,
-                                                   DocumentSourceCursor::CursorType::kRegular);
+        auto cursor = DocumentSourceCursor::create(
+            std::move(exec), _ctx, DocumentSourceCursor::CursorType::kRegular);
+        cursor->bindCatalogInfo(collections, transactionResourcesStasher);
 
         // Stash the ShardRole resources.
         stashTransactionResourcesFromOperationContext(opCtx(), transactionResourcesStasher.get());

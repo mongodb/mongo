@@ -369,21 +369,14 @@ std::unique_ptr<Pipeline> attachCursorSourceToPipelineForLocalReadImpl(
 
     auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
     auto sharedStasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
-    auto catalogResourceHandle = make_intrusive<DSCursorCatalogResourceHandle>(sharedStasher);
-    PipelineD::buildAndAttachInnerQueryExecutorToPipeline(holder,
-                                                          expCtx->getNamespaceString(),
-                                                          resolvedAggRequest,
-                                                          pipeline.get(),
-                                                          catalogResourceHandle);
 
     const bool isMongotPipeline = search_helpers::isMongotPipeline(pipeline.get());
-    // We split up mongot special logic as bindCatalogInfo() should be called on a desugared search
-    // pipeline and requires catalog locks.
     if (isMongotPipeline) {
         search_helpers::desugarSearchPipeline(pipeline.get());
     }
 
-    pipeline->bindCatalogInfo(holder, sharedStasher);
+    PipelineD::buildAndAttachInnerQueryExecutorAndBindCatalogInfoToPipeline(
+        holder, expCtx->getNamespaceString(), resolvedAggRequest, pipeline.get(), sharedStasher);
 
     // Mongot pipelines may not use the MultipleCollectionAccessor and related acquisitions. Clear
     // them to prevent dangling references to CollectionAcquistions.
@@ -776,13 +769,12 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalReadWithCatalo
     const boost::intrusive_ptr<ExpressionContext>& expCtx = pipeline->getContext();
 
     auto stasher = catalogResourceHandle->getStasher();
-    PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
+    PipelineD::buildAndAttachInnerQueryExecutorAndBindCatalogInfoToPipeline(
         collections,
         expCtx->getNamespaceString(),
         nullptr /*resolvedAggRequest*/,
         pipeline.get(),
-        make_intrusive<DSCursorCatalogResourceHandle>(stasher));
-    pipeline->bindCatalogInfo(collections, stasher);
+        stasher);
 
     return pipeline;
 }

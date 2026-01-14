@@ -250,13 +250,10 @@ QuerySettingsStage::createQueryShapeRepresentativeQueriesCursor(OperationContext
         collScanExecutor->saveState();
 
         auto stasher = make_intrusive<ShardRoleTransactionResourcesStasherForPipeline>();
-        auto catalogResourceHandle = make_intrusive<DSCursorCatalogResourceHandle>(stasher);
         // TODO SERVER-107922: Construct the execution stage directly.
-        auto cursor = DocumentSourceCursor::create(collAccessor,
-                                                   std::move(collScanExecutor),
-                                                   std::move(catalogResourceHandle),
-                                                   getContext(),
-                                                   DocumentSourceCursor::CursorType::kRegular);
+        auto cursor = DocumentSourceCursor::create(
+            std::move(collScanExecutor), getContext(), DocumentSourceCursor::CursorType::kRegular);
+        cursor->bindCatalogInfo(collAccessor, stasher);
 
         // 'catalogResourceHandle' and 'stasher' are responsible for acquiring and relinquishing the
         // locks. In order for it to work we need to stash the resources first.
