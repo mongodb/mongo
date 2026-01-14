@@ -975,6 +975,10 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                     ResourceId{RESOURCE_COLLECTION, nss}) == MODE_NONE);
     }
 
+    // The functions below expect to work over the latest state of the collections,
+    // so abandon any snapshot that we may have acquired during the data copy.
+    shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
     // Getting here means we successfully built the target copy. We now do the final
     // in-place rename and remove the source collection.
     invariant(tmpName.isEqualDb(target));
