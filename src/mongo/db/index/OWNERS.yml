@@ -1,5 +1,9 @@
 version: 1.0.0
 filters:
+  - "OWNERS.yml":
+    approvers:
+      - 10gen/server-index-builds
+      - 10gen/query-execution-write-exec
   - "*access_method*":
     approvers:
       - 10gen/server-index-builds

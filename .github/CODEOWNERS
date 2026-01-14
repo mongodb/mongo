@@ -2174,6 +2174,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/global_catalog/ddl/**/*refine_collection_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/index/OWNERS.yml
+/src/mongo/db/index/**/OWNERS.yml @10gen/query-execution-write-exec @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/index/**/*access_method* @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/index/**/index_constants.h @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/db/index/**/key_gen_bm.cpp @10gen/query-execution-write-exec @svc-auto-approve-bot
