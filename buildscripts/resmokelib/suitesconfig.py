@@ -6,7 +6,7 @@ import itertools
 import os
 import pathlib
 from threading import Lock
-from typing import Dict, List
+from typing import Any, Optional
 
 import yaml
 
@@ -29,7 +29,7 @@ SuiteName = str
 _NAMED_SUITES = None
 
 
-def get_named_suites() -> List[SuiteName]:
+def get_named_suites() -> list[SuiteName]:
     """Return a list of the suites names."""
     global _NAMED_SUITES
 
@@ -54,7 +54,7 @@ def get_named_suites() -> List[SuiteName]:
     return _NAMED_SUITES
 
 
-def get_suite_files() -> Dict[str, str]:
+def get_suite_files() -> dict[str, str]:
     """Get the physical files defining these suites for parsing comments."""
     return merge_dicts(ExplicitSuiteConfig.get_suite_files(), MatrixSuiteConfig.get_suite_files())
 
@@ -102,7 +102,7 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
     return test_membership
 
 
-def get_suites(suite_names_or_paths: list[str], test_files: list[str]) -> List[_suite.Suite]:
+def get_suites(suite_names_or_paths: list[str], test_files: list[str]) -> list[_suite.Suite]:
     """Retrieve the Suite instances based on suite configuration files and override parameters.
 
     Args:
@@ -269,7 +269,7 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
         return utils.load_yaml_file(suite_path)
 
     @classmethod
-    def get_named_suites(cls) -> Dict[str, str]:
+    def get_named_suites(cls) -> dict[str, str]:
         """Populate the named suites by scanning config_dir/suites."""
         with cls._name_suites_lock:
             if not cls._named_suites:
@@ -302,10 +302,26 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     _all_overrides = {}
 
     @classmethod
-    def get_suite_files(cls):
-        """Get the suite files."""
-        mappings_dir = os.path.join(cls.get_suites_dir(), "mappings")
-        return cls.__get_suite_files_in_dir(mappings_dir)
+    def get_suite_files(cls) -> dict[str, str]:
+        """Get the suite files from all matrix suite directories.
+
+        Searches through all configured matrix suite directories (including module directories)
+        and collects mapping files. Raises an error if duplicate suite names are found.
+
+        Returns:
+            Dictionary mapping suite names to their file paths.
+
+        Raises:
+            ValueError: If a suite name appears in multiple directories.
+        """
+        result = {}
+        for suites_dir in cls.get_suites_dirs():
+            mappings_dir = os.path.join(suites_dir, "mappings")
+            for suite_name, path in cls.__get_suite_files_in_dir(mappings_dir).items():
+                if suite_name in result:
+                    raise ValueError(f"Duplicate matrix suite definition for {suite_name}")
+                result[suite_name] = path
+        return result
 
     @classmethod
     def get_all_yamls(cls, target_dir):
@@ -318,8 +334,18 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         }
 
     @staticmethod
-    def get_suites_dir():
-        return os.path.join(_config.CONFIG_DIR, "matrix_suites")
+    def get_suites_dirs() -> list[str]:
+        """Get all matrix suite directories to search for suite configurations.
+
+        Returns a list of directories containing matrix suite definitions, including
+        both the main resmoke configuration directory and any enabled module directories.
+
+        Returns:
+            List of absolute paths to matrix suite directories.
+        """
+        return [
+            os.path.join(_config.CONFIG_DIR, "matrix_suites")
+        ] + _config.MODULE_MATRIX_SUITE_DIRS
 
     @classmethod
     def get_config_obj_and_verify(cls, suite_name):
@@ -358,14 +384,13 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     @classmethod
     def get_config_obj_no_verify(cls, suite_name):
         """Get the suite config object in the given file."""
-        suites_dir = cls.get_suites_dir()
-        if not os.path.exists(suites_dir):
+        suites_dirs = cls.get_suites_dirs()
+        if all(not os.path.exists(dir_path) for dir_path in suites_dirs):
             return None
-        matrix_suite = cls.parse_mappings_file(suites_dir, suite_name)
+        matrix_suite = cls.parse_mappings_file(suites_dirs, suite_name)
         if not matrix_suite:
             return None
-
-        all_overrides = cls.parse_override_file(suites_dir)
+        all_overrides = cls.parse_override_file(suites_dirs)
 
         return cls.process_overrides(matrix_suite, all_overrides, suite_name)
 
@@ -442,29 +467,58 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         return res
 
     @classmethod
-    def parse_override_file(cls, suites_dir):
-        """Get a dictionary of all overrides in a given directory keyed by the suite name."""
-        if not cls._all_overrides:
-            overrides_dir = os.path.join(suites_dir, "overrides")
-            overrides_files = cls.get_all_yamls(overrides_dir)
+    def parse_override_file(cls, suites_dirs: list[str]) -> dict[str, Any]:
+        """Get a dictionary of all overrides from multiple directories keyed by override name.
 
-            for filename, override_config_file in overrides_files.items():
-                for override_config in override_config_file:
-                    if "name" in override_config and "value" in override_config:
-                        cls._all_overrides[f"{filename}.{override_config['name']}"] = (
-                            override_config["value"]
-                        )
-                    else:
-                        raise ValueError(
-                            "Invalid override configuration, missing required keys. ",
-                            override_config,
-                        )
+        Parses override files from all provided suite directories and collects them into
+        a single dictionary. Each override is keyed by "filename.override_name". Raises
+        an error if duplicate override names are found across directories.
+
+        Args:
+            suites_dirs: List of directories containing matrix suite configurations.
+
+        Returns:
+            Dictionary mapping override keys (format: "filename.name") to their values.
+
+        Raises:
+            ValueError: If duplicate override definitions are found or if an override
+                       configuration is missing required keys (name, value).
+        """
+        if not cls._all_overrides:
+            for suites_dir in suites_dirs:
+                overrides_dir = os.path.join(suites_dir, "overrides")
+                overrides_files = cls.get_all_yamls(overrides_dir)
+
+                for filename, override_config_file in overrides_files.items():
+                    for override_config in override_config_file:
+                        if "name" in override_config and "value" in override_config:
+                            key = f"{filename}.{override_config['name']}"
+                            if key in cls._all_overrides:
+                                raise ValueError(f"Duplicate override definition for {key}")
+                            cls._all_overrides[key] = override_config["value"]
+                        else:
+                            raise ValueError(
+                                "Invalid override configuration, missing required keys. ",
+                                override_config,
+                            )
         return cls._all_overrides
 
     @classmethod
-    def parse_mappings_file(cls, suites_dir, suite_name):
-        """Get the mapping object for a given suite name and directory to search for suite mappings."""
-        all_matrix_suites = cls.get_all_mappings(suites_dir)
+    def parse_mappings_file(
+        cls, suites_dirs: list[str], suite_name: str
+    ) -> Optional[dict[str, Any]]:
+        """Get the mapping configuration for a given suite name.
+
+        Looks up the suite in the aggregated mappings from all directories.
+
+        Args:
+            suites_dirs: List of directories containing matrix suite configurations.
+            suite_name: Name of the suite to find.
+
+        Returns:
+            The suite mapping configuration dictionary if found, None otherwise.
+        """
+        all_matrix_suites = cls.get_all_mappings(suites_dirs)
 
         if suite_name in all_matrix_suites:
             return all_matrix_suites[suite_name]
@@ -473,24 +527,43 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     @classmethod
     def get_named_suites(cls):
         """Get a list of all suite names."""
-        suites_dir = cls.get_suites_dir()
-        all_mappings = cls.get_all_mappings(suites_dir)
+        suites_dirs = cls.get_suites_dirs()
+        all_mappings = cls.get_all_mappings(suites_dirs)
         return list(all_mappings.keys())
 
     @classmethod
-    def get_all_mappings(cls, suites_dir) -> Dict[str, str]:
-        """Get a dictionary of all suite mapping files keyed by the suite name."""
-        if not cls._all_mappings:
-            mappings_dir = os.path.join(suites_dir, "mappings")
-            mappings_files = cls.get_all_yamls(mappings_dir)
+    def get_all_mappings(cls, suites_dirs: list[str]) -> dict[str, Any]:
+        """Get a dictionary of all suite mapping configurations from multiple directories.
 
-            for suite_name, suite_config in mappings_files.items():
-                if "base_suite" in suite_config:
-                    cls._all_mappings[suite_name] = suite_config
-                else:
-                    raise ValueError(
-                        "Invalid suite configuration, missing required keys. ", suite_config
-                    )
+        Collects and validates all matrix suite mapping files from the provided directories.
+        Each mapping must contain a "base_suite" key. Raises an error if duplicate suite
+        names are found across directories.
+
+        Args:
+            suites_dirs: List of directories containing matrix suite configurations.
+
+        Returns:
+            Dictionary mapping suite names to their configuration dictionaries.
+
+        Raises:
+            ValueError: If duplicate suite names are found or if a suite configuration
+                       is missing the required "base_suite" key.
+        """
+        if not cls._all_mappings:
+            for suites_dir in suites_dirs:
+                mappings_dir = os.path.join(suites_dir, "mappings")
+                mappings_files = cls.get_all_yamls(mappings_dir)
+
+                for suite_name, suite_config in mappings_files.items():
+                    if suite_name in cls._all_mappings:
+                        raise ValueError(f"Duplicate matrix suite definition for {suite_name}")
+
+                    if "base_suite" in suite_config:
+                        cls._all_mappings[suite_name] = suite_config
+                    else:
+                        raise ValueError(
+                            "Invalid suite configuration, missing required keys. ", suite_config
+                        )
         return cls._all_mappings
 
     @classmethod
@@ -511,23 +584,76 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         return all_files
 
     @classmethod
-    def get_generated_suite_path(cls, suite_name):
-        matrix_dir = cls.get_suites_dir()
-        suites_dir = os.path.join(matrix_dir, "generated_suites")
+    def get_mappings_path(cls, suite_name: str) -> tuple[str, str]:
+        """Get the mapping file path and suite directory for a given suite name.
+
+        Searches all configured suite directories for a mapping file (.yml or .yaml)
+        matching the given suite name. Ensures exactly one mapping file exists.
+
+        Args:
+            suite_name: Name of the suite to find the mapping file for.
+
+        Returns:
+            Tuple of (mapping_file_path, suite_directory_path).
+
+        Raises:
+            ValueError: If no mapping file is found or if multiple mapping files
+                       exist for the same suite name across different directories.
+        """
+        suites_dirs = cls.get_suites_dirs()
+        results = []
+        for suites_dir in suites_dirs:
+            mappings_dir = os.path.join(suites_dir, "mappings")
+            for ext in (".yml", ".yaml"):
+                path = os.path.join(mappings_dir, f"{suite_name}{ext}")
+                if os.path.exists(path):
+                    results.append((path, suites_dir))
+        if len(results) == 0:
+            raise ValueError(f"No mapping file found for suite {suite_name}")
+        if len(results) > 1:
+            raise ValueError(
+                f"Multiple mapping files found for suite {suite_name}, cannot determine mapping file path: {results}"
+            )
+        return results[0]
+
+    @classmethod
+    def get_generated_suite_path(cls, suite_name: str) -> str:
+        """Get the path where the generated suite file should be written.
+
+        Determines the appropriate location for the generated suite file based on
+        where the mapping file is located. Creates the generated_suites directory
+        if it doesn't exist.
+
+        Args:
+            suite_name: Name of the suite to get the generated path for.
+
+        Returns:
+            Absolute path to the generated suite file.
+        """
+        _, suite_dir = cls.get_mappings_path(suite_name)
+
+        suites_dir = os.path.join(suite_dir, "generated_suites")
         if not os.path.exists(suites_dir):
             os.mkdir(suites_dir)
         path = os.path.join(suites_dir, f"{suite_name}.yml")
         return path
 
     @classmethod
-    def generate_matrix_suite_text(cls, suite_name):
-        suites_dir = cls.get_suites_dir()
-        mappings_dir = os.path.join(suites_dir, "mappings")
-        mapping_path = None
-        for ext in (".yml", ".yaml"):
-            path = os.path.join(mappings_dir, f"{suite_name}{ext}")
-            if os.path.exists(path):
-                mapping_path = path
+    def generate_matrix_suite_text(cls, suite_name: str) -> Optional[str]:
+        """Generate the full text content for a matrix suite file.
+
+        Creates the complete YAML content for a generated matrix suite file, including
+        header comments indicating the file is auto-generated and referencing the
+        source mapping file.
+
+        Args:
+            suite_name: Name of the suite to generate text for.
+
+        Returns:
+            Complete text content for the generated suite file, or None if the
+            mapping file cannot be found.
+        """
+        mapping_path, _ = cls.get_mappings_path(suite_name)
 
         matrix_suite = cls.get_config_obj_no_verify(suite_name)
 

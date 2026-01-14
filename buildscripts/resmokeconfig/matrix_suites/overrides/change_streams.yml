@@ -14,17 +14,6 @@
   value:
     eval: await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
 
-- name: base_eval
-  value:
-    executor:
-      config:
-        shell_options:
-          # this is not under the eval section on purpose, we want to override this
-          # to get rid of causal consistency
-          eval: >-
-            globalThis.testingReplication = true;
-            await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
-
 - name: mongos_passthrough
   value:
     executor:

@@ -383,6 +383,9 @@ MODULES = None
 # list of dirs from enabled modules to get suites from
 MODULE_SUITE_DIRS = []
 
+# list of dirs from enabled modules to get matrix suites from
+MODULE_MATRIX_SUITE_DIRS = []
+
 # list of dirs from disabled modules to filter out of suite selectors
 MODULE_DISABLED_JSTEST_DIRS = []
 

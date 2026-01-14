@@ -8,5 +8,7 @@ atlas:
     - buildscripts/modules/atlas/hooks
   suite_dirs:
     - buildscripts/modules/atlas/suites
+  matrix_suite_dirs:
+    - buildscripts/modules/atlas/matrix_suites
   jstest_dirs:
     - src/mongo/db/modules/atlas/jstests
