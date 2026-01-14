@@ -2004,9 +2004,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, StageWithDefaultStaticProperties)
     ASSERT_TRUE(staticProperties.getPreservesUpstreamMetadata());
     ASSERT_FALSE(staticProperties.getRequiredMetadataFields().has_value());
     ASSERT_FALSE(staticProperties.getProvidedMetadataFields().has_value());
-    ASSERT_TRUE(staticProperties.getUnionWithIsAllowed());
-    ASSERT_TRUE(staticProperties.getLookupIsAllowed());
-    ASSERT_TRUE(staticProperties.getFacetIsAllowed());
+    ASSERT_TRUE(staticProperties.getAllowedInUnionWith());
+    ASSERT_TRUE(staticProperties.getAllowedInLookup());
+    ASSERT_TRUE(staticProperties.getAllowedInFacet());
 
     auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
 
@@ -2134,8 +2134,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, StageWithNonDefaultSubPipelineStaticProperties) {
-    auto properties = BSON("unionWithIsAllowed" << false << "lookupIsAllowed" << false
-                                                << "facetIsAllowed" << false);
+    auto properties = BSON("allowedInUnionWith" << false << "allowedInLookup" << false
+                                                << "allowedInFacet" << false);
     auto astNode = new sdk::ExtensionAggStageAstNode(
         std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(properties));
     auto astHandle = AggStageAstNodeHandle(astNode);
@@ -2144,9 +2144,9 @@ TEST_F(DocumentSourceExtensionOptimizableTest, StageWithNonDefaultSubPipelineSta
         host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
 
     const auto& staticProperties = optimizable->getStaticProperties();
-    ASSERT_FALSE(staticProperties.getUnionWithIsAllowed());
-    ASSERT_FALSE(staticProperties.getLookupIsAllowed());
-    ASSERT_FALSE(staticProperties.getFacetIsAllowed());
+    ASSERT_FALSE(staticProperties.getAllowedInUnionWith());
+    ASSERT_FALSE(staticProperties.getAllowedInLookup());
+    ASSERT_FALSE(staticProperties.getAllowedInFacet());
 
     auto constraints = optimizable->constraints(PipelineSplitState::kUnsplit);
     ASSERT_EQ(constraints.unionRequirement, StageConstraints::UnionRequirement::kNotAllowed);

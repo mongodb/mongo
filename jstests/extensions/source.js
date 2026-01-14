@@ -69,17 +69,6 @@ if (!FixtureHelpers.isMongos(db)) {
 // results = coll.aggregate([{$lookup: {from: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}], as: "slices"}}]).toArray();
 // assert.eq(results, [{breadType: "sourdough", slices: [{slice: 0, isBurnt: false}, {slice: 1, isBurnt: false}]}]);
 
-// TODO SERVER-115918 Enable this test.
-// Source stage is not allowed in $facet.
-// assert.commandFailedWithCode(
-//     db.runCommand({
-//         aggregate: collName,
-//         pipeline: [{$facet: {slices: [{$toast: {temp: 250.0, numSlices: 2}}]}}],
-//         cursor: {},
-//     }),
-//     40600,
-// );
-
 // Two source stages in the pipeline.
 const twoSourceStagePipeline = [
     {$toast: {temp: 100.0, numSlices: 1}},

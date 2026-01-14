@@ -353,21 +353,21 @@ TEST_F(AggStageTest, SubPipelineRequirementPropertiesDefaultValues) {
         std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(BSONObj()));
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle->getProperties();
-    ASSERT_TRUE(props.getUnionWithIsAllowed());
-    ASSERT_TRUE(props.getLookupIsAllowed());
-    ASSERT_TRUE(props.getFacetIsAllowed());
+    ASSERT_TRUE(props.getAllowedInUnionWith());
+    ASSERT_TRUE(props.getAllowedInLookup());
+    ASSERT_TRUE(props.getAllowedInFacet());
 }
 
 TEST_F(AggStageTest, SubPipelineRequirementProperties) {
     auto astNode = new sdk::ExtensionAggStageAstNode(
         std::make_unique<sdk::shared_test_stages::CustomPropertiesAstNode>(
-            BSON("unionWithIsAllowed" << false << "lookupIsAllowed" << false << "facetIsAllowed"
+            BSON("allowedInUnionWith" << false << "allowedInLookup" << false << "allowedInFacet"
                                       << false)));
     auto handle = AggStageAstNodeHandle{astNode};
     auto props = handle->getProperties();
-    ASSERT_FALSE(props.getUnionWithIsAllowed());
-    ASSERT_FALSE(props.getLookupIsAllowed());
-    ASSERT_FALSE(props.getFacetIsAllowed());
+    ASSERT_FALSE(props.getAllowedInUnionWith());
+    ASSERT_FALSE(props.getAllowedInLookup());
+    ASSERT_FALSE(props.getAllowedInFacet());
 }
 
 TEST_F(AggStageTest, TransformAggStageAstNodeSucceeds) {

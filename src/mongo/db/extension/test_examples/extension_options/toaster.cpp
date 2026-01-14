@@ -199,6 +199,7 @@ public:
         properties.setHostType(
             mongo::extension::MongoExtensionHostTypeRequirementEnum::kRunOnceAnyNode);
         properties.setRequiresInputDocSource(false);
+        properties.setAllowedInFacet(false);
         properties.serialize(&builder);
         return builder.obj();
     }

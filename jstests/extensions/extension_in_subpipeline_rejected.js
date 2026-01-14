@@ -3,8 +3,6 @@
  *
  * @tags: [
  *  featureFlagExtensionsAPI,
- *  # TODO SERVER-115918 Re-enable this test.
- *  __TEMPORARILY_DISABLED__
  * ]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
@@ -21,7 +19,9 @@ const kNotAllowedInLookupErrorCode = 51047;
 const kNotAllowedInUnionWithErrorCode = 31441;
 const kNotAllowedInFacetErrorCode = 40600;
 
-// Test $lookup pipeline rejects extension stage.
+/*
+TODO SERVER-117179 Enable this test.
+// Test that a $lookup pipeline can reject an extension stage.
 {
     const lookupPipeline = [{$lookup: {from: other.getName(), as: "joined", pipeline: [{$testFoo: {}}]}}];
     assertErrorCode(
@@ -57,8 +57,9 @@ const kNotAllowedInFacetErrorCode = 40600;
         kNotAllowedInLookupErrorCode,
     );
 }
+*/
 
-// Test $unionWith pipeline rejects extension stage.
+// Test that a $unionWith pipeline can reject an extension stage.
 {
     const unionWithPipeline = [{$unionWith: {coll: other.getName(), pipeline: [{$testFoo: {}}]}}];
     assertErrorCode(
@@ -94,8 +95,9 @@ const kNotAllowedInFacetErrorCode = 40600;
         kNotAllowedInUnionWithErrorCode,
     );
 }
-
-// Test $facet pipeline rejects extension stage.
+/*
+TODO SERVER-117179 Enable this test.
+// Test that a $facet pipeline can reject an extension stage.
 {
     const facetPipeline = [{$facet: {facetPipe: [{$testFoo: {}}]}}];
     assertErrorCode(
@@ -131,3 +133,4 @@ const kNotAllowedInFacetErrorCode = 40600;
         kNotAllowedInFacetErrorCode,
     );
 }
+*/

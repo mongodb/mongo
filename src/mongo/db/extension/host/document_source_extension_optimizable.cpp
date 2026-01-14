@@ -270,13 +270,13 @@ StageConstraints DocumentSourceExtensionOptimizable::constraints(
     if (auto host = static_properties_util::toHostTypeRequirement(_properties.getHostType())) {
         constraints.hostRequirement = *host;
     }
-    if (!_properties.getUnionWithIsAllowed()) {
+    if (!_properties.getAllowedInUnionWith()) {
         constraints.unionRequirement = StageConstraints::UnionRequirement::kNotAllowed;
     }
-    if (!_properties.getLookupIsAllowed()) {
+    if (!_properties.getAllowedInLookup()) {
         constraints.lookupRequirement = StageConstraints::LookupRequirement::kNotAllowed;
     }
-    if (!_properties.getFacetIsAllowed()) {
+    if (!_properties.getAllowedInFacet()) {
         constraints.facetRequirement = StageConstraints::FacetRequirement::kNotAllowed;
     }
 

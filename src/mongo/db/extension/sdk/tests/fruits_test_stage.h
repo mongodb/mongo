@@ -124,6 +124,8 @@ public:
         properties.setHostType(
             mongo::extension::MongoExtensionHostTypeRequirementEnum::kRunOnceAnyNode);
         properties.setRequiresInputDocSource(false);
+        properties.setAllowedInFacet(false);
+
         // Report that this stage will provide metadata.
         std::vector<std::string> providedMetadata{
             "textScore", "searchScore", "score", "searchScoreDetails"};

@@ -34,15 +34,39 @@
 
 namespace sdk = mongo::extension::sdk;
 
+
+class FooAstNode : public sdk::TestAstNode<sdk::shared_test_stages::TransformLogicalAggStage> {
+public:
+    FooAstNode(std::string_view stageName, const mongo::BSONObj& arguments)
+        : sdk::TestAstNode<sdk::shared_test_stages::TransformLogicalAggStage>(stageName,
+                                                                              arguments) {}
+
+    mongo::BSONObj getProperties() const override {
+        mongo::extension::MongoExtensionStaticProperties properties;
+        properties.setAllowedInLookup(false);
+        properties.setAllowedInUnionWith(false);
+        properties.setAllowedInFacet(false);
+
+        mongo::BSONObjBuilder builder;
+        properties.serialize(&builder);
+        return builder.obj();
+    }
+
+
+    std::unique_ptr<AggStageAstNode> clone() const override {
+        return std::make_unique<FooAstNode>(_name, _arguments);
+    }
+};
+
+DEFAULT_PARSE_NODE(Foo);
+
 /**
- * $testFoo is a no-op stage.
+ * $testFoo is a transform stage. It is not allowed to run in subpipelines.
  *
  * The stage definition must be empty, like {$testFoo: {}}, or it will fail to parse.
  */
 using FooStageDescriptor =
-    sdk::TestStageDescriptor<"$testFoo",
-                             sdk::shared_test_stages::TransformAggStageParseNode,
-                             true /* ExpectEmptyStageDefinition */>;
+    sdk::TestStageDescriptor<"$testFoo", FooParseNode, true /* ExpectEmptyStageDefinition */>;
 
 DEFAULT_EXTENSION(Foo)
 REGISTER_EXTENSION(FooExtension)

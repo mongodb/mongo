@@ -120,6 +120,7 @@ public:
         extension::MongoExtensionStaticProperties properties;
         properties.setPosition(extension::MongoExtensionPositionRequirementEnum::kFirst);
         properties.setRequiresInputDocSource(false);
+        properties.setAllowedInFacet(false);
 
         BSONObjBuilder builder;
         properties.serialize(&builder);

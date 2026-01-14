@@ -127,15 +127,15 @@ structs:
                 description: Whether incoming metadata is retained and passed to downstream stages.
                 type: bool
                 default: true
-            unionWithIsAllowed:
+            allowedInUnionWith:
                 description: Whether the stage is allowed in $unionWith subpipelines.
                 type: bool
                 default: true
-            lookupIsAllowed:
+            allowedInLookup:
                 description: Whether the stage is allowed in $lookup subpipelines.
                 type: bool
                 default: true
-            facetIsAllowed:
+            allowedInFacet:
                 description: Whether the stage is allowed in $facet subpipelines.
                 type: bool
                 default: true
