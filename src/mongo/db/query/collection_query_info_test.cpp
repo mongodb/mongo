@@ -33,6 +33,7 @@
 #include "mongo/db/index_builds/index_build_test_helpers.h"
 #include "mongo/db/index_builds/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_test_utils.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"
@@ -131,6 +132,7 @@ CollectionOrViewAcquisition acquireCollectionForRead(OperationContext* opCtx,
 }
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndexOnEmptyCollection) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
     RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
     auto indexA = BSON("v" << 2 << "name" << "a_1" << "key" << BSON("a" << 1) << "unique" << false);
     createIndexOnEmptyCollection(indexA);
@@ -139,10 +141,11 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndexOnEmptyCollect
     const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
     const auto pathArrayness =
         CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
-    ASSERT_FALSE(pathArrayness.get()->isPathArray("a"));
+    ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
 }
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndex) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
     RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
     std::vector<BSONObj> docs;
     for (int i = 0; i < 100; ++i) {
@@ -158,11 +161,12 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndex) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "a" is not multi-key at this point.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("a"));
+        ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
     }
 }
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
     RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
     std::vector<BSONObj> docs;
     for (int i = 0; i < 100; ++i) {
@@ -179,7 +183,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "a" is not multi-key at this point.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("a"));
+        ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
     }
 
     // Make "a" multikey but inserting a doc where "a" is multikey.
@@ -191,8 +195,8 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         pathArrayness->visualizeTrie_forTest();
         // "a" is now mulitkey.
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("a"));
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("b"));
+        ASSERT_TRUE(pathArrayness.get()->isPathArray("a", &expCtx));
+        ASSERT_FALSE(pathArrayness.get()->isPathArray("b", &expCtx));
     }
 
     // Now make "b" multikey as well.
@@ -204,12 +208,13 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // Both "a" and "b" are now mulitkey.
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("a"));
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("b"));
+        ASSERT_TRUE(pathArrayness.get()->isPathArray("a", &expCtx));
+        ASSERT_TRUE(pathArrayness.get()->isPathArray("b", &expCtx));
     }
 }
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForDropIndex) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
     RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
     std::vector<BSONObj> docs;
     for (int i = 0; i < 100; ++i) {
@@ -222,7 +227,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForDropIndex) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "b" index does not exist yet.
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("b"));
+        ASSERT_TRUE(pathArrayness.get()->isPathArray("b", &expCtx));
     }
 
 
@@ -233,7 +238,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForDropIndex) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "b" index does exist here.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("b"));
+        ASSERT_FALSE(pathArrayness.get()->isPathArray("b", &expCtx));
     }
 
     dropIndex(operationContext(), _kTestNss, "b_1");
@@ -242,11 +247,12 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForDropIndex) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "b" is dropped so we assume "b" is an array to be conservative.
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("b"));
+        ASSERT_TRUE(pathArrayness.get()->isPathArray("b", &expCtx));
     }
 }
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultipleIndexes) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
     RAIIServerParameterControllerForTest featureFlag{"featureFlagPathArrayness", true};
     std::vector<BSONObj> docs;
     for (int i = 0; i < 100; ++i) {
@@ -262,8 +268,8 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultipleIndexes) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "a" is not multi-key at this point.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("a"));
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("b"));
+        ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
+        ASSERT_TRUE(pathArrayness.get()->isPathArray("b", &expCtx));
     }
     // Create index on "b".
     auto indexB = BSON("b" << 1);
@@ -273,9 +279,9 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultipleIndexes) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "a" is not multi-key at this point.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("a"));
+        ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
         // We created index on "b" and can now see that "b" is not multi-key.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("b"));
+        ASSERT_FALSE(pathArrayness.get()->isPathArray("b", &expCtx));
     }
 }
 }  // namespace

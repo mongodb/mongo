@@ -44,6 +44,8 @@ mongo_cc_library(
         "//src/mongo/db:common",
         "//src/mongo/db/commands/server_status:server_status_core",
         "//src/mongo/db/pipeline:field_path",
+        "//src/mongo/db/query:query_knob_configuration",
+        "//src/mongo/db/query/query_settings",
     ],
 )
 
@@ -71,6 +73,7 @@ mongo_cc_unit_test(
         ":path_arrayness",
         ":path_arrayness_test_helpers",
         "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/pipeline:expression_context_for_test",
     ],
 )
 

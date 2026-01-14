@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/metadata/path_arrayness_test_helpers.h"
 
 #include <benchmark/benchmark.h>
@@ -104,6 +105,8 @@ void BM_PathArraynessLookup(benchmark::State& state) {
     size_t seed = 1354754;
     size_t seed2 = 3421354754;
 
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+
     auto pathsToInsert = generatePathsToInsert(state, seed, seed2);
 
     // Maximum length of dotted field paths.
@@ -146,7 +149,7 @@ void BM_PathArraynessLookup(benchmark::State& state) {
             // numberOfPathsQuery could be larger than the number of paths we have, so we take the
             // modulo of the index in order to wrap back around to the start of the array if that's
             // the case.
-            pathArrayness.isPathArray(pathsToQuery[i % pathsToQuery.size()]);
+            pathArrayness.isPathArray(pathsToQuery[i % pathsToQuery.size()], &expCtx);
         }
     }
 }
