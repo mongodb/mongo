@@ -28,9 +28,20 @@ if [[ "$ARCH" == "ppc64le" ]]; then
 else
     # Update virtual env directory in activate script
     if [ "Windows_NT" = "$OS" ]; then
-        sed -i -e "s:VIRTUAL_ENV=\".*\":VIRTUAL_ENV=\"$venv_dir\":" "$venv_dir/Scripts/activate"
+        # Update VIRTUAL_ENV paths in activate script
+        # Python 3.10 format: VIRTUAL_ENV="C:\path\to\venv"
+        # Python 3.13 format: VIRTUAL_ENV=$(cygpath 'C:\path\to\venv') and export VIRTUAL_ENV='C:\path\to\venv'
+        # Use multiple sed patterns to handle both formats
+        sed -i -e "s:VIRTUAL_ENV=\".*\":VIRTUAL_ENV=\"$venv_dir\":" \
+            -e "s:VIRTUAL_ENV='.*':VIRTUAL_ENV='$venv_dir':" \
+            -e "s:VIRTUAL_ENV=\$(cygpath ['\"].*['\"])$:VIRTUAL_ENV=\$(cygpath '$venv_dir'):" \
+            "$venv_dir/Scripts/activate"
     else
-        sed -i -e "s:VIRTUAL_ENV=\".*\":VIRTUAL_ENV=\"$venv_dir\":" "$venv_dir/bin/activate"
+        # Update VIRTUAL_ENV paths in activate script
+        # Handle both double and single quotes for cross-version compatibility
+        sed -i -e "s:VIRTUAL_ENV=\".*\":VIRTUAL_ENV=\"$venv_dir\":" \
+            -e "s:VIRTUAL_ENV='.*':VIRTUAL_ENV='$venv_dir':" \
+            "$venv_dir/bin/activate"
     fi
 
     # Add back python symlinks on linux platforms
