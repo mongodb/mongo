@@ -115,8 +115,18 @@ mongo_cc_library(
         "update_metrics.cpp",
     ],
     deps = [
-        "//src/mongo/db/commands/server_status:server_status_core",
+        "cmd_specific_metric_helpers",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
+    ],
+)
+
+mongo_cc_library(
+    name = "cmd_specific_metric_helpers",
+    srcs = [
+        "cmd_specific_metric_helpers.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/commands/server_status:server_status_core",
     ],
 )
 

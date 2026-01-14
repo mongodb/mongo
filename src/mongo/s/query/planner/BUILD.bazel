@@ -18,6 +18,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:fle_crud",
         "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db/commands/query_cmd:cmd_specific_metric_helpers",
         "//src/mongo/db/memory_tracking",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:docs_needed_bounds_visitor",

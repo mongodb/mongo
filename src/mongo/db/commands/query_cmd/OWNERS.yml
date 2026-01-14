@@ -45,3 +45,9 @@ filters:
   - "update_metrics.*":
     approvers:
       - 10gen/query-execution
+  - "extension_metrics.*":
+    approvers:
+      - 10gen/query-integration-observability
+  - "cmd_specific_metric_helpers.*":
+    approvers:
+      - 10gen/query-integration-observability

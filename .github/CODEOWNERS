@@ -2043,6 +2043,8 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/mr_* @10gen/query-integration-features @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/release_memory_cmd.* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/commands/query_cmd/**/update_metrics.* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/commands/query_cmd/**/extension_metrics.* @10gen/query-integration-observability @svc-auto-approve-bot
+/src/mongo/db/commands/query_cmd/**/cmd_specific_metric_helpers.* @10gen/query-integration-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/commands/server_status/OWNERS.yml
 /src/mongo/db/commands/server_status/ @10gen/server-networking-and-observability @svc-auto-approve-bot

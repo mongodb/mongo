@@ -31,21 +31,15 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/commands/query_cmd/cmd_specific_metric_helpers.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 
-#include <fmt/format.h>
-
 namespace mongo {
-namespace {
-Counter64* getSingletonMetricPtr(StringData commandName, StringData stat, ClusterRole role) {
-    return &*MetricBuilder<Counter64>{fmt::format("commands.{}.{}", commandName, stat)}.setRole(
-        role);
-}
-}  // namespace
-
 UpdateMetrics::UpdateMetrics(StringData commandName, ClusterRole role)
-    : _commandsWithAggregationPipeline(getSingletonMetricPtr(commandName, "pipeline", role)),
-      _commandsWithArrayFilters(getSingletonMetricPtr(commandName, "arrayFilters", role)) {}
+    : _commandsWithAggregationPipeline(
+          getSingletonMetricPtrWithinCmd(commandName, "pipeline", role)),
+      _commandsWithArrayFilters(getSingletonMetricPtrWithinCmd(commandName, "arrayFilters", role)) {
+}
 
 void UpdateMetrics::incrementExecutedWithAggregationPipeline() {
     _commandsWithAggregationPipeline->increment();

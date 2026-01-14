@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/router_role/collection_routing_info_targeter.h"
@@ -103,6 +104,8 @@ public:
             : CommandInvocation(cmd),
               _request(request),
               _aggregationRequest(std::move(aggregationRequest)),
+              _extensionMetrics(static_cast<const ClusterPipelineCommandBase*>(cmd)
+                                    ->getExtensionMetricsAllocation()),
               _liteParsedPipeline(LiteParsedPipeline(_aggregationRequest)),
               _privileges(std::move(privileges)) {}
 
@@ -175,6 +178,7 @@ public:
                         result));
                 }
             }
+            _extensionMetrics.markSuccess();
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
@@ -213,6 +217,7 @@ public:
 
         const OpMsgRequest& _request;
         AggregateCommandRequest _aggregationRequest;
+        ExtensionMetrics _extensionMetrics;
         const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;
     };
@@ -257,6 +262,22 @@ public:
     bool enableDiagnosticPrintingOnFailure() const final {
         return true;
     }
+
+    const ExtensionMetricsAllocation& getExtensionMetricsAllocation() const {
+        tassert(
+            11695900,
+            "Expected cluster role to have been initialized before requesting extension metrics",
+            _extensionMetricsAllocation.has_value());
+        return _extensionMetricsAllocation.get();
+    }
+
+protected:
+    void doInitializeClusterRole(ClusterRole role) override {
+        _extensionMetricsAllocation.emplace(getName(), role);
+    }
+
+private:
+    boost::optional<ExtensionMetricsAllocation> _extensionMetricsAllocation;
 };
 
 }  // namespace mongo

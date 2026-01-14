@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -201,6 +202,8 @@ public:
                   }
                   return ifrContext;
               }()),
+              _extensionMetrics(
+                  static_cast<const PipelineCommand*>(cmd)->getExtensionMetricsAllocation()),
               _liteParsedPipeline(
                   _aggregationRequest, false, {.ifrContext = _ifrContext, .opCtx = opCtx}),
               _privileges(std::move(privileges)) {
@@ -330,6 +333,7 @@ public:
                     _aggregationRequest.getNamespace().tenantId(),
                     _aggregationRequest.getSerializationContext());
             }
+            _extensionMetrics.markSuccess();
         }
 
         NamespaceString ns() const override {
@@ -392,6 +396,7 @@ public:
         // that a consistent and single IFR context is used across the entirety of query processing,
         // including in child subpipelines.
         std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext;
+        ExtensionMetrics _extensionMetrics;
         const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;
         std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>
@@ -420,6 +425,22 @@ public:
     bool allowedInTransactions() const final {
         return true;
     }
+
+    const ExtensionMetricsAllocation& getExtensionMetricsAllocation() const {
+        tassert(
+            11695901,
+            "Expected cluster role to have been initialized before requesting extension metrics",
+            _extensionMetricsAllocation.has_value());
+        return _extensionMetricsAllocation.get();
+    }
+
+protected:
+    void doInitializeClusterRole(ClusterRole role) override {
+        _extensionMetricsAllocation.emplace(getName(), role);
+    }
+
+private:
+    boost::optional<ExtensionMetricsAllocation> _extensionMetricsAllocation;
 };
 MONGO_REGISTER_COMMAND(PipelineCommand).forShard();
 
