@@ -47,7 +47,9 @@ describe("QueryShapeHash in slow logs", function () {
         assert.commandWorked(db.runCommand({profile: profilingStatus.was, slowms: profilingStatus.slowms}));
     });
 
-    // Finds the query shape hash from slow query logs where the query has comment 'queryComment'.
+    /**
+     * Finds the query shape hash from slow query logs where the query has comment 'queryComment'.
+     */
     function getQueryShapeHashFromSlowQueryLog(queryComment, expectedCount) {
         const slowQueryLogs = assert
             .commandWorked(db.adminCommand({getLog: "global"}))
@@ -76,11 +78,20 @@ describe("QueryShapeHash in slow logs", function () {
         return slowQueryLogs.pop().attr.queryShapeHash;
     }
 
-    // Asserts that the query shape hash is found in slow query logs for the given comment.
+    /**
+     * Asserts that the query shape hash is found in slow query logs for the given comment.
+     */
     function assertQueryShapeHashFromSlowLogs(comment, expectedCount) {
         const slowLogQueryShapeHash = getQueryShapeHashFromSlowQueryLog(comment, expectedCount);
         assert(slowLogQueryShapeHash, "Couldn't find query shape hash in slow queries log");
         return slowLogQueryShapeHash;
+    }
+
+    /**
+     * Utillity to sufix comments with a unique identifier so each test is isolated.
+     */
+    function makeUniqueComment(label) {
+        return `${label}-${UUID().toString()}`;
     }
 
     function testQueryShapeHash(query) {
@@ -115,30 +126,33 @@ describe("QueryShapeHash in slow logs", function () {
     }
 
     it("should be reported for find and getMore commands", function () {
+        const comment = makeUniqueComment("Query shape hash in slow query logs test. Find query.");
         const query = qsutils.makeFindQueryInstance({
             filter: {x: 4},
             batchSize: 0,
-            comment: "Query shape hash in slow query logs test. Find query.",
+            comment,
         });
         testQueryShapeHash(query);
     });
 
     it("should be reported for distinct commands", function () {
+        const comment = makeUniqueComment("Query shape hash in slow query logs test. Distinct query.");
         const query = qsutils.makeDistinctQueryInstance({
             key: "x",
             query: {x: 4},
-            comment: "Query shape hash in slow query logs test. Distinct query.",
+            comment,
         });
         testQueryShapeHash(query);
     });
 
     it("should be reported for aggregate and getMore commands", function () {
+        const comment = makeUniqueComment("Query shape hash in slow query logs test. Aggregate query.");
         const query = qsutils.makeAggregateQueryInstance({
             pipeline: [{$match: {x: 4}}],
-            comment: "Query shape hash in slow query logs test. Aggregate query.",
             cursor: {
                 batchSize: 0,
             },
+            comment,
         });
         testQueryShapeHash(query);
     });

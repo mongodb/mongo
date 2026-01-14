@@ -224,12 +224,16 @@ describe("originalQueryShapeHash appears in slow logs", function () {
                 assert.commandWorked(routerDB.createView(viewName, collName, [{$addFields: {z: 1}}]));
             });
 
+            function makeUniqueComment(str) {
+                return `!!${str} ${collName} test ${UUID().toString()}`;
+            }
+
             it("should be reported for find", function () {
                 testQueryShapeHash({
                     find: collName,
                     filter: {x: 4},
                     batchSize: 0,
-                    comment: `!!find ${collName} test`,
+                    comment: makeUniqueComment("find"),
                 });
             });
 
@@ -238,7 +242,7 @@ describe("originalQueryShapeHash appears in slow logs", function () {
                     find: viewName,
                     filter: {x: 4},
                     batchSize: 0,
-                    comment: `!!find view ${collName} test`,
+                    comment: makeUniqueComment("find view"),
                 });
             });
 
@@ -247,7 +251,7 @@ describe("originalQueryShapeHash appears in slow logs", function () {
                     aggregate: collName,
                     pipeline: [{$match: {x: 4}}],
                     cursor: {batchSize: 0},
-                    comment: `!!aggregate ${collName} test`,
+                    comment: makeUniqueComment("aggregate"),
                 });
             });
 
@@ -256,7 +260,7 @@ describe("originalQueryShapeHash appears in slow logs", function () {
                     aggregate: viewName,
                     pipeline: [{$match: {x: 4}}],
                     cursor: {batchSize: 0},
-                    comment: `!!aggregate view ${collName} test`,
+                    comment: makeUniqueComment("aggregate view"),
                 });
             });
 
@@ -264,7 +268,7 @@ describe("originalQueryShapeHash appears in slow logs", function () {
                 testQueryShapeHash({
                     count: collName,
                     query: {x: 4},
-                    comment: `!!count ${collName} test`,
+                    comment: makeUniqueComment("count"),
                 });
             });
 
@@ -272,7 +276,7 @@ describe("originalQueryShapeHash appears in slow logs", function () {
                 testQueryShapeHash({
                     count: viewName,
                     query: {x: 4},
-                    comment: `!!count view ${collName} test`,
+                    comment: makeUniqueComment("count view"),
                 });
             });
 
@@ -281,7 +285,7 @@ describe("originalQueryShapeHash appears in slow logs", function () {
                     distinct: collName,
                     key: "x",
                     query: {x: 4},
-                    comment: `!!distinct ${collName} test`,
+                    comment: makeUniqueComment("distinct"),
                 });
             });
 
@@ -290,7 +294,7 @@ describe("originalQueryShapeHash appears in slow logs", function () {
                     distinct: viewName,
                     key: "x",
                     query: {x: 4},
-                    comment: `!!distinct view ${collName} test`,
+                    comment: makeUniqueComment("distinct view"),
                 });
             });
         });
