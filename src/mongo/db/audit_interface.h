@@ -55,6 +55,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <set>

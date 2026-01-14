@@ -33,6 +33,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata/audit_attrs_gen.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -45,7 +46,7 @@ namespace mongo::rpc {
  * authenticated user or currently impersonated user. This is used to audit correct user
  * information for an operation.
  */
-class AuditUserAttrs : public AuditUserAttrsBase {
+class MONGO_MOD_PUBLIC AuditUserAttrs : public AuditUserAttrsBase {
 public:
     AuditUserAttrs(UserName userName, std::vector<RoleName> roleNames, bool isImpersonating)
         : AuditUserAttrsBase(std::move(userName), std::move(roleNames), isImpersonating) {}

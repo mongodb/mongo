@@ -34,6 +34,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata/audit_attrs_gen.h"
 #include "mongo/rpc/metadata/audit_metadata_gen.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
@@ -41,7 +42,7 @@
 
 namespace mongo::rpc {
 
-class AuditClientAttrs : public rpc::AuditClientAttrsBase {
+class MONGO_MOD_PUBLIC AuditClientAttrs : public rpc::AuditClientAttrsBase {
 public:
     AuditClientAttrs(HostAndPort local,
                      HostAndPort remote,

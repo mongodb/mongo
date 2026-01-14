@@ -54,6 +54,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <set>
@@ -82,7 +83,7 @@ namespace mutablebson {
 class Document;
 }  // namespace mutablebson
 
-namespace audit {
+namespace MONGO_MOD_PUBLIC audit {
 
 // AuditManager hooks.
 extern std::function<void(OperationContext*)> initializeManager;
@@ -93,7 +94,7 @@ extern std::function<void()> shutdownSynchronizeJob;
 /**
  * Narrow API for the parts of mongo::Command used by the audit library.
  */
-class CommandInterface {
+class MONGO_MOD_OPEN CommandInterface {
 public:
     virtual ~CommandInterface() = default;
     virtual std::set<StringData> sensitiveFieldNames() const = 0;
@@ -453,5 +454,5 @@ void logRotateLog(Client* client,
                   const std::vector<Status>& errors,
                   const std::string& suffix);
 
-}  // namespace audit
+}  // namespace MONGO_MOD_PUBLIC audit
 }  // namespace mongo

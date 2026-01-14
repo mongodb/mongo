@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/rpc/metadata/audit_metadata_gen.h"
 #include "mongo/rpc/metadata/impersonated_client_session.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 
@@ -41,7 +42,7 @@
 #include <boost/optional/optional.hpp>
 
 namespace mongo {
-namespace rpc {
+namespace MONGO_MOD_PUBLIC rpc {
 
 /*
  * The name of the BSON element in message metadata that contains the impersonated user and the
@@ -54,7 +55,7 @@ namespace rpc {
  *
  * This metadata should only appear in requests from mongos to mongod.
  */
-static constexpr auto kImpersonationMetadataSectionName = "$audit"_sd;
+MONGO_MOD_FILE_PRIVATE static constexpr auto kImpersonationMetadataSectionName = "$audit"_sd;
 
 /*
  * Sets the provided audit metadata on the AuditClientAttrs decorator (via
@@ -82,5 +83,5 @@ void writeAuditMetadata(OperationContext* opCtx, BSONObjBuilder* out);
 std::size_t estimateAuditMetadataSize(const AuditMetadata& md);
 std::size_t estimateAuditMetadataSize(OperationContext* opCtx);
 
-}  // namespace rpc
+}  // namespace MONGO_MOD_PUBLIC rpc
 }  // namespace mongo
