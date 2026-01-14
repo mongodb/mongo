@@ -177,6 +177,12 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     std::string errContext = std::string(strerror) + (reason ? " - " : "") + reason;
     auto s = generateContextStrStream(prefix, errContext.c_str(), retCode);
 
+    if (retCode == WT_DUPLICATE_KEY) {
+        return Status(ErrorCodes::DuplicateKey, s);
+    }
+    if (retCode == WT_NOTFOUND) {
+        return Status(ErrorCodes::NoSuchKey, s);
+    }
     if (retCode == EINVAL) {
         return Status(ErrorCodes::BadValue, s);
     }
