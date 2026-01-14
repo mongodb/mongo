@@ -99,10 +99,6 @@ public:
         return std::make_unique<LogicalStageType>(getName(), _arguments);
     };
 
-    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
-        return std::make_unique<TestAstNode>(_name, _arguments);
-    }
-
 protected:
     const mongo::BSONObj _arguments;
 };
@@ -128,10 +124,6 @@ public:
     }
     mongo::BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
         return BSON(_name << _arguments);
-    }
-
-    std::unique_ptr<sdk::AggStageParseNode> clone() const override {
-        return std::make_unique<TestParseNode>(_name, _arguments);
     }
 
 protected:
@@ -208,15 +200,29 @@ namespace sdk = mongo::extension::sdk;
  * Defines a default AstNode class implementation with the name <ExtensionName>AstNode. This class
  * will bind() to <ExtensionName>LogicalStage (which must also exist).
  */
-#define DEFAULT_AST_NODE(ExtensionName) \
-    using ExtensionName##AstNode = sdk::TestAstNode<ExtensionName##LogicalStage>;
+#define DEFAULT_AST_NODE(ExtensionName)                                                     \
+    class ExtensionName##AstNode : public sdk::TestAstNode<ExtensionName##LogicalStage> {   \
+    public:                                                                                 \
+        ExtensionName##AstNode(std::string_view stageName, const mongo::BSONObj& arguments) \
+            : sdk::TestAstNode<ExtensionName##LogicalStage>(stageName, arguments) {}        \
+        std::unique_ptr<sdk::AggStageAstNode> clone() const override {                      \
+            return std::make_unique<ExtensionName##AstNode>(getName(), _arguments);         \
+        }                                                                                   \
+    };
 
 /*
  * Defines a default ParseNode class implementation with the name <ExtensionName>ParseNode. This
  * class will expand() to <ExtensionName>AstNode (which must also exist).
  */
-#define DEFAULT_PARSE_NODE(ExtensionName) \
-    using ExtensionName##ParseNode = sdk::TestParseNode<ExtensionName##AstNode>;
+#define DEFAULT_PARSE_NODE(ExtensionName)                                                     \
+    class ExtensionName##ParseNode : public sdk::TestParseNode<ExtensionName##AstNode> {      \
+    public:                                                                                   \
+        ExtensionName##ParseNode(std::string_view stageName, const mongo::BSONObj& arguments) \
+            : sdk::TestParseNode<ExtensionName##AstNode>(stageName, arguments) {}             \
+        std::unique_ptr<sdk::AggStageParseNode> clone() const override {                      \
+            return std::make_unique<ExtensionName##ParseNode>(getName(), _arguments);         \
+        }                                                                                     \
+    };
 
 /**
  * Defines an extension that registers a single StageDescriptor with the given name prefix.

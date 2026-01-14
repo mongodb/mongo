@@ -965,6 +965,10 @@ public:
     ValidateSortKeyMetadataAstStage()
         : sdk::TestAstNode<ValidateSortKeyMetadataLogicalStage>(kSourceName, BSONObj()) {}
 
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return make();
+    }
+
     static inline std::unique_ptr<sdk::AggStageAstNode> make() {
         return std::make_unique<ValidateSortKeyMetadataAstStage>();
     }

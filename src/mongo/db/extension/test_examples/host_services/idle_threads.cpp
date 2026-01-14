@@ -98,6 +98,10 @@ public:
         return sdk::TestAstNode<sdk::shared_test_stages::TransformLogicalAggStage>::bind(
             catalogContext);
     }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        return std::make_unique<IdleThreadsAstNode>(getName(), _arguments);
+    }
 };
 
 DEFAULT_PARSE_NODE(IdleThreads);
