@@ -16,7 +16,6 @@
 - featureFlagGRPC
 - featureFlagCreateCollectionInPreparedTransactions
 - featureFlagSearchInSbe
-- featureFlagEgressGrpcForSearch
 - featureFlagTSBucketingParametersUnchanged
 - featureFlagGaplessFTDC
 # TODO SERVER-67034: re-enable 'featureFlagSbeFull'.
