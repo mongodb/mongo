@@ -128,15 +128,18 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise, atlas):
             )
 
         if persistent_compdb:
+            args = []
+            for arg in action["arguments"]:
+                if arg.startswith("bazel-out/"):
+                    arg = f"{symlink_prefix}out" + arg[len("bazel-out/") :]
+                elif arg.startswith("external/"):
+                    arg = f"{symlink_prefix}out/../../../external/" + arg[len("external/") :]
+                args.append(arg)
+
             output_json.append(
                 {
                     "file": input_file.replace("bazel-out", f"{symlink_prefix}out"),
-                    "arguments": [
-                        arg.replace("bazel-out", f"{symlink_prefix}out").replace(
-                            "external/", f"{symlink_prefix}out/../../../external/"
-                        )
-                        for arg in action["arguments"]
-                    ],
+                    "arguments": args,
                     "directory": repo_root_resolved,
                     "output": output_file.replace("bazel-out", f"{symlink_prefix}out"),
                 }
