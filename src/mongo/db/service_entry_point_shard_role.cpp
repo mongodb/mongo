@@ -1910,24 +1910,29 @@ void ExecCommandDatabase::_initiateCommand() {
                 OperationShardingState::setShardRole(
                     opCtx, invocationNss, shardVersion, databaseVersion);
 
-                // If a timeseries collection is sharded, only the buckets collection would be
-                // sharded. We expect all versioned commands to be sent over 'system.buckets'
-                // namespace. But it is possible that a stale mongos may send the request over a
-                // view namespace. In this case, we initialize the 'OperationShardingState' with
-                // both the invocation and buckets namespaces.
-                // TODO: SERVER-80719 revisit this.
-                auto bucketNss = invocationNss.makeTimeseriesBucketsNamespace();
-                auto catalog = CollectionCatalog::get(opCtx);
-                auto coll = catalog->lookupCollectionByNamespace(opCtx, bucketNss);
-
-                if (coll && coll->getTimeseriesOptions()) {
-                    // To guard against stale mongos instances, we intentionally enter the shard
-                    // role with an invalid <dbVersion, shardVersion> combination. This forces the
-                    // shard to go through the shard versioning protocol rather than bypassing it.
-                    // As a result, we must disable the versioning correctness check.
+                // For legacy viewful timeseries, a router may target the main namespace but the
+                // shard will translate the namespace and execute on the underlying timeseries
+                // system buckets.
+                //
+                // This NSS translation is only safe if both router and shard agree the collection
+                // is 'untracked'.
+                //
+                // We enforce this by initializing the 'OperationShardingState' with the timeseries
+                // system buckets namespace, but intentionally passing it the router's version for
+                // the main nss.
+                //
+                // This forces a check of the router's main namespace version vs. the shard's
+                // timeseries system buckets version. This check will only pass if both are
+                // 'untracked'. All other combinations (e.g., 'tracked' vs 'untracked', or 'tracked'
+                // vs 'tracked') will cause the shard to throw a StaleConfigInfo.
+                //
+                // TODO SERVER-117124 remove this workaround once 9.0 becomes last LTS and all
+                // timeseries are viewless
+                if (!invocationNss.isTimeseriesBucketsCollection()) {
+                    auto timeseriesBucketsNss = invocationNss.makeTimeseriesBucketsNamespace();
                     OperationShardingState::setShardRole(
                         opCtx,
-                        bucketNss,
+                        timeseriesBucketsNss,
                         shardVersion,
                         {},
                         true /* disableCheckVersioningCorrectness */);

@@ -1831,30 +1831,35 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
     // case there is a mismatch in the mongos request provided versions and the local (shard's)
     // understanding of the version.
     for (const auto& nsInfo : req.getNsInfo()) {
+        auto& invocationNss = nsInfo.getNs();
         auto& shardVersion = nsInfo.getShardVersion();
         auto& databaseVersion = nsInfo.getDatabaseVersion();
 
         if (shardVersion || databaseVersion) {
             OperationShardingState::setShardRole(
-                opCtx, nsInfo.getNs(), shardVersion, databaseVersion);
+                opCtx, invocationNss, shardVersion, databaseVersion);
 
-            // For timeseries, a router may target the main namespace but the shard will execute on
-            // the buckets namespace. This NSS translation is only safe if both router and shard
-            // agree the collection is 'untracked'.
+            // For legacy viewful timeseries, a router may target the main namespace but the shard
+            // will translate the namespace and execute on the underlying timeseries system buckets.
             //
-            // We enforce this by initializing the 'OperationShardingState' with the 'buckets_nss',
-            // but intentionally passing it the router's version for the main nss.
+            // This NSS translation is only safe if both router and shard agree the collection is
+            // 'untracked'.
             //
-            // This forces a check of the router's main_nss version vs. the shard's buckets_nss
-            // version. This check will only pass if both are 'untracked'. All other combinations
-            // (e.g., 'tracked' vs 'untracked', or 'tracked' vs 'tracked') will fail.
-            auto preConditions = timeseries::CollectionPreConditions::getCollectionPreConditions(
-                opCtx, nsInfo.getNs(), /*expectedUUID=*/boost::none);
-            if (nsInfo.getNs() != preConditions.getTargetNs(nsInfo.getNs())) {
-                OperationShardingState::setShardRole(opCtx,
-                                                     preConditions.getTargetNs(nsInfo.getNs()),
-                                                     shardVersion,
-                                                     databaseVersion);
+            // We enforce this by initializing the 'OperationShardingState' with the timeseries
+            // system buckets namespace, but intentionally passing it the router's version for the
+            // main nss.
+            //
+            // This forces a check of the router's main namespace version vs. the shard's timeseries
+            // system buckets version. This check will only pass if both are 'untracked'. All other
+            // combinations (e.g., 'tracked' vs 'untracked', or 'tracked' vs 'tracked') will cause
+            // the shard to throw a StaleConfigInfo.
+            //
+            // TODO SERVER-117124 remove this workaround once 9.0 becomes last LTS and all
+            // timeseries are viewless
+            if (!invocationNss.isTimeseriesBucketsCollection()) {
+                auto timeseriesBucketsNss = invocationNss.makeTimeseriesBucketsNamespace();
+                OperationShardingState::setShardRole(
+                    opCtx, timeseriesBucketsNss, shardVersion, databaseVersion);
             }
         }
 
