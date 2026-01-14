@@ -73,6 +73,7 @@ TEST_F(CBRForNoMPResultsTest, SingleSolutionDoesNotUseMultiPlanner) {
     ASSERT_EQ(status.getValue().rejectedPlans.size(), 0);
     ASSERT_EQ(status.getValue().estimates.size(), 0);
     ASSERT_EQ(strategy.getMultiPlanner(), boost::none);
+    ASSERT_EQ(status.getValue().needsWorksMeasured, false);
 }
 
 TEST_F(CBRForNoMPResultsTest, EOFMultiPlannerMakesADecisionWithoutCBR) {
@@ -103,6 +104,7 @@ TEST_F(CBRForNoMPResultsTest, EOFMultiPlannerMakesADecisionWithoutCBR) {
     ASSERT_EQ(stats->numResultsFound, 2);  // One result per plan
     ASSERT_EQ(stats->numCandidatePlans, 2);
     ASSERT_EQ(stats->totalWorks, 4);  // 2 works per plan (seek + advance)
+    ASSERT_EQ(status.getValue().needsWorksMeasured, false);
 }
 
 TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
@@ -134,6 +136,7 @@ TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
     ASSERT_EQ(stats->numResultsFound, 200);  // Batch filled during trials
     ASSERT_EQ(stats->numCandidatePlans, 2);
     ASSERT_EQ(stats->totalWorks, 202);  // 1 work to seek + 200 advances per plan
+    ASSERT_EQ(status.getValue().needsWorksMeasured, false);
 }
 
 TEST_F(CBRForNoMPResultsTest, LittleResultsMultiPlannerMakesADecisionWithoutCBR) {
@@ -165,6 +168,7 @@ TEST_F(CBRForNoMPResultsTest, LittleResultsMultiPlannerMakesADecisionWithoutCBR)
     ASSERT_EQ(stats->numResultsFound, 2);  // One per plan
     ASSERT_EQ(stats->numCandidatePlans, 2);
     ASSERT_EQ(stats->totalWorks, 20000);  // Each plan exhausted all credits (10k)
+    ASSERT_EQ(status.getValue().needsWorksMeasured, false);
 }
 
 TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
@@ -197,6 +201,7 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     ASSERT_EQ(stats->numResultsFound, 0);
     ASSERT_EQ(stats->numCandidatePlans, 2);
     ASSERT_EQ(stats->totalWorks, 10000);
+    ASSERT_EQ(status.getValue().needsWorksMeasured, true);
 }
 }  // namespace
 }  // namespace mongo
