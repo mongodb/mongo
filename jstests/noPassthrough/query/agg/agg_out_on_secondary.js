@@ -5,6 +5,8 @@
  *
  * @tags: [
  *   requires_replication,
+ *   # This test invokes db.setProfilingLevel()
+ *   requires_profiling,
  * ]
  */
 

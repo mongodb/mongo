@@ -184,7 +184,7 @@ assert.commandFailedWithCode(
 
 st.stop();
 
-const rst = new ReplSetTest({nodes: 3});
+const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 const rstDb = rst.getPrimary().getDB(dbName);

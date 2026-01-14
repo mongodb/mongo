@@ -249,7 +249,7 @@ function runTestMongos(st, collName, callback) {
 }
 
 {
-    const rst = new ReplSetTest({nodes: 3, nodeOptions: getQueryStatsServerParameters()});
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: getQueryStatsServerParameters()});
     rst.startSet();
     rst.initiate();
     const collName = makeUnshardedCollection(rst.getPrimary()).getName();

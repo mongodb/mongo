@@ -3530,6 +3530,16 @@ ReplSetTest.OpTimeType = {
     LAST_DURABLE: 2,
 };
 
+ReplSetTest.getNumNodesFromOptions = (opts) => {
+    if (isObject(opts.nodes)) {
+        return Object.keys(opts.nodes).length;
+    }
+    if (Array.isArray(opts.nodes)) {
+        return opts.nodes.length;
+    }
+    return opts.nodes;
+};
+
 /**
  * Constructor, which initializes the ReplSetTest object by starting new instances.
  */
@@ -3579,35 +3589,27 @@ function _constructStartNewInstances(rst, opts) {
 
     rst.nodeOptions = {};
 
-    let numNodes;
+    const numNodes = ReplSetTest.getNumNodesFromOptions(opts);
 
     if (isObject(opts.nodes)) {
-        let len = 0;
+        let nodeNum = 0;
         for (var i in opts.nodes) {
             // opts.nodeOptions and opts.nodes[i] may contain nested objects that have
             // the same key, e.g. setParameter. So we need to recursively merge them.
             // Object.assign and Object.merge do not merge nested objects of the same key.
-            let options = (rst.nodeOptions["n" + len] = _deepObjectMerge(opts.nodeOptions, opts.nodes[i]));
+            let options = (rst.nodeOptions["n" + nodeNum++] = _deepObjectMerge(opts.nodeOptions, opts.nodes[i]));
             if (i.startsWith("a")) {
                 options.arbiter = true;
             }
-
-            len++;
         }
-
-        numNodes = len;
     } else if (Array.isArray(opts.nodes)) {
         for (var i = 0; i < opts.nodes.length; i++) {
             rst.nodeOptions["n" + i] = Object.merge(opts.nodeOptions, opts.nodes[i]);
         }
-
-        numNodes = opts.nodes.length;
     } else {
         for (var i = 0; i < opts.nodes; i++) {
             rst.nodeOptions["n" + i] = opts.nodeOptions;
         }
-
-        numNodes = opts.nodes;
     }
 
     for (let i = 0; i < numNodes; i++) {

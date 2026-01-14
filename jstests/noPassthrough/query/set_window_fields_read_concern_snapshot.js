@@ -5,6 +5,7 @@
  *   requires_replication,
  *   uses_transactions,
  *   uses_snapshot_read_concern,
+ *   requires_profiling,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

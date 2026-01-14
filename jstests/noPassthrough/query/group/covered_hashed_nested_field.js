@@ -30,7 +30,7 @@ function runTestOnFixtures(runQueriesAndCompareResults) {
         MongoRunner.stopMongod(conn);
     }
     {
-        const rst = new ReplSetTest({nodes: 3});
+        const rst = new ReplSetTest({nodes: 2});
         rst.startSet();
         rst.initiate();
         runQueriesAndCompareResults(rst.getPrimary(), rst);

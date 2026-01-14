@@ -20,7 +20,7 @@ const samplingConfigs = [
 
 for (const config of samplingConfigs) {
     jsTestLog(`Testing with config: ${tojson(config)}`);
-    const rst = new ReplSetTest({nodes: 3, nodeOptions: config});
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: config});
 
     rst.startSet();
     rst.initiate();

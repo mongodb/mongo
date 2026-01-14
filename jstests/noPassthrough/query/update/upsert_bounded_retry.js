@@ -8,7 +8,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runOnReplsetAndShardedCluster(callbackFn) {
     {
-        const rst = new ReplSetTest({nodes: 3});
+        const rst = new ReplSetTest({nodes: 2});
         rst.startSet();
         rst.initiate();
 

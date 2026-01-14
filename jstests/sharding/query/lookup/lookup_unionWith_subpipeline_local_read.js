@@ -2,13 +2,12 @@
  * Tests $lookup, $graphLookup, and $unionWith in a sharded environment to verify the local read
  * behavior of subpipelines dispatched as part of these stages.
  *
- * Requires 7.3 to avoid multiversion problems because we updated targeting logic.
  * @tags: [
  *   requires_majority_read_concern,
- *   requires_fcv_73,
  *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
  *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
- *   requires_fcv_80
+ *   # This test invokes db.setProfilingLevel()
+ *   requires_profiling,
  * ]
  */
 

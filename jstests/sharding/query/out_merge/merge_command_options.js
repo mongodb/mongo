@@ -1,4 +1,9 @@
 // Tests that aggregations with a $merge stage respect the options set on the command.
+// @tags: [
+//   # This test invokes db.setProfilingLevel()
+//   requires_profiling,
+// ]
+
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

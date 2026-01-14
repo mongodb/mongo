@@ -1083,7 +1083,7 @@ export function runForEachDeployment(callbackFn) {
  */
 export function runOnReplsetAndShardedCluster(callbackFn) {
     {
-        const rst = new ReplSetTest({nodes: 3, nodeOptions: getQueryStatsServerParameters()});
+        const rst = new ReplSetTest({nodes: 2, nodeOptions: getQueryStatsServerParameters()});
         rst.startSet();
         rst.initiate();
 

@@ -2,6 +2,8 @@
  * Tests $sample pushdown on sharded time-series collections for a small collection size.
  *
  * @tags: [
+ *   # This test invokes db.setProfilingLevel()
+ *   requires_profiling,
  * ]
  */
 import {documentEq} from "jstests/aggregation/extras/utils.js";

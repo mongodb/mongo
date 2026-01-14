@@ -4,6 +4,7 @@
  *   # Slow Windows machines cause this test to be flaky. Increasing maxPlanningTimeMicros would
  *   # make the test less useful on Linux variants so we don't run on Windows.
  *   incompatible_with_windows_tls,
+ *   requires_profiling,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -5,6 +5,8 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_replication,
+ *   # This test invokes db.setProfilingLevel()
+ *   requires_profiling,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

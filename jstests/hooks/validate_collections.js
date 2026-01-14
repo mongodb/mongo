@@ -32,6 +32,11 @@ export class CollectionValidator {
             let hashesSet = false;
             returnData.forEach((res) => {
                 assert.commandWorked(res, "Collection validation failed");
+                if (TestData.skipInterNodeCollectionHashValidation) {
+                    jsTest.log.info("Skipping inter-node collection hash validation as per test configuration");
+                    return;
+                }
+
                 if (!hashesSet) {
                     if (!res.dbHashes || Object.keys(res.dbHashes).length === 0) {
                         return;

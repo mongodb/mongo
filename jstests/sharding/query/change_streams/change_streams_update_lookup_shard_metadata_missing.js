@@ -18,7 +18,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,
-    rs: {nodes: 3, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 5}},
+    rs: {nodes: 2, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 5}},
 });
 
 let mongosDB = st.s.getDB(jsTestName());

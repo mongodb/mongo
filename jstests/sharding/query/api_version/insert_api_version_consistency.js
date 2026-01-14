@@ -87,7 +87,7 @@ let test = function (db) {
 
 // Testing against a replica set.
 {
-    const rst = new ReplSetTest({nodes: 3});
+    const rst = new ReplSetTest({nodes: 2});
     rst.startSet();
     rst.initiate();
     const db = rst.getPrimary().getDB("test");
