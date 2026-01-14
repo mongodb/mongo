@@ -226,7 +226,11 @@ TEST(MyFeatureTest, RecordsMetrics) {
         otel::metrics::MetricUnit::kOperations);
     counter->add(5);
 
-    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kMyFeatureEvents), 5);
+    // Some variants don't currently include otel (notably Windows and some suse variants) so
+    // always condition on if metrics can be read if your tests will run in one of those variants.
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kMyFeatureEvents), 5);
+    }
 }
 
 }  // namespace mongo::otel::metrics

@@ -81,7 +81,9 @@ TEST_F(SessionManagerCommonTest, ConnectionsProcessedCounterWorks) {
 
     sm.startSession(session);
 
-    ASSERT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kConnectionsProcessed), 1);
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Counter(otel::metrics::MetricNames::kConnectionsProcessed), 1);
+    }
 }
 
 }  // namespace
