@@ -171,8 +171,6 @@ public:
         setupShardingState(svcCtx);
         setupOpObservers(svcCtx);
         setupStorage(svcCtx, getClusterRole());
-
-        _populateTestData(svcCtx);
     }
 
     void tearDownServiceContext(ServiceContext* svcCtx) override {
@@ -184,7 +182,7 @@ public:
         return ClusterRole::ShardServer;
     }
 
-private:
+protected:
     void _populateTestData(ServiceContext* svcCtx) {
         auto service = svcCtx->getService(getClusterRole());
         auto strand = ClientStrand::make(service->makeClient("db-initializer", nullptr));
@@ -201,6 +199,7 @@ private:
 
 BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_FIND_ONE)
 (benchmark::State& state) {
+    _populateTestData(getGlobalServiceContext());
     // clang-format off
     BSONObj cmd = BSON(
             "find" << kCollection
@@ -214,6 +213,7 @@ BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_FIND_ONE)
 
 BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_UPDATE_ONE)
 (benchmark::State& state) {
+    _populateTestData(getGlobalServiceContext());
     runBenchmark(state, [updateValue = int64_t{0}]() mutable {
         // clang-format off
         return BSON(
@@ -238,8 +238,28 @@ BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_UPDATE_ONE)
     });
 }
 
+BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_INSERT)(benchmark::State& state) {
+    auto cmd = std::invoke([&state] {
+        static const std::string data(256, 'x');
+        BSONObjBuilder bob;
+        bob.append("insert", kCollection);
+        bob.append("$db", kDatabase);
+        BSONArrayBuilder bab;
+        for (int i = 0; i < state.range(0); ++i) {
+            bab.append(BSON("data" << data));
+        }
+        bob.append("documents", bab.obj());
+        return bob.obj();
+    });
+    runBenchmark(state, [cmd] { return cmd; });
+}
+
 BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_FIND_ONE)->ThreadRange(1, kCommandBMMaxThreads);
 BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_UPDATE_ONE)->ThreadRange(1, kCommandBMMaxThreads);
+
+static constexpr unsigned long long minDocsToInsert{1};
+static constexpr unsigned long long maxDocsToInsert{4096};
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_INSERT)->Range(minDocsToInsert, maxDocsToInsert);
 
 }  // namespace
 }  // namespace mongo
