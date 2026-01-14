@@ -1456,6 +1456,17 @@ mongo_cc_benchmark(
     ],
 )
 
+mongo_cc_benchmark(
+    name = "field_path_bm",
+    srcs = ["field_path_bm.cpp"],
+    tags = ["query_bm"],
+    deps = [
+        ":field_path",
+        "//src/mongo/db/query:query_test_service_context",
+        "//src/mongo/db/query/compiler/ce:ce_test_utils",
+    ],
+)
+
 idl_generator(
     name = "document_source_coll_stats_gen",
     src = "document_source_coll_stats.idl",
