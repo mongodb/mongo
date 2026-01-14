@@ -48,7 +48,8 @@ public:
 
     static ShardVersion make(const ChunkManager& chunkManager, const ShardId& shardId);
 
-    static ShardVersion make(const CollectionMetadata& cm);
+    static ShardVersion make(const CollectionMetadata& cm,
+                             boost::optional<NamespaceString> nss = boost::none);
 
     // The other three builders should be used instead of this one whenever possible.
     static ShardVersion make(const ChunkVersion& chunkVersion);

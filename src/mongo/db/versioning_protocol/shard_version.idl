@@ -61,3 +61,13 @@ structs:
                     catalog and their local catalog. Only meant to be used for
                     inconsistency-recovery situations."
                 type: optionalBool
+            nss:
+                description:
+                    "The namespace associated with this ShardVersion. This field is populated only
+                    when TestingProctor is enabled and is used to validate that the ShardVersion
+                    attached to a command matches the command's target namespace. This validation
+                    helps prevent bugs where mismatched namespaces could lead to incorrect routing
+                    or versioning decisions. Not included in production builds to avoid performance
+                    overhead."
+                type: namespacestring
+                optional: true

@@ -42,6 +42,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #include <string>
@@ -131,6 +132,24 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
         // Ensure that command requests are sent with a valid <dbVersion, shardVersion> combination
         checkVersioningCorrectness(shardVersion, databaseVersion);
     }
+
+    // Namespace validation (matching ShardVersion's embedded nss against the operation's nss) is
+    // only enforced when TestingProctor is initialized and enabled, typically during testing.
+    // Additionally, validation is skipped for timeseries bucket collections where the physical
+    // bucket namespace (system.buckets.*) differs from the logical view namespace.
+    bool skipNssValidation = !TestingProctor::instance().isInitialized() ||
+        !TestingProctor::instance().isEnabled() || nss.isTimeseriesBucketsCollection();
+    // TODO SERVER-80719: Remove the timeseries exception once collection
+    // naming is unified.
+
+    tassert(11420200,
+            str::stream() << "ShardVersion nss mismatch: expected " << nss.toStringForErrorMsg()
+                          << ", but got "
+                          << (shardVersion && shardVersion->getNSS().has_value()
+                                  ? shardVersion->getNSS()->toStringForErrorMsg()
+                                  : "none"),
+            skipNssValidation || !shardVersion || !shardVersion->getNSS().has_value() ||
+                shardVersion->getNSS().get() == nss);
 
     bool shardVersionInserted = false;
     bool databaseVersionInserted = false;

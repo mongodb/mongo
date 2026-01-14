@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
 #include "mongo/util/modules.h"
 
@@ -66,7 +67,7 @@ public:
     ShardVersion() : _chunkVersion(ChunkVersion()) {}
 
     static ShardVersion UNTRACKED() {
-        return ShardVersion(ChunkVersion::UNTRACKED(), boost::none);
+        return ShardVersion(ChunkVersion::UNTRACKED(), boost::none, boost::none);
     }
 
     static bool isPlacementVersionIgnored(const ShardVersion& version) {
@@ -113,11 +114,17 @@ public:
     std::string toString() const;
     BSONObj toBSON() const;
 
+    const boost::optional<NamespaceString>& getNSS() const {
+        return _nss;
+    }
+
 private:
     ShardVersion(ChunkVersion chunkVersion,
-                 const boost::optional<LogicalTime>& placementConflictTime)
-        : _chunkVersion(chunkVersion), _placementConflictTime(placementConflictTime) {}
-
+                 const boost::optional<LogicalTime>& placementConflictTime,
+                 boost::optional<NamespaceString> nss)
+        : _chunkVersion(chunkVersion),
+          _placementConflictTime(placementConflictTime),
+          _nss(std::move(nss)) {}
     friend class ShardVersionFactory;
 
     ChunkVersion _chunkVersion;
@@ -126,6 +133,8 @@ private:
     // When set to true, shards will ignore collection UUID mismatches between the sharding catalog
     // and their local catalog.
     bool _ignoreShardingCatalogUuidMismatch = false;
+
+    boost::optional<NamespaceString> _nss;
 };
 
 inline std::ostream& operator<<(std::ostream& s, const ShardVersion& v) {
