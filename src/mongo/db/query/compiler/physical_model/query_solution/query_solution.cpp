@@ -2036,7 +2036,7 @@ HashJoinEmbeddingNode::HashJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> 
     for (auto&& joinPred : joinPredicates) {
         tassert(10976202,
                 "HashJoinEmbeddingNode only supports equijoin predicates",
-                joinPred.op == QSNJoinPredicate::ComparisonOp::Eq);
+                joinPred.isEquality());
     }
 }
 
@@ -2051,15 +2051,7 @@ void BinaryJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const 
     *ss << "joinPredicates:\n";
     for (auto&& joinPred : joinPredicates) {
         addIndent(ss, indent + 2);
-        std::string op = [&joinPred] {
-            switch (joinPred.op) {
-                case QSNJoinPredicate::ComparisonOp::Eq:
-                    return "=";
-            }
-            return "(unknown op)";
-        }();
-        *ss << joinPred.leftField.fullPath() << " " << op << " " << joinPred.rightField.fullPath()
-            << "\n";
+        *ss << joinPred.toString() << "\n";
     }
     addIndent(ss, indent + 1);
     *ss << "Outer:\n";

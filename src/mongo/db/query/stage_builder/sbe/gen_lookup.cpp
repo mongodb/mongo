@@ -1897,9 +1897,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
             }
         }
 
-        tassert(10984704,
-                "Unknown operation in join predicate",
-                predicate.op == QSNJoinPredicate::ComparisonOp::Eq);
+        // TODO SERVER-113276: Support $expr eq.
+        tassert(10984704, "Unknown operation in join predicate", predicate.isEquality());
 
         // Generate an expression for one predicate, which evaluates a path on each document and
         // compares the resulting values. Any path that fails to evaluate, because of a missing or
@@ -1965,9 +1964,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildHashJoinEmbedding
 
     SbExprOptSlotVector leftPrj, rightPrj;
     for (const auto& predicate : hashJoinEmbeddingNode->joinPredicates) {
-        tassert(11122104,
-                "Unknown operation in join predicate",
-                predicate.op == QSNJoinPredicate::ComparisonOp::Eq);
+        // TODO SERVER-113276: Support $expr eq.
+        tassert(11122104, "Unknown operation in join predicate", predicate.isEquality());
 
         // Create an expression for each side of the predicate, and add it to a $project stage to be
         // placed on top of the source stages. Any path that fails to evaluate, because of a missing
@@ -2078,9 +2076,8 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexedJoinEmbedd
     std::vector<FieldPath> foreignPaths;
     StringSet dedupForeignPaths;
     for (const auto& predicate : indexedJoinEmbeddingNode->joinPredicates) {
-        tassert(11122204,
-                "Unknown operation in join predicate",
-                predicate.op == QSNJoinPredicate::ComparisonOp::Eq);
+        // TODO SERVER-113276: Support $expr eq.
+        tassert(11122204, "Unknown operation in join predicate", predicate.isEquality());
 
         // Create an expression for the left side of the predicate, and add it to a ProjectStage
         // to be placed on top of the source stages. Any path that fails to evaluate, because of a

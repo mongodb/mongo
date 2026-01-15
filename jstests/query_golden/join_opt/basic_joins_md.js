@@ -350,3 +350,27 @@ runBasicJoinTest([
     {$lookup: {from: foreignColl3.getName(), as: "z", localField: "a", foreignField: "_id"}},
     {$unwind: "$z"},
 ]);
+
+section("Basic example with $expr predicates");
+runBasicJoinTest([
+    {
+        $lookup: {
+            from: foreignColl1.getName(),
+            as: "x",
+            let: {a: "$a"},
+            pipeline: [{$match: {$expr: {$eq: ["$a", "$$a"]}}}],
+        },
+    },
+    {$unwind: "$x"},
+    {
+        $lookup: {
+            from: foreignColl2.getName(),
+            as: "z",
+            let: {b: "$b"},
+            pipeline: [{$match: {$expr: {$eq: ["$b", "$$b"]}}}],
+        },
+    },
+    {$unwind: "$z"},
+    {$lookup: {from: foreignColl3.getName(), as: "y", localField: "x.c", foreignField: "c"}},
+    {$unwind: "$y"},
+]);

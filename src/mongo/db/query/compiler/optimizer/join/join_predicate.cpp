@@ -38,6 +38,8 @@ std::string opToString(QSNJoinPredicate::ComparisonOp op) {
     switch (op) {
         case QSNJoinPredicate::ComparisonOp::Eq:
             return "=";
+        case QSNJoinPredicate::ComparisonOp::ExprEq:
+            return "$=";
     }
     MONGO_UNREACHABLE_TASSERT(11083901);
 }

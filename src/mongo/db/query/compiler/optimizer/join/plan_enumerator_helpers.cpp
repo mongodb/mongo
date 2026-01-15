@@ -155,7 +155,7 @@ QSNJoinPredicate::ComparisonOp convertToPhysicalOperator(JoinPredicate::Operator
         case JoinPredicate::Eq:
             return QSNJoinPredicate::ComparisonOp::Eq;
         case JoinPredicate::ExprEq:
-            return QSNJoinPredicate::ComparisonOp::Eq;
+            return QSNJoinPredicate::ComparisonOp::ExprEq;
     }
     MONGO_UNREACHABLE_TASSERT(11075702);
 }

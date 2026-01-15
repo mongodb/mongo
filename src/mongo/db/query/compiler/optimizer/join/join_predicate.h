@@ -38,7 +38,10 @@ namespace mongo {
  */
 struct QSNJoinPredicate {
     enum class ComparisonOp {
+        // Regular equality (null == missing).
         Eq,
+        // "Strict" $expr equality (null != missing).
+        ExprEq
     };
 
     ComparisonOp op;
@@ -50,9 +53,11 @@ struct QSNJoinPredicate {
     FieldPath leftField;
     FieldPath rightField;
 
+    bool isEquality() const {
+        return op == ComparisonOp::Eq || op == ComparisonOp::ExprEq;
+    }
+
     std::string toString() const;
 };
-
-std::ostream& operator<<(std::ostream& out, const QSNJoinPredicate& jp);
 
 }  // namespace mongo
