@@ -31,6 +31,7 @@
 
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_role/transaction_resources.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/mutex.h"

@@ -82,7 +82,7 @@ struct PlanExecutorShardingState {
      * will be set to a future that becomes ready when the critical section ends. This future can be
      * waited on to hold off resuming the plan execution while the critical section is still active.
      */
-    boost::optional<SharedSemiFuture<void>> criticalSectionFuture;
+    boost::optional<CriticalSectionSignal> criticalSectionFuture;
     /**
      * If a plan yielded because it needed to refresh a sharding catalog cache, then
      * 'catalogCacheRefreshRequired' will be set to the nss for which the CatalogCache needs to be

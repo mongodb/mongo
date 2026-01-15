@@ -157,7 +157,7 @@ public:
         void waitForCriticalSectionToComplete(OperationContext* opCtx,
                                               const DatabaseName& dbName,
                                               const BSONObj& movePrimaryReason) {
-            auto criticalSectionSignal = [&]() -> boost::optional<SharedSemiFuture<void>> {
+            auto criticalSectionSignal = [&]() -> boost::optional<CriticalSectionSignal> {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
                 const auto scopedDsr =
                     DatabaseShardingRuntime::assertDbLockedAndAcquireShared(opCtx, dbName);

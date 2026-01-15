@@ -568,9 +568,9 @@ void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationConte
                 Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_X, Date_t::max(), dbLockOptions};
                 auto scopedDsr =
                     DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());
-                scopedDsr->enterCriticalSectionCatchUpPhase(doc.getReason());
+                scopedDsr->enterCriticalSectionCatchUpPhase(opCtx, doc.getReason());
                 if (doc.getBlockReads()) {
-                    scopedDsr->enterCriticalSectionCommitPhase(doc.getReason());
+                    scopedDsr->enterCriticalSectionCommitPhase(opCtx, doc.getReason());
                 }
             } else {
                 Lock::DBLock dbLock{opCtx, nss.dbName(), MODE_IX, Date_t::max(), dbLockOptions};
@@ -578,9 +578,9 @@ void ShardingRecoveryService::_recoverRecoverableCriticalSections(OperationConte
                 auto scopedCsr =
                     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
                                                                                          nss);
-                scopedCsr->enterCriticalSectionCatchUpPhase(doc.getReason());
+                scopedCsr->enterCriticalSectionCatchUpPhase(opCtx, doc.getReason());
                 if (doc.getBlockReads()) {
-                    scopedCsr->enterCriticalSectionCommitPhase(doc.getReason());
+                    scopedCsr->enterCriticalSectionCommitPhase(opCtx, doc.getReason());
                 }
             }
 
@@ -633,7 +633,7 @@ void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx) {
         Lock::CollectionLock collLock{opCtx, nss, MODE_IX};
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
-        scopedCsr->exitCriticalSectionNoChecks();
+        scopedCsr->exitCriticalSectionNoChecks(opCtx);
     }
 
     // ShardingRecoveryService can bypass the critical section to recover database metadata as there
@@ -644,7 +644,7 @@ void ShardingRecoveryService::_resetInMemoryStates(OperationContext* opCtx) {
     for (const auto& dbName : DatabaseShardingState::getDatabaseNames(opCtx)) {
         Lock::DBLock dbLock{opCtx, dbName, MODE_X, Date_t::max(), dbLockOptions};
         auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-        scopedDsr->exitCriticalSectionNoChecks();
+        scopedDsr->exitCriticalSectionNoChecks(opCtx);
         scopedDsr->clearDbMetadata(opCtx);
     }
 

@@ -48,6 +48,7 @@
 #include "mongo/db/shard_role/shard_catalog/shard_filtering_metadata_refresh.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -467,15 +468,60 @@ TEST_F(DatabaseShardingRuntimeTestWithMockedLoader,
     AutoGetDb autoDb(operationContext(), kDbName, MODE_X);
     const auto dsr =
         DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);
-    dsr->enterCriticalSectionCatchUpPhase(BSONObj());
-    dsr->enterCriticalSectionCommitPhase(BSONObj());
+    dsr->enterCriticalSectionCatchUpPhase(operationContext(), BSONObj());
+    dsr->enterCriticalSectionCommitPhase(operationContext(), BSONObj());
 
     ASSERT_THROWS_CODE(dsr->checkDbVersionOrThrow(operationContext(),
                                                   DatabaseVersion(UUID::gen(), Timestamp(10, 0))),
                        AssertionException,
                        ErrorCodes::StaleDbVersion);
 
-    ASSERT_DOES_NOT_THROW(dsr->exitCriticalSection(BSONObj()));
+    ASSERT_DOES_NOT_THROW(dsr->exitCriticalSection(operationContext(), BSONObj()));
+}
+
+TEST_F(DatabaseShardingRuntimeTestWithMockedLoader, CheckCriticalSectionMetricsAreReported) {
+    // If critical section is active, then throw.
+    AutoGetDb autoDb(operationContext(), kDbName, MODE_X);
+    const auto dsr =
+        DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(operationContext(), kDbName);
+
+    auto getStatistics = [&] {
+        auto& shardingStatistics = ShardingStatistics::get(operationContext());
+        BSONObjBuilder builder;
+        shardingStatistics.report(&builder);
+        auto fullMetrics = builder.obj();
+        return fullMetrics.getObjectField("databaseCriticalSectionStatistics").getOwned();
+    };
+
+    auto metrics = getStatistics();
+    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
+    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 0);
+
+    dsr->enterCriticalSectionCatchUpPhase(operationContext(), BSONObj());
+
+    metrics = getStatistics();
+    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 1);
+    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 0);
+    ASSERT_EQ(metrics["totalTimeActiveCommitMillis"].safeNumberLong(), 0);
+
+    dsr->enterCriticalSectionCommitPhase(operationContext(), BSONObj());
+
+    metrics = getStatistics();
+    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
+    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 1);
+    ASSERT_EQ(metrics["totalTimeActiveCatchupMillis"].safeNumberLong(), 0);
+
+    sleepmillis(20);
+    metrics = getStatistics();
+    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
+    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 1);
+    ASSERT_GTE(metrics["totalTimeActiveCommitMillis"].safeNumberLong(), 20);
+
+    ASSERT_DOES_NOT_THROW(dsr->exitCriticalSection(operationContext(), BSONObj()));
+
+    metrics = getStatistics();
+    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
+    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 0);
 }
 
 class BypassDatabaseMetadataAccessTest : public ServiceContextMongoDTest {};
