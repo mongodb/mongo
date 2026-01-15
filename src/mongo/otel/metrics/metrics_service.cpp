@@ -304,8 +304,7 @@ Counter<T>* MetricsService::createCounter(MetricName name,
     }
 
     // Make the raw counter.
-    auto counter = std::make_unique<CounterImpl<T>>(
-        std::string(nameStr), description, std::string(toString(unit)));
+    auto counter = std::make_unique<CounterImpl<T>>();
     Counter<T>* const counter_ptr = counter.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(counter)};
 
