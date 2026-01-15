@@ -12,8 +12,6 @@
  *   does_not_support_transactions,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
- *   # TODO (SERVER-88964, SERVER-90971, SERVER-91702, SERVER-87931): Enable this test
- *   exclude_when_record_ids_replicated,
  *   # Relies on internalInsertMaxBatchSize to be 64 or above, but it may be fuzzed to lower values.
  *   does_not_support_config_fuzzer,
  *  ]

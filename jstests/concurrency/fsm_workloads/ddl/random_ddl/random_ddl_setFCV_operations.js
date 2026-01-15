@@ -8,8 +8,6 @@
  *   multiversion_incompatible,
  *   # TODO (SERVER-104171) Remove the 'assumes_balancer_off' tag
  *   assumes_balancer_off,
- *   # TODO (SERVER-88964, SERVER-90971, SERVER-91702, SERVER-87931): Enable this test
- *   exclude_when_record_ids_replicated
  *  ]
  */
 

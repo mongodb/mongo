@@ -10,8 +10,6 @@
  *   multiversion_incompatible,
  *   # TODO (SERVER-88539) Remove the 'assumes_balancer_off' tag
  *   assumes_balancer_off,
- *   # TODO (SERVER-91702): Enable this test
- *   exclude_when_record_ids_replicated,
  *   # Interrupting resharding on stepdown suites might leave garbage that will make setFCV to fail
  *   does_not_support_stepdowns,
  *   # Currently all DDL are not compatible with transactions, it does not make sense to run this

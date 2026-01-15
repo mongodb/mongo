@@ -57,6 +57,7 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/router_role/router_role.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/scoped_read_concern.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -1120,6 +1121,15 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataConsistencyAcrossS
                 'md.timeseriesBucketingParametersHaveChanged': 0,
                 'md.timeseriesBucketsMayHaveMixedSchemaData': 0
             }})"));
+        // TODO (SERVER-91702): Remove the exclusion once the race with downgrade is fixed.
+        if (const auto& provider =
+                rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+            !provider.shouldUseReplicatedRecordIds()) {
+            pipeline.emplace_back(fromjson(R"(
+                {$project: {
+                    'md.options.recordIdsReplicated': 0
+                }})"));
+        }
         pipeline.emplace_back(fromjson(R"(
             {$facet: {
                 options: [
