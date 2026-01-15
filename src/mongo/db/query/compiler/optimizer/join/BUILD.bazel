@@ -154,3 +154,13 @@ mongo_cc_library(
         "//src/mongo/unittest",
     ],
 )
+
+mongo_cc_library(
+    name = "join_estimates",
+    srcs = [
+        "join_estimates.cpp",
+    ],
+    deps = [
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
+    ],
+)
