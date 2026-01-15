@@ -51,6 +51,7 @@ const BSONField<std::string> ShardType::name("_id");
 const BSONField<std::string> ShardType::host("host");
 const BSONField<bool> ShardType::draining("draining");
 const BSONField<BSONArray> ShardType::tags("tags");
+// TODO SERVER-116437 Remove once 9.0 becomes last lts.
 const BSONField<ShardType::ShardState> ShardType::state("state");
 const BSONField<Timestamp> ShardType::topologyTime("topologyTime");
 const BSONField<long long> ShardType::replSetConfigVersion("replSetConfigVersion");
@@ -106,27 +107,6 @@ StatusWith<ShardType> ShardType::fromBSON(const BSONObj& source) {
                                             << typeName(tagElement.type()));
             }
             shard._tags->push_back(tagElement.String());
-        }
-    }
-
-    {
-        long long shardState;
-        Status status = bsonExtractIntegerField(source, state.name(), &shardState);
-        if (status.isOK()) {
-            // Make sure the state field falls within the valid range of ShardState values.
-            if (!(shardState >= static_cast<std::underlying_type<ShardState>::type>(
-                                    ShardState::kNotShardAware) &&
-                  shardState <= static_cast<std::underlying_type<ShardState>::type>(
-                                    ShardState::kShardAware))) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "Invalid shard state value: " << shardState);
-            } else {
-                shard._state = static_cast<ShardState>(shardState);
-            }
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // state field can be mssing in which case it is presumed kNotShardAware
-        } else {
-            return status;
         }
     }
 
@@ -191,8 +171,6 @@ BSONObj ShardType::toBSON() const {
         builder.append(draining(), getDraining());
     if (_tags)
         builder.append(tags(), getTags());
-    if (_state)
-        builder.append(state(), static_cast<std::underlying_type<ShardState>::type>(getState()));
     if (_topologyTime)
         builder.append(topologyTime(), getTopologyTime());
     if (_replSetConfigVersion)
@@ -221,11 +199,6 @@ void ShardType::setDraining(const bool isDraining) {
 void ShardType::setTags(const std::vector<std::string>& tags) {
     invariant(tags.size() > 0);
     _tags = tags;
-}
-
-void ShardType::setState(const ShardState state) {
-    invariant(!_state.has_value());
-    _state = state;
 }
 
 void ShardType::setTopologyTime(const Timestamp& topologyTime) {

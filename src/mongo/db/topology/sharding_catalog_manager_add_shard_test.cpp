@@ -391,7 +391,6 @@ protected:
         ASSERT_EQUALS(expectedShard.getName(), foundShard.getName());
         ASSERT_EQUALS(expectedShard.getHost(), foundShard.getHost());
         ASSERT_EQUALS(expectedShard.getDraining(), foundShard.getDraining());
-        ASSERT_EQUALS((int)expectedShard.getState(), (int)foundShard.getState());
         ASSERT_TRUE(foundShard.getTags().empty());
     }
 
@@ -446,7 +445,6 @@ protected:
         ShardType expectedShard;
         expectedShard.setName(expectedShardName);
         expectedShard.setHost(connString.toString());
-        expectedShard.setState(ShardType::ShardState::kShardAware);
 
         DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
                                   ShardId(expectedShardName),
@@ -889,7 +887,6 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     ShardType expectedShard;
     expectedShard.setName(expectedShardName);
     expectedShard.setHost(connString.toString());
-    expectedShard.setState(ShardType::ShardState::kShardAware);
 
     DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
                               ShardId(expectedShardName),
@@ -980,7 +977,6 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     ShardType expectedShard;
     expectedShard.setName(expectedShardName);
     expectedShard.setHost(fullConnString.toString());
-    expectedShard.setState(ShardType::ShardState::kShardAware);
 
     DatabaseType discoveredDB(DatabaseName::createDatabaseName_forTest(boost::none, "shardDB"),
                               ShardId(expectedShardName),
@@ -1069,7 +1065,6 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
     ShardType existingShard;
     existingShard.setName(existingShardName);
     existingShard.setHost(shardTarget.toString());
-    existingShard.setState(ShardType::ShardState::kShardAware);
 
     // Make sure the shard already exists.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
@@ -1168,7 +1163,6 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
     ShardType existingShard;
     existingShard.setName(existingShardName);
     existingShard.setHost(connString.toString());
-    existingShard.setState(ShardType::ShardState::kShardAware);
 
     // Make sure the shard already exists.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
@@ -1326,7 +1320,6 @@ TEST_F(AddShardTest, AddShardWithOverlappingHosts) {
     ShardType existingShard;
     existingShard.setName(existingShardName);
     existingShard.setHost(connString.toString());
-    existingShard.setState(ShardType::ShardState::kShardAware);
 
     // Make sure the shard already exists.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),

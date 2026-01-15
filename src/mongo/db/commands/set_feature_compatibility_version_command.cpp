@@ -1224,6 +1224,11 @@ private:
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion())
                 .from;
 
+        // TODO SERVER-116437: Remove once 9.0 becomes last lts.
+        if (role && role->has(ClusterRole::ConfigServer)) {
+            _removeShardStateFromConfigCollection(opCtx);
+        }
+
         // TODO SERVER-103046: Remove once 9.0 becomes last lts.
         if (role && role->has(ClusterRole::ShardServer) &&
             feature_flags::gTerminateSecondaryReadsUponRangeDeletion
@@ -1919,6 +1924,37 @@ private:
                   "Failed to create config.system.sessions on upgrade",
                   "error"_attr = redact(ex));
         }
+    }
+
+    // TODO SERVER-116437 Remove once 9.0 becomes last lts.
+    void _removeShardStateFromConfigCollection(OperationContext* opCtx) {
+        // Prevent concurrent add/remove shard operations.
+        Lock::ExclusiveLock shardMembershipLock =
+            ShardingCatalogManager::get(opCtx)->acquireShardMembershipLockForTopologyChange(opCtx);
+
+        LOGV2(11354300, "Updating 'config.shards' entries to remove 'state' field");
+
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigsvrShardsNamespace);
+        updateOp.setUpdates({[&] {
+            const auto filter = BSON(ShardType::state << BSON("$exists" << true));
+            const auto update = BSON("$unset" << BSON(ShardType::state << ""));
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(filter);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            entry.setUpsert(false);
+            // We want to remove the 'state' field from all entries.
+            entry.setMulti(true);
+            return entry;
+        }()});
+        updateOp.setWriteConcern(defaultMajorityWriteConcern());
+
+        DBDirectClient client(opCtx);
+        const auto result = client.update(updateOp);
+        write_ops::checkWriteErrors(result);
+
+        LOGV2(11354301,
+              "Update of 'config.shards' entries succeeded",
+              "updateResponse"_attr = result.toBSON());
     }
 
     // _finalizeUpgrade is only for any tasks that must be done to fully complete the FCV upgrade

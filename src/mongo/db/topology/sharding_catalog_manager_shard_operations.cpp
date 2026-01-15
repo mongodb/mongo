@@ -533,7 +533,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     ShardType shardType;
     shardType.setName(shardName);
     shardType.setHost(targeter->connectionString().toString());
-    shardType.setState(ShardType::ShardState::kShardAware);
     shardType.setTopologyTime(newTopologyTime.asTimestamp());
 
     LOGV2(21942,

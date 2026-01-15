@@ -15,10 +15,9 @@ const checkShardingStateInitialized = function (conn, configConnStr, shardName, 
     assert.soon(() => configConnStr == conn.adminCommand({shardingState: 1}).configServer);
 };
 
-const checkShardMarkedAsShardAware = function (mongosConn, shardName) {
+const checkShardInConfigDotShards = function (mongosConn, shardName) {
     const res = mongosConn.getDB("config").getCollection("shards").findOne({_id: shardName});
     assert.neq(null, res, "Could not find new shard " + shardName + " in config.shards");
-    assert.eq(1, res.state);
 };
 
 // Create the cluster to test adding shards to.
@@ -34,7 +33,7 @@ replTest.initiate();
 jsTest.log("Going to add replica set as shard: " + tojson(replTest));
 assert.commandWorked(st.s.adminCommand({addShard: replTest.getURL(), name: newShardName}));
 checkShardingStateInitialized(replTest.getPrimary(), st.configRS.getURL(), newShardName, clusterId);
-checkShardMarkedAsShardAware(st.s, newShardName);
+checkShardInConfigDotShards(st.s, newShardName);
 
 replTest.stopSet();
 

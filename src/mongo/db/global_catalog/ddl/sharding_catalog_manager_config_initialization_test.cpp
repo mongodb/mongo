@@ -135,7 +135,6 @@ protected:
         static uint32_t numInvocations = 0;
         const std::string host("localhost:" + std::to_string(30000 + numInvocations++));
         ShardType shard(shardId.toString(), host);
-        shard.setState(ShardType::ShardState::kShardAware);
         ASSERT_OK(insertToConfigCollection(
             opCtx, NamespaceString::kConfigsvrShardsNamespace, shard.toBSON()));
         return shard;

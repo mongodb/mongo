@@ -120,11 +120,6 @@ public:
     }
     void setTags(const std::vector<std::string>& tags);
 
-    ShardState getState() const {
-        return _state.value_or(ShardState::kNotShardAware);
-    }
-    void setState(ShardState state);
-
     Timestamp getTopologyTime() const {
         return _topologyTime.value_or(Timestamp());
     }
@@ -146,8 +141,6 @@ private:
     boost::optional<bool> _draining;
     // (O) shard tags
     boost::optional<std::vector<std::string>> _tags;
-    // (O) shard state
-    boost::optional<ShardState> _state;
     // (O) topologyTime
     boost::optional<Timestamp> _topologyTime;
     // (O) repl set config version.

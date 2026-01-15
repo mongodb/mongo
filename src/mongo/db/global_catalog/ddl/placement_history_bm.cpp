@@ -181,8 +181,7 @@ private:
         for (int i = 1; i <= nShards; i++) {
             const std::string shardName = "shard" + std::to_string(i);
             const std::string shardHost = "localhost:" + std::to_string(30000 + i);
-            const auto& doc = BSON("_id" << shardName << "host" << shardHost << "state"
-                                         << ShardType::ShardState::kShardAware);
+            const auto& doc = BSON("_id" << shardName << "host" << shardHost);
             configShardData.push_back(doc);
         }
 
