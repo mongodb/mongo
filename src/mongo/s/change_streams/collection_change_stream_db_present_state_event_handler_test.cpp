@@ -116,7 +116,7 @@ using CollectionDbPresentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTes
 
 DEATH_TEST_REGEX_F(CollectionDbPresentStateEventHandlerStrictModeFixtureDeathTest,
                    Given_DatabaseCreatedControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*IllegalOperation") {
+                   "Tripwire assertion.*11600503") {
     handler().handleEvent(opCtx(), DatabaseCreatedControlEvent{}, ctx(), readerCtx());
 }
 
@@ -326,7 +326,7 @@ TEST_F(
 
 DEATH_TEST_REGEX_F(CollectionDbPresentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_DatabaseCreatedControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*IllegalOperation") {
+                   "Tripwire assertion.*11600503") {
     handler().handleEvent(opCtx(), DatabaseCreatedControlEvent{}, ctx(), readerCtx());
 }
 
@@ -511,16 +511,11 @@ DEATH_TEST_REGEX_F(CollectionDbPresentStateEventHandlerIgnoreRemovedShardsModeFi
     handler().handleEventInDegradedMode(opCtx(), event, ctx(), readerCtx());
 }
 
-TEST_F(CollectionDbPresentStateEventHandlerIgnoreRemovedShardsModeFixture,
-       When_HandleEventInDegradedModeIsCalledForDatabaseCreated_Then_DoesNotModifyCursors) {
+DEATH_TEST_REGEX_F(CollectionDbPresentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
+                   When_HandleEventInDegradedModeIsCalledForDatabaseCreated_Then_Throws,
+                   "Tripwire assertion.*11600501") {
     readerCtx().setDegradedMode(true);
-    auto result = handler().handleEventInDegradedMode(
-        opCtx(), DatabaseCreatedControlEvent{}, ctx(), readerCtx());
-    ASSERT_EQ(result, ShardTargeterDecision::kContinue);
-
-    assertNoCursorOperations();
-
-    ASSERT_EQ(ctx().setHandlerCalls.size(), 0);
+    handler().handleEventInDegradedMode(opCtx(), DatabaseCreatedControlEvent{}, ctx(), readerCtx());
 }
 
 TEST_F(CollectionDbPresentStateEventHandlerIgnoreRemovedShardsModeFixture,

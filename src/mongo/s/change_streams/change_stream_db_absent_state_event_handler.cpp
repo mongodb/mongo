@@ -44,7 +44,7 @@ ShardTargeterDecision ChangeStreamShardTargeterDbAbsentStateEventHandler::handle
     const ControlEvent& event,
     ChangeStreamShardTargeterStateEventHandlingContext& ctx,
     ChangeStreamReaderContext& readerCtx) {
-    tassert(ErrorCodes::IllegalOperation,
+    tassert(11600502,
             "Only DatabaseCreatedControlEvent can be processed in DbAbsent state.",
             std::holds_alternative<DatabaseCreatedControlEvent>(event));
     Timestamp clusterTime = std::get<DatabaseCreatedControlEvent>(event).clusterTime;

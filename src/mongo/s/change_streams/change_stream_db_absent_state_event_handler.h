@@ -37,10 +37,15 @@ namespace mongo {
 class ChangeStreamShardTargeterDbAbsentStateEventHandler
     : public ChangeStreamShardTargeterStateEventHandler {
 public:
+    ChangeStreamShardTargeterStateEventHandler::DbPresenceState getDbPresenceState()
+        const override {
+        return ChangeStreamShardTargeterStateEventHandler::DbPresenceState::kDbAbsent;
+    }
+
     /**
      * Handles DatabaseCreatedControlEvent by fetching the placement history, closing the cursor on
-     * the configsvr and opening a cursor on the data shard. Throws IllegalOperation for other
-     * ControlEvents as it violates a design invariant.
+     * the configsvr and opening a cursor on the data shard. Tasserts for other control events, as
+     * it violates a design invariant.
      */
     ShardTargeterDecision handleEvent(OperationContext* opCtx,
                                       const ControlEvent& event,
@@ -48,8 +53,8 @@ public:
                                       ChangeStreamReaderContext& readerCtx) override;
 
     /**
-     * Throws IllegalOperation exception. This method should not be called for this state as it
-     * violates the design invariant.
+     * Always tasserts. This method should not be called for this state, as it violates the design
+     * invariant.
      */
     ShardTargeterDecision handleEventInDegradedMode(
         OperationContext* opCtx,

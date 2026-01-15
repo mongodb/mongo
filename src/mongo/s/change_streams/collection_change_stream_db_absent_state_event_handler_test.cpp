@@ -40,7 +40,6 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
-
 namespace mongo {
 namespace {
 NamespaceString makeTestNss() {
@@ -109,19 +108,19 @@ using CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest
 
 DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
                    Given_MovePrimaryControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*IllegalOperation") {
+                   "Tripwire assertion.*11600502") {
     handler().handleEvent(opCtx(), MovePrimaryControlEvent{}, ctx(), readerCtx());
 }
 
 DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
                    Given_MoveChunkControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*IllegalOperation") {
+                   "Tripwire assertion.*11600502") {
     handler().handleEvent(opCtx(), MoveChunkControlEvent{}, ctx(), readerCtx());
 }
 
 DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerStrictModeFixtureDeathTest,
                    Given_NamespacePlacementChangedControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*IllegalOperation") {
+                   "Tripwire assertion.*11600502") {
     handler().handleEvent(opCtx(), NamespacePlacementChangedControlEvent{}, ctx(), readerCtx());
 }
 
@@ -205,19 +204,19 @@ TEST_F(
 
 DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_MovePrimaryControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*IllegalOperation") {
+                   "Tripwire assertion.*11600502") {
     handler().handleEvent(opCtx(), MovePrimaryControlEvent{}, ctx(), readerCtx());
 }
 
 DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_MoveChunkControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*IllegalOperation") {
+                   "Tripwire assertion.*11600502") {
     handler().handleEvent(opCtx(), MoveChunkControlEvent{}, ctx(), readerCtx());
 }
 
 DEATH_TEST_REGEX_F(CollectionDbAbsentStateEventHandlerIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_NamespacePlacementChangedControlEvent_When_HandleEventIsCalled_Then_Throws,
-                   "Tripwire assertion.*IllegalOperation") {
+                   "Tripwire assertion.*11600502") {
     handler().handleEvent(opCtx(), NamespacePlacementChangedControlEvent{}, ctx(), readerCtx());
 }
 

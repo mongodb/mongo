@@ -74,6 +74,17 @@ public:
  */
 class ChangeStreamShardTargeterStateEventHandler {
 public:
+    enum class DbPresenceState {
+        // Unknown state.
+        kUnknown,
+
+        // Database is absent.
+        kDbAbsent,
+
+        // Database is present.
+        kDbPresent,
+    };
+
     virtual ~ChangeStreamShardTargeterStateEventHandler() = default;
 
     /**
@@ -98,5 +109,11 @@ public:
      * Returns the name of the event handler.
      */
     virtual std::string toString() const = 0;
+
+
+    /**
+     * Returns the db presence state (absent/present/unknown) for this event handler.
+     */
+    virtual DbPresenceState getDbPresenceState() const = 0;
 };
 }  // namespace mongo

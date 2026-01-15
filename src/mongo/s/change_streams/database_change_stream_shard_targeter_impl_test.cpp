@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/change_streams/collection_change_stream_shard_targeter_impl.h"
+#include "mongo/s/change_streams/database_change_stream_shard_targeter_impl.h"
 
 #include "mongo/db/pipeline/change_stream_read_mode.h"
 #include "mongo/db/pipeline/change_stream_reader_context_mock.h"
@@ -48,11 +48,11 @@ namespace mongo {
 namespace {
 
 NamespaceString makeTestNss() {
-    return NamespaceString::createNamespaceString_forTest("testDb.testColl");
+    return NamespaceString::createNamespaceString_forTest("testDb");
 }
 
 template <ChangeStreamReadMode ReadMode>
-class CollectionChangeStreamShardTargeterImplFixture : public ServiceContextTest {
+class DatabaseChangeStreamShardTargeterImplFixture : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
@@ -60,25 +60,25 @@ public:
         _fetcher = std::make_unique<HistoricalPlacementFetcherMock>();
         if constexpr (ReadMode == ChangeStreamReadMode::kStrict) {
             _readerCtx = std::make_unique<ChangeStreamReaderContextMock>(ChangeStream(
-                ChangeStreamReadMode::kStrict, ChangeStreamType::kCollection, makeTestNss()));
+                ChangeStreamReadMode::kStrict, ChangeStreamType::kDatabase, makeTestNss()));
         } else {
             _readerCtx = std::make_unique<ChangeStreamReaderContextMock>(
                 ChangeStream(ChangeStreamReadMode::kIgnoreRemovedShards,
-                             ChangeStreamType::kCollection,
+                             ChangeStreamType::kDatabase,
                              makeTestNss()));
         }
-        _targeter = std::make_unique<CollectionChangeStreamShardTargeterImpl>(std::move(_fetcher));
+        _targeter = std::make_unique<DatabaseChangeStreamShardTargeterImpl>(std::move(_fetcher));
     }
 
     OperationContext* opCtx() {
         return _opCtx.get();
     }
 
-    const CollectionChangeStreamShardTargeterImpl& targeter() const {
+    const DatabaseChangeStreamShardTargeterImpl& targeter() const {
         return *_targeter;
     }
 
-    CollectionChangeStreamShardTargeterImpl& targeter() {
+    DatabaseChangeStreamShardTargeterImpl& targeter() {
         return *_targeter;
     }
 
@@ -104,31 +104,31 @@ public:
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<ChangeStreamReaderContextMock> _readerCtx;
-    std::unique_ptr<CollectionChangeStreamShardTargeterImpl> _targeter;
+    std::unique_ptr<DatabaseChangeStreamShardTargeterImpl> _targeter;
     std::unique_ptr<HistoricalPlacementFetcherMock> _fetcher;
 };
 
-using CollectionChangeStreamShardTargeterImplStrictModeFixture =
-    CollectionChangeStreamShardTargeterImplFixture<ChangeStreamReadMode::kStrict>;
-using CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture =
-    CollectionChangeStreamShardTargeterImplFixture<ChangeStreamReadMode::kIgnoreRemovedShards>;
+using DatabaseChangeStreamShardTargeterImplStrictModeFixture =
+    DatabaseChangeStreamShardTargeterImplFixture<ChangeStreamReadMode::kStrict>;
+using DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture =
+    DatabaseChangeStreamShardTargeterImplFixture<ChangeStreamReadMode::kIgnoreRemovedShards>;
 
-using CollectionChangeStreamShardTargeterImplStrictModeFixtureDeathTest =
-    CollectionChangeStreamShardTargeterImplStrictModeFixture;
-using CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest =
-    CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture;
+using DatabaseChangeStreamShardTargeterImplStrictModeFixtureDeathTest =
+    DatabaseChangeStreamShardTargeterImplStrictModeFixture;
+using DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest =
+    DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture;
 
 // Tests for strict mode.
 // ----------------------
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplStrictModeFixtureDeathTest,
+DEATH_TEST_REGEX_F(DatabaseChangeStreamShardTargeterImplStrictModeFixtureDeathTest,
                    Given_StrictMode_When_StartChangeStreamSegment_Then_Throws,
                    "Tripwire assertion.*10922911") {
     Timestamp clusterTime(10, 1);
     targeter().startChangeStreamSegment(opCtx(), clusterTime, readerCtx());
 }
 
-TEST_F(CollectionChangeStreamShardTargeterImplStrictModeFixture,
+TEST_F(DatabaseChangeStreamShardTargeterImplStrictModeFixture,
        Given_PlacementNotAvailable_When_Initialize_Then_ReturnsSwitchToV1AndDoesNotOpenCursors) {
     Timestamp clusterTime(10, 1);
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -141,7 +141,7 @@ TEST_F(CollectionChangeStreamShardTargeterImplStrictModeFixture,
     ASSERT_TRUE(readerCtx().openCursorOnConfigServerCalls.empty());
 }
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplStrictModeFixtureDeathTest,
+DEATH_TEST_REGEX_F(DatabaseChangeStreamShardTargeterImplStrictModeFixtureDeathTest,
                    Given_FuturePlacement_When_Initialize_Then_Throws,
                    "Tripwire assertion.*10720100") {
     Timestamp clusterTime(20, 1);
@@ -153,7 +153,7 @@ DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplStrictModeFixtureDeath
 }
 
 TEST_F(
-    CollectionChangeStreamShardTargeterImplStrictModeFixture,
+    DatabaseChangeStreamShardTargeterImplStrictModeFixture,
     Given_NoShardsInPlacement_When_Initialize_Then_ConfigsvrCursorOpenedAndEventHandlerSetToDbAbsent) {
     Timestamp clusterTime(11, 2);
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -170,7 +170,7 @@ TEST_F(
 }
 
 TEST_F(
-    CollectionChangeStreamShardTargeterImplStrictModeFixture,
+    DatabaseChangeStreamShardTargeterImplStrictModeFixture,
     Given_ActiveShardsInPlacement_When_Initialize_Then_OpensDataShardCursorsAndEventHandlerSetToDbPresent) {
     Timestamp clusterTime(13, 5);
     std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
@@ -190,14 +190,14 @@ TEST_F(
     ASSERT_TRUE(isInDbPresentState());
 }
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplStrictModeFixtureDeathTest,
+DEATH_TEST_REGEX_F(DatabaseChangeStreamShardTargeterImplStrictModeFixtureDeathTest,
                    Given_NoEventHandlerSet_When_HandleEvent_Then_Throws,
                    "Tripwire assertion.*10720101") {
     Document event(BSON("operationType" << MoveChunkControlEvent::opType));
     targeter().handleEvent(opCtx(), event, readerCtx());
 }
 
-TEST_F(CollectionChangeStreamShardTargeterImplStrictModeFixture,
+TEST_F(DatabaseChangeStreamShardTargeterImplStrictModeFixture,
        Given_HandlerSet_When_HandleEvent_Then_ParsesEventAndDelegatesToHandler) {
     targeter().setEventHandler(std::make_unique<ChangeStreamShardTargeterEventHandlerMock>(
         ShardTargeterDecision::kContinue, ShardTargeterDecision::kContinue));
@@ -238,14 +238,14 @@ TEST_F(CollectionChangeStreamShardTargeterImplStrictModeFixture,
 // Tests for ignoreRemovedShards mode.
 // -----------------------------------
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
+DEATH_TEST_REGEX_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_IgnoreRemovedShardsMode_When_Initialize_Then_Throws,
                    "Tripwire assertion.*10922910") {
     Timestamp clusterTime(10, 1);
     targeter().initialize(opCtx(), clusterTime, readerCtx());
 }
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
+DEATH_TEST_REGEX_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_FuturePlacement_When_StartChangeStreamSegment_Then_Throws,
                    "Tripwire assertion.*10917001") {
     Timestamp clusterTime(20, 1);
@@ -256,7 +256,7 @@ DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsMod
     targeter().startChangeStreamSegment(opCtx(), clusterTime, readerCtx());
 }
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
+DEATH_TEST_REGEX_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_OpenCursorAtBeforeAtClusterTime_When_StartChangeStreamSegment_Then_Throws,
                    "Tripwire assertion.*10922901") {
     std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
@@ -273,7 +273,7 @@ DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsMod
 }
 
 DEATH_TEST_REGEX_F(
-    CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
+    DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
     Given_NextPlacementChangedAtBeforeOpenCursorAt_When_StartChangeStreamSegment_Then_Throws,
     "Tripwire assertion.*10922902") {
     std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
@@ -291,7 +291,7 @@ DEATH_TEST_REGEX_F(
 }
 
 DEATH_TEST_REGEX_F(
-    CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
+    DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
     Given_NextPlacementChangedAtWithoutShards_When_StartChangeStreamSegment_Then_Throws,
     "Tripwire assertion.*10922913") {
     Timestamp clusterTime(20, 1);
@@ -306,7 +306,7 @@ DEATH_TEST_REGEX_F(
 }
 
 TEST_F(
-    CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
+    DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     Given_PlacementNotAvailable_When_StartChangeStreamSegment_Then_ReturnsSwitchToV1AndDoesNotOpenCursors) {
     Timestamp clusterTime(10, 1);
     std::vector<HistoricalPlacementFetcherMock::Response> responses{
@@ -320,7 +320,7 @@ TEST_F(
     ASSERT_TRUE(readerCtx().openCursorOnConfigServerCalls.empty());
 }
 
-TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
+TEST_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
        Given_PlacementWithoutShards_When_StartChangeStreamSegment_Then_OpensCursorOnConfigSvr) {
     Timestamp clusterTime(20, 1);
 
@@ -338,7 +338,7 @@ TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     ASSERT_TRUE(isInDbAbsentState());
 }
 
-TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
+TEST_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
        Given_PlacementWithShards_When_StartChangeStreamSegment_Then_OpensCursorOnDataShards) {
     std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardB")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
@@ -362,7 +362,7 @@ TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
 }
 
 TEST_F(
-    CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
+    DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     Given_PlacementWithShardsAndUnboundedSegmentInFuture_When_StartChangeStreamSegment_Then_OpensCursorOnDataShardsAtSegmentStart) {
     std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardC")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
@@ -388,7 +388,7 @@ TEST_F(
 }
 
 TEST_F(
-    CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
+    DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     Given_PlacementWithShardsAndBoundedSegment_When_StartChangeStreamSegment_Then_OpensCursorOnDataShardsAtSegmentStart) {
     std::vector<ShardId> shards{ShardId("shardA"), ShardId("shardC")};
     stdx::unordered_set<ShardId> shardSet(shards.begin(), shards.end());
@@ -415,7 +415,7 @@ TEST_F(
     ASSERT_TRUE(isInDbPresentState());
 }
 
-TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
+TEST_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
        Given_CursorIsOpenOnConfigShard_When_HandleEvent_Then_OpensCursorOnDataShards) {
     // First invocation of 'startChangeStreamSegment()' opens a cursor on the config server.
     {
@@ -465,7 +465,7 @@ TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
 }
 
 TEST_F(
-    CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
+    DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
     Given_MultipleChangeStreamSegments_When_StartChangeStreamSegment_Then_OpensCursorOnDataShardsAtSegmentStart) {
     // First invocation of 'startChangeStreamSegment()' opens cursors on three shards.
     {
@@ -528,14 +528,14 @@ TEST_F(
     }
 }
 
-DEATH_TEST_REGEX_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
+DEATH_TEST_REGEX_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixtureDeathTest,
                    Given_NoEventHandlerSet_When_HandleEvent_Then_Throws,
                    "Tripwire assertion.*10720101") {
     Document event(BSON("operationType" << MoveChunkControlEvent::opType));
     targeter().handleEvent(opCtx(), event, readerCtx());
 }
 
-TEST_F(CollectionChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
+TEST_F(DatabaseChangeStreamShardTargeterImplIgnoreRemovedShardsModeFixture,
        Given_HandlerSet_When_HandleEvent_Then_ParsesEventAndDelegatesToHandler) {
     targeter().setEventHandler(std::make_unique<ChangeStreamShardTargeterEventHandlerMock>(
         ShardTargeterDecision::kContinue, ShardTargeterDecision::kContinue));

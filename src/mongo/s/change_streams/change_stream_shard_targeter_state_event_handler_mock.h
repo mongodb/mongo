@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/historical_placement_fetcher_mock.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -81,6 +82,12 @@ public:
     explicit ChangeStreamShardTargeterEventHandlerMock(ShardTargeterDecision normal,
                                                        ShardTargeterDecision degraded)
         : normalDecision(normal), degradedDecision(degraded) {}
+
+    ChangeStreamShardTargeterStateEventHandler::DbPresenceState getDbPresenceState()
+        const override {
+        // The mock does not know about absence/presence of the database.
+        return ChangeStreamShardTargeterStateEventHandler::DbPresenceState::kUnknown;
+    }
 
     ShardTargeterDecision handleEvent(OperationContext*,
                                       const ControlEvent& e,

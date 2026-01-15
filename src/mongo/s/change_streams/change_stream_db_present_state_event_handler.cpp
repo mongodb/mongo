@@ -31,8 +31,8 @@
 
 #include "mongo/db/pipeline/change_stream.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/change_streams/control_events.h"
 #include "mongo/s/change_streams/shard_targeter_helper.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
 #include <variant>
@@ -58,7 +58,7 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
                 return handleMoveChunk(opCtx, e, ctx, readerCtx);
             },
             [&](const DatabaseCreatedControlEvent&) {
-                tasserted(ErrorCodes::IllegalOperation,
+                tasserted(11600503,
                           "DatabaseCreatedControlEvent can not be processed in DbPresent state");
                 return ShardTargeterDecision::kContinue;
             }},
@@ -75,6 +75,10 @@ ChangeStreamShardTargeterDbPresentStateEventHandler::handleEventInDegradedMode(
         10922909,
         "Change stream reader must be in degraded mode when calling 'handleEventInDegradedMode()'",
         readerCtx.inDegradedMode());
+
+    tassert(11600501,
+            "DatabaseCreatedControlEvent can not be processed in DbPresent state",
+            !std::holds_alternative<DatabaseCreatedControlEvent>(event));
 
     // In degraded mode, requests to open and/or close cursors cannot be made - the set of tracked
     // shards for a bounded change stream segment is fixed.

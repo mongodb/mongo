@@ -1,5 +1,6 @@
 /**
- * Smoke tests for $changeStream v2, ignoreRemovedShards mode in a sharded cluster.
+ * Smoke tests for v2 collection-level change streams, ignoreRemovedShards mode in a sharded
+ * cluster.
  *
  * @tags: [
  *   # Assume balancer is off, and we do not get random moveChunk events during the test.
@@ -529,9 +530,9 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         // Insert a few documents on the just-added shard.
         insertDocumentOnShard({_id: 6, a: 6}, newShard);
         insertDocumentOnShard({_id: 7, a: 7}, newShard);
-        coll.drop();
+        assertDropCollection(db, coll.getName());
 
-        // Read the newly inserted document from the just-added shard.
+        // Read the newly inserted documents from the just-added shard.
         csTest.assertNextChangesEqual({
             cursor: csCursor,
             expectedChanges: [
@@ -545,7 +546,7 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
         csTest.assertNoChange(csCursor);
     });
 
-    it("does not return events in ignoreRemovedShards mode for a non-existing database", () => {
+    it("does not return events in ignoreRemovedShards mode for a non-existing collection", () => {
         // Record high-watermark time marking the start point of the test.
         const startAtOperationTime = getClusterTime(db);
 
@@ -563,37 +564,6 @@ describe("$changeStream v2, ignoreRemovedShards mode", function () {
                 },
             ],
             collection: coll.getName(),
-        });
-
-        csTest.assertNoChange(csCursor);
-    });
-
-    it("does not return events in ignoreRemovedShards mode for a non-existing collection", () => {
-        // Enable sharding on the the test database and ensure that the primary is shard0.
-        assert.commandWorked(
-            db.adminCommand({
-                enableSharding: db.getName(),
-                primaryShard: st.shard0.shardName,
-            }),
-        );
-
-        // Record high-watermark time marking the start point of the test.
-        const startAtOperationTime = getClusterTime(db);
-
-        // Open a change stream on a non-existing collection in ignoreRemovedShards mode from the
-        // original start point, and assume that there are no events.
-        csTest = new ChangeStreamTest(db);
-        const csCursor = csTest.startWatchingChanges({
-            pipeline: [
-                {
-                    $changeStream: {
-                        version: "v2",
-                        ignoreRemovedShards: true,
-                        startAtOperationTime,
-                    },
-                },
-            ],
-            collection: coll.getName() + "-does-not-exist",
         });
 
         csTest.assertNoChange(csCursor);

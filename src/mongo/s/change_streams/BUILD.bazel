@@ -16,6 +16,7 @@ mongo_cc_library(
         "change_stream_db_absent_state_event_handler.cpp",
         "change_stream_db_present_state_event_handler.cpp",
         "change_stream_reader_builder_impl.cpp",
+        "change_stream_shard_targeter_base.cpp",
         "collection_change_stream_db_absent_state_event_handler.cpp",
         "collection_change_stream_db_present_state_event_handler.cpp",
         "collection_change_stream_shard_targeter_impl.cpp",
@@ -61,6 +62,7 @@ mongo_cc_unit_test(
         "data_to_shards_allocation_query_service_impl_test.cpp",
         "database_change_stream_db_absent_state_event_handler_test.cpp",
         "database_change_stream_db_present_state_event_handler_test.cpp",
+        "database_change_stream_shard_targeter_impl_test.cpp",
     ],
     tags = ["mongo_unittest_fifth_group"],
     deps = [

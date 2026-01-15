@@ -33,41 +33,24 @@
 #include "mongo/db/pipeline/change_stream_reader_context.h"
 #include "mongo/db/pipeline/change_stream_shard_targeter.h"
 #include "mongo/db/pipeline/historical_placement_fetcher.h"
+#include "mongo/s/change_streams/change_stream_shard_targeter_base.h"
 #include "mongo/s/change_streams/change_stream_shard_targeter_state_event_handler.h"
-#include "mongo/s/change_streams/control_events.h"
 #include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 
 namespace mongo {
 
-class DatabaseChangeStreamShardTargeterImpl : public ChangeStreamShardTargeter,
-                                              ChangeStreamShardTargeterStateEventHandlingContext {
+class DatabaseChangeStreamShardTargeterImpl : public ChangeStreamShardTargeterBase {
 public:
     DatabaseChangeStreamShardTargeterImpl(std::unique_ptr<HistoricalPlacementFetcher> fetcher)
-        : _fetcher(std::move(fetcher)) {}
+        : ChangeStreamShardTargeterBase(std::move(fetcher)) {}
 
-    ShardTargeterDecision initialize(OperationContext* opCtx,
-                                     Timestamp atClusterTime,
-                                     ChangeStreamReaderContext& context) override;
+    std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> createDbAbsentHandler()
+        const override;
 
-    std::pair<ShardTargeterDecision, boost::optional<Timestamp>> startChangeStreamSegment(
-        OperationContext* opCtx,
-        Timestamp atClusterTime,
-        ChangeStreamReaderContext& context) override;
-
-    ShardTargeterDecision handleEvent(OperationContext* opCtx,
-                                      const Document& event,
-                                      ChangeStreamReaderContext& context) override;
-
-    HistoricalPlacementFetcher& getHistoricalPlacementFetcher() const override;
-
-    void setEventHandler(
-        std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> eventHandler) override;
-
-private:
-    std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> _eventHandler = nullptr;
-    std::unique_ptr<HistoricalPlacementFetcher> _fetcher;
+    std::unique_ptr<ChangeStreamShardTargeterStateEventHandler> createDbPresentHandler()
+        const override;
 };
 
 }  // namespace mongo

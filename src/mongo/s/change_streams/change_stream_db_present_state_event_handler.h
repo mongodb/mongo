@@ -37,6 +37,11 @@ namespace mongo {
 class ChangeStreamShardTargeterDbPresentStateEventHandler
     : public ChangeStreamShardTargeterStateEventHandler {
 public:
+    ChangeStreamShardTargeterStateEventHandler::DbPresenceState getDbPresenceState()
+        const override {
+        return ChangeStreamShardTargeterStateEventHandler::DbPresenceState::kDbPresent;
+    }
+
     ShardTargeterDecision handleEvent(OperationContext* opCtx,
                                       const ControlEvent& event,
                                       ChangeStreamShardTargeterStateEventHandlingContext& ctx,
