@@ -342,9 +342,11 @@ def get_visibility(
                 return GetVisibilityResult("private")
 
     if c.normalized_parent:
-        return get_visibility(
+        parent_vis = get_visibility(
             c.normalized_parent, scanning_parent=True, last_non_ns_parent=last_non_ns_parent
         )
+        if parent_vis.attr != "UNKNOWN":
+            return parent_vis
 
     # At top level: break recursion
     default_vis = "private" if in_complete_header else "UNKNOWN"
