@@ -292,7 +292,7 @@ T* MetricsService::getDuplicateMetric(WithLock,
 }
 
 template <typename T>
-Counter<T>* MetricsService::createCounter(MetricName name,
+Counter<T>& MetricsService::createCounter(MetricName name,
                                           std::string description,
                                           MetricUnit unit) {
     const std::string nameStr(name.getName());
@@ -300,7 +300,7 @@ Counter<T>* MetricsService::createCounter(MetricName name,
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Counter<T>>(lock, nameStr, identifier);
     if (duplicate) {
-        return duplicate;
+        return *duplicate;
     }
 
     // Make the raw counter.
@@ -320,29 +320,29 @@ Counter<T>* MetricsService::createCounter(MetricName name,
     _observableInstruments.push_back(std::move(observableCounter));
 #endif  // MONGO_CONFIG_OTEL
 
-    return counter_ptr;
+    return *counter_ptr;
 }
 
-Counter<int64_t>* MetricsService::createInt64Counter(MetricName name,
+Counter<int64_t>& MetricsService::createInt64Counter(MetricName name,
                                                      std::string description,
                                                      MetricUnit unit) {
     return createCounter<int64_t>(name, description, unit);
 }
 
-Counter<double>* MetricsService::createDoubleCounter(MetricName name,
+Counter<double>& MetricsService::createDoubleCounter(MetricName name,
                                                      std::string description,
                                                      MetricUnit unit) {
     return createCounter<double>(name, description, unit);
 }
 
 template <typename T>
-Gauge<T>* MetricsService::createGauge(MetricName name, std::string description, MetricUnit unit) {
+Gauge<T>& MetricsService::createGauge(MetricName name, std::string description, MetricUnit unit) {
     std::string nameStr(name.getName());
     MetricIdentifier identifier{.description = description, .unit = unit};
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Gauge<T>>(lock, nameStr, identifier);
     if (duplicate) {
-        return duplicate;
+        return *duplicate;
     }
 
     // Make the raw gauge.
@@ -362,22 +362,22 @@ Gauge<T>* MetricsService::createGauge(MetricName name, std::string description, 
     _observableInstruments.push_back(std::move(observableGauge));
 #endif  // MONGO_CONFIG_OTEL
 
-    return gauge_ptr;
+    return *gauge_ptr;
 }
 
-Gauge<int64_t>* MetricsService::createInt64Gauge(MetricName name,
+Gauge<int64_t>& MetricsService::createInt64Gauge(MetricName name,
                                                  std::string description,
                                                  MetricUnit unit) {
     return createGauge<int64_t>(name, description, unit);
 }
 
-Gauge<double>* MetricsService::createDoubleGauge(MetricName name,
+Gauge<double>& MetricsService::createDoubleGauge(MetricName name,
                                                  std::string description,
                                                  MetricUnit unit) {
     return createGauge<double>(name, description, unit);
 }
 
-Histogram<double>* MetricsService::createDoubleHistogram(
+Histogram<double>& MetricsService::createDoubleHistogram(
     MetricName name,
     std::string description,
     MetricUnit unit,
@@ -387,7 +387,7 @@ Histogram<double>* MetricsService::createDoubleHistogram(
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Histogram<double>>(lock, nameStr, identifier);
     if (duplicate) {
-        return duplicate;
+        return *duplicate;
     }
 
 #ifdef MONGO_CONFIG_OTEL
@@ -404,10 +404,10 @@ Histogram<double>* MetricsService::createDoubleHistogram(
     auto* histogram_ptr = histogram.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
 
-    return histogram_ptr;
+    return *histogram_ptr;
 }
 
-Histogram<int64_t>* MetricsService::createInt64Histogram(
+Histogram<int64_t>& MetricsService::createInt64Histogram(
     MetricName name,
     std::string description,
     MetricUnit unit,
@@ -417,7 +417,7 @@ Histogram<int64_t>* MetricsService::createInt64Histogram(
     stdx::lock_guard lock(_mutex);
     auto duplicate = getDuplicateMetric<Histogram<int64_t>>(lock, nameStr, identifier);
     if (duplicate) {
-        return duplicate;
+        return *duplicate;
     }
 
     const std::string unitStr(toString(unit));
@@ -435,7 +435,7 @@ Histogram<int64_t>* MetricsService::createInt64Histogram(
     auto* histogram_ptr = histogram.get();
     _metrics[nameStr] = {.identifier = std::move(identifier), .metric = std::move(histogram)};
 
-    return histogram_ptr;
+    return *histogram_ptr;
 }
 
 void MetricsService::appendMetricsForServerStatus(BSONObjBuilder& bsonBuilder) const {

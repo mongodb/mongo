@@ -41,6 +41,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/otel/metrics/metric_unit.h"
+#include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
@@ -140,6 +141,11 @@ std::size_t getSupportedMax() {
 
     return supportedMax;
 }
+
+auto& connectionsProcessedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
+    otel::metrics::MetricNames::kConnectionsProcessed,
+    "Total number of ingress connections processed (accepted or rejected)",
+    otel::metrics::MetricUnit::kConnections);
 
 }  // namespace
 
@@ -270,12 +276,7 @@ SessionManagerCommon::SessionManagerCommon(
     : _svcCtx(svcCtx),
       _maxOpenSessions(getSupportedMax()),
       _sessions(std::make_unique<Sessions>()),
-      _observers(std::move(observers)) {
-    _connectionsProcessedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
-        otel::metrics::MetricNames::kConnectionsProcessed,
-        "Total number of ingress connections processed (accepted or rejected)",
-        otel::metrics::MetricUnit::kConnections);
-}
+      _observers(std::move(observers)) {}
 
 SessionManagerCommon::~SessionManagerCommon() = default;
 
@@ -283,7 +284,7 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     invariant(session);
     IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 
-    _connectionsProcessedCounter->add(1);
+    connectionsProcessedCounter.add(1);
 
     serverGlobalParams.maxIncomingConnsOverride.refreshSnapshot(maxIncomingConnsOverride);
     const bool isPrivilegedSession = session->isConnectedToMaintenancePort() ||

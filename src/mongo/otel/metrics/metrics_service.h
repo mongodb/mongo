@@ -62,48 +62,48 @@ public:
     }
 
     /**
-     * Creates a counter with the provided parameters. The result is never null but will throw an
+     * Creates a counter with the provided parameters. The function will throw an exception if the
+     * counter would collide with an existing metric (i.e., same name but different type or other
+     * parameters). Metrics should be stashed once they are created to avoid taking a lock on the
+     * global list of metrics in performance-sensitive codepaths.
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    Counter<int64_t>& createInt64Counter(MetricName name, std::string description, MetricUnit unit);
+
+    /**
+     * Creates a counter with the provided parameters. The function will throw an exception if the
+     * counter would collide with an existing metric (i.e., same name but different type or other
+     * parameters). Metrics should be stashed once they are created to avoid taking a lock on the
+     * global list of metrics in performance-sensitive codepaths.
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    Counter<double>& createDoubleCounter(MetricName name, std::string description, MetricUnit unit);
+
+    /**
+     * Creates or returns an existing gauge with the provided parameters. The function will throw an
+     * exception if the gauge would collide with an different metric (i.e., same name but different
+     * type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    Gauge<int64_t>& createInt64Gauge(MetricName name, std::string description, MetricUnit unit);
+
+    /**
+     * Creates or returns an existing gauge with the provided parameters. The function will throw an
+     * exception if the gauge would collide with an different metric (i.e., same name but different
+     * type or other parameters).
+     *
+     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
+     */
+    Gauge<double>& createDoubleGauge(MetricName name, std::string description, MetricUnit unit);
+
+    /**
+     * Creates an int64_t histogram with the provided parameters. The function will throw an
      * exception if the counter would collide with an existing metric (i.e., same name but different
      * type or other parameters). Metrics should be stashed once they are created to avoid taking a
      * lock on the global list of metrics in performance-sensitive codepaths.
-     *
-     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
-     */
-    Counter<int64_t>* createInt64Counter(MetricName name, std::string description, MetricUnit unit);
-
-    /**
-     * Creates a counter with the provided parameters. The result is never null but will throw an
-     * exception if the counter would collide with an existing metric (i.e., same name but different
-     * type or other parameters). Metrics should be stashed once they are created to avoid taking a
-     * lock on the global list of metrics in performance-sensitive codepaths.
-     *
-     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
-     */
-    Counter<double>* createDoubleCounter(MetricName name, std::string description, MetricUnit unit);
-
-    /**
-     * Creates or returns an existing gauge with the provided parameters. The result is never null
-     * but will throw an exception if the gauge would collide with an different metric (i.e., same
-     * name but different type or other parameters).
-     *
-     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
-     */
-    Gauge<int64_t>* createInt64Gauge(MetricName name, std::string description, MetricUnit unit);
-
-    /**
-     * Creates or returns an existing gauge with the provided parameters. The result is never null
-     * but will throw an exception if the gauge would collide with an different metric (i.e., same
-     * name but different type or other parameters).
-     *
-     * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
-     */
-    Gauge<double>* createDoubleGauge(MetricName name, std::string description, MetricUnit unit);
-
-    /**
-     * Creates an int64_t histogram with the provided parameters. The result is never null but will
-     * throw an exception if the counter would collide with an existing metric (i.e., same name but
-     * different type or other parameters). Metrics should be stashed once they are created to avoid
-     * taking a lock on the global list of metrics in performance-sensitive codepaths.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      *
@@ -126,24 +126,24 @@ public:
      * See https://opentelemetry.io/docs/specs/otel/metrics/data-model/#histogram for more
      * information.
      */
-    Histogram<int64_t>* createInt64Histogram(
+    Histogram<int64_t>& createInt64Histogram(
         MetricName name,
         std::string description,
         MetricUnit unit,
         boost::optional<std::vector<double>> explicitBucketBoundaries = boost::none);
 
     /**
-     * Creates a double histogram with the provided parameters. The result is never null but will
-     * throw an exception if the counter would collide with an existing metric (i.e., same name but
-     * different type or other parameters). Metrics should be stashed once they are created to avoid
-     * taking a lock on the global list of metrics in performance-sensitive codepaths.
+     * Creates a double histogram with the provided parameters. The function will throw an exception
+     * if the counter would collide with an existing metric (i.e., same name but different type or
+     * other parameters). Metrics should be stashed once they are created to avoid taking a lock on
+     * the global list of metrics in performance-sensitive codepaths.
      *
      * All callers must add an entry in metric_names.h to create a MetricName to pass to the API.
      *
      * See the documentation for createInt64Histogram for an explanation of the explict bucket
      * boundaries parameter.
      */
-    Histogram<double>* createDoubleHistogram(
+    Histogram<double>& createDoubleHistogram(
         MetricName name,
         std::string description,
         MetricUnit unit,
@@ -189,10 +189,10 @@ private:
     T* getDuplicateMetric(WithLock, const std::string& name, MetricIdentifier identifier);
 
     template <typename T>
-    Counter<T>* createCounter(MetricName name, std::string description, MetricUnit unit);
+    Counter<T>& createCounter(MetricName name, std::string description, MetricUnit unit);
 
     template <typename T>
-    Gauge<T>* createGauge(MetricName name, std::string description, MetricUnit unit);
+    Gauge<T>& createGauge(MetricName name, std::string description, MetricUnit unit);
 
     using OwnedMetric = std::variant<std::unique_ptr<Counter<int64_t>>,
                                      std::unique_ptr<Counter<double>>,

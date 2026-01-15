@@ -40,9 +40,9 @@ class ServerStatusServersTest : public DBCommandTestFixture {};
 TEST_F(ServerStatusServersTest, IncludesOtelMetrics) {
     otel::metrics::OtelMetricsCapturer capturer;
     auto& metricsService = otel::metrics::MetricsService::instance();
-    auto counter = metricsService.createInt64Counter(
+    auto& counter = metricsService.createInt64Counter(
         otel::metrics::MetricNames::kTest1, "description", otel::metrics::MetricUnit::kSeconds);
-    counter->add(11);
+    counter.add(11);
 
     BSONObj result = runCommand(BSON("serverStatus" << 1 << "otelMetrics" << 1));
     ASSERT_TRUE(result.hasField("otelMetrics"));
