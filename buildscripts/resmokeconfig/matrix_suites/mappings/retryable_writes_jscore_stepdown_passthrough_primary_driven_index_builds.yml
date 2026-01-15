@@ -1,9 +1,9 @@
 # Temporary suites to assists the development of primary-driven index builds.
-# Run all tests in replica set jscore passthrough suite with
+# Run all tests in retryable writes jscore stepdown passthrough suite with
 # PrimaryDrivenIndexBuilds feature flag enabled.
 #
 # TODO(SERVER-108818): remove this temporary suite and all its usages.
-base_suite: replica_sets_jscore_passthrough
+base_suite: retryable_writes_jscore_stepdown_passthrough
 overrides:
   - "primary_driven_index_builds.enable_primary_driven_index_builds_feature_flag_mongod"
 

@@ -1409,6 +1409,19 @@ tasks:
       - func: "do setup"
       - func: "run tests"
 
+  # TODO(SERVER-108818): Remove this temporary suite.
+  - <<: *gen_task_template
+    name: retryable_writes_jscore_stepdown_passthrough_primary_driven_index_builds_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "default",
+        "retry",
+        "primary_driven_index_builds",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
   ## resharding generational fuzzer ##
   - <<: *jstestfuzz_template
     name: resharding_fuzzer_idempotency_gen
