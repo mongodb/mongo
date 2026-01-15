@@ -77,9 +77,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBso
                 !specIt.more());
     }
     if (allHosts) {
+        // This check is necessary to correctly target shards. In circumstances where we aren't
+        // actually running the query (e.g. parsing for query shape), we don't need to do this (and
+        // it can erroneously error - SERVER-117156).
         uassert(4503200,
                 "$planCacheStats stage supports allHosts parameter only for sharded clusters",
-                pExpCtx->getFromRouter() || pExpCtx->getInRouter());
+                pExpCtx->getFromRouter() || pExpCtx->getInRouter() ||
+                    !pExpCtx->getMongoProcessInterface()->isExpectedToExecuteQueries());
     }
     return new DocumentSourcePlanCacheStats(pExpCtx, allHosts);
 }

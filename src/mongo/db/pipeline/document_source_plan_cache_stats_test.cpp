@@ -93,6 +93,10 @@ public:
         return "testHostName";
     }
 
+    bool isExpectedToExecuteQueries() override {
+        return true;
+    }
+
 private:
     std::vector<BSONObj> _planCacheStats;
 };
@@ -114,6 +118,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ShouldFailToParseIfSpecIsANonEmptyObjec
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, ShouldFailToParseIfAllHostsTrueInNonShardedContext) {
+    // Need to override 'isExpectedToExecuteQueries' since we only do this validation in execution
+    // settings (i.e. when we don't have `StubMongoProcessInterface`).
+    getExpCtx()->setMongoProcessInterface(
+        std::make_shared<PlanCacheStatsMongoProcessInterface>(std::vector<BSONObj>{}));
     ASSERT_THROWS_CODE(DocumentSourcePlanCacheStats::createFromBson(
                            kAllHostsTrueSpecObj.firstElement(), getExpCtx()),
                        AssertionException,

@@ -8,7 +8,7 @@
  * @tags: [featureFlagQueryStatsForInternalClients]
  */
 
-import {after, before, describe, it} from "jstests/libs/mochalite.js";
+import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
 import {
     getQueryStatsAggCmd,
     getQueryStatsCountCmd,
@@ -17,6 +17,7 @@ import {
     getQueryStatsServerParameters,
     verifyMetrics,
     confirmAllExpectedFieldsPresent,
+    resetQueryStatsStore,
 } from "jstests/libs/query/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -72,6 +73,12 @@ describe("query stats sharded cluster", function () {
 
     after(function () {
         st.stop();
+    });
+
+    beforeEach(function () {
+        resetQueryStatsStore(mongos, "1MB");
+        resetQueryStatsStore(shard0Conn, "1MB");
+        resetQueryStatsStore(shard1Conn, "1MB");
     });
 
     function setupCollections() {
@@ -140,7 +147,7 @@ describe("query stats sharded cluster", function () {
             // Other tests validate the mongos key.
             verifyMetrics(entries);
             if (expectedKeyOnShards) {
-                confirmAllExpectedFieldsPresent(entries[0].key, expectedKeyOnShards);
+                confirmAllExpectedFieldsPresent(expectedKeyOnShards, entries[0].key);
             }
         }
     }
@@ -275,6 +282,37 @@ describe("query stats sharded cluster", function () {
                     getStatsFn: (conn) => getQueryStatsDistinctCmd(conn, {collName: config.name}),
                     runCommandFn: (coll) => {
                         coll.distinct("x", {x: {$ne: 0}});
+                    },
+                    config,
+                    expectedKeyOnShards: expectedKeyOnShards,
+                });
+            });
+
+            // Reproduces a reparse bug caught by the fuzzer.
+            it("should report query stats for $planCacheStats", function () {
+                const expectedKeyOnShards = {
+                    queryShape: {
+                        cmdNs: {db: "test", coll: config.name},
+                    },
+                    client: {application: {name: "MongoDB Shell"}},
+                    readConcern: {level: "local", provenance: "implicitDefault"},
+                    $readPreference: {"mode": "nearest"},
+                    collectionType: "collection",
+                    cursor: {batchSize: "?number"},
+                };
+                // This will be added by mongos for tracked collections.
+                if (configName != "unsharded") {
+                    expectedKeyOnShards.queryShape.collation = {locale: "simple"};
+                }
+                expectedKeyOnShards.queryShape.let = {};
+                expectedKeyOnShards.queryShape.command = "aggregate";
+                expectedKeyOnShards.queryShape.pipeline = [{$planCacheStats: {allHosts: true}}];
+
+                testCommand({
+                    commandName: "aggregate",
+                    getStatsFn: (conn) => getQueryStatsAggCmd(conn.getDB(mongosDB.getName()), {collName: config.name}),
+                    runCommandFn: (coll) => {
+                        coll.aggregate([{$planCacheStats: {allHosts: true}}]).toArray();
                     },
                     config,
                     expectedKeyOnShards: expectedKeyOnShards,
