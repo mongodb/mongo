@@ -50,6 +50,147 @@ error_categories:
   - SystemOverloadedError
 
 error_codes:
+  #############################################################
+  # There are two sections of error code definitions.
+  # 1) Legacy and one-off error codes that are not sequentially
+  #    numbered for whatever reason but cannot be renumbered.
+  # 2) Sequentially numbered error codes. New codes should be
+  #    appended to this section.
+  #############################################################
+
+  # Error codes 4000-8999 are reserved.
+
+  # Non-sequential error codes for compatibility only)
+  - {
+      code: 9001,
+      name: SocketException,
+      categories: [NetworkError, RetriableError],
+    }
+  - {code: 9996, name: OBSOLETE_RecvStaleConfig}
+  - {code: 10003, name: CannotGrowDocumentInCappedNamespace}
+  - {code: 10058, name: LegacyNotPrimary}
+  - {
+      code: 10107,
+      name: NotWritablePrimary,
+      categories: [NotPrimaryError, RetriableError],
+    }
+  - {code: 10334, name: BSONObjectTooLarge}
+  - {code: 11000, name: DuplicateKey, extra: DuplicateKeyErrorInfo}
+  - {
+      code: 11600,
+      name: InterruptedAtShutdown,
+      categories:
+        [Interruption, ShutdownError, CancellationError, RetriableError],
+    }
+  - {code: 11601, name: Interrupted, categories: [Interruption]}
+  - {
+      code: 11602,
+      name: InterruptedDueToReplStateChange,
+      categories: [Interruption, NotPrimaryError, RetriableError],
+    }
+  - {code: 12586, name: BackgroundOperationInProgressForDatabase}
+  - {code: 12587, name: BackgroundOperationInProgressForNamespace}
+  - {code: 13104, name: OBSOLETE_PrepareConfigsFailed}
+  - {code: 13113, name: MergeStageNoMatchingDocument}
+  - {code: 13297, name: DatabaseDifferCase}
+  - {
+      code: 13388,
+      name: StaleConfig,
+      extra: StaleConfigInfo,
+      categories: [StaleShardVersionError, NeedRetargettingError],
+    }
+  - {
+      code: 13435,
+      name: NotPrimaryNoSecondaryOk,
+      categories: [NotPrimaryError, RetriableError],
+    }
+  - {
+      code: 13436,
+      name: NotPrimaryOrSecondary,
+      categories: [NotPrimaryError, RetriableError],
+    }
+  - {code: 14031, name: OutOfDiskSpace}
+  - {code: 17280, name: OBSOLETE_KeyTooLong}
+  - {code: 28769, name: NamespaceCannotBeSharded}
+  - {code: 31082, name: SearchNotEnabled}
+  - {code: 40413, name: IDLDuplicateField, categories: [IDLParseError]}
+  # Specifically, 40414 indicates a missing but required field.
+  - {code: 40414, name: IDLFailedToParse, categories: [IDLParseError]}
+  - {code: 40415, name: IDLUnknownField, categories: [IDLParseError]}
+  - {
+      code: 46841,
+      name: ClientMarkedKilled,
+      categories: [Interruption, CancellationError],
+    }
+  - {code: 50768, name: NotARetryableWriteCommand}
+  - {
+      code: 50915,
+      name: BackupCursorOpenConflictWithCheckpoint,
+      categories: [RetriableError],
+    }
+  - {code: 56846, name: ConfigServerUnreachable}
+  - {code: 57986, name: RetryableInternalTransactionNotSupported}
+  # Codes 65000-70999 are reserved for extension-developed logs and errors. Do not use these unless they are used for writing an extension.
+  - {code: 640570, name: IllegalChangeToExpectedShardVersion}
+  - {code: 640571, name: IllegalChangeToExpectedDatabaseVersion}
+  - {
+      code: 4662500,
+      name: IDLUnknownFieldPossibleMongocryptd,
+      categories: [IDLParseError],
+    }
+  - {code: 6371402, name: EncryptedFindAndModifyNewNotSupported}
+
+  # The following is for rewriting errors returned by a remote server while running a retriable
+  # command so that the error is not passed through to other servers in a cluster. See SERVER-91331
+  # for an example of using this error code.
+  - {
+      code: 91331,
+      name: RetriableRemoteCommandFailure,
+      categories: [Interruption, RetriableError],
+    }
+  - {code: 4938500, name: IndexNotFoundCachedPlan}
+
+  # CBR error codes
+  - {
+      code: 9751901,
+      name: HistogramCEFailure,
+      categories: [PlannerEstimationError],
+    }
+  - {
+      code: 9751902,
+      name: SamplingCEFailure,
+      categories: [PlannerEstimationError],
+    }
+  - {code: 9751903, name: CEFailure, categories: [PlannerEstimationError]}
+  - {
+      code: 9737301,
+      name: UnsupportedCbrNode,
+      categories: [PlannerEstimationError],
+    }
+
+  # The following is for remove shard commit commands which fail due to draining not yet being
+  # complete.
+  - {
+      code: 1003141,
+      name: RemoveShardDrainingInProgress,
+      extra: RemoveShardDrainingInfo,
+    }
+  - {
+      code: 10045600,
+      name: InterruptedDueToFCVChange,
+      categories: [Interruption, RetriableError],
+    }
+
+  - {code: 10171600, name: ReadThroughCacheTimeMonotonicityViolation}
+
+  # Add new codes at the bottom of this file, not here. They are to be
+  # allocated sequentially. Do not use Jira ticket numbers as the basis
+  # for choosing named ErrorCode numbers.
+
+  ############################################################
+  #### Sequentially numbered error codes
+  ############################################################
+
   - {code: 0, name: OK}
   - {code: 1, name: InternalError}
   - {code: 2, name: BadValue}
@@ -1000,127 +1141,5 @@ error_codes:
     }
   - {code: 480, name: UnrecognizedIFRFlag}
 
-  # Error codes 4000-8999 are reserved.
-
-  # Non-sequential error codes for compatibility only)
-  - {
-      code: 9001,
-      name: SocketException,
-      categories: [NetworkError, RetriableError],
-    }
-  - {code: 9996, name: OBSOLETE_RecvStaleConfig}
-  - {code: 10003, name: CannotGrowDocumentInCappedNamespace}
-  - {code: 10058, name: LegacyNotPrimary}
-  - {
-      code: 10107,
-      name: NotWritablePrimary,
-      categories: [NotPrimaryError, RetriableError],
-    }
-  - {code: 10334, name: BSONObjectTooLarge}
-  - {code: 11000, name: DuplicateKey, extra: DuplicateKeyErrorInfo}
-  - {
-      code: 11600,
-      name: InterruptedAtShutdown,
-      categories:
-        [Interruption, ShutdownError, CancellationError, RetriableError],
-    }
-  - {code: 11601, name: Interrupted, categories: [Interruption]}
-  - {
-      code: 11602,
-      name: InterruptedDueToReplStateChange,
-      categories: [Interruption, NotPrimaryError, RetriableError],
-    }
-  - {code: 12586, name: BackgroundOperationInProgressForDatabase}
-  - {code: 12587, name: BackgroundOperationInProgressForNamespace}
-  - {code: 13104, name: OBSOLETE_PrepareConfigsFailed}
-  - {code: 13113, name: MergeStageNoMatchingDocument}
-  - {code: 13297, name: DatabaseDifferCase}
-  - {
-      code: 13388,
-      name: StaleConfig,
-      extra: StaleConfigInfo,
-      categories: [StaleShardVersionError, NeedRetargettingError],
-    }
-  - {
-      code: 13435,
-      name: NotPrimaryNoSecondaryOk,
-      categories: [NotPrimaryError, RetriableError],
-    }
-  - {
-      code: 13436,
-      name: NotPrimaryOrSecondary,
-      categories: [NotPrimaryError, RetriableError],
-    }
-  - {code: 14031, name: OutOfDiskSpace}
-  - {code: 17280, name: OBSOLETE_KeyTooLong}
-  - {code: 28769, name: NamespaceCannotBeSharded}
-  - {code: 31082, name: SearchNotEnabled}
-  - {code: 40413, name: IDLDuplicateField, categories: [IDLParseError]}
-  # Specifically, 40414 indicates a missing but required field.
-  - {code: 40414, name: IDLFailedToParse, categories: [IDLParseError]}
-  - {code: 40415, name: IDLUnknownField, categories: [IDLParseError]}
-  - {
-      code: 46841,
-      name: ClientMarkedKilled,
-      categories: [Interruption, CancellationError],
-    }
-  - {code: 50768, name: NotARetryableWriteCommand}
-  - {
-      code: 50915,
-      name: BackupCursorOpenConflictWithCheckpoint,
-      categories: [RetriableError],
-    }
-  - {code: 56846, name: ConfigServerUnreachable}
-  - {code: 57986, name: RetryableInternalTransactionNotSupported}
-  # Codes 65000-70999 are reserved for extension-developed logs and errors. Do not use these unless they are used for writing an extension.
-  - {code: 640570, name: IllegalChangeToExpectedShardVersion}
-  - {code: 640571, name: IllegalChangeToExpectedDatabaseVersion}
-  - {
-      code: 4662500,
-      name: IDLUnknownFieldPossibleMongocryptd,
-      categories: [IDLParseError],
-    }
-  - {code: 6371402, name: EncryptedFindAndModifyNewNotSupported}
-
-  # The following is for rewriting errors returned by a remote server while running a retriable
-  # command so that the error is not passed through to other servers in a cluster. See SERVER-91331
-  # for an example of using this error code.
-  - {
-      code: 91331,
-      name: RetriableRemoteCommandFailure,
-      categories: [Interruption, RetriableError],
-    }
-  - {code: 4938500, name: IndexNotFoundCachedPlan}
-
-  # CBR error codes
-  - {
-      code: 9751901,
-      name: HistogramCEFailure,
-      categories: [PlannerEstimationError],
-    }
-  - {
-      code: 9751902,
-      name: SamplingCEFailure,
-      categories: [PlannerEstimationError],
-    }
-  - {code: 9751903, name: CEFailure, categories: [PlannerEstimationError]}
-  - {
-      code: 9737301,
-      name: UnsupportedCbrNode,
-      categories: [PlannerEstimationError],
-    }
-
-  # The following is for remove shard commit commands which fail due to draining not yet being
-  # complete.
-  - {
-      code: 1003141,
-      name: RemoveShardDrainingInProgress,
-      extra: RemoveShardDrainingInfo,
-    }
-  - {
-      code: 10045600,
-      name: InterruptedDueToFCVChange,
-      categories: [Interruption, RetriableError],
-    }
-
-  - {code: 10171600, name: ReadThroughCacheTimeMonotonicityViolation}
+  # ^^^^
+  # Add new codes, sequentially numbered, above.
