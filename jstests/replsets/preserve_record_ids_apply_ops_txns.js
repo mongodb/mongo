@@ -259,8 +259,6 @@ assert.eq(replRidColl.find().count(), numIters - docsRemovedPerColl);
 validateShowRecordIdReplicatesAcrossNodes(replSet.nodes, dbName, replRidNs);
 validateMostRecentApplyOpsInOplogs();
 
-/**
-// TODO SERVER-78350: Enable testing incorrect rids.
 jsTestLog("Testing that providing non-existent recordIds to applyOps are no-ops.");
 assert.commandWorked(replRidColl.remove({}));
 
@@ -272,7 +270,7 @@ for (let i = 0; i < numIters; i++) {
         ns: replRidColl.getFullName(),
         o: {_id: i, a: 1},
         o2: {_id: i},
-        rid: NumberLong(i),
+        rid: NumberLong(i + 1), // RecordId(0) is a Null RecordId, which is not allowed.
     });
 
     ops.push({
@@ -280,11 +278,11 @@ for (let i = 0; i < numIters; i++) {
         ns: replRidColl.getFullName(),
         o: {_id: i},
         o2: {_id: i},
-        rid: NumberLong(2000 + i)
+        rid: NumberLong(2000 + i),
     });
 }
 
 assert.commandWorked(primDB.runCommand({applyOps: ops}));
 assert.eq(replRidColl.find().count(), numIters - docsRemovedPerColl);
-*/
+
 replSet.stopSet();
