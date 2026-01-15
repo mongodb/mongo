@@ -35,7 +35,7 @@ assert.sameMembers(results, documents);
 results = coll.aggregate([{$readNDocuments: {numDocs: 6, sortById: true}}]).toArray();
 assert.eq(results, documents);
 
-// TODO SERVER-113930 Test in lookup and unionWith.
+// TODO SERVER-113930 Test in lookup.
 // results = coll.aggregate([{$sort: {_id: 1}}, {$limit: 1}, {$lookup: {from: collName, pipeline: [{$readNDocuments: {numDocs: 2, sortById: true}}], as: "dogs"}}]).toArray();
 // assert.eq(results, [{_id: 0, dog: "labradoodle", dogs: documents.slice(0, 2)}]);
 
@@ -44,7 +44,13 @@ assert.eq(results, documents);
 // assert(results[0].hasOwnProperty("dogs"));
 // assert.sameMembers(documents.slice(0, 2), results[0].dogs);
 
-// results = coll.aggregate([{$unionWith: {coll: collName, pipeline: [{$readNDocuments: {numDocs: 2}}]}}]).toArray();
-// assert.sameMembers(results, documents.concat(documents.slice(0, 2)));
-// results = coll.aggregate([{$unionWith: {coll: collName, pipeline: [{$readNDocuments: {numDocs: 2, sortById: true}}]}}]).toArray();
-// assert.eq(results, documents.concat(documents.slice(0, 2)));
+// Test in $unionWith.
+results = coll.aggregate([{$unionWith: {coll: collName, pipeline: [{$readNDocuments: {numDocs: 2}}]}}]).toArray();
+assert.sameMembers(results, documents.concat(documents.slice(0, 2)));
+results = coll
+    .aggregate([
+        {$sort: {_id: 1}},
+        {$unionWith: {coll: collName, pipeline: [{$readNDocuments: {numDocs: 2, sortById: true}}]}},
+    ])
+    .toArray();
+assert.eq(results, documents.concat(documents.slice(0, 2)));

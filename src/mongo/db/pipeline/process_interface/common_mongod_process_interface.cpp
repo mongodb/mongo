@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/shard_role_transaction_resources_stasher_for_pipeline.h"
 #include "mongo/db/pipeline/stage_constraints.h"
@@ -295,7 +296,12 @@ bool requiresCollectionAcquisition(const Pipeline& pipeline) {
             !firstStage || !dynamic_cast<DocumentSourceCursor*>(*firstStage));
 
     const bool isMongotPipeline = search_helpers::isMongotPipeline(&pipeline);
-    if (!isMongotPipeline && firstStage && !(*firstStage)->constraints().requiresInputDocSource) {
+    const bool hasIdLookup = std::any_of(sources.begin(), sources.end(), [](const auto& source) {
+        return source->getSourceName() == DocumentSourceInternalSearchIdLookUp::kStageName;
+    });
+
+    if (!hasIdLookup && !isMongotPipeline && firstStage &&
+        !(*firstStage)->constraints().requiresInputDocSource) {
         // There's no need to attach a cursor or perform collection acquisition here (for stages
         // like $documents or $collStats that will not read from a user collection). Mongot
         // pipelines will not need a cursor but _do_ need to acquire the collection to check for a
