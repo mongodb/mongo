@@ -264,6 +264,9 @@ struct SerializationOptions {
     // If set to true, serializes each stage and expression as needed for array filters in updates.
     bool serializeForUpdateArrayFilters = false;
 
+    // If set to true, serializes each stage and expression as needed for pull modifier in updates.
+    bool serializeForUpdatePullModifier = false;
+
     // Serialization state check helpers.
     bool isDefaultSerialization() const;
     bool isKeepingLiteralsUnchanged() const;

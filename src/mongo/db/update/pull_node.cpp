@@ -37,6 +37,7 @@
 #include "mongo/db/exec/mutable_bson/const_element.h"
 #include "mongo/db/matcher/copyable_match_expression.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
@@ -113,6 +114,13 @@ public:
 
 private:
     BSONObj value(const SerializationOptions& opts) const final {
+        // For query stats, set flag to serialize $not{$eq/$in/$exists} back to
+        // $ne/$nin/{$exists:false} since top-level $not cannot be re-parsed.
+        if (opts.isSerializingForQueryStats() && _matchExpr->matchType() == MatchExpression::NOT) {
+            SerializationOptions modifiedOpts = opts;
+            modifiedOpts.serializeForUpdatePullModifier = true;
+            return _matchExpr->serialize(modifiedOpts);
+        }
         return _matchExpr->serialize(opts);
     }
 

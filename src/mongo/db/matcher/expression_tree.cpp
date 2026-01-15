@@ -295,6 +295,29 @@ void NotMatchExpression::serialize(BSONObjBuilder* out,
         expressionToNegate = _exp->getChild(0);
     }
 
+    // For $pull modifier, rewrite $not{$eq/$in/$exists} back to $ne/$nin/{$exists: false} since
+    // top-level $not cannot be re-parsed.
+    if (opts.serializeForUpdatePullModifier) {
+        tassert(
+            11699500,
+            "serializeForUpdatePullModifier should only be set when serializing for query stats",
+            opts.isSerializingForQueryStats());
+        const auto childType = expressionToNegate->matchType();
+        if (childType == MatchExpression::EQ || childType == MatchExpression::MATCH_IN ||
+            childType == MatchExpression::EXISTS) {
+            auto* pathMatch = getEligiblePathMatchForNotSerialization(expressionToNegate);
+            BSONObjBuilder pathBob(
+                out->subobjStart(opts.serializeFieldPathFromString(pathMatch->path())));
+            if (childType == MatchExpression::EXISTS) {
+                pathBob.append("$exists", false);
+            } else {
+                StringData op = (childType == MatchExpression::EQ) ? "$ne"_sd : "$nin"_sd;
+                pathBob.appendAs(pathMatch->getSerializedRightHandSide(opts).firstElement(), op);
+            }
+            return;
+        }
+    }
+
     // It is generally easier to be correct if we just always serialize to a $nor, since this will
     // delegate the path serialization to lower in the tree where we have the information on-hand.
     // However, for legibility we preserve a $not with a single path-accepting child as a $not.

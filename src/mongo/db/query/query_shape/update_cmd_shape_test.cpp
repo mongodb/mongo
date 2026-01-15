@@ -926,6 +926,75 @@ TEST_F(UpdateCmdShapeTest, PullModifierUpdateShape) {
                      SerializationContext::stateDefault()));
 }
 
+TEST_F(UpdateCmdShapeTest, PullModifierWithNotExpressionShape) {
+    auto shape = makeOneShapeFromUpdate(R"({
+        update: "testColl",
+        updates: [
+            {
+                q: { x: {$eq: 3} },
+                u: {
+                    $pull: { arrNe: { $ne: 5 } },
+                    $pull: { arrNin: { $nin: [1, 2, 3] } },
+                    $pull: { arrExistsFalse: { $exists: false } }
+                },
+                multi: false,
+                upsert: true
+            } ],
+        "$db": "testDB"
+    })"_sd);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            cmdNs : {db : "testDB", coll : "testColl"},
+            command : "update",
+            q : {x : {$eq : 1}},
+            u : {
+                $pull : {
+                    arrExistsFalse : {$exists : false},
+                    arrNe : {$ne : 1},
+                    arrNin : {$nin : [1]}
+                }
+            },
+            multi : false,
+            upsert : true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            cmdNs : {db : "testDB", coll : "testColl"},
+            command : "update",
+            q : {x : {$eq : "?number"}},
+            u : {
+                $pull : {
+                    arrExistsFalse : {$exists : false},
+                    arrNe : {$ne : "?number"},
+                    arrNin : {$nin : "?array<?number>"}
+                }
+            },
+            multi : false,
+            upsert : true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugQueryShapeSerializeOptions,
+                     SerializationContext::stateDefault()));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            cmdNs : {db : "HASH<testDB>", coll : "HASH<testColl>"},
+            command : "update",
+            q : {"HASH<x>" : {$eq : "?number"}},
+            u : {
+                $pull : {
+                    "HASH<arrExistsFalse>" : {$exists : false},
+                    "HASH<arrNe>" : {$ne : "?number"},
+                    "HASH<arrNin>" : {$nin : "?array<?number>"}
+                }
+            },
+            multi : false,
+            upsert : true })",
+        shape.toBson(_operationContext.get(),
+                     SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST,
+                     SerializationContext::stateDefault()));
+}
+
 TEST_F(UpdateCmdShapeTest, BitModifierUpdateShape) {
     auto shape = makeOneShapeFromUpdate(R"({
         update: "testColl",
