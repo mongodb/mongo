@@ -81,8 +81,12 @@ std::unique_ptr<QuerySolution> makeVirtualCollScanPlan(size_t size,
                                                        std::unique_ptr<MatchExpression> filter);
 
 OrderedIntervalList makePointInterval(double point, std::string fieldName);
+OrderedIntervalList makePointInterval(StringData str, std::string fieldName);
+OrderedIntervalList makePointInterval(const BSONObj& obj, std::string fieldName);
 
 IndexBounds makePointIntervalBounds(double point, std::string fieldName);
+IndexBounds makePointIntervalBounds(StringData str, std::string fieldName);
+IndexBounds makePointIntervalBounds(const BSONObj& obj, std::string fieldName);
 
 IndexBounds makeRangeIntervalBounds(const BSONObj& range,
                                     BoundInclusion boundInclusion,

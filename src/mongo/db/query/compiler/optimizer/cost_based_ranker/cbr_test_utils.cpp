@@ -30,6 +30,7 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/ce/ce_test_utils.h"
@@ -48,6 +49,7 @@ SelectivityEstimate makeSel(double d) {
     return SelectivityEstimate(SelectivityType(d), EstimationSource::Code);
 }
 
+// Caller has to maintain ownership of 'obj'.
 std::unique_ptr<MatchExpression> parse(const BSONObj& bson) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto expr = MatchExpressionParser::parse(
@@ -208,9 +210,33 @@ OrderedIntervalList makePointInterval(double point, std::string fieldName) {
     return oil;
 }
 
+OrderedIntervalList makePointInterval(StringData str, std::string fieldName) {
+    OrderedIntervalList oil(fieldName);
+    oil.intervals.emplace_back(IndexBoundsBuilder::makePointInterval(str));
+    return oil;
+}
+
+OrderedIntervalList makePointInterval(const BSONObj& obj, std::string fieldName) {
+    OrderedIntervalList oil(fieldName);
+    oil.intervals.emplace_back(IndexBoundsBuilder::makePointInterval(obj));
+    return oil;
+}
+
 IndexBounds makePointIntervalBounds(double point, std::string fieldName) {
     IndexBounds bounds;
     bounds.fields.emplace_back(makePointInterval(point, fieldName));
+    return bounds;
+}
+
+IndexBounds makePointIntervalBounds(StringData str, std::string fieldName) {
+    IndexBounds bounds;
+    bounds.fields.emplace_back(makePointInterval(str, fieldName));
+    return bounds;
+}
+
+IndexBounds makePointIntervalBounds(const BSONObj& obj, std::string fieldName) {
+    IndexBounds bounds;
+    bounds.fields.emplace_back(makePointInterval(obj, fieldName));
     return bounds;
 }
 

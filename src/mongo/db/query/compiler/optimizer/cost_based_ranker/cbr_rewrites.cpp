@@ -30,15 +30,120 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_rewrites.h"
 
 #include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/expression_hasher.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 
 namespace mongo::cost_based_ranker {
 
 namespace {
+
+/* Returns true if the given value, with the given inclusivity,
+ * corresponds to the beginning of a type bracket.
+ * The logic is derived by inspecting index ranges built for
+ * $type queries, eg db.a.explain().find({a: {$type: 'bool'}})
+ * where the field in question has an index.
+ */
+bool isTypeBracketLowerBound(const BSONElement& value, bool isInclusive) {
+    if (!isInclusive)
+        return false;
+    switch (value.type()) {
+        case BSONType::numberDouble:
+            return std::isnan(value.numberDouble());
+        case BSONType::string:
+            return value.valuestrsize() == 1;
+        case BSONType::object:
+            return value.embeddedObject().isEmpty();
+        case BSONType::binData:
+            return value.binDataType() == BinDataType::BinDataGeneral && value.valuestrsize() == 0;
+        case BSONType::undefined:
+            return true;
+        case BSONType::oid:
+            return value.OID() == OID();
+        case BSONType::boolean:
+            return value.boolean() == false;
+        case BSONType::date:
+            return value.date() == Date_t::min();
+        case BSONType::null:
+            return true;
+        case BSONType::regEx:
+            return value.regex()[0] == '\0' && value.regexFlags()[0] == '\0';
+        case BSONType::dbRef:
+            return value.dbrefNS()[0] == '\0' && value.dbrefOID() == OID();
+        case BSONType::code:
+            return value.valuestrsize() == 1;
+        case BSONType::codeWScope:
+            return value.codeWScopeCodeLen() == 1 && value.codeWScopeObject().isEmpty();
+        case BSONType::timestamp:
+            return value.timestamp() == Timestamp::min();
+        case BSONType::minKey:
+        case BSONType::maxKey:
+            return true;
+        case BSONType::array:
+        case BSONType::symbol:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
+        case BSONType::eoo:
+            return false;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(4793095);
+}
+
+/* Returns true if the given value, with the given inclusivity,
+ * corresponds to the end of a type bracket.
+ * See isLowerBound for details.
+ */
+bool isTypeBracketUpperBound(const BSONElement& value, bool isInclusive) {
+    switch (value.type()) {
+        case BSONType::numberDouble:
+            return value.numberDouble() == std::numeric_limits<double>::infinity() && isInclusive;
+        case BSONType::object:
+        case BSONType::array:
+            return value.embeddedObject().isEmpty() && !isInclusive;
+        case BSONType::undefined:
+            return isInclusive;
+        case BSONType::oid:
+            return (value.OID() == OID() && !isInclusive) ||
+                (value.OID() == OID::max() && isInclusive);
+        case BSONType::boolean:
+            return value.boolean() && isInclusive;
+        case BSONType::date:
+            return value.date() == Date_t::max() && isInclusive;
+        case BSONType::null:
+            return isInclusive;
+        case BSONType::dbRef:
+            return value.dbrefNS()[0] == '\0' && value.dbrefOID() == OID() && !isInclusive;
+        case BSONType::code:
+            return value.valuestrsize() == 1 && !isInclusive;
+        case BSONType::codeWScope:
+            return value.codeWScopeCodeLen() == 1 && value.codeWScopeObject().isEmpty() &&
+                !isInclusive;
+        case BSONType::timestamp:
+            return value.timestamp() == Timestamp::max() && isInclusive;
+        case BSONType::minKey:
+            return isInclusive;
+        case BSONType::maxKey:
+            return true;
+        case BSONType::string:
+        case BSONType::binData:
+        case BSONType::regEx:
+        case BSONType::symbol:
+        case BSONType::numberInt:
+        case BSONType::numberLong:
+        case BSONType::numberDecimal:
+        case BSONType::eoo:
+            return false;
+    }
+
+    MONGO_UNREACHABLE_TASSERT(40957476);
+}
+
+const BSONObj constantHolder = BSON_ARRAY(BSONArray() << BSONNULL);
+const BSONElement emptyArrayElem = constantHolder["0"];
+const BSONElement nullElem = constantHolder["1"];
 
 /**
  * Given a 'path' and an 'interval' on that path, generate a minimal logically equivalent
@@ -63,12 +168,33 @@ std::unique_ptr<MatchExpression> getMatchExpressionFromInterval(StringData path,
         return std::make_unique<AlwaysFalseMatchExpression>();
     }
 
-    if (interval.isUndefined()) {
-        // The transformation of undefined interval to match expression is not supported.
-        return nullptr;
-    }
-
     if (interval.isPoint()) {
+        const BSONType type = interval.start.type();
+        if (type == BSONType::undefined) {
+            // The range [undefined, undefined] can be derived from either:
+            //   - a check for undefined itself (eg. {$type: 'undefined'}) or
+            //   - a check for an empty array (eg. {$eq: []}).
+            // Both of these predicates remain as the residual filter,
+            // so even though we emit a $or here, the disjunction will get
+            // normalized away with the call to normalizeMatchExpression.
+            std::vector<std::unique_ptr<MatchExpression>> vec;
+            vec.push_back(
+                std::make_unique<TypeMatchExpression>(path, MatcherTypeSet(BSONType::undefined)));
+            vec.push_back(std::make_unique<EqualityMatchExpression>(path, emptyArrayElem));
+            return std::make_unique<OrMatchExpression>(std::move(vec));
+        } else if (type == BSONType::null) {
+            // This is semantically equivalent to just {$eq: null} but
+            // gets normalized better by the call to normalizeMatchExpression.
+            // Both {$eq: null} and {$exists: false} remain as the residual filter,
+            // so even though we emit a $or here, the disjunction will get
+            // normalized away with the call to normalizeMatchExpression.
+            std::vector<std::unique_ptr<MatchExpression>> vec;
+            vec.push_back(std::make_unique<EqualityMatchExpression>(path, nullElem));
+            vec.push_back(std::make_unique<NotMatchExpression>(
+                std::make_unique<ExistsMatchExpression>(path)));
+            return std::make_unique<OrMatchExpression>(std::move(vec));
+        }
+        // In all other cases, we can emit an equality check.
         return std::make_unique<EqualityMatchExpression>(path, interval.start);
     }
 
@@ -78,50 +204,73 @@ std::unique_ptr<MatchExpression> getMatchExpressionFromInterval(StringData path,
             "Expected interval with ascending or descending direction",
             direction != Interval::Direction::kDirectionNone);
 
-    std::vector<std::unique_ptr<MatchExpression>> expressions;
     bool isAscending = (direction == Interval::Direction::kDirectionAscending);
 
     bool gtIncl = (isAscending) ? interval.startInclusive : interval.endInclusive;
     auto& gtVal = (isAscending) ? interval.start : interval.end;
-    bool isLB = isLowerBound(gtVal, gtIncl);  // Low type bracket or -inf
+    bool isLB = isTypeBracketLowerBound(gtVal, gtIncl);  // Low type bracket or -inf
 
     bool ltIncl = (isAscending) ? interval.endInclusive : interval.startInclusive;
     auto& ltVal = (isAscending) ? interval.end : interval.start;
-    bool isUB = isUpperBound(ltVal, ltIncl);  // Upper type bracket or inf
+    bool isUB = isTypeBracketUpperBound(ltVal, ltIncl);  // Upper type bracket or inf
 
-    // If this is a type bracket interval create a condition that represents it even if both
-    // bounds are minimal/maximal. Such intervals are usually part of an OIL and are complimentary
-    // to the other OIL intervals.
-    bool isTypeBracketInterval = isLB && isUB;
+    // If this is a type bracket interval create the corresponding $type predicate.
+    if (isLB && isUB) {
+        const BSONType type = gtVal.type();
+        // This assumes we never get index bounds spanning over multiple
+        // data types, which does not hold for eg. $type: ['string', 'object'].
+        MatcherTypeSet typeSet;
+        if (type == BSONType::numberDouble) {
+            // We cannot distinguish between numeric types using
+            // index bounds alone.
+            typeSet.allNumbers = true;
+        } else if (type == BSONType::string) {
+            // Indices encode strings and symbols identically,
+            // so we cannot distinguish between the two by index
+            // bounds alone.
+            std::vector<std::unique_ptr<MatchExpression>> vec;
+            vec.push_back(std::make_unique<TypeMatchExpression>(path, BSONType::string));
+            vec.push_back(std::make_unique<TypeMatchExpression>(path, BSONType::symbol));
+            // Combining $type predicates with a $or lets the disjunction
+            // get normalized away by the normalizeMatchExpression call.
+            // See the path for BSONType::undefined
+            return std::make_unique<OrMatchExpression>(std::move(vec));
+        } else {
+            typeSet.bsonTypes.insert(gtVal.type());
+        }
+        return std::make_unique<TypeMatchExpression>(path, std::move(typeSet));
+    }
 
-    if (isTypeBracketInterval || !isLB) {
+    std::vector<std::unique_ptr<MatchExpression>> expressions;
+
+    if (isUB ||
+        (!isLB &&
+         (gtVal.type() != BSONType::numberDouble ||
+          gtVal.numberDouble() != -std::numeric_limits<double>::infinity()))) {
         // Create an expression for the lower bound only if it is not minimal for the type. This
         // avoids adding redundant always true conditions such as {a: {$gt: -inf}}.
         if (gtIncl) {
             expressions.push_back(std::make_unique<GTEMatchExpression>(path, gtVal));
         } else {
             expressions.push_back(std::make_unique<GTMatchExpression>(path, gtVal));
-        };
+        }
     }
 
-    if (isTypeBracketInterval || !isUB) {
+    if (!isUB) {
         // Create an expression for the upper bound only if it is not maximal for the type. This
         // avoids adding redundant always true conditions such as {a: {$lt: inf}}.
         if (ltIncl) {
             expressions.push_back(std::make_unique<LTEMatchExpression>(path, ltVal));
         } else {
             expressions.push_back(std::make_unique<LTMatchExpression>(path, ltVal));
-        };
+        }
     }
 
     if (expressions.size() > 1) {
         return std::make_unique<AndMatchExpression>(std::move(expressions));
     }
-    if (expressions.size() == 1) {
-        return std::move(expressions[0]);
-    }
-    // The transformation of this interval to match expression is not supported.
-    return nullptr;
+
+    return std::move(expressions[0]);
 }
 
 std::unique_ptr<MatchExpression> getMatchExpressionFromOIL(const OrderedIntervalList* oil) {
@@ -178,21 +327,22 @@ std::unique_ptr<MatchExpression> getMatchExpressionFromBounds(const IndexBounds&
         expressions.push_back(filterExpr->clone());
     }
 
-    if (expressions.size() > 1) {
-        // Normalize and simplify the resulting conjunction in order to enable better detection of
-        // expression equivalence.
-        auto conj = std::make_unique<AndMatchExpression>(std::move(expressions));
-        auto simplified = normalizeMatchExpression(std::move(conj), true);
-        if (simplified->isTriviallyTrue()) {
-            // There are at least two different forms of true expressions. Return the same form.
-            return std::make_unique<AlwaysTrueMatchExpression>();
-        }
-        return simplified;
+    if (expressions.size() == 0) {
+        return nullptr;
     }
-    if (expressions.size() == 1) {
-        return std::move(expressions[0]);
+
+    auto expression = expressions.size() == 1
+        ? std::move(expressions[0])
+        : std::make_unique<AndMatchExpression>(std::move(expressions));
+
+    // Normalize and simplify the resulting conjunction in order to enable better detection of
+    // expression equivalence.
+    auto simplified = normalizeMatchExpression(std::move(expression), true);
+    if (simplified->isTriviallyTrue()) {
+        // There are at least two different forms of true expressions. Return the same form.
+        return std::make_unique<AlwaysTrueMatchExpression>();
     }
-    return nullptr;
+    return simplified;
 }
 
 }  // namespace mongo::cost_based_ranker

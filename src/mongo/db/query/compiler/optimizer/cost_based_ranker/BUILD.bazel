@@ -90,6 +90,17 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "cbr_rewrites_test",
+    srcs = [
+        "cbr_rewrites_test.cpp",
+    ],
+    tags = ["mongo_unittest_fifth_group"],
+    deps = [
+        ":cbr_test_utils",
+    ],
+)
+
 mongo_cc_library(
     name = "cbr_test_utils",
     srcs = [
