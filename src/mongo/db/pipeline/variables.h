@@ -45,7 +45,6 @@
 #include <functional>
 #include <iterator>
 #include <map>
-#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -89,7 +88,8 @@ public:
         Variables::Id _nextId;
     };
 
-    Variables() = default;
+    Variables()
+        : _queryConstantDefinitions(std::make_shared<absl::flat_hash_map<Id, ValueAndState>>()) {}
 
     static bool isUserDefinedVariable(Variables::Id id) {
         return id >= 0;
@@ -109,11 +109,16 @@ public:
     // Ids for builtin variables.
     static constexpr auto kRootId = Id(-1);
     static constexpr auto kRemoveId = Id(-2);
-    static constexpr auto kNowId = Id(-3);
-    static constexpr auto kClusterTimeId = Id(-4);
-    static constexpr auto kJsScopeId = Id(-5);
-    static constexpr auto kIsMapReduceId = Id(-6);
-    static constexpr auto kSearchMetaId = Id(-7);
+    static constexpr auto kSearchMetaId = Id(-3);
+
+    // Every variable with id <= kMaxQueryConstantId once set, should have the same value during the
+    // whole execution of the query.
+    static constexpr auto kMaxQueryConstantId = Id(-4);
+
+    static constexpr auto kNowId = kMaxQueryConstantId;
+    static constexpr auto kClusterTimeId = Id(-5);
+    static constexpr auto kJsScopeId = Id(-6);
+    static constexpr auto kIsMapReduceId = Id(-7);
     static constexpr auto kUserRolesId = Id(-8);
 
     static constexpr StringData kRootName = "ROOT"_sd;
@@ -172,8 +177,10 @@ public:
      * Returns whether a constant value for 'id' has been defined using setConstantValue().
      */
     bool hasConstantValue(Variables::Id id) const {
-        auto it = _definitions.find(id);
-        return (it != _definitions.end() && it->second.isConstant);
+        const auto& definitionsMap =
+            id <= kMaxQueryConstantId ? *_queryConstantDefinitions : _definitions;
+        auto it = definitionsMap.find(id);
+        return (it != definitionsMap.end() && it->second.isConstant);
     }
 
     /**
@@ -208,7 +215,9 @@ public:
     BSONObj toBSON(const VariablesParseState& vps, const BSONObj& varsToSerialize) const;
 
     bool hasValue(Variables::Id id) const {
-        return _definitions.find(id) != _definitions.end();
+        const auto& definitionsMap =
+            id <= kMaxQueryConstantId ? *_queryConstantDefinitions : _definitions;
+        return definitionsMap.find(id) != definitionsMap.end();
     };
 
     void appendSystemVariables(BSONObjBuilder& bob) const;
@@ -226,13 +235,12 @@ public:
 
     LegacyRuntimeConstants transitionalExtractRuntimeConstants() const;
 
-    static auto getBuiltinVariableName(Variables::Id variable) {
-        for (auto& [name, id] : kBuiltinVarNameToId) {
-            if (variable == id) {
-                return name;
-            }
-        }
-        MONGO_UNREACHABLE_TASSERT(5858104);
+    static std::string getBuiltinVariableName(Variables::Id variable) {
+        auto it = kIdToBuiltinVarName.find(variable);
+        tassert(5858104,
+                str::stream() << "Variable id " << variable << "is not a builtin variable",
+                it != kIdToBuiltinVarName.end());
+        return it->second;
     }
 
     /**
@@ -269,9 +277,15 @@ private:
     };
 
     void setValue(Id id, const Value& value, bool isConstant);
+    void setQueryConstantValue(Id id, Value value);
 
     IdGenerator _idGenerator;
-    stdx::unordered_map<Id, ValueAndState> _definitions;
+    absl::flat_hash_map<Id, ValueAndState> _definitions;
+
+    // Contains variables that should be constant throughout the whole query execution. We create
+    // copies of Variables object for sub-pipelines (e.g $lookup). std::shared_ptr allows us to keep
+    // these values the same across all copies.
+    std::shared_ptr<absl::flat_hash_map<Id, ValueAndState>> _queryConstantDefinitions;
 };
 
 /**
