@@ -47,6 +47,10 @@ public:
     BSONObj serialize() const override {
         return BSON(_name << BSON(kShardedAssertFlagFieldName << true));
     }
+
+    std::unique_ptr<extension::sdk::LogicalAggStage> clone() const override {
+        return std::make_unique<ShardedExecutionSerializationLogicalStage>(_name, _arguments);
+    }
 };
 
 DEFAULT_AST_NODE(ShardedExecutionSerialization);

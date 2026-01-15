@@ -161,6 +161,10 @@ public:
         return boost::none;
     }
 
+    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
+        return std::make_unique<MetricsLogicalStage>(_algorithm);
+    }
+
 private:
     std::string _algorithm;
 };

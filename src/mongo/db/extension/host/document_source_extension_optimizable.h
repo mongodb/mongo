@@ -377,6 +377,9 @@ public:
         return _logicalStage->compile();
     }
 
+    boost::intrusive_ptr<DocumentSource> clone(
+        const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const override;
+
 protected:
     /**
      * NB : Here we keep a copy of the stage name to service getSourceName().

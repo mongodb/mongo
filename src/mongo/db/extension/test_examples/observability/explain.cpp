@@ -85,6 +85,10 @@ public:
 
         return builder.obj();
     }
+
+    std::unique_ptr<extension::sdk::LogicalAggStage> clone() const override {
+        return std::make_unique<ExplainLogicalStage>(_name, _arguments);
+    }
 };
 
 DEFAULT_AST_NODE(Explain);

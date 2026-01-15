@@ -120,6 +120,10 @@ public:
     TestLogicalStageCompile()
         : TestLogicalStage(toStdStringViewForInterop(kStageName), BSON(kStageSpec << "")) {}
 
+    std::unique_ptr<extension::sdk::LogicalAggStage> clone() const override {
+        return make();
+    }
+
     static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {
         return std::make_unique<TestLogicalStageCompile>();
     }

@@ -86,7 +86,7 @@ public:
     ProduceIdsLogicalStage(std::string_view stageName, const BSONObj& arguments)
         : sdk::TestLogicalStage<ProduceIdsExecStage>(stageName, arguments) {}
 
-    std::unique_ptr<sdk::LogicalAggStage> clone() const {
+    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
         return std::make_unique<ProduceIdsLogicalStage>(_name, _arguments);
     }
 

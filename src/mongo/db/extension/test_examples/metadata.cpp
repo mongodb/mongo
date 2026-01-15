@@ -103,14 +103,17 @@ public:
         sdk::DistributedPlanLogic dpl;
 
         std::vector<mongo::extension::VariantDPLHandle> shardElements;
-        shardElements.emplace_back(mongo::extension::LogicalAggStageHandle{
-            new sdk::ExtensionLogicalAggStage(std::make_unique<ValidateMultiSortKeyLogicalStage>(
-                kMultiKeySortStageName, mongo::BSONObj()))});
+        shardElements.emplace_back(
+            mongo::extension::LogicalAggStageHandle{new sdk::ExtensionLogicalAggStage(clone())});
         dpl.shardsPipeline = sdk::DPLArrayContainer(std::move(shardElements));
 
         dpl.sortPattern = BSON("$searchScore" << 1 << "$textScore" << 1);
 
         return dpl;
+    }
+
+    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
+        return std::make_unique<ValidateMultiSortKeyLogicalStage>(_name, _arguments);
     }
 };
 

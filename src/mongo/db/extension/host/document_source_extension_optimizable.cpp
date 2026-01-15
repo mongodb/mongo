@@ -442,4 +442,9 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceExtensionOptimizab
     return outExpanded;
 }
 
+boost::intrusive_ptr<DocumentSource> DocumentSourceExtensionOptimizable::clone(
+    const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const {
+    return create(newExpCtx, _logicalStage->clone(), _properties);
+}
+
 }  // namespace mongo::extension::host

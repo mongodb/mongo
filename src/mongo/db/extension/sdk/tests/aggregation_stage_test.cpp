@@ -446,12 +446,15 @@ TEST_F(AggStageTest, BadTypeRequiredPrivilegesAstNodeFails) {
     ASSERT_THROWS_CODE(handle->getProperties(), DBException, ErrorCodes::TypeMismatch);
 }
 
-class SimpleSerializationLogicalStage : public LogicalAggStage {
+class SimpleSerializationLogicalStage
+    : public sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage> {
 public:
     static constexpr StringData kStageName = "$simpleSerialization";
     static constexpr StringData kStageSpec = "mongodb";
 
-    SimpleSerializationLogicalStage() : LogicalAggStage(toStdStringViewForInterop(kStageName)) {}
+    SimpleSerializationLogicalStage()
+        : sdk::TestLogicalStage<sdk::shared_test_stages::TransformExecAggStage>(
+              toStdStringViewForInterop(kStageName), BSONObj()) {}
 
     BSONObj serialize() const override {
         return BSON(kStageName << kStageSpec);
@@ -461,12 +464,8 @@ public:
         return BSON(kStageName << verbosity);
     }
 
-    std::unique_ptr<ExecAggStageBase> compile() const override {
-        return nullptr;
-    }
-
-    boost::optional<DistributedPlanLogic> getDistributedPlanLogic() const override {
-        return boost::none;
+    std::unique_ptr<extension::sdk::LogicalAggStage> clone() const override {
+        return make();
     }
 
     static inline std::unique_ptr<extension::sdk::LogicalAggStage> make() {

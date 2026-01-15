@@ -74,6 +74,7 @@ public:
     virtual BSONObj explain(::MongoExtensionExplainVerbosity verbosity) const = 0;
     virtual std::unique_ptr<ExecAggStageBase> compile() const = 0;
     virtual boost::optional<DistributedPlanLogic> getDistributedPlanLogic() const = 0;
+    virtual std::unique_ptr<LogicalAggStage> clone() const = 0;
 
 protected:
     LogicalAggStage() = delete;  // No default constructor.
@@ -170,13 +171,24 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extClone(const ::MongoExtensionLogicalAggStage* extLogicalStage,
+                                             ::MongoExtensionLogicalAggStage** output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            auto logicalStagePtr =
+                static_cast<const ExtensionLogicalAggStage*>(extLogicalStage)->getImpl().clone();
+
+            *output = new ExtensionLogicalAggStage(std::move(logicalStagePtr));
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
         .serialize = &_extSerialize,
         .explain = &_extExplain,
         .compile = &_extCompile,
-        .get_distributed_plan_logic = &_extGetDistributedPlanLogic};
+        .get_distributed_plan_logic = &_extGetDistributedPlanLogic,
+        .clone = &_extClone};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

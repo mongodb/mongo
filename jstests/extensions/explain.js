@@ -4,7 +4,6 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -55,21 +54,22 @@ function runUnionWithTest(verbosity, pipeline, expectedStages) {
     const result = coll.explain(verbosity).aggregate({$unionWith: {coll: coll.getName(), pipeline}});
 
     for (const unionWithStage of getAggPlanStages(result, "$unionWith")) {
-        const unionWithPipelineStages = unionWithStage["$unionWith"]["pipeline"];
+        const unionWithPipelineExplainOutput = unionWithStage["$unionWith"]["pipeline"];
+
         // A $unionWith subpipeline looks the same as a top-level pipeline in the explain output,
         // just nested differently. We can reuse our existing validation if we present it like a
-        // top-level pipeline.
-        verifyPipelineExplainOutput(verbosity, {stages: unionWithPipelineStages}, expectedStages);
+        // top-level pipeline (this can differ for different topologies).
+        const unionWithPipelineStages = unionWithPipelineExplainOutput.hasOwnProperty("shards")
+            ? unionWithPipelineExplainOutput
+            : {stages: unionWithPipelineExplainOutput};
+        verifyPipelineExplainOutput(verbosity, unionWithPipelineStages, expectedStages);
     }
 }
 
-// TODO SERVER-117134 Enable once sharded $explain is fixed for extension stages in $unionWith.
-if (!FixtureHelpers.isMongos(db)) {
-    // Test the $explain stage in a $unionWith subpipeline.
-    runUnionWithTest("queryPlanner", [{$explain: {input: "hello"}}], {
-        $explain: {input: "hello", verbosity: "queryPlanner"},
-    });
-    runUnionWithTest("executionStats", [{$explain: {input: "hello"}}], {
-        $explain: {input: "hello", verbosity: "executionStats"},
-    });
-}
+// Test the $explain stage in a $unionWith subpipeline.
+runUnionWithTest("queryPlanner", [{$explain: {input: "hello"}}], {
+    $explain: {input: "hello", verbosity: "queryPlanner"},
+});
+runUnionWithTest("executionStats", [{$explain: {input: "hello"}}], {
+    $explain: {input: "hello", verbosity: "executionStats"},
+});

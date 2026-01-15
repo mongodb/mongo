@@ -38,6 +38,7 @@
 namespace mongo::extension {
 
 using DistributedPlanLogicHandle = OwnedHandle<::MongoExtensionDistributedPlanLogic>;
+using LogicalAggStageHandle = OwnedHandle<::MongoExtensionLogicalAggStage>;
 
 class LogicalAggStageAPI;
 
@@ -74,6 +75,11 @@ public:
      */
     DistributedPlanLogicHandle getDistributedPlanLogic() const;
 
+    /**
+     * Clones the logical stage.
+     */
+    LogicalAggStageHandle clone() const;
+
     static void assertVTableConstraints(const VTable_t& vtable) {
         tassert(
             11420603, "ExtensionLogicalAggStage 'get_name' is null", vtable.get_name != nullptr);
@@ -84,9 +90,8 @@ public:
         tassert(10917600,
                 "ExtensionLogicalAggStage 'get_distributed_plan_logic' is null",
                 vtable.get_distributed_plan_logic != nullptr);
+        tassert(11713400, "ExtensionLogicalAggStage 'clone' is null", vtable.clone != nullptr);
     }
 };
-
-using LogicalAggStageHandle = OwnedHandle<::MongoExtensionLogicalAggStage>;
 
 }  // namespace mongo::extension

@@ -404,6 +404,11 @@ typedef struct MongoExtensionLogicalAggStageVTable {
         const MongoExtensionLogicalAggStage* logicalStage,
         struct MongoExtensionDistributedPlanLogic** output);
 
+    /**
+     * Clones the logical stage. Ownership of the output pointer is transferred to the caller.
+     */
+    MongoExtensionStatus* (*clone)(const MongoExtensionLogicalAggStage* logicalStage,
+                                   MongoExtensionLogicalAggStage** output);
 } MongoExtensionLogicalAggStageVTable;
 
 /**

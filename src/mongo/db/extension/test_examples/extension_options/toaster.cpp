@@ -169,7 +169,7 @@ public:
     LoafLogicalStage(std::string_view stageName, const mongo::BSONObj& arguments)
         : sdk::TestLogicalStage<LoafExecStage>(stageName, arguments) {}
 
-    std::unique_ptr<sdk::LogicalAggStage> clone() const {
+    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
         return std::make_unique<LoafLogicalStage>(_name, _arguments);
     }
 

@@ -64,6 +64,10 @@ public:
     TransformLogicalAggStage(std::string_view stageName, const mongo::BSONObj& arguments)
         : TestLogicalStage(stageName, arguments) {}
 
+    std::unique_ptr<extension::sdk::LogicalAggStage> clone() const override {
+        return make();
+    }
+
     static std::unique_ptr<sdk::LogicalAggStage> make() {
         return std::make_unique<TransformLogicalAggStage>();
     }

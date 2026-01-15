@@ -193,9 +193,15 @@ namespace sdk = mongo::extension::sdk;
  * Defines a default LogicalStage class implementation with the name <ExtensionName>LogicalStage.
  * This class will compile() to <ExtensionName>ExecStage (which must also exist).
  */
-#define DEFAULT_LOGICAL_STAGE(ExtensionName) \
-    using ExtensionName##LogicalStage = sdk::TestLogicalStage<ExtensionName##ExecStage>;
-
+#define DEFAULT_LOGICAL_STAGE(ExtensionName)                                                     \
+    class ExtensionName##LogicalStage : public sdk::TestLogicalStage<ExtensionName##ExecStage> { \
+    public:                                                                                      \
+        ExtensionName##LogicalStage(std::string_view stageName, const mongo::BSONObj& arguments) \
+            : sdk::TestLogicalStage<ExtensionName##ExecStage>(stageName, arguments) {}           \
+        std::unique_ptr<sdk::LogicalAggStage> clone() const override {                           \
+            return std::make_unique<ExtensionName##LogicalStage>(_name, _arguments);             \
+        }                                                                                        \
+    };
 /*
  * Defines a default AstNode class implementation with the name <ExtensionName>AstNode. This class
  * will bind() to <ExtensionName>LogicalStage (which must also exist).

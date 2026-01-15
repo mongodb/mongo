@@ -85,4 +85,11 @@ DistributedPlanLogicHandle LogicalAggStageAPI::getDistributedPlanLogic() const {
     return DistributedPlanLogicHandle(dpl);
 }
 
+LogicalAggStageHandle LogicalAggStageAPI::clone() const {
+    ::MongoExtensionLogicalAggStage* logicalAggStage{nullptr};
+    invokeCAndConvertStatusToException([&]() { return vtable().clone(get(), &logicalAggStage); });
+
+    return LogicalAggStageHandle(logicalAggStage);
+}
+
 }  // namespace mongo::extension

@@ -83,7 +83,7 @@ public:
         return _stageBson;
     }
 
-    std::unique_ptr<sdk::LogicalAggStage> clone() const {
+    std::unique_ptr<sdk::LogicalAggStage> clone() const override {
         return std::make_unique<LimitLogicalStage>(_name, _stageBson);
     }
 
