@@ -217,6 +217,11 @@ public:
 
     virtual std::unique_ptr<AggStageAstNode> clone() const = 0;
 
+    virtual MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
+        const {
+        return MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend;
+    }
+
 protected:
     AggStageAstNode() = delete;  // No default constructor.
     explicit AggStageAstNode(std::string_view name) : _name(name) {}
@@ -307,12 +312,24 @@ private:
         });
     }
 
-    static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE = {.destroy = &_extDestroy,
-                                                                     .get_name = &_extGetName,
-                                                                     .get_properties =
-                                                                         &_extGetProperties,
-                                                                     .bind = &_extBind,
-                                                                     .clone = &_extClone};
+    static ::MongoExtensionStatus* _extGetFirstStageViewApplicationPolicy(
+        const ::MongoExtensionAggStageAstNode* astNode,
+        ::MongoExtensionFirstStageViewApplicationPolicy* output) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            auto policy = static_cast<const ExtensionAggStageAstNode*>(astNode)
+                              ->getImpl()
+                              .getFirstStageViewApplicationPolicy();
+            *output = policy;
+        });
+    }
+
+    static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE = {
+        .destroy = &_extDestroy,
+        .get_name = &_extGetName,
+        .get_properties = &_extGetProperties,
+        .bind = &_extBind,
+        .clone = &_extClone,
+        .get_first_stage_view_application_policy = &_extGetFirstStageViewApplicationPolicy};
     std::unique_ptr<AggStageAstNode> _astNode;
 };
 

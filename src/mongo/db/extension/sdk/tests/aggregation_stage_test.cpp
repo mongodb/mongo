@@ -1652,6 +1652,52 @@ TEST(HostAstNodeCloneTest, CloneExtensionAllocatedAstNodePreservesProperties) {
     ASSERT_EQ(originalProps.getPosition(), clonedProps.getPosition());
 }
 
+class ConfigurableViewPolicyExtensionAstNode : public sdk::AggStageAstNode {
+public:
+    ConfigurableViewPolicyExtensionAstNode(MongoExtensionFirstStageViewApplicationPolicy viewPolicy)
+        : sdk::AggStageAstNode("$configurableViewPolicy"), _viewPolicy(viewPolicy) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
+        const override {
+        return _viewPolicy;
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make(
+        MongoExtensionFirstStageViewApplicationPolicy viewPolicy) {
+        return std::make_unique<ConfigurableViewPolicyExtensionAstNode>(viewPolicy);
+    }
+
+private:
+    MongoExtensionFirstStageViewApplicationPolicy _viewPolicy;
+};
+
+TEST_F(AggStageTest, ExtensionAstNodeCanReturnDefaultViewPolicy) {
+    auto extensionAstNode =
+        new sdk::ExtensionAggStageAstNode(ConfigurableViewPolicyExtensionAstNode::make(
+            MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend));
+    auto handle = AggStageAstNodeHandle{extensionAstNode};
+    auto policy = handle->getFirstStageViewApplicationPolicy();
+    ASSERT_EQ(policy, MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend);
+}
+
+TEST_F(AggStageTest, ExtensionAstNodeCanReturnDoNothingViewPolicy) {
+    auto extensionAstNode =
+        new sdk::ExtensionAggStageAstNode(ConfigurableViewPolicyExtensionAstNode::make(
+            MongoExtensionFirstStageViewApplicationPolicy::kDoNothing));
+    auto handle = AggStageAstNodeHandle{extensionAstNode};
+    auto policy = handle->getFirstStageViewApplicationPolicy();
+    ASSERT_EQ(policy, MongoExtensionFirstStageViewApplicationPolicy::kDoNothing);
+}
+
 }  // namespace
 
 }  // namespace mongo::extension::sdk

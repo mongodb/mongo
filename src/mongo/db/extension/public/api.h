@@ -677,6 +677,18 @@ typedef struct MongoExtensionAggStageParseNodeVTable {
 } MongoExtensionAggStageParseNodeVTable;
 
 /**
+ * Types of first stage view application policies that an extension can implement.
+ */
+typedef enum MongoExtensionFirstStageViewApplicationPolicy : uint32_t {
+    // If this stage is at the front of the pipeline, the pipeline should
+    // prepend the view.
+    kDefaultPrepend = 0,
+    // If this stage is at the front of the pipeline, the pipeline should not
+    // prepend the view. The stage will apply the view pipeline itself internally.
+    kDoNothing = 1,
+} MongoExtensionFirstStageViewApplicationPolicy;
+
+/**
  * Virtual function table for MongoExtensionAggStageAstNode.
  */
 typedef struct MongoExtensionAggStageAstNodeVTable {
@@ -713,6 +725,15 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
      */
     MongoExtensionStatus* (*clone)(const MongoExtensionAggStageAstNode* astNode,
                                    MongoExtensionAggStageAstNode** output);
+
+    /**
+     * Populates the MongoExtensionFirstStageViewApplicationPolicy with the extension's desired
+     * FirstStageViewApplicationPolicy. The caller should allocate and own the enum for the callee
+     * to populate. Ownership is not transferred to the callee.
+     */
+    MongoExtensionStatus* (*get_first_stage_view_application_policy)(
+        const MongoExtensionAggStageAstNode* astNode,
+        MongoExtensionFirstStageViewApplicationPolicy* viewPolicyOutput);
 } MongoExtensionAggStageAstNodeVTable;
 
 /**

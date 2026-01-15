@@ -68,4 +68,13 @@ AggStageAstNodeHandle AggStageAstNodeAPI::clone() const {
 
     return AggStageAstNodeHandle(astNodePtr);
 }
+
+MongoExtensionFirstStageViewApplicationPolicy
+AggStageAstNodeAPI::getFirstStageViewApplicationPolicy() const {
+    MongoExtensionFirstStageViewApplicationPolicy policy =
+        MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend;
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().get_first_stage_view_application_policy(get(), &policy); });
+    return policy;
+}
 }  // namespace mongo::extension
