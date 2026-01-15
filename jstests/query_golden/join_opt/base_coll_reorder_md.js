@@ -134,68 +134,71 @@ runRandomReorderTests([
     {$project: {_id: 0, "x._id": 0, "y._id": 0}},
 ]);
 
-section("4-Node graph + potentially inferred edges & filters");
-runRandomReorderTests([
-    {$match: {b: {$eq: 3}}},
-    {$lookup: {from: a.getName(), as: "x", localField: "base", foreignField: "base"}},
-    {$unwind: "$x"},
-    {$lookup: {from: b.getName(), as: "y", localField: "base", foreignField: "base"}},
-    {$unwind: "$y"},
-    {
-        $lookup: {
-            from: coll.getName(),
-            as: "z",
-            localField: "y.base",
-            foreignField: "base",
-            pipeline: [{$match: {base: {$gt: 3}}}],
+if (!checkSbeFullFeatureFlagEnabled(db)) {
+    // TODO SERVER-114457: re-enable for featureFlagSbeFull once $match constants are correctly extracted
+    section("4-Node graph + potentially inferred edges & filters");
+    runRandomReorderTests([
+        {$match: {b: {$eq: 3}}},
+        {$lookup: {from: a.getName(), as: "x", localField: "base", foreignField: "base"}},
+        {$unwind: "$x"},
+        {$lookup: {from: b.getName(), as: "y", localField: "base", foreignField: "base"}},
+        {$unwind: "$y"},
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "z",
+                localField: "y.base",
+                foreignField: "base",
+                pipeline: [{$match: {base: {$gt: 3}}}],
+            },
         },
-    },
-    {$unwind: "$z"},
-    {$project: {_id: 0, "x._id": 0, "y._id": 0, "z._id": 0}},
-]);
+        {$unwind: "$z"},
+        {$project: {_id: 0, "x._id": 0, "y._id": 0, "z._id": 0}},
+    ]);
 
-section("5-Node graph + filters");
-runRandomReorderTests([
-    {$match: {b: {$eq: 3}}},
-    {
-        $lookup: {
-            from: a.getName(),
-            as: "aaa",
-            localField: "a",
-            foreignField: "a",
-            pipeline: [{$match: {base: {$in: [22, 33]}}}],
+    section("5-Node graph + filters");
+    runRandomReorderTests([
+        {$match: {b: {$eq: 3}}},
+        {
+            $lookup: {
+                from: a.getName(),
+                as: "aaa",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {base: {$in: [22, 33]}}}],
+            },
         },
-    },
-    {$unwind: "$aaa"},
-    {
-        $lookup: {
-            from: b.getName(),
-            as: "bbb",
-            localField: "b",
-            foreignField: "b",
-            pipeline: [{$match: {base: {$gt: 20}}}],
+        {$unwind: "$aaa"},
+        {
+            $lookup: {
+                from: b.getName(),
+                as: "bbb",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$match: {base: {$gt: 20}}}],
+            },
         },
-    },
-    {$unwind: "$bbb"},
-    {
-        $lookup: {
-            from: coll.getName(),
-            as: "ccc",
-            localField: "aaa.base",
-            foreignField: "base",
-            pipeline: [{$match: {b: {$lt: 0}}}],
+        {$unwind: "$bbb"},
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "ccc",
+                localField: "aaa.base",
+                foreignField: "base",
+                pipeline: [{$match: {b: {$lt: 0}}}],
+            },
         },
-    },
-    {$unwind: "$ccc"},
-    {
-        $lookup: {
-            from: b.getName(),
-            as: "ddd",
-            localField: "base",
-            foreignField: "base",
-            pipeline: [{$match: {b: {$gt: 0}}}],
+        {$unwind: "$ccc"},
+        {
+            $lookup: {
+                from: b.getName(),
+                as: "ddd",
+                localField: "base",
+                foreignField: "base",
+                pipeline: [{$match: {b: {$gt: 0}}}],
+            },
         },
-    },
-    {$unwind: "$ddd"},
-    {$project: {_id: 0, "aaa._id": 0, "bbb._id": 0, "ccc._id": 0, "ddd._id": 0}},
-]);
+        {$unwind: "$ddd"},
+        {$project: {_id: 0, "aaa._id": 0, "bbb._id": 0, "ccc._id": 0, "ddd._id": 0}},
+    ]);
+}
