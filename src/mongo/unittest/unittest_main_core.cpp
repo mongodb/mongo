@@ -339,9 +339,11 @@ boost::optional<ExitCode> MainProgress::parseAndAcceptOptions() {
     if (auto&& o = _options.fileNameFilter)
         uto.fileNameFilter = *o;
 
-    applyTestFilters(uto.suites.value_or(std::vector<std::string>{}),
-                     uto.filter.value_or(""),
-                     uto.fileNameFilter.value_or(""));
+    if (uto.suites || uto.filter || uto.fileNameFilter) {
+        applyTestFilters(uto.suites.value_or(std::vector<std::string>{}),
+                         uto.filter.value_or(""),
+                         uto.fileNameFilter.value_or(""));
+    }
 
     if (uto.tempPath)
         TempDir::setTempPath(*uto.tempPath);
