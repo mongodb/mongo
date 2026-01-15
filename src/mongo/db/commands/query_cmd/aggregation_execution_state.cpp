@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/disk_use_options_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
-#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/profile_settings.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -658,38 +657,6 @@ StatusWith<std::unique_ptr<ResolvedViewAggExState>> ResolvedViewAggExState::crea
     // initialization.
     return std::make_unique<ResolvedViewAggExState>(
         std::move(*aggExState), aggCatalogState, viewDefinition);
-}
-
-std::unique_ptr<Pipeline> ResolvedViewAggExState::applyViewToPipeline(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    std::unique_ptr<Pipeline> pipeline,
-    boost::optional<UUID> uuid) const {
-    if (getResolvedView().timeseries()) {
-        // For timeseries, there may have been rewrites done on the raw BSON pipeline
-        // during view resolution. We must parse the request's full resolved pipeline
-        // which will account for those rewrites.
-        // TODO SERVER-101599 remove this code once 9.0 becomes last LTS. By then only viewless
-        // timeseries collections will exist.
-        return pipeline_factory::makePipeline(
-            getRequest().getPipeline(), expCtx, pipeline_factory::kOptionsMinimal);
-    } else if (search_helpers::isMongotPipeline(pipeline.get())) {
-        // For search queries on views don't do any of the pipeline stitching that is done for
-        // normal views.
-        return pipeline;
-    }
-
-    // Parse and desugar the view pipeline, then stitch the user pipeline and full-parsed view
-    // pipeline together to build the total aggregation pipeline.
-    auto userPipeline = std::move(pipeline);
-    pipeline = pipeline_factory::makePipeline(getResolvedView().getPipeline(),
-                                              expCtx,
-                                              {.optimize = false,
-                                               .alreadyOptimized = false,
-                                               .attachCursorSource = false,
-                                               .desugar = true});
-
-    pipeline->appendPipeline(std::move(userPipeline));
-    return pipeline;
 }
 
 ScopedSetShardRole ResolvedViewAggExState::setShardRole(const CollectionRoutingInfo& cri) {
