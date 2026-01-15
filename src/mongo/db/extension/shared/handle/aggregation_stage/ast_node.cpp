@@ -77,4 +77,9 @@ AggStageAstNodeAPI::getFirstStageViewApplicationPolicy() const {
         [&]() { return vtable().get_first_stage_view_application_policy(get(), &policy); });
     return policy;
 }
+
+void AggStageAstNodeAPI::bindViewInfo(std::string_view viewName) const {
+    invokeCAndConvertStatusToException(
+        [&]() { return vtable().bind_view_info(get(), stringViewAsByteView(viewName)); });
+}
 }  // namespace mongo::extension

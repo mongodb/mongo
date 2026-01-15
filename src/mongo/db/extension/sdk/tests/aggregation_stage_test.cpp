@@ -1680,6 +1680,35 @@ private:
     MongoExtensionFirstStageViewApplicationPolicy _viewPolicy;
 };
 
+class ViewInfoBindingExtensionAstNode : public sdk::AggStageAstNode {
+public:
+    ViewInfoBindingExtensionAstNode() : sdk::AggStageAstNode("$viewInfoBinding") {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    void bindViewInfo(std::string_view viewName) const override {
+        _boundViewName = std::string(viewName);
+    }
+
+    std::string getBoundViewName() const {
+        return _boundViewName;
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make() {
+        return std::make_unique<ViewInfoBindingExtensionAstNode>();
+    }
+
+private:
+    mutable std::string _boundViewName;
+};
+
 TEST_F(AggStageTest, ExtensionAstNodeCanReturnDefaultViewPolicy) {
     auto extensionAstNode =
         new sdk::ExtensionAggStageAstNode(ConfigurableViewPolicyExtensionAstNode::make(
@@ -1696,6 +1725,19 @@ TEST_F(AggStageTest, ExtensionAstNodeCanReturnDoNothingViewPolicy) {
     auto handle = AggStageAstNodeHandle{extensionAstNode};
     auto policy = handle->getFirstStageViewApplicationPolicy();
     ASSERT_EQ(policy, MongoExtensionFirstStageViewApplicationPolicy::kDoNothing);
+}
+
+TEST_F(AggStageTest, ExtensionAstNodeCanBindViewInfo) {
+    auto astNodeImpl = ViewInfoBindingExtensionAstNode::make();
+    auto* astNodeImplPtr = static_cast<ViewInfoBindingExtensionAstNode*>(astNodeImpl.get());
+    auto extensionAstNode = new sdk::ExtensionAggStageAstNode(std::move(astNodeImpl));
+    auto handle = AggStageAstNodeHandle{extensionAstNode};
+
+    std::string viewName = "testViewName";
+
+    handle->bindViewInfo(viewName);
+
+    ASSERT_EQ(astNodeImplPtr->getBoundViewName(), viewName);
 }
 
 }  // namespace

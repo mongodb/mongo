@@ -222,6 +222,13 @@ public:
         return MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend;
     }
 
+    // Note that bindViewInfo receives a std::string_view. If an extension wants to access a view
+    // name outside of the call to bindViewInfo, it must make its own copy of it. There are no
+    // guarantees on the lifetime of the string outside of the scope of this function.
+    virtual void bindViewInfo(std::string_view viewName) const {
+        // Default implementation is a no-op.
+    }
+
 protected:
     AggStageAstNode() = delete;  // No default constructor.
     explicit AggStageAstNode(std::string_view name) : _name(name) {}
@@ -323,13 +330,22 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extBindViewInfo(const ::MongoExtensionAggStageAstNode* astNode,
+                                                    ::MongoExtensionByteView viewName) noexcept {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            static_cast<const ExtensionAggStageAstNode*>(astNode)->getImpl().bindViewInfo(
+                byteViewAsStringView(viewName));
+        });
+    }
+
     static constexpr ::MongoExtensionAggStageAstNodeVTable VTABLE = {
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
         .get_properties = &_extGetProperties,
         .bind = &_extBind,
         .clone = &_extClone,
-        .get_first_stage_view_application_policy = &_extGetFirstStageViewApplicationPolicy};
+        .get_first_stage_view_application_policy = &_extGetFirstStageViewApplicationPolicy,
+        .bind_view_info = &_extBindViewInfo};
     std::unique_ptr<AggStageAstNode> _astNode;
 };
 

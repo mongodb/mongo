@@ -734,6 +734,13 @@ typedef struct MongoExtensionAggStageAstNodeVTable {
     MongoExtensionStatus* (*get_first_stage_view_application_policy)(
         const MongoExtensionAggStageAstNode* astNode,
         MongoExtensionFirstStageViewApplicationPolicy* viewPolicyOutput);
+
+    /**
+     * Passes viewInfo over to the extension. For now we just send the view name.
+     * Ownership of the view name is not transferred over the API boundary.
+     */
+    MongoExtensionStatus* (*bind_view_info)(const MongoExtensionAggStageAstNode* astNode,
+                                            MongoExtensionByteView viewName);
 } MongoExtensionAggStageAstNodeVTable;
 
 /**
