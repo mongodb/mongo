@@ -100,7 +100,7 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
         internalMaxNumberNodesConsideredForImplicitEdges.load();
     _internalMaxGroupAccumulatorsInSbe = gInternalMaxGroupAccumulatorsInSbe.loadRelaxed();
     _enableJoinEnumerationHJOrderPruning = internalEnableJoinEnumerationHJOrderPruning.load();
-
+    _enablePathArrayness = internalEnablePathArrayness.loadRelaxed();
     _enablePipelineOptimizationAdditionalTestingRules =
         internalEnablePipelineOptimizationAdditionalTestingRules.loadRelaxed();
 }
@@ -237,6 +237,10 @@ bool QueryKnobConfiguration::getUseMultiplannerForSingleSolutions() const {
 
 int64_t QueryKnobConfiguration::getMaxGroupAccumulatorsInSbe() const {
     return _internalMaxGroupAccumulatorsInSbe;
+}
+
+bool QueryKnobConfiguration::getEnablePathArrayness() const {
+    return _enablePathArrayness;
 }
 
 bool QueryKnobConfiguration::getEnablePipelineOptimizationAdditionalTestingRules() const {

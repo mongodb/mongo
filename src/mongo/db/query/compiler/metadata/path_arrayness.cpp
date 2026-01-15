@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/compiler/metadata/path_arrayness.h"
 
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/logv2/log.h"
 
 #include <stack>
@@ -72,14 +73,24 @@ void PathArrayness::addPathsFromIndexKeyPattern(const BSONObj& indexKeyPattern,
     }
 }
 
-bool PathArrayness::isPathArray(const FieldPath& path) const {
+bool PathArrayness::isPathArray(const FieldPath& path, const ExpressionContext* expCtx) const {
+    // If the PathArrayness query knob is disabled, conservatively return true.
+    if (!expCtx->getQueryKnobConfiguration().getEnablePathArrayness()) {
+        return true;
+    }
+
     bool arrayness = _root.isPathArray(path);
     LOGV2_DEBUG(
         11467800, 5, "Checking path arrayness", "path"_attr = path, "isPathArray"_attr = arrayness);
     return arrayness;
 }
 
-bool PathArrayness::isPathArray(const FieldRef& path) const {
+bool PathArrayness::isPathArray(const FieldRef& path, const ExpressionContext* expCtx) const {
+    // If the PathArrayness query knob is disabled, conservatively return true.
+    if (!expCtx->getQueryKnobConfiguration().getEnablePathArrayness()) {
+        return true;
+    }
+
     StringData pathString = path.dottedField(0);
     StatusWith<FieldPath> maybeFieldPath = fieldPathWithValidationStatus(std::string(pathString));
 
@@ -88,7 +99,7 @@ bool PathArrayness::isPathArray(const FieldRef& path) const {
         return true;
     }
 
-    return isPathArray(maybeFieldPath.getValue());
+    return isPathArray(maybeFieldPath.getValue(), expCtx);
 }
 
 bool PathArrayness::TrieNode::isPathArray(const FieldPath& path) const {

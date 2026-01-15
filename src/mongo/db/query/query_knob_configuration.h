@@ -102,6 +102,11 @@ public:
     int64_t getMaxGroupAccumulatorsInSbe() const;
 
     /**
+     * Returns whether we should use PathArrayness when applying optimizations.
+     */
+    bool getEnablePathArrayness() const;
+
+    /**
      * Returns whether to apply experimental testing aggregation pipeline rules.
      */
     bool getEnablePipelineOptimizationAdditionalTestingRules() const;
@@ -141,6 +146,7 @@ private:
     int64_t _internalQuerySpillingMinAvailableDiskSpaceBytes;
     int64_t _internalMaxGroupAccumulatorsInSbe;
 
+    bool _enablePathArrayness;
     bool _enablePipelineOptimizationAdditionalTestingRules;
 };
 }  // namespace mongo
