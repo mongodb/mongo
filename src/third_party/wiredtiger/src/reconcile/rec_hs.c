@@ -904,7 +904,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
              * No need to insert any data that is older than the update restored from delta. They
              * are already in the history store.
              */
-            if (F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_RESTORED_FROM_DELTA)) {
+            if (F_ISSET(upd, WT_UPDATE_HS)) {
                 if (upd->type == WT_UPDATE_STANDARD)
                     break;
 

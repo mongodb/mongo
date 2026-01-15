@@ -74,8 +74,8 @@ __block_disagg_addr_flags(const WT_PAGE_BLOCK_META *block_meta)
  */
 int
 __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *block_disagg,
-  WT_ITEM *buf, WT_PAGE_BLOCK_META *block_meta, uint32_t *sizep, uint32_t *checksump,
-  bool data_checksum, bool checkpoint_io)
+  WT_ITEM *buf, WT_PAGE_BLOCK_META *block_meta, size_t page_image_size, uint32_t *sizep,
+  uint32_t *checksump, bool data_checksum, bool checkpoint_io)
 {
     WT_BLOCK_DISAGG_HEADER *blk;
     WT_CONNECTION_IMPL *conn;
@@ -172,7 +172,7 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
     put_args.backlink_lsn = block_meta->backlink_lsn;
     put_args.base_lsn = block_meta->base_lsn;
     put_args.encryption = block_meta->encryption;
-    put_args.image_size = block_meta->image_size;
+    put_args.image_size = page_image_size;
 
     if (F_ISSET(blk, WT_BLOCK_DISAGG_COMPRESSED))
         F_SET(&put_args, WT_PAGE_LOG_COMPRESSED);
@@ -195,10 +195,9 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
     __wt_stat_usecs_hist_incr_disaggbmwrite(session, WT_CLOCKDIFF_US(time_stop, time_start));
 
     __wt_verbose(session, WT_VERB_WRITE,
-      "page_id %" PRIuMAX ", size %" PRIuMAX ", checksum %" PRIx32 ", lsn %" PRIu64
-      ", page_image_size %" PRIuMAX,
-      (uintmax_t)page_id, (uintmax_t)buf->size, checksum, put_args.lsn,
-      (uintmax_t)block_meta->image_size);
+      "page_id %" PRIu64 ", size %" WT_SIZET_FMT ", checksum %" PRIx32 ", lsn %" PRIu64
+      ", page_image_size %" WT_SIZET_FMT,
+      page_id, buf->size, checksum, put_args.lsn, page_image_size);
 
     /* Some extra data is set by the put interface, and must be returned up the chain. */
     block_meta->disagg_lsn = put_args.lsn;
@@ -217,8 +216,8 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
  */
 int
 __wti_block_disagg_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
-  WT_PAGE_BLOCK_META *block_meta, uint8_t *addr, size_t *addr_sizep, bool data_checksum,
-  bool checkpoint_io)
+  WT_PAGE_BLOCK_META *block_meta, size_t page_image_size, uint8_t *addr, size_t *addr_sizep,
+  bool data_checksum, bool checkpoint_io)
 {
     WT_BLOCK_DISAGG *block_disagg;
     WT_BLOCK_DISAGG_ADDRESS_COOKIE cookie;
@@ -239,8 +238,8 @@ __wti_block_disagg_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf
      */
     __wt_page_header_byteswap(buf->mem);
 
-    WT_RET(__wti_block_disagg_write_internal(
-      session, block_disagg, buf, block_meta, &size, &checksum, data_checksum, checkpoint_io));
+    WT_RET(__wti_block_disagg_write_internal(session, block_disagg, buf, block_meta,
+      page_image_size, &size, &checksum, data_checksum, checkpoint_io));
 
     __wt_page_header_byteswap(buf->mem);
 

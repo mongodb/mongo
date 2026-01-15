@@ -329,49 +329,6 @@ __wt_btree_shared_base_name(
 }
 
 /*
- * __wt_cache_page_inmem_incr_delta_updates --
- *     Increment a page's delta updates in the cache.
- */
-static WT_INLINE void
-__wt_cache_page_inmem_incr_delta_updates(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
-{
-    WT_BTREE *btree;
-    WT_CACHE *cache;
-
-    WT_ASSERT(session, size < WT_EXABYTE);
-    btree = S2BT(session);
-    cache = S2C(session)->cache;
-
-    (void)__wt_atomic_add_uint64_relaxed(&cache->bytes_delta_updates, size);
-    (void)__wt_atomic_add_uint64_relaxed(&btree->bytes_delta_updates, size);
-    (void)__wt_atomic_add_uint64_relaxed(&page->modify->bytes_delta_updates, size);
-}
-
-/*
- * __wt_cache_page_inmem_decr_delta_updates --
- *     Decrease a page's delta updates in the cache.
- */
-static WT_INLINE void
-__wt_cache_page_inmem_decr_delta_updates(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
-{
-    WT_BTREE *btree;
-    WT_CACHE *cache;
-
-    WT_ASSERT(session, size < WT_EXABYTE);
-    btree = S2BT(session);
-    cache = S2C(session)->cache;
-
-    if (__wt_atomic_load_uint64_relaxed(&page->modify->bytes_delta_updates) > 0) {
-        __wt_cache_decr_check_uint64(
-          session, &page->modify->bytes_delta_updates, size, "WT_PAGE_MODIFY.bytes_delta_updates");
-        __wt_cache_decr_check_uint64(
-          session, &btree->bytes_delta_updates, size, "WT_BTREE.bytes_delta_updates");
-        __wt_cache_decr_check_uint64(
-          session, &cache->bytes_delta_updates, size, "WT_CACHE.bytes_delta_updates");
-    }
-}
-
-/*
  * __wt_cache_page_inmem_incr --
  *     Increment a page's memory footprint in the cache.
  */

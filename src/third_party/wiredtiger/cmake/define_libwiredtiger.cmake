@@ -110,4 +110,8 @@ macro(define_wiredtiger_library target type)
             endif()
         endif()
     endif()
+
+    if(HAVE_BUILTIN_EXTENSION_KEY_PROVIDER)
+        target_link_libraries(${target} PRIVATE wiredtiger_key_provider)
+    endif()
 endmacro()

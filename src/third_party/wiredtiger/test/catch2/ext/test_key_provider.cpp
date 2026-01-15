@@ -6,6 +6,12 @@
  * See the file LICENSE for redistribution information.
  */
 
+#include <functional>
+#include <iostream>
+#include <memory>
+
+#include <catch2/catch.hpp>
+
 #include "ext/test/key_provider/key_provider.h"
 
 #include "wrappers/connection_wrapper.h"
@@ -14,19 +20,11 @@
 #include "wiredtiger.h"
 #include "wt_internal.h"
 
-#include <functional>
-#include <iostream>
-#include <memory>
-
-#include <catch2/catch.hpp>
-
 /*
  * kp_fixture
  *     Test fixture for the key provider extension tests.
  */
 struct kp_fixture {
-    utils::shared_library lib{KEY_PROVIDER_EXTENSION};
-
     using extension_init_t = decltype(&wiredtiger_extension_init);
     extension_init_t extension_init = nullptr;
 
@@ -36,6 +34,17 @@ struct kp_fixture {
     KEY_PROVIDER *kp = nullptr;
     using kp_ptr_t = std::unique_ptr<KEY_PROVIDER, std::function<void(KEY_PROVIDER *)>>;
 
+    static extension_init_t
+    get_init_proc()
+    {
+#if defined(HAVE_BUILTIN_EXTENSION_KEY_PROVIDER)
+        return key_provider_extension_init;
+#else
+        static utils::shared_library lib{KEY_PROVIDER_EXTENSION};
+        return lib.get<extension_init_t>("wiredtiger_extension_init");
+#endif /* HAVE_BUILTIN_EXTENSION_KEY_PROVIDER */
+    }
+
     ~kp_fixture()
     {
         kp_reset();
@@ -43,9 +52,7 @@ struct kp_fixture {
         session = nullptr;
     }
 
-    kp_fixture()
-        : extension_init(lib.get<extension_init_t>("wiredtiger_extension_init")),
-          conn(DB_HOME, "create,in_memory")
+    kp_fixture() : extension_init(get_init_proc()), conn(DB_HOME, "create,in_memory")
     {
         REQUIRE(conn.get_wt_connection()->open_session(
                   conn.get_wt_connection(), NULL, NULL, &session) == 0);
@@ -258,14 +265,14 @@ TEST_CASE_METHOD(kp_fixture, "Key expired and rotated", "[key_provider]")
     REQUIRE(kp->key_expires == -43200);
     REQUIRE(kp->state.key_state == KEY_STATE_CURRENT);
 
-    const clock_t init_key_time = kp->state.key_time;
+    const auto init_key_time = kp->state.key_time;
 
     /* Expire the key by setting the key_time to the past */
     kp->state.key_time -= (kp->key_expires + 1) * CLOCKS_PER_SEC;
 
     /* Generates a new key */
     WT_CRYPT_KEYS crypt = kp_get_key();
-    const clock_t new_key_time = kp->state.key_time;
+    const auto new_key_time = kp->state.key_time;
     REQUIRE(init_key_time != new_key_time); /* New key generated */
 
     free(const_cast<void *>(crypt.keys.data));
@@ -328,13 +335,13 @@ TEST_CASE_METHOD(kp_fixture, "Key always expires", "[key_provider]")
     REQUIRE(kp->key_expires == 0);
     REQUIRE(kp->state.key_state == KEY_STATE_CURRENT);
 
-    const clock_t initial_key_time = kp->state.key_time;
+    const auto initial_key_time = kp->state.key_time;
 
     WT_KEY_PROVIDER *wtkp = &kp->iface;
 
     /* Probe the key; the key is always rotated */
     WT_CRYPT_KEYS crypt = kp_get_key();
-    const clock_t first_key_time = kp->state.key_time;
+    const auto first_key_time = kp->state.key_time;
     REQUIRE(initial_key_time != first_key_time); /* New key generated */
 
     /* Simulate key queueing */

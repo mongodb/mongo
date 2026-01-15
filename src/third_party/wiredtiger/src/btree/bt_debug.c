@@ -1620,11 +1620,6 @@ __debug_update_dump_flags(WT_DBG *ds, WT_UPDATE *upd)
             WT_RET(flag_num == 0 ? ds->f(ds, "fast-truncate") : ds->f(ds, ", fast-truncate"));
             ++flag_num;
         }
-        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DELTA)) {
-            WT_RET(flag_num == 0 ? ds->f(ds, "restored-from-delta") :
-                                   ds->f(ds, ", restored-from-delta"));
-            ++flag_num;
-        }
         if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DS)) {
             WT_RET(flag_num == 0 ? ds->f(ds, "restored-from-ds") : ds->f(ds, ", restored-from-ds"));
             ++flag_num;

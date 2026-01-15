@@ -33,6 +33,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif /* _WIN32 */
 
 /* Format specifier for size_t */
 #if defined(_MSC_VER) && _MSC_VER < 1900
@@ -46,16 +52,16 @@
     do {                                                                                       \
         if ((kp)->verbose >= (level)) {                                                        \
             ((level) == WT_VERBOSE_ERROR ? (kp)->wtext->err_printf : (kp)->wtext->msg_printf)( \
-              (kp)->wtext, (session), "%p, %s: " fmt, (void *)(kp), __func__, ##__VA_ARGS__);  \
+              (kp)->wtext, (session), fmt, __VA_ARGS__);                                       \
         }                                                                                      \
     } while (0)
 
-#define LOG_INFO(kp, session, ...) LOG_AT((kp), (session), WT_VERBOSE_INFO, __VA_ARGS__)
-#define LOG_DEBUG(kp, session, ...) LOG_AT((kp), (session), WT_VERBOSE_DEBUG_1, __VA_ARGS__)
-#define LOG_ERROR(kp, session, ...) LOG_AT((kp), (session), WT_VERBOSE_ERROR, __VA_ARGS__)
-
-/* Convert clock ticks to seconds */
-#define CLOCK_SECS(ct) ((double)(ct) / CLOCKS_PER_SEC)
+#define LOG_INFO(kp, session, fmt, ...) \
+    LOG_AT((kp), (session), WT_VERBOSE_INFO, "%p, %s: " fmt, (void *)(kp), __func__, __VA_ARGS__)
+#define LOG_DEBUG(kp, session, fmt, ...) \
+    LOG_AT((kp), (session), WT_VERBOSE_DEBUG_1, "%p, %s: " fmt, (void *)(kp), __func__, __VA_ARGS__)
+#define LOG_ERROR(kp, session, fmt, ...) \
+    LOG_AT((kp), (session), WT_VERBOSE_ERROR, "%p, %s: " fmt, (void *)(kp), __func__, __VA_ARGS__)
 
 /* Date format for ISO 8601 */
 #define DATE_FORMAT_ISO8601 "%Y-%m-%dT%H:%M:%S%z"
@@ -71,6 +77,41 @@ static const WT_CRYPT_KEYS DEFAULT_KEY = {
   .r = {.lsn = 0},
   .keys = {.data = (const void *)DEFAULT_KEY_DATA, .size = sizeof(DEFAULT_KEY_DATA) - 1},
 };
+
+#define USEC_PER_SEC 1000000
+
+#if defined(_WIN32)
+/*
+ * Windows FILETIME ticks are in 100-nanosecond intervals. Convert 100-nanosecond intervals to
+ * microseconds.
+ */
+#define CLOCK_USECS(ts) (ts) / 10
+#else
+/*
+ * On non-Windows platforms, convert clock ticks to microseconds.
+ */
+#define CLOCK_USECS(ts) ((ts)*USEC_PER_SEC) / CLOCKS_PER_SEC
+#endif /* CLOCK_USECS */
+
+/*
+ * kp_timestamp --
+ *     Get a timestamp in platform-specific clock ticks.
+ */
+static uint64_t
+kp_timestamp()
+{
+#if defined(_WIN32)
+    FILETIME ft = {0};
+    GetSystemTimePreciseAsFileTime(&ft);
+
+    ULARGE_INTEGER uli = {0};
+    uli.LowPart = ft.dwLowDateTime;
+    uli.HighPart = ft.dwHighDateTime;
+    return uli.QuadPart; /* Returns 100 - nanosecond intervals */
+#else
+    return (uint64_t)clock(); /* Returns clock ticks */
+#endif
+}
 
 /*
  * kp_free_key --
@@ -114,7 +155,7 @@ kp_set_key(KEY_PROVIDER *kp, const WT_CRYPT_KEYS *crypt)
     kp->state.key_size = key_size;
     kp->state.lsn = lsn;
 
-    kp->state.key_time = clock();
+    kp->state.key_time = kp_timestamp();
     kp->state.key_state = KEY_STATE_CURRENT;
     return (0);
 }
@@ -128,8 +169,8 @@ static int
 kp_load_key(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, const WT_CRYPT_KEYS *crypt)
 {
     KEY_PROVIDER *kp = (KEY_PROVIDER *)wtkp;
-    LOG_DEBUG(kp, session, "Current key: LSN=%" PRIu64 ", key_time=%.2f, size=%" PRIzu,
-      kp->state.lsn, CLOCK_SECS(kp->state.key_time), kp->state.key_size);
+    LOG_DEBUG(kp, session, "Current key: LSN=%" PRIu64 ", key_time=%" PRIu64 ", size=%" PRIzu,
+      kp->state.lsn, kp->state.key_time, kp->state.key_size);
 
     LOG_INFO(
       kp, session, "Loading key for LSN=%" PRIu64 ", size=%" PRIzu, crypt->r.lsn, crypt->keys.size);
@@ -156,9 +197,9 @@ kp_key_expired(KEY_PROVIDER *kp)
         return (true);
     }
 
-    const clock_t now = clock();
-    double elapsed_sec = CLOCK_SECS(now - kp->state.key_time);
-    return (elapsed_sec >= kp->key_expires);
+    const uint64_t now = kp_timestamp();
+    double elapsed_usec = CLOCK_USECS(now - kp->state.key_time);
+    return (elapsed_usec >= kp->key_expires * USEC_PER_SEC);
 }
 
 /*
@@ -240,8 +281,8 @@ static int
 kp_get_key(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, WT_CRYPT_KEYS *crypt)
 {
     KEY_PROVIDER *kp = (KEY_PROVIDER *)wtkp;
-    LOG_DEBUG(kp, session, "Current key: LSN=%" PRIu64 ", key_time=%.2f, size=%" PRIzu,
-      kp->state.lsn, CLOCK_SECS(kp->state.key_time), kp->state.key_size);
+    LOG_DEBUG(kp, session, "Current key: LSN=%" PRIu64 ", key_time=%" PRIu64 ", size=%" PRIzu,
+      kp->state.lsn, kp->state.key_time, kp->state.key_size);
 
     /*
      * Real key provider may rotate the key independently of the get_key calls. In the mock
@@ -249,7 +290,7 @@ kp_get_key(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, WT_CRYPT_KEYS *crypt)
      * key rotation between paired get_key calls: first requesting the size, then filling the data.
      */
     if (crypt->keys.data == NULL && kp_key_expired(kp)) {
-        LOG_INFO(kp, session, "Key expired (key_time=%.2f)", CLOCK_SECS(kp->state.key_time));
+        LOG_INFO(kp, session, "Key expired (key_time=%" PRIu64 ")", kp->state.key_time);
 
         /* Key must be current */
         assert(kp->state.key_state == KEY_STATE_CURRENT);
@@ -260,8 +301,8 @@ kp_get_key(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, WT_CRYPT_KEYS *crypt)
             return (ret);
         }
 
-        LOG_INFO(kp, session, "Reporting new key (key_time=%.2f, key_size=%" PRIzu ")",
-          CLOCK_SECS(kp->state.key_time), kp->state.key_size);
+        LOG_INFO(kp, session, "Reporting new key (key_time=%" PRIu64 ", key_size=%" PRIzu ")",
+          kp->state.key_time, kp->state.key_size);
         crypt->keys.size = kp->state.key_size;
         kp->state.key_state = KEY_STATE_PENDING;
     } else if (crypt->keys.data != NULL) {
@@ -270,13 +311,13 @@ kp_get_key(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, WT_CRYPT_KEYS *crypt)
         /* The size of requested data must match previously reported key size. */
         assert(crypt->keys.size == kp->state.key_size);
 
-        LOG_INFO(kp, session, "Providing new key data (key_time=%.2f, key_size=%" PRIzu ")",
-          CLOCK_SECS(kp->state.key_time), kp->state.key_size);
+        LOG_INFO(kp, session, "Providing new key data (key_time=%" PRIu64 ", key_size=%" PRIzu ")",
+          kp->state.key_time, kp->state.key_size);
         memcpy((void *)crypt->keys.data, kp->state.key_data, crypt->keys.size);
         kp->state.key_state = KEY_STATE_READ;
     } else {
-        LOG_INFO(kp, session, "Key is still valid, no change (key_time=%.2f)",
-          CLOCK_SECS(kp->state.key_time));
+        LOG_INFO(
+          kp, session, "Key is still valid, no change (key_time=%" PRIu64 ")", kp->state.key_time);
         assert(kp->state.key_state == KEY_STATE_CURRENT);
         crypt->keys.size = 0;
     }
@@ -295,8 +336,8 @@ static int
 kp_on_key_update(WT_KEY_PROVIDER *wtkp, WT_SESSION *session, const WT_CRYPT_KEYS *crypt)
 {
     KEY_PROVIDER *kp = (KEY_PROVIDER *)wtkp;
-    LOG_DEBUG(kp, session, "Current key: LSN=%" PRIu64 ", key_time=%.2f, size=%" PRIzu,
-      kp->state.lsn, CLOCK_SECS(kp->state.key_time), kp->state.key_size);
+    LOG_DEBUG(kp, session, "Current key: LSN=%" PRIu64 ", key_time=%" PRIu64 ", size=%" PRIzu,
+      kp->state.lsn, kp->state.key_time, kp->state.key_size);
 
     assert(kp->state.key_data != NULL);
     assert(kp->state.key_state == KEY_STATE_READ); /* Key must have been read */
@@ -330,7 +371,7 @@ kp_terminate(WT_KEY_PROVIDER *wtkp, WT_SESSION *session)
 {
     KEY_PROVIDER *kp = (KEY_PROVIDER *)wtkp;
 
-    LOG_INFO(kp, session, "Terminating key provider");
+    LOG_INFO(kp, session, "%s", "Terminating key provider");
 
     kp_free_key(kp);
     free(kp);
@@ -407,11 +448,12 @@ err:
 }
 
 /*
- * wiredtiger_extension_init --
- *     WiredTiger test key provider extension initialization.
+ * key_provider_extension_init --
+ *     WiredTiger key provider extension - called directly when key provider support is built in, or
+ *     via wiredtiger_extension_init when key provider support is included via extension loading.
  */
 int
-wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
+key_provider_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 {
     WT_EXTENSION_API *wtext = conn->get_extension_api(conn);
 
@@ -467,3 +509,21 @@ err:
 
     return (ret);
 }
+
+/*
+ * We have to remove this symbol when building as a builtin extension otherwise it will conflict
+ * with other builtin libraries.
+ */
+#ifndef HAVE_BUILTIN_EXTENSION_KEY_PROVIDER
+
+/*
+ * wiredtiger_extension_init --
+ *     WiredTiger test key provider extension initialization.
+ */
+int
+wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
+{
+    return (key_provider_extension_init(conn, config));
+}
+
+#endif /* HAVE_BUILTIN_EXTENSION_KEY_PROVIDER */

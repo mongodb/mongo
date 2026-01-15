@@ -16,7 +16,7 @@
  */
 static int
 __bmd_checkpoint_pack_raw(WT_BLOCK_DISAGG *block_disagg, WT_SESSION_IMPL *session,
-  WT_ITEM *root_image, WT_PAGE_BLOCK_META *block_meta, WT_CKPT *ckpt)
+  WT_ITEM *root_image, WT_PAGE_BLOCK_META *block_meta, size_t page_image_size, WT_CKPT *ckpt)
 {
     WT_BLOCK_DISAGG_ADDRESS_COOKIE root_cookie;
     uint32_t checksum, size;
@@ -51,8 +51,8 @@ __bmd_checkpoint_pack_raw(WT_BLOCK_DISAGG *block_disagg, WT_SESSION_IMPL *sessio
          * page, and currently we rely on this assumption to discard older checkpoint root page when
          * the checkpoint becomes redundant.
          */
-        WT_RET(__wti_block_disagg_write_internal(
-          session, block_disagg, root_image, block_meta, &size, &checksum, true, true));
+        WT_RET(__wti_block_disagg_write_internal(session, block_disagg, root_image, block_meta,
+          page_image_size, &size, &checksum, true, true));
         __wt_page_header_byteswap((void *)root_image->data);
 
         /* Initialize and pack the address cookie for the root page. */
@@ -99,7 +99,8 @@ __wti_block_disagg_checkpoint(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *root
      */
     WT_CKPT_FOREACH (ckptbase, ckpt)
         if (F_ISSET(ckpt, WT_CKPT_ADD))
-            WT_RET(__bmd_checkpoint_pack_raw(block_disagg, session, root_image, block_meta, ckpt));
+            WT_RET(__bmd_checkpoint_pack_raw(block_disagg, session, root_image, block_meta,
+              root_image == NULL ? 0 : root_image->size, ckpt));
 
     return (0);
 }

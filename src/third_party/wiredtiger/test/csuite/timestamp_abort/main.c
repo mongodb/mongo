@@ -1678,29 +1678,12 @@ main(int argc, char *argv[])
             testutil_assertfmt(waitpid(pid, &status, WNOHANG) == 0,
               "Child process %" PRIu64 " already exited with status %d", pid, status);
 
-            /*
-             * Sleep for the configured amount of time before killing the child. Start the timeout
-             * from the time we notice that the file has been created. That allows the test to run
-             * correctly on really slow machines.
-             */
             wait_time = 0;
             while (!testutil_exists(NULL, ckpt_file)) {
                 testutil_sleep_wait(1, pid);
                 ++wait_time;
-                /*
-                 * We want to wait the MAX_TIME not the timeout because the timeout chosen could be
-                 * smaller than the time it takes to start up the child and complete the first
-                 * checkpoint. If there's an issue creating the first checkpoint we just want to
-                 * eventually exit and not have the parent process hang.
-                 */
-                if (wait_time > MAX_TIME) {
-                    sa.sa_handler = SIG_DFL;
-                    testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
-                    testutil_assert_errno(kill(pid, SIGABRT) == 0);
-                    testutil_assert_errno(waitpid(pid, &status, 0) != -1);
-                    testutil_die(
-                      ENOENT, "waited %" PRIu32 " seconds for checkpoint file creation", wait_time);
-                }
+                if (wait_time % 10 == 0)
+                    printf("Wait %ds for checkpoint generation\n", wait_time);
             }
             sleep(timeout);
             sa.sa_handler = SIG_DFL;

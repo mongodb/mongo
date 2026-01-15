@@ -240,8 +240,8 @@ struct __wt_bm {
     int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     int (*verify_end)(WT_BM *, WT_SESSION_IMPL *, bool verify_success);
     int (*verify_start)(WT_BM *, WT_SESSION_IMPL *, WT_CKPT *, const char *[]);
-    int (*write)(
-      WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_PAGE_BLOCK_META *, uint8_t *, size_t *, bool, bool);
+    int (*write)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_PAGE_BLOCK_META *, size_t, uint8_t *,
+      size_t *, bool, bool);
     int (*write_size)(WT_BM *, WT_SESSION_IMPL *, size_t *);
 
     WT_BLOCK *block; /* Underlying file. For a multi-handle tree this will be the writable file. */

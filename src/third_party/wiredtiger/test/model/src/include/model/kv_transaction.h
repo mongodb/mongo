@@ -94,6 +94,7 @@ public:
     inline bool
     empty() const noexcept
     {
+        std::lock_guard lock_guard(_lock); /* So that Coverity does not complain. */
         return _updates.empty();
     }
 

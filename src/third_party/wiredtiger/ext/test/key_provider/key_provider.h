@@ -30,7 +30,9 @@
 
 #include "wiredtiger_ext.h"
 
-#include <time.h>
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 /*
  * A test key provider extension. This extension implements the WT_KEY_PROVIDER interface to provide
@@ -77,8 +79,15 @@ typedef struct {
     struct {
         uint64_t lsn;
         KEY_STATE key_state;
-        clock_t key_time;
+        uint64_t key_time;
         size_t key_size;
         uint8_t *key_data;
     } state;
 } KEY_PROVIDER;
+
+/* Expose function to tests or direct initialization */
+extern int key_provider_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config);
+
+#if defined(__cplusplus)
+}
+#endif

@@ -6424,38 +6424,38 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_WRITE_APP_COUNT		1104
 /*! cache: application threads page write from cache to disk time (usecs) */
 #define	WT_STAT_CONN_CACHE_WRITE_APP_TIME		1105
-/*! cache: bytes allocated for delta updates */
-#define	WT_STAT_CONN_CACHE_BYTES_DELTA_UPDATES		1106
 /*! cache: bytes allocated for updates */
-#define	WT_STAT_CONN_CACHE_BYTES_UPDATES		1107
+#define	WT_STAT_CONN_CACHE_BYTES_UPDATES		1106
 /*! cache: bytes allocated for updates from the ingest btrees */
-#define	WT_STAT_CONN_CACHE_BYTES_UPDATES_INGEST		1108
+#define	WT_STAT_CONN_CACHE_BYTES_UPDATES_INGEST		1107
 /*! cache: bytes allocated for updates from the stable btrees */
-#define	WT_STAT_CONN_CACHE_BYTES_UPDATES_STABLE		1109
+#define	WT_STAT_CONN_CACHE_BYTES_UPDATES_STABLE		1108
 /*! cache: bytes belonging to page images in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_IMAGE			1110
+#define	WT_STAT_CONN_CACHE_BYTES_IMAGE			1109
 /*!
  * cache: bytes belonging to page images in the cache from the ingest
  * btrees
  */
-#define	WT_STAT_CONN_CACHE_BYTES_IMAGE_INGEST		1111
+#define	WT_STAT_CONN_CACHE_BYTES_IMAGE_INGEST		1110
 /*!
  * cache: bytes belonging to page images in the cache from the stable
  * btrees
  */
-#define	WT_STAT_CONN_CACHE_BYTES_IMAGE_STABLE		1112
+#define	WT_STAT_CONN_CACHE_BYTES_IMAGE_STABLE		1111
 /*! cache: bytes belonging to the history store table in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_HS			1113
+#define	WT_STAT_CONN_CACHE_BYTES_HS			1112
 /*! cache: bytes currently in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_INUSE			1114
+#define	WT_STAT_CONN_CACHE_BYTES_INUSE			1113
 /*! cache: bytes dirty in the cache cumulative */
-#define	WT_STAT_CONN_CACHE_BYTES_DIRTY_TOTAL		1115
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY_TOTAL		1114
 /*! cache: bytes not belonging to page images in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_OTHER			1116
+#define	WT_STAT_CONN_CACHE_BYTES_OTHER			1115
 /*! cache: bytes read into cache */
-#define	WT_STAT_CONN_CACHE_BYTES_READ			1117
+#define	WT_STAT_CONN_CACHE_BYTES_READ			1116
 /*! cache: bytes written from cache */
-#define	WT_STAT_CONN_CACHE_BYTES_WRITE			1118
+#define	WT_STAT_CONN_CACHE_BYTES_WRITE			1117
+/*! cache: cache tolerance configured */
+#define	WT_STAT_CONN_CACHE_TOLERANCE_LEVEL		1118
 /*! cache: checkpoint blocked page eviction */
 #define	WT_STAT_CONN_CACHE_EVICTION_BLOCKED_CHECKPOINT	1119
 /*!

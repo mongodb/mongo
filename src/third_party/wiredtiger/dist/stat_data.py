@@ -298,7 +298,6 @@ conn_stats = [
     ##########################################
     # Cache statistics
     ##########################################
-    CacheStat('cache_bytes_delta_updates', 'bytes allocated for delta updates', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_dirty_ingest', 'tracked dirty bytes in the cache from the ingest btrees', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_dirty_internal_ingest', 'tracked dirty internal page bytes in the cache from the ingest btrees', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_dirty_internal_stable', 'tracked dirty internal page bytes in the cache from the stable btrees', 'no_clear,no_scale,size'),
@@ -336,6 +335,7 @@ conn_stats = [
     CacheStat('cache_pages_inuse_stable', 'pages currently held in the cache from the stable btrees', 'no_clear,no_scale'),
     CacheStat('cache_read_app_count', 'application threads page read from disk to cache count'),
     CacheStat('cache_read_app_time', 'application threads page read from disk to cache time (usecs)'),
+    CacheStat('cache_tolerance_level', 'cache tolerance configured', 'no_clear,no_scale,size'),
     CacheStat('cache_updates_txn_uncommitted_bytes', 'updates in uncommitted txn - bytes', 'no_clear,no_scale,size'),
     CacheStat('cache_updates_txn_uncommitted_count', 'updates in uncommitted txn - count', 'no_clear,no_scale,size'),
     CacheStat('cache_write_app_count', 'application threads page write from cache to disk count'),

@@ -73,7 +73,6 @@ struct __wt_cache {
     wt_shared uint64_t bytes_updates; /* Bytes of updates to pages */
     wt_shared uint64_t bytes_updates_ingest;
     wt_shared uint64_t bytes_updates_stable;
-    wt_shared uint64_t bytes_delta_updates; /* Bytes of updates reconstructed from deltas */
     wt_shared uint64_t bytes_written;
 
     WT_CACHE_EVICTION_CONTROLS cache_eviction_controls;

@@ -1082,11 +1082,11 @@ __txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bo
 
     if (!commit) {
         /* As updating timestamp might not be an atomic operation, we will manage using state. */
-        upd->prepare_state = WT_PREPARE_LOCKED;
+        __wt_atomic_store_uint8_v_relaxed(&upd->prepare_state, WT_PREPARE_LOCKED);
         WT_RELEASE_BARRIER();
         if (F_ISSET(txn, WT_TXN_HAS_TS_ROLLBACK))
-            upd->upd_rollback_ts = txn->rollback_timestamp;
-        upd->upd_saved_txnid = upd->txnid;
+            __wt_atomic_store_uint64_relaxed(&upd->upd_rollback_ts, txn->rollback_timestamp);
+        __wt_atomic_store_uint64_relaxed(&upd->upd_saved_txnid, upd->txnid);
         __wt_atomic_store_uint64_v_release(&upd->txnid, WT_TXN_ABORTED);
         __wt_atomic_store_uint8_v_release(&upd->prepare_state, WT_PREPARE_INPROGRESS);
         WT_STAT_CONN_INCR(session, txn_prepared_updates_rolledback);

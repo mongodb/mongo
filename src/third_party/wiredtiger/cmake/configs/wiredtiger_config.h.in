@@ -30,6 +30,9 @@
 /* libsodium support automatically loaded. */
 #cmakedefine HAVE_BUILTIN_EXTENSION_SODIUM 1
 
+/* key provider extension automatically loaded. */
+#cmakedefine HAVE_BUILTIN_EXTENSION_KEY_PROVIDER 1
+
 /* Define to 1 for call logging. */
 #cmakedefine HAVE_CALL_LOG 1
 

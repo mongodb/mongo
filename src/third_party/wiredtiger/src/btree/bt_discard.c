@@ -549,9 +549,9 @@ void
 __wt_free_obsolete_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *visible_all_upd)
 {
     WT_UPDATE *next, *upd;
-    size_t delta_upd_size, size;
+    size_t size;
 
-    delta_upd_size = size = 0;
+    size = 0;
 
     next = visible_all_upd->next;
 
@@ -569,13 +569,9 @@ __wt_free_obsolete_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *v
     for (upd = next; upd != NULL; upd = next) {
         next = upd->next;
         size += WT_UPDATE_MEMSIZE(upd);
-        if (F_ISSET(upd, WT_UPDATE_RESTORED_FROM_DELTA))
-            delta_upd_size += WT_UPDATE_MEMSIZE(upd);
         __wt_free(session, upd);
     }
 
     WT_ASSERT(session, size != 0);
     __wt_cache_page_inmem_decr(session, page, size);
-    if (delta_upd_size != 0)
-        __wt_cache_page_inmem_decr_delta_updates(session, page, delta_upd_size);
 }

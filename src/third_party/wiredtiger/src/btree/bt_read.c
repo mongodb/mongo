@@ -374,19 +374,6 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
         page->disagg_info->rec_lsn_max = block_meta.disagg_lsn;
     }
 
-    /* Reconstruct deltas*/
-    if (count > 1 && !build_full_disk_image_from_deltas) {
-        ret = __wti_page_reconstruct_deltas(session, ref, deltas, count - 1);
-        for (i = 0; i < count - 1; ++i)
-            __wt_buf_free(session, &deltas[i]);
-        WT_ERR(ret);
-        /* The page may be changed if we consolidate the deltas to a new page. */
-        if (page != ref->page) {
-            page = ref->page;
-            page_change = true;
-        }
-    }
-
     __wt_free(session, tmp);
 
     if (!page_change && instantiate_upd && !WT_IS_HS(session->dhandle))
@@ -441,16 +428,10 @@ err:
         __wt_ref_out(session, ref);
     }
 
+    /* Free any disk images or delta buffers we allocated or read. */
     if (tmp != NULL) {
-        size_t start = disk_image_freed ? 1 : 0;
-
-        for (i = start; i < count; ++i)
+        for (i = 0; i < count; ++i)
             __wt_buf_free(session, &tmp[i]);
-
-        /* Free the base image memory when a full disk image is constructed from deltas. */
-        if (build_full_disk_image_from_deltas)
-            __wt_buf_free(session, &tmp[0]);
-
         __wt_free(session, tmp);
     }
 

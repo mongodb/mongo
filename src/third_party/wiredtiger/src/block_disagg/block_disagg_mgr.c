@@ -102,12 +102,12 @@ __bmd_stat(WT_BM *bm, WT_SESSION_IMPL *session, WT_DSRC_STATS *stats)
  */
 static int
 __bmd_write(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *block_meta,
-  uint8_t *addr, size_t *addr_sizep, bool data_checksum, bool checkpoint_io)
+  size_t page_image_size, uint8_t *addr, size_t *addr_sizep, bool data_checksum, bool checkpoint_io)
 {
     __wt_capacity_throttle(
       session, buf->size, checkpoint_io ? WT_THROTTLE_CKPT : WT_THROTTLE_EVICT);
-    return (__wti_block_disagg_write(
-      session, bm->block, buf, block_meta, addr, addr_sizep, data_checksum, checkpoint_io));
+    return (__wti_block_disagg_write(session, bm->block, buf, block_meta, page_image_size, addr,
+      addr_sizep, data_checksum, checkpoint_io));
 }
 
 /*

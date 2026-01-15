@@ -15,11 +15,6 @@ static int __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, bool *);
 static int __inmem_row_leaf_entries(WT_SESSION_IMPL *, const WT_PAGE_HEADER *, uint32_t *);
 
 /*
- * Define functions that increment histogram statistics for reconstruction of pages with deltas.
- */
-WT_STAT_USECS_HIST_INCR_FUNC(leaf_reconstruct, perf_hist_leaf_reconstruct_latency)
-
-/*
  * __page_find_min_delta --
  *     Identify the smallest key across all active delta streams and return the corresponding delta
  *     entry and its stream index (min_d).
@@ -879,194 +874,6 @@ err:
 }
 
 /*
- * __page_reconstruct_leaf_delta --
- *     Reconstruct delta on a leaf page
- */
-static int
-__page_reconstruct_leaf_delta(WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *delta)
-{
-    WT_CELL_UNPACK_DELTA_LEAF_KV unpack;
-    WT_CURSOR_BTREE cbt;
-    WT_DECL_ITEM(lastkey);
-    WT_DECL_RET;
-    WT_ITEM key, value;
-    WT_PAGE *page;
-    WT_PAGE_HEADER *header;
-    WT_ROW *rip;
-    WT_UPDATE *first_upd, *standard_value, *tombstone, *upd;
-    size_t size, tmp_size, total_size;
-    uint8_t key_prefix;
-
-    header = (WT_PAGE_HEADER *)delta->data;
-    tmp_size = total_size = 0;
-    page = ref->page;
-    standard_value = tombstone = NULL;
-
-    WT_CLEAR(unpack);
-
-    WT_RET(__wt_scr_alloc(session, 0, &lastkey));
-
-    __wt_btcur_init(session, &cbt);
-    __wt_btcur_open(&cbt);
-
-    WT_CELL_FOREACH_DELTA_LEAF(session, header, &unpack)
-    {
-        key.data = unpack.delta_key.data;
-        key.size = unpack.delta_key.size;
-        key_prefix = unpack.delta_key.prefix;
-        /*
-         * If the key has no prefix count, no prefix compression work is needed; else check for a
-         * previously built key big enough cover this key's prefix count.
-         */
-        if (key_prefix == 0) {
-            lastkey->data = key.data;
-            lastkey->size = key.size;
-        } else {
-            WT_ASSERT(session, lastkey->size >= key_prefix);
-            /*
-             * Grow the buffer as necessary as well as ensure data has been copied into local buffer
-             * space, then append the suffix to the prefix already in the buffer. Don't grow the
-             * buffer unnecessarily or copy data we don't need, truncate the item's CURRENT data
-             * length to the prefix bytes before growing the buffer.
-             */
-            lastkey->size = key_prefix;
-            WT_ERR(__wt_buf_grow(session, lastkey, key_prefix + key.size));
-            memcpy((uint8_t *)lastkey->mem + key_prefix, key.data, key.size);
-            lastkey->size = key_prefix + key.size;
-        }
-
-        upd = standard_value = tombstone = NULL;
-        size = 0;
-
-        /* Search the page and apply the modification. */
-        WT_ERR(__wt_row_search(&cbt, lastkey, true, ref, true, NULL));
-        /*
-         * Deltas are applied from newest to oldest, ignore keys that have already got a delta
-         * update.
-         */
-        if (cbt.compare == 0) {
-            if (cbt.ins != NULL) {
-                if (cbt.ins->upd != NULL && F_ISSET(cbt.ins->upd, WT_UPDATE_RESTORED_FROM_DELTA))
-                    continue;
-            } else {
-                rip = &page->pg_row[cbt.slot];
-                first_upd = WT_ROW_UPDATE(page, rip);
-                if (first_upd != NULL && F_ISSET(first_upd, WT_UPDATE_RESTORED_FROM_DELTA))
-                    continue;
-            }
-        }
-
-        if (F_ISSET(&unpack, WT_DELTA_LEAF_IS_DELETE)) {
-            WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &tmp_size));
-            F_SET(tombstone, WT_UPDATE_DELETE_DURABLE | WT_UPDATE_RESTORED_FROM_DELTA);
-            size += tmp_size;
-            upd = tombstone;
-        } else {
-            value.data = unpack.delta_value_data.data;
-            value.size = unpack.delta_value_data.size;
-            WT_ERR(__wt_upd_alloc(session, &value, WT_UPDATE_STANDARD, &standard_value, &tmp_size));
-            standard_value->txnid = unpack.delta_value.tw.start_txn;
-            if (WT_TIME_WINDOW_HAS_START_PREPARE(&unpack.delta_value.tw)) {
-                standard_value->prepared_id = unpack.delta_value.tw.start_prepared_id;
-                standard_value->prepare_ts = unpack.delta_value.tw.start_prepare_ts;
-                standard_value->prepare_state = WT_PREPARE_INPROGRESS;
-                standard_value->upd_start_ts = unpack.delta_value.tw.start_prepare_ts;
-
-                F_SET(standard_value,
-                  WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS |
-                    WT_UPDATE_RESTORED_FROM_DELTA);
-            } else {
-                standard_value->upd_start_ts = unpack.delta_value.tw.start_ts;
-                standard_value->upd_durable_ts = unpack.delta_value.tw.durable_start_ts;
-                F_SET(standard_value, WT_UPDATE_DURABLE | WT_UPDATE_RESTORED_FROM_DELTA);
-            }
-            size += tmp_size;
-
-            if (WT_TIME_WINDOW_HAS_STOP(&unpack.delta_value.tw)) {
-                WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, &tmp_size));
-                tombstone->txnid = unpack.delta_value.tw.stop_txn;
-
-                if (WT_TIME_WINDOW_HAS_STOP_PREPARE(&unpack.delta_value.tw)) {
-                    tombstone->prepared_id = unpack.delta_value.tw.stop_prepared_id;
-                    tombstone->prepare_ts = unpack.delta_value.tw.stop_prepare_ts;
-                    tombstone->prepare_state = WT_PREPARE_INPROGRESS;
-                    tombstone->upd_start_ts = unpack.delta_value.tw.stop_prepare_ts;
-                    F_SET(tombstone,
-                      WT_UPDATE_PREPARE_DURABLE | WT_UPDATE_PREPARE_RESTORED_FROM_DS |
-                        WT_UPDATE_RESTORED_FROM_DELTA);
-                } else {
-                    tombstone->upd_start_ts = unpack.delta_value.tw.stop_ts;
-                    tombstone->upd_durable_ts = unpack.delta_value.tw.durable_stop_ts;
-                    F_SET(tombstone, WT_UPDATE_DURABLE | WT_UPDATE_RESTORED_FROM_DELTA);
-                }
-                size += tmp_size;
-                tombstone->next = standard_value;
-                upd = tombstone;
-            } else
-                upd = standard_value;
-        }
-
-        WT_ERR(__wt_row_modify(&cbt, lastkey, NULL, &upd, WT_UPDATE_INVALID, true, true));
-
-        total_size += size;
-    }
-    WT_CELL_FOREACH_END;
-
-    __wt_cache_page_inmem_incr_delta_updates(session, page, total_size);
-    WT_STAT_CONN_DSRC_INCRV(session, cache_read_delta_updates, total_size);
-
-    if (0) {
-err:
-        __wt_free(session, standard_value);
-        __wt_free(session, tombstone);
-    }
-    __wt_scr_free(session, &lastkey);
-    WT_TRET(__wt_btcur_close(&cbt, true));
-    return (ret);
-}
-
-/*
- * __wti_page_reconstruct_deltas --
- *     Reconstruct deltas on a page
- */
-int
-__wti_page_reconstruct_deltas(
-  WT_SESSION_IMPL *session, WT_REF *ref, WT_ITEM *deltas, size_t delta_size)
-{
-    uint64_t time_start, time_stop;
-    int i;
-
-    WT_ASSERT(session, delta_size != 0);
-
-    switch (ref->page->type) {
-    case WT_PAGE_ROW_LEAF:
-
-        /*
-         * We apply the deltas in reverse order because we only care about the latest change of a
-         * key. The older changes are ignored.
-         */
-        time_start = __wt_clock(session);
-        for (i = (int)delta_size - 1; i >= 0; --i)
-            WT_RET(__page_reconstruct_leaf_delta(session, ref, &deltas[i]));
-
-        time_stop = __wt_clock(session);
-        __wt_stat_usecs_hist_incr_leaf_reconstruct(session, WT_CLOCKDIFF_US(time_stop, time_start));
-        WT_STAT_CONN_DSRC_INCR(session, cache_read_leaf_delta);
-        break;
-    case WT_PAGE_ROW_INT:
-        WT_ASSERT_ALWAYS(session, false, "Internal delta reconstruction not supported");
-        break;
-    default:
-        WT_RET(__wt_illegal_value(session, ref->page->type));
-    }
-
-    /* The data is written to the disk so we can mark the page clean. */
-    __wt_page_modify_clear(session, ref->page);
-
-    return (0);
-}
-
-/*
  * __wt_page_block_meta_assign --
  *     Initialize the page's block management metadata.
  */
@@ -1369,7 +1176,7 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_DECL_RET;
     WT_PAGE *page;
     WT_ROW *rip;
-    WT_UPDATE *first_upd, *upd;
+    WT_UPDATE *upd;
     size_t size, total_size;
     uint64_t recno, rle;
     uint32_t i;
@@ -1439,20 +1246,14 @@ __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
             WT_ERR(__wt_page_cell_data_ref_kv(session, page, &unpack, value));
             WT_ASSERT_ALWAYS(session, __wt_cell_type_raw(unpack.cell) != WT_CELL_VALUE_OVFL_RM,
               "Should never read an overflow removed value for a prepared update");
-            first_upd = WT_ROW_UPDATE(page, rip);
-            /*
-             * FIXME-WT-15592: This key must have been overwritten by a delta. Don't instantiate it.
-             */
-            if (first_upd == NULL) {
-                WT_ERR(__wt_page_inmem_update(session, value, &unpack, &upd, &size));
-                total_size += size;
 
-                /* Search the page and apply the modification. */
-                WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
-                WT_ERR(__wt_row_modify(&cbt, key, NULL, &upd, WT_UPDATE_INVALID, true, true));
-                upd = NULL;
-            } else
-                WT_ASSERT(session, F_ISSET(first_upd, WT_UPDATE_RESTORED_FROM_DELTA));
+            WT_ERR(__wt_page_inmem_update(session, value, &unpack, &upd, &size));
+            total_size += size;
+
+            /* Search the page and apply the modification. */
+            WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
+            WT_ERR(__wt_row_modify(&cbt, key, NULL, &upd, WT_UPDATE_INVALID, true, true));
+            upd = NULL;
         }
     }
 

@@ -1015,8 +1015,8 @@ __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE_BLOCK_META *block_me
         WT_RET(ret);
     }
 
-    return (__wt_blkcache_write(session, buf, block_meta, addr, addr_sizep, compressed_sizep,
-      checkpoint, checkpoint_io, compressed));
+    return (__wt_blkcache_write(session, buf, block_meta, buf->size, addr, addr_sizep,
+      compressed_sizep, checkpoint, checkpoint_io, compressed));
 }
 
 /*
@@ -2121,12 +2121,11 @@ __rec_write_delta(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
         multi->block_meta->base_lsn = multi->block_meta->disagg_lsn;
     WT_ASSERT(session, multi->block_meta->base_lsn > 0);
     multi->block_meta->backlink_lsn = block_meta->disagg_lsn;
-    multi->block_meta->image_size = chunk->image.size;
     ++multi->block_meta->delta_count;
 
     /* Get the checkpoint ID. */
-    WT_RET(__wt_blkcache_write(session, &r->delta, multi->block_meta, addr, addr_sizep,
-      compressed_sizep, false, F_ISSET(r, WT_REC_CHECKPOINT), false));
+    WT_RET(__wt_blkcache_write(session, &r->delta, multi->block_meta, chunk->image.size, addr,
+      addr_sizep, compressed_sizep, false, F_ISSET(r, WT_REC_CHECKPOINT), false));
     /* Turn off compression adjustment for delta. */
     *compressed_sizep = 0;
 
@@ -2242,8 +2241,6 @@ __rec_write_image(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
             multi->block_meta->base_lsn = WT_DISAGG_LSN_NONE;
         } else
             __wt_page_block_meta_assign(session, multi->block_meta);
-
-        multi->block_meta->image_size = chunk->image.size;
     }
     WT_RET(__rec_write(session, &chunk->image, multi->block_meta, addr, addr_sizep,
       compressed_sizep, false, F_ISSET(r, WT_REC_CHECKPOINT), false));

@@ -285,6 +285,7 @@ functions:
           ${NONSTANDALONE|} \
           ${ENABLE_SHARED|} \
           ${ENABLE_STATIC|} \
+          ${HAVE_BUILTIN_EXTENSION_KEY_PROVIDER|} \
           ${HAVE_BUILTIN_EXTENSION_LZ4|} \
           ${HAVE_BUILTIN_EXTENSION_SNAPPY|} \
           ${HAVE_BUILTIN_EXTENSION_ZLIB|} \
@@ -6555,7 +6556,6 @@ buildvariants:
     - name: doc-compile
     - name: make-check-test
     - name: configure-combinations
-    - name: syscall-linux
     - name: unit-test-zstd
     - name: unit-test-hook-disagg-leader-key-provider
     - name: unit-test-hook-tiered
@@ -6885,6 +6885,7 @@ buildvariants:
     # Remove the default configurations for the toolchain, install prefix and number of jobs.
     CMAKE_TOOLCHAIN_FILE:
     CMAKE_INSTALL_PREFIX:
+    HAVE_BUILTIN_EXTENSION_KEY_PROVIDER: -DHAVE_BUILTIN_EXTENSION_KEY_PROVIDER=1
     num_jobs:
     python_binary: "/cygdrive/c/python/Python311/python"
   tasks:
@@ -7512,7 +7513,7 @@ buildvariants:
     additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
     ctest_extra_args: -E "wt12015_backup_corruption"
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test !.unit_test_tsan"
+    - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test !.unit_test_tsan !.unit_test_tsan !syscall-linux !chunkcache-test"
     - name: examples-c-test
     - name: format-asan-smoke-test
     - name: model-test-long

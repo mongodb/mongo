@@ -51,8 +51,7 @@ restart_read:
             WT_STAT_CONN_DSRC_INCR(session, cursor_bounds_next_early_exit);
         WT_RET(ret);
 
-        WT_RET(
-          __wt_txn_read_upd_list(session, cbt, NULL, WT_INSERT_RECNO(cbt->ins), cbt->ins->upd));
+        WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
 
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
             ++*skippedp;
@@ -146,8 +145,7 @@ restart_read:
             if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
                 return (0);
 
-            WT_RET(
-              __wt_txn_read_upd_list(session, cbt, NULL, WT_INSERT_RECNO(cbt->ins), cbt->ins->upd));
+            WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
         }
         if (cbt->upd_value->type != WT_UPDATE_INVALID) {
             if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
@@ -336,7 +334,7 @@ restart_read_insert:
             WT_RET(ret);
 
             upd = __wt_tsan_suppress_load_wt_update_ptr(&ins->upd);
-            WT_RET(__wt_txn_read_upd_list(session, cbt, key, WT_RECNO_OOB, upd));
+            WT_RET(__wt_txn_read_upd_list(session, cbt, upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
                 ++*skippedp;
                 continue;

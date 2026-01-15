@@ -112,9 +112,9 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STATP_CONN_SET(session, stats, cache_bytes_max, conn->cache_size);
     WT_STATP_CONN_SET(session, stats, cache_bytes_inuse, inuse);
     WT_STATP_CONN_SET(session, stats, cache_overhead, cache->overhead_pct);
+    WT_STATP_CONN_SET(session, stats, cache_tolerance_level,
+      cache->cache_eviction_controls.cache_tolerance_for_app_eviction);
 
-    WT_STATP_CONN_SET(
-      session, stats, cache_bytes_delta_updates, __wt_cache_bytes_delta_updates(cache));
     WT_STATP_CONN_SET(session, stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
     WT_STATP_CONN_SET(
       session, stats, cache_bytes_dirty_ingest, __wt_cache_dirty_inuse_ingest(cache));
