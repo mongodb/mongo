@@ -146,6 +146,8 @@ core.commands:
     - src/mongo/s/commands/cluster_shutdown_cmd.cpp
 
 core.unittest:
+  meta:
+    fully_marked: true
   files:
     - src/mongo/unittest/
     - src/mongo/dbtests/framework[._]*

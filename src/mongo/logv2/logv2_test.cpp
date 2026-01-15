@@ -28,57 +28,6 @@
  */
 
 
-#include <array>
-#include <csignal>
-#include <cstdint>
-#include <cstdlib>
-#include <deque>
-#include <exception>
-#include <forward_list>
-#include <fstream>  // IWYU pragma: keep
-#include <initializer_list>
-#include <iostream>
-#include <iterator>
-#include <limits>
-#include <list>
-#include <map>
-#include <memory>
-#include <sstream>
-#include <string>
-#include <string_view>  // NOLINT
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/core/swap.hpp>
-#include <boost/exception/exception.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/log/attributes/attribute_value_set.hpp>
-#include <boost/log/core/core.hpp>
-#include <boost/log/core/record_view.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/tuple/tuple.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
-// IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
-#include <boost/log/keywords/file_name.hpp>
-#include <boost/log/sinks/basic_sink_backend.hpp>
-#include <boost/log/sinks/frontend_requirements.hpp>
-#include <boost/log/sinks/sink.hpp>
-#include <boost/log/sinks/sync_frontend.hpp>
-#include <boost/log/sinks/text_file_backend.hpp>
-#include <boost/log/sinks/unlocked_frontend.hpp>
-#include <boost/move/utility_core.hpp>
-// IWYU pragma: no_include "boost/multi_index/detail/bidir_node_iterator.hpp"
-#include <boost/none.hpp>
-#include <boost/operators.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/parameter/keyword.hpp>
-// IWYU pragma: no_include "boost/property_tree/detail/exception_implementation.hpp"
-// IWYU pragma: no_include "boost/property_tree/detail/ptree_implementation.hpp"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -88,6 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
@@ -138,11 +88,62 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+#include <array>
+#include <csignal>
+#include <cstdint>
+#include <cstdlib>
+#include <deque>
+#include <exception>
+#include <forward_list>
+#include <fstream>  // IWYU pragma: keep
+#include <initializer_list>
+#include <iostream>
+#include <iterator>
+#include <limits>
+#include <list>
+#include <map>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <string_view>  // NOLINT
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/core/swap.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/log/attributes/attribute_value_set.hpp>
+#include <boost/log/core/core.hpp>
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/keywords/file_name.hpp>
+#include <boost/log/sinks/basic_sink_backend.hpp>
+#include <boost/log/sinks/frontend_requirements.hpp>
+#include <boost/log/sinks/sink.hpp>
+#include <boost/log/sinks/sync_frontend.hpp>
+#include <boost/log/sinks/text_file_backend.hpp>
+#include <boost/log/sinks/unlocked_frontend.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/operators.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/parameter/keyword.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ptree_fwd.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/thread/exceptions.hpp>
+#include <boost/tuple/tuple.hpp>
 #include <fmt/format.h>
+
+// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
+// IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
+// IWYU pragma: no_include "boost/multi_index/detail/bidir_node_iterator.hpp"
+// IWYU pragma: no_include "boost/property_tree/detail/exception_implementation.hpp"
+// IWYU pragma: no_include "boost/property_tree/detail/ptree_implementation.hpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

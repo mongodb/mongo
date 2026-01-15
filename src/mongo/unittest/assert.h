@@ -40,29 +40,21 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/mutable_bson/mutable_bson_test_utils.h"
-#include "mongo/logv2/log_debug.h"
-#include "mongo/logv2/log_detail.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/unittest/stringify.h"
-#include "mongo/unittest/test_info.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/pcre.h"
-#include "mongo/util/str.h"
+#include "mongo/util/modules.h"
 
 #include <cmath>
-#include <functional>
-#include <sstream>
 #include <string>
-#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include <boost/exception/diagnostic_information.hpp>
 #include <fmt/format.h>
+
+MONGO_MOD_PUBLIC;
 
 /**
  * Fail unconditionally, reporting the given message.
@@ -295,6 +287,7 @@ T assertGet(StatusWith<T>&& swt) {
     ::mongo::unittest::assertComparison_BSONObjBINARY_EQ(__FILE__, __LINE__, #a, #b, a, b)
 
 #define DECLARE_BSON_CMP_FUNC(BSONTYPE, NAME)                          \
+    MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS                             \
     void assertComparison_##BSONTYPE##NAME(const std::string& theFile, \
                                            unsigned theLine,           \
                                            StringData aExpression,     \

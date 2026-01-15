@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/json.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/sharding_environment/cluster_command_test_fixture.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 

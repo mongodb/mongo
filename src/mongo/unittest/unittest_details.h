@@ -35,6 +35,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
