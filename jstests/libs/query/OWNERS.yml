@@ -30,3 +30,6 @@ filters:
   - "convert_shared.js":
     approvers:
       - 10gen/query-optimization
+  - "query_stats_utils.js":
+    approvers:
+      - 10gen/query-integration-observability
