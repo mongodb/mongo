@@ -9,6 +9,9 @@
  *   does_not_support_stepdowns,
  *   # The test creates a sharded cluster with a dedicated config server, so the test is incompatible with fixtures with embedded config servers
  *   config_shard_incompatible,
+ *   # This test restarts an initiated node and expects the node to remember the replica set it was
+ *   # initiated into.
+ *   requires_persistence,
  * ]
  */
 
