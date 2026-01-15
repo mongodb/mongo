@@ -210,7 +210,7 @@ TEST_F(DBClientGRPCTest, GetMaxWireVersionCallsClusterMaxWireVersion) {
         ASSERT_EQ(dbclient.getMaxWireVersion(), kDefaultMaxWireVersion);
 
         // After connecting, returns the value of EgressSession::getClusterMaxWireVersion(), as
-        // determined by the value recieved by the server hello.
+        // determined by the value received by the server hello.
         dbclient.connect(kServerHostAndPort, "test", boost::none);
         ON_BLOCK_EXIT([&] { dbclient.shutdown(); });
         ASSERT_EQ(dbclient.getMaxWireVersion(), kNewMaxWireVersion);
@@ -251,12 +251,16 @@ TEST_F(DBClientGRPCTest, AutoReconnectionSucceeds) {
 
 TEST_F(DBClientGRPCTest, ShutdownBehavior) {
     AtomicWord<bool> firstRun(true);
+    Notification<void> firstSessionReady;
+
     auto serverCb = [&](auto session) {
         ON_BLOCK_EXIT([&] { session->setTerminationStatus(Status::OK()); });
 
         confirmHelloAndRespond(session);
 
         if (firstRun.swap(false)) {
+            firstSessionReady.set();
+
             // Cannot read from the stream after shutdown.
             auto ping = session->sourceMessage();
             ASSERT_NOT_OK(ping.getStatus());
@@ -264,7 +268,7 @@ TEST_F(DBClientGRPCTest, ShutdownBehavior) {
             return;
         }
 
-        // Now that we have reconnected, we can successfully recieve messages again.
+        // Now that we have reconnected, we can successfully receive messages again.
         confirmPingAndRespondPong(session);
     };
 
@@ -272,6 +276,11 @@ TEST_F(DBClientGRPCTest, ShutdownBehavior) {
         dbclient.connect(kServerHostAndPort, "test", boost::none);
         ON_BLOCK_EXIT([&] { dbclient.shutdown(); });
         ASSERT_TRUE(dbclient.isStillConnected());
+
+        // Wait for the first server session to get and update the firstRun atomic before shutting
+        // down and spawning a second server session to prevent a race where the second server
+        // session could acquire firstRun before the first server session leading to test failures.
+        firstSessionReady.get();
 
         // After shutdown, we can reconnect and send messages over the stream again.
         dbclient.shutdown();
