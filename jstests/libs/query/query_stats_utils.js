@@ -620,8 +620,12 @@ export function getValueAtPath(object, dottedPath) {
  * @param {Function} callbackFn - The function to make the assertion on each connection.
  */
 export function withQueryStatsEnabled(collName, callbackFn) {
+    const options = {
+        setParameter: {internalQueryStatsRateLimit: -1},
+    };
+
     {
-        const conn = MongoRunner.runMongod(getQueryStatsServerParameters());
+        const conn = MongoRunner.runMongod(options);
         const testDB = conn.getDB("test");
         var coll = testDB[collName];
         coll.drop();
@@ -631,11 +635,7 @@ export function withQueryStatsEnabled(collName, callbackFn) {
     }
 
     {
-        const st = new ShardingTest({
-            shards: 2,
-            mongosOptions: getQueryStatsServerParameters(),
-            rsOptions: getQueryStatsServerParameters(),
-        });
+        const st = new ShardingTest({shards: 2, mongosOptions: options});
         const testDB = st.getDB("test");
         var coll = testDB[collName];
         st.shardColl(coll, {_id: 1}, {_id: 1});
@@ -1094,10 +1094,7 @@ export function runOnReplsetAndShardedCluster(callbackFn) {
 
     {
         const st = new ShardingTest(
-            Object.assign({
-                shards: 2,
-                other: {mongosOptions: getQueryStatsServerParameters(), rsOptions: getQueryStatsServerParameters()},
-            }),
+            Object.assign({shards: 2, other: {mongosOptions: getQueryStatsServerParameters()}}),
         );
 
         const testDB = st.s.getDB("test");

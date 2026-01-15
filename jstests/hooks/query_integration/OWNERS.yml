@@ -1,8 +1,0 @@
-version: 1.0.0
-filters:
-  - "*":
-    approvers:
-      - 10gen/query-integration
-  - "run_query_stats.js":
-    approvers:
-      - 10gen/query-integration-observability

@@ -1,14 +1,18 @@
 """
 Test hook for verifying $queryStats collects expected metrics and can redact query shapes.
+
+This runs in the background as other tests are ongoing.
 """
 
-import os.path
+import pymongo.errors
+from bson import binary
 
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.hooks import jsfile
+from buildscripts.resmokelib.testing.hooks.interface import Hook
+
+QUERY_STATS_NOT_ENABLED_CODES = [224, 7373500, 6579000]
 
 
-class RunQueryStats(jsfile.JSHook):
+class RunQueryStats(Hook):
     """Runs $queryStats after every test, and clears the query stats store before every test."""
 
     IS_BACKGROUND = False
@@ -19,71 +23,62 @@ class RunQueryStats(jsfile.JSHook):
         Args:
             hook_logger: the logger instance for this hook.
             fixture: the target fixture (replica sets or a sharded cluster).
-            allow_feature_not_supported: absorb query stats not enabled errors when calling $queryStats.
+            allow_feature_not_supported: absorb 'QueryFeatureNotAllowed' errors when calling
+                $queryStats. This is to support fuzzer suites that may manipulate the FCV.
         """
-        description = "Read query stats data on all nodes after each test."
-        js_filename = os.path.join("jstests", "hooks", "query_integration", "run_query_stats.js")
-
-        # TODO SERVER-116389 remove allow_feature_not_supported.
-        shell_options = {
-            "eval": f"""
-                TestData.allowFeatureNotSupported = {str(allow_feature_not_supported).lower()};
-            """
-        }
-
-        super().__init__(
-            hook_logger, fixture, js_filename, description, shell_options=shell_options
-        )
+        description = "Read query stats data after each test."
+        super().__init__(hook_logger, fixture, description)
+        self.client = self.fixture.mongo_client()
+        self.hmac_key = binary.Binary(("0" * 32).encode("utf-8"), 8)
         self.allow_feature_not_supported = allow_feature_not_supported
 
-    def before_test(self, test, test_report):
-        """Clear query stats before each test."""
-        js_filename = os.path.join("jstests", "hooks", "query_integration", "run_query_stats.js")
-        shell_options = {
-            "eval": f"""
-                TestData.allowFeatureNotSupported = {str(self.allow_feature_not_supported).lower()};
-                TestData.queryStatsOperation = "clear";
-            """
-        }
-
-        hook_test_case = jsfile.DynamicJSTestCase.create_before_test(
-            test.logger, test, self, js_filename, shell_options
-        )
-        hook_test_case.configure(self.fixture)
-
+    def verify_query_stats(self, querystats_spec):
+        """Verify a $queryStats call has all the right properties."""
         try:
-            hook_test_case.run_dynamic_test(test_report)
-        except errors.TestFailure as err:
-            # Convert test failures to warnings for query stats operations.
-            if self.allow_feature_not_supported:
-                self.logger.warning(
-                    f"Failed to clear query stats (may not be enabled): {err.args[0]}"
+            with self.client.admin.aggregate([{"$queryStats": querystats_spec}]) as cursor:
+                for operation in cursor:
+                    assert "key" in operation
+                    assert "metrics" in operation
+                    assert "asOf" in operation
+        except pymongo.errors.OperationFailure as err:
+            errMsg = err.details.get("errmsg")
+            # The analyze command cannot be re-parsed (see SERVER-85374). Since this is a test only
+            # command, it is low priority to fix this issue, and therefore we ignore the reparse
+            # errors in this hook. The analyze command desugars into an aggregation pipeline that
+            # includes the "system.statistics" collection and the '$_internalConstructStats'
+            # accumulator. Since the aggregation pipeline can be slightly different based on user
+            # inputs, we do a best guess here that we are running analyze.
+            analyzeCmdReparseErr = (
+                "Failed to re-parse query" in errMsg
+                and "$_internalConstructStats" in errMsg
+                and "system.statistics" in errMsg
+            )
+            if analyzeCmdReparseErr or (
+                self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES
+            ):
+                self.logger.info(
+                    "Encountered an error while running $queryStats. "
+                    "$queryStats will not be run for this test."
                 )
             else:
-                raise errors.ServerFailure(err.args[0])
+                raise err
 
     def after_test(self, test, test_report):
-        """Verify $queryStats after each test."""
-        js_filename = os.path.join("jstests", "hooks", "query_integration", "run_query_stats.js")
-        shell_options = {
-            "eval": f"""
-                TestData.allowFeatureNotSupported = {str(self.allow_feature_not_supported).lower()};
-                TestData.queryStatsOperation = "verify";
-            """
-        }
-
-        hook_test_case = jsfile.DynamicJSTestCase.create_after_test(
-            test.logger, test, self, js_filename, shell_options
+        self.verify_query_stats({})
+        self.verify_query_stats(
+            {"transformIdentifiers": {"algorithm": "hmac-sha-256", "hmacKey": self.hmac_key}}
         )
-        hook_test_case.configure(self.fixture)
 
+    def before_test(self, test, test_report):
         try:
-            hook_test_case.run_dynamic_test(test_report)
-        except errors.TestFailure as err:
-            # Convert test failures to warnings for query stats operations.
-            if self.allow_feature_not_supported:
-                self.logger.warning(
-                    f"Failed to verify query stats (may not be enabled): {err.args[0]}"
+            # Clear out all existing entries, then reset the size cap.
+            self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="0%")
+            self.client.admin.command("setParameter", 1, internalQueryStatsCacheSize="1%")
+        except pymongo.errors.OperationFailure as err:
+            if self.allow_feature_not_supported and err.code in QUERY_STATS_NOT_ENABLED_CODES:
+                self.logger.info(
+                    "Encountered an error while configuring the query stats store. "
+                    "Query stats will not be collected for this test."
                 )
             else:
-                raise errors.ServerFailure(err.args[0])
+                raise err
