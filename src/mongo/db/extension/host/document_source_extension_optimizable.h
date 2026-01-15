@@ -370,7 +370,8 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override;
 
     // Wrapper around the LogicalAggStageHandle::compile() method. Returns an ExecAggStageHandle.
     ExecAggStageHandle compile() {

@@ -82,7 +82,8 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         return DistributedPlanLogic{nullptr, this, change_stream_constants::kSortSpec};
     }
 

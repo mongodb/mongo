@@ -181,7 +181,8 @@ public:
     /**
      * In a sharded cluster, this becomes a merge sort by distance, from nearest to furthest.
      */
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final;
 
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);

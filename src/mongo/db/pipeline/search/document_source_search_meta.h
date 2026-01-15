@@ -66,7 +66,8 @@ public:
      * This is the first stage in the pipeline, but we need to gather responses from all shards in
      * order to set $$SEARCH_META appropriately.
      */
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         // We must override DocumentSourceInternalSearchMongotRemote::getDependencies() since this

@@ -72,7 +72,7 @@ REGISTER_DOCUMENT_SOURCE_WITH_STAGE_PARAMS_DEFAULT(searchMeta,
 ALLOCATE_DOCUMENT_SOURCE_ID(searchMeta, DocumentSourceSearchMeta::id);
 
 boost::optional<DocumentSource::DistributedPlanLogic>
-DocumentSourceSearchMeta::distributedPlanLogic() {
+DocumentSourceSearchMeta::distributedPlanLogic(const DistributedPlanContext* ctx) {
     DistributedPlanLogic logic;
     logic.shardsStage = this;
     tassert(6448011, "Expected merging pipeline to be set already", _mergingPipeline);

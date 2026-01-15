@@ -174,11 +174,10 @@ private:
      */
     auto _popFirstMergeStage() {
         boost::intrusive_ptr<DocumentSource> current = _splitPipeline.mergePipeline->popFront();
-        return std::make_pair(current,
-                              current->pipelineDependentDistributedPlanLogic(
-                                  {.pipelinePrefix = *_splitPipeline.shardsPipeline,
-                                   .pipelineSuffix = *_splitPipeline.mergePipeline,
-                                   .shardKeyPaths = _initialShardKeyPaths}));
+        DocumentSource::DistributedPlanContext ctx{.pipelinePrefix = *_splitPipeline.shardsPipeline,
+                                                   .pipelineSuffix = *_splitPipeline.mergePipeline,
+                                                   .shardKeyPaths = _initialShardKeyPaths};
+        return std::make_pair(current, current->distributedPlanLogic(&ctx));
     }
 
     /**

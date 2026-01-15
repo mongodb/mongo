@@ -88,7 +88,8 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const override {}
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         return boost::none;
     }
 

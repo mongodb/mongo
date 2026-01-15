@@ -125,7 +125,8 @@ public:
         return id;
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         DistributedPlanLogic logic;
         logic.shardsStage = this;
         if (_limit) {

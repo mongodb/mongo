@@ -105,7 +105,8 @@ public:
      * Returns a DistributedPlanLogic with two identical $limit stages; one for the shards pipeline
      * and one for the merging pipeline.
      */
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         // Running this stage on the shards is an optimization, but is not strictly necessary in
         // order to produce correct pipeline output.
         // {shardsStage, mergingStage, sortPattern}

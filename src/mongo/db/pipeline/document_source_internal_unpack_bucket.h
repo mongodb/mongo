@@ -186,7 +186,8 @@ public:
             _sharedState->_bucketUnpacker.getTimeField());
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         return boost::none;
     };
 

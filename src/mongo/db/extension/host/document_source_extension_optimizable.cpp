@@ -316,7 +316,7 @@ DepsTracker::State DocumentSourceExtensionOptimizable::getDependencies(DepsTrack
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
-DocumentSourceExtensionOptimizable::distributedPlanLogic() {
+DocumentSourceExtensionOptimizable::distributedPlanLogic(const DistributedPlanContext* ctx) {
     auto dplHandle = _logicalStage->getDistributedPlanLogic();
 
     if (!dplHandle.isValid()) {

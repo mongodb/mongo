@@ -84,7 +84,8 @@ public:
         return DepsTracker::State::SEE_NEXT;
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final;
 
     long long getSampleSize() const {
         return _size;

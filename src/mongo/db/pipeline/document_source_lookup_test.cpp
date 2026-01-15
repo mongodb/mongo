@@ -1105,7 +1105,7 @@ TEST_F(DocumentSourceLookUpTest, FromDBAndCollDistributedPlanLogic) {
             .firstElement(),
         expCtx);
 
-    ASSERT(!lookupStage->distributedPlanLogic());
+    ASSERT(!lookupStage->distributedPlanLogic(nullptr));
 }
 
 // Tests $lookup distributedPlanLogic() is prohibited from executing on the shardsStage for standard
@@ -1123,9 +1123,9 @@ TEST_F(DocumentSourceLookUpTest, LookupDistributedPlanLogic) {
                                       << "as"))
             .firstElement(),
         expCtx);
-    ASSERT(lookupStage->distributedPlanLogic());
-    ASSERT(lookupStage->distributedPlanLogic()->shardsStage == nullptr);
-    ASSERT_EQ(lookupStage->distributedPlanLogic()->mergingStages.size(), 1);
+    ASSERT(lookupStage->distributedPlanLogic(nullptr));
+    ASSERT(lookupStage->distributedPlanLogic(nullptr)->shardsStage == nullptr);
+    ASSERT_EQ(lookupStage->distributedPlanLogic(nullptr)->mergingStages.size(), 1);
 }
 
 TEST(MakeMatchStageFromInput, NonArrayValueUsesEqQuery) {

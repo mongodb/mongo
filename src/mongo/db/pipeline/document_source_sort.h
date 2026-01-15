@@ -218,7 +218,8 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final;
 
     bool canRunInParallelBeforeWriteStage(
         const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const final;

@@ -530,7 +530,8 @@ boost::intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     return ds;
 }
 
-boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distributedPlanLogic() {
+boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSort::distributedPlanLogic(
+    const DistributedPlanContext* ctx) {
     uassert(6369906,
             "$_internalBoundedSort cannot be the first stage on the merger, because it requires "
             "almost-sorted input, which the shardsPart of a pipeline can't provide",

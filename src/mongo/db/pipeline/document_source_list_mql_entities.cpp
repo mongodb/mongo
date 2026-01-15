@@ -116,7 +116,7 @@ Value DocumentSourceListMqlEntities::serialize(const SerializationOptions& opts)
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
-DocumentSourceListMqlEntities::distributedPlanLogic() {
+DocumentSourceListMqlEntities::distributedPlanLogic(const DistributedPlanContext* ctx) {
     return boost::none;
 }
 

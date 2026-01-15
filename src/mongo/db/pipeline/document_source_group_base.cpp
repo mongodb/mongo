@@ -701,44 +701,47 @@ bool DocumentSourceGroupBase::groupIsOnShardKey(
     return true;
 }
 
-boost::optional<DocumentSource::DistributedPlanLogic>
-DocumentSourceGroupBase::pipelineDependentDistributedPlanLogic(
-    const DocumentSourceGroup::DistributedPlanContext& ctx) {
+boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceGroupBase::distributedPlanLogic(
+    const DistributedPlanContext* ctx) {
+    if (!ctx) {
+        return distributedPlanLogicWithoutContext();
+    }
+
     if (!getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled()) {
         // Feature flag guards ability to entirely push down a $group; if disabled
         // do not perform any pipeline aware logic.
-        return distributedPlanLogic();
+        return distributedPlanLogicWithoutContext();
     }
 
     if (!CollatorInterface::isSimpleCollator(getExpCtx()->getCollator())) {
         // A collation on the aggregation may result in the aggregation being more coarse-grained
         // than the shard-key, i.e. pushing the $group down fully may result in more group keys than
         // we actually want.
-        return distributedPlanLogic();
+        return distributedPlanLogicWithoutContext();
     }
 
     if (repl::ReadConcernArgs::get(getExpCtx()->getOperationContext()).getLevel() ==
         repl::ReadConcernLevel::kAvailableReadConcern) {
         // Can't rely on multiple shards not returning the same document twice.
-        return distributedPlanLogic();
+        return distributedPlanLogicWithoutContext();
     }
 
     // TODO SERVER-97135: Refactor so we can remove the following check.
-    auto mergeStage = ctx.pipelineSuffix.empty()
+    auto mergeStage = ctx->pipelineSuffix.empty()
         ? nullptr
-        : dynamic_cast<DocumentSourceMerge*>(ctx.pipelineSuffix.getSources().back().get());
+        : dynamic_cast<DocumentSourceMerge*>(ctx->pipelineSuffix.getSources().back().get());
     if (mergeStage) {
         // This $group may be eligible for a $exchange optimisation, which fully pushing down $group
         // would prevent.
-        return distributedPlanLogic();
+        return distributedPlanLogicWithoutContext();
     }
 
     if (getExpCtx()->getSubPipelineDepth() >= 1) {
         // TODO SERVER-99094: Allow $group pushdown within nested pipelines.
-        return distributedPlanLogic();
+        return distributedPlanLogicWithoutContext();
     }
 
-    if (groupIsOnShardKey(ctx.pipelinePrefix, ctx.shardKeyPaths)) {
+    if (groupIsOnShardKey(ctx->pipelinePrefix, ctx->shardKeyPaths)) {
         // This group can fully execute on a shard, because no two shards will return the same group
         // key. Prior calls to distributedPlanLogic() may have set the 'willBeMerged' flag to true,
         // so we set it to false here to ensure it is correct.
@@ -746,11 +749,11 @@ DocumentSourceGroupBase::pipelineDependentDistributedPlanLogic(
         return boost::none;
     }
     // Fall back to non-pipeline dependent.
-    return distributedPlanLogic();
+    return distributedPlanLogicWithoutContext();
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
-DocumentSourceGroupBase::distributedPlanLogic() {
+DocumentSourceGroupBase::distributedPlanLogicWithoutContext() {
     VariablesParseState vps = getExpCtx()->variablesParseState;
     /* the merger will use the same grouping key */
     auto mergerGroupByExpression = ExpressionFieldPath::parse(getExpCtx().get(), "$$ROOT._id", vps);

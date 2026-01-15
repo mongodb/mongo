@@ -76,7 +76,8 @@ public:
                                   DocumentSourceContainer::const_iterator pos,
                                   const DocumentSourceContainer& container) const final;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         return boost::none;
     }
 

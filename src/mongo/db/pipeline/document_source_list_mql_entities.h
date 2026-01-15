@@ -125,7 +125,8 @@ public:
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:

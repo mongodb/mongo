@@ -399,8 +399,9 @@ StageConstraints DocumentSourceMerge::constraints(PipelineSplitState pipeState) 
     return result;
 }
 
-boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distributedPlanLogic() {
-    return getMergeShardId() ? DocumentSourceWriter::distributedPlanLogic() : boost::none;
+boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distributedPlanLogic(
+    const DistributedPlanContext* ctx) {
+    return getMergeShardId() ? DocumentSourceWriter::distributedPlanLogic(ctx) : boost::none;
 }
 
 Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {

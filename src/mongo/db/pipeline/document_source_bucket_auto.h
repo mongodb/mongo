@@ -93,7 +93,8 @@ public:
     /**
      * The $bucketAuto stage must be run on the merging shard.
      */
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         // {shardsStage, mergingStage, sortPattern}
         return DistributedPlanLogic{nullptr, this, boost::none};
     }

@@ -175,7 +175,8 @@ public:
     DocumentSourceContainer::iterator optimizeAt(DocumentSourceContainer::iterator itr,
                                                  DocumentSourceContainer* container);
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         // Force to run on the merging half for now.
         return DistributedPlanLogic{nullptr, this, boost::none};
     }

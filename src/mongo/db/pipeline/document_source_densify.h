@@ -379,7 +379,8 @@ public:
         // based on a set of field paths.
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 

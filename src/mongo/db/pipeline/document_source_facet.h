@@ -183,7 +183,8 @@ public:
      * TODO SERVER-24154: Should be smarter about splitting so that parts of the sub-pipelines can
      * potentially be run in parallel on multiple shards.
      */
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         // {shardsStage, mergingStage, sortPattern}
         return DistributedPlanLogic{nullptr, this, boost::none};
     }

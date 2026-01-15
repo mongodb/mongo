@@ -84,7 +84,8 @@ public:
         return id;
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         // {shardsStage, mergingStage, sortPattern}
         return DistributedPlanLogic{nullptr, this, boost::none};
     }

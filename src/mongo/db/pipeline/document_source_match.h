@@ -224,7 +224,8 @@ public:
     std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
     splitSourceBy(const OrderedPathSet& fields, const StringMap<std::string>& renames) &&;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         return boost::none;
     }
 

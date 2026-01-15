@@ -2430,7 +2430,8 @@ public:
         return 0;
     }
     void addVariableRefs(std::set<Variables::Id>* refs) const override {}
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         return DistributedPlanLogic{};
     }
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override {

@@ -104,7 +104,8 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 

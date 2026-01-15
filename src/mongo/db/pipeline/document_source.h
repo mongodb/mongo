@@ -330,7 +330,7 @@ public:
     };
 
     /**
-     * Describes context pipelineDependentDistributedPlanLogic() should take into account to make a
+     * Describes context distributedPlanLogic() should take into account to make a
      * decision about whether or not a document source can be pushed down to shards.
      */
     struct DistributedPlanContext {
@@ -629,23 +629,13 @@ public:
      * behaviour is required, a new source should be created and configured appropriately. It is an
      * error for the returned DistributedPlanLogic to have identical pointers for 'shardsStage' and
      * 'mergingStage'.
-     */
-    virtual boost::optional<DistributedPlanLogic> distributedPlanLogic() = 0;
-
-    /**
-     * Check if a source is able to run in parallel across a distributed collection, given
-     * sharding context and that it will be evaluated _after_ pipelinePrefix, and _before_
-     * pipelineSuffix.
      *
-     * For stages which do not have any pipeline-dependent behaviour, the default impl
-     * calls distributedPlanLogic.
-     *
-     * See distributedPlanLogic() for conditions and return values.
+     * Stages with pipeline-dependent behaviour (such as $group) rely on the sharding and pipeline
+     * context when provided to determine the distributed plan logic. Other stages will ignore the
+     * context.
      */
-    virtual boost::optional<DistributedPlanLogic> pipelineDependentDistributedPlanLogic(
-        const DistributedPlanContext& ctx) {
-        return distributedPlanLogic();
-    }
+    virtual boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx = nullptr) = 0;
 
     /**
      * Returns true if it would be correct to execute this stage in parallel across the shards in

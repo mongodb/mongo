@@ -90,7 +90,8 @@ public:
         return id;
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         // The desugaring of DocumentSourceSearch happens after sharded planning, so we should never
         // execute distributedPlanLogic here, instead it should be called against
         // DocumentSourceSearch.

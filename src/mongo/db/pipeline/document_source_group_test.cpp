@@ -654,7 +654,7 @@ TEST_F(DocumentSourceGroupTest, CorrectlyReportsTriviallyReferencedExprsFromID) 
 TEST_F(DocumentSourceGroupTest, DistributedLogicRequiresMergeIfWithoutShardKey) {
     auto spec = fromjson(R"({$group: {_id: "$x.y", $willBeMerged: true}})");
     auto group = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
-    auto distributedPlanLogic = group->distributedPlanLogic();
+    auto distributedPlanLogic = group->distributedPlanLogic(nullptr);
     ASSERT_EQ(distributedPlanLogic->mergingStages.size(), 1UL);
     ASSERT_BSONOBJ_EQ(distributedPlanLogic->shardsStage->serializeToBSONForDebug(),
                       group->serializeToBSONForDebug());
@@ -664,8 +664,8 @@ TEST_F(DocumentSourceGroupTest, DistributedLogicRequiresMergeIfIdNotSupersetOfSh
     auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}, $willBeMerged: true}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "b", "d"}));
+    auto planCtx = makePlanCtx({"a", "b", "d"});
+    auto distributedPlanLogic = group->distributedPlanLogic(&planCtx);
     ASSERT_EQ(distributedPlanLogic->mergingStages.size(), 1UL);
     ASSERT_BSONOBJ_EQ(distributedPlanLogic->shardsStage->serializeToBSONForDebug(),
                       group->serializeToBSONForDebug());
@@ -676,8 +676,8 @@ TEST_F(DocumentSourceGroupTest, DistributedLogicDoesNotRequireMergeIfIdEqualToSh
     auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "b", "c"}));
+    auto planCtx = makePlanCtx({"a", "b", "c"});
+    auto distributedPlanLogic = group->distributedPlanLogic(&planCtx);
     ASSERT_FALSE(distributedPlanLogic);
 }
 
@@ -686,8 +686,8 @@ TEST_F(DocumentSourceGroupTest, DistributedLogicDoesRequireMergeIfIdEqualToShard
     auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "b", "c"}));
+    auto planCtx = makePlanCtx({"a", "b", "c"});
+    auto distributedPlanLogic = group->distributedPlanLogic(&planCtx);
     ASSERT_TRUE(distributedPlanLogic);
 }
 
@@ -696,8 +696,8 @@ TEST_F(DocumentSourceGroupTest, DistributedLogicDoesNotRequireMergeIfIdSupersetO
     auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "c"}));
+    auto planCtx = makePlanCtx({"a", "c"});
+    auto distributedPlanLogic = group->distributedPlanLogic(&planCtx);
     ASSERT_FALSE(distributedPlanLogic);
 }
 
@@ -707,8 +707,8 @@ TEST_F(DocumentSourceGroupTest,
     auto spec = fromjson(R"({$group: {_id: {a: "$a", b: "$b", c: "$c"}}})");
     boost::intrusive_ptr<DocumentSourceGroup> group = dynamic_cast<DocumentSourceGroup*>(
         DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()).get());
-    auto distributedPlanLogic =
-        group->pipelineDependentDistributedPlanLogic(makePlanCtx({"a", "c"}));
+    auto planCtx = makePlanCtx({"a", "c"});
+    auto distributedPlanLogic = group->distributedPlanLogic(&planCtx);
     ASSERT_TRUE(distributedPlanLogic);
 }
 
@@ -1415,7 +1415,7 @@ protected:
     boost::intrusive_ptr<exec::agg::Stage> createMerger() {
         // Set up a group merger to simulate merging results in the router.  In this
         // case only one shard is in use.
-        auto distributedPlanLogic = group()->distributedPlanLogic();
+        auto distributedPlanLogic = group()->distributedPlanLogic(nullptr);
         ASSERT(distributedPlanLogic);
         ASSERT_EQ(distributedPlanLogic->mergingStages.size(), 1)
             << distributedPlanLogic->mergingStages.size();

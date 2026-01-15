@@ -2164,7 +2164,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, DistributedPlanLogicReturnsNoneWh
     auto optimizable =
         host::DocumentSourceExtensionOptimizable::create(getExpCtx(), std::move(astHandle));
 
-    auto dpl = optimizable->distributedPlanLogic();
+    auto dpl = optimizable->distributedPlanLogic(nullptr);
     ASSERT_FALSE(dpl.has_value());
 }
 
@@ -2197,7 +2197,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     auto optimizable = host::DocumentSourceExtensionOptimizable::create(
         getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
 
-    ASSERT_THROWS_CODE(optimizable->distributedPlanLogic(), AssertionException, 11513800);
+    ASSERT_THROWS_CODE(optimizable->distributedPlanLogic(nullptr), AssertionException, 11513800);
 }
 
 TEST_F(DocumentSourceExtensionOptimizableTest, DistributedPlanLogicWithMergeOnlyStage) {
@@ -2214,7 +2214,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest, DistributedPlanLogicWithMergeOnly
     auto optimizable = host::DocumentSourceExtensionOptimizable::create(
         getExpCtx(), std::move(logicalStageHandle), properties);
 
-    auto dpl = optimizable->distributedPlanLogic();
+    auto dpl = optimizable->distributedPlanLogic(nullptr);
     ASSERT_TRUE(dpl.has_value());
 
     const auto& logic = dpl.get();
@@ -2352,7 +2352,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     auto optimizable = host::DocumentSourceExtensionOptimizable::create(
         getExpCtx(), std::move(logicalStageHandle), MongoExtensionStaticProperties{});
 
-    auto dpl = optimizable->distributedPlanLogic();
+    auto dpl = optimizable->distributedPlanLogic(nullptr);
     ASSERT_TRUE(dpl.has_value());
 
     const auto& logic = dpl.get();

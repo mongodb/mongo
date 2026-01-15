@@ -147,7 +147,7 @@ bool DocumentSourceGraphLookUp::foreignShardedGraphLookupAllowed() const {
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
-DocumentSourceGraphLookUp::distributedPlanLogic() {
+DocumentSourceGraphLookUp::distributedPlanLogic(const DistributedPlanContext* ctx) {
     // If $graphLookup into a sharded foreign collection is allowed, top-level $graphLookup
     // stages can run in parallel on the shards.
     if (foreignShardedGraphLookupAllowed() && getExpCtx()->getSubPipelineDepth() == 0) {

@@ -175,7 +175,8 @@ public:
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final;
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 

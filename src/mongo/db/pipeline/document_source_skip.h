@@ -112,7 +112,8 @@ public:
     /**
      * The $skip stage must run on the merging half of the pipeline.
      */
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         // {shardsStage, mergingStage, sortPattern}
         return DistributedPlanLogic{nullptr, this, boost::none};
     }

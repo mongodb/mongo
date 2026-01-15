@@ -110,7 +110,8 @@ public:
         return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{_distanceField.fullPath()}, {}};
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         return boost::none;
     }
 

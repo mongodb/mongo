@@ -186,7 +186,8 @@ public:
 
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         expression::addDependencies(_params.startWith.get(), deps);

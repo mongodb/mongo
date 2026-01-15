@@ -92,7 +92,8 @@ public:
     GetModPathsReturn getModifiedPaths() const final;
     StageConstraints constraints(PipelineSplitState pipeState) const final;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         return boost::none;
     }
 

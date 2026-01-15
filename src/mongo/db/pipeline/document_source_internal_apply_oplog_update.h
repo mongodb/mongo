@@ -99,7 +99,8 @@ public:
         return {GetModPathsReturn::Type::kAllPaths, {}, {}};
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         return boost::none;
     }
 

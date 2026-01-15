@@ -78,7 +78,8 @@ public:
 
     const char* getSourceName() const override;
     StageConstraints constraints(PipelineSplitState pipeState) const override;
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
     DepsTracker::State getDependencies(DepsTracker* deps) const override;
 

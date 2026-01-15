@@ -99,7 +99,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSample::create(
     return sample;
 }
 
-boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSample::distributedPlanLogic() {
+boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceSample::distributedPlanLogic(
+    const DistributedPlanContext* ctx) {
     // On the merger we need to merge the pre-sorted documents by their random values, then limit to
     // the number we need.
     DistributedPlanLogic logic;

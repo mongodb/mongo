@@ -168,9 +168,9 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
         sort()->serializeToArray(arr);
         ASSERT_BSONOBJ_EQ(arr[0].getDocument().toBson(), BSON("$sort" << BSON("a" << 1)));
 
-        ASSERT(sort()->distributedPlanLogic());
-        ASSERT(sort()->distributedPlanLogic()->shardsStage != nullptr);
-        ASSERT(sort()->distributedPlanLogic()->mergingStages.empty());
+        ASSERT(sort()->distributedPlanLogic(nullptr));
+        ASSERT(sort()->distributedPlanLogic(nullptr)->shardsStage != nullptr);
+        ASSERT(sort()->distributedPlanLogic(nullptr)->mergingStages.empty());
     }
 
     container.push_back(DocumentSourceLimit::create(expCtx, 10));
@@ -194,11 +194,11 @@ TEST_F(DocumentSourceSortTest, SortWithLimit) {
     sort()->serializeToArray(arr);
     ASSERT_VALUE_EQ(Value(arr), DOC_ARRAY(DOC("$sort" << DOC("a" << 1)) << DOC("$limit" << 5)));
 
-    ASSERT(sort()->distributedPlanLogic());
-    ASSERT(sort()->distributedPlanLogic()->shardsStage != nullptr);
-    ASSERT_EQ(sort()->distributedPlanLogic()->mergingStages.size(), 1);
+    ASSERT(sort()->distributedPlanLogic(nullptr));
+    ASSERT(sort()->distributedPlanLogic(nullptr)->shardsStage != nullptr);
+    ASSERT_EQ(sort()->distributedPlanLogic(nullptr)->mergingStages.size(), 1);
     ASSERT(dynamic_cast<DocumentSourceLimit*>(
-        sort()->distributedPlanLogic()->mergingStages.begin()->get()));
+        sort()->distributedPlanLogic(nullptr)->mergingStages.begin()->get()));
 }
 
 TEST_F(DocumentSourceSortTest, ParseableSerialization) {

@@ -202,7 +202,8 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         // {shardsStage, mergingStage, sortPattern}
         return DistributedPlanLogic{nullptr, this, boost::none};
     }

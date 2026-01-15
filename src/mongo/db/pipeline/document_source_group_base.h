@@ -108,9 +108,8 @@ public:
      */
     StringMap<boost::intrusive_ptr<Expression>> getIdFields() const;
 
-    boost::optional<DistributedPlanLogic> pipelineDependentDistributedPlanLogic(
-        const DistributedPlanContext& ctx) final;
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final;
 
     /**
      * Can be used to change or swap out individual _id fields, but should not be used
@@ -260,6 +259,8 @@ private:
      * Returns true if 'dottedPath' is one of the group keys present in '_idExpressions'.
      */
     bool pathIncludedInGroupKeys(const std::string& dottedPath) const;
+
+    boost::optional<DocumentSource::DistributedPlanLogic> distributedPlanLogicWithoutContext();
 
     SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;
 };

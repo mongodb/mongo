@@ -148,7 +148,8 @@ public:
         return constraints;
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         // This stage will run once on the entire cluster since we've set `kRunOnceAnyNode` as the
         // `HostTypeRequirement` constraint.
         return boost::none;

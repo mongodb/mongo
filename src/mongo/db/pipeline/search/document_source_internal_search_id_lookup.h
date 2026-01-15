@@ -153,7 +153,8 @@ public:
      * For the purposes of this function, we want default behavior to happen upon seeing an idLookup
      * (which is to push it down to the shards and continue forward in looking for a split point).
      */
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) final {
         return boost::none;
     }
 

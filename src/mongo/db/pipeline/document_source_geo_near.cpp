@@ -561,8 +561,8 @@ void DocumentSourceGeoNear::addVariableRefs(std::set<Variables::Id>* refs) const
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)
     : DocumentSource(kStageName, pExpCtx), spherical(false) {}
 
-boost::optional<DocumentSource::DistributedPlanLogic>
-DocumentSourceGeoNear::distributedPlanLogic() {
+boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceGeoNear::distributedPlanLogic(
+    const DistributedPlanContext* ctx) {
     DistributedPlanLogic logic;
     logic.shardsStage = this;
     // Note that we may not output a distance field, and it may have a different name if we do.

@@ -1024,7 +1024,8 @@ void DocumentSourceLookUp::addVariableRefs(std::set<Variables::Id>* refs) const 
     }
 }
 
-boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceLookUp::distributedPlanLogic() {
+boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceLookUp::distributedPlanLogic(
+    const DistributedPlanContext* ctx) {
     // If $lookup into a sharded foreign collection is allowed and the foreign namespace is sharded,
     // top-level $lookup stages can run in parallel on the shards.
     //

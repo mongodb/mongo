@@ -51,7 +51,8 @@ public:
         return ds.constraints().preservesOrderAndMetadata;
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         DistributedPlanLogic logic;
 
         logic.shardsStage = this;
@@ -98,7 +99,8 @@ public:
         return new DocumentSourceCanSwapWithSort(expCtx);
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         return boost::none;
     }
 

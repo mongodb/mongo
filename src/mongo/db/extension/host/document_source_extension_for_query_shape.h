@@ -70,7 +70,8 @@ public:
 
     Id getId() const override;
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic(
+        const DistributedPlanContext* ctx) override {
         tasserted(
             11420600,
             "distributedPlanLogic() should not be called on "
