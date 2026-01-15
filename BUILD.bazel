@@ -180,6 +180,9 @@ mongo_install(
 mongo_install(
     name = "devcore",
     srcs = [],
+    root_files = {
+        "//x509:generate_main_certificates": "bin/x509",
+    },
     deps = [
         "mongo",
         "mongod",
@@ -305,8 +308,11 @@ mongo_install(
     root_files = select({
         "@platforms//os:linux": {
             "//src/mongo/db/extension/test_examples:extension_options_configs": "etc/mongo/extensions",
+            "//x509:generate_main_certificates": "bin/x509",
         },
-        "//conditions:default": {},
+        "//conditions:default": {
+            "//x509:generate_main_certificates": "bin/x509",
+        },
     }),
     try_zstd = True,
     deps = [

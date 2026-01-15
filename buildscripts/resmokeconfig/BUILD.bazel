@@ -44,6 +44,7 @@ resmoke_suite_test(
         "//jstests/sharding/libs:last_lts_mongos_commands.js",
         "//jstests/third_party/fast_check:fc-3.1.0.js",
         "//src/third_party/schemastore.org:schemas",
+        "//x509:generate_main_certificates",
     ],
     exclude_files = [
         # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the

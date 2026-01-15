@@ -859,6 +859,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/testing/OWNERS.yml
 /jstests/core/testing/**/* @10gen/server-programmability @svc-auto-approve-bot
+/jstests/core/testing/**/certs_are_generated.js @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/timeseries/OWNERS.yml
 /jstests/core/timeseries/**/* @10gen/server-collection-write-path @svc-auto-approve-bot

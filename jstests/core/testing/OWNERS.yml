@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-programmability
+  - "certs_are_generated.js":
+    approvers:
+      - 10gen/server-security
