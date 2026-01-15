@@ -9,7 +9,7 @@ exports_files(
 )
 
 mongo_cc_library(
-    name = "aggregation_stage",
+    name = "aggregation_stage_handles",
     srcs = [
         "ast_node.cpp",
         "distributed_plan_logic.cpp",

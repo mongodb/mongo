@@ -265,7 +265,7 @@ mongo_cc_library(
         "//src/mongo/db/admission:ingress_request_rate_limiter",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/stats:counters",
-        "//src/mongo/otel/metrics:metrics_service",
+        "//src/mongo/otel/metrics:otel_metrics_service",
         "//src/mongo/rpc:client_metadata",
         "//src/mongo/rpc:message",
         "//src/mongo/util:processinfo",

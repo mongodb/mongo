@@ -24,7 +24,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/db/extension/shared/handle/aggregation_stage",
+        "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
     ],
 )
 
@@ -61,7 +61,7 @@ mongo_cc_library(
         "//src/mongo/db/extension/host_connector/adapter:host_adapters",
         "//src/mongo/db/extension/host_connector/adapter:host_services_adapter",
         "//src/mongo/db/extension/host_connector/handle:host_handles",
-        "//src/mongo/db/extension/shared/handle/aggregation_stage",
+        "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
         "//src/mongo/db/pipeline",
         "//src/mongo/db/pipeline:lite_parsed_desugarer",
     ],

@@ -245,7 +245,7 @@ mongo_cc_library(
     name = "my_library",
     # ...
     deps = [
-        "//src/mongo/otel/metrics:metrics_service",
+        "//src/mongo/otel/metrics:otel_metrics_service",
     ],
 )
 ```

@@ -22,7 +22,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/extension/public:extensions_api_public",
         "//src/mongo/db/extension/shared",
-        "//src/mongo/db/extension/shared/handle/aggregation_stage",
+        "//src/mongo/db/extension/shared/handle/aggregation_stage:aggregation_stage_handles",
         "//src/third_party/yaml-cpp:yaml",
     ],
 )

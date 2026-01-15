@@ -2,17 +2,36 @@ import argparse
 import os
 import pathlib
 import platform
+import shutil
 import subprocess
 import sys
 import tempfile
-from typing import List
+from typing import List, Optional
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.parent
 sys.path.append(str(REPO_ROOT))
 
 LARGE_FILE_THRESHOLD = 10 * 1024 * 1024  # 10MiB
 
+
+def _get_buildozer() -> Optional[str]:
+    """Get the path to buildozer, installing it if necessary."""
+    from buildscripts.install_bazel import install_bazel
+
+    buildozer_name = "buildozer" if platform.system() != "Windows" else "buildozer.exe"
+    buildozer = shutil.which(buildozer_name)
+    if not buildozer:
+        buildozer = str(pathlib.Path(f"~/.local/bin/{buildozer_name}").expanduser())
+        if not os.path.exists(buildozer):
+            bazel_bin_dir = str(pathlib.Path("~/.local/bin").expanduser())
+            if not os.path.exists(bazel_bin_dir):
+                os.makedirs(bazel_bin_dir)
+            install_bazel(bazel_bin_dir)
+    return buildozer if os.path.exists(buildozer) else None
+
+
 SUPPORTED_EXTENSIONS = (
+    ".bazel",
     ".cpp",
     ".c",
     ".h",
@@ -167,6 +186,88 @@ class LintRunner:
                 self.fail = True
                 if not self.keep_going:
                     raise LinterFail("File too large")
+
+    def check_duplicate_lib_names(self):
+        """Check for duplicate mongo_cc_library names using buildozer."""
+        print("Checking for duplicate cc_library names...")
+
+        buildozer = _get_buildozer()
+        if not buildozer:
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail("buildozer not found")
+
+        # Query all mongo_cc_library targets for their label, name, and srcs
+        p = subprocess.run(
+            [buildozer, "print label name srcs", "//src/...:%mongo_cc_library"],
+            capture_output=True,
+            text=True,
+        )
+
+        if p.returncode != 0:
+            print("buildozer query failed:")
+            print(p.stderr)
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail("buildozer query failed")
+            return
+
+        # Parse output and check for duplicates
+        # Output format: "//path/to:target name [srcs...]" or "... name (missing)" per line
+        # Libraries with no srcs or srcs=(missing) are header-only and don't produce .so
+        name_to_labels: dict = {}  # name -> list of labels
+        for line in p.stdout.strip().splitlines():
+            line = line.strip()
+            if not line or line.startswith("rule "):
+                # Skip empty lines and "rule ... has no attribute" warnings
+                continue
+
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+
+            label = parts[0]
+            name = parts[1]
+
+            # Check if library has source files (produces .so)
+            # Format is either: "label name (missing)" for no srcs
+            # or: "label name [file1.cpp file2.cpp ...]" for srcs
+            has_cpp_sources = False
+            if len(parts) > 2:
+                # Check if srcs contains .cpp files
+                srcs_str = " ".join(parts[2:])
+                if srcs_str != "(missing)" and ".cpp" in srcs_str:
+                    has_cpp_sources = True
+
+            if has_cpp_sources:
+                if name not in name_to_labels:
+                    name_to_labels[name] = []
+                name_to_labels[name].append(label)
+
+        # Find duplicates
+        duplicates = {name: labels for name, labels in name_to_labels.items() if len(labels) > 1}
+
+        if duplicates:
+            error_msg = "Duplicate cc_library names detected:\n\n"
+            for name in sorted(duplicates.keys()):
+                labels = duplicates[name]
+                error_msg += f"  Library name: '{name}'\n"
+                for i, label in enumerate(labels):
+                    if i == 0:
+                        error_msg += f"    First defined at:  {label}\n"
+                    else:
+                        error_msg += f"    Also defined at:   {label}\n"
+                error_msg += "\n"
+            error_msg += "When doing dynamic linking, only one .so file with each name can exist.\n"
+            error_msg += "This causes the later library to overwrite the first, leading to\n"
+            error_msg += "hard-to-debug linking issues at runtime.\n"
+            error_msg += "\nPlease rename one of the libraries to avoid this conflict.\n"
+            print(error_msg)
+            self.fail = True
+            if not self.keep_going:
+                raise LinterFail("Duplicate cc_library names detected")
+        else:
+            print("No duplicate cc_library names found!")
 
 
 def _git_distance(args: list) -> int:
@@ -364,6 +465,9 @@ def run_rules_lint(bazel_bin: str, args: List[str]):
         for file in files_to_lint
     ):
         lint_mod(lr)
+
+    if lint_all or any(file.endswith((".bazel")) for file in files_to_lint):
+        lr.check_duplicate_lib_names()
 
     if lr.fail:
         raise LinterFail("Linter(s) failed")
