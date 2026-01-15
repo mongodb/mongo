@@ -45,7 +45,14 @@
 namespace mongo::otel::metrics {
 namespace {
 
-class MetricsServiceTest : public ServiceContextTest {};
+class MetricsServiceTest : public testing::Test {
+public:
+    void SetUp() override {
+        metricsService = std::make_unique<MetricsService>();
+    }
+
+    std::unique_ptr<MetricsService> metricsService;
+};
 
 /**
  * Type traits for creating different metric types via MetricsService.
@@ -57,61 +64,61 @@ struct MetricCreator;
 
 template <>
 struct MetricCreator<Counter<int64_t>> {
-    static Counter<int64_t>* create(MetricsService& svc,
+    static Counter<int64_t>* create(MetricsService* svc,
                                     MetricName name,
                                     std::string desc,
                                     MetricUnit unit) {
-        return svc.createInt64Counter(name, std::move(desc), unit);
+        return svc->createInt64Counter(name, std::move(desc), unit);
     }
 };
 
 template <>
 struct MetricCreator<Counter<double>> {
-    static Counter<double>* create(MetricsService& svc,
+    static Counter<double>* create(MetricsService* svc,
                                    MetricName name,
                                    std::string desc,
                                    MetricUnit unit) {
-        return svc.createDoubleCounter(name, std::move(desc), unit);
+        return svc->createDoubleCounter(name, std::move(desc), unit);
     }
 };
 
 template <>
 struct MetricCreator<Gauge<int64_t>> {
-    static Gauge<int64_t>* create(MetricsService& svc,
+    static Gauge<int64_t>* create(MetricsService* svc,
                                   MetricName name,
                                   std::string desc,
                                   MetricUnit unit) {
-        return svc.createInt64Gauge(name, std::move(desc), unit);
+        return svc->createInt64Gauge(name, std::move(desc), unit);
     }
 };
 
 template <>
 struct MetricCreator<Gauge<double>> {
-    static Gauge<double>* create(MetricsService& svc,
+    static Gauge<double>* create(MetricsService* svc,
                                  MetricName name,
                                  std::string desc,
                                  MetricUnit unit) {
-        return svc.createDoubleGauge(name, std::move(desc), unit);
+        return svc->createDoubleGauge(name, std::move(desc), unit);
     }
 };
 
 template <>
 struct MetricCreator<Histogram<int64_t>> {
-    static Histogram<int64_t>* create(MetricsService& svc,
+    static Histogram<int64_t>* create(MetricsService* svc,
                                       MetricName name,
                                       std::string desc,
                                       MetricUnit unit) {
-        return svc.createInt64Histogram(name, std::move(desc), unit);
+        return svc->createInt64Histogram(name, std::move(desc), unit);
     }
 };
 
 template <>
 struct MetricCreator<Histogram<double>> {
-    static Histogram<double>* create(MetricsService& svc,
+    static Histogram<double>* create(MetricsService* svc,
                                      MetricName name,
                                      std::string desc,
                                      MetricUnit unit) {
-        return svc.createDoubleHistogram(name, std::move(desc), unit);
+        return svc->createDoubleHistogram(name, std::move(desc), unit);
     }
 };
 
@@ -120,7 +127,7 @@ struct MetricCreator<Histogram<double>> {
  * that is common across all metric types (Counter, Gauge, Histogram).
  */
 template <typename T>
-class MetricCreationTest : public ServiceContextTest {};
+class MetricCreationTest : public MetricsServiceTest {};
 
 using testing::ElementsAre;
 using testing::ElementsAreArray;
@@ -133,42 +140,121 @@ using MetricTypes = testing::Types<Counter<int64_t>,
 TYPED_TEST_SUITE(MetricCreationTest, MetricTypes);
 
 TYPED_TEST(MetricCreationTest, SameMetricReturnedOnSameCreate) {
-    auto& metricsService = MetricsService::get(this->getServiceContext());
     auto* metric1 = MetricCreator<TypeParam>::create(
-        metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds);
+        this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds);
     auto* metric2 = MetricCreator<TypeParam>::create(
-        metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds);
+        this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    // Initialize MetricsService.
+    OtelMetricsCapturer metricsCapturer(*this->metricsService);
+
+    auto* metric3 = MetricCreator<TypeParam>::create(
+        this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds);
     EXPECT_EQ(metric1, metric2);
+    EXPECT_EQ(metric2, metric3);
 }
 
 TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentParameters) {
-    auto& metricsService = MetricsService::get(this->getServiceContext());
     MetricCreator<TypeParam>::create(
-        metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    ASSERT_THROWS_CODE(
-        MetricCreator<TypeParam>::create(
-            metricsService, MetricNames::kTest1, "different_description", MetricUnit::kSeconds),
-        DBException,
-        ErrorCodes::ObjectAlreadyExists);
-    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(
-                           metricsService, MetricNames::kTest1, "description", MetricUnit::kBytes),
+        this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                        MetricNames::kTest1,
+                                                        "different_description",
+                                                        MetricUnit::kSeconds),
                        DBException,
                        ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(
+        MetricCreator<TypeParam>::create(
+            this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kBytes),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
+
+    // Initialize MetricsService.
+    OtelMetricsCapturer metricsCapturer(*this->metricsService);
+
+    ASSERT_THROWS_CODE(MetricCreator<TypeParam>::create(this->metricsService.get(),
+                                                        MetricNames::kTest1,
+                                                        "different_description",
+                                                        MetricUnit::kSeconds),
+                       DBException,
+                       ErrorCodes::ObjectAlreadyExists);
+    ASSERT_THROWS_CODE(
+        MetricCreator<TypeParam>::create(
+            this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kBytes),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
 }
 
 TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentType) {
-    auto& metricsService = MetricsService::get(this->getServiceContext());
     MetricCreator<TypeParam>::create(
-        metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds);
+        this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds);
     // Choose a metric type that is different from the current type.
     using DifferentType = std::conditional_t<std::is_same_v<TypeParam, Counter<int64_t>>,
                                              Counter<double>,
                                              Counter<int64_t>>;
     ASSERT_THROWS_CODE(
         MetricCreator<DifferentType>::create(
-            metricsService, MetricNames::kTest1, "description", MetricUnit::kSeconds),
+            this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds),
         DBException,
         ErrorCodes::ObjectAlreadyExists);
+
+    // Initialize MetricsService.
+    OtelMetricsCapturer metricsCapturer(*this->metricsService);
+
+    ASSERT_THROWS_CODE(
+        MetricCreator<DifferentType>::create(
+            this->metricsService.get(), MetricNames::kTest1, "description", MetricUnit::kSeconds),
+        DBException,
+        ErrorCodes::ObjectAlreadyExists);
+}
+
+TEST_F(MetricsServiceTest, CreateCounterBeforeInitialization) {
+    auto* int64Counter = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    auto* doubleCounter = metricsService->createDoubleCounter(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds);
+    ASSERT_TRUE(int64Counter != nullptr);
+    ASSERT_TRUE(doubleCounter != nullptr);
+
+    // Initialize the MetricsService.
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 0);
+        EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 0.0);
+    }
+
+    int64Counter->add(5);
+    doubleCounter->add(5.0);
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 5);
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 5.0);
+    }
+}
+
+TEST_F(MetricsServiceTest, CreateGaugeBeforeInitialization) {
+    auto* int64Gauge =
+        metricsService->createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    auto* doubleGauge =
+        metricsService->createDoubleGauge(MetricNames::kTest2, "description", MetricUnit::kSeconds);
+    ASSERT_TRUE(int64Gauge != nullptr);
+    ASSERT_TRUE(doubleGauge != nullptr);
+
+    // Initialize the MetricsService.
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 0);
+        EXPECT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 0.0);
+    }
+
+    int64Gauge->set(5);
+    doubleGauge->set(5.0);
+
+    if (metricsCapturer.canReadMetrics()) {
+        EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 5);
+        EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 5.0);
+    }
 }
 
 #ifdef MONGO_CONFIG_OTEL
@@ -176,7 +262,7 @@ TYPED_TEST(MetricCreationTest, ExceptionWhenSameNameButDifferentType) {
 // the expected metadata.
 TEST_F(MetricsServiceTest, MeterIsInitialized) {
     // Set up a valid MeterProvider.
-    OtelMetricsCapturer metricsCapturer;
+    OtelMetricsCapturer metricsCapturer(*metricsService);
 
     std::shared_ptr<opentelemetry::metrics::MeterProvider> meterProvider =
         opentelemetry::metrics::Provider::GetMeterProvider();
@@ -193,7 +279,7 @@ TEST_F(MetricsServiceTest, MeterIsInitialized) {
 }
 
 // Assert that we create a NoopMeter if the global MeterProvider hasn't been set.
-TEST_F(MetricsServiceTest, ServiceContextInitBeforeMeterProvider) {
+TEST_F(MetricsServiceTest, NoOpMeterProviderBeforeInit) {
     std::shared_ptr<opentelemetry::metrics::MeterProvider> meterProvider =
         opentelemetry::metrics::Provider::GetMeterProvider();
     ASSERT(meterProvider != nullptr);
@@ -203,13 +289,12 @@ TEST_F(MetricsServiceTest, ServiceContextInitBeforeMeterProvider) {
 #endif  // MONGO_CONFIG_OTEL
 
 TEST_F(MetricsServiceTest, SerializeMetrics) {
-    auto& metricsService = MetricsService::get(getServiceContext());
-    auto int64Histogram = metricsService.createInt64Histogram(
+    auto int64Histogram = metricsService->createInt64Histogram(
         MetricNames::kTest1, "description", MetricUnit::kSeconds);
-    auto doubleHistogram = metricsService.createDoubleHistogram(
+    auto doubleHistogram = metricsService->createDoubleHistogram(
         MetricNames::kTest2, "description", MetricUnit::kSeconds);
-    auto counter =
-        metricsService.createInt64Counter(MetricNames::kTest3, "description", MetricUnit::kSeconds);
+    auto counter = metricsService->createInt64Counter(
+        MetricNames::kTest3, "description", MetricUnit::kSeconds);
     int64Histogram->record(10);
     doubleHistogram->record(20);
     counter->add(1);
@@ -221,37 +306,38 @@ TEST_F(MetricsServiceTest, SerializeMetrics) {
     expectedBson.doneFast();
 
     BSONObjBuilder builder;
-    metricsService.appendMetricsForServerStatus(builder);
+    metricsService->appendMetricsForServerStatus(builder);
     ASSERT_BSONOBJ_EQ(builder.obj(), expectedBson.obj());
 }
 
 using CreateInt64CounterTest = MetricsServiceTest;
 
 TEST_F(CreateInt64CounterTest, RecordsValues) {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Counter<int64_t>* counter_1 = metricsService.createInt64Counter(
+    Counter<int64_t>* counter1 = metricsService->createInt64Counter(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-    Counter<int64_t>* counter_2 =
-        metricsService.createInt64Counter(MetricNames::kTest2, "description2", MetricUnit::kBytes);
+
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    Counter<int64_t>* counter2 =
+        metricsService->createInt64Counter(MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
     if (metricsCapturer.canReadMetrics()) {
         EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 0);
         EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 0);
     }
 
-    counter_1->add(10);
-    counter_2->add(1);
-    counter_1->add(5);
-    counter_2->add(1);
-    counter_2->add(1);
+    counter1->add(10);
+    counter2->add(1);
+    counter1->add(5);
+    counter2->add(1);
+    counter2->add(1);
 
     if (metricsCapturer.canReadMetrics()) {
         EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 15);
         EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest2), 3);
     }
 
-    counter_1->add(5);
+    counter1->add(5);
     if (metricsCapturer.canReadMetrics()) {
         EXPECT_EQ(metricsCapturer.readInt64Counter(MetricNames::kTest1), 20);
     }
@@ -260,23 +346,24 @@ TEST_F(CreateInt64CounterTest, RecordsValues) {
 using CreateDoubleCounterTest = MetricsServiceTest;
 
 TEST_F(CreateDoubleCounterTest, RecordsValues) {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Counter<double>* counter_1 = metricsService.createDoubleCounter(
+    Counter<double>* counter1 = metricsService->createDoubleCounter(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-    Counter<double>* counter_2 =
-        metricsService.createDoubleCounter(MetricNames::kTest2, "description2", MetricUnit::kBytes);
+
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    Counter<double>* counter2 = metricsService->createDoubleCounter(
+        MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
     if (metricsCapturer.canReadMetrics()) {
         EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 0.0);
         EXPECT_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest2), 0.0);
     }
 
-    counter_1->add(10.5);
-    counter_2->add(1.25);
-    counter_1->add(5.5);
-    counter_2->add(1.25);
-    counter_2->add(1.25);
+    counter1->add(10.5);
+    counter2->add(1.25);
+    counter1->add(5.5);
+    counter2->add(1.25);
+    counter2->add(1.25);
 
     if (metricsCapturer.canReadMetrics()) {
         EXPECT_DOUBLE_EQ(metricsCapturer.readDoubleCounter(MetricNames::kTest1), 16.0);
@@ -287,12 +374,11 @@ TEST_F(CreateDoubleCounterTest, RecordsValues) {
 using CreateInt64GaugeTest = MetricsServiceTest;
 
 TEST_F(CreateInt64GaugeTest, RecordsValues) {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
+    OtelMetricsCapturer metricsCapturer(*metricsService);
     Gauge<int64_t>* gauge_1 =
-        metricsService.createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+        metricsService->createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     Gauge<int64_t>* gauge_2 =
-        metricsService.createInt64Gauge(MetricNames::kTest2, "description2", MetricUnit::kBytes);
+        metricsService->createInt64Gauge(MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
     if (metricsCapturer.canReadMetrics()) {
         EXPECT_EQ(metricsCapturer.readInt64Gauge(MetricNames::kTest1), 0);
@@ -316,27 +402,26 @@ TEST_F(CreateInt64GaugeTest, RecordsValues) {
 using CreateDoubleGaugeTest = MetricsServiceTest;
 
 TEST_F(CreateDoubleGaugeTest, RecordsValues) {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Gauge<double>* gauge_1 =
-        metricsService.createDoubleGauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-    Gauge<double>* gauge_2 =
-        metricsService.createDoubleGauge(MetricNames::kTest2, "description2", MetricUnit::kBytes);
+    Gauge<double>* gauge1 = metricsService->createDoubleGauge(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    Gauge<double>* gauge2 =
+        metricsService->createDoubleGauge(MetricNames::kTest2, "description2", MetricUnit::kBytes);
 
     if (metricsCapturer.canReadMetrics()) {
         ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 0.0);
         ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 0.0);
     }
 
-    gauge_1->set(10.5);
-    gauge_2->set(3.5);
+    gauge1->set(10.5);
+    gauge2->set(3.5);
 
     if (metricsCapturer.canReadMetrics()) {
         ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 10.5);
         ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest2), 3.5);
     }
 
-    gauge_1->set(20.8);
+    gauge1->set(20.8);
     if (metricsCapturer.canReadMetrics()) {
         ASSERT_EQ(metricsCapturer.readDoubleGauge(MetricNames::kTest1), 20.8);
     }
@@ -344,18 +429,22 @@ TEST_F(CreateDoubleGaugeTest, RecordsValues) {
 
 using CreateHistogramTest = MetricsServiceTest;
 
-TEST_F(CreateHistogramTest, RecordsValues) {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Histogram<int64_t>* int64Histogram = metricsService.createInt64Histogram(
-        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-    Histogram<double>* doubleHistogram = metricsService.createDoubleHistogram(
-        MetricNames::kTest2, "description1", MetricUnit::kSeconds);
+TEST_F(CreateHistogramTest, RecordsInt64Values) {
+    auto* histogram1 = metricsService->createInt64Histogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_TRUE(histogram1 != nullptr);
+
+    // Initialize the MetricsService.
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    auto* histogram2 = metricsService->createInt64Histogram(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds);
+    ASSERT_TRUE(histogram2 != nullptr);
 
     const std::vector<double> expectedBoundaries = {
         0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000};
 
-    int64Histogram->record(5);
+    histogram1->record(5);
     if (metricsCapturer.canReadMetrics()) {
         const auto data1 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
         EXPECT_THAT(data1.boundaries, ElementsAreArray(expectedBoundaries));
@@ -366,49 +455,64 @@ TEST_F(CreateHistogramTest, RecordsValues) {
         EXPECT_EQ(data1.count, 1);
     }
 
-    int64Histogram->record(15);
+    histogram2->record(5);
     if (metricsCapturer.canReadMetrics()) {
-        const auto data2 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
+        const auto data2 = metricsCapturer.readInt64Histogram(MetricNames::kTest2);
         EXPECT_THAT(data2.boundaries, ElementsAreArray(expectedBoundaries));
-        EXPECT_EQ(data2.sum, 20);
+        EXPECT_EQ(data2.sum, 5);
         EXPECT_EQ(data2.min, 5);
-        EXPECT_EQ(data2.max, 15);
-        EXPECT_THAT(data2.counts, ElementsAre(0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-        EXPECT_EQ(data2.count, 2);
-    }
-
-    doubleHistogram->record(103.14);
-    if (metricsCapturer.canReadMetrics()) {
-        const auto data3 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
-        EXPECT_THAT(data3.boundaries, ElementsAreArray(expectedBoundaries));
-        EXPECT_DOUBLE_EQ(data3.sum, 103.14);
-        EXPECT_DOUBLE_EQ(data3.min, 103.14);
-        EXPECT_DOUBLE_EQ(data3.max, 103.14);
-        EXPECT_THAT(data3.counts, ElementsAre(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0));
-        EXPECT_EQ(data3.count, 1);
-    }
-
-    doubleHistogram->record(10.0);
-    if (metricsCapturer.canReadMetrics()) {
-        const auto data4 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
-        EXPECT_THAT(data4.boundaries, ElementsAreArray(expectedBoundaries));
-        EXPECT_DOUBLE_EQ(data4.sum, 113.14);
-        EXPECT_DOUBLE_EQ(data4.min, 10.0);
-        EXPECT_DOUBLE_EQ(data4.max, 103.14);
-        EXPECT_THAT(data4.counts, ElementsAre(0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0));
-        EXPECT_EQ(data4.count, 2);
+        EXPECT_EQ(data2.max, 5);
+        EXPECT_THAT(data2.counts, ElementsAre(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        EXPECT_EQ(data2.count, 1);
     }
 }
 
-TEST_F(CreateHistogramTest, RecordsValuesExplicitBoundaries) {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Histogram<int64_t>* int64Histogram = metricsService.createInt64Histogram(
+TEST_F(CreateHistogramTest, RecordsDoubleValues) {
+    auto* histogram1 = metricsService->createDoubleHistogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    ASSERT_TRUE(histogram1 != nullptr);
+
+    // Initialize the MetricsService.
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+
+    auto* histogram2 = metricsService->createDoubleHistogram(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds);
+    ASSERT_TRUE(histogram1 != nullptr);
+
+    const std::vector<double> expectedBoundaries = {
+        0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000};
+
+    histogram1->record(103.14);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data1 = metricsCapturer.readDoubleHistogram(MetricNames::kTest1);
+        EXPECT_THAT(data1.boundaries, ElementsAreArray(expectedBoundaries));
+        EXPECT_DOUBLE_EQ(data1.sum, 103.14);
+        EXPECT_DOUBLE_EQ(data1.min, 103.14);
+        EXPECT_DOUBLE_EQ(data1.max, 103.14);
+        EXPECT_THAT(data1.counts, ElementsAre(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0));
+        EXPECT_EQ(data1.count, 1);
+    }
+
+    histogram2->record(103.14);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data2 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
+        EXPECT_THAT(data2.boundaries, ElementsAreArray(expectedBoundaries));
+        EXPECT_DOUBLE_EQ(data2.sum, 103.14);
+        EXPECT_DOUBLE_EQ(data2.min, 103.14);
+        EXPECT_DOUBLE_EQ(data2.max, 103.14);
+        EXPECT_THAT(data2.counts, ElementsAre(0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0));
+        EXPECT_EQ(data2.count, 1);
+    }
+}
+
+TEST_F(CreateHistogramTest, RecordsInt64ValuesExplicitBoundaries) {
+    Histogram<int64_t>* histogram1 = metricsService->createInt64Histogram(
         MetricNames::kTest1, "description", MetricUnit::kSeconds, std::vector<double>({2, 4}));
-    Histogram<double>* doubleHistogram = metricsService.createDoubleHistogram(
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    Histogram<int64_t>* histogram2 = metricsService->createInt64Histogram(
         MetricNames::kTest2, "description", MetricUnit::kSeconds, std::vector<double>({10, 100}));
 
-    int64Histogram->record(15);
+    histogram1->record(15);
     if (metricsCapturer.canReadMetrics()) {
         const auto data1 = metricsCapturer.readInt64Histogram(MetricNames::kTest1);
         EXPECT_THAT(data1.boundaries, ElementsAre(2, 4));
@@ -419,7 +523,37 @@ TEST_F(CreateHistogramTest, RecordsValuesExplicitBoundaries) {
         EXPECT_EQ(data1.count, 1);
     }
 
-    doubleHistogram->record(2);
+    histogram2->record(2);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data2 = metricsCapturer.readInt64Histogram(MetricNames::kTest2);
+        EXPECT_THAT(data2.boundaries, ElementsAre(10, 100));
+        EXPECT_DOUBLE_EQ(data2.sum, 2);
+        EXPECT_DOUBLE_EQ(data2.min, 2);
+        EXPECT_DOUBLE_EQ(data2.max, 2);
+        EXPECT_THAT(data2.counts, ElementsAre(1, 0, 0));
+        EXPECT_EQ(data2.count, 1);
+    }
+}
+
+TEST_F(CreateHistogramTest, RecordsDoubleValuesExplicitBoundaries) {
+    Histogram<double>* histogram1 = metricsService->createDoubleHistogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds, std::vector<double>({2, 4}));
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    Histogram<double>* histogram2 = metricsService->createDoubleHistogram(
+        MetricNames::kTest2, "description", MetricUnit::kSeconds, std::vector<double>({10, 100}));
+
+    histogram1->record(15);
+    if (metricsCapturer.canReadMetrics()) {
+        const auto data1 = metricsCapturer.readDoubleHistogram(MetricNames::kTest1);
+        EXPECT_THAT(data1.boundaries, ElementsAre(2, 4));
+        EXPECT_EQ(data1.sum, 15);
+        EXPECT_EQ(data1.min, 15);
+        EXPECT_EQ(data1.max, 15);
+        EXPECT_THAT(data1.counts, ElementsAre(0, 0, 1));
+        EXPECT_EQ(data1.count, 1);
+    }
+
+    histogram2->record(2);
     if (metricsCapturer.canReadMetrics()) {
         const auto data2 = metricsCapturer.readDoubleHistogram(MetricNames::kTest2);
         EXPECT_THAT(data2.boundaries, ElementsAre(10, 100));
@@ -430,6 +564,5 @@ TEST_F(CreateHistogramTest, RecordsValuesExplicitBoundaries) {
         EXPECT_EQ(data2.count, 1);
     }
 }
-
 }  // namespace
 }  // namespace mongo::otel::metrics

@@ -36,11 +36,20 @@
 
 namespace mongo::otel::metrics {
 
-class OtelMetricsCapturerTest : public ServiceContextTest {};
+namespace {
+class OtelMetricsCapturerTest : public testing::Test {
+public:
+    void SetUp() override {
+        metricsService = std::make_unique<MetricsService>();
+    }
+
+    std::unique_ptr<MetricsService> metricsService;
+};
+}  // namespace
 
 #if MONGO_CONFIG_OTEL
 TEST_F(OtelMetricsCapturerTest, ReadThrowsExceptionIfMetricNotFound) {
-    OtelMetricsCapturer metricsCapturer;
+    OtelMetricsCapturer metricsCapturer(*metricsService);
     ASSERT_THROWS_CODE(metricsCapturer.readInt64Counter(MetricNames::kTest1),
                        DBException,
                        ErrorCodes::KeyNotFound);
@@ -53,11 +62,10 @@ TEST_F(OtelMetricsCapturerTest, ReadThrowsExceptionIfMetricNotFound) {
 }
 
 TEST_F(OtelMetricsCapturerTest, HistogramWrongValueTypeThrowsException) {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Histogram<int64_t>* int64Histogram = metricsService.createInt64Histogram(
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    Histogram<int64_t>* int64Histogram = metricsService->createInt64Histogram(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-    Histogram<double>* doubleHistogram = metricsService.createDoubleHistogram(
+    Histogram<double>* doubleHistogram = metricsService->createDoubleHistogram(
         MetricNames::kTest2, "description1", MetricUnit::kSeconds);
     // A value must be recorded for the histogram to be initialized in the underlying metrics
     // exporter.
@@ -73,10 +81,9 @@ TEST_F(OtelMetricsCapturerTest, HistogramWrongValueTypeThrowsException) {
 }
 
 TEST_F(OtelMetricsCapturerTest, CounterWrongValueTypeThrowsException) {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    metricsService.createInt64Counter(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-    metricsService.createDoubleCounter(MetricNames::kTest2, "description2", MetricUnit::kSeconds);
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    metricsService->createInt64Counter(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    metricsService->createDoubleCounter(MetricNames::kTest2, "description2", MetricUnit::kSeconds);
 
     // Reading an int64 counter as a double counter should throw TypeMismatch.
     ASSERT_THROWS_CODE(metricsCapturer.readDoubleCounter(MetricNames::kTest1),
@@ -89,10 +96,9 @@ TEST_F(OtelMetricsCapturerTest, CounterWrongValueTypeThrowsException) {
 }
 
 TEST_F(OtelMetricsCapturerTest, GaugeWrongValueTypeThrowsException) {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    metricsService.createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-    metricsService.createDoubleGauge(MetricNames::kTest2, "description2", MetricUnit::kSeconds);
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    metricsService->createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    metricsService->createDoubleGauge(MetricNames::kTest2, "description2", MetricUnit::kSeconds);
 
     // Reading an int64 gauge as a double gauge should throw TypeMismatch.
     ASSERT_THROWS_CODE(metricsCapturer.readDoubleGauge(MetricNames::kTest1),
@@ -116,45 +122,40 @@ TEST_F(OtelMetricsCapturerTest, CanReadMetricsIsFalse) {
 using OtelMetricsCapturerDeathTest = OtelMetricsCapturerTest;
 
 DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Counter, "doesn't have otel enabled") {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Counter<int64_t>* int64Counter = metricsService.createInt64Counter(
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    Counter<int64_t>* int64Counter = metricsService->createInt64Counter(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     int64Counter->add(3);
     metricsCapturer.readInt64Counter(MetricNames::kTest1);
 }
 
 DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingDoubleCounter, "doesn't have otel enabled") {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Counter<double>* doubleCounter = metricsService.createDoubleCounter(
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    Counter<double>* doubleCounter = metricsService->createDoubleCounter(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     doubleCounter->add(3);
     metricsCapturer.readInt64Counter(MetricNames::kTest1);
 }
 
 DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Gauge, "doesn't have otel enabled") {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
+    OtelMetricsCapturer metricsCapturer(*metricsService);
     Gauge<int64_t>* int64Gauge =
-        metricsService.createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+        metricsService->createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     int64Gauge->set(3);
     metricsCapturer.readInt64Gauge(MetricNames::kTest1);
 }
 
 DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingDoubleGauge, "doesn't have otel enabled") {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Gauge<double>* doubleGauge =
-        metricsService.createDoubleGauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    Gauge<double>* doubleGauge = metricsService->createDoubleGauge(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     doubleGauge->set(3);
     metricsCapturer.readDoubleGauge(MetricNames::kTest1);
 }
 
 DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Histogram, "doesn't have otel enabled") {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Histogram<int64_t>* int64Histogram = metricsService.createInt64Histogram(
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    Histogram<int64_t>* int64Histogram = metricsService->createInt64Histogram(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     int64Histogram->record(3);
     metricsCapturer.readInt64Histogram(MetricNames::kTest1);
@@ -163,13 +164,136 @@ DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Histogram, "doesn't h
 DEATH_TEST_F(OtelMetricsCapturerDeathTest,
              DiesReadingDoubleHistogram,
              "doesn't have otel enabled") {
-    OtelMetricsCapturer metricsCapturer;
-    auto& metricsService = MetricsService::get(getServiceContext());
-    Histogram<double>* doubleHistogram = metricsService.createDoubleHistogram(
+    OtelMetricsCapturer metricsCapturer(*metricsService);
+    Histogram<double>* doubleHistogram = metricsService->createDoubleHistogram(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     doubleHistogram->record(3);
     metricsCapturer.readInt64Histogram(MetricNames::kTest1);
 }
 
 #endif  // MONGO_CONFIG_OTEL
+
+// The below tests verify the independence of OtelMetricCapturer instances by sharing the same
+// MetricsService among multiple capturers.
+TEST_F(OtelMetricsCapturerTest, CreateInt64CounterWithTwoCapturers) {
+    auto* metric = metricsService->createInt64Counter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->add(1);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readInt64Counter(MetricNames::kTest1), 1);
+        }
+    }
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->add(10);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readInt64Counter(MetricNames::kTest1), 10);
+        }
+    }
+}
+
+TEST_F(OtelMetricsCapturerTest, CreateDoubleCounterWithTwoCapturers) {
+    auto* metric = metricsService->createDoubleCounter(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->add(1.5);
+        if (capturer.canReadMetrics()) {
+            EXPECT_DOUBLE_EQ(capturer.readDoubleCounter(MetricNames::kTest1), 1.5);
+        }
+    }
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->add(10.5);
+        if (capturer.canReadMetrics()) {
+            EXPECT_DOUBLE_EQ(capturer.readDoubleCounter(MetricNames::kTest1), 10.5);
+        }
+    }
+}
+
+TEST_F(OtelMetricsCapturerTest, CreateInt64GaugeWithTwoCapturers) {
+    auto* metric =
+        metricsService->createInt64Gauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->set(1);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kTest1), 1);
+        }
+    }
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->set(10);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readInt64Gauge(MetricNames::kTest1), 10);
+        }
+    }
+}
+
+TEST_F(OtelMetricsCapturerTest, CreateDoubleGaugeWithTwoCapturers) {
+    auto* metric =
+        metricsService->createDoubleGauge(MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->set(1.5);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readDoubleGauge(MetricNames::kTest1), 1.5);
+        }
+    }
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->set(10.5);
+        if (capturer.canReadMetrics()) {
+            EXPECT_EQ(capturer.readDoubleGauge(MetricNames::kTest1), 10.5);
+        }
+    }
+}
+
+TEST_F(OtelMetricsCapturerTest, CreateInt64HistogramWithTwoCapturers) {
+    auto* metric = metricsService->createInt64Histogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->record(1);
+        if (capturer.canReadMetrics()) {
+            const auto data = capturer.readInt64Histogram(MetricNames::kTest1);
+            EXPECT_EQ(data.sum, 1);
+            EXPECT_EQ(data.count, 1);
+        }
+    }
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->record(10);
+        if (capturer.canReadMetrics()) {
+            const auto data = capturer.readInt64Histogram(MetricNames::kTest1);
+            EXPECT_EQ(data.sum, 10);
+            EXPECT_EQ(data.count, 1);
+        }
+    }
+}
+
+TEST_F(OtelMetricsCapturerTest, CreateDoubleHistogramWithTwoCapturers) {
+    auto* metric = metricsService->createDoubleHistogram(
+        MetricNames::kTest1, "description", MetricUnit::kSeconds);
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->record(1.5);
+        if (capturer.canReadMetrics()) {
+            const auto data = capturer.readDoubleHistogram(MetricNames::kTest1);
+            EXPECT_DOUBLE_EQ(data.sum, 1.5);
+            EXPECT_EQ(data.count, 1);
+        }
+    }
+    {
+        OtelMetricsCapturer capturer(*metricsService);
+        metric->record(10.5);
+        if (capturer.canReadMetrics()) {
+            const auto data = capturer.readDoubleHistogram(MetricNames::kTest1);
+            EXPECT_DOUBLE_EQ(data.sum, 10.5);
+            EXPECT_EQ(data.count, 1);
+        }
+    }
+}
 }  // namespace mongo::otel::metrics

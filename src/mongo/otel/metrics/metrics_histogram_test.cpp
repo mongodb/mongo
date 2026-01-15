@@ -40,10 +40,11 @@ namespace mongo::otel::metrics {
 TEST(OtelMetricsHistogramTest, Int64Histogram) {
 #ifdef MONGO_CONFIG_OTEL
     HistogramImpl<int64_t> histogram(
-        opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter").get(),
+        *opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter"),
         "name",
         "description",
-        "unit");
+        "unit",
+        boost::none);
 #else
     HistogramImpl<int64_t> histogram;
 #endif  // MONGO_CONFIG_OTEL
@@ -61,10 +62,11 @@ TEST(OtelMetricsHistogramTest, Int64Histogram) {
 TEST(OtelMetricsHistogramTest, DoubleHistogram) {
 #ifdef MONGO_CONFIG_OTEL
     HistogramImpl<double> histogram(
-        opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter").get(),
+        *opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter"),
         "name",
         "description",
-        "unit");
+        "unit",
+        boost::none);
 #else
     HistogramImpl<double> histogram;
 #endif  // MONGO_CONFIG_OTEL
@@ -79,10 +81,11 @@ TEST(OtelMetricsHistogramTest, DoubleHistogram) {
 TEST(OtelMetricsHistogramTest, HistogramSerialization) {
 #ifdef MONGO_CONFIG_OTEL
     HistogramImpl<int64_t> histogram(
-        opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter").get(),
+        *opentelemetry::metrics::Provider::GetMeterProvider()->GetMeter("test_meter"),
         "name",
         "description",
-        "unit");
+        "unit",
+        boost::none);
 #else
     HistogramImpl<int64_t> histogram;
 #endif  // MONGO_CONFIG_OTEL

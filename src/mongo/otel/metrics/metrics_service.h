@@ -31,12 +31,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
-#include "mongo/db/service_context.h"
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metric_unit.h"
 #include "mongo/otel/metrics/metrics_counter.h"
 #include "mongo/otel/metrics/metrics_gauge.h"
 #include "mongo/otel/metrics/metrics_histogram.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 
 #include <absl/container/btree_map.h>
@@ -50,14 +50,16 @@ namespace mongo::otel::metrics {
 
 /**
  * The MetricsService is the external interface by which API consumers can create Instruments. The
- * global MeterProvider must be set before ServiceContext construction to ensure that the meter can
- * be properly initialized.
+ * MetricsService must be initialized before metrics can record values or be read.
  */
-class MONGO_MOD_PUBLIC MetricsService {
+class MONGO_MOD_PUBLIC MetricsService final {
 public:
     static constexpr StringData kMeterName = "mongodb";
 
-    static MetricsService& get(ServiceContext*);
+    static MetricsService& instance() {
+        static MetricsService metricsService;
+        return metricsService;
+    }
 
     /**
      * Creates a counter with the provided parameters. The result is never null but will throw an
@@ -152,6 +154,18 @@ public:
      */
     void appendMetricsForServerStatus(BSONObjBuilder& bsonBuilder) const;
 
+#ifdef MONGO_CONFIG_OTEL
+    /**
+     * Initializes the metrics service by registering metrics created before initialization with the
+     * provided meter provider.
+     *
+     * This function enables metrics to be created statically, before the meter provider is
+     * initialized in mongod_main.cpp. Any metrics created before initialization are reset to their
+     * default value.
+     */
+    MONGO_MOD_PRIVATE void initialize(opentelemetry::metrics::MeterProvider& provider);
+#endif  // MONGO_CONFIG_OTEL
+
 private:
     // Identifies metrics to help prevent conflicting registrations.
     struct MetricIdentifier {
@@ -184,8 +198,31 @@ private:
                                      std::unique_ptr<Counter<double>>,
                                      std::unique_ptr<Gauge<int64_t>>,
                                      std::unique_ptr<Gauge<double>>,
-                                     std::unique_ptr<Histogram<double>>,
-                                     std::unique_ptr<Histogram<int64_t>>>;
+                                     std::unique_ptr<Histogram<int64_t>>,
+                                     std::unique_ptr<Histogram<double>>>;
+
+#ifdef MONGO_CONFIG_OTEL
+    /**
+     * Visitor struct used for initializing OwnedMetric variants in MetricsService::initialize().
+     *
+     * The visitor assumes the MetricService mutex is locked, hence the WithLock member variable.
+     */
+    struct OwnedMetricVisitor {
+        WithLock lock;
+        opentelemetry::metrics::MeterProvider& provider;
+        const std::string& name;
+        MetricIdentifier id;
+        std::vector<std::shared_ptr<opentelemetry::metrics::ObservableInstrument>>&
+            newObservableInstruments;
+
+        void operator()(std::unique_ptr<Counter<int64_t>>& counter);
+        void operator()(std::unique_ptr<Counter<double>>& counter);
+        void operator()(std::unique_ptr<Gauge<int64_t>>& gauge);
+        void operator()(std::unique_ptr<Gauge<double>>& gauge);
+        void operator()(std::unique_ptr<Histogram<double>>& histogram);
+        void operator()(std::unique_ptr<Histogram<int64_t>>& histogram);
+    };
+#endif  // MONGO_CONFIG_OTEL
 
     struct IdentifierAndMetric {
         MetricIdentifier identifier;

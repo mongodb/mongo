@@ -271,7 +271,7 @@ SessionManagerCommon::SessionManagerCommon(
       _maxOpenSessions(getSupportedMax()),
       _sessions(std::make_unique<Sessions>()),
       _observers(std::move(observers)) {
-    _connectionsProcessedCounter = otel::metrics::MetricsService::get(_svcCtx).createInt64Counter(
+    _connectionsProcessedCounter = otel::metrics::MetricsService::instance().createInt64Counter(
         otel::metrics::MetricNames::kConnectionsProcessed,
         "Total number of ingress connections processed (accepted or rejected)",
         otel::metrics::MetricUnit::kConnections);

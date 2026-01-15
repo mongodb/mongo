@@ -137,16 +137,35 @@ HistogramData<T>::HistogramData(opentelemetry::sdk::metrics::HistogramPointData 
 #endif  // MONGO_CONFIG_OTEL
 
 /**
- * Sets up a MetricProvider with an in-memory exporter so tests can create and inspect metrics.
- * This must be constructed before creating any metrics in order to capture them.
+ * Sets up a MetricProvider with an in-memory exporter so tests can create and inspect metrics. This
+ * must be constructed before creating any metrics in order to capture them.
  *
- * Note that not all environments support exporting otel metrics (e.g., Windows) so in those
- * environments it's not possible to read the metrics in tests. `canReadMetrics` can be used in
- * tests to condition making expectations based on whether the environment supports otel metrics.
+ * NOTE: Not all platforms support exporting OpenTelemetry metrics (e.g., Windows), and on those
+ * platforms it is not possible to read the metrics in tests via readInt64Counter(),
+ * readDoubleCounter(), etc. You can use canReadMetrics() in tests to check whether the platform
+ * supports OpenTelemetry metrics.
+ *
+ * WARNING: On platforms that do not support OpenTelemetry metrics, the OtelMetricsCapturer does not
+ * call MetricsService::initialize(), so metric values recorded before initialization are not reset
+ * when creating the OtelMetricsCapturer. Do not record metrics before creating the
+ * OtelMetricsCapturer, otherwise the values will vary depending on the platform. On
+ * non-OpenTelemetry platforms, it is only possible to read metrics via serverStatus.
  */
 class MONGO_MOD_PUBLIC OtelMetricsCapturer {
 public:
+    /**
+     * Default constructor which uses the static MetricsService object.
+     */
     OtelMetricsCapturer();
+
+    /**
+     * Constructor that allows specifying the MetricsService object to initialize.
+     *
+     * This constructor should be used directly in limited circumstances. Specifically, this
+     * constructor allows unit testing the MetricsService, but tests in server code should use the
+     * static instance.
+     */
+    MONGO_MOD_PRIVATE OtelMetricsCapturer(MetricsService& metricsService);
 #if MONGO_CONFIG_OTEL
     ~OtelMetricsCapturer() {
         opentelemetry::metrics::Provider::SetMeterProvider(

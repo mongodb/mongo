@@ -30,9 +30,14 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"
 #include "mongo/otel/metrics/metrics_metric.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/util/modules.h"
+
+#ifdef MONGO_CONFIG_OTEL
+#include <opentelemetry/metrics/meter.h>
+#endif
 
 namespace mongo::otel::metrics {
 
@@ -57,6 +62,10 @@ public:
 
     BSONObj serializeToBson(const std::string& key) const override;
 
+#ifdef MONGO_CONFIG_OTEL
+    void reset(opentelemetry::metrics::Meter* meter) override;
+#endif  // MONGO_CONFIG_OTEL
+
 private:
     Atomic<T> _value;
 };
@@ -75,4 +84,11 @@ BSONObj GaugeImpl<T>::serializeToBson(const std::string& key) const {
     return BSON(key << value());
 }
 
+#ifdef MONGO_CONFIG_OTEL
+template <typename T>
+void GaugeImpl<T>::reset(opentelemetry::metrics::Meter* meter) {
+    invariant(!meter);
+    _value.store(0);
+}
+#endif  // MONGO_CONFIG_OTEL
 }  // namespace mongo::otel::metrics

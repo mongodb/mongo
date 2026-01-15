@@ -40,7 +40,9 @@ constexpr StringData kUsingOtelOnWindows =
 }
 #endif  // not MONGO_CONFIG_OTEL
 
-OtelMetricsCapturer::OtelMetricsCapturer() {
+OtelMetricsCapturer::OtelMetricsCapturer() : OtelMetricsCapturer(MetricsService::instance()) {}
+
+OtelMetricsCapturer::OtelMetricsCapturer(MetricsService& metricsService) {
 #ifdef MONGO_CONFIG_OTEL
     invariant(isNoopMeterProvider(opentelemetry::metrics::Provider::GetMeterProvider().get()));
 
@@ -57,6 +59,10 @@ OtelMetricsCapturer::OtelMetricsCapturer() {
     std::shared_ptr<opentelemetry::sdk::metrics::MeterProvider> provider =
         opentelemetry::sdk::metrics::MeterProviderFactory::Create();
     provider->AddMetricReader(std::move(reader));
+
+    // Initialize metrics that were created before the MeterProvider was set.
+    metricsService.initialize(*provider);
+
     opentelemetry::metrics::Provider::SetMeterProvider(std::move(provider));
 #endif  // MONGO_CONFIG_OTEL
 }

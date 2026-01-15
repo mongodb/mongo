@@ -25,6 +25,7 @@ mongo_cc_library(
         "metrics_settings_gen",
     ],
     deps = [
+        ":otel_metrics_service",
         "//src/mongo/db:server_base",
     ] + select(
         {
@@ -125,6 +126,15 @@ mongo_cc_unit_test(
         "metrics_counter_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
+    deps = [
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                "//src/third_party/opentelemetry-cpp/api",
+            ],
+            "//conditions:default": [],
+        },
+    ),
 )
 
 mongo_cc_unit_test(
@@ -133,6 +143,15 @@ mongo_cc_unit_test(
         "metrics_gauge_test.cpp",
     ],
     tags = ["mongo_unittest_seventh_group"],
+    deps = [
+    ] + select(
+        {
+            "@//bazel/config:build_otel_enabled": [
+                "//src/third_party/opentelemetry-cpp/api",
+            ],
+            "//conditions:default": [],
+        },
+    ),
 )
 
 mongo_cc_library(
@@ -188,6 +207,7 @@ mongo_cc_library(
         "metrics_test_util.cpp",
     ],
     deps = [
+        ":otel_metrics_service",
         "//src/mongo:base",
         "//src/mongo/db:server_base",
     ] + select(
@@ -209,5 +229,19 @@ mongo_cc_unit_test(
     deps = [
         ":metrics_test_util",
         "//src/mongo/db:service_context_test_fixture",
+    ],
+)
+
+test_suite(
+    name = "otel_tests",
+    tests = [
+        ":metric_names_test",
+        ":metric_unit_test",
+        ":metrics_counter_test",
+        ":metrics_gauge_test",
+        ":metrics_histogram_test",
+        ":metrics_initialization_test",
+        ":metrics_service_test",
+        ":metrics_test_util_test",
     ],
 )

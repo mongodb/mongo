@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/otel/metrics/metrics_metric.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/moving_average.h"
 
@@ -80,10 +81,11 @@ public:
      *
      * Meter must be non-null and remain valid for the lifetime of the Histogram instance.
      */
-    HistogramImpl(opentelemetry::metrics::Meter* meter,
-                  const std::string& name,
-                  const std::string& description,
-                  const std::string& unit);
+    HistogramImpl(opentelemetry::metrics::Meter& meter,
+                  std::string name,
+                  std::string description,
+                  std::string unit,
+                  boost::optional<std::vector<double>> explicitBucketBoundaries);
 #else
     HistogramImpl();
 #endif  // MONGO_CONFIG_OTEL
@@ -100,17 +102,40 @@ public:
      */
     BSONObj serializeToBson(const std::string& key) const override;
 
-private:
-    using UnderlyingType = std::conditional_t<std::is_same_v<T, int64_t>, uint64_t, double>;
-
 #ifdef MONGO_CONFIG_OTEL
-    // The underlying OpenTelemety histogram implementation.
-    std::unique_ptr<opentelemetry::metrics::Histogram<UnderlyingType>> _histogram;
+    /**
+     * Resets the HistogramImpl by creating a new OpenTelemetry histogram implementation and
+     * resetting the internal metrics _avg and _count.
+     */
+    void reset(opentelemetry::metrics::Meter* meter) override;
 #endif  // MONGO_CONFIG_OTEL
 
+    boost::optional<std::vector<double>> explicitBucketBoundaries;
+
+private:
     // Internal metrics used for server status reporting.
     MovingAverage _avg;
     Atomic<int64_t> _count;
+
+#ifdef MONGO_CONFIG_OTEL
+    using UnderlyingType = std::conditional_t<std::is_same_v<T, int64_t>, uint64_t, double>;
+
+    std::unique_ptr<opentelemetry::metrics::Histogram<UnderlyingType>> createOpenTelemetryHistogram(
+        opentelemetry::metrics::Meter& meter,
+        const std::string& name,
+        const std::string& description,
+        const std::string& unit);
+
+    const std::string _name;
+    const std::string _description;
+    const std::string _unit;
+
+    // Read-write mutex that protects the _histogram pointer.
+    mutable WriteRarelyRWMutex _rwMutex;
+
+    // The underlying OpenTelemety histogram implementation.
+    std::unique_ptr<opentelemetry::metrics::Histogram<UnderlyingType>> _histogram;
+#endif  // MONGO_CONFIG_OTEL
 };
 
 // The smoothing factor for the exponential moving average. See moving_average.h.
@@ -118,22 +143,35 @@ constexpr double kAlpha = 0.2;
 
 #ifdef MONGO_CONFIG_OTEL
 template <HistogramValueType T>
-HistogramImpl<T>::HistogramImpl(opentelemetry::metrics::Meter* meter,
-                                const std::string& name,
-                                const std::string& description,
-                                const std::string& unit)
-    : _avg(kAlpha) {
-    invariant(meter);
+std::unique_ptr<opentelemetry::metrics::Histogram<typename HistogramImpl<T>::UnderlyingType>>
+HistogramImpl<T>::createOpenTelemetryHistogram(opentelemetry::metrics::Meter& meter,
+                                               const std::string& name,
+                                               const std::string& description,
+                                               const std::string& unit) {
     if constexpr (std::is_same_v<T, int64_t>) {
         // The OpenTelemetry library provides histogram implementations for uint64_t and double.
         // If a negative integer is passed to `HistogramImpl<uint64_t>::record`, it wraps to an
         // extremely large positive value due to unsigned conversion. To prevent this unintended
         // behavior, we use int64_t as our API type but store an uint64_t histogram, allowing
         // us to explicitly reject negative inputs to the record member function.
-        _histogram = meter->CreateUInt64Histogram(name, description, unit);
+        return meter.CreateUInt64Histogram(name, description, unit);
     } else {
-        _histogram = meter->CreateDoubleHistogram(name, description, unit);
+        return meter.CreateDoubleHistogram(name, description, unit);
     }
+}
+
+template <HistogramValueType T>
+HistogramImpl<T>::HistogramImpl(opentelemetry::metrics::Meter& meter,
+                                std::string name,
+                                std::string description,
+                                std::string unit,
+                                boost::optional<std::vector<double>> explicitBucketBoundaries)
+    : explicitBucketBoundaries(std::move(explicitBucketBoundaries)),
+      _avg(kAlpha),
+      _name(std::move(name)),
+      _description(std::move(description)),
+      _unit(std::move(unit)) {
+    _histogram = createOpenTelemetryHistogram(meter, _name, _description, _unit);
 }
 #else
 template <HistogramValueType T>
@@ -144,7 +182,10 @@ template <HistogramValueType T>
 void HistogramImpl<T>::record(T value) {
     massert(ErrorCodes::BadValue, "Histogram values must be nonnegative", value >= 0);
 #ifdef MONGO_CONFIG_OTEL
-    _histogram->Record(value, opentelemetry::context::Context{});
+    {
+        auto readLock = _rwMutex.readLock();
+        _histogram->Record(value, opentelemetry::context::Context{});
+    }
 #endif  // MONGO_CONFIG_OTEL
     _avg.addSample(value);
     _count.fetchAndAddRelaxed(1);
@@ -159,4 +200,15 @@ BSONObj HistogramImpl<T>::serializeToBson(const std::string& key) const {
     metrics.doneFast();
     return builder.obj();
 }
+
+#ifdef MONGO_CONFIG_OTEL
+template <HistogramValueType T>
+void HistogramImpl<T>::reset(opentelemetry::metrics::Meter* meter) {
+    invariant(meter);
+    _avg.reset();
+    _count.store(0);
+    auto writeLock = _rwMutex.writeLock();
+    _histogram = createOpenTelemetryHistogram(*meter, _name, _description, _unit);
+};
+#endif  // MONGO_CONFIG_OTEL
 }  // namespace mongo::otel::metrics

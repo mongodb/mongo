@@ -7,14 +7,14 @@ utilities. For now, this is only supported in mongod, SERVER-116960 will add thi
 ## Creating Metrics
 
 Metrics are created by calling the `create*` functions on the
-[`MetricsService`](metrics_service.h), which is accessed via the `ServiceContext`:
+[`MetricsService`](metrics_service.h), which is accessed via the `MetricService` instance:
 
 ```cpp
 #include "mongo/otel/metrics/metric_names.h"
 #include "mongo/otel/metrics/metrics_service.h"
 
-void initializeMetrics(ServiceContext* svcCtx) {
-    auto& metricsService = otel::metrics::MetricsService::get(svcCtx);
+void initializeMetrics() {
+    auto& metricsService = otel::metrics::MetricsService::instance();
 
     auto* operationsCounter = metricsService.createInt64Counter(
         otel::metrics::MetricNames::kQueryCount,        // name
@@ -93,7 +93,7 @@ typically be run on these metrics.
 - Query count
 
 ```cpp
-auto* counter = otel::metrics::MetricsService::get(svcCtx).createInt64Counter(
+auto* counter = otel::metrics::MetricsService::instance().createInt64Counter(
     otel::metrics::MetricNames::kOperationsTotal,
     "Total number of operations performed",
     otel::metrics::MetricUnit::kOperations);
@@ -182,18 +182,31 @@ class MyClass {
     Counter<int64_t>* _counter;  // Stashed pointer
 
 public:
-    void init(ServiceContext* svc) {
-        _counter = MetricsService::get(svc).createInt64Counter(...);
+    void init() {
+        _counter = MetricsService::instance().createInt64Counter(...);
     }
 
     void doWork() {
         _counter->add(1);  // Fast: no lock
     }
 };
+```
 
+```cpp
+// GOOD: Create static pointer once, pointer reused in function.
+namespace {
+Counter<int64_t>* counter = MetricsService::instance().createInt64Counter(...);
+}  // namespace
+
+void doWork() {
+    counter->add(1);
+}
+```
+
+```cpp
 // BAD: Creates/looks up metric on every call
-void doWork(ServiceContext* svc) {
-    auto* counter = MetricsService::get(svc).createInt64Counter(...);  // Slow: acquires lock
+void doWork() {
+    auto* counter = MetricsService::instance().createInt64Counter(...);  // Slow: acquires lock
     counter->add(1);
 }
 ```
@@ -220,7 +233,7 @@ namespace mongo::otel::metrics {
 TEST(MyFeatureTest, RecordsMetrics) {
     otel::metrics::OtelMetricsCapturer capturer;
 
-    auto* counter = otel::metrics::MetricsService::get(getServiceContext()).createInt64Counter(
+    auto* counter = otel::metrics::MetricsService::instance().createInt64Counter(
         otel::metrics::MetricNames::kMyFeatureEvents,
         "Number of events processed",
         otel::metrics::MetricUnit::kOperations);

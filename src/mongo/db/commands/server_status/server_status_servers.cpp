@@ -135,11 +135,8 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder b;
-        auto svcCtx = opCtx->getServiceContext();
-
-        auto& metricsService = otel::metrics::MetricsService::get(svcCtx);
+        auto& metricsService = otel::metrics::MetricsService::instance();
         metricsService.appendMetricsForServerStatus(b);
-
         return b.obj();
     }
 };

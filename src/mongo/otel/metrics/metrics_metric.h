@@ -30,6 +30,11 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/config.h"
+
+#ifdef MONGO_CONFIG_OTEL
+#include <opentelemetry/metrics/meter.h>
+#endif  // MONGO_CONFIG_OTEL
 
 namespace mongo::otel::metrics {
 
@@ -51,5 +56,15 @@ public:
      * For example, {"a": 1} or {"b": {...}}.
      */
     virtual BSONObj serializeToBson(const std::string& key) const = 0;
+
+#ifdef MONGO_CONFIG_OTEL
+    /**
+     * Resets the metric to its original state.
+     *
+     * This is used during MetricsService initialization since recording values pre-init should be
+     * a no-op.
+     */
+    virtual void reset(opentelemetry::metrics::Meter* meter = nullptr) = 0;
+#endif  // MONGO_CONFIG_OTEL
 };
 }  // namespace mongo::otel::metrics

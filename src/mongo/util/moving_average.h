@@ -115,6 +115,13 @@ public:
         return _alpha;
     }
 
+    /**
+     * Resets the moving average to no value.
+     */
+    void reset() {
+        _average.store(std::nan(""));
+    }
+
 private:
     Atomic<double> _average;
     const double _alpha;

@@ -34,6 +34,7 @@
 
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/otel/metrics/metrics_settings_gen.h"
 #include "mongo/stdx/chrono.h"
 
@@ -146,13 +147,31 @@ void validateOptions() {
 Status initialize() {
     try {
         validateOptions();
-        if (!gOpenTelemetryMetricsHttpEndpoint.empty()) {
-            return initializeHttp(gOpenTelemetryMetricsHttpEndpoint,
-                                  gOpenTelemetryMetricsCompression);
-        } else if (!gOpenTelemetryMetricsDirectory.empty()) {
-            return initializeFile(gOpenTelemetryMetricsDirectory);
+
+        const bool httpEndpointParameterSet = !gOpenTelemetryMetricsHttpEndpoint.empty();
+        const bool directoryParameterSet = !gOpenTelemetryMetricsDirectory.empty();
+
+        if (!httpEndpointParameterSet && !directoryParameterSet) {
+            LOGV2(10500903, "Not initializing OpenTelemetry metrics");
+            return Status::OK();
         }
-        LOGV2(10500903, "Not initializing OpenTelemetry metrics");
+
+        auto status = [&]() {
+            if (httpEndpointParameterSet) {
+                return initializeHttp(gOpenTelemetryMetricsHttpEndpoint,
+                                      gOpenTelemetryMetricsCompression);
+            }
+            return initializeFile(gOpenTelemetryMetricsDirectory);
+        }();
+
+        if (!status.isOK()) {
+            return status;
+        }
+
+        auto provider = metrics_api::Provider::GetMeterProvider();
+        invariant(provider);
+        MetricsService::instance().initialize(*provider);
+
         return Status::OK();
     } catch (...) {
         return exceptionToStatus();
