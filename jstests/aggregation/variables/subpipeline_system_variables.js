@@ -1,7 +1,6 @@
 /**
  * Tests that $$NOW and $$CLUSTER_TIME have the same value in subpipelines as in the parent pipeline.
  * @tags: [
- *   requires_fcv_83,
  *   do_not_wrap_aggregations_in_facets,
  *   assumes_unsharded_collection,
  * ]
@@ -11,10 +10,11 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 db.dropDatabase();
-db.test.insertOne({a: 1});
+const coll = db[jsTestName()];
+assert.commandWorked(coll.insertOne({a: 1}));
 
 function testSystemTimeVariable(pipeline) {
-    const docs = db.test.aggregate(pipeline).toArray();
+    const docs = coll.aggregate(pipeline).toArray();
     for (const doc of docs) {
         const variableMainPipeline = doc["variableMainPipeline"];
         const variableSubPipeline = doc["variableSubPipeline"];
@@ -30,7 +30,7 @@ function generateTestPipelineLookup(variableName) {
     return [
         {
             $lookup: {
-                from: "test",
+                from: jsTestName(),
                 pipeline: [{$project: {_id: 0, variableSubPipeline: `$$${variableName}`}}],
                 as: "out",
             },
@@ -50,7 +50,7 @@ function generateTestPipelineUnionWith(variableName) {
         {$match: {a: 0}},
         {
             $unionWith: {
-                coll: "test",
+                coll: jsTestName(),
                 pipeline: [{$project: {_id: 0, variableSubPipeline: `$$${variableName}`}}],
             },
         },
@@ -67,13 +67,13 @@ function generateTestMultipleSubPipelines(variableName) {
         {$match: {a: 0}},
         {
             $unionWith: {
-                coll: "test",
+                coll: jsTestName(),
                 pipeline: [{$project: {_id: 0, variableMainPipeline: `$$${variableName}`}}],
             },
         },
         {
             $lookup: {
-                from: "test",
+                from: jsTestName(),
                 pipeline: [{$project: {_id: 0, variableSubPipeline: `$$${variableName}`}}],
                 as: "out",
             },
@@ -100,13 +100,14 @@ const isStandalone = FixtureHelpers.isStandalone(db);
 // Run parallel shell to continuously tick cluster time.
 const latch = new CountDownLatch(1);
 const updateThread = new Thread((latch) => {
-    db.background_update.drop();
+    const background_update_coll = db[jsTestName() + "background_update"];
+    background_update_coll.drop();
     let count = 0;
     while (true) {
-        db.background_update.insertOne({_id: count});
+        background_update_coll.insertOne({_id: count});
         count++;
         for (let id = 0; id < count; ++id) {
-            db.background_update.updateOne({_id: id}, {$inc: {u: 1}});
+            background_update_coll.updateOne({_id: id}, {$inc: {u: 1}});
         }
         if (latch.getCount() === 0) {
             break;
