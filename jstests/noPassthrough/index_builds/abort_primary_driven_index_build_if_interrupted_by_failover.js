@@ -63,7 +63,7 @@ let buildUUID = extractUUIDFromObject(
 );
 jsTest.log.info(`buildUUID: ${tojson(buildUUID)}`);
 
-jsTest.log.info("6. CommitQuorum is kDisabled (0) while primary-driven");
+jsTest.log.info("6. Setting commitQuorum is ignored while primary-driven");
 assert.commandWorked(
     primary.getDB(dbName).runCommand({setIndexCommitQuorum: collName, indexNames: [indexName], commitQuorum: 1}),
 );

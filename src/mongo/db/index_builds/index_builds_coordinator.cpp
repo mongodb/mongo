@@ -3041,6 +3041,18 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
         return;
     }
 
+    // In primary-driven index builds, when a primary steps down it loses the authority to abort the
+    // index build. Skip the cleanup here and wait for external abort signals (kOplogAbort or
+    // kRollbackAbort).
+    if (status.isA<ErrorCategory::NotPrimaryError>() &&
+        indexBuildOptions.indexBuildMethod == IndexBuildMethodEnum::kPrimaryDriven) {
+        LOGV2(11717000,
+              "Index build: skipping cleanup for primary-driven index build on step down",
+              "buildUUD"_attr = replState->buildUUID,
+              "error"_attr = status);
+        return;
+    }
+
     if (!status.isA<ErrorCategory::ShutdownError>()) {
         try {
             // It is still possible to get a shutdown request while trying to clean-up. All shutdown
