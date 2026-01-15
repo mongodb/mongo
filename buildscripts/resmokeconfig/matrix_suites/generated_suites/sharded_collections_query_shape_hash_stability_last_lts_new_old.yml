@@ -34,6 +34,7 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+    num_mongos: 3
     num_rs_nodes_per_shard: 2
     num_sharded_clusters: 2
     num_shards: 1
