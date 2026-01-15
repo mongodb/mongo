@@ -138,7 +138,6 @@ void throwAppropriateException(bool txnTooLargeEnabled,
 }
 
 void dumpErrorLog() {
-    LOGV2_FATAL_CONTINUE(11720300, "Gathering WiredTiger error log");
     int ret = wiredtiger_dump_error_log([](const char* message) -> int {
         LOGV2_FATAL_CONTINUE(11131000, "WiredTiger dump error log", "message"_attr = message);
         return 0;
