@@ -38,7 +38,8 @@
 
 namespace mongo {
 
-class ClusterNetworkRestrictionManager {
+// TODO move to access_control module where the only impl is.
+class MONGO_MOD_UNFORTUNATELY_OPEN ClusterNetworkRestrictionManager {
 public:
     virtual ~ClusterNetworkRestrictionManager() = default;
     virtual void updateClusterNetworkRestrictions() = 0;
@@ -46,16 +47,17 @@ public:
                     std::unique_ptr<ClusterNetworkRestrictionManager> manager);
 };
 
-struct MongodGlobalParams {
+struct MONGO_MOD_NEEDS_REPLACEMENT MongodGlobalParams {
     bool scriptingEnabled = true;  // Use "security.javascriptEnabled" to set this variable. Or use
                                    // --noscripting which will set it to false.
 
     std::shared_ptr<std::vector<std::string>> allowlistedClusterNetwork;
 };
 
-extern MongodGlobalParams mongodGlobalParams;
+MONGO_MOD_NEEDS_REPLACEMENT extern MongodGlobalParams mongodGlobalParams;
 
+// TODO: move these to a replication module.
 void setGlobalReplSettings(const repl::ReplSettings& settings);
-const repl::ReplSettings& getGlobalReplSettings();
+MONGO_MOD_NEEDS_REPLACEMENT const repl::ReplSettings& getGlobalReplSettings();
 
 }  // namespace mongo

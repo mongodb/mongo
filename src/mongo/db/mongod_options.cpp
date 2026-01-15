@@ -95,21 +95,6 @@
 namespace mongo {
 
 
-std::string storageDBPathDescription() {
-    StringBuilder sb;
-
-    sb << "Directory for datafiles - defaults to " << storageGlobalParams.kDefaultDbPath;
-
-#ifdef _WIN32
-    boost::filesystem::path currentPath = boost::filesystem::current_path();
-
-    sb << " which is " << currentPath.root_name().string() << storageGlobalParams.kDefaultDbPath
-       << " based on the current working drive";
-#endif
-
-    return sb.str();
-}
-
 Status addMongodOptions(moe::OptionSection* options) try {
     uassertStatusOK(addGeneralServerOptions(options));
     uassertStatusOK(addNonGeneralServerOptions(options));

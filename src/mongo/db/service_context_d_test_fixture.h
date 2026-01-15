@@ -38,6 +38,7 @@
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -47,7 +48,8 @@
 
 namespace mongo {
 
-class MongoDScopedGlobalServiceContextForTest : public ScopedGlobalServiceContextForTest {
+class MONGO_MOD_OPEN MongoDScopedGlobalServiceContextForTest
+    : public ScopedGlobalServiceContextForTest {
 public:
     constexpr static StorageEngineInitFlags kDefaultStorageEngineInitFlags =
         StorageEngineInitFlags::kSkipMetadataFile;
@@ -195,7 +197,7 @@ private:
     unittest::TempDir _tempDir{"service_context_d_test_fixture"};
 };
 
-class ServiceContextMongoDTest : public ServiceContextTest {
+class MONGO_MOD_OPEN ServiceContextMongoDTest : public ServiceContextTest {
 public:
     using Options = MongoDScopedGlobalServiceContextForTest::Options;
 

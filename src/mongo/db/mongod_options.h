@@ -30,15 +30,10 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/db/auth/cluster_auth_mode.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/util/exit_code.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/value.h"
 
-#include <functional>
 #include <string>
 #include <vector>
 
@@ -81,10 +76,5 @@ Status validateMongodOptions(const moe::Environment& params);
 Status canonicalizeMongodOptions(moe::Environment* params);
 
 Status storeMongodOptions(const moe::Environment& params);
-
-/**
- * Help test user for storage.dbPath config option.
- */
-std::string storageDBPathDescription();
 
 }  // namespace mongo

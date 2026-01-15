@@ -40,6 +40,10 @@
 
 #include <boost/optional/optional.hpp>
 
+#ifdef _WIN32
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#endif
 namespace mongo {
 
 StorageGlobalParams::StorageGlobalParams() {
@@ -100,5 +104,20 @@ const char* StorageGlobalParams::kDefaultConfigDbPath = "\\data\\configdb\\";
 const char* StorageGlobalParams::kDefaultDbPath = "/data/db";
 const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
 #endif
+
+std::string storageDBPathDescription() {
+    StringBuilder sb;
+
+    sb << "Directory for datafiles - defaults to " << storageGlobalParams.kDefaultDbPath;
+
+#ifdef _WIN32
+    boost::filesystem::path currentPath = boost::filesystem::current_path();
+
+    sb << " which is " << currentPath.root_name().string() << storageGlobalParams.kDefaultDbPath
+       << " based on the current working drive";
+#endif
+
+    return sb.str();
+}
 
 }  // namespace mongo

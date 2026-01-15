@@ -148,6 +148,11 @@ private:
     void _reset();
 };
 
+/**
+ * Help test user for storage.dbPath config option.
+ */
+std::string storageDBPathDescription();
+
 extern StorageGlobalParams storageGlobalParams;
 
 }  // namespace MONGO_MOD_PUBLIC mongo

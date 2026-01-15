@@ -29,7 +29,6 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/mongod_options.h"
         - "mongo/db/storage/storage_options.h"
     configs:
         section: "Storage options"

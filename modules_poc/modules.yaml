@@ -100,6 +100,8 @@ core.service:
 
 # stuff that is part of a *specific* mongo server (eg mongos, mongod)
 core.servers:
+  meta:
+    fully_marked: true
   files:
     - src/mongo/db/mongod.cpp
     - src/mongo/db/mongod_main.*
