@@ -382,6 +382,25 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
             } else {
                 prefix->pushBack(std::move(next));
             }
+        } else if (auto* match = dynamic_cast<DocumentSourceMatch*>(stage); match) {
+            tassert(11116400, "unexpected $match", !prefix->getSources().empty());
+
+            auto result = extractExprPredicates(pathResolver, match->getMatchExpression());
+            for (const auto& predicate : result.predicates) {
+                auto leftNodeId = pathResolver[predicate.left].nodeId;
+                auto rightNodeId = pathResolver[predicate.right].nodeId;
+                tassert(11116401,
+                        "Join predicate fields must be from different nodes",
+                        leftNodeId != rightNodeId);
+                graph.addEdge(leftNodeId, rightNodeId, {predicate});
+            }
+
+            if (result.expressionIsFullyAbsorbed) {
+                auto next = suffix->popFront();
+                prefix->pushBack(std::move(next));
+            } else {
+                break;
+            }
         } else {
             // Unrecognized stage, give up on building a prefix.
             break;
