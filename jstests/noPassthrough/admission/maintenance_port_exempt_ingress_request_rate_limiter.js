@@ -205,9 +205,7 @@ describe("Tests for maintenance port exemption from ingress request rate limiter
             shards: 1,
             mongos: 2,
             useMaintenancePorts: true,
-            // TODO(SERVER-114947): Add configOptions once config server nodes testing is
-            // enabled
-            other: {keyFile: this.keyFile, auth: "", mongosOptions: opts, rsOptions: opts},
+            other: {keyFile: this.keyFile, auth: "", mongosOptions: opts, rsOptions: opts, configOptions: opts},
         });
 
         jsTest.log.info("Creating users for config server");
@@ -222,14 +220,10 @@ describe("Tests for maintenance port exemption from ingress request rate limiter
         st.configRS.awaitSecondaryNodes();
         st.rs0.awaitSecondaryNodes();
 
-        // TODO(SERVER-114947): Enable once we have understood why during the testing
-        // environment startup the ingressRequestRateLimiterEnabled server parameter is set to
-        // true, allowing authenticated connections to use tokens from the config server bucket
-        // (making the following test starting with a non full bucket).
-        // jsTest.log.info("Testing config server nodes");
-        // st.configRS.nodes.forEach((conn) => {
-        //     this.testIngressRequestRateLimiter(conn, st.configRS);
-        // });
+        jsTest.log.info("Testing config server nodes");
+        st.configRS.nodes.forEach((conn) => {
+            this.testIngressRequestRateLimiter(conn, st.configRS);
+        });
 
         jsTest.log.info("Testing shard server nodes");
         st.rs0.nodes.forEach((conn) => {
