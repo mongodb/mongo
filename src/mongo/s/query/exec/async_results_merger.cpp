@@ -269,17 +269,19 @@ Status AsyncResultsMerger::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     }
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    // For sorted tailable awaitData cursors on multiple shards, cap the getMore timeout at 1000ms.
-    // This is to ensure that we get a continuous stream of updates from each shard with their most
-    // recent optimes, which allows us to return sorted $changeStream results even if some shards
-    // are yet to provide a batch of data. If the timeout specified by the client is greater than
-    // 1000ms, then it will be enforced elsewhere.
-    _awaitDataTimeout =
-        (_params.getSort() && _remotes.size() > 1u ? std::min(awaitDataTimeout, Milliseconds{1000})
-                                                   : awaitDataTimeout);
+    _awaitDataTimeout = awaitDataTimeout;
 
     return Status::OK();
+}
+
+boost::optional<Milliseconds> AsyncResultsMerger::getAwaitDataTimeout_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _awaitDataTimeout;
+}
+
+boost::optional<Milliseconds> AsyncResultsMerger::getEffectiveAwaitDataTimeout_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _calculateEffectiveAwaitDataTimeout(lk);
 }
 
 bool AsyncResultsMerger::ready() {
@@ -353,7 +355,6 @@ void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCurso
                     "remoteHost"_attr = remote->getTargetHost(),
                     "shardId"_attr = remote->shardId.toString(),
                     "tag"_attr = remote->tag);
-
         _remotes.push_back(std::move(remote));
     }
 }
@@ -911,16 +912,29 @@ void AsyncResultsMerger::_updateHighWaterMark(const BSONObj& value) {
     _highWaterMark = std::move(nextHighWaterMark);
 }
 
-BSONObj AsyncResultsMerger::_makeRequest(WithLock,
+boost::optional<Milliseconds> AsyncResultsMerger::_calculateEffectiveAwaitDataTimeout(
+    WithLock lk) const {
+    // For sorted tailable awaitData cursors on multiple shards, cap the getMore timeout at
+    // 1000ms. This is to ensure that we get a continuous stream of updates from each shard
+    // with their most recent optimes, which allows us to return sorted $changeStream
+    // results even if some shards are yet to provide a batch of data. If the timeout
+    // specified by the client is greater than 1000ms, then it will be enforced elsewhere.
+    return (_awaitDataTimeout && _params.getSort() && _remotes.size() > 1u
+                ? std::min(*_awaitDataTimeout, Milliseconds{1000})
+                : _awaitDataTimeout);
+}
+
+BSONObj AsyncResultsMerger::_makeRequest(WithLock lk,
                                          const RemoteCursorData& remote,
                                          const ServerGlobalParams::FCVSnapshot& fcvSnapshot) const {
     tassert(11052306, "Expected to not have outstanding requests", !remote.outstandingRequest);
 
     GetMoreCommandRequest getMoreRequest(remote.cursorId, std::string{remote.cursorNss.coll()});
     getMoreRequest.setBatchSize(_params.getBatchSize());
-    if (_awaitDataTimeout) {
+
+    if (auto effectiveAwaitDataTimeout = _calculateEffectiveAwaitDataTimeout(lk)) {
         getMoreRequest.setMaxTimeMS(
-            static_cast<std::int64_t>(durationCount<Milliseconds>(*_awaitDataTimeout)));
+            static_cast<std::int64_t>(durationCount<Milliseconds>(*effectiveAwaitDataTimeout)));
     }
 
     if (_params.getRequestQueryStatsFromRemotes()) {

@@ -165,11 +165,26 @@ public:
     /**
      * Sets the maxTimeMS value that the ARM should forward with any internally issued getMore
      * requests.
+     * The effectively used value of maxTimeMS is capped to 1000ms for tailable, awaitData queries
+     * in case there is more than one remote cursor.
      *
      * Returns a non-OK status if this cursor type does not support maxTimeMS on getMore (i.e. if
      * the cursor is not tailable + awaitData).
      */
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
+
+    /**
+     * Returns the user-specified maxTimeMS value that is sent along with requests to remote shards,
+     * if set.
+     */
+    boost::optional<Milliseconds> getAwaitDataTimeout_forTest() const;
+
+    /**
+     * Returns the effective maxTimeMS value that is sent along with requests to remote shards, if
+     * set. This value can differ from the value the user specified, based on the number of remotes
+     * that are managed by the ARM.
+     */
+    boost::optional<Milliseconds> getEffectiveAwaitDataTimeout_forTest() const;
 
     /**
      * Signals to the AsyncResultsMerger that the caller is finished using it in the current
@@ -652,10 +667,20 @@ private:
     static StatusWith<CursorResponse> _parseCursorResponse(const BSONObj& responseObj,
                                                            CursorId expectedCursorId);
 
+
+    /**
+     * Calculates the effective value for maxTimeMS to be used for getMore requests to the shards,
+     * without clobbering the value set in '_awaitDataTimeout'.
+     * The effective value is based on the value of '_awaitDataTimeout' and the number of shards.
+     *
+     * This method must only be called in tailable, awaitData mode.
+     */
+    boost::optional<Milliseconds> _calculateEffectiveAwaitDataTimeout(WithLock lk) const;
+
     /**
      * Helper to create the getMore command asking the remote node for another batch of results.
      */
-    BSONObj _makeRequest(WithLock,
+    BSONObj _makeRequest(WithLock lk,
                          const RemoteCursorData& remote,
                          const ServerGlobalParams::FCVSnapshot& fcvSnapshot) const;
 

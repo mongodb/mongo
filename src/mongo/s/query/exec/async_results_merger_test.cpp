@@ -2618,6 +2618,8 @@ TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestIncludesMaxTimeMS) {
     readyEvent = unittest::assertGet(arm->nextEvent());
 
     ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
+    ASSERT_EQ(Milliseconds(789), arm->getAwaitDataTimeout_forTest());
+    ASSERT_EQ(Milliseconds(789), arm->getEffectiveAwaitDataTimeout_forTest());
 
     // Pending getMore request should already have been scheduled without the maxTimeMS.
     BSONObj expectedCmdObj = BSON("getMore" << CursorId(123) << "collection"
@@ -2650,6 +2652,117 @@ TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestIncludesMaxTimeMS) {
     std::vector<BSONObj> batch3 = {fromjson("{_id: 3}")};
     responses.emplace_back(kTestNss, CursorId(0), batch3);
     scheduleNetworkResponses(std::move(responses));
+}
+
+TEST_F(AsyncResultsMergerTest, NoMaxTimeMSSetByDefault) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 123, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 456, {})));
+
+    AsyncResultsMergerParams params;
+    params.setNss(kTestNss);
+    params.setRemotes(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    params.setSort(change_stream_constants::kSortSpec);
+    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+
+    ASSERT_EQ(boost::none, arm->getAwaitDataTimeout_forTest());
+    ASSERT_EQ(boost::none, arm->getEffectiveAwaitDataTimeout_forTest());
+}
+
+TEST_F(AsyncResultsMergerTest, MaxTimeMSIsNotCappedAt1000ForSingleRemote) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 123, {})));
+
+    AsyncResultsMergerParams params;
+    params.setNss(kTestNss);
+    params.setRemotes(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    params.setSort(change_stream_constants::kSortSpec);
+
+    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+
+    ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(5000)));
+    ASSERT_EQ(Milliseconds(5000), arm->getAwaitDataTimeout_forTest());
+    ASSERT_EQ(Milliseconds(5000), arm->getEffectiveAwaitDataTimeout_forTest());
+}
+
+TEST_F(AsyncResultsMergerTest, MaxTimeMSIsCappedAt1000ForMultipleRemotes) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 123, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 456, {})));
+
+    AsyncResultsMergerParams params;
+    params.setNss(kTestNss);
+    params.setRemotes(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    params.setSort(change_stream_constants::kSortSpec);
+
+    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+
+    ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(5000)));
+    ASSERT_EQ(Milliseconds(5000), arm->getAwaitDataTimeout_forTest());
+    ASSERT_EQ(Milliseconds(1000), arm->getEffectiveAwaitDataTimeout_forTest());
+}
+
+TEST_F(AsyncResultsMergerTest, MaxTimeMSGetsCappedIfRemoteGetsAdded) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 123, {})));
+
+    AsyncResultsMergerParams params;
+    params.setNss(kTestNss);
+    params.setRemotes(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    params.setSort(change_stream_constants::kSortSpec);
+
+    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+
+    ASSERT_EQ(boost::none, arm->getAwaitDataTimeout_forTest());
+
+    ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(5000)));
+    ASSERT_EQ(Milliseconds(5000), arm->getAwaitDataTimeout_forTest());
+    ASSERT_EQ(Milliseconds(5000), arm->getEffectiveAwaitDataTimeout_forTest());
+
+    std::vector<RemoteCursor> newCursors;
+    newCursors.push_back(
+        makeRemoteCursor(kTestShardIds[1], kTestShardHosts[1], CursorResponse(kTestNss, 456, {})));
+    arm->addNewShardCursors(std::move(newCursors), ShardTag::kDefault);
+
+    ASSERT_EQ(Milliseconds(5000), arm->getAwaitDataTimeout_forTest());
+    ASSERT_EQ(Milliseconds(1000), arm->getEffectiveAwaitDataTimeout_forTest());
+}
+
+TEST_F(AsyncResultsMergerTest, MaxTimeMSGetsUncappedIfRemoteGetsClosed) {
+    std::vector<RemoteCursor> cursors;
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 123, {})));
+    cursors.push_back(
+        makeRemoteCursor(kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 456, {})));
+
+    AsyncResultsMergerParams params;
+    params.setNss(kTestNss);
+    params.setRemotes(std::move(cursors));
+    params.setTailableMode(TailableModeEnum::kTailableAndAwaitData);
+    params.setSort(change_stream_constants::kSortSpec);
+
+    auto arm = buildARM(std::move(params), false /* recognizeControlEvents */);
+
+    ASSERT_EQ(boost::none, arm->getAwaitDataTimeout_forTest());
+
+    ASSERT_OK(arm->setAwaitDataTimeout(Milliseconds(5000)));
+    ASSERT_EQ(Milliseconds(5000), arm->getAwaitDataTimeout_forTest());
+    ASSERT_EQ(Milliseconds(1000), arm->getEffectiveAwaitDataTimeout_forTest());
+
+    arm->closeShardCursors({kTestShardIds[0]}, ShardTag::kDefault);
+
+    ASSERT_EQ(Milliseconds(5000), arm->getAwaitDataTimeout_forTest());
+    ASSERT_EQ(Milliseconds(5000), arm->getEffectiveAwaitDataTimeout_forTest());
 }
 
 DEATH_TEST_REGEX_F(AsyncResultsMergerTestDeathTest,
@@ -3130,6 +3243,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestWithoutTailableCantHaveMaxTi
     auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_NOT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
+    ASSERT_EQ(boost::none, arm->getAwaitDataTimeout_forTest());
     arm->kill(operationContext()).wait();
 }
 
@@ -3141,6 +3255,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreCommandRequestWithoutAwaitDataCantHaveMaxT
     auto arm = makeARMFromExistingCursors(std::move(cursors), findCmd);
 
     ASSERT_NOT_OK(arm->setAwaitDataTimeout(Milliseconds(789)));
+    ASSERT_EQ(boost::none, arm->getAwaitDataTimeout_forTest());
     arm->kill(operationContext()).wait();
 }
 
