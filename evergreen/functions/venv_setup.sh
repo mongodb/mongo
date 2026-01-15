@@ -95,13 +95,13 @@ export VIRTUAL_ENV_DISABLE_PROMPT=yes
 . "$evergreen_dir/prelude_venv.sh"
 
 activate_venv
-echo "Upgrading pip to 21.0.1"
+echo "Upgrading pip to 25.3 and wheel to 0.45.1"
 
 # Loop 5 times to retry the pip install
 # We have seen weird network errors that can sometimes mess up the pip install
 # By retrying we would like to only see errors that happen consistently
 for i in {1..5}; do
-    python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" && RET=0 && break || RET=$? && sleep 1
+    python -m pip --disable-pip-version-check install "pip==25.3" "wheel==0.45.1" && RET=0 && break || RET=$? && sleep 1
     echo "Python failed to install pip and wheel, retrying..."
 done
 
