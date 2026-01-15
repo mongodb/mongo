@@ -12,7 +12,13 @@ import {
 
 import {checkSbeFullFeatureFlagEnabled, checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
-const isSbePlanCacheEnabled = checkSbeFullFeatureFlagEnabled(db);
+if (checkSbeFullFeatureFlagEnabled(db)) {
+    jsTest.log.info("Skipping test because the SBE plan cache is enabled");
+    quit();
+}
+
+// SBE plans can get cached in the classic plan cache, and some metrics are different for SBE plans
+// in the classic cache vs classic plans in the classic cache.
 const isSbeEnabled = checkSbeFullyEnabled(db);
 
 const collName = jsTestName();
@@ -49,7 +55,7 @@ function runInitialCacheTest() {
     let entry = getCachedPlanForQuery(db, coll, aIndexQuery);
     let planCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
     assert.eq(entry.isActive, false);
-    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
     assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
     assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
 
@@ -61,7 +67,7 @@ function runInitialCacheTest() {
     _ = coll.find(aIndexQuery).toArray();
     entry = getCachedPlanForQuery(db, coll, aIndexQuery);
     assert.eq(entry.isActive, true);
-    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
     assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
     assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
 
@@ -82,14 +88,14 @@ function runReplanningTest() {
     let entryWorks = entry.works;
     assert.eq(entry.isActive, false);
     assert.eq(entryWorks, currWorks);
-    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "b_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "b_1", planCacheShapeHash);
 
     // Running the query again activates the cache entry.
     _ = coll.find(bIndexQuery).toArray();
     entry = getCachedPlanForQuery(db, coll, bIndexQuery);
     assert.eq(entry.isActive, true);
     assert.eq(entry.works, entryWorks);
-    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "b_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "b_1", planCacheShapeHash);
     assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
     assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
 
@@ -98,7 +104,7 @@ function runReplanningTest() {
     _ = coll.find(aIndexQuery).toArray();
     entry = getCachedPlanForQuery(db, coll, aIndexQuery);
     assert.eq(entry.isActive, false);
-    assertPlanHasIxScanStage(isSbePlanCacheEnabled, entry, "a_1", planCacheShapeHash);
+    assertPlanHasIxScanStage(false /* isSbePlanCacheEnabled */, entry, "a_1", planCacheShapeHash);
     assert.eq(entry.creationExecStats.length, 2); // One for each candidate plan.
     assert.eq(entry.candidatePlanScores.length, 2); // One for each candidate plan.
 
