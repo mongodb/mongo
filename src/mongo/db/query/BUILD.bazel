@@ -739,7 +739,6 @@ mongo_cc_unit_test(
     deps = [
         "collection_query_info",
         "//src/mongo/db/index_builds:index_build_test_helpers",
-        "//src/mongo/db/query:query_test_service_context",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",
     ],

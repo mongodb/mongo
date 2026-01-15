@@ -271,7 +271,7 @@ bool introduceArrayTypeFilteringToMatch(PipelineRewriteContext& ctx) {
         for (const auto& elem : query) {
             auto typeExpr = std::make_unique<TypeMatchExpression>(
                 StringData(elem.fieldNameStringData()), MatcherTypeSet(BSONType::array));
-            if (pathArrayness.isPathArray(elem.fieldNameStringData(), &ctx.getExpCtx())) {
+            if (pathArrayness.isPathArray(elem.fieldNameStringData())) {
                 additionalFilter->add(std::move(typeExpr));
             } else {
                 additionalFilter->add(std::make_unique<NotMatchExpression>(std::move(typeExpr)));

@@ -657,14 +657,6 @@ server_parameters:
         default: true
         redact: false
 
-    internalEnablePathArrayness:
-        description: "Whether or not to use PathArrayness when applying optimizations"
-        set_at: [startup, runtime]
-        cpp_varname: "internalEnablePathArrayness"
-        cpp_vartype: AtomicWord<bool>
-        default: true
-        redact: false
-
     internalEnablePipelineOptimizationAdditionalTestingRules:
         description: "Whether or not to enable pipeline optimization rules with Testing tag."
         set_at: [startup, runtime]

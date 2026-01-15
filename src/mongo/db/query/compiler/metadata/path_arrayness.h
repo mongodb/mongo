@@ -36,9 +36,6 @@
 #include "mongo/util/modules.h"
 
 namespace mongo {
-
-class ExpressionContext;
-
 /**
  * Data structure representing arrayness of field paths.
  */
@@ -76,8 +73,8 @@ public:
      * Given a path return whether any component of it is an array.
      * For field paths that are not included in any index, assumes that the path has an array.
      */
-    bool isPathArray(const FieldPath& path, const ExpressionContext* expCtx) const;
-    bool isPathArray(const FieldRef& path, const ExpressionContext* expCtx) const;
+    bool isPathArray(const FieldPath& path) const;
+    bool isPathArray(const FieldRef& path) const;
 
     /**
      * Debugging helper to visualize trie.
