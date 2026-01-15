@@ -89,19 +89,26 @@ struct JoinNode {
 };
 
 /** A join predicate is a condition that specifies how two collections should be joined. It has two
- * fields, one from each of the joining collections. At the momemnt the only operator used is
+ * fields, one from each of the joining collections. At the moment the only operator used is
  * equality, which creates an equi-join. This predicate links documents from the two collections
  * where the values of the specified fields are equal. For example, joining a customers collection
  * and an orders collection might use the predicate customers.id = orders.customer_id.
  */
 struct JoinPredicate {
     enum Operator {
+        // Regular equality (like we see in find). null == missing
         Eq,
+        // $expr equality, e.g. an expression like {$expr: {$eq: ["$a", "$b"]}}. null != missing.
+        ExprEq,
     };
 
     Operator op;
     PathId left;
     PathId right;
+
+    bool isEquality() const {
+        return op == Operator::Eq || op == Operator::ExprEq;
+    }
 
     /** Serializes the Join Predicate to BSON.
      */
@@ -223,6 +230,12 @@ public:
                                                   PathId leftPathId,
                                                   PathId rightPathId) {
         return addEdge(leftNode, rightNode, {{JoinPredicate::Eq, leftPathId, rightPathId}});
+    }
+    boost::optional<EdgeId> addExprEqualityEdge(NodeId leftNode,
+                                                NodeId rightNode,
+                                                PathId leftPathId,
+                                                PathId rightPathId) {
+        return addEdge(leftNode, rightNode, {{JoinPredicate::ExprEq, leftPathId, rightPathId}});
     }
 
     const JoinNode& getNode(NodeId nodeId) const {

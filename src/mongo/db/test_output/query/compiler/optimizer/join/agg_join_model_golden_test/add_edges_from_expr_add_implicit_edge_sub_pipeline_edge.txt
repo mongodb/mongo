@@ -145,7 +145,7 @@ output: {
                         "right": {"$numberInt":"5"}
                     },
                     {
-                        "op": "eq",
+                        "op": "exprEq",
                         "left": {"$numberInt":"3"},
                         "right": {"$numberInt":"6"}
                     }
@@ -167,7 +167,7 @@ output: {
             {
                 "predicates": [
                     {
-                        "op": "eq",
+                        "op": "exprEq",
                         "left": {"$numberInt":"1"},
                         "right": {"$numberInt":"8"}
                     },

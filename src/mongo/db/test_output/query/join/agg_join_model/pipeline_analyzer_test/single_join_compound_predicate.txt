@@ -20,12 +20,12 @@
             {
                 "predicates": [
                     {
-                        "op": "eq",
+                        "op": "exprEq",
                         "left": {"$numberInt":"0"},
                         "right": {"$numberInt":"1"}
                     },
                     {
-                        "op": "eq",
+                        "op": "exprEq",
                         "left": {"$numberInt":"2"},
                         "right": {"$numberInt":"3"}
                     }

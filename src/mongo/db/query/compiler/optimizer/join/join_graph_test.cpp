@@ -79,6 +79,69 @@ TEST(JoinGraphTests, AddEdge) {
     ASSERT_EQ(graph.findEdge(third, first), boost::none);
 }
 
+TEST(JoinGraphTests, DedupEqualityPredicates) {
+    MutableJoinGraph mgraph{};
+
+    auto first = *mgraph.addNode(makeNSS("first"), nullptr, boost::none);
+    auto second = *mgraph.addNode(makeNSS("second"), nullptr, FieldPath("snd"));
+    auto third = *mgraph.addNode(makeNSS("third"), nullptr, FieldPath("tree"));
+    auto fourth = *mgraph.addNode(makeNSS("fourth"), nullptr, FieldPath("for"));
+
+    auto e1 = mgraph.addSimpleEqualityEdge(first, second, 0, 1);
+    auto e2 = mgraph.addExprEqualityEdge(second, first, 1, 0);
+    ASSERT(e1.has_value());
+    ASSERT(e2.has_value());
+    ASSERT(e1 == e2);
+
+    auto e3 = mgraph.addExprEqualityEdge(third, first, 2, 0);
+    auto e4 = mgraph.addSimpleEqualityEdge(first, third, 0, 2);
+    ASSERT(e3.has_value());
+    ASSERT(e4.has_value());
+    ASSERT(e3 == e4);
+
+    auto e5 = mgraph.addExprEqualityEdge(third, second, 2, 1);
+    auto e6 = mgraph.addExprEqualityEdge(second, third, 1, 2);
+    ASSERT(e5.has_value());
+    ASSERT(e6.has_value());
+    ASSERT(e5 == e6);
+
+    auto e7 = mgraph.addSimpleEqualityEdge(third, fourth, 2, 3);
+    auto e8 = mgraph.addSimpleEqualityEdge(fourth, third, 3, 2);
+    ASSERT(e7.has_value());
+    ASSERT(e8.has_value());
+    ASSERT(e7 == e8);
+
+    JoinGraph graph(std::move(mgraph));
+
+    ASSERT_EQ(graph.numNodes(), 4);
+    ASSERT_EQ(graph.numEdges(), 4);
+
+    ASSERT_EQ(graph.findEdge(first, second), e1);
+    ASSERT_EQ(graph.findEdge(second, first), e1);
+    ASSERT_EQ(graph.findEdge(second, third), e5);
+    ASSERT_EQ(graph.findEdge(third, second), e5);
+    ASSERT_EQ(graph.findEdge(first, third), e3);
+    ASSERT_EQ(graph.findEdge(third, first), e3);
+    ASSERT_EQ(graph.findEdge(fourth, third), e7);
+    ASSERT_EQ(graph.findEdge(third, fourth), e7);
+
+    auto edge1 = graph.getEdge(*e1);
+    ASSERT_EQ(edge1.predicates.size(), 1);
+    ASSERT_EQ(edge1.predicates[0].op, JoinPredicate::ExprEq);
+
+    auto edge2 = graph.getEdge(*e3);
+    ASSERT_EQ(edge2.predicates.size(), 1);
+    ASSERT_EQ(edge2.predicates[0].op, JoinPredicate::ExprEq);
+
+    auto edge3 = graph.getEdge(*e5);
+    ASSERT_EQ(edge3.predicates.size(), 1);
+    ASSERT_EQ(edge3.predicates[0].op, JoinPredicate::ExprEq);
+
+    auto edge4 = graph.getEdge(*e7);
+    ASSERT_EQ(edge4.predicates.size(), 1);
+    ASSERT_EQ(edge4.predicates[0].op, JoinPredicate::Eq);
+}
+
 DEATH_TEST(JoinGraphTestsDeathTest,
            AddEdgeSimpleSelfEdgeForbidden,
            "Self edges are not permitted") {

@@ -154,8 +154,8 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
     std::vector<FieldPath> fields;
     for (auto&& joinPred : edge.predicates) {
         tassert(11352502,
-                "join predicate selectivity estimatation only supported for equality",
-                joinPred.op == JoinPredicate::Eq);
+                "join predicate selectivity estimation only supported for equality",
+                joinPred.isEquality());
         auto pathId = smallerCardIsLeft ? joinPred.left : joinPred.right;
         fields.push_back(ctx.resolvedPaths[pathId].fieldName);
     }

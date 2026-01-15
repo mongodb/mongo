@@ -162,7 +162,7 @@ output: {
             {
                 "predicates": [
                     {
-                        "op": "eq",
+                        "op": "exprEq",
                         "left": {"$numberInt":"4"},
                         "right": {"$numberInt":"5"}
                     }
@@ -184,7 +184,7 @@ output: {
             {
                 "predicates": [
                     {
-                        "op": "eq",
+                        "op": "exprEq",
                         "left": {"$numberInt":"8"},
                         "right": {"$numberInt":"9"}
                     }
@@ -206,7 +206,7 @@ output: {
             {
                 "predicates": [
                     {
-                        "op": "eq",
+                        "op": "exprEq",
                         "left": {"$numberInt":"12"},
                         "right": {"$numberInt":"13"}
                     }
@@ -217,7 +217,7 @@ output: {
             {
                 "predicates": [
                     {
-                        "op": "eq",
+                        "op": "exprEq",
                         "left": {"$numberInt":"15"},
                         "right": {"$numberInt":"14"}
                     }

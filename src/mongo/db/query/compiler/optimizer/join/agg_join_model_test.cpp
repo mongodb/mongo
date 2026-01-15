@@ -531,6 +531,110 @@ TEST_F(PipelineAnalyzerTest, CompoundJoinKeyWithLocalForeignSyntax) {
     goldenCtx.outStream() << joinModel.toString(true) << std::endl;
 }
 
+TEST_F(PipelineAnalyzerTest, DuplicateExprEqAndEqEdges) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    // This test joins on the "bar" field in several different ways, ensuring that we don't keep
+    // both an expr and a regular eq predicate on the same edge, while at the same time adding
+    // implicit edges as eqs in all cases where we can.
+    const auto query = R"([
+    {
+        $lookup: {
+            from: "A",
+            localField: "bar",
+            foreignField: "bar",
+            as: "localForeign"
+        }
+    },
+    {$unwind: "$localForeign"},
+    {
+        $lookup: {
+            from: "B",
+            let: {bar: "$bar"},
+            pipeline: [
+                {
+                    $match: {
+                        $expr: {$eq: ["$bar", "$$bar"]}
+                    }
+                }
+            ],
+            as: "correlatedSubpipeline"
+        }
+    },
+    {$unwind: "$correlatedSubpipeline"},
+    {
+        $lookup: {
+            from: "C",
+            localField: "bar",
+            foreignField: "bar",
+            let: {bar: "$bar"},
+            pipeline: [
+                {
+                    $match: {
+                        $expr: {$eq: ["$bar", "$$bar"]}
+                    }
+                }
+            ],
+            as: "both"
+        }
+    },
+    {$unwind: "$both"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A", "B", "C"});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
+TEST_F(PipelineAnalyzerTest, ExprOnlyImplicitEdges) {
+    unittest::GoldenTestContext goldenCtx(&goldenTestConfig);
+    const auto query = R"([
+    {
+        $lookup: {
+            from: "A",
+            let: {bar: "$bar"},
+            pipeline: [
+                {
+                    $match: {
+                        $expr: {$eq: ["$bar", "$$bar"]}
+                    }
+                }
+            ],
+            as: "a"
+        }
+    },
+    {$unwind: "$a"},
+    {
+        $lookup: {
+            from: "B",
+            let: {bar: "$bar"},
+            pipeline: [
+                {
+                    $match: {
+                        $expr: {$eq: ["$bar", "$$bar"]}
+                    }
+                }
+            ],
+            as: "b"
+        }
+    },
+    {$unwind: "$b"}
+    ])";
+
+    auto pipeline = makePipeline(query, {"A", "B"});
+
+    ASSERT_TRUE(AggJoinModel::pipelineEligibleForJoinReordering(*pipeline));
+
+    auto swJoinModel = AggJoinModel::constructJoinModel(*pipeline, defaultBuildParams);
+    ASSERT_OK(swJoinModel);
+    auto& joinModel = swJoinModel.getValue();
+    goldenCtx.outStream() << joinModel.toString(true) << std::endl;
+}
+
 TEST_F(PipelineAnalyzerTest, PipelineIneligibleWithCorrelatedNonJoinPredicate) {
     const auto query = R"([
     {

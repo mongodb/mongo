@@ -132,19 +132,11 @@ QSNJoinPredicate makePhysicalPredicate(const JoinReorderingContext& ctx,
                                        JoinPredicate pred,
                                        bool expandLeftPath,
                                        bool expandRightPath) {
-    QSNJoinPredicate::ComparisonOp op = [&pred] {
-        switch (pred.op) {
-            case JoinPredicate::Eq:
-                return QSNJoinPredicate::ComparisonOp::Eq;
-        }
-        MONGO_UNREACHABLE_TASSERT(11075702);
-    }();
-
     // Left field is a local field and potentially could come from already joined foreign
     // collection, so its embedPath is important to handle here. Right field is a foreign field
     // which comes from the current foreign collection, SBE does not expect it to be prefixed
     // with the foreign collection's as field.
-    return {.op = op,
+    return {.op = convertToPhysicalOperator(pred.op),
             .leftField = expandEmbeddedPath(ctx, pred.left, expandLeftPath),
             .rightField = expandEmbeddedPath(ctx, pred.right, expandRightPath)};
 }

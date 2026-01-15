@@ -30,7 +30,6 @@
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/query/util/bitset_util.h"
 
 namespace mongo::join_ordering {
 namespace {
@@ -38,6 +37,8 @@ StringData toStringData(JoinPredicate::Operator op) {
     switch (op) {
         case JoinPredicate::Operator::Eq:
             return "eq";
+        case JoinPredicate::Operator::ExprEq:
+            return "exprEq";
     }
     MONGO_UNREACHABLE_TASSERT(11147100);
 }
@@ -52,9 +53,7 @@ BSONObj canonicalQueryToBSON(const std::unique_ptr<CanonicalQuery>& cq) {
 
 static void swapPredicateSides(JoinEdge::PredicateList& predicates) {
     std::for_each(predicates.begin(), predicates.end(), [](JoinPredicate& pred) {
-        tassert(11233806,
-                "only support swapping equality predicate",
-                pred.op == JoinPredicate::Operator::Eq);
+        tassert(11233806, "only support swapping equality predicate", pred.isEquality());
         std::swap(pred.left, pred.right);
     });
 }
@@ -99,6 +98,23 @@ JoinEdge JoinEdge::reverseEdge() const {
 }
 
 void JoinEdge::insertPredicate(JoinPredicate pred) {
+    if (pred.isEquality()) {
+        // Check to see if we already have an equality predicate of a different type.
+        JoinPredicate preExisting{.op = pred.op == JoinPredicate::Operator::Eq
+                                      ? JoinPredicate::Operator::ExprEq
+                                      : JoinPredicate::Operator::Eq,
+                                  .left = pred.left,
+                                  .right = pred.right};
+        auto pos = std::find(predicates.begin(), predicates.end(), preExisting);
+        if (pos != predicates.end()) {
+            // Keep only the stricter version of equality ($expr).
+            if (pos->op == JoinPredicate::Eq) {
+                pos->op = JoinPredicate::ExprEq;
+            }
+            return;
+        }
+    }
+
     auto pos = std::find(predicates.begin(), predicates.end(), pred);
     if (pos == predicates.end()) {
         predicates.push_back(pred);

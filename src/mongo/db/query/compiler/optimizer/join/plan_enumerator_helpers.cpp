@@ -140,7 +140,7 @@ std::shared_ptr<const IndexCatalogEntry> bestIndexSatisfyingJoinPredicates(
             // We may not have re-oriented the edge if we're calling from bottom-up enumeration.
             const auto pathId = edge.left == nodeId ? pred.left : pred.right;
             indexedJoinPreds.push_back({
-                .op = QSNJoinPredicate::ComparisonOp::Eq,
+                .op = convertToPhysicalOperator(pred.op),
                 .field = ctx.resolvedPaths[pathId].fieldName,
             });
         }
@@ -148,6 +148,16 @@ std::shared_ptr<const IndexCatalogEntry> bestIndexSatisfyingJoinPredicates(
         return bestIndexSatisfyingJoinPredicates(ixes->second, indexedJoinPreds);
     }
     return nullptr;
+}
+
+QSNJoinPredicate::ComparisonOp convertToPhysicalOperator(JoinPredicate::Operator op) {
+    switch (op) {
+        case JoinPredicate::Eq:
+            return QSNJoinPredicate::ComparisonOp::Eq;
+        case JoinPredicate::ExprEq:
+            return QSNJoinPredicate::ComparisonOp::Eq;
+    }
+    MONGO_UNREACHABLE_TASSERT(11075702);
 }
 
 }  // namespace mongo::join_ordering

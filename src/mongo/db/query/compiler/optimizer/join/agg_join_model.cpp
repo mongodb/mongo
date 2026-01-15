@@ -163,7 +163,7 @@ void addImplicitEdges(MutableJoinGraph& graph,
     DisjointSet ds{resolvedPaths.size()};
     for (const auto& edge : graph.edges()) {
         for (const auto& pred : edge.predicates) {
-            if (pred.op == JoinPredicate::Eq) {
+            if (pred.isEquality()) {
                 ds.unite(pred.left, pred.right);
             }
         }
@@ -183,6 +183,8 @@ void addImplicitEdges(MutableJoinGraph& graph,
                 // and the predicate wouldn't be added. This is fine because it doesn't affect the
                 // correctness of the query, only the size of the graph and the number of possible
                 // join plans.
+                // Note: We always add implicit edges as equality edges, then enforce stricter $expr
+                // equality semantics during physical plan generation.
                 graph.addSimpleEqualityEdge(nodeId, currentNodeId, pathId, currentPathId);
             }
             pathSet.push_back(currentPathId);
@@ -252,8 +254,8 @@ void addExprJoinPredicates(MutableJoinGraph& graph,
         tassert(11317204,
                 "expected to resolve both local and foreign paths",
                 localPath.has_value() && foreignPath.has_value());
-        // TODO SERVER-112608: Account for different semantics of $expr equality.
-        graph.addSimpleEqualityEdge(localColl, foreignColl, *localPath, *foreignPath);
+
+        graph.addExprEqualityEdge(localColl, foreignColl, *localPath, *foreignPath);
     }
 }
 

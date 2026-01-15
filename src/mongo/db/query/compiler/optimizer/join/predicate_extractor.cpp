@@ -326,8 +326,8 @@ private:
             return;
         }
 
-        // TODO SERVER-112608: Change the operator to $expr eq.
-        _predicates.push_back({.op = JoinPredicate::Eq, .left = leftPathId, .right = rightPathId});
+        _predicates.push_back(
+            {.op = JoinPredicate::ExprEq, .left = leftPathId, .right = rightPathId});
     }
 
     PathResolver& _pathResolver;

@@ -104,4 +104,10 @@ std::shared_ptr<const IndexCatalogEntry> bestIndexSatisfyingJoinPredicates(
 std::shared_ptr<const IndexCatalogEntry> bestIndexSatisfyingJoinPredicates(
     const JoinReorderingContext& ctx, NodeId nodeId, const JoinEdge& edge);
 
+/**
+ * Helper to convert from a logical JoinPredicate::Operator into a physical one used in constructing
+ * a QSN tree.
+ */
+QSNJoinPredicate::ComparisonOp convertToPhysicalOperator(JoinPredicate::Operator op);
+
 }  // namespace mongo::join_ordering
