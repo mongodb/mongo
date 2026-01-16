@@ -230,7 +230,6 @@
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
-#include "mongo/s/read_write_concern_defaults_cache_lookup_mongos.h"
 #include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
@@ -2062,12 +2061,8 @@ int mongod_main(int argc, char* argv[]) {
 
     startAllocatorThread();
 
-    auto routerService = service->getService(ClusterRole::RouterServer);
-    auto shardService = service->getService(ClusterRole::ShardServer);
-    if (routerService) {
-        ReadWriteConcernDefaults::create(routerService, readWriteConcernDefaultsCacheLookupMongoS);
-    }
-    ReadWriteConcernDefaults::create(shardService, readWriteConcernDefaultsCacheLookupMongoD);
+    ReadWriteConcernDefaults::create(service->getService(),
+                                     readWriteConcernDefaultsCacheLookupMongoD);
 
     ChangeStreamOptionsManager::create(service);
 
