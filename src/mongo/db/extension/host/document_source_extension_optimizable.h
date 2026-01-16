@@ -32,7 +32,7 @@
 #include "mongo/db/extension/host/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/host/aggregation_stage/parse_node.h"
 #include "mongo/db/extension/host/catalog_context.h"
-#include "mongo/db/extension/host/static_properties_util.h"
+#include "mongo/db/extension/host/extension_host_utils.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/ast_node.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/distributed_plan_logic.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/logical.h"
@@ -297,6 +297,8 @@ public:
         }
 
         bool isExtensionVectorSearchStage() const override;
+
+        ViewPolicy getViewPolicy() const override;
 
     private:
         const AggStageAstNodeHandle _astNode;

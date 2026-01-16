@@ -28,7 +28,9 @@
  */
 
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/public/extension_agg_stage_static_properties_gen.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/util/modules.h"
 
@@ -85,6 +87,18 @@ inline boost::optional<StageConstraints::HostTypeRequirement> toHostTypeRequirem
     }
     MONGO_UNREACHABLE_TASSERT(11376901);
 }
-
 }  // namespace static_properties_util
+
+namespace view_util {
+inline ViewPolicy::kFirstStageApplicationPolicy toFirstStageApplicationPolicy(
+    MongoExtensionFirstStageViewApplicationPolicy policy) {
+    switch (policy) {
+        case MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend:
+            return ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend;
+        case MongoExtensionFirstStageViewApplicationPolicy::kDoNothing:
+            return ViewPolicy::kFirstStageApplicationPolicy::kDoNothing;
+    }
+    MONGO_UNREACHABLE_TASSERT(11507600);
+}
+}  // namespace view_util
 }  // namespace mongo::extension::host

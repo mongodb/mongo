@@ -43,10 +43,13 @@
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_documents.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo::extension {
 
@@ -2379,6 +2382,91 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
     ++it;
     ASSERT_NE(*it, nullptr);
     ASSERT_EQ(std::string((*it)->getSourceName()), "$limit");
+}
+
+namespace {
+class ConfigurableViewPolicyTestAstNode : public sdk::AggStageAstNode {
+public:
+    static constexpr std::string kStageName = "$testStage";
+
+    ConfigurableViewPolicyTestAstNode(MongoExtensionFirstStageViewApplicationPolicy viewPolicy)
+        : sdk::AggStageAstNode("$configurableViewPolicyAndBindingTest"), _viewPolicy(viewPolicy) {}
+
+    std::unique_ptr<sdk::LogicalAggStage> bind(
+        const ::MongoExtensionCatalogContext& catalogContext) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    std::unique_ptr<sdk::AggStageAstNode> clone() const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    MongoExtensionFirstStageViewApplicationPolicy getFirstStageViewApplicationPolicy()
+        const override {
+        return _viewPolicy;
+    }
+
+    void bindViewInfo(std::string_view viewName) const override {
+        _boundViewName = std::string(viewName);
+    }
+
+    std::string getBoundViewName() const {
+        return _boundViewName;
+    }
+
+    static inline std::unique_ptr<sdk::AggStageAstNode> make(
+        MongoExtensionFirstStageViewApplicationPolicy viewPolicy) {
+        return std::make_unique<ConfigurableViewPolicyTestAstNode>(viewPolicy);
+    }
+
+private:
+    MongoExtensionFirstStageViewApplicationPolicy _viewPolicy;
+    mutable std::string _boundViewName;
+};
+
+void testViewPolicyHelper(const NamespaceString& nss,
+                          MongoExtensionFirstStageViewApplicationPolicy extensionPolicy,
+                          ViewPolicy::kFirstStageApplicationPolicy expectedPolicy,
+                          const std::string& expectedViewName) {
+    auto astNodeImpl = ConfigurableViewPolicyTestAstNode::make(extensionPolicy);
+    auto* astNodeImplPtr = static_cast<ConfigurableViewPolicyTestAstNode*>(astNodeImpl.get());
+    auto astNode = new sdk::ExtensionAggStageAstNode(std::move(astNodeImpl));
+    auto handle = AggStageAstNodeHandle{astNode};
+
+    host::DocumentSourceExtensionOptimizable::LiteParsedExpanded liteParsed(
+        ConfigurableViewPolicyTestAstNode::kStageName, std::move(handle), nss);
+
+    auto viewPolicy = liteParsed.getViewPolicy();
+    ASSERT_EQ(viewPolicy.policy, expectedPolicy);
+
+    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
+    const auto resolvedNss = NamespaceString::createNamespaceString_forTest("test.collection"_sd);
+    std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("x" << 1))};
+    ViewInfo viewInfo(viewNss, resolvedNss, std::move(viewPipeline));
+
+    viewPolicy.callback(viewInfo, ConfigurableViewPolicyTestAstNode::kStageName);
+    ASSERT_EQ(astNodeImplPtr->getBoundViewName(), expectedViewName);
+}
+}  // namespace
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedGetViewPolicyWithDefaultPrependAndCallback) {
+    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
+    testViewPolicyHelper(
+        _nss,
+        MongoExtensionFirstStageViewApplicationPolicy::kDefaultPrepend,
+        ViewPolicy::kFirstStageApplicationPolicy::kDefaultPrepend,
+        NamespaceStringUtil::serialize(viewNss, SerializationContext::stateDefault()));
+}
+
+TEST_F(DocumentSourceExtensionOptimizableTest,
+       LiteParsedExpandedGetViewPolicyWithDoNothingAndCallback) {
+    const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
+    testViewPolicyHelper(
+        _nss,
+        MongoExtensionFirstStageViewApplicationPolicy::kDoNothing,
+        ViewPolicy::kFirstStageApplicationPolicy::kDoNothing,
+        NamespaceStringUtil::serialize(viewNss, SerializationContext::stateDefault()));
 }
 
 }  // namespace mongo::extension

@@ -32,7 +32,10 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo::extension::host {
 
@@ -204,6 +207,16 @@ bool DocumentSourceExtensionOptimizable::LiteParsedExpandable::isExtensionVector
 // TODO SERVER-116021 Remove this check when the extension can do this through ViewPolicy.
 bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isExtensionVectorSearchStage() const {
     return search_helpers::isExtensionVectorSearchStage(getParseTimeName());
+}
+
+ViewPolicy DocumentSourceExtensionOptimizable::LiteParsedExpanded::getViewPolicy() const {
+    return ViewPolicy{.policy = view_util::toFirstStageApplicationPolicy(
+                          _astNode->getFirstStageViewApplicationPolicy()),
+                      .callback = [this](const ViewInfo& viewInfo, StringData stageName) {
+                          const auto viewNameStr = NamespaceStringUtil::serialize(
+                              viewInfo.viewName, SerializationContext::stateDefault());
+                          _astNode->bindViewInfo(viewNameStr);
+                      }};
 }
 
 // static
