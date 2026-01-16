@@ -32,4 +32,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryFLEAlwaysUseEncryptedCollScanMode: 1
+    num_mongos: 3
     num_rs_nodes_per_shard: 2
