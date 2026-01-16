@@ -33,9 +33,9 @@ assert.commandFailed(db.adminCommand({"setParameter": 1, logLevel: NaN}));
 assert.commandFailed(db.adminCommand({"setParameter": 1, logLevel: Number.MAX_SAFE_INTEGER + 1}));
 assert.commandFailed(db.adminCommand({"setParameter": 1, logLevel: Number.MIN_SAFE_INTEGER - 1}));
 
-assert.eq(old, now, "A");
-assert.eq(old.logLevel, tmp1.was, "B");
-assert.eq(5, tmp2.was, "C");
+assert.eq(old.logLevel, now.logLevel, "logLevel should be restored to original value");
+assert.eq(old.logLevel, tmp1.was, "setParameter should return previous logLevel value");
+assert.eq(5, tmp2.was, "setParameter should return the value that was just set");
 
 //
 // component verbosity
