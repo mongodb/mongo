@@ -51,7 +51,7 @@ These classes handle the following processes internally:
 
 When using `CollectionRouter` or `DBPrimaryRouter`, keep the following in mind:
 
-- The lambda function passed to `CollectionRouter::routeWithRoutingContext()` or `DBPrimaryRouter::route()` must use the provided [RoutingContext](./README_routing_context.md) or `CachedDatabaseInfo` objects to dispatch a shard-versioned command to the shards.
+- The lambda function passed to `CollectionRouter::routeWithRoutingContext()` or `DBPrimaryRouter::route()` must use the provided [RoutingContext](./README_routing_context.md) or `CachedDatabaseInfo` objects to dispatch a shard-versioned command to the shards. The recommended approach is to use the [Scatter-Gather API](#scatter-gather-api).
 - Any stale routing error returned by a shard must be thrown so that it can be properly handled by the router logic.
 - During a single routing operation, it is crucial to consult only one version of the routing table.
 
@@ -83,3 +83,209 @@ multiCollectionrouter.route(
 ```
 
 You can also find a real usage example for the `MultiCollectionRouter` [here](https://github.com/mongodb/mongo/blob/8ceda1cf09d3b04d3010136777576f8ddd405f94/src/mongo/db/pipeline/initialize_auto_get_helper.h#L99-L124).
+
+## Router Command Distribution and Versioning API
+
+This section describes the utility APIs that support router-side operations in MongoDB's sharded cluster architecture. These utilities work in conjunction with the Router Role API to provide standardized methods for shard versioning, command distribution, and query targeting.
+
+While the Router Role API manages the high-level workflow (routing context lifecycle, retry logic, and validation), these utilities handle the implementation details of targeting shards, attaching version metadata, and dispatching commands.
+
+### Scatter-Gather API
+
+The scatter-gather family of functions provides high-level abstractions for dispatching versioned commands to multiple shards and aggregating their responses.
+
+#### scatterGatherVersionedTargetByRoutingTable
+
+Executes versioned commands against shards determined by query targeting logic. If the query is empty, the command runs on all shards that own chunks for the collection.
+
+```cpp
+std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
+    OperationContext* opCtx,
+    RoutingContext& routingCtx,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    const BSONObj& query,
+    const BSONObj& collation
+    // ... additional parameters
+);
+```
+
+**Workflow:**
+
+1. Calls buildVersionedRequestsForTargetedShards() to:
+   - Analyze the query against the routing table
+   - Determine which shards own matching data
+   - Build versioned command objects for each target shard
+2. Dispatches commands via `gatherResponses()`
+3. Returns aggregated responses
+
+Here is an example of how it works together with the Router Role API:
+
+```cpp
+#include "src/mongo/db/router_role/router_role.h"
+#include "src/mongo/db/router_role/cluster_commands_helpers.h"  // Contains utility APIs
+
+// Complete router operation using all API layers
+StatusWith<BSONObj> executeShardedQuery(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& query) {
+
+    // ROUTER ROLE API: Set up routing workflow
+    sharding::router::CollectionRouter router(opCtx, nss);
+
+    return router.routeWithRoutingContext(
+        "Complete sharded query example",
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+
+            // SCATTER-GATHER API: Automated targeting and dispatch
+            auto responses = scatterGatherVersionedTargetByRoutingTable(
+                opCtx,
+                routingCtx,                    // From Router Role API
+                nss,
+                BSON("find" << nss.coll()),
+                ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+                Shard::RetryPolicy::kIdempotent,
+                query,
+                BSONObj()
+            );
+
+            // Internally, scatter-gather uses:
+            // - QUERY TARGETING API to determine shards
+            // - SHARD VERSIONING API to attach versions
+
+            // Process results
+            return mergeShardResponses(responses);
+        }
+    );
+    // Router Role API handles stale routing errors and retries
+}
+```
+
+#### scatterGatherVersionedTargetToShards
+
+Executes versioned commands against an explicitly specified set of shards, bypassing query analysis.
+
+```cpp
+std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetToShards(
+    OperationContext* opCtx,
+    RoutingContext& routingCtx,
+    const DatabaseName& dbName,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    const std::set<ShardId>& targetShards
+);
+```
+
+**When to use:**
+
+- When the caller has already determined the target shards
+- Operations that need fine-grained control over shard targeting
+
+An example of usage:
+
+```cpp
+#include "src/mongo/db/router_role/router_role.h"
+#include "src/mongo/db/router_role/cluster_commands_helpers.h"  // Contains utility APIs
+
+// Complete router operation using all API layers
+StatusWith<BSONObj> executeShardedQuery(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& query) {
+
+    // ROUTER ROLE API: Set up routing workflow
+    sharding::router::CollectionRouter router(opCtx, nss);
+
+    return router.routeWithRoutingContext(
+        "Complete targeted sharded query example",
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+
+            // Custom targeting logic beyond standard chunk-based routing
+            targetedShardsSet = computeShardsToTargetForSpecialCase(routingCtx);
+
+            // SCATTER-GATHER API: Explicitly target computed shard set
+            auto response = scatterGatherVersionedTargetToShards(
+                opCtx,
+                routingCtx,                    // From Router Role API
+                DatabaseName::kAdmin,          // Custom database name
+                targetedShardsSet,
+                BSON("find" << nss.coll()),
+                ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+                Shard::RetryPolicy::kIdempotent,
+                query,
+                BSONObj()
+            ).front();
+
+            return response;
+        }
+    );
+    // Router Role API handles stale routing errors and retries
+}
+```
+
+### When to Use Lower-Level APIs
+
+Most router-side operations should use the high-level scatter-gather functions. Direct use of lower-level APIs like `buildVersionedRequests`/`gatherResponses` is only permitted in exceptional cases:
+
+- Complex aggregation pipelines requiring custom shard targeting logic
+- Operations needing fine-grained control over request building
+- Special cases where standard targeting doesn't apply (e.g., sharded_agg_helpers.cpp using RemoteCursor API)
+
+### Shard Versioning API
+
+#### Attaching ShardVersion to Commands
+
+All router-side operations that target sharded collections must include versioning metadata to ensure routing consistency and detect stale metadata. Use the standardized appendShardVersion functions to attach version information:
+
+```cpp
+// Append shard version to an existing command object
+BSONObj appendShardVersion(BSONObj cmdObj, ShardVersion version);
+
+// Append shard version to a BSONObjBuilder
+void appendShardVersion(BSONObjBuilder& cmd, ShardVersion version);
+```
+
+**Usage example:**
+
+```cpp
+BSONObj cmd = BSON("find" << "myCollection");
+auto versionedCmd = appendShardVersion(std::move(cmd), routingCtx.getShardVersion(shardId));
+```
+
+**Important guidelines:**
+
+- Never manually serialize version information
+- Always use appendShardVersion functions to ensure consistent field naming and proper BSON serialization
+- Ensure version is attached before sending any command to sharded collections
+
+## Architectural Layers
+
+The Router Role is composed of three complementary API layers:
+
+**ROUTER ROLE API**
+
+- Is composed by the following elements: CollectionRouter, DBPrimaryRouter, MultiCollectionRouter
+- Manages routing context lifecycle
+- Handles stale routing error detection and retry logic
+- Validates routing context after operations
+
+provides RoutingContext to
+
+**SCATTER-GATHER API** (Command Distribution)
+
+- Analyzes queries to determine target shards
+- Builds and dispatches versioned commands concurrently
+- Aggregates responses from multiple shards
+
+uses
+
+**SHARD VERSIONING** API
+
+- Ensures consistent ShardVersion attachment
+- Prevents manual version serialization
+- Provides single point of control for versioning
