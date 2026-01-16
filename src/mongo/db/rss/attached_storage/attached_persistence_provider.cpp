@@ -111,6 +111,10 @@ bool AttachedPersistenceProvider::supportsUnstableCheckpoints() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsPreservingPreparedTxnInPreciseCheckpoints() const {
+    return false;
+}
+
 bool AttachedPersistenceProvider::supportsTableLogging() const {
     return true;
 }

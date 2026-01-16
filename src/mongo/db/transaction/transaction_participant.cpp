@@ -659,6 +659,12 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
 
     try {
         auto opCtx = cc().makeOperationContext();
+        // Precise checkpoints include prepared transactions, so we no longer need the prepared
+        // oplog entries to rebuild transactions.
+        bool includePreparedTransactions =
+            !rss::ReplicatedStorageService::get(opCtx->getServiceContext())
+                 .getPersistenceProvider()
+                 .supportsPreservingPreparedTxnInPreciseCheckpoints();
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
         if (!stableTimestamp.isNull()) {
@@ -689,7 +695,8 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
         while (exec->getNext(&doc, nullptr) == PlanExecutor::ADVANCED) {
             auto txnRecord =
                 SessionTxnRecord::parse(doc, IDLParserContext("parse oldest active txn record"));
-            if (txnRecord.getState() != DurableTxnStateEnum::kPrepared &&
+            if (!(txnRecord.getState() == DurableTxnStateEnum::kPrepared &&
+                  includePreparedTransactions) &&
                 txnRecord.getState() != DurableTxnStateEnum::kInProgress) {
                 continue;
             }

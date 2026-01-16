@@ -152,6 +152,12 @@ public:
     virtual bool supportsUnstableCheckpoints() const = 0;
 
     /**
+     * If true, the provider can support preserving prepared transactions in the precise
+     * checkpoints.
+     */
+    virtual bool supportsPreservingPreparedTxnInPreciseCheckpoints() const = 0;
+
+    /**
      * If true, the provider can support logging (i.e. journaling) on individual tables.
      */
     virtual bool supportsTableLogging() const = 0;

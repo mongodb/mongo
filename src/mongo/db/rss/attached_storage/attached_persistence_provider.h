@@ -116,6 +116,11 @@ public:
     bool supportsUnstableCheckpoints() const override;
 
     /**
+     * We do not support preserving prepared transactions in the precise checkpoints.
+     */
+    bool supportsPreservingPreparedTxnInPreciseCheckpoints() const override;
+
+    /**
      * We can support table logging.
      */
     bool supportsTableLogging() const override;

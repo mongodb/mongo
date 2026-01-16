@@ -86,6 +86,8 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -4127,5 +4129,91 @@ TEST_F(MultiDocumentTransactionTest, AbortedPreparedMultiDocumentTransaction) {
         assertOldestActiveTxnTimestampEquals(boost::none, abortEntryTs);
         assertOldestActiveTxnTimestampEquals(boost::none, _nullTs);
     }
+}
+
+namespace {
+// Custom persistence provider that enables supportsPreservingPreparedTxnInPreciseCheckpoints
+class TestPersistenceProviderWithPreservedPreparedTxnInPreciseCheckpoints
+    : public mongo::rss::AttachedPersistenceProvider {
+public:
+    std::string name() const override {
+        return "TestPersistenceProviderWithPreciseCheckpoints";
+    }
+
+    bool supportsPreservingPreparedTxnInPreciseCheckpoints() const override {
+        return true;
+    }
+};
+}  // namespace
+
+class GetOldestActiveTimestampTest : public StorageTimestampTest {
+public:
+    GetOldestActiveTimestampTest()
+        : configTxnsNss(NamespaceString::kSessionTransactionsTableNamespace) {
+        // Create config.transactions collection
+        ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, configTxnsNss));
+        ASSERT_OK(createCollection(
+            _opCtx, configTxnsNss.dbName(), BSON("create" << configTxnsNss.coll())));
+    }
+
+protected:
+    void insertTxnEntry(const LogicalSessionId& sessionId,
+                        TxnNumber txnNum,
+                        DurableTxnStateEnum state,
+                        const Timestamp& startTs) {
+        BSONObjBuilder doc;
+        doc.append("_id", sessionId.toBSON());
+        doc.append("txnNum", txnNum);
+        doc.append("state", DurableTxnState_serializer(state));
+        doc.append("startOpTime", repl::OpTime(startTs, 1).toBSON());
+        doc.append("lastWriteOpTime", repl::OpTime(startTs, 1).toBSON());
+        doc.append("lastWriteDate", Date_t::now());
+
+        auto collAcq =
+            acquireCollection(_opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  _opCtx, configTxnsNss, AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
+
+        WriteUnitOfWork wuow(_opCtx);
+        insertDocument(collAcq.getCollectionPtr(), InsertStatement(doc.obj()));
+        wuow.commit();
+    }
+
+    NamespaceString configTxnsNss;
+};
+
+TEST_F(GetOldestActiveTimestampTest, RespectsPreciseCheckpointsSetting) {
+    auto service = _opCtx->getServiceContext();
+
+    // Use simple timestamps - prepared is earlier, inProgress is later
+    const auto preparedStartTs = Timestamp(20, 1);    // Earlier
+    const auto inProgressStartTs = Timestamp(30, 1);  // Later
+
+    const auto preparedSessionId = makeLogicalSessionIdForTest();
+    const auto inProgressSessionId = makeLogicalSessionIdForTest();
+
+    // Insert inProgress transaction first
+    insertTxnEntry(inProgressSessionId, 101LL, DurableTxnStateEnum::kInProgress, inProgressStartTs);
+
+    // With default provider (supportsPreservingPreparedTxnInPreciseCheckpoints = false), should
+    // return inProgress
+    assertOldestActiveTxnTimestampEquals(inProgressStartTs, _nullTs);
+
+    // Insert prepared transaction with earlier timestamp
+    insertTxnEntry(preparedSessionId, 100LL, DurableTxnStateEnum::kPrepared, preparedStartTs);
+
+    // With default provider (supportsPreservingPreparedTxnInPreciseCheckpoints = false),
+    // should now return prepared (the earlier timestamp)
+    assertOldestActiveTxnTimestampEquals(preparedStartTs, _nullTs);
+
+    // Now switch to provider with supportsPreservingPreparedTxnInPreciseCheckpoints = true
+    auto testProvider =
+        std::make_unique<TestPersistenceProviderWithPreservedPreparedTxnInPreciseCheckpoints>();
+    auto& rss = rss::ReplicatedStorageService::get(service);
+    rss.setPersistenceProvider(std::move(testProvider));
+
+    // Should skip prepared and return inProgress timestamp instead
+    assertOldestActiveTxnTimestampEquals(inProgressStartTs, _nullTs);
 }
 }  // namespace mongo

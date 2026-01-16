@@ -1971,6 +1971,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/op_observer:operation_logger_impl",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/session:session_catalog_mongod",
         "//src/mongo/db/shard_role/shard_catalog:catalog_helpers",
         "//src/mongo/db/transaction",
