@@ -132,17 +132,20 @@ DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Counter, "doesn't hav
 DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingDoubleCounter, "doesn't have otel enabled") {
     OtelMetricsCapturer metricsCapturer(*metricsService);
     Counter<double>& doubleCounter = metricsService->createDoubleCounter(
+        MetricNames::kTest1, "description1", MetricUnit::kSeconds);
+    doubleCounter.add(3);
     metricsCapturer.readInt64Counter(MetricNames::kTest1);
 }
 
 DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingInt64Gauge, "doesn't have otel enabled") {
     OtelMetricsCapturer metricsCapturer(*metricsService);
-    Gauge<int64_t>* int64Gauge =
-        metricsService->createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
-    int64Gauge->set(3);
     Gauge<int64_t>& int64Gauge =
         metricsService->createInt64Gauge(MetricNames::kTest1, "description1", MetricUnit::kSeconds);
     int64Gauge.set(3);
+    metricsCapturer.readInt64Gauge(MetricNames::kTest1);
+}
+
+DEATH_TEST_F(OtelMetricsCapturerDeathTest, DiesReadingDoubleGauge, "doesn't have otel enabled") {
     OtelMetricsCapturer metricsCapturer(*metricsService);
     Gauge<double>& doubleGauge = metricsService->createDoubleGauge(
         MetricNames::kTest1, "description1", MetricUnit::kSeconds);
