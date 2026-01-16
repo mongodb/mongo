@@ -51,6 +51,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
 
 #include <cstddef>
 #include <functional>
@@ -93,7 +94,7 @@ namespace MONGO_MOD_PARENT_PRIVATE repl {
  *
  * An oplog fetcher is an abstract async component, which takes care of startup and shutdown logic.
  */
-class OplogFetcher : public AbstractAsyncComponent {
+class OplogFetcher : public AbstractAsyncComponent<ObservableMutex<stdx::mutex>> {
     OplogFetcher(const OplogFetcher&) = delete;
     OplogFetcher& operator=(const OplogFetcher&) = delete;
 
@@ -333,7 +334,7 @@ private:
 
     void _preJoin() noexcept override {}
 
-    stdx::mutex* _getMutex() noexcept override;
+    ObservableMutex<stdx::mutex>* _getMutex() noexcept override;
 
     // ============= End AbstractAsyncComponent overrides ==============
 
@@ -438,7 +439,7 @@ private:
     Status _checkTooStaleToSyncFromSource(OpTime lastFetched, OpTime firstOpTimeInBatch);
 
     // Protects member data of this OplogFetcher.
-    mutable stdx::mutex _mutex;
+    mutable ObservableMutex<stdx::mutex> _mutex;
 
     // Namespace of the oplog to read.
     const NamespaceString _nss = NamespaceString::kRsOplogNamespace;

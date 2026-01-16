@@ -75,6 +75,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/observable_mutex_registry.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
@@ -245,6 +246,7 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
     invariant(!_lastFetched.isNull());
     invariant(onShutdownCallbackFn);
     invariant(enqueueDocumentsFn);
+    ObservableMutexRegistry::get().add("OplogFetcher::_mutex", _mutex);
 }
 
 OplogFetcher::~OplogFetcher() {
@@ -283,7 +285,7 @@ void OplogFetcher::_doShutdown(WithLock lk) noexcept {
     _shutdownCondVar.notify_all();
 }
 
-stdx::mutex* OplogFetcher::_getMutex() noexcept {
+ObservableMutex<stdx::mutex>* OplogFetcher::_getMutex() noexcept {
     return &_mutex;
 }
 
@@ -334,7 +336,7 @@ Milliseconds OplogFetcher::getRetriedFindMaxTime_forTest() const {
 }
 
 void OplogFetcher::_setSocketTimeout(long long timeout) {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     invariant(_conn);
     // setSoTimeout takes a double representing the number of seconds for send and receive
     // timeouts. Thus, we must express the timeout in milliseconds and divide by 1000.0 to get
@@ -343,7 +345,7 @@ void OplogFetcher::_setSocketTimeout(long long timeout) {
 }
 
 OpTime OplogFetcher::getLastOpTimeFetched() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     return _lastFetched;
 }
 
@@ -367,7 +369,7 @@ void OplogFetcher::_finishCallback(Status status) {
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     decltype(_oplogFetcherRestartDecision) oplogFetcherRestartDecision;
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     _transitionToComplete(lock);
 
     // Release any resources that might be held by the '_onShutdownCallbackFn' function object.
@@ -391,7 +393,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
 
     bool hadExistingConnection = true;
     {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard lock(_mutex);
         if (!_conn) {
             _conn = _createClientFn();
             hadExistingConnection = false;
@@ -417,7 +419,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
         {
             // Both of these checks need to happen while holding the mutex since they could race
             // with shutdown.
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
+            stdx::lock_guard lock(_mutex);
             if (_isShuttingDown(lock)) {
                 status = {ErrorCodes::CallbackCanceled, "oplog fetcher shutting down"};
             } else if (_runQueryHandle.isCanceled()) {
@@ -469,7 +471,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
             if (!_cursor->tailable()) {
                 try {
                     auto opCtx = cc().makeOperationContext();
-                    stdx::unique_lock<stdx::mutex> lk(_mutex);
+                    stdx::unique_lock lk(_mutex);
                     // Wait a little before re-running the aggregation command on the donor's
                     // oplog. We are not actually intending to wait for shutdown here, we use
                     // this as a way to wait while still being able to be interrupted outside of
@@ -938,7 +940,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                     "Oplog fetcher setting last fetched optime ahead after batch",
                     "lastDocOpTime"_attr = lastDocOpTime);
 
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard lock(_mutex);
         _lastFetched = lastDocOpTime;
     }
 
