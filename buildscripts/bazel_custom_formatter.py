@@ -2,24 +2,17 @@ import argparse
 import hashlib
 import json
 import os
-import platform
-import stat
 import subprocess
 import sys
 import time
-import urllib.request
 from collections import deque
 from pathlib import Path
 from typing import Dict, List
 
-from retry import retry
-
 sys.path.append(".")
 
-from buildscripts.install_bazel import install_bazel
+from buildscripts.install_bazel import install_bazel, install_buildozer
 from buildscripts.simple_report import make_report, put_report, try_combine_reports
-
-RELEASE_URL = "https://github.com/bazelbuild/buildtools/releases/download/v7.3.1/"
 
 groups_sort_keys = {
     "first": 1,
@@ -31,54 +24,6 @@ groups_sort_keys = {
     "seventh": 7,
     "eighth": 8,
 }
-
-
-@retry(tries=3, delay=5)
-def _download_with_retry(*args, **kwargs):
-    return urllib.request.urlretrieve(*args, **kwargs)
-
-
-def determine_platform():
-    syst = platform.system()
-    pltf = None
-    if syst == "Darwin":
-        pltf = "darwin"
-    elif syst == "Windows":
-        pltf = "windows"
-    elif syst == "Linux":
-        pltf = "linux"
-    else:
-        raise RuntimeError("Platform cannot be inferred.")
-    return pltf
-
-
-def determine_architecture():
-    arch = None
-    machine = platform.machine()
-    if machine in ("AMD64", "x86_64"):
-        arch = "amd64"
-    elif machine in ("arm", "arm64", "aarch64"):
-        arch = "arm64"
-    else:
-        raise RuntimeError(f"Detected architecture is not supported: {machine}")
-
-    return arch
-
-
-def download_buildozer(download_location: str = "./"):
-    operating_system = determine_platform()
-    architechture = determine_architecture()
-    if operating_system == "windows" and architechture == "arm64":
-        raise RuntimeError("There are no published arm windows releases for buildozer.")
-
-    extension = ".exe" if operating_system == "windows" else ""
-    binary_name = f"buildozer-{operating_system}-{architechture}{extension}"
-    url = f"{RELEASE_URL}{binary_name}"
-
-    file_location = os.path.join(download_location, f"buildozer{extension}")
-    _download_with_retry(url, file_location)
-    os.chmod(file_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-    return file_location
 
 
 def find_group(unittest_paths):
@@ -173,7 +118,7 @@ def iter_clang_tidy_files(root: str | Path) -> list[Path]:
 
 
 def validate_clang_tidy_configs(generate_report, fix):
-    buildozer = download_buildozer()
+    buildozer = install_buildozer()
 
     mongo_dir = "src/mongo"
 
@@ -219,7 +164,7 @@ def validate_clang_tidy_configs(generate_report, fix):
 
 
 def validate_bazel_groups(generate_report, fix):
-    buildozer = download_buildozer()
+    buildozer = install_buildozer()
 
     bazel_bin = install_bazel(".")
 
@@ -525,7 +470,7 @@ def validate_private_headers(generate_report: bool, fix: bool) -> None:
     # If True, exit(1) whenever a header is found only via select()/glob()
     FAIL_ON_STRUCTURED = True
 
-    buildozer = download_buildozer()
+    buildozer = install_buildozer()
 
     def _run_print(selector: str) -> tuple[str, str]:
         """Run one buildozer print invocation; return (selector, stdout)."""
