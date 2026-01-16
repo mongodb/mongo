@@ -235,8 +235,6 @@ private:
         return std::get<DataType>(it->second);
     }
 
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagOtelMetrics", true};
-
     // Stash the reader so that callers can trigger on-demand metric collection.
     test_util_detail::OnDemandMetricReader* _reader;
     // This is the in-memory data structure that holds the collected metrics. The exporter writes to

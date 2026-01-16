@@ -234,7 +234,7 @@ feature_flags:
     featureFlagOtelMetrics:
         description: "Feature flag to enable exporting OpenTelemetry metrics"
         cpp_varname: gFeatureFlagOtelMetrics
-        default: false
+        default: true
         fcv_gated: false
     featureFlagReplicateMultikeynessInTransactions:
         description: "Enable explicit replication of multikey metadata inside multi-document transactions"

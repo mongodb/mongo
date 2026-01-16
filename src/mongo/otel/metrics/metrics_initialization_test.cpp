@@ -61,7 +61,6 @@ public:
 
 private:
     unittest::TempDir _tempMetricsDir{"otel_metrics_test"};
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagOtelMetrics", true};
 };
 
 TEST_F(OtelMetricsInitializationTest, NoMeterProvider) {

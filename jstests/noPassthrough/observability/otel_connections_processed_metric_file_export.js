@@ -35,7 +35,6 @@ jsTest.log.info("Starting mongod with OTel file exporter, metrics directory: " +
 // Use a short export interval to avoid long test times
 const mongod = MongoRunner.runMongod({
     setParameter: {
-        featureFlagOtelMetrics: true,
         openTelemetryMetricsDirectory: metricsDir,
         openTelemetryExportIntervalMillis: 500,
         openTelemetryExportTimeoutMillis: 200,

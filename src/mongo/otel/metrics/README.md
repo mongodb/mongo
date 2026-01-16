@@ -305,6 +305,4 @@ Additional export methods (such as Prometheus Pull) are in development.
 
 ## Feature Flag
 
-Metrics are gated behind the `featureFlagOtelMetrics` feature flag. The `OtelMetricsCapturer`
-automatically enables this flag in tests. In production, ensure the flag is enabled for metrics
-to be collected.
+Metrics are gated behind the `featureFlagOtelMetrics` feature flag, which is enabled by default.
