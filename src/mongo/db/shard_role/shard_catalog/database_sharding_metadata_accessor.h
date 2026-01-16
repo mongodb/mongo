@@ -94,27 +94,25 @@ public:
     /**
      * Sets the movePrimary operation flag to indicate it is in progress.
      */
-    void setMovePrimaryInProgress(OperationContext* opCtx);
+    void setMovePrimaryInProgress();
 
     /**
      * Unsets the movePrimary operation flag, indicating that the operation is no longer in
      * progress.
      */
-    void unsetMovePrimaryInProgress(OperationContext* opCtx);
+    void unsetMovePrimaryInProgress();
 
     /**
      * Switches between read, no-access and write access type to this component metadata.
      */
-    void setAccessType(OperationContext* opCtx, AccessType accessType);
+    void setAccessType(AccessType accessType);
 
     /**
      * UNSAFE: Sets the database metadata (primary shard and database version), bypassing the access
      * type. This is maintained for backward compatibility, where database metadata could be
      * installed without entering the critical section.
      */
-    void setDbMetadata_UNSAFE(OperationContext* opCtx,
-                              const ShardId& dbPrimaryShard,
-                              const DatabaseVersion& dbVersion);
+    void setDbMetadata_UNSAFE(const ShardId& dbPrimaryShard, const DatabaseVersion& dbVersion);
 
 private:
     const DatabaseName _dbName;

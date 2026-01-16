@@ -34,10 +34,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/shard_role/shard_catalog/critical_section_signal.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/util/concurrency/notification.h"
+#include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -59,7 +60,7 @@ public:
                     ShardVersion received,
                     boost::optional<ShardVersion> wanted,
                     ShardId shardId,
-                    boost::optional<CriticalSectionSignal> criticalSectionSignal = boost::none,
+                    boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none,
                     boost::optional<OperationType> duringOperationType = boost::none)
         : _nss(std::move(nss)),
           _received(received),
@@ -102,7 +103,7 @@ private:
     ShardId _shardId;
 
     // The following fields are not serialized and therefore do not get propagated to the router.
-    boost::optional<CriticalSectionSignal> _criticalSectionSignal;
+    boost::optional<SharedSemiFuture<void>> _criticalSectionSignal;
     boost::optional<OperationType> _duringOperationType;
 };
 
@@ -145,7 +146,7 @@ public:
         const DatabaseName& db,
         DatabaseVersion received,
         boost::optional<DatabaseVersion> wanted,
-        boost::optional<CriticalSectionSignal> criticalSectionSignal = boost::none)
+        boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none)
         : _db(std::move(db)),
           _received(received),
           _wanted(wanted),
@@ -176,7 +177,7 @@ private:
     boost::optional<DatabaseVersion> _wanted;
 
     // This signal does not get serialized and therefore does not get propagated to the router
-    boost::optional<CriticalSectionSignal> _criticalSectionSignal;
+    boost::optional<SharedSemiFuture<void>> _criticalSectionSignal;
 };
 
 /*

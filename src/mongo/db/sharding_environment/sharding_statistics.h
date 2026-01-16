@@ -29,15 +29,12 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/shard_role/shard_catalog/authoritative_database_statistics.h"
-#include "mongo/db/shard_role/shard_catalog/critical_section_statistics.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/modules.h"
 
 namespace mongo {
 
+class BSONObjBuilder;
 class OperationContext;
 class ServiceContext;
 
@@ -162,11 +159,6 @@ struct MONGO_MOD_NEEDS_REPLACEMENT ShardingStatistics {
     //
     // TODO (SERVER-112793) Remove once v9.0 branches out.
     AtomicWord<long long> countHitsOfCompoundWildcardIndexesWithShardKeyPrefix{0};
-
-    CriticalSectionStatistics<DatabaseName> databaseCriticalSectionStatistics;
-    CriticalSectionStatistics<NamespaceString> collectionCriticalSectionStatistics;
-
-    AuthoritativeDatabaseVersionUpdates authoritativeShardDatabaseStatistics;
 
     /**
      * Obtains the per-process instance of the sharding statistics object.

@@ -39,7 +39,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
-#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -161,6 +160,7 @@ boost::optional<DatabaseVersion> getOperationReceivedVersion(OperationContext* o
     // operations.
     return boost::none;
 }
+
 }  // namespace
 
 DatabaseShardingRuntime::DatabaseShardingRuntime(const DatabaseName& dbName)
@@ -311,53 +311,40 @@ void DatabaseShardingRuntime::clearDbMetadata(OperationContext* opCtx) {
     _dbMetadataAccessor.clearDbMetadata(opCtx);
 }
 
-void DatabaseShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
-                                                               const BSONObj& reason) {
-    ShardingStatistics::get(opCtx).databaseCriticalSectionStatistics.registerCatchupCriticalSection(
-        _dbName);
+void DatabaseShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {
     _criticalSection.enterCriticalSectionCatchUpPhase(reason);
 
     _cancelDbMetadataRefresh_DEPRECATED();
 }
 
-void DatabaseShardingRuntime::enterCriticalSectionCommitPhase(OperationContext* opCtx,
-                                                              const BSONObj& reason) {
-    ShardingStatistics::get(opCtx).databaseCriticalSectionStatistics.registerCommitCriticalSection(
-        _dbName);
+void DatabaseShardingRuntime::enterCriticalSectionCommitPhase(const BSONObj& reason) {
     _criticalSection.enterCriticalSectionCommitPhase(reason);
 
-    _dbMetadataAccessor.setAccessType(opCtx,
-                                      DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
 }
 
-void DatabaseShardingRuntime::exitCriticalSection(OperationContext* opCtx, const BSONObj& reason) {
+void DatabaseShardingRuntime::exitCriticalSection(const BSONObj& reason) {
     _criticalSection.exitCriticalSection(reason);
-    ShardingStatistics::get(opCtx).databaseCriticalSectionStatistics.releaseCriticalSection(
-        _dbName);
 
-    _dbMetadataAccessor.setAccessType(opCtx,
-                                      DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
 }
 
-void DatabaseShardingRuntime::exitCriticalSectionNoChecks(OperationContext* opCtx) {
+void DatabaseShardingRuntime::exitCriticalSectionNoChecks() {
     _criticalSection.exitCriticalSectionNoChecks();
-    ShardingStatistics::get(opCtx).databaseCriticalSectionStatistics.releaseCriticalSection(
-        _dbName);
 
-    _dbMetadataAccessor.setAccessType(opCtx,
-                                      DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
+    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
 }
 
 void DatabaseShardingRuntime::setMovePrimaryInProgress(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_X));
 
-    _dbMetadataAccessor.setMovePrimaryInProgress(opCtx);
+    _dbMetadataAccessor.setMovePrimaryInProgress();
 }
 
 void DatabaseShardingRuntime::unsetMovePrimaryInProgress(OperationContext* opCtx) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
-    _dbMetadataAccessor.unsetMovePrimaryInProgress(opCtx);
+    _dbMetadataAccessor.unsetMovePrimaryInProgress();
 }
 
 // DEPRECATED methods
@@ -366,7 +353,7 @@ void DatabaseShardingRuntime::setDbInfo_DEPRECATED(OperationContext* opCtx,
                                                    const DatabaseType& dbInfo) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(_dbName, MODE_IX));
 
-    _dbMetadataAccessor.setDbMetadata_UNSAFE(opCtx, dbInfo.getPrimary(), dbInfo.getVersion());
+    _dbMetadataAccessor.setDbMetadata_UNSAFE(dbInfo.getPrimary(), dbInfo.getVersion());
 }
 
 void DatabaseShardingRuntime::clearDbInfo_DEPRECATED(OperationContext* opCtx,
@@ -401,13 +388,4 @@ void DatabaseShardingRuntime::_cancelDbMetadataRefresh_DEPRECATED() {
     }
 }
 
-boost::optional<CriticalSectionSignal> DatabaseShardingRuntime::getCriticalSectionSignal(
-    ShardingMigrationCriticalSection::Operation op) const {
-    auto signal = _criticalSection.getSignal(op);
-    if (signal) {
-        return CriticalSectionSignal{std::move(*signal),
-                                     CriticalSectionSignal::CriticalSectionType::Database};
-    }
-    return {};
-}
 }  // namespace mongo

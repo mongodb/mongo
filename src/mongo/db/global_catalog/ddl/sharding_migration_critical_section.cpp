@@ -108,9 +108,8 @@ boost::optional<SharedSemiFuture<void>> ShardingMigrationCriticalSection::getSig
     if (!_critSecCtx)
         return boost::none;
 
-    if (op == kWrite || _critSecCtx->readsShouldWaitOnCritSec) {
+    if (op == kWrite || _critSecCtx->readsShouldWaitOnCritSec)
         return _critSecCtx->critSecSignal.getFuture();
-    }
 
     return boost::none;
 }

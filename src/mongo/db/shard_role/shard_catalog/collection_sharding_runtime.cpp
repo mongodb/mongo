@@ -49,7 +49,6 @@
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
-#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -346,10 +345,7 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(
         opCtx, boost::none, receivedShardVersion, false /* preserveRange */);
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
-                                                                 const BSONObj& reason) {
-    ShardingStatistics::get(opCtx)
-        .collectionCriticalSectionStatistics.registerCatchupCriticalSection(_nss);
+void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {
     _critSec.enterCriticalSectionCatchUpPhase(reason);
 
     if (_placementVersionInRecoverOrRefresh) {
@@ -357,39 +353,26 @@ void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(OperationContex
     }
 }
 
-void CollectionShardingRuntime::enterCriticalSectionCommitPhase(OperationContext* opCtx,
-                                                                const BSONObj& reason) {
-    ShardingStatistics::get(opCtx)
-        .collectionCriticalSectionStatistics.registerCommitCriticalSection(_nss);
+void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const BSONObj& reason) {
     _critSec.enterCriticalSectionCommitPhase(reason);
 }
 
 void CollectionShardingRuntime::rollbackCriticalSectionCommitPhaseToCatchUpPhase(
-    OperationContext* opCtx, const BSONObj& reason) {
-    ShardingStatistics::get(opCtx)
-        .collectionCriticalSectionStatistics.registerCatchupCriticalSection(_nss);
+    const BSONObj& reason) {
     _critSec.rollbackCriticalSectionCommitPhaseToCatchUpPhase(reason);
 }
 
-void CollectionShardingRuntime::exitCriticalSection(OperationContext* opCtx,
-                                                    const BSONObj& reason) {
+void CollectionShardingRuntime::exitCriticalSection(const BSONObj& reason) {
     _critSec.exitCriticalSection(reason);
-    ShardingStatistics::get(opCtx).collectionCriticalSectionStatistics.releaseCriticalSection(_nss);
 }
 
-void CollectionShardingRuntime::exitCriticalSectionNoChecks(OperationContext* opCtx) {
+void CollectionShardingRuntime::exitCriticalSectionNoChecks() {
     _critSec.exitCriticalSectionNoChecks();
-    ShardingStatistics::get(opCtx).collectionCriticalSectionStatistics.releaseCriticalSection(_nss);
 }
 
-boost::optional<CriticalSectionSignal> CollectionShardingRuntime::getCriticalSectionSignal(
+boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getCriticalSectionSignal(
     ShardingMigrationCriticalSection::Operation op) const {
-    auto signal = _critSec.getSignal(op);
-    if (signal) {
-        return CriticalSectionSignal{std::move(*signal),
-                                     CriticalSectionSignal::CriticalSectionType::Collection};
-    }
-    return {};
+    return _critSec.getSignal(op);
 }
 
 void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
@@ -587,14 +570,9 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     {
         auto criticalSectionSignal =
-            _critSec
-                .getSignal(shard_role_details::getLocker(opCtx)->isWriteLocked()
-                               ? ShardingMigrationCriticalSection::kWrite
-                               : ShardingMigrationCriticalSection::kRead)
-                .map([&](auto&& signal) {
-                    return CriticalSectionSignal{
-                        std::move(signal), CriticalSectionSignal::CriticalSectionType::Collection};
-                });
+            _critSec.getSignal(shard_role_details::getLocker(opCtx)->isWriteLocked()
+                                   ? ShardingMigrationCriticalSection::kWrite
+                                   : ShardingMigrationCriticalSection::kRead);
         std::string reason = _critSec.getReason() ? _critSec.getReason()->toString() : "unknown";
         uassert(StaleConfigInfo(_nss,
                                 receivedShardVersion,
@@ -745,7 +723,7 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
     tassert(7032305,
             "Collection metadata unknown when entering critical section",
             scopedCsr->getCurrentMetadataIfKnown());
-    scopedCsr->enterCriticalSectionCatchUpPhase(_opCtx, _reason);
+    scopedCsr->enterCriticalSectionCatchUpPhase(_reason);
 }
 
 CollectionCriticalSection::~CollectionCriticalSection() {
@@ -757,7 +735,7 @@ CollectionCriticalSection::~CollectionCriticalSection() {
     AutoGetCollection autoColl(_opCtx, _nss, MODE_IX, autoGetCollOptions);
     auto scopedCsr =
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, _nss);
-    scopedCsr->exitCriticalSection(_opCtx, _reason);
+    scopedCsr->exitCriticalSection(_reason);
 }
 
 void CollectionCriticalSection::enterCommitPhase() {
@@ -772,7 +750,7 @@ void CollectionCriticalSection::enterCommitPhase() {
     tassert(7032304,
             "Collection metadata unknown when entering critical section commit phase",
             scopedCsr->getCurrentMetadataIfKnown());
-    scopedCsr->enterCriticalSectionCommitPhase(_opCtx, _reason);
+    scopedCsr->enterCriticalSectionCommitPhase(_reason);
 }
 
 void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(

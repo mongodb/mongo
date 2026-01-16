@@ -204,12 +204,10 @@ TEST_F(ShardRoleLoopTest, handleStaleDbException) {
         "shard does not know its version"};
 
     const Status staleDbCriticalSectionActiveStatus{
-        StaleDbRoutingVersion(
-            kDbName,
-            DatabaseVersion(UUID::gen(), Timestamp(2, 0)),
-            boost::none,
-            CriticalSectionSignal{SemiFuture<void>::makeReady().share(),
-                                  CriticalSectionSignal::CriticalSectionType::Database}),
+        StaleDbRoutingVersion(kDbName,
+                              DatabaseVersion(UUID::gen(), Timestamp(2, 0)),
+                              boost::none,
+                              SemiFuture<void>::makeReady().share()),
         "critical section active"};
 
     const Status staleDbStaleRouterStatus{
@@ -276,13 +274,11 @@ TEST_F(ShardRoleLoopTest, handleStaleConfigException) {
         "shard does not know its version"};
 
     const Status staleConfigShardCriticalSectionActiveStatus{
-        StaleConfigInfo(
-            kTestNss,
-            ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
-            boost::none,
-            kTestShardId,
-            CriticalSectionSignal{SemiFuture<void>::makeReady().share(),
-                                  CriticalSectionSignal::CriticalSectionType::Collection}),
+        StaleConfigInfo(kTestNss,
+                        ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
+                        boost::none,
+                        kTestShardId,
+                        SemiFuture<void>::makeReady().share()),
         "shard critical section active"};
 
     const Status staleConfigRouterIsStaleStatus{
@@ -542,15 +538,13 @@ TEST_F(ShardRoleLoopTest, LoopFnThrowsStaleConfigBecauseShardIsStale) {
                         kTestShardId),
         "shard's known placement version is older than the one in the request"});
 
-    testFn(
-        Status{StaleConfigInfo(
-                   kTestNss,
-                   ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {2, 0})),
-                   ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
-                   kTestShardId,
-                   CriticalSectionSignal{SemiFuture<void>::makeReady().share(),
-                                         CriticalSectionSignal::CriticalSectionType::Collection}),
-               "critical section active"});
+    testFn(Status{
+        StaleConfigInfo(kTestNss,
+                        ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {2, 0})),
+                        ShardVersionFactory::make(ChunkVersion(collectionGeneration1, {1, 0})),
+                        kTestShardId,
+                        SemiFuture<void>::makeReady().share()),
+        "critical section active"});
 }
 
 TEST_F(ShardRoleLoopTest, LoopFnThrowsStaleConfigBecauseRouterIsStale) {

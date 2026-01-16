@@ -764,8 +764,8 @@ TEST_F(MetadataConsistencyTest, CheckDatabaseMetadataConsistency_CriticalSection
     {
         AutoGetDb autoDb(operationContext(), _dbName, MODE_IX);
         auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
-        scopedDsr->enterCriticalSectionCatchUpPhase(operationContext(), BSON("reason" << "test"));
-        scopedDsr->enterCriticalSectionCommitPhase(operationContext(), BSON("reason" << "test"));
+        scopedDsr->enterCriticalSectionCatchUpPhase(BSON("reason" << "test"));
+        scopedDsr->enterCriticalSectionCommitPhase(BSON("reason" << "test"));
     }
 
 
@@ -776,7 +776,7 @@ TEST_F(MetadataConsistencyTest, CheckDatabaseMetadataConsistency_CriticalSection
                        ErrorCodes::StaleDbVersion);
 
     auto scopedDsr = DatabaseShardingRuntime::acquireExclusive(operationContext(), _dbName);
-    scopedDsr->exitCriticalSectionNoChecks(operationContext());
+    scopedDsr->exitCriticalSectionNoChecks();
 }
 
 TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) {

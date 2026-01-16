@@ -548,32 +548,21 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:shard_filtering_util.cpp",
         "//src/mongo/db/sharding_environment:range_arithmetic.cpp",
         "//src/mongo/db/sharding_environment:sharding_api_d_params_gen",
+        "//src/mongo/db/sharding_environment:sharding_statistics.cpp",
         "//src/mongo/db/topology:sharding_state.cpp",
         "//src/mongo/db/topology/user_write_block:global_user_write_block_state.cpp",
     ],
     deps = [
         ":server_base",
         ":server_feature_flags",
-        ":sharding_statistics",
         "//src/mongo/db/admission/execution_control:execution_admission_context",
         "//src/mongo/db/shard_role:shard_role_api_stor_ex",
         "//src/mongo/db/shard_role/shard_catalog:index_catalog",
         "//src/mongo/db/storage:write_unit_of_work",
         "//src/mongo/db/topology/user_write_block:write_block_bypass",
         "//src/mongo/db/views",
-        "//src/mongo/executor:inline_executor",
         "//src/mongo/s:grid",
         "//src/mongo/util/concurrency:spin_lock",
-    ],
-)
-
-mongo_cc_library(
-    name = "sharding_statistics",
-    srcs = [
-        "//src/mongo/db/sharding_environment:sharding_statistics.cpp",
-    ],
-    deps = [
-        "//src/mongo:base",
     ],
 )
 

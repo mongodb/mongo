@@ -99,24 +99,6 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
                     countFlushReshardingStateChangeFailedShardingMetadataRefreshes.loadRelaxed());
     builder->append("countHitsOfCompoundWildcardIndexesWithShardKeyPrefix",
                     countHitsOfCompoundWildcardIndexesWithShardKeyPrefix.loadRelaxed());
-
-    {
-        BSONObjBuilder databaseCriticalSectionBuilder{
-            builder->subobjStart("databaseCriticalSectionStatistics")};
-        databaseCriticalSectionStatistics.report(databaseCriticalSectionBuilder);
-        databaseCriticalSectionBuilder.doneFast();
-    }
-    {
-        BSONObjBuilder collectionCriticalSectionBuilder{
-            builder->subobjStart("collectionCriticalSectionStatistics")};
-        collectionCriticalSectionStatistics.report(collectionCriticalSectionBuilder);
-        collectionCriticalSectionBuilder.doneFast();
-    }
-    {
-        BSONObjBuilder databaseVersionUpdateCountersBuilder{
-            builder->subobjStart("databaseVersionUpdateCounters")};
-        authoritativeShardDatabaseStatistics.report(databaseVersionUpdateCountersBuilder);
-        databaseVersionUpdateCountersBuilder.doneFast();
-    }
 }
+
 }  // namespace mongo

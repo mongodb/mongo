@@ -32,6 +32,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
@@ -42,32 +43,39 @@
 #include "mongo/db/global_catalog/sharding_catalog_client.h"
 #include "mongo/db/global_catalog/sharding_catalog_client_mock.h"
 #include "mongo/db/global_catalog/type_collection.h"
+#include "mongo/db/global_catalog/type_collection_common_types_gen.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache_loader.h"
+#include "mongo/db/router_role/routing_cache/catalog_cache_loader_mock.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deleter_service_test.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
+#include "mongo/db/shard_role/shard_catalog/create_collection.h"
 #include "mongo/db/shard_role/shard_catalog/operation_sharding_state.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/sharding_environment/shard_server_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_mongod_test_fixture.h"
-#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/vector_clock/vector_clock.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
+#include "mongo/db/versioning_protocol/database_version.h"
 #include "mongo/db/versioning_protocol/shard_version_factory.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -76,7 +84,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
 
-#include <barrier>
 #include <chrono>
 #include <tuple>
 
@@ -723,137 +730,6 @@ public:
         return {chunk1, chunk2};
     }
 };
-
-TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CheckCriticalSectionMetricsAreReported) {
-    auto acq = acquireCollection(operationContext(),
-                                 CollectionAcquisitionRequest{kNss,
-                                                              PlacementConcern::kPretendUnsharded,
-                                                              repl::ReadConcernArgs{},
-                                                              AcquisitionPrerequisites::kWrite},
-                                 MODE_X);
-    auto getStatistics = [&] {
-        auto& shardingStatistics = ShardingStatistics::get(operationContext());
-        BSONObjBuilder builder;
-        shardingStatistics.report(&builder);
-        auto fullMetrics = builder.obj();
-        return fullMetrics.getObjectField("collectionCriticalSectionStatistics").getOwned();
-    };
-
-    const auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-        operationContext(), kNss);
-
-    auto metrics = getStatistics();
-    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 0);
-
-    csr->enterCriticalSectionCatchUpPhase(operationContext(), BSONObj());
-
-    metrics = getStatistics();
-    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 1);
-    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["totalTimeActiveCommitMillis"].safeNumberLong(), 0);
-
-    csr->enterCriticalSectionCommitPhase(operationContext(), BSONObj());
-
-    metrics = getStatistics();
-    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 1);
-    ASSERT_EQ(metrics["totalTimeActiveCatchupMillis"].safeNumberLong(), 0);
-
-    ASSERT_EQ(metrics["totalTimeWaiting"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["activeWaitersCount"].safeNumberLong(), 0);
-
-    ASSERT_DOES_NOT_THROW(csr->exitCriticalSection(operationContext(), BSONObj()));
-
-    metrics = getStatistics();
-    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["activeWaitersCount"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["totalTimeWaiting"].safeNumberLong(), 0);
-}
-
-TEST_F(CollectionShardingRuntimeTestWithMockedLoader, CriticalSectionMetricsReportWaiters) {
-    const BSONObj criticalSectionReason = BSON("reason" << 1);
-    {
-        // Enter the critical section.
-        AutoGetCollection coll(operationContext(), kNss, MODE_X);
-        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), kNss);
-        csr->enterCriticalSectionCatchUpPhase(operationContext(), criticalSectionReason);
-        csr->enterCriticalSectionCommitPhase(operationContext(), criticalSectionReason);
-    }
-
-    const ShardVersion shardVersionShardedCollection1 = ShardVersionFactory::make(ChunkVersion(
-        CollectionGeneration{OID::gen(), Timestamp(5, 0)}, CollectionPlacement(10, 1)));
-
-    auto getStatistics = [&] {
-        auto& shardingStatistics = ShardingStatistics::get(operationContext());
-        BSONObjBuilder builder;
-        shardingStatistics.report(&builder);
-        auto fullMetrics = builder.obj();
-        return fullMetrics.getObjectField("collectionCriticalSectionStatistics").getOwned();
-    };
-
-    // At this point the critical section has been taken, so a new waiter will have to wait for the
-    // signal to finish. This means that
-    std::barrier phase(2);
-    stdx::thread waiter([&] {
-        PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
-
-        auto validateException = [&](const DBException& ex) {
-            const auto exInfo = ex.extraInfo<StaleConfigInfo>();
-            ASSERT_EQ(kNss, exInfo->getNss());
-            ASSERT_EQ(shardVersionShardedCollection1, exInfo->getVersionReceived());
-            ASSERT_EQ(boost::none, exInfo->getVersionWanted());
-            ASSERT_EQ(kMyShardName, exInfo->getShardId());
-            const auto& signal = exInfo->getCriticalSectionSignal();
-            sleepmillis(10);
-            auto metrics = getStatistics();
-            ASSERT_EQ(metrics["activeWaitersCount"].safeNumberLong(), 0);
-            ASSERT_TRUE(signal.is_initialized());
-            phase.arrive_and_wait();
-            signal->get(operationContext());
-        };
-        ASSERT_THROWS_WITH_CHECK(
-            acquireCollection(
-                operationContext(),
-                {kNss, placementConcern, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
-                MODE_IX),
-            ExceptionFor<ErrorCodes::StaleConfig>,
-            validateException);
-
-        phase.arrive_and_wait();
-    });
-
-    {
-        phase.arrive_and_wait();
-        // We wait a bit to simulate slowness.
-        sleepmillis(10);
-        auto metrics = getStatistics();
-        ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
-        ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 1);
-        ASSERT_GTE(metrics["totalTimeActiveCommitMillis"].safeNumberLong(), 20);
-        ASSERT_EQ(metrics["activeWaitersCount"].safeNumberLong(), 1);
-        ASSERT_GTE(metrics["totalTimeWaiting"].safeNumberLong(), 10);
-    }
-
-    {
-        AutoGetCollection coll(operationContext(), kNss, MODE_X);
-        const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-            operationContext(), kNss);
-        csr->exitCriticalSection(operationContext(), criticalSectionReason);
-    }
-
-    phase.arrive_and_wait();
-
-    auto metrics = getStatistics();
-    ASSERT_EQ(metrics["activeCatchupCount"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["activeCommitCount"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["activeWaitersCount"].safeNumberLong(), 0);
-    ASSERT_EQ(metrics["totalTimeWaiting"].safeNumberLong(), 0);
-
-    waiter.join();
-}
 
 /**
  * Fixture for when range deletion functionality is required in CollectionShardingRuntime tests.

@@ -130,7 +130,6 @@ DatabaseShardingState::ScopedDatabaseShardingState::acquireScopedDatabaseShardin
         return ScopedDatabaseShardingState{std::shared_lock(dssAndLock->dssMutex),  // NOLINT
                                            dssAndLock->dss.get()};
     }
-
     return ScopedDatabaseShardingState{std::unique_lock(dssAndLock->dssMutex),  // NOLINT
                                        dssAndLock->dss.get()};
 }

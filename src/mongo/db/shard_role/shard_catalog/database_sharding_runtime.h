@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/global_catalog/ddl/sharding_migration_critical_section.h"
 #include "mongo/db/global_catalog/type_database_gen.h"
@@ -164,13 +163,14 @@ public:
      * Methods to control the databases's critical section. Must be called with the database X lock
      * held.
      */
-    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx, const BSONObj& reason);
-    void enterCriticalSectionCommitPhase(OperationContext* opCtx, const BSONObj& reason);
-    void exitCriticalSection(OperationContext* opCtx, const BSONObj& reason);
-    void exitCriticalSectionNoChecks(OperationContext* opCtx);
+    void enterCriticalSectionCatchUpPhase(const BSONObj& reason);
+    void enterCriticalSectionCommitPhase(const BSONObj& reason);
+    void exitCriticalSection(const BSONObj& reason);
+    void exitCriticalSectionNoChecks();
 
-    boost::optional<CriticalSectionSignal> getCriticalSectionSignal(
-        ShardingMigrationCriticalSection::Operation op) const;
+    auto getCriticalSectionSignal(ShardingMigrationCriticalSection::Operation op) const {
+        return _criticalSection.getSignal(op);
+    }
 
     auto getCriticalSectionReason() const {
         return _criticalSection.getReason();

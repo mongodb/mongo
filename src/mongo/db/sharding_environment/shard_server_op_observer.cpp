@@ -55,7 +55,6 @@
 #include "mongo/db/shard_role/shard_catalog/type_oplog_catalog_metadata_gen.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
-#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/topology/shard_identity_rollback_notifier.h"
@@ -268,7 +267,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                         }
                         auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
                             opCtx, insertedNss.dbName());
-                        scopedDsr->enterCriticalSectionCatchUpPhase(opCtx, reason);
+                        scopedDsr->enterCriticalSectionCatchUpPhase(reason);
                     } else {
                         // Primaries take locks when writing to certain internal namespaces. It must
                         // be ensured that those locks are also taken on secondaries, when
@@ -295,16 +294,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                         auto scopedCsr =
                             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                                 opCtx, insertedNss);
-                        scopedCsr->enterCriticalSectionCatchUpPhase(opCtx, reason);
+                        scopedCsr->enterCriticalSectionCatchUpPhase(reason);
                     }
-                });
-        }
-
-        if (nss == NamespaceString::kConfigShardCatalogDatabasesNamespace) {
-            shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-                [](OperationContext* opCtx, boost::optional<Timestamp>) {
-                    ShardingStatistics::get(opCtx)
-                        .authoritativeShardDatabaseStatistics.registerDurableUpdate();
                 });
         }
     }
@@ -430,7 +421,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
 
                     auto scopedDsr = DatabaseShardingRuntime::assertDbLockedAndAcquireExclusive(
                         opCtx, updatedNss.dbName());
-                    scopedDsr->enterCriticalSectionCommitPhase(opCtx, reason);
+                    scopedDsr->enterCriticalSectionCommitPhase(reason);
                 } else {
                     // Primaries take locks when writing to certain internal namespaces. It must
                     // be ensured that those locks are also taken on secondaries, when
@@ -457,7 +448,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                     auto scopedCsr =
                         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                             opCtx, updatedNss);
-                    scopedCsr->enterCriticalSectionCommitPhase(opCtx, reason);
+                    scopedCsr->enterCriticalSectionCommitPhase(reason);
                 }
             });
     }
@@ -499,14 +490,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
                 }
             }
         }();
-    }
-
-    if (nss == NamespaceString::kConfigShardCatalogDatabasesNamespace) {
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [](OperationContext* opCtx, boost::optional<Timestamp>) {
-                ShardingStatistics::get(opCtx)
-                    .authoritativeShardDatabaseStatistics.registerDurableUpdate();
-            });
     }
 }
 
@@ -592,7 +575,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                         scopedDsr->clearDbInfo_DEPRECATED(opCtx);
                     }
 
-                    scopedDsr->exitCriticalSection(opCtx, reason);
+                    scopedDsr->exitCriticalSection(reason);
                 } else {
                     // Primaries take locks when writing to certain internal namespaces. It must
                     // be ensured that those locks are also taken on secondaries, when
@@ -626,7 +609,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                         scopedCsr->clearFilteringMetadata(opCtx);
                     }
 
-                    scopedCsr->exitCriticalSection(opCtx, reason);
+                    scopedCsr->exitCriticalSection(reason);
                 }
             });
     }
@@ -652,14 +635,6 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                                             boost::optional<Timestamp>) {
                 BalancerStatsRegistry::get(opCtx)->onRangeDeletionTaskDeletion(collUuid,
                                                                                numOrphanDocs);
-            });
-    }
-
-    if (nss == NamespaceString::kConfigShardCatalogDatabasesNamespace) {
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [](OperationContext* opCtx, boost::optional<Timestamp>) {
-                ShardingStatistics::get(opCtx)
-                    .authoritativeShardDatabaseStatistics.registerDurableUpdate();
             });
     }
 }

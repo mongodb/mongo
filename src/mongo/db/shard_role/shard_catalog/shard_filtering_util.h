@@ -44,7 +44,7 @@ namespace refresh_util {
  * transactions and locking.
  */
 MONGO_MOD_PRIVATE void waitForRefreshToComplete(OperationContext* opCtx,
-                                                const SharedSemiFuture<void>& refresh);
+                                                SharedSemiFuture<void> refresh);
 
 /**
  * This method implements a best-effort attempt to wait for the critical section to complete
@@ -55,7 +55,7 @@ MONGO_MOD_PRIVATE void waitForRefreshToComplete(OperationContext* opCtx,
  * accounts for transactions and locking.
  */
 MONGO_MOD_NEEDS_REPLACEMENT Status waitForCriticalSectionToComplete(
-    OperationContext* opCtx, const CriticalSectionSignal& critSecSignal) noexcept;
+    OperationContext* opCtx, SharedSemiFuture<void> critSecSignal) noexcept;
 
 }  // namespace refresh_util
 

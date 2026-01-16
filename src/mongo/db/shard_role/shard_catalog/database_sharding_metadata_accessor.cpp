@@ -30,7 +30,6 @@
 #include "mongo/db/shard_role/shard_catalog/database_sharding_metadata_accessor.h"
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/sharding_environment/sharding_statistics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -111,7 +110,6 @@ void DatabaseShardingMetadataAccessor::setDbMetadata(OperationContext* opCtx,
     }
     _dbPrimaryShard.emplace(dbPrimaryShard);
     _dbVersion.emplace(dbVersion);
-    ShardingStatistics::get(opCtx).authoritativeShardDatabaseStatistics.registerInMemorySet();
 }
 
 void DatabaseShardingMetadataAccessor::clearDbMetadata(OperationContext* opCtx) {
@@ -131,32 +129,21 @@ void DatabaseShardingMetadataAccessor::clearDbMetadata(OperationContext* opCtx) 
     */
     _dbPrimaryShard = boost::none;
     _dbVersion = boost::none;
-    ShardingStatistics::get(opCtx).authoritativeShardDatabaseStatistics.registerInMemoryClear();
 }
 
-void DatabaseShardingMetadataAccessor::setMovePrimaryInProgress(OperationContext* opCtx) {
-    auto oldState = std::exchange(_movePrimaryInProgress, true);
-    if (oldState == false)
-        ShardingStatistics::get(opCtx)
-            .authoritativeShardDatabaseStatistics.registerInMemoryMovePrimaryState(true);
+void DatabaseShardingMetadataAccessor::setMovePrimaryInProgress() {
+    _movePrimaryInProgress = true;
 }
 
-void DatabaseShardingMetadataAccessor::unsetMovePrimaryInProgress(OperationContext* opCtx) {
-    auto oldState = std::exchange(_movePrimaryInProgress, false);
-    if (oldState == true)
-        ShardingStatistics::get(opCtx)
-            .authoritativeShardDatabaseStatistics.registerInMemoryMovePrimaryState(false);
+void DatabaseShardingMetadataAccessor::unsetMovePrimaryInProgress() {
+    _movePrimaryInProgress = false;
 }
 
-void DatabaseShardingMetadataAccessor::setAccessType(OperationContext* opCtx,
-                                                     AccessType accessType) {
+void DatabaseShardingMetadataAccessor::setAccessType(AccessType accessType) {
     _accessType = accessType;
-    ShardingStatistics::get(opCtx)
-        .authoritativeShardDatabaseStatistics.registerInMemoryAccessTypeChange();
 }
 
-void DatabaseShardingMetadataAccessor::setDbMetadata_UNSAFE(OperationContext* opCtx,
-                                                            const ShardId& dbPrimaryShard,
+void DatabaseShardingMetadataAccessor::setDbMetadata_UNSAFE(const ShardId& dbPrimaryShard,
                                                             const DatabaseVersion& dbVersion) {
     LOGV2(10371107,
           "Setting this node's cached database metadata",
@@ -165,7 +152,6 @@ void DatabaseShardingMetadataAccessor::setDbMetadata_UNSAFE(OperationContext* op
 
     _dbPrimaryShard.emplace(dbPrimaryShard);
     _dbVersion.emplace(dbVersion);
-    ShardingStatistics::get(opCtx).authoritativeShardDatabaseStatistics.registerInMemorySet();
 }
 
 OperationDatabaseMetadata& OperationDatabaseMetadata::get(OperationContext* opCtx) {

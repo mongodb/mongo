@@ -131,7 +131,7 @@ public:
                                   << " on collections",
                     !ns().coll().empty());
 
-            boost::optional<CriticalSectionSignal> criticalSectionSignal;
+            boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {
                 // If the primary is in the critical section, secondaries must wait for the commit

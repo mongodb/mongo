@@ -409,18 +409,6 @@ mongo_cc_benchmark(
     ],
 )
 
-mongo_cc_library(
-    name = "critical_section_signal",
-    srcs = [
-        "critical_section_signal.cpp",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:sharding_statistics",
-    ],
-)
-
 mongo_cc_unit_test(
     name = "db_catalog_test",
     srcs = [
