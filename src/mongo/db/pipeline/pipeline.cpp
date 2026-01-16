@@ -113,11 +113,13 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
                 !(nss.isCollectionlessAggregateNS() &&
                   !firstStageConstraints.isIndependentOfAnyCollection));
 
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "'" << sources.front()->getSourceName()
-                              << "' can only be run with {aggregate: 1}",
-                !(!nss.isCollectionlessAggregateNS() &&
-                  firstStageConstraints.isIndependentOfAnyCollection));
+        uassert(
+            ErrorCodes::InvalidNamespace,
+            str::stream()
+                << "'" << sources.front()->getSourceName()
+                << "' can only be run with database or cluster-level aggregation {aggregate: 1}",
+            !(!nss.isCollectionlessAggregateNS() &&
+              firstStageConstraints.isIndependentOfAnyCollection));
 
         // If the first stage is a $changeStream stage, then all stages in the pipeline must be
         // either $changeStream stages or allowlisted as being able to run in a change stream.
