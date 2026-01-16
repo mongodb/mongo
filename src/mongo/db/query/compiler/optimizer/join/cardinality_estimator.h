@@ -37,6 +37,9 @@
 #include "mongo/util/modules.h"
 
 namespace mongo::join_ordering {
+
+using cost_based_ranker::CardinalityEstimate;
+
 /**
  * Contains logic necessary to do selectivity and cardinality estimation for joins.
  */
@@ -44,7 +47,8 @@ class JoinCardinalityEstimator {
 public:
     JoinCardinalityEstimator(const JoinReorderingContext& ctx,
                              EdgeSelectivities edgeSelectivities,
-                             NodeCardinalities nodeCardinalities);
+                             NodeCardinalities nodeCardinalities,
+                             NodeCardinalities collCardinalities);
     virtual ~JoinCardinalityEstimator() {};
 
     static JoinCardinalityEstimator make(const JoinReorderingContext& ctx,
@@ -65,19 +69,30 @@ public:
     static NodeCardinalities extractNodeCardinalities(
         const JoinReorderingContext& ctx, const cost_based_ranker::EstimateMap& estimates);
 
+    static NodeCardinalities extractCollCardinalities(
+        const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators);
+
     /**
      * Estimates the cardinality of a join plan over the given subset of nodes. This method
      * constructs a spanning tree from the edges in the graph induced by 'nodes', and combines the
      * edge selectivities, base table cardinalities, and single-table predicate selectivities to
      * produce an estimate. Populates `_subsetCardinalities` with the result.
      */
-    virtual cost_based_ranker::CardinalityEstimate getOrEstimateSubsetCardinality(
-        const NodeSet& nodes);
+    virtual CardinalityEstimate getOrEstimateSubsetCardinality(const NodeSet& nodes);
+
+    /**
+     * Returns the cardinality of the collection referenced by the given node. This ignores any
+     * single table predicates.
+     */
+    CardinalityEstimate getCollCardinality(NodeId node);
 
 private:
     const JoinReorderingContext& _ctx;
     const EdgeSelectivities _edgeSelectivities;
+    // Stores cardinality estimates for nodes after single-table predicates are applied.
     const NodeCardinalities _nodeCardinalities;
+    // Stores cardinalities for the underlying collections as reported by the catalog.
+    const NodeCardinalities _collCardinalities;
 
     GraphCycleBreaker _cycleBreaker;
 

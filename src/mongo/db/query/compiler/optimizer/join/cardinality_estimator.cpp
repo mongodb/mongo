@@ -37,12 +37,16 @@
 
 namespace mongo::join_ordering {
 
+using namespace cost_based_ranker;
+
 JoinCardinalityEstimator::JoinCardinalityEstimator(const JoinReorderingContext& ctx,
                                                    EdgeSelectivities edgeSelectivities,
-                                                   NodeCardinalities nodeCardinalities)
+                                                   NodeCardinalities nodeCardinalities,
+                                                   NodeCardinalities collCardinalities)
     : _ctx(ctx),
       _edgeSelectivities(std::move(edgeSelectivities)),
       _nodeCardinalities(std::move(nodeCardinalities)),
+      _collCardinalities(std::move(collCardinalities)),
       _cycleBreaker(
           GraphCycleBreaker(_ctx.joinGraph, _edgeSelectivities, _ctx.resolvedPaths.size())) {
     tassert(11514700,
@@ -60,7 +64,8 @@ JoinCardinalityEstimator JoinCardinalityEstimator::make(
     return JoinCardinalityEstimator(
         ctx,
         JoinCardinalityEstimator::estimateEdgeSelectivities(ctx, samplingEstimators),
-        JoinCardinalityEstimator::extractNodeCardinalities(ctx, estimates));
+        JoinCardinalityEstimator::extractNodeCardinalities(ctx, estimates),
+        JoinCardinalityEstimator::extractCollCardinalities(ctx, samplingEstimators));
 }
 
 EdgeSelectivities JoinCardinalityEstimator::estimateEdgeSelectivities(
@@ -86,6 +91,19 @@ NodeCardinalities JoinCardinalityEstimator::extractNodeCardinalities(
         auto cbrRes = estimates.find(qsn->second->root());
         tassert(11514601, "Missing estimate for QSN root", cbrRes != estimates.end());
         nodeCardinalities.push_back(cbrRes->second.outCE);
+    }
+    return nodeCardinalities;
+}
+
+NodeCardinalities JoinCardinalityEstimator::extractCollCardinalities(
+    const JoinReorderingContext& ctx, const SamplingEstimatorMap& samplingEstimators) {
+    NodeCardinalities nodeCardinalities;
+    nodeCardinalities.reserve(ctx.joinGraph.numNodes());
+    for (size_t nodeId = 0; nodeId < ctx.joinGraph.numNodes(); nodeId++) {
+        auto nss = ctx.joinGraph.getNode(nodeId).collectionName;
+        auto samplingEstimator = samplingEstimators.at(nss).get();
+        nodeCardinalities.push_back(CardinalityEstimate{
+            CardinalityType{samplingEstimator->getCollCard()}, EstimationSource::Metadata});
     }
     return nodeCardinalities;
 }
@@ -236,4 +254,9 @@ cost_based_ranker::CardinalityEstimate JoinCardinalityEstimator::getOrEstimateSu
     _subsetCardinalities.emplace(nodes, ce);
     return ce;
 }
+
+CardinalityEstimate JoinCardinalityEstimator::getCollCardinality(NodeId node) {
+    return _collCardinalities[node];
+}
+
 }  // namespace mongo::join_ordering

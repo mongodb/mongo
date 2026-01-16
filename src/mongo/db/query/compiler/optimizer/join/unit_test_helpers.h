@@ -189,7 +189,8 @@ public:
         : JoinCardinalityEstimator(
               jCtx,
               EdgeSelectivities(jCtx.joinGraph.numEdges(), cost_based_ranker::zeroSel),
-              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::oneCE)) {};
+              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::oneCE),
+              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::zeroCE)) {};
 
     cost_based_ranker::CardinalityEstimate getOrEstimateSubsetCardinality(
         const NodeSet& nodes) override {

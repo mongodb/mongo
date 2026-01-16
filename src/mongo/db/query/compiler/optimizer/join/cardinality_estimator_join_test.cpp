@@ -239,7 +239,7 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinality) {
     }
 
     auto jCtx = makeContext();
-    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs);
+    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs, {});
     {
         // Cardinality for subset of size 1 is pulled directly from the CE map.
         ASSERT_EQ(oneCE * 10, jce.getOrEstimateSubsetCardinality(makeNodeSet(1)));
@@ -306,7 +306,7 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalityAlmostCycle) {
     }
 
     auto jCtx = makeContext();
-    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs);
+    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs, {});
     ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2 * 0.3,
               jce.getOrEstimateSubsetCardinality(makeNodeSet(1, 2, 3)));
 }
@@ -351,7 +351,7 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalitySameCollectionPre
     };
 
     auto jCtx = makeContext();
-    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs);
+    JoinCardinalityEstimator jce(jCtx, edgeSels, nodeCEs, {});
 
     // Show that even though the namespace is the same for two of the nodes, we are able to
     // correctly associate CE with the particular filters associated with those nodes.
@@ -366,4 +366,13 @@ TEST_F(JoinPredicateEstimatorFixture, EstimateSubsetCardinalitySameCollectionPre
     ASSERT_EQ(oneCE * 10 * 20 * 30 * 0.1 * 0.2,
               jce.getOrEstimateSubsetCardinality(makeNodeSet(0, 1, 2)));
 }
+
+TEST_F(JoinPredicateEstimatorFixture, GetCollectionCardinality) {
+    auto jCtx = makeContext();
+    JoinCardinalityEstimator jce(jCtx, {}, {}, {oneCE * 10, oneCE * 20, oneCE * 30});
+    ASSERT_EQ(oneCE * 10, jce.getCollCardinality(0));
+    ASSERT_EQ(oneCE * 20, jce.getCollCardinality(1));
+    ASSERT_EQ(oneCE * 30, jce.getCollCardinality(2));
+}
+
 }  // namespace mongo::join_ordering
