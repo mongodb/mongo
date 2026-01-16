@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/query-optimization
+  - "api_version_prepare_txn.js":
+    approvers:
+      - 10gen/server-transactions
