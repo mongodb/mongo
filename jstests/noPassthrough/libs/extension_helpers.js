@@ -93,8 +93,8 @@ export function withExtensions(
     extToOptionsMap,
     testFn,
     topologiesToTest = ["standalone", "sharded"],
-    numShards = 1,
-    additionalOptions = {},
+    shardingOptions = {},
+    additionalMongodOptions = {},
 ) {
     const extensionsToLoad = [];
 
@@ -108,7 +108,7 @@ export function withExtensions(
         {
             loadExtensions: extensionsToLoad,
         },
-        additionalOptions,
+        additionalMongodOptions,
     );
 
     function runStandaloneTest(func) {
@@ -119,15 +119,20 @@ export function withExtensions(
 
     function runShardedTest(func) {
         {
-            const shardingTest = new ShardingTest({
-                shards: numShards,
-                rs: {nodes: 1},
-                mongos: 1,
-                config: 1,
-                mongosOptions: options,
-                configOptions: options,
-                rsOptions: options,
-            });
+            const shardingTest = new ShardingTest(
+                Object.assign(
+                    {
+                        shards: 1,
+                        rs: {nodes: 1},
+                        mongos: 1,
+                        config: 1,
+                        mongosOptions: options,
+                        configOptions: options,
+                        rsOptions: options,
+                    },
+                    shardingOptions,
+                ),
+            );
             func(shardingTest.s, shardingTest);
             shardingTest.stop();
         }
@@ -165,7 +170,7 @@ export function withExtensionsAndMongot(
     extToOptionsMap,
     testFn,
     topologiesToTest = ["standalone", "sharded"],
-    numShards = 1,
+    shardingOptions = {},
 ) {
     // Set up mongot mock.
     let mongotmock;
@@ -189,7 +194,7 @@ export function withExtensionsAndMongot(
     };
 
     try {
-        withExtensions(extToOptionsMap, wrappedTestFn, topologiesToTest, numShards, additionalOptions);
+        withExtensions(extToOptionsMap, wrappedTestFn, topologiesToTest, shardingOptions, additionalOptions);
     } finally {
         if (mongotmock) {
             mongotmock.stop();

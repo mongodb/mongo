@@ -194,12 +194,28 @@ public:
     // TODO SERVER-114234 Set properties for this to be a collectionless stage.
     mongo::BSONObj getProperties() const override {
         mongo::extension::MongoExtensionStaticProperties properties;
-        mongo::BSONObjBuilder builder;
+
+        // Source stage properties.
         properties.setPosition(mongo::extension::MongoExtensionPositionRequirementEnum::kFirst);
         properties.setHostType(
             mongo::extension::MongoExtensionHostTypeRequirementEnum::kRunOnceAnyNode);
         properties.setRequiresInputDocSource(false);
         properties.setAllowedInFacet(false);
+
+        // Set up some required privileges for auth testing.
+        mongo::extension::MongoExtensionRequiredPrivilege privilege;
+        privilege.setResourcePattern(
+            mongo::extension::MongoExtensionPrivilegeResourcePatternEnum::kNamespace);
+        mongo::extension::MongoExtensionPrivilegeActionEntry findAction;
+        findAction.setAction(mongo::extension::MongoExtensionPrivilegeActionEnum::kFind);
+        mongo::extension::MongoExtensionPrivilegeActionEntry listIndexesAction;
+        listIndexesAction.setAction(
+            mongo::extension::MongoExtensionPrivilegeActionEnum::kListIndexes);
+        privilege.setActions({listIndexesAction, findAction});
+        properties.setRequiredPrivileges(
+            std::vector<mongo::extension::MongoExtensionRequiredPrivilege>{privilege});
+
+        mongo::BSONObjBuilder builder;
         properties.serialize(&builder);
         return builder.obj();
     }

@@ -448,4 +448,4 @@ function runTests(conn) {
     }
 }
 
-withExtensions({"liblimit_mongo_extension.so": {}}, runTests, ["sharded", "standalone", "replica_set"], 2);
+withExtensions({"liblimit_mongo_extension.so": {}}, runTests, ["sharded", "standalone", "replica_set"], {shards: 2});
