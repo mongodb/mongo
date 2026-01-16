@@ -1682,6 +1682,27 @@ variables:
           format_args: disagg.mode=switch ops.verify=1 runs.mirror=1 table1.runs.source=table table1.disagg.enabled=0 runs.timer=5:10
           times: 5
 
+  - &format-stress-test-disagg-multi
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000
+          times: 5
+
+  - &format-stress-test-disagg-multi-data-validation
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "format test disagg"
+        vars:
+          # Validate data with a non-layered table.
+          format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 runs.ops=500000:2000000
+          times: 5
+
 #######################################
 #               Tasks                 #
 #######################################
@@ -4760,6 +4781,18 @@ tasks:
   - <<: *format-stress-test-disagg-switch-data-validation
     name: format-stress-test-disagg-switch-data-validation-3
     tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi
+    name: format-stress-test-disagg-multi-1
+    tags: ["stress-test-disagg-fail", "stress-test-disagg-san-fail"]
+  - <<: *format-stress-test-disagg-multi
+    name: format-stress-test-disagg-multi-2
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi-data-validation
+    name: format-stress-test-disagg-multi-validation-1
+    tags: ["stress-test-disagg-fail"]
+  - <<: *format-stress-test-disagg-multi-data-validation
+    name: format-stress-test-disagg-multi-validation-2
+    tags: ["stress-test-disagg-fail"]
 
   - name: format-stress-test-disagg-leader-pull-request
     tags: ["pull_request"]
@@ -7550,7 +7583,7 @@ buildvariants:
     - name: compile
     - name: examples-c-test
     - name: .unit_test_tsan
-    # FIXME-WT-16424 Remove unit test tsan once we incorporate TSAN environment variable setting into run.py
+    # FIXME-WT-16066 Remove unit test tsan once we incorporate TSAN environment variable setting into run.py
     - name: unit-test-tsan
       distros: amazon2023-arm64-latest-large-m8g
     - name: unit-test-hook-disagg-leader-tsan

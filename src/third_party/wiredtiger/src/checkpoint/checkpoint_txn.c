@@ -1348,23 +1348,6 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
     ckpt_tree_duration_usecs = WT_CLOCKDIFF_US(time_stop_ckpt_tree, time_start_ckpt_tree);
     WT_STAT_CONN_SET(session, checkpoint_tree_duration, ckpt_tree_duration_usecs);
 
-    /*
-     * Copy any additional metadata to the shared metadata table, especially to ensure that the
-     * shared metadata table contains entries even for empty tables that would not otherwise
-     * participate in the checkpoint. This could include metadata that we already copied as a part
-     * of the checkpointing process above, but that's ok, as we would just overwrite the new
-     * metadata with exactly the same value. It is also possible that the table has already been
-     * dropped, in which case those entries would be silently ignored.
-     *
-     * FIXME-WT-14725: We should make this more efficient in the future, and we should also include
-     * a protection against someone creating a layered table, dropping the table, and then
-     * recreating a local table with the same name.
-     */
-    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
-        WT_WITH_SCHEMA_LOCK(session, ret = __wt_disagg_copy_metadata_process(session));
-        WT_ERR(ret);
-    }
-
     /* Wait prior to checkpointing the history store to simulate checkpoint slowness. */
     __checkpoint_timing_stress(session, WT_TIMING_STRESS_HS_CHECKPOINT_DELAY, &tsp);
 
@@ -1403,6 +1386,14 @@ __checkpoint_db_internal(WT_SESSION_IMPL *session, const char *cfg[])
         time_stop_hs = __wt_clock(session);
         hs_ckpt_duration_usecs = WT_CLOCKDIFF_US(time_stop_hs, time_start_hs);
         WT_STAT_CONN_SET(session, txn_hs_ckpt_duration, hs_ckpt_duration_usecs);
+    }
+
+    /*
+     * Copy any updated metadata to the shared metadata table.
+     */
+    if (__wt_conn_is_disagg(session) && conn->layered_table_manager.leader) {
+        WT_WITH_SCHEMA_LOCK(session, ret = __wt_disagg_update_metadata_process(session));
+        WT_ERR(ret);
     }
 
     /*

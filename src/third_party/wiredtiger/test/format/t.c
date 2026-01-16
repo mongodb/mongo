@@ -431,14 +431,14 @@ skip_operations:
 
     trace_teardown();
 
+    disagg_teardown_multi_node();
+
     /* Overwrite the progress line with a completion line. */
     if (!GV(QUIET))
         printf("\r%78s\r", " ");
     __wt_seconds(NULL, &now);
     printf("%s: successful run completed (%" PRIu64 " seconds)\n ", progname, now - start);
     fflush(stdout);
-
-    disagg_teardown_multi_node();
 
     config_clear();
 

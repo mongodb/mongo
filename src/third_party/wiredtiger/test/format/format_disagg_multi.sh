@@ -13,16 +13,36 @@ trap 'onintr' 2
 
 usage() {
     echo "usage: $0"
-    echo "    -h home      run directory (defaults to RUNDIR)"
+    echo "    -h home      run directory (defaults to $home_dir)"
+    echo "    -c config    custom config file (defaults to CONFIG.disagg)"
+    echo "    -v           enable multi-node validation (default: disabled)"
+    echo "    -r rows      rows range for multi-node disagg (default:$rows_val)"
+    echo "    -o ops       ops range for multi-node disagg (default:$ops_val)"
     exit 1
 }
 
 home_dir="RUNDIR"
+custom_config=""
+multi_validation_val=0
+rows_val="100000:500000"
+ops_val="500000:2000000"
 
 while :; do
     case $1 in
     -h | --home)
         home_dir="$2"
+        shift ; shift ;;
+    -c | --config)
+        custom_config="$2"
+        shift ; shift ;;
+    -v | --validation)
+        multi_validation_val=1
+        shift ;;
+    -r | --rows)
+        rows_val="$2"
+        shift ; shift ;;
+    -o | --ops)
+        ops_val="$2"
         shift ; shift ;;
     -?*)
         usage
@@ -38,9 +58,15 @@ if [ $# -ne 0 ]; then
     usage
 fi
 
+if [ -n "$custom_config" ]; then
+    CONFIG="$custom_config"
+    DISAGG_MULTI_CONFIG=""
+else
+    CONFIG="../../../test/format/CONFIG.disagg"
+    DISAGG_MULTI_CONFIG="disagg.multi=1 runs.predictable_replay=1 disagg.multi_validation=$multi_validation_val runs.rows=$rows_val runs.ops=$ops_val "
+fi
+
 PROG="./t"
-CONFIG="../../../test/format/CONFIG.disagg"
-DISAGG_MULTI_CONFIG="disagg.multi=1 disagg.multi_validation=1 runs.predictable_replay=1 runs.rows=100000:500000 runs.ops=5000000:20000000 "
 LEADER_LOG="$home_dir/leader.out"
 FOLLOWER_LOG="$home_dir/follower/follower.out"
 SESSION_NAME="format_disagg_multi_node"
@@ -62,8 +88,8 @@ msg "Database directory: $home_dir"
 # Run the test in background
 tmux new-session -d -s "$SESSION_NAME" -n "run" \
     "clear; \
-     echo '${CYAN}Running: $PROG -h $home_dir -c $CONFIG $DISAGG_MULTI_CONFIG $LIMIT_CONFIG${RESET}'; echo; \
-     $PROG -h $home_dir -c $CONFIG $DISAGG_MULTI_CONFIG $LIMIT_CONFIG; \
+     echo '${CYAN}Running: $PROG -h $home_dir -c $CONFIG $DISAGG_MULTI_CONFIG${RESET}'; echo; \
+     $PROG -h $home_dir -c $CONFIG $DISAGG_MULTI_CONFIG; \
      echo; \
      echo '${GREEN}Program finished. Press Ctrl-c :kill-session to close.${RESET}'; \
      read -p 'Press Enter to exit...'"

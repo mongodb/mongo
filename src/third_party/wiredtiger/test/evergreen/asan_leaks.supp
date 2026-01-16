@@ -18,9 +18,6 @@ leak:__chunkcache_metadata_queue_internal
 # FIXME-WT-16328: test_layered08
 leak:__wt_dlopen
 
-# FIXME-WT-16330: test_schema02
-leak:__schema_open_table
-
 # FIXME-WT-16331: test_tiered04
 leak:__tiered_name_str
 

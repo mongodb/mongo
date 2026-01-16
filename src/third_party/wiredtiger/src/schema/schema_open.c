@@ -460,42 +460,47 @@ __schema_open_table(WT_SESSION_IMPL *session)
 
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE));
 
-    WT_RET(__wt_config_gets(session, table_cfg, "columns", &cval));
-    WT_RET(__wt_config_gets(session, table_cfg, "key_format", &cval));
-    WT_RET(__wt_strndup(session, cval.str, cval.len, &table->key_format));
-    WT_RET(__wt_config_gets(session, table_cfg, "value_format", &cval));
-    WT_RET(__wt_strndup(session, cval.str, cval.len, &table->value_format));
+    WT_ERR(__wt_config_gets(session, table_cfg, "columns", &cval));
+    WT_ERR(__wt_config_gets(session, table_cfg, "key_format", &cval));
+    WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->key_format));
+    WT_ERR(__wt_config_gets(session, table_cfg, "value_format", &cval));
+    WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->value_format));
 
     /* Point to some items in the copy to save re-parsing. */
-    WT_RET(__wt_config_gets(session, table_cfg, "columns", &table->colconf));
+    WT_ERR(__wt_config_gets(session, table_cfg, "columns", &table->colconf));
 
-    WT_RET(__wt_is_simple_table(session, &table->colconf, &table->is_simple));
+    WT_ERR(__wt_is_simple_table(session, &table->colconf, &table->is_simple));
 
     /* Check that the columns match the key and value formats. */
     if (!table->is_simple)
-        WT_RET(__wti_schema_colcheck(session, table->key_format, table->value_format,
+        WT_ERR(__wti_schema_colcheck(session, table->key_format, table->value_format,
           &table->colconf, &table->nkey_columns, NULL));
 
-    WT_RET(__wt_config_gets(session, table_cfg, "colgroups", &table->cgconf));
+    WT_ERR(__wt_config_gets(session, table_cfg, "colgroups", &table->cgconf));
 
     /* Count the number of column groups. */
     __wt_config_subinit(session, &cparser, &table->cgconf);
     table->ncolgroups = 0;
     while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
         ++table->ncolgroups;
-    WT_RET_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
     if (table->ncolgroups > 0 && table->is_simple)
-        WT_RET_MSG(session, EINVAL, "%s requires a table with named columns", tablename);
+        WT_ERR_MSG(session, EINVAL, "%s requires a table with named columns", tablename);
 
     if ((ret = __wt_config_gets(session, table_cfg, "shared", &cval)) == 0)
         table->is_tiered_shared = true;
-    WT_RET_NOTFOUND_OK(ret);
+    WT_ERR_NOTFOUND_OK(ret, false);
 
-    WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
-    WT_RET(__wti_schema_open_colgroups(session, table));
+    WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
+    WT_ERR(__wti_schema_open_colgroups(session, table));
 
-    return (0);
+    if (0) {
+err:
+        WT_TRET(__wt_schema_close_table(session, table));
+    }
+
+    return (ret);
 }
 
 /*

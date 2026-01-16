@@ -500,7 +500,7 @@ operations(u_int ops_seconds, u_int run_current, u_int run_total)
      */
     rollback_to_stable(session);
 
-    disagg_validate_multi_node(session);
+    disagg_sync_multi_node(session);
 
     replay_run_end(session);
 

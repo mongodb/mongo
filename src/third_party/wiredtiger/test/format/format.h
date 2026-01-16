@@ -35,6 +35,7 @@
 #include <sys/resource.h>
 #endif
 #include <signal.h>
+#include <sys/socket.h>
 
 #define BUILDDIR "../../"
 #define EXTPATH BUILDDIR "ext/" /* Extensions path */
@@ -211,8 +212,8 @@ extern u_int ntables;
 #define DATASOURCE(table, ds) (strcmp((table)->v[V_TABLE_RUNS_SOURCE].vstr, ds) == 0)
 
 typedef struct {
-    wt_shared volatile uint64_t leader_hash;
-    wt_shared volatile uint64_t follower_hash;
+    wt_shared uint64_t leader_hash;
+    wt_shared uint64_t follower_hash;
 } DISAGG_MULTI_DB_HASH;
 
 typedef struct {
@@ -311,6 +312,7 @@ typedef struct {
     pid_t follower_pid; /* For multi-node disagg follower process */
     char checkpoint_metadata[FILENAME_MAX]; /* Last checkpoint metadata picked up by follower. */
     DISAGG_MULTI_DB_HASH *disagg_multi_db_hash; /* Leader and follower database hash */
+    int disagg_multi_sync_socket;               /* Socket for leader-follower sync */
 
     bool column_store_config;           /* At least one column-store table configured */
     bool disagg_storage_config;         /* If disaggregated storage is configured */
@@ -462,7 +464,7 @@ bool disagg_is_multi_node(void);
 void disagg_setup_multi_node(void);
 void disagg_switch_roles(void);
 void disagg_teardown_multi_node(void);
-void disagg_validate_multi_node(WT_SESSION *);
+void disagg_sync_multi_node(WT_SESSION *);
 bool enable_session_prefetch(void);
 void fclose_and_clear(FILE **);
 void follower_read_latest_checkpoint(void);
