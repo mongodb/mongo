@@ -1,4 +1,4 @@
-VARIATION addEdgesFromExpr_earlyEnd
+VARIATION addEdgesFromExpr_addImplicitEdge
 input {
     "pipeline": [
         {

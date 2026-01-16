@@ -222,8 +222,7 @@ void addExprJoinPredicates(MutableJoinGraph& graph,
                            const std::vector<boost::intrusive_ptr<const Expression>>& joinPreds,
                            PathResolver& pathResolver,
                            const std::vector<LetVariable>& letVars,
-                           NodeId localColl,
-                           NodeId foreignColl) {
+                           NodeId foreignNodeId) {
     for (auto&& joinPred : joinPreds) {
         auto eqNode = tassert_cast<const ExpressionCompare*>(joinPred.get());
         auto left = tassert_cast<const ExpressionFieldPath*>(eqNode->getChildren()[0].get());
@@ -233,19 +232,19 @@ void addExprJoinPredicates(MutableJoinGraph& graph,
         boost::optional<PathId> foreignPath;
 
         if (left->isVariableReference()) {
-            // LHS is referencing a field from local collection
+            // LHS is referencing a field from intermediate join result aka local "collection".
             // RHS is referencing a field from the foreign collection
-            localPath = pathResolver.addPath(
-                localColl, localCollectionFieldPath(letVars, left->getVariableId()));
+            localPath =
+                pathResolver.resolve(localCollectionFieldPath(letVars, left->getVariableId()));
             foreignPath =
-                pathResolver.addPath(foreignColl, right->getFieldPathWithoutCurrentPrefix());
+                pathResolver.addPath(foreignNodeId, right->getFieldPathWithoutCurrentPrefix());
         } else if (right->isVariableReference()) {
-            // LHS is referencing a field from the foreign collection
-            // RHS is referencing a field from local collection
-            localPath = pathResolver.addPath(
-                localColl, localCollectionFieldPath(letVars, right->getVariableId()));
+            // LHS is referencing a field from the foreign collection.
+            // RHS is referencing a field from intermediate join result aka local "collection".
+            localPath =
+                pathResolver.resolve(localCollectionFieldPath(letVars, right->getVariableId()));
             foreignPath =
-                pathResolver.addPath(foreignColl, left->getFieldPathWithoutCurrentPrefix());
+                pathResolver.addPath(foreignNodeId, left->getFieldPathWithoutCurrentPrefix());
         } else {
             // We expect one of the children of the ExpressionCompare to be a variable and the other
             // to be a field path.
@@ -254,8 +253,8 @@ void addExprJoinPredicates(MutableJoinGraph& graph,
         tassert(11317204,
                 "expected to resolve both local and foreign paths",
                 localPath.has_value() && foreignPath.has_value());
-
-        graph.addExprEqualityEdge(localColl, foreignColl, *localPath, *foreignPath);
+        auto localNodeId = pathResolver[*localPath].nodeId;
+        graph.addExprEqualityEdge(localNodeId, foreignNodeId, *localPath, *foreignPath);
     }
 }
 
@@ -375,7 +374,6 @@ StatusWith<AggJoinModel> AggJoinModel::constructJoinModel(const Pipeline& pipeli
                                   swPreds.getValue().joinPredicates,
                                   pathResolver,
                                   lookup->getLetVariables(),
-                                  *baseNodeId,
                                   *foreignNodeId);
 
             auto next = suffix->popFront();

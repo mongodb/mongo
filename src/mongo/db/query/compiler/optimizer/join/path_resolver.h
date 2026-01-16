@@ -43,9 +43,34 @@ public:
     PathResolver(NodeId baseNode, std::vector<ResolvedPath>& resolvedPaths)
         : _baseNode(baseNode), _resolvedPaths(resolvedPaths), _nodeMaps(_baseNode + 1) {}
 
+    /**
+     * Introduces a new prefix 'embedPath' in the resolver that is associated with the node
+     * 'nodeId'.
+     */
     void addNode(NodeId nodeId, const FieldPath& embedPath);
 
+    /**
+     * Add a new path to the given node. The known node prefixes are not consulted.
+     * This function should be used when it is know for sure that this particular fieldPath comes
+     * from the node 'nodeId'.
+     * Unlike the 'resolve' function, this function never removes prefixes of the matched node from
+     * the 'fieldPath'. It means, that even after call 'addNode(1, "a")', 'addNode(1, "a.b.c")'
+     * resolves to the field "a.b.c" of node 1. However, 'resolve("a.b.c")' resolves to field "b.c"
+     * of node 1 and 'resolve("a.a.b.c")' resolved to the field "a.b.c" of node 1.
+     */
     PathId addPath(NodeId nodeId, FieldPath fieldPath);
+
+    /**
+     * The function looks for known prefixes, the longest match prefix defines a collection to which
+     * this field path is resolved.
+     * It is important to understand that 'addNode' calls changes how a particular paths is
+     * resolved. Foe example:
+     * 1. Call for "a.b.c", no prefixes matched, the field is resolved to "a.b.c" of node
+     * '_baseNode'.
+     * 2. After 'addNode(1, "a")' is called, the field "a.b.c" is resolved to "b.c" of node 1.
+     * 3. After 'addNode(2, "a.b")' is called, the field "a.b.c" is resolved to "c" of node 2.
+     * Because prefix "a.b" of node 2 is longer than prefix "a" of node 1.
+     */
     PathId resolve(const FieldPath& path);
 
     const ResolvedPath& operator[](PathId PathId) const {
