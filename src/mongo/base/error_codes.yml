@@ -1140,6 +1140,11 @@ error_codes:
       extra: IFRFlagRetryInfo,
     }
   - {code: 480, name: UnrecognizedIFRFlag}
+  - {
+      code: 481,
+      name: StreamProcessorBadChangeStreamPipeline,
+      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+    }
 
   # ^^^^
   # Add new codes, sequentially numbered, above.
