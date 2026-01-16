@@ -29,104 +29,198 @@
 
 #pragma once
 
-#include <cstdint>
-#include <mutex>
-
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/random.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 
+#include <cstdint>
+#include <utility>
+
 namespace mongo {
 
-/**
- * Rate limiting is used to put a bound on the number of requests to a certain resource over a fixed
- * time window. This implementation is approximate in the sense that it may permit the bound to
- * exceeded. The bound is approximate as a trade off to reduce contention on internal resources.
+/*
+ * The rate limiting policy is either a sliding window or a sampling based policy. The sliding
+ * window policy is used to limit the number of requests over a fixed time period. The sampling
+ * based policy is used to limit the number of requests over a fixed percentage.
  */
-class RateLimiting {
-    using RequestCount = uint32_t;
+class RateLimiter {
+    using Limit = uint32_t;
+
+    struct WindowBasedPolicy {
+        using RequestCount = uint32_t;
+        /*
+         * Constructor for a rate limiter. Specify the number of requests you want to take place, as
+         * well as the time period in milliseconds.
+         */
+        WindowBasedPolicy(const WindowBasedPolicy&) = delete;
+        WindowBasedPolicy& operator=(const WindowBasedPolicy&) = delete;
+        WindowBasedPolicy(WindowBasedPolicy&&) = delete;
+        WindowBasedPolicy& operator=(WindowBasedPolicy&&) = delete;
+        ~WindowBasedPolicy() = default;
+        WindowBasedPolicy() = default;
+        /*
+         * Getter for the sampling rate.
+         */
+        inline RequestCount getSamplingRate() const noexcept {
+            return _requestLimit.load();
+        }
+
+        /*
+         * Setter for the sampling rate.
+         */
+        inline void setSamplingRate(RequestCount samplingRate) noexcept {
+            _requestLimit.store(samplingRate);
+        }
+
+        /*
+         * A method that ensures a more steady rate of requests. Rather than only looking at the
+         * current time block, this method simulates a sliding window to estimate how many requests
+         * occurred in the last full time period. Like the above, returns whether the request should
+         * be handled, and resets the window if enough time has passed.
+         */
+        bool handle();
+
+    private:
+        /*
+         * Resets the current window if it has ended. Returns the current time. This must be called
+         * in the beginning of each handleRequest...() method.
+         */
+        Date_t tickWindow();
+
+        /*
+         * Clock source used to track time.
+         */
+        ClockSource* const _clockSource = SystemClockSource::get();
+
+        /*
+         * Sampling rate is the bound on the number of requests we want to admit per window.
+         */
+        AtomicWord<RequestCount> _requestLimit = 0;
+
+        /*
+         * Time period is the window size in ms.
+         */
+        const Milliseconds _timePeriod = Seconds{1};
+
+        /*
+         * Window start.
+         */
+        Date_t _windowStart;
+
+        /*
+         * Count of requests handled in the previous window.
+         */
+        RequestCount _prevCount = 0;
+
+        /*
+         * Count of requests handled in the current window.
+         */
+        RequestCount _currentCount = 0;
+
+        /*
+         * Mutex used when reading/writing the window.
+         */
+        stdx::mutex _windowMutex;  // NOLINT
+    };
+
+    struct SampleBasedPolicy {
+        using SampleRate = uint32_t;
+        static constexpr uint32_t kDenominator = 1000;
+
+        /*
+         * Constructor for a rate limiter. Specify the percentage of requests you want to take place
+         */
+        SampleBasedPolicy(const SampleBasedPolicy&) = delete;
+        SampleBasedPolicy& operator=(const SampleBasedPolicy&) = delete;
+        SampleBasedPolicy(SampleBasedPolicy&&) = delete;
+        SampleBasedPolicy& operator=(SampleBasedPolicy&&) = delete;
+        ~SampleBasedPolicy() = default;
+        SampleBasedPolicy() = default;
+
+        /*
+         * Getter for the sampling rate.
+         */
+        inline SampleRate getSamplingRate() const noexcept {
+            return _samplingRate.load();
+        }
+
+        /*
+         * Setter for the sampling rate.
+         */
+        inline void setSamplingRate(SampleRate samplingRate) noexcept {
+            _samplingRate.store(samplingRate);
+        }
+
+        /*
+         * Setter for the random seed.
+         */
+        inline void setRandomSeed(uint64_t randomSeed) noexcept {
+            _randomSeed.store(randomSeed);
+        }
+
+        /*
+         * A method that ensures a steady rate of requests. This method uses a pseudo random
+         * number generator to determine whether the request should be handled or not.
+         */
+        bool handle();
+
+    private:
+        AtomicWord<SampleRate> _samplingRate = 0;
+        AtomicWord<uint64_t> _randomSeed = 0;
+    };
 
 public:
-    /*
-     * Constructor for a rate limiter. Specify the number of requests you want to take place, as
-     * well as the time period in milliseconds.
-     */
-    RateLimiting(RequestCount samplingRate,
-                 Milliseconds timePeriod = Seconds{1},
-                 ClockSource* clockSource = nullptr);
+    enum PolicyType { kSampleBasedPolicy, kWindowBasedPolicy };
 
     /*
      * Getter for the sampling rate.
      */
-    RequestCount getSamplingRate() {
-        return _samplingRate.load();
+    inline Limit getSamplingRate() const noexcept {
+        if (_mode.load() == PolicyType::kWindowBasedPolicy) {
+            return _windowPolicy.getSamplingRate();
+        } else {
+            return _samplePolicy.getSamplingRate();
+        }
     }
 
     /*
-     * Setter for the sampling rate.
+     * A method that ensures a more steady rate of requests.
+     * See WindowBasedPolicy::handle() & SampleBasedPolicy::handle() for more details.
      */
-    void setSamplingRate(RequestCount samplingRate) {
-        _samplingRate.store(samplingRate);
+    bool handle();
+
+    /*
+     * Returns the policy type.
+     */
+    PolicyType getPolicyType() const;
+
+    /**
+     * Round a fractional sampling rate to an integer value per thousand. For example, a
+     * samplingRate of 0.1 (10%) will be rounded to 100 (per thousand).
+     */
+    static int roundSampleRateToPerThousand(double samplingRate);
+
+    void configureSampleBased(uint32_t rate, int seed) {
+        _samplePolicy.setSamplingRate(rate);
+        _samplePolicy.setRandomSeed(seed);
+        _mode.store(PolicyType::kSampleBasedPolicy);
     }
 
-    /*
-     * A simple method for rate limiting. Returns false if we have reached the request limit for the
-     * current time window; otherwise, returns true and adds the request to the count for the
-     * current window. If we have passed the end of the previous window, the slate is wiped clean.
-     */
-    bool handleRequestFixedWindow();
+    void configureWindowBased(uint32_t rate) {
+        _windowPolicy.setSamplingRate(rate);
+        _mode.store(PolicyType::kWindowBasedPolicy);
+    }
 
-    /*
-     * A method that ensures a more steady rate of requests. Rather than only looking at the current
-     * time block, this method simulates a sliding window to estimate how many requests occurred in
-     * the last full time period. Like the above, returns whether the request should be handled, and
-     * resets the window if enough time has passed.
-     */
-    bool handleRequestSlidingWindow();
+    RateLimiter() = default;
+    ~RateLimiter() = default;
 
 private:
-    /*
-     * Resets the current window if it has ended. Returns the current time. This must be called in
-     * the beginning of each handleRequest...() method.
-     */
-    Date_t tickWindow();
-
-    /*
-     * Clock source used to track time.
-     */
-    ClockSource* const _clockSource;
-
-    /*
-     * Sampling rate is the bound on the number of requests we want to admit per window.
-     */
-    AtomicWord<RequestCount> _samplingRate;
-
-    /*
-     * Time period is the window size in ms.
-     */
-    const Milliseconds _timePeriod;
-
-    /*
-     * Window start.
-     */
-    Date_t _windowStart;
-
-    /*
-     * Count of requests handled in the previous window.
-     */
-    RequestCount _prevCount;
-
-    /*
-     * Count of requests handled in the current window.
-     */
-    RequestCount _currentCount;
-
-    /*
-     * Mutex used when reading/writing the window.
-     */
-    SimpleMutex _windowMutex;
+    SampleBasedPolicy _samplePolicy;
+    WindowBasedPolicy _windowPolicy;
+    AtomicWord<PolicyType> _mode = PolicyType::kWindowBasedPolicy;
 };
 }  // namespace mongo

@@ -31,20 +31,10 @@
 
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/system_clock_source.h"
-
+#include "mongo/util/overloaded_visitor.h"
 namespace mongo {
-RateLimiting::RateLimiting(RequestCount samplingRate,
-                           Milliseconds timePeriod,
-                           ClockSource* clockSource)
-    : _clockSource(clockSource != nullptr ? clockSource : SystemClockSource::get()),
-      _samplingRate(samplingRate),
-      _timePeriod(timePeriod),
-      _windowStart(_clockSource->now()),
-      _prevCount(0),
-      _currentCount(0) {}
 
-Date_t RateLimiting::tickWindow() {
+Date_t RateLimiter::WindowBasedPolicy::tickWindow() {
     Date_t currentTime = _clockSource->now();
 
     // Elapsed time since window start exceeds the time period. Start a new window.
@@ -56,18 +46,7 @@ Date_t RateLimiting::tickWindow() {
     return currentTime;
 }
 
-bool RateLimiting::handleRequestFixedWindow() {
-    stdx::unique_lock windowLock{_windowMutex};
-    tickWindow();
-
-    if (_currentCount < _samplingRate.load()) {
-        _currentCount += 1;
-        return true;
-    }
-    return false;
-}
-
-bool RateLimiting::handleRequestSlidingWindow() {
+bool RateLimiter::WindowBasedPolicy::handle() {
     stdx::unique_lock windowLock{_windowMutex};
 
     Date_t currentTime = tickWindow();
@@ -89,10 +68,34 @@ bool RateLimiting::handleRequestSlidingWindow() {
     // Add this estimate to the requests we know have taken place within the current time block.
     double estimatedCount = _currentCount + estimatedRemaining;
 
-    if (estimatedCount < _samplingRate.load()) {
+    if (estimatedCount < _requestLimit.load()) {
         _currentCount += 1;
         return true;
     }
     return false;
 }
+
+bool RateLimiter::SampleBasedPolicy::handle() {
+    SampleRate curRate = _samplingRate.load();
+    thread_local PseudoRandom prng{_randomSeed.load()};
+    return prng.nextUInt32(kDenominator) < curRate;
+}
+
+bool RateLimiter::handle() {
+    if (_mode.load() == RateLimiter::PolicyType::kWindowBasedPolicy) {
+        return _windowPolicy.handle();
+    } else {
+        return _samplePolicy.handle();
+    }
+}
+
+RateLimiter::PolicyType RateLimiter::getPolicyType() const {
+    return _mode.load();
+}
+
+int RateLimiter::roundSampleRateToPerThousand(double samplingRate) {
+    // Round up to ensure that any nonzero sample rate is not rounded down to zero.
+    return static_cast<int>(ceil(samplingRate * SampleBasedPolicy::kDenominator));
+}
+
 }  // namespace mongo

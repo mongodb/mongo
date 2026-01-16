@@ -51,6 +51,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
+#include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -75,9 +76,8 @@ const Decorable<ServiceContext>::Decoration<std::unique_ptr<QueryStatsStoreManag
     QueryStatsStoreManager::get =
         ServiceContext::declareDecoration<std::unique_ptr<QueryStatsStoreManager>>();
 
-const Decorable<ServiceContext>::Decoration<std::unique_ptr<RateLimiting>>
-    QueryStatsStoreManager::getRateLimiter =
-        ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
+const Decorable<ServiceContext>::Decoration<RateLimiter> QueryStatsStoreManager::getRateLimiter =
+    ServiceContext::declareDecoration<RateLimiter>();
 
 
 namespace {
@@ -135,6 +135,25 @@ void assertConfigurationAllowed() {
             isQueryStatsFeatureEnabled());
 }
 
+/**
+ * Configure the rate limiter. This reads the configured values from the server parameters. To
+ * ensure idempotency when both parameters are set to non-zero values, the sample-based policy takes
+ * precedence over the window-based policy.
+ */
+void configureRateLimiter(ServiceContext* serviceCtx) {
+    auto& limiter = QueryStatsStoreManager::getRateLimiter(serviceCtx);
+
+    const auto configuredRateLimit = internalQueryStatsRateLimit.load();
+    const auto configuredSamplingRate =
+        RateLimiter::roundSampleRateToPerThousand(internalQueryStatsSampleRate.load());
+
+    if (configuredSamplingRate > 0) {
+        limiter.configureSampleBased(configuredSamplingRate, SecureRandom().nextInt32());
+    } else {
+        limiter.configureWindowBased(configuredRateLimit < 0 ? INT_MAX : configuredRateLimit);
+    }
+}
+
 class QueryStatsOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
@@ -149,9 +168,9 @@ public:
         // challenging while there is concurrent traffic.
     }
 
-    void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) override {
+    void updateRateLimiter(ServiceContext* serviceCtx) override {
         assertConfigurationAllowed();
-        QueryStatsStoreManager::getRateLimiter(serviceCtx).get()->setSamplingRate(samplingRate);
+        configureRateLimiter(serviceCtx);
     }
 };
 
@@ -165,7 +184,6 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         // 'internalQueryStatsCacheSize', but we will prevent changing its shape or rate limit at
         // runtime unless the feature flag is enabled (at whatever current FCV when the
         // configuration setParameter command is run).
-
         query_stats_util::queryStatsStoreOnParamChangeUpdater(serviceCtx) =
             std::make_unique<QueryStatsOnParamChangeUpdaterImpl>();
         size_t size = getQueryStatsStoreSize();
@@ -187,9 +205,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
 
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
-        auto configuredSamplingRate = internalQueryStatsRateLimit.load();
-        QueryStatsStoreManager::getRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
-            configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate, Seconds{1});
+        configureRateLimiter(serviceCtx);
     }};
 
 /**
@@ -208,10 +224,12 @@ bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
  * Internal check for whether we should collect metrics. This checks the rate limiting
  * configuration for a global on/off decision and, if enabled, delegates to the rate limiter.
  */
-bool shouldCollect(const ServiceContext* serviceCtx) {
+bool shouldCollect(ServiceContext* serviceCtx) {
+    auto& limiter = QueryStatsStoreManager::getRateLimiter(serviceCtx);
+
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
-    auto samplingRate = QueryStatsStoreManager::getRateLimiter(serviceCtx)->getSamplingRate();
+    const auto samplingRate = limiter.getSamplingRate();
     if (samplingRate <= 0) {
         LOGV2_DEBUG(8473001,
                     5,
@@ -219,9 +237,9 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
                     "samplingRate"_attr = samplingRate);
         return false;
     }
+
     // Check if rate limiting allows us to collect queryStats for this request.
-    if (samplingRate < INT_MAX &&
-        !QueryStatsStoreManager::getRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
+    if (samplingRate < INT_MAX && !limiter.handle()) {
         queryStatsRateLimitedRequestsMetric.increment();
         LOGV2_DEBUG(8473002,
                     5,
@@ -438,7 +456,6 @@ void writeQueryStats(OperationContext* opCtx,
                      const QueryStatsSnapshot& snapshot,
                      std::unique_ptr<SupplementalStatsEntry> supplementalMetrics,
                      bool willNeverExhaust) {
-
     // Generally we expect a 'key' to write query stats. However, for a change stream query, we
     // expect it has no 'key' after its first writeQueryStats(), but it must have a
     // 'queryStatsKeyHash' for its entry to be updated.

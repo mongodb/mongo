@@ -138,8 +138,18 @@ public:
     }
 
     /** A number in the half-open interval [0, max) */
+    uint32_t nextUInt32(uint32_t max) {
+        return std::uniform_int_distribution<uint32_t>(0, max - 1)(_urbg);
+    }
+
+    /** A number in the half-open interval [0, max) */
     int64_t nextInt64(int64_t max) {
         return std::uniform_int_distribution<int64_t>(0, max - 1)(_urbg);
+    }
+
+    /** A number in the half-open interval [0, max) */
+    uint64_t nextUInt64(uint64_t max) {
+        return std::uniform_int_distribution<uint64_t>(0, max - 1)(_urbg);
     }
 
     /**

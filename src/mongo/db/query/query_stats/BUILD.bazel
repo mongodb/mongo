@@ -25,6 +25,9 @@ mongo_cc_library(
     srcs = [
         "//src/mongo/db/query/query_stats:rate_limiting.cpp",
     ],
+    hdrs = [
+        "//src/mongo/db/query/query_stats:rate_limiting.h",
+    ],
     deps = [
         "//src/mongo:base",
         "//src/mongo/util:clock_sources",
