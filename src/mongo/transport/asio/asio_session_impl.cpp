@@ -39,6 +39,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/otel/metrics/metrics_histogram.h"
+#include "mongo/otel/metrics/metrics_service.h"
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
@@ -132,6 +134,11 @@ auto& totalIngressTLSConnections =  //
     *MetricBuilder<Counter64>("network.totalIngressTLSConnections");
 auto& totalIngressTLSHandshakeTimeMillis =  //
     *MetricBuilder<Counter64>("network.totalIngressTLSHandshakeTimeMillis");
+otel::metrics::Histogram<int64_t>& ingressTLSHandshakeTimesMillis =
+    otel::metrics::MetricsService::instance().createInt64Histogram(
+        otel::metrics::MetricNames::kIngressTLSHandshakeLatency,
+        "The latency of the TLS handshake when establishing a new ingress connection.",
+        otel::metrics::MetricUnit::kMilliseconds);
 }  // namespace
 
 
@@ -851,6 +858,7 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
             }
             totalIngressTLSConnections.increment(1);
             totalIngressTLSHandshakeTimeMillis.increment(handshakeDurationMillis);
+            ingressTLSHandshakeTimesMillis.record(handshakeDurationMillis);
             auto sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
             if (!sslPeerInfo) {
                 return getSSLManager()

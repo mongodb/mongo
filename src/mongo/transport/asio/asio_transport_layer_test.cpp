@@ -36,6 +36,7 @@
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/logv2/log.h"
+#include "mongo/otel/metrics/metrics_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
@@ -53,6 +54,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
@@ -74,6 +77,7 @@
 
 namespace mongo::transport {
 namespace {
+using otel::metrics::MetricNames;
 
 #ifdef _WIN32
 using SetsockoptPtr = char*;
@@ -975,7 +979,7 @@ public:
         auto* svcCtx = getServiceContext();
         svcCtx->getService()->setServiceEntryPoint(
             std::make_unique<test::ServiceEntryPointUnimplemented>());
-        auto tl = makeTLA(std::make_unique<test::MockSessionManager>());
+        auto tl = makeTLA(std::make_unique<test::MockSessionManager>(onStartSession));
         svcCtx->setTransportLayerManager(
             std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
     }
@@ -988,6 +992,10 @@ public:
         auto tl = getServiceContext()->getTransportLayerManager()->getDefaultEgressLayer();
         return *checked_cast<AsioTransportLayer*>(tl);
     }
+    /**
+     * Passed to the MockSessionManager when it is created in setUp. By default does nothing.
+     */
+    std::function<void(test::SessionThread&)> onStartSession;
 };
 
 TEST_F(AsioTransportLayerWithServiceContextTest, TimerServiceDoesNotSpawnThreadsBeforeStart) {
@@ -1068,6 +1076,93 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
     ASSERT_THROWS_CODE(conn.connectNoHello({testHostName(), port}, std::move(transientParams)),
                        DBException,
                        ErrorCodes::HostUnreachable);
+}
+/**
+ * Fixture for tests around performing a TLS handshake. `serverHandshakeDone` can be used to be
+ * notified when a handshake should have been completed.
+ */
+class AsioTransportLayerTLSHandshakeTest : public AsioTransportLayerWithServiceContextTest {
+public:
+    void setUp() override {
+        const std::string kCAFile = "jstests/libs/ca.pem";
+        const std::string kServerCertificateKeyFile = "jstests/libs/server_SAN.pem";
+        const std::string kClientCertificateKeyFile = "jstests/libs/client.pem";
+        _tempDir = test::copyCertsToTempDir(
+            kCAFile, kServerCertificateKeyFile, kClientCertificateKeyFile, "rpc");
+
+        sslGlobalParams.sslCAFile = kCAFile;
+        sslGlobalParams.sslPEMKeyFile = kServerCertificateKeyFile;
+        sslGlobalParams.sslMode.store(SSLParams::SSLModes::SSLMode_requireSSL);
+        sslGlobalParams.sslClusterFile = kClientCertificateKeyFile;
+
+        onStartSession = [this](test::SessionThread& sessionThread) {
+            sessionThread.schedule([this](Session& session) {
+                // Calling sourceMessage triggers reading a message.
+                ASSERT_OK(session.sourceMessage());
+                if (serverHandshakeDone != nullptr) {
+                    serverHandshakeDone->set();
+                }
+            });
+        };
+        AsioTransportLayerWithServiceContextTest::setUp();
+    }
+
+    /**
+     * If set, this will be notified once the handshake should have completed.
+     */
+    std::unique_ptr<Notification<void>> serverHandshakeDone = nullptr;
+
+private:
+    test::SSLGlobalParamsGuard _sslGlobalParamsGuard;
+    std::unique_ptr<test::TempCertificatesDir> _tempDir;
+};
+
+/**
+ * Returns a valid message that can be used with `say` on a new connection.
+ */
+Message pingMessage() {
+    OpMsgBuilder builder;
+    builder.setBody(BSON("ping" << 1));
+    Message msg = builder.finish();
+    msg.header().setResponseToMsgId(0);
+    msg.header().setId(0);
+    return msg;
+}
+
+TEST_F(AsioTransportLayerTLSHandshakeTest, SuccessfulHandshakes) {
+    otel::metrics::OtelMetricsCapturer capturer;
+    const int port = tla().listenerMainPort();
+
+    // DBClientConnection handles SSL
+    DBClientConnection conn;
+    conn.setSoTimeout(1);
+
+    Message msg = pingMessage();
+
+    // The server's sourceMessage() triggers handshake on server side. We need to send a message
+    // to guarantee that the handshake happens.
+    serverHandshakeDone = std::make_unique<Notification<void>>();
+    conn.connectNoHello({testHostName(), port}, /*transientSSLParams=*/{});
+    conn.say(msg);
+    serverHandshakeDone->get();
+    conn.shutdown();
+    if (capturer.canReadMetrics()) {
+        EXPECT_EQ(capturer.readInt64Histogram(MetricNames::kIngressTLSHandshakeLatency).count, 1);
+    }
+
+    serverHandshakeDone = std::make_unique<Notification<void>>();
+    conn.connectNoHello({testHostName(), port}, /*transientSSLParams=*/{});
+    conn.say(msg);
+    serverHandshakeDone->get();
+    if (capturer.canReadMetrics()) {
+        const otel::metrics::HistogramData histogramData =
+            capturer.readInt64Histogram(MetricNames::kIngressTLSHandshakeLatency);
+        EXPECT_EQ(histogramData.count, 2);
+        // We can't really control the latency in the test, but 100ms per handshake seems like a
+        // good upper bound for a unit test. If this causes significant flakiness, increase this
+        // value.
+        EXPECT_LE(histogramData.sum, 200);
+    }
 }
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #endif  // MONGO_CONFIG_SSL
