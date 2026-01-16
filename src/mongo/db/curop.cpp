@@ -411,6 +411,14 @@ void CurOp::setGenericCursor(WithLock, GenericCursor gc) {
 CurOp::~CurOp() {
     if (parent() != nullptr) {
         parent()->yielded(_numYields.load());
+    } else if (_stack) {
+        if (auto ticketingSystem =
+                admission::execution_control::TicketingSystem::get(opCtx()->getServiceContext())) {
+            // For top-level operations, ensure execution stats are finalized even if the operation
+            // has no valid response and, therefore, completeAndLogOperation() was never called.
+            // We don't record time stats because the counters are lost in the ~CurOp destructor.
+            ticketingSystem->finalizeOperationStats(opCtx(), 0, 0);
+        }
     }
     invariant(!_stack || this == _stack->pop());
 }

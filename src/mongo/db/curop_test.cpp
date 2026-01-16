@@ -33,6 +33,9 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/admission/execution_control/execution_admission_context.h"
+#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
+#include "mongo/db/admission/execution_control/ticketing_system.h"
 #include "mongo/db/operation_context_options_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -840,6 +843,42 @@ TEST(CurOpTest, ReportStateIncludesPriorityLowered) {
         ASSERT_TRUE(state.hasField("priorityLowered"));
         ASSERT_TRUE(state["priorityLowered"].Bool());
     }
+}
+
+TEST(CurOpTest, ShouldFinalizeExecutionStatsWhenOperationHasNoValidResponse) {
+    using namespace admission::execution_control;
+
+    QueryTestServiceContext serviceContext;
+    auto service = serviceContext.getServiceContext();
+
+    TicketingSystem::RWTicketHolder normal{std::make_unique<TicketHolder>(service, 100, true, 100),
+                                           std::make_unique<TicketHolder>(service, 100, true, 100)};
+    TicketingSystem::RWTicketHolder low{std::make_unique<TicketHolder>(service, 100, true, 100),
+                                        std::make_unique<TicketHolder>(service, 100, true, 100)};
+    TicketingSystem::use(
+        service,
+        std::make_unique<TicketingSystem>(
+            service,
+            std::move(normal),
+            std::move(low),
+            ExecutionControlConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions));
+
+    {
+        auto opCtx = serviceContext.makeOperationContext();
+        CurOp::get(*opCtx)->ensureStarted();
+
+        // Simulate that the operation had admissions
+        ExecutionAdmissionContext::get(opCtx.get()).setAdmission_forTest(1);
+
+        // Intentionally do NOT call completeAndLogOperation().
+    }
+
+    // Verify stats were finalized, meaning that totalOpsFinished should have been incremented by 1.
+    BSONObjBuilder bob;
+    TicketingSystem::get(service)->appendStats(bob);
+    BSONObj stats = bob.obj();
+    ASSERT_TRUE(stats.hasField("shortRunning"));
+    ASSERT_EQ(stats["shortRunning"]["totalOpsFinished"].Long(), 1);
 }
 
 TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {
