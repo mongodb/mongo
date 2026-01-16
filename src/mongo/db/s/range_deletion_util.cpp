@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
-#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/classic/batched_delete_stage.h"
@@ -338,11 +337,7 @@ StatusWith<std::pair<int, int>> deleteRangeInBatches(OperationContext* opCtx,
                                                      const UUID& collectionUuid,
                                                      const BSONObj& keyPattern,
                                                      const ChunkRange& range) {
-    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>>
-        deprioritizeExecutionControl;
-    if (admission::execution_control::gBackgroundTasksDeprioritization.load()) {
-        deprioritizeExecutionControl.emplace(opCtx, AdmissionContext::Priority::kLow);
-    }
+    admission::execution_control::ScopedLowPriorityBackgroundTask backgroundTask(opCtx);
 
     suspendRangeDeletion.pauseWhileSet(opCtx);
 

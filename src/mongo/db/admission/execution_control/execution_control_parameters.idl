@@ -210,10 +210,9 @@ server_parameters:
     executionControlBackgroundTasksDeprioritization:
         description: >-
             This controls whether background tasks (defined as index builds, range deletions, and
-            TTL deletions) are automatically deprioritized to the low-priority pool. If set to false,
-            these tasks will not be automatically deprioritized upon starting. However, they can
-            still be deprioritized later by the heuristic if the operation exceeds the admissions
-            threshold.
+            TTL deletions) are automatically deprioritized to the low-priority pool. When true,
+            background tasks always run at low priority. When false, background tasks run at normal
+            priority and are immune to heuristic deprioritization.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: gBackgroundTasksDeprioritization

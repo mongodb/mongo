@@ -60,6 +60,7 @@ ExecutionAdmissionContext::ExecutionAdmissionContext(const ExecutionAdmissionCon
       _shortRunningFinalStats(other._shortRunningFinalStats),
       _longRunningFinalStats(other._longRunningFinalStats),
       _priorityLowered(other._priorityLowered.loadRelaxed()),
+      _isBackgroundTask(other._isBackgroundTask.loadRelaxed()),
       _opType(other._opType),
       _statsFinalized(other._statsFinalized.loadRelaxed()),
       _inMultiDocTxn(other._inMultiDocTxn.loadRelaxed()),
@@ -77,6 +78,7 @@ ExecutionAdmissionContext& ExecutionAdmissionContext::operator=(
     _shortRunningFinalStats = other._shortRunningFinalStats;
     _longRunningFinalStats = other._longRunningFinalStats;
     _priorityLowered.store(other._priorityLowered.loadRelaxed());
+    _isBackgroundTask.store(other._isBackgroundTask.loadRelaxed());
     _opType = other._opType;
     _statsFinalized.store(other._statsFinalized.loadRelaxed());
     _inMultiDocTxn.store(other._inMultiDocTxn.loadRelaxed());
@@ -195,8 +197,9 @@ bool ExecutionAdmissionContext::_isLongRunning(bool isFinalization) const {
     //   1. It exceeded the admission threshold (heuristic deprioritization).
     //   2. It was explicitly deprioritized at some point (priorityLowered flag).
     //   3. It has an inherently low priority.
+    //   4. It is a background task.
     return shouldDeprioritize(admissions) || getPriorityLowered() ||
-        getPriority() == AdmissionContext::Priority::kLow;
+        getPriority() == AdmissionContext::Priority::kLow || isBackgroundTask();
 }
 
 ec::OperationExecutionStats& ExecutionAdmissionContext::_getOperationExecutionStats() {

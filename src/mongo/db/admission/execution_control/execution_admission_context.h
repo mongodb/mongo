@@ -40,6 +40,7 @@ class OperationContext;
 
 namespace admission::execution_control {
 enum class MONGO_MOD_PUBLIC OperationType { kRead = 0, kWrite };
+class ScopedLowPriorityBackgroundTask;
 };  // namespace admission::execution_control
 
 namespace ec = admission::execution_control;
@@ -117,6 +118,13 @@ public:
     }
 
     /**
+     * Returns whether this operation is considered as background task.
+     */
+    bool isBackgroundTask() const {
+        return _isBackgroundTask.loadRelaxed();
+    }
+
+    /**
      * Records that a ticket was acquired. Increments totalAdmissions for the current bucket.
      */
     void recordExecutionAcquisition();
@@ -191,6 +199,8 @@ public:
     }
 
 private:
+    friend class ec::ScopedLowPriorityBackgroundTask;
+
     /**
      * Returns true if this operation should be classified as "long running" based on admission
      * count, priority flags, and exemption status.
@@ -238,6 +248,10 @@ private:
     // True if this operation was ever heuristically deprioritized.
     Atomic<bool> _priorityLowered{false};
 
+    // True if this operation is considered as background task, e.g. index builds, range deletions,
+    // and TTL deletions.
+    Atomic<bool> _isBackgroundTask{false};
+
     // Current operation type (read or write).
     ec::OperationType _opType{ec::OperationType::kRead};
 
@@ -251,5 +265,30 @@ private:
     // True if the operation was ever in a multi-document transaction. Once set to true, stays true.
     Atomic<bool> _wasInMultiDocTxn{false};
 };
+
+namespace admission::execution_control {
+
+/**
+ * RAII object to set the background task flag on the ExecutionAdmissionContext decoration and
+ * restore it to its original value upon destruction.
+ */
+class MONGO_MOD_PUBLIC ScopedLowPriorityBackgroundTask {
+public:
+    ScopedLowPriorityBackgroundTask(OperationContext* opCtx) : _opCtx(opCtx) {
+        ExecutionAdmissionContext::get(_opCtx)._isBackgroundTask.store(true);
+    }
+
+    ~ScopedLowPriorityBackgroundTask() {
+        ExecutionAdmissionContext::get(_opCtx)._isBackgroundTask.store(false);
+    }
+
+    ScopedLowPriorityBackgroundTask(const ScopedLowPriorityBackgroundTask&) = delete;
+    ScopedLowPriorityBackgroundTask& operator=(const ScopedLowPriorityBackgroundTask&) = delete;
+
+private:
+    OperationContext* _opCtx;
+};
+
+};  // namespace admission::execution_control
 
 }  // namespace mongo

@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
-#include "mongo/db/admission/execution_control/execution_control_parameters_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
@@ -353,11 +352,7 @@ void TTLMonitor::shutdown() {
 }
 
 void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
-    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>>
-        deprioritizeExecutionControl;
-    if (admission::execution_control::gBackgroundTasksDeprioritization.load()) {
-        deprioritizeExecutionControl.emplace(opCtx, AdmissionContext::Priority::kLow);
-    }
+    admission::execution_control::ScopedLowPriorityBackgroundTask backgroundTask(opCtx);
 
     // Don't do work if we are a secondary (TTL will be handled by primary)
     auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);

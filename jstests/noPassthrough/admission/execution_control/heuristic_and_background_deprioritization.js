@@ -23,6 +23,7 @@ import {
     getLowPriorityWriteCount,
     insertTestDocuments,
     setBackgroundTaskDeprioritization,
+    setHeuristicDeprioritization,
 } from "jstests/noPassthrough/admission/execution_control/libs/execution_control_helper.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
@@ -202,6 +203,7 @@ describe("Execution control deprioritization mechanisms", function () {
                     setParameter: {
                         executionControlDeprioritizationGate: true,
                         executionControlHeuristicDeprioritization: false,
+                        internalQueryExecYieldIterations: 1,
                     },
                 },
             });
@@ -214,8 +216,13 @@ describe("Execution control deprioritization mechanisms", function () {
             secondaryDB = secondary.getDB(jsTestName());
 
             insertTestDocuments(coll, kNumDocs, {
-                payloadSize: 256,
-                docGenerator: (i, payload) => ({_id: i, x: `value_${i}`, payload: payload}),
+                payloadSize: 1024,
+                docGenerator: (i, payload) => ({
+                    _id: i,
+                    x: `value_${i}`,
+                    y: `field_${i}_${"z".repeat(100)}`,
+                    payload: payload,
+                }),
             });
         });
 
@@ -240,15 +247,37 @@ describe("Execution control deprioritization mechanisms", function () {
         it("should use normal priority for index builds when deprioritization is disabled", function () {
             setBackgroundTaskDeprioritization(primary, false);
             setBackgroundTaskDeprioritization(secondary, false);
+            setHeuristicDeprioritization(primary, true);
+            setHeuristicDeprioritization(secondary, true);
 
             const primaryBefore = getLowPriorityWriteCount(primary);
             const secondaryBefore = getLowPriorityWriteCount(secondary);
 
-            assert.commandWorked(coll.createIndex({y: 1}));
+            // Build a heavy compound index on multiple fields. With 1000 documents,
+            // internalQueryExecYieldIterations=1, and a threshold of 1, this would definitely
+            // trigger heuristic deprioritization if it weren't a background task.
+            assert.commandWorked(coll.createIndex({x: 1, y: 1, payload: 1, _id: 1}));
             IndexBuildTest.waitForIndexBuildToStop(secondaryDB);
 
-            assert.eq(getLowPriorityWriteCount(primary), primaryBefore);
-            assert.eq(getLowPriorityWriteCount(secondary), secondaryBefore);
+            // Allow a small delta for other background tasks or operations within createIndexes
+            // that may get deprioritized by the heuristic. The key assertion is that the heavy
+            // index build work (which would generate hundreds of low priority ops) is protected.
+            const maxAllowedDelta = 5;
+            const primaryDelta = getLowPriorityWriteCount(primary) - primaryBefore;
+            const secondaryDelta = getLowPriorityWriteCount(secondary) - secondaryBefore;
+
+            assert.lte(
+                primaryDelta,
+                maxAllowedDelta,
+                `Primary delta ${primaryDelta} exceeds max ${maxAllowedDelta}. ` +
+                    "Index build appears to not be protected from heuristic deprioritization.",
+            );
+            assert.lte(
+                secondaryDelta,
+                maxAllowedDelta,
+                `Secondary delta ${secondaryDelta} exceeds max ${maxAllowedDelta}. ` +
+                    "Index build appears to not be protected from heuristic deprioritization.",
+            );
         });
     });
 
@@ -264,6 +293,7 @@ describe("Execution control deprioritization mechanisms", function () {
                         ttlMonitorEnabled: false,
                         executionControlDeprioritizationGate: true,
                         executionControlHeuristicDeprioritization: false,
+                        internalQueryExecYieldIterations: 1,
                     },
                 },
             });
@@ -288,7 +318,13 @@ describe("Execution control deprioritization mechanisms", function () {
             const pastDate = new Date(Date.now() - 5000);
             insertTestDocuments(coll, numDocs, {
                 startId,
-                docGenerator: (id, payload) => ({_id: id, expireAt: pastDate, payload}),
+                payloadSize: 1024,
+                docGenerator: (id, payload) => ({
+                    _id: id,
+                    expireAt: pastDate,
+                    payload: payload,
+                    extraField: "x".repeat(512),
+                }),
             });
         }
 
@@ -320,6 +356,7 @@ describe("Execution control deprioritization mechanisms", function () {
 
         it("should use normal priority for TTL deletions when deprioritization is disabled", function () {
             setBackgroundTaskDeprioritization(primary, false);
+            setHeuristicDeprioritization(primary, true);
 
             insertExpiredDocs(kNumDocs, kNumDocs);
             const before = getLowPriorityWriteCount(primary);
@@ -327,7 +364,18 @@ describe("Execution control deprioritization mechanisms", function () {
             enableTTLMonitor(true);
             waitForTTLDeletion();
 
-            assert.eq(getLowPriorityWriteCount(primary), before);
+            // Allow a small delta for other background tasks or operations that may get
+            // deprioritized by the heuristic. The key assertion is that the heavy TTL deletion work
+            // (which would generate hundreds of low priority admissions) is protected.
+            const maxAllowedDelta = 5;
+            const delta = getLowPriorityWriteCount(primary) - before;
+
+            assert.lte(
+                delta,
+                maxAllowedDelta,
+                `Delta ${delta} exceeds max ${maxAllowedDelta}. ` +
+                    "TTL deletion appears to not be protected from heuristic deprioritization.",
+            );
         });
     });
 
@@ -342,6 +390,7 @@ describe("Execution control deprioritization mechanisms", function () {
                         setParameter: {
                             executionControlDeprioritizationGate: true,
                             executionControlHeuristicDeprioritization: false,
+                            internalQueryExecYieldIterations: 1,
                         },
                     },
                 },
@@ -354,7 +403,14 @@ describe("Execution control deprioritization mechanisms", function () {
             assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
             assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
-            insertTestDocuments(coll, kNumDocs, {payloadSize: 256});
+            insertTestDocuments(coll, kNumDocs, {
+                payloadSize: 1024,
+                docGenerator: (i, payload) => ({
+                    _id: i,
+                    payload: payload,
+                    extraField: "y".repeat(512),
+                }),
+            });
 
             assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: kNumDocs / 2}}));
 
@@ -381,19 +437,43 @@ describe("Execution control deprioritization mechanisms", function () {
         });
 
         it("should use normal priority for range deletions when deprioritization is disabled", function () {
-            setBackgroundTaskDeprioritization(recipient, false);
+            assert.commandWorked(recipient.adminCommand({setParameter: 1, disableResumableRangeDeleter: true}));
 
-            const recipientBefore = getLowPriorityWriteCount(recipient);
             assert.commandWorked(
                 st.s.adminCommand({
                     moveChunk: ns,
                     find: {_id: 0},
                     to: donor.shardName,
-                    _waitForDelete: true,
+                    _waitForDelete: false,
                 }),
             );
 
-            assert.eq(getLowPriorityWriteCount(recipient), recipientBefore);
+            setBackgroundTaskDeprioritization(recipient, false);
+            setHeuristicDeprioritization(recipient, true);
+
+            const recipientBefore = getLowPriorityWriteCount(recipient);
+
+            assert.commandWorked(recipient.adminCommand({setParameter: 1, disableResumableRangeDeleter: false}));
+
+            const recipientDB = recipient.getDB(dbName);
+            assert.soon(
+                () => recipientDB.coll.countDocuments({}) === 0,
+                "Range deletion did not complete on recipient",
+                60 * 1000 /* 60 seconds */,
+            );
+
+            // Allow a small delta for other background tasks or operations that may get
+            // deprioritized by the heuristic. The key assertion is that the heavy range deletion
+            // work (which would generate hundreds of low priority admissions) is protected.
+            const maxAllowedDelta = 5;
+            const delta = getLowPriorityWriteCount(recipient) - recipientBefore;
+
+            assert.lte(
+                delta,
+                maxAllowedDelta,
+                `Delta ${delta} exceeds max ${maxAllowedDelta}. ` +
+                    "Range deletion appears to not be protected from heuristic deprioritization.",
+            );
         });
     });
 });

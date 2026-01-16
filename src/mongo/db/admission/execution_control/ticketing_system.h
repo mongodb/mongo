@@ -318,6 +318,12 @@ private:
     AtomicWord<TicketingState> _state;
 
     /**
+     * Returns true if the operation should be downgraded to low priority.
+     */
+    bool _wasOperationDowngradedToLowPriority(OperationContext* opCtx,
+                                              ExecutionAdmissionContext* admCtx) const;
+
+    /**
      * Helper method to set a deprioritization flag with proper state transition checking.
      * The setFlag function is invoked to modify the new state before storing it.
      */

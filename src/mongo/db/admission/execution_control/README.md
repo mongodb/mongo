@@ -163,7 +163,7 @@ The following server parameters control the ticketing system:
 - `executionControlDeprioritizationGate`: Global toggle that must be enabled for any deprioritization features to work. When set to `false` (default), all deprioritization is disabled regardless of other settings. When set to `true`, deprioritization features can be independently enabled.
 - `executionControlHeuristicDeprioritization`: Enables automatic deprioritization of long-running operations. Requires `executionControlDeprioritizationGate` to be `true`.
 - `executionControlHeuristicNumAdmissionsDeprioritizeThreshold`: Number of admissions an operation must perform before being deprioritized.
-- `executionControlBackgroundTasksDeprioritization`: Enables automatic deprioritization of background tasks. Requires `executionControlDeprioritizationGate` to be `true`.
+- `executionControlBackgroundTasksDeprioritization`: Controls deprioritization for background task operations (index builds, TTL deletions, range deletions). When `true` (default), background tasks always run at low priority. When `false`, background tasks run at normal priority and are immune to heuristic deprioritization.
 
 #### Throughput Probing Configuration
 
