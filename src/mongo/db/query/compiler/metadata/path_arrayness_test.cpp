@@ -315,8 +315,9 @@ TEST(PathArraynessTest, FieldRefInvalidDollarPrefix) {
 TEST(PathArraynessTest, FieldRefValidPath) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
 
+    // Arrays: ["a.b", "a.b.c"]
     std::string validFieldRefString("a.b.c");
-    MultikeyComponents multikeyPaths{0U, 1U};
+    MultikeyComponents multikeyPaths{1U, 2U};
 
     PathArrayness pathArrayness;
     auto initialState = pathArrayness.exportToMap_forTest();
@@ -329,64 +330,31 @@ TEST(PathArraynessTest, FieldRefValidPath) {
     ASSERT_NE(initialState, afterInsertState);
     // Should have "a", "a.b", and "a.b.c" entries (all nodes in the path)
     ASSERT_EQ(afterInsertState.size(), 3U);
-    ASSERT_EQ(afterInsertState["a"], true);       // Component 0 is array
-    ASSERT_EQ(afterInsertState["a.b"], true);     // Component 1 is array
-    ASSERT_EQ(afterInsertState["a.b.c"], false);  // Component 2 is not array
+    ASSERT_EQ(afterInsertState["a"], false);     // Component 0 is array
+    ASSERT_EQ(afterInsertState["a.b"], true);    // Component 1 is array
+    ASSERT_EQ(afterInsertState["a.b.c"], true);  // Component 2 is not array
 
     // Lookup should work correctly - "a.b.c" has array prefix, so it's considered an array.
     FieldRef validFieldRef = FieldRef(validFieldRefString);
     ASSERT_EQ(pathArrayness.isPathArray(validFieldRef, &expCtx), true);
 
     // Test lookup of a prefix that is an array.
-    FieldRef prefixFieldRef("a");
+    FieldRef prefixFieldRef("a.b");
     ASSERT_EQ(pathArrayness.isPathArray(prefixFieldRef, &expCtx), true);
+
+    // Test lookup of a prefix that is not an array.
+    FieldRef fieldRef("a");
+    ASSERT_EQ(pathArrayness.isPathArray(fieldRef, &expCtx), false);
 }
+
 /**
  * Test that the enablePathArrayness query knob works
  * When disabled, lookups should always conservatively return true.
+ * The value of the knob is cached on first access, so changing the value at runtime should not
+ * affect the value PathArrayness sees for a given query.
  */
 
-TEST(ArraynessTrie, LookupFieldPathInTrieWithQueryKnobDisabled) {
-    ExpressionContextForTest expCtx = ExpressionContextForTest();
-
-    // Disable query knob
-    RAIIServerParameterControllerForTest queryKnobController("internalEnablePathArrayness", false);
-
-    // Array: ["a.b"]
-    FieldPath field_AB("a.b");
-    MultikeyComponents multikeyPaths_AB{1U};
-
-    // Array: ["a.b"]. Note in this case "a.b" is not an array.
-    FieldPath field_ABC("a.b.c");
-    MultikeyComponents multikeyPaths_ABC{1U};
-
-    // Note "a" is not an array in field_AB or field_ABC examples above.
-    FieldPath field_A("a");
-
-    // First add field_AB to trie and then add field_ABC to trie.
-    std::vector<FieldPath> fields{field_AB, field_ABC};
-    std::vector<MultikeyComponents> multikeyness{multikeyPaths_AB, multikeyPaths_ABC};
-
-    PathArrayness pathArrayness;
-
-    pathArrayness.addPath(field_AB, multikeyPaths_AB);
-    pathArrayness.addPath(field_ABC, multikeyPaths_ABC);
-
-    // Path "a" is not an array in either of the paths inserted into the trie, but since the
-    // query knob is disabled PathArrayness should conservatively return true.
-    ASSERT_EQ(pathArrayness.isPathArray(field_A, &expCtx), true);
-
-    // Enable query knob
-    queryKnobController = RAIIServerParameterControllerForTest("internalEnablePathArrayness", true);
-
-    // The original value of the query knob is cached in the ExpressionContext, so even though
-    // the query knob has now been enabled PathArrayness will still use the cached value
-    // (disabled) and conservatively return true. This ensures consistent results during the
-    // lifetime of any given query.
-    ASSERT_EQ(pathArrayness.isPathArray(field_A, &expCtx), true);
-}
-
-TEST(ArraynessTrie, LookupFieldRefInTrieWithQueryKnobDisabled) {
+TEST(ArraynessTrie, LookupTrieWithQueryKnobDisabled) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
 
     // Disable query knob
@@ -402,7 +370,6 @@ TEST(ArraynessTrie, LookupFieldRefInTrieWithQueryKnobDisabled) {
 
     // Note "a" is not an array in field_AB or field_ABC examples above.
     std::string fieldPathString_A = "a";
-    FieldPath field_A(fieldPathString_A);
 
     // First add field_AB to trie and then add field_ABC to trie.
     std::vector<FieldPath> fields{field_AB, field_ABC};
@@ -415,6 +382,8 @@ TEST(ArraynessTrie, LookupFieldRefInTrieWithQueryKnobDisabled) {
 
     // Path "a" is not an array in either of the paths inserted into the trie, but since the
     // query knob is disabled PathArrayness should conservatively return true.
+    // Test for both FieldPath and FieldRef.
+    ASSERT_EQ(pathArrayness.isPathArray(FieldPath(fieldPathString_A), &expCtx), true);
     ASSERT_EQ(pathArrayness.isPathArray(FieldRef(fieldPathString_A), &expCtx), true);
 
     // Enable query knob
@@ -424,8 +393,54 @@ TEST(ArraynessTrie, LookupFieldRefInTrieWithQueryKnobDisabled) {
     // the query knob has now been enabled PathArrayness will still use the cached value
     // (disabled) and conservatively return true. This ensures consistent results during the
     // lifetime of any given query.
+    // Test for both FieldPath and FieldRef.
+    ASSERT_EQ(pathArrayness.isPathArray(FieldPath(fieldPathString_A), &expCtx), true);
     ASSERT_EQ(pathArrayness.isPathArray(FieldRef(fieldPathString_A), &expCtx), true);
 }
 
+TEST(ArraynessTrie, LookupTrieWithQueryKnobEnabled) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+
+    // Disable query knob
+    RAIIServerParameterControllerForTest queryKnobController("internalEnablePathArrayness", true);
+
+    // Array: ["a.b"]
+    FieldPath field_AB("a.b");
+    MultikeyComponents multikeyPaths_AB{1U};
+
+    // Array: ["a.b"]. Note in this case "a.b" is not an array.
+    FieldPath field_ABC("a.b.c");
+    MultikeyComponents multikeyPaths_ABC{1U};
+
+    // Note "a" is not an array in field_AB or field_ABC examples above.
+    std::string fieldPathString_A = "a";
+
+    // First add field_AB to trie and then add field_ABC to trie.
+    std::vector<FieldPath> fields{field_AB, field_ABC};
+    std::vector<MultikeyComponents> multikeyness{multikeyPaths_AB, multikeyPaths_ABC};
+
+    PathArrayness pathArrayness;
+
+    pathArrayness.addPath(field_AB, multikeyPaths_AB);
+    pathArrayness.addPath(field_ABC, multikeyPaths_ABC);
+
+    // Path "a" is not an array in either of the paths inserted into the trie and the query knob is
+    // enabled so we should see that the path is not an array.
+    // Test for both FieldPath and FieldRef.
+    ASSERT_EQ(pathArrayness.isPathArray(FieldPath(fieldPathString_A), &expCtx), false);
+    ASSERT_EQ(pathArrayness.isPathArray(FieldRef(fieldPathString_A), &expCtx), false);
+
+    // Enable query knob
+    queryKnobController =
+        RAIIServerParameterControllerForTest("internalEnablePathArrayness", false);
+
+    // The original value of the query knob is cached in the ExpressionContext, so even though
+    // the query knob has now been disabled PathArrayness will still use the cached value
+    // (enabled) and search the trie for arrayness values. This ensures consistent results during
+    // the lifetime of any given query.
+    // Test for both FieldPath and FieldRef.
+    ASSERT_EQ(pathArrayness.isPathArray(FieldPath(fieldPathString_A), &expCtx), false);
+    ASSERT_EQ(pathArrayness.isPathArray(FieldRef(fieldPathString_A), &expCtx), false);
+}
 
 }  // namespace mongo
