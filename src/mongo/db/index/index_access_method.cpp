@@ -182,11 +182,17 @@ public:
     // Sorter statistics that are aggregate of all sorters.
     SorterTracker sorterTracker;
 
-    // Number of times the external sorter opened/closed a file handle to spill data to disk.
-    // This pair of counters in aggregate indicate the number of open file handles used by
-    // the external sorter and may be useful in diagnosing situations where the process is
-    // close to exhausting this finite resource.
-    SorterFileStats sorterFileStats = {&sorterTracker};
+    // Number of times a file-based external sorter opens/closes a file handle to spill data to
+    // disk. This pair of counters in aggregate indicate the number of open file handles used by the
+    // external sorter and may be useful in diagnosing situations where the process is close to
+    // exhausting this finite resource.
+    SorterFileStats sorterFileStats{&sorterTracker};
+
+    // Tracks the number of bytes of uncompressed data spilled from a external sorter with a
+    // container as the underlying storage. This is the only metric tracked as we only open one
+    // container per sorter instance and we don't handle compression in the sorter for a
+    // container-based sorter.
+    SorterContainerStats sorterContainerStats{&sorterTracker};
 };
 
 auto& indexBulkBuilderSSS =
@@ -920,8 +926,12 @@ void IndexAccessMethod::BulkBuilder::countResumedBuildInStats() {
     indexBulkBuilderSSS.resumed.addAndFetch(1);
 }
 
-SorterFileStats* IndexAccessMethod::BulkBuilder::bulkBuilderFileStats() {
-    return &indexBulkBuilderSSS.sorterFileStats;
+SorterFileStats& IndexAccessMethod::BulkBuilder::bulkBuilderFileStats() {
+    return indexBulkBuilderSSS.sorterFileStats;
+}
+
+SorterContainerStats& IndexAccessMethod::BulkBuilder::bulkBuilderContainerStats() {
+    return indexBulkBuilderSSS.sorterContainerStats;
 }
 
 SorterTracker* IndexAccessMethod::BulkBuilder::bulkBuilderTracker() {
@@ -1545,7 +1555,7 @@ std::unique_ptr<HybridBulkBuilder::Sorter> HybridBulkBuilder::_makeSorter(
     const DatabaseName& dbName,
     boost::optional<StringData> fileName,
     const boost::optional<std::vector<SorterRange>>& ranges) const {
-    auto fileStats = bulkBuilderFileStats();
+    auto& fileStats = bulkBuilderFileStats();
     boost::filesystem::path tmpPath = storageGlobalParams.dbpath + "/_tmp";
     std::function<int(const key_string::Value&, const key_string::Value&)> comparator =
         [](const key_string::Value& lhs, const key_string::Value& rhs) -> int {
@@ -1558,7 +1568,7 @@ std::unique_ptr<HybridBulkBuilder::Sorter> HybridBulkBuilder::_makeSorter(
               makeSortOptions(maxMemoryUsageBytes, dbName),
               comparator,
               std::make_shared<sorter::FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
-                  std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, fileStats),
+                  std::make_shared<SorterFile>(tmpPath / std::string{*fileName}, &fileStats),
                   tmpPath,
                   dbName),
               _makeSorterSettings())
@@ -1566,7 +1576,7 @@ std::unique_ptr<HybridBulkBuilder::Sorter> HybridBulkBuilder::_makeSorter(
               makeSortOptions(maxMemoryUsageBytes, dbName),
               comparator,
               std::make_shared<sorter::FileBasedSorterSpiller<key_string::Value, mongo::NullValue>>(
-                  tmpPath, fileStats, dbName),
+                  tmpPath, &fileStats, dbName),
               _makeSorterSettings());
 }
 

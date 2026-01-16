@@ -75,7 +75,7 @@ private:
  */
 class SorterFileStats {
 public:
-    SorterFileStats(SorterTracker* sorterTracker);
+    explicit SorterFileStats(SorterTracker* sorterTracker);
 
     void addSpilledDataSize(long long size);
     void addSpilledDataSizeUncompressed(long long size);
