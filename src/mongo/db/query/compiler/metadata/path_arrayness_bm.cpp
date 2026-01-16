@@ -151,7 +151,7 @@ void BM_PathArraynessLookup(benchmark::State& state) {
             // numberOfPathsQuery could be larger than the number of paths we have, so we take the
             // modulo of the index in order to wrap back around to the start of the array if that's
             // the case.
-            pathArrayness.isPathArray(pathsToQuery[i % pathsToQuery.size()], &expCtx);
+            pathArrayness.canPathBeArray(pathsToQuery[i % pathsToQuery.size()], &expCtx);
         }
     }
 }

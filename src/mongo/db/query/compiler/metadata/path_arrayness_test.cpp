@@ -91,13 +91,13 @@ TEST(PathArraynessTest, InsertIntoPathArraynessPredefined) {
     auto arraynessMapExported = pathArrayness.exportToMap_forTest();
 
     ASSERT_EQ(arraynessMapInitial, arraynessMapExported);
-    ASSERT_EQ(pathArrayness.isPathArray(field_A, &expCtx), true);
-    ASSERT_EQ(pathArrayness.isPathArray(field_ABC, &expCtx), true);
-    ASSERT_EQ(pathArrayness.isPathArray(field_ABD, &expCtx), true);
-    ASSERT_EQ(pathArrayness.isPathArray(field_ABCJ, &expCtx), true);
-    ASSERT_EQ(pathArrayness.isPathArray(field_ABDE, &expCtx), true);
-    ASSERT_EQ(pathArrayness.isPathArray(field_BDE, &expCtx), false);
-    ASSERT_EQ(pathArrayness.isPathArray(field_BDEF, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_A, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_ABC, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_ABD, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_ABCJ, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_ABDE, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_BDE, &expCtx), false);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_BDEF, &expCtx), true);
 }
 
 TEST(PathArraynessTest, InsertIntoPathArraynessGenerated) {
@@ -148,10 +148,10 @@ TEST(PathArraynessTest, BuildAndLookupNonExistingFields) {
         pathArrayness.addPath(fields[i], multikeyness[i], true);
     }
 
-    ASSERT_EQ(pathArrayness.isPathArray(field_ABC, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_ABC, &expCtx), true);
 
     // Path component "d" does not exist but it has prefix "a", "a.b" and "a.b.c" that are
-    ASSERT_EQ(pathArrayness.isPathArray(field_ABCD, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_ABCD, &expCtx), true);
 }
 
 TEST(PathArraynessTest, LookupEmptyTrie) {
@@ -165,8 +165,8 @@ TEST(PathArraynessTest, LookupEmptyTrie) {
     PathArrayness pathArrayness;
 
     // Neither of these fields or their prefixes are in the trie, so assume arrays.
-    ASSERT_EQ(pathArrayness.isPathArray(field_A, &expCtx), true);
-    ASSERT_EQ(pathArrayness.isPathArray(field_ABCD, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_A, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_ABCD, &expCtx), true);
 }
 
 // When fully rebuilding the trie, we err on the side of non-arrayness when conflicts occur.
@@ -191,7 +191,7 @@ TEST(ArraynessTrie, FullyRebuildAndLookupTrieWithConflictingArrayInformation) {
     pathArrayness.addPath(field_ABC, multikeyPaths_ABC, true);
 
     // In the case of conflicts, we assume multikeyness.
-    ASSERT_EQ(pathArrayness.isPathArray(field_AB, &expCtx), false);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_AB, &expCtx), false);
 
     // Now let's flip the insertion order.
     PathArrayness pathArrayness1;
@@ -199,7 +199,7 @@ TEST(ArraynessTrie, FullyRebuildAndLookupTrieWithConflictingArrayInformation) {
     pathArrayness1.addPath(field_AB, multikeyPaths_AB, true);
 
     // We should still get the same result.
-    ASSERT_EQ(pathArrayness1.isPathArray(field_AB, &expCtx), false);
+    ASSERT_EQ(pathArrayness1.canPathBeArray(field_AB, &expCtx), false);
 }
 
 // When updating the trie due to an index catalog update following a write operation, we err on the
@@ -225,7 +225,7 @@ TEST(ArraynessTrie, UpdateAndLookupTrieWithConflictingArrayInformation) {
     pathArrayness.addPath(field_ABC, multikeyPaths_ABC, false);
 
     // In the case of conflicts, we assume multikeyness.
-    ASSERT_EQ(pathArrayness.isPathArray(field_AB, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_AB, &expCtx), true);
 
     // Now let's flip the insertion order.
     PathArrayness pathArrayness1;
@@ -233,7 +233,7 @@ TEST(ArraynessTrie, UpdateAndLookupTrieWithConflictingArrayInformation) {
     pathArrayness1.addPath(field_AB, multikeyPaths_AB, false);
 
     // We should still get the same result.
-    ASSERT_EQ(pathArrayness1.isPathArray(field_AB, &expCtx), true);
+    ASSERT_EQ(pathArrayness1.canPathBeArray(field_AB, &expCtx), true);
 }
 
 TEST(ArraynessTrie, BuildAndLookupTrieWithSameArrayInformation) {
@@ -260,9 +260,9 @@ TEST(ArraynessTrie, BuildAndLookupTrieWithSameArrayInformation) {
     pathArrayness.addPath(field_ABC, multikeyPaths_ABC, true);
 
     // Path "a.b" is an array in both of the paths inserted into the trie.
-    ASSERT_EQ(pathArrayness.isPathArray(field_AB, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_AB, &expCtx), true);
     // Path "a" is not an array in either of the paths inserted into the trie.
-    ASSERT_EQ(pathArrayness.isPathArray(field_A, &expCtx), false);
+    ASSERT_EQ(pathArrayness.canPathBeArray(field_A, &expCtx), false);
 }
 
 
@@ -283,7 +283,7 @@ TEST(PathArraynessTest, FieldRefEmptyString) {
     PathArrayness pathArrayness;
 
     // Lookup should conservatively return true for invalid FieldPath.
-    ASSERT_EQ(pathArrayness.isPathArray(emptyFieldRef, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(emptyFieldRef, &expCtx), true);
 }
 
 // FieldRef allows paths ending with a dot, but FieldPath does not.
@@ -296,7 +296,7 @@ TEST(PathArraynessTest, FieldRefEndsWithDot) {
     PathArrayness pathArrayness;
 
     // Lookup should conservatively return true for invalid FieldPath.
-    ASSERT_EQ(pathArrayness.isPathArray(fieldRefWithDot, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(fieldRefWithDot, &expCtx), true);
 }
 
 // FieldRef allows empty field names between dots (e.g., "a..b"), but FieldPath does not.
@@ -309,7 +309,7 @@ TEST(PathArraynessTest, FieldRefEmptyFieldNameBetweenDots) {
     PathArrayness pathArrayness;
 
     // Lookup should conservatively return true for invalid FieldPath.
-    ASSERT_EQ(pathArrayness.isPathArray(fieldRefWithEmpty, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(fieldRefWithEmpty, &expCtx), true);
 }
 
 // FieldRef allows up to 255 components, but FieldPath only allows 200.
@@ -329,7 +329,7 @@ TEST(PathArraynessTest, FieldRefTooManyComponents) {
     PathArrayness pathArrayness;
 
     // Lookup should conservatively return true for invalid FieldPath.
-    ASSERT_EQ(pathArrayness.isPathArray(fieldRefLong, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(fieldRefLong, &expCtx), true);
 }
 
 // FieldRef allows any field name starting with $, but FieldPath only allows certain
@@ -344,7 +344,7 @@ TEST(PathArraynessTest, FieldRefInvalidDollarPrefix) {
     PathArrayness pathArrayness;
 
     // Lookup should conservatively return true for invalid FieldPath.
-    ASSERT_EQ(pathArrayness.isPathArray(fieldRefWithInvalidDollar, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(fieldRefWithInvalidDollar, &expCtx), true);
 }
 
 // Test that a FieldRef that is also a valid FieldPath works correctly.
@@ -372,15 +372,15 @@ TEST(PathArraynessTest, FieldRefValidPath) {
 
     // Lookup should work correctly - "a.b.c" has array prefix, so it's considered an array.
     FieldRef validFieldRef = FieldRef(validFieldRefString);
-    ASSERT_EQ(pathArrayness.isPathArray(validFieldRef, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(validFieldRef, &expCtx), true);
 
     // Test lookup of a prefix that is an array.
     FieldRef prefixFieldRef("a.b");
-    ASSERT_EQ(pathArrayness.isPathArray(prefixFieldRef, &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(prefixFieldRef, &expCtx), true);
 
     // Test lookup of a prefix that is not an array.
     FieldRef fieldRef("a");
-    ASSERT_EQ(pathArrayness.isPathArray(fieldRef, &expCtx), false);
+    ASSERT_EQ(pathArrayness.canPathBeArray(fieldRef, &expCtx), false);
 }
 
 /**
@@ -419,8 +419,8 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobDisabled) {
     // Path "a" is not an array in either of the paths inserted into the trie, but since the
     // query knob is disabled PathArrayness should conservatively return true.
     // Test for both FieldPath and FieldRef.
-    ASSERT_EQ(pathArrayness.isPathArray(FieldPath(fieldPathString_A), &expCtx), true);
-    ASSERT_EQ(pathArrayness.isPathArray(FieldRef(fieldPathString_A), &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(FieldPath(fieldPathString_A), &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(FieldRef(fieldPathString_A), &expCtx), true);
 
     // Enable query knob
     queryKnobController = RAIIServerParameterControllerForTest("internalEnablePathArrayness", true);
@@ -430,8 +430,8 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobDisabled) {
     // (disabled) and conservatively return true. This ensures consistent results during the
     // lifetime of any given query.
     // Test for both FieldPath and FieldRef.
-    ASSERT_EQ(pathArrayness.isPathArray(FieldPath(fieldPathString_A), &expCtx), true);
-    ASSERT_EQ(pathArrayness.isPathArray(FieldRef(fieldPathString_A), &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(FieldPath(fieldPathString_A), &expCtx), true);
+    ASSERT_EQ(pathArrayness.canPathBeArray(FieldRef(fieldPathString_A), &expCtx), true);
 }
 
 TEST(ArraynessTrie, LookupTrieWithQueryKnobEnabled) {
@@ -463,8 +463,8 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobEnabled) {
     // Path "a" is not an array in either of the paths inserted into the trie and the query knob is
     // enabled so we should see that the path is not an array.
     // Test for both FieldPath and FieldRef.
-    ASSERT_EQ(pathArrayness.isPathArray(FieldPath(fieldPathString_A), &expCtx), false);
-    ASSERT_EQ(pathArrayness.isPathArray(FieldRef(fieldPathString_A), &expCtx), false);
+    ASSERT_EQ(pathArrayness.canPathBeArray(FieldPath(fieldPathString_A), &expCtx), false);
+    ASSERT_EQ(pathArrayness.canPathBeArray(FieldRef(fieldPathString_A), &expCtx), false);
 
     // Enable query knob
     queryKnobController =
@@ -475,8 +475,8 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobEnabled) {
     // (enabled) and search the trie for arrayness values. This ensures consistent results during
     // the lifetime of any given query.
     // Test for both FieldPath and FieldRef.
-    ASSERT_EQ(pathArrayness.isPathArray(FieldPath(fieldPathString_A), &expCtx), false);
-    ASSERT_EQ(pathArrayness.isPathArray(FieldRef(fieldPathString_A), &expCtx), false);
+    ASSERT_EQ(pathArrayness.canPathBeArray(FieldPath(fieldPathString_A), &expCtx), false);
+    ASSERT_EQ(pathArrayness.canPathBeArray(FieldRef(fieldPathString_A), &expCtx), false);
 }
 
 }  // namespace mongo

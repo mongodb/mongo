@@ -141,7 +141,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndexOnEmptyCollect
     const auto coll = acquireCollectionForRead(operationContext(), _kTestNss);
     const auto pathArrayness =
         CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
-    ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
+    ASSERT_FALSE(pathArrayness.get()->canPathBeArray("a", &expCtx));
 }
 
 TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndex) {
@@ -161,7 +161,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForCreateIndex) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "a" is not multi-key at this point.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
+        ASSERT_FALSE(pathArrayness.get()->canPathBeArray("a", &expCtx));
     }
 }
 
@@ -183,7 +183,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "a" is not multi-key at this point.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
+        ASSERT_FALSE(pathArrayness.get()->canPathBeArray("a", &expCtx));
     }
 
     // Make "a" multikey but inserting a doc where "a" is multikey.
@@ -195,8 +195,8 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         pathArrayness->visualizeTrie_forTest();
         // "a" is now mulitkey.
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("a", &expCtx));
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("b", &expCtx));
+        ASSERT_TRUE(pathArrayness.get()->canPathBeArray("a", &expCtx));
+        ASSERT_FALSE(pathArrayness.get()->canPathBeArray("b", &expCtx));
     }
 
     // Now make "b" multikey as well.
@@ -208,8 +208,8 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultikeyChange) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // Both "a" and "b" are now mulitkey.
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("a", &expCtx));
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("b", &expCtx));
+        ASSERT_TRUE(pathArrayness.get()->canPathBeArray("a", &expCtx));
+        ASSERT_TRUE(pathArrayness.get()->canPathBeArray("b", &expCtx));
     }
 }
 
@@ -227,7 +227,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForDropIndex) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "b" index does not exist yet.
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("b", &expCtx));
+        ASSERT_TRUE(pathArrayness.get()->canPathBeArray("b", &expCtx));
     }
 
 
@@ -238,7 +238,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForDropIndex) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "b" index does exist here.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("b", &expCtx));
+        ASSERT_FALSE(pathArrayness.get()->canPathBeArray("b", &expCtx));
     }
 
     dropIndex(operationContext(), _kTestNss, "b_1");
@@ -247,7 +247,7 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForDropIndex) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "b" is dropped so we assume "b" is an array to be conservative.
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("b", &expCtx));
+        ASSERT_TRUE(pathArrayness.get()->canPathBeArray("b", &expCtx));
     }
 }
 
@@ -268,8 +268,8 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultipleIndexes) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "a" is not multi-key at this point.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
-        ASSERT_TRUE(pathArrayness.get()->isPathArray("b", &expCtx));
+        ASSERT_FALSE(pathArrayness.get()->canPathBeArray("a", &expCtx));
+        ASSERT_TRUE(pathArrayness.get()->canPathBeArray("b", &expCtx));
     }
     // Create index on "b".
     auto indexB = BSON("b" << 1);
@@ -279,9 +279,9 @@ TEST_F(CollectionQueryInfoTest, PathArraynessUpdatesForMultipleIndexes) {
         const auto pathArrayness =
             CollectionQueryInfo::get(coll.getCollection().getCollectionPtr()).getPathArrayness();
         // "a" is not multi-key at this point.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("a", &expCtx));
+        ASSERT_FALSE(pathArrayness.get()->canPathBeArray("a", &expCtx));
         // We created index on "b" and can now see that "b" is not multi-key.
-        ASSERT_FALSE(pathArrayness.get()->isPathArray("b", &expCtx));
+        ASSERT_FALSE(pathArrayness.get()->canPathBeArray("b", &expCtx));
     }
 }
 }  // namespace

@@ -76,19 +76,22 @@ void PathArrayness::addPathsFromIndexKeyPattern(const BSONObj& indexKeyPattern,
     }
 }
 
-bool PathArrayness::isPathArray(const FieldPath& path, const ExpressionContext* expCtx) const {
+bool PathArrayness::canPathBeArray(const FieldPath& path, const ExpressionContext* expCtx) const {
     // If the PathArrayness query knob is disabled, conservatively return true.
     if (!expCtx->getQueryKnobConfiguration().getEnablePathArrayness()) {
         return true;
     }
 
-    bool arrayness = _root.isPathArray(path);
-    LOGV2_DEBUG(
-        11467800, 5, "Checking path arrayness", "path"_attr = path, "isPathArray"_attr = arrayness);
+    bool arrayness = _root.canPathBeArray(path);
+    LOGV2_DEBUG(11467800,
+                5,
+                "Checking path arrayness",
+                "path"_attr = path,
+                "canPathBeArray"_attr = arrayness);
     return arrayness;
 }
 
-bool PathArrayness::isPathArray(const FieldRef& path, const ExpressionContext* expCtx) const {
+bool PathArrayness::canPathBeArray(const FieldRef& path, const ExpressionContext* expCtx) const {
     // If the PathArrayness query knob is disabled, conservatively return true.
     if (!expCtx->getQueryKnobConfiguration().getEnablePathArrayness()) {
         return true;
@@ -102,10 +105,10 @@ bool PathArrayness::isPathArray(const FieldRef& path, const ExpressionContext* e
         return true;
     }
 
-    return isPathArray(maybeFieldPath.getValue(), expCtx);
+    return canPathBeArray(maybeFieldPath.getValue(), expCtx);
 }
 
-bool PathArrayness::TrieNode::isPathArray(const FieldPath& path) const {
+bool PathArrayness::TrieNode::canPathBeArray(const FieldPath& path) const {
     const TrieNode* current = this;
     // Track the number of times we have seen an array prefix.
     for (size_t depth = 0; depth < path.getPathLength(); ++depth) {
@@ -116,11 +119,11 @@ bool PathArrayness::TrieNode::isPathArray(const FieldPath& path) const {
             return true;
         }
         current = &next->second;
-        if (current->isArray()) {
+        if (current->canBeArray()) {
             return true;
         }
     }
-    return current->isArray();
+    return current->canBeArray();
 }
 
 stdx::unordered_map<std::string, bool> PathArrayness::exportToMap_forTest() {
@@ -136,7 +139,7 @@ stdx::unordered_map<std::string, bool> PathArrayness::exportToMap_forTest() {
 
         // Do not insert the root (which is the only record with an empty fieldname)
         if (!currPathComponent.empty()) {
-            result[currPathComponent] = currNode.isArray();
+            result[currPathComponent] = currNode.canBeArray();
         }
 
         for (auto&& [childNode, childPathComponent] : currNode.getChildren()) {
@@ -154,7 +157,7 @@ void PathArrayness::TrieNode::visualizeTrie_forTest(std::string fieldName, int d
         std::cout << "  ";
     }
 
-    std::cout << fieldName << "(" << _isArray << ")" << std::endl;
+    std::cout << fieldName << "(" << _canBeArray << ")" << std::endl;
 
     // Recursively print children
     for (auto it = _children.begin(); it != _children.end(); ++it) {
@@ -182,12 +185,12 @@ void PathArrayness::TrieNode::insertPath(const FieldPath& path,
             // If we're fully rebuilding the trie from the full set of indexes, we can assume that
             // if the same path shows up as multikey and non-multikey then the non-multikey index is
             // more up to date.
-            maybeChild->second._isArray &= (multikeyPath.count(depth) > 0);
+            maybeChild->second._canBeArray &= (multikeyPath.count(depth) > 0);
         } else {
             // Otherwise (if we're inserting a path due to an index catalog update from a document
             // write operation), we take the conservative approach, i.e. prefer multikey in case of
             // conflict.
-            maybeChild->second._isArray |= (multikeyPath.count(depth) > 0);
+            maybeChild->second._canBeArray |= (multikeyPath.count(depth) > 0);
         }
     }
 
