@@ -916,6 +916,11 @@ class MoveCommandBase extends Command {
         //   const moveCommand = this._buildMoveCommand(targetShardId);
         //   assert.commandWorked(connection.adminCommand(moveCommand));
     }
+
+    getChangeEvents() {
+        // Move operations are no-ops in this test framework, so no events are emitted.
+        return [];
+    }
 }
 
 /**

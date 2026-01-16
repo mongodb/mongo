@@ -381,7 +381,6 @@ class ShardingCommandGenerator {
                 break;
             case Action.UNSHARD_COLLECTION:
                 // Collection becomes unsplittable (single-shard) but still exists.
-                // Old shard key index is explicitly dropped in _appendAction.
                 assert(ctx.shardKeySpec, "Unshard requires existing shard key");
                 ctx.shardKeySpec = null;
                 ctx.isSharded = false;
