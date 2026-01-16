@@ -35,7 +35,7 @@ assert.sameMembers(results, documents);
 results = coll.aggregate([{$readNDocuments: {numDocs: 6, sortById: true}}]).toArray();
 assert.eq(results, documents);
 
-// TODO SERVER-113930 Test in lookup.
+// TODO SERVER-117259 Test in lookup.
 // results = coll.aggregate([{$sort: {_id: 1}}, {$limit: 1}, {$lookup: {from: collName, pipeline: [{$readNDocuments: {numDocs: 2, sortById: true}}], as: "dogs"}}]).toArray();
 // assert.eq(results, [{_id: 0, dog: "labradoodle", dogs: documents.slice(0, 2)}]);
 

@@ -239,9 +239,9 @@ assert.eq(results.length, 0, results);
     runTestcase(inputPipeline, expectedResults);
 }
 
-// TODO SERVER-113930 Enable tests for $lookup.
+// TODO SERVER-117259 Enable tests for $lookup.
 // Transform stage in $lookup.
 // results = coll.aggregate([{$lookup: {from: collName, pipeline: [{$loaf: {numSlices: 2}}], as: "slices"}}]).toArray();
 // assert.gt(results.length, 0);
 
-// TODO SERVER-113930 Test transform stage in $facet.
+// TODO SERVER-117260 Test transform stage in $facet.

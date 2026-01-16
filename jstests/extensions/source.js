@@ -64,7 +64,7 @@ if (!FixtureHelpers.isMongos(db)) {
     assert.gte(results.length, 4, results);
 }
 
-// TODO SERVER-113930 Enable tests for $lookup.
+// TODO SERVER-117259 Enable tests for $lookup.
 // Source stage in $lookup.
 // results = coll.aggregate([{$lookup: {from: collName, pipeline: [{$toast: {temp: 350.0, numSlices: 2}}], as: "slices"}}]).toArray();
 // assert.eq(results, [{breadType: "sourdough", slices: [{slice: 0, isBurnt: false}, {slice: 1, isBurnt: false}]}]);
