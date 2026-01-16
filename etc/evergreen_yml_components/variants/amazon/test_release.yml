@@ -395,6 +395,8 @@ buildvariants:
     run_on:
       - amazon2023.3-arm64-m8g-xlarge
     expansions: &enterprise-amazon2023-arm64-dynamic-expansions
+      mciuploads_binary_permissions: private
+      mciuploads_binary_visibility: signed
       additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com

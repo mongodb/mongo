@@ -2512,6 +2512,7 @@ functions:
     - *f_expansions_write
     - *fetch_dist_tarball
     - *fetch_dist_debugsymbols
+    - *configure_evergreen_api_credentials
     - command: subprocess.exec
       display_name: "package test py"
       type: test
@@ -2525,7 +2526,9 @@ functions:
           - "branch"
           - "--test"
           - "${packager_distro}"
-          - "https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
+          - "unused-url-placeholder"
+          - "--evg-build-id"
+          - "${build_id}"
           - "--edition"
           - "${repo_edition}"
           - "--server-version"

@@ -9,6 +9,7 @@ import pathlib
 import platform
 import pwd
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -49,11 +50,22 @@ def run_and_log(cmd: str, end_on_error: bool = True):
 
 
 def download_extract_package(package: str) -> List[str]:
-    # Use wget here because using urllib we get errors like the following
-    # https://stackoverflow.com/questions/27835619/urllib-and-ssl-certificate-verify-failed-error
-    run_and_log('wget -q "{}"'.format(package))
-    downloaded_file = package.split("/")[-1]
-    if not package.endswith(".tgz"):
+    # Handle local files (file:// protocol) - these are pre-downloaded by package_test.py
+    # when using --evg-build-id for private artifacts
+    if package.startswith("file://"):
+        local_path = package[7:]  # Remove "file://" prefix
+        logging.info("Using local file: %s", local_path)
+        downloaded_file = os.path.basename(local_path)
+        # Copy the file to the current directory if it's not already here
+        if local_path != downloaded_file and local_path != os.path.join(".", downloaded_file):
+            shutil.copy(local_path, downloaded_file)
+    else:
+        # Use wget here because using urllib we get errors like the following
+        # https://stackoverflow.com/questions/27835619/urllib-and-ssl-certificate-verify-failed-error
+        run_and_log('wget -q "{}"'.format(package))
+        downloaded_file = package.split("/")[-1]
+
+    if not downloaded_file.endswith(".tgz"):
         return [downloaded_file]
 
     extracted_paths = []  # type: List[str]
