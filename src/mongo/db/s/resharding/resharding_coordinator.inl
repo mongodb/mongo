@@ -1223,33 +1223,6 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
         });
 }
 
-void ReshardingCoordinator::_updateCoordinatorDocDonorShardEntriesNumDocuments(
-    OperationContext* opCtx,
-    const std::map<ShardId, int64_t>& values,
-    std::function<void(DonorShardEntry& donorShard, int64_t value)> setter) {
-    auto updatedCoordinatorDoc = _coordinatorDoc;
-    auto& donorShards = updatedCoordinatorDoc.getDonorShards();
-
-    invariant(values.size() == donorShards.size());
-    for (auto& donorShard : donorShards) {
-        auto it = values.find(donorShard.getId());
-        invariant(it != values.end());
-        setter(donorShard, it->second);
-    }
-
-    resharding::executeMetadataChangesInTxn(
-        opCtx, [&updatedCoordinatorDoc](OperationContext* opCtx, TxnNumber txnNumber) {
-            // Metrics are null because we are not transitioning state and do not want to
-            // write any metrics.
-            resharding::writeToCoordinatorStateNss(
-                opCtx, nullptr, updatedCoordinatorDoc, txnNumber);
-        });
-    // We call _installCoordinatorDoc instead of installCoordinatorDocOnStateTransition
-    // because we do not to udpate any metrics or print any logs indicating we transitioned
-    // states.
-    _installCoordinatorDoc(updatedCoordinatorDoc);
-}
-
 ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneFromDonors(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     // The exact numbers of documents to copy are only need for verification so don't fetch them if
@@ -1315,13 +1288,25 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsToCloneF
                            });
                    })
                    .then([this](std::map<ShardId, int64_t> documentsToCopy) {
+                       auto& donorShards = _coordinatorDoc.getDonorShards();
+                       // Before passing in the documentsToCopy map into the dao function, we need
+                       // to verify that the map contains only the shard ids for the donor shards of
+                       // this resharding operation.
+                       tassert(10324200,
+                               str::stream() << "Number of shards from documentsToCopy does not "
+                                                "match expected number of donor shards.",
+                               documentsToCopy.size() == donorShards.size());
+                       for (auto& donorShard : donorShards) {
+                           auto it = documentsToCopy.find(donorShard.getId());
+                           tassert(10324201,
+                                   str::stream() << "Donor shard " << donorShard.getId()
+                                                 << " not found in documentsToCopy map",
+                                   it != documentsToCopy.end());
+                       }
                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                       _updateCoordinatorDocDonorShardEntriesNumDocuments(
-                           opCtx.get(),
-                           documentsToCopy,
-                           [](DonorShardEntry& donorShard, int64_t value) {
-                               donorShard.setDocumentsToCopy(value);
-                           });
+                       auto updatedCoordinatorDoc =
+                           _coordinatorDao.updateNumberOfDocsToCopy(opCtx.get(), documentsToCopy);
+                       _installCoordinatorDoc(updatedCoordinatorDoc);
 
                        LOGV2(9858106,
                              "Finished fetching the number of documents to copy from all donor "
@@ -1541,20 +1526,33 @@ ExecutorFuture<void> ReshardingCoordinator::_fetchAndPersistNumDocumentsFinalFro
                                _coordinatorDoc.getDonorShards()));
                    })
                    .then([this](std::map<ShardId, int64_t> documentsDelta) {
+                       auto& donorShards = _coordinatorDoc.getDonorShards();
+                       std::map<ShardId, int64_t> documentsFinal;
+                       tassert(10324202,
+                               str::stream() << "Number of shards from documentsFinal does not "
+                                                "match expected number of donor shards.",
+                               documentsDelta.size() == donorShards.size());
+
+                       for (auto& donorShard : donorShards) {
+                           auto it = documentsDelta.find(donorShard.getId());
+                           tassert(10324203,
+                                   str::stream() << "Donor shard " << donorShard.getId()
+                                                 << " not found in documentsDelta map",
+                                   it != documentsDelta.end());
+                           auto documentsToCopy = donorShard.getDocumentsToCopy();
+                           tassert(1003582,
+                                   str::stream()
+                                       << "Expected the number of documents to copy from the "
+                                          "donor shard '"
+                                       << donorShard.getId() << "' to have been set",
+                                   documentsToCopy);
+                           documentsFinal.emplace(donorShard.getId(),
+                                                  *documentsToCopy + it->second);
+                       }
                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                       _updateCoordinatorDocDonorShardEntriesNumDocuments(
-                           opCtx.get(),
-                           documentsDelta,
-                           [](DonorShardEntry& donorShard, int64_t value) {
-                               auto documentsToCopy = donorShard.getDocumentsToCopy();
-                               tassert(1003582,
-                                       str::stream()
-                                           << "Expected the number of documents to copy from the "
-                                              "donor shard '"
-                                           << donorShard.getId() << "' to have been set",
-                                       documentsToCopy);
-                               donorShard.setDocumentsFinal(*documentsToCopy + value);
-                           });
+                       auto updatedCoordinatorDoc = _coordinatorDao.updateNumberOfDocsCopiedFinal(
+                           opCtx.get(), documentsFinal);
+                       _installCoordinatorDoc(updatedCoordinatorDoc);
 
                        LOGV2(1003583,
                              "Finished fetching the change in the number of documents from all "

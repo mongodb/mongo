@@ -360,15 +360,6 @@ private:
     void _startCommitMonitor(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Updates the on-disk coordinator document after applying the given setter on each donor shard
-     * entry and replaces the in-memory coordinator document with the updated one.
-     */
-    void _updateCoordinatorDocDonorShardEntriesNumDocuments(
-        OperationContext* opCtx,
-        const std::map<ShardId, int64_t>& values,
-        std::function<void(DonorShardEntry& donorShard, int64_t value)> setter);
-
-    /**
      * If verification is enabled, fetches the number of documents to clone from all donor shards
      * involved in resharding and persists the value for each donor shard in the coordinator state
      * document.

@@ -109,6 +109,15 @@ public:
         ReshardingApproxCopySize approxCopySize,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
+    /*
+     * Updates every donor shards' DocumentsToCopy value on coordinator document in the cloning
+     * phase. Will invariant if called in any other phase.
+     */
+    ReshardingCoordinatorDocument updateNumberOfDocsToCopy(
+        OperationContext* opCtx,
+        const std::map<ShardId, int64_t>& documentsToCopy,
+        boost::optional<TxnNumber> txnNumber = boost::none);
+
     ReshardingCoordinatorDocument transitionToApplyingPhase(
         OperationContext* opCtx, Date_t now, boost::optional<TxnNumber> txnNumber = boost::none);
 
@@ -116,6 +125,15 @@ public:
         OperationContext* opCtx,
         Date_t now,
         Date_t criticalSectionExpireTime,
+        boost::optional<TxnNumber> txnNumber = boost::none);
+
+    /*
+     * Updates every donor shards' DocumentsFinal value on coordinator document in the blocking
+     * writes phase. Will invariant if called in any other phase.
+     */
+    ReshardingCoordinatorDocument updateNumberOfDocsCopiedFinal(
+        OperationContext* opCtx,
+        const std::map<ShardId, int64_t>& documentsCopiedFinal,
         boost::optional<TxnNumber> txnNumber = boost::none);
 
     ReshardingCoordinatorDocument transitionToAbortingPhase(
@@ -127,6 +145,9 @@ public:
 private:
     const UUID _reshardingUUID;
     std::unique_ptr<DaoStorageClientFactory> _clientFactory;
+    BSONObjBuilder _documentsCopyUpdateBuilder(const ReshardingCoordinatorDocument& doc,
+                                               const std::map<ShardId, int64_t>& documents,
+                                               StringData numberOfDocsFieldName);
 };
 
 }  // namespace resharding

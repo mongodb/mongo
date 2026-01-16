@@ -229,6 +229,97 @@ TEST_F(ReshardingCoordinatorDaoFixture, TransitionToCloningPhaseSucceeds) {
                             << "metrics.documentCopy.start" << cloneStartTime)});
 }
 
+TEST_F(ReshardingCoordinatorDaoFixture, UpdateNumberOfDocsToCopy) {
+    std::map<ShardId, int64_t> shardToNumDocsCopied;
+    ShardId shard1("shard1");
+    ShardId shard2("shard2");
+
+    shardToNumDocsCopied.emplace(shard1, 100);
+    shardToNumDocsCopied.emplace(shard2, 200);
+
+    // Set up donor shards in the coordinator document
+    std::vector<DonorShardEntry> donorShards;
+    DonorShardContext donorContext;
+    donorContext.setState(DonorStateEnum::kDonatingInitialData);
+    donorShards.emplace_back(shard1, donorContext);
+    donorShards.emplace_back(shard2, donorContext);
+    _state->document.setDonorShards(donorShards);
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kCloning,
+        .transitionFn = [&]() { _dao->updateNumberOfDocsToCopy(_opCtx, shardToNumDocsCopied); },
+        .set = BSON(ReshardingCoordinatorDocument::kDonorShardsFieldName + ".0." +
+                        DonorShardEntry::kDocumentsToCopyFieldName
+                    << 100
+                    << ReshardingCoordinatorDocument::kDonorShardsFieldName + ".1." +
+                        DonorShardEntry::kDocumentsToCopyFieldName
+                    << 200)});
+}
+
+DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
+             UpdateNumberOfDocsToCopyPhasePreviousStateInvariant,
+             "invariant") {
+
+    std::map<ShardId, int64_t> shardToNumDocsCopied;
+
+    ShardId shard1("shard1");
+    ShardId shard2("shard2");
+
+    shardToNumDocsCopied.emplace(shard1, 100);
+    shardToNumDocsCopied.emplace(shard2, 200);
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kApplying, .transitionFn = [&]() {
+            _dao->updateNumberOfDocsToCopy(_opCtx, shardToNumDocsCopied);
+        }});
+}
+
+TEST_F(ReshardingCoordinatorDaoFixture, UpdateNumberOfDocsCopiedFinal) {
+    std::map<ShardId, int64_t> shardToNumDocsCopiedFinal;
+    ShardId shard1("shard1");
+    ShardId shard2("shard2");
+
+    shardToNumDocsCopiedFinal.emplace(shard1, 100);
+    shardToNumDocsCopiedFinal.emplace(shard2, 200);
+
+    // Set up donor shards in the coordinator document
+    std::vector<DonorShardEntry> donorShards;
+    DonorShardContext donorContext;
+    donorContext.setState(DonorStateEnum::kDonatingInitialData);
+    donorShards.emplace_back(shard1, donorContext);
+    donorShards.emplace_back(shard2, donorContext);
+    _state->document.setDonorShards(donorShards);
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kBlockingWrites,
+        .transitionFn =
+            [&]() { _dao->updateNumberOfDocsCopiedFinal(_opCtx, shardToNumDocsCopiedFinal); },
+        .set = BSON(ReshardingCoordinatorDocument::kDonorShardsFieldName + ".0." +
+                        DonorShardEntry::kDocumentsFinalFieldName
+                    << 100
+                    << ReshardingCoordinatorDocument::kDonorShardsFieldName + ".1." +
+                        DonorShardEntry::kDocumentsFinalFieldName
+                    << 200)});
+}
+
+DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
+             UpdateNumberOfDocsCopiedFinalPhasePreviousStateInvariant,
+             "invariant") {
+
+    std::map<ShardId, int64_t> shardToNumDocsCopiedFinal;
+
+    ShardId shard1("shard1");
+    ShardId shard2("shard2");
+
+    shardToNumDocsCopiedFinal.emplace(shard1, 100);
+    shardToNumDocsCopiedFinal.emplace(shard2, 200);
+
+    runPhaseTransitionTest(PhaseTransitionTestCase{
+        .initialPhase = CoordinatorStateEnum::kApplying, .transitionFn = [&]() {
+            _dao->updateNumberOfDocsCopiedFinal(_opCtx, shardToNumDocsCopiedFinal);
+        }});
+}
+
 DEATH_TEST_F(ReshardingCoordinatorDaoFixtureDeathTest,
              TransitionToCloningPhasePreviousStateInvariant,
              "invariant") {
