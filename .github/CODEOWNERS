@@ -35,4 +35,4 @@ src/third_party/scripts/gen_thirdpartyreadme.py
 src/third_party/scripts/README.third_party.md.template
 
 # Changes to WT sources can be approved by wiredtiger release team
-src/third_party/wiredtiger/ @10gen/wiredtiger-release
+src/third_party/wiredtiger/ @10gen/wiredtiger-release @10gen/server-release
