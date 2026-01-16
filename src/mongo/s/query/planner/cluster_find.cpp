@@ -174,7 +174,7 @@ BSONObj makeFindCommandForShards(OperationContext* opCtx,
 
     // Reset the input request's generic arguments and only set the ones needed for the query.
     // TODO: SERVER-90827 Only reset arguments not suitable for passing through to shards.
-    GenericArguments args;
+    GenericArguments args{};
     std::swap(findCommand.getGenericArguments(), args);
     findCommand.setUnwrappedReadPref(std::move(args.getUnwrappedReadPref()));
     findCommand.setMaxTimeMS(args.getMaxTimeMS());
