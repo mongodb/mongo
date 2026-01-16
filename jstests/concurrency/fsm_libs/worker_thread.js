@@ -62,7 +62,8 @@ export const workerThread = (function () {
             if (TestData.pinningSecondary) {
                 mongo = new SpecificSecondaryReaderMongo(connectionString, args.secondaryHost);
             } else {
-                mongo = new Mongo(connectionString);
+                // mongo will be a Mongo or MultiRouterMongo depending on the connection string.
+                mongo = connect(connectionString).getMongo();
             }
 
             if (typeof args.tenantId !== "undefined") {

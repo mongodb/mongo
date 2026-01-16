@@ -23,6 +23,10 @@ import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js
 // This workload involves running commands outside a session.
 TestData.disableImplicitSessions = true;
 
+// Internal transaction tests need to be able to pin to a single mongos.
+// pinToSingleMongos due to testInternalTransactions command usage.
+TestData.pinToSingleMongos = true;
+
 export function extendWithInternalTransactionsUnsharded($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;

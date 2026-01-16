@@ -10,6 +10,11 @@
  *  ]
  */
 
+// Pin each FSM thread to a single mongos because this workload relies on killing operations running
+// on a specific mongos instance.
+// pinToSingleMongos due to killOp command usage.
+TestData.pinToSingleMongos = true;
+
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_operations.js";

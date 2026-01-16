@@ -17,6 +17,11 @@ import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {assertWorkedOrFailedHandleTxnErrors} from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
+// Pin each FSM thread to a single mongos because this workload relies on killing pinned cursors on
+// a specific mongos instance.
+// pinToSingleMongos due to killOp command usage.
+TestData.pinToSingleMongos = true;
+
 export const $config = (function () {
     let data = {
         chooseRandomlyFrom: function chooseRandomlyFrom(arr) {

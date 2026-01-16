@@ -12,6 +12,10 @@
  * ]
  */
 
+// This tests expects to see, via currentOp, transactions running running on a particular mongos.
+// pinToSingleMongos due to currentOp command usage.
+TestData.pinToSingleMongos = true;
+
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_all_commands.js";
 
