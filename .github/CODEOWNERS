@@ -1959,6 +1959,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/cleanup_structured* @10gen/server-catalog-and-routing-ddl @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/**/compact_structured* @10gen/server-catalog-and-routing-ddl @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/**/partitioned* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/db/**/logical_session_cache_factory_mongod* @10gen/server-transactions @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/admission/OWNERS.yml
 /src/mongo/db/admission/**/* @10gen/server-workload-resilience @svc-auto-approve-bot

@@ -52,8 +52,7 @@
 
 namespace mongo {
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state,
-                                                              bool isRouterServer) {
+std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state) {
     auto liaison = std::make_unique<ServiceLiaisonImpl>(
         service_liaison_shard_callbacks::getOpenCursorSessions,
         service_liaison_shard_callbacks::killCursorsWithMatchingSessions);

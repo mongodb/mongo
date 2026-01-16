@@ -1116,8 +1116,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
         } else if (replSettings.isReplSet()) {
             kind = LogicalSessionCacheServer::kReplicaSet;
         }
-        return makeLogicalSessionCacheD(
-            kind, serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
+        return makeLogicalSessionCacheD(kind);
     }();
     LogicalSessionCache::set(serviceContext, std::move(logicalSessionCache));
 

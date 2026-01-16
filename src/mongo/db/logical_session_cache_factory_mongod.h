@@ -44,6 +44,6 @@ enum class MONGO_MOD_PUB LogicalSessionCacheServer {
 };
 
 MONGO_MOD_PUB std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(
-    LogicalSessionCacheServer state, bool isRouterServer);
+    LogicalSessionCacheServer state);
 
 }  // namespace mongo

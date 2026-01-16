@@ -33,7 +33,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session/service_liaison_router.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -43,19 +42,7 @@ namespace service_liaison_shard_callbacks {
 
 LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx) {
     LogicalSessionIdSet shardOpenCursorsSessions;
-
     CursorManager::get(opCtx)->appendActiveSessions(&shardOpenCursorsSessions);
-
-    auto embeddedRouterOpenCursorsSessions = [&]() {
-        if (auto service = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
-            !service) {
-            return LogicalSessionIdSet{};
-        }
-
-        return service_liaison_router_callbacks::getOpenCursorSessions(opCtx);
-    }();
-
-    shardOpenCursorsSessions.merge(std::move(embeddedRouterOpenCursorsSessions));
     return shardOpenCursorsSessions;
 }
 
@@ -63,15 +50,6 @@ int killCursorsWithMatchingSessions(OperationContext* opCtx,
                                     const SessionKiller::Matcher& matcher) {
     auto shardKilledCursors =
         CursorManager::get(opCtx)->killCursorsWithMatchingSessions(opCtx, matcher);
-
-    auto embeddedRouterKilledCursors = [&]() {
-        if (auto service = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
-            !service) {
-            return 0;
-        }
-
-        return service_liaison_router_callbacks::killCursorsWithMatchingSessions(opCtx, matcher);
-    }();
 
     // Ignore errors when trying to kill cursors with matching sessions. This flow is only run by
     // the LogicalSessionCache, that eventually will call it again.
@@ -81,7 +59,7 @@ int killCursorsWithMatchingSessions(OperationContext* opCtx,
                       "error"_attr = redact(shardKilledCursors.first));
     }
 
-    return shardKilledCursors.second + embeddedRouterKilledCursors;
+    return shardKilledCursors.second;
 }
 
 }  // namespace service_liaison_shard_callbacks
