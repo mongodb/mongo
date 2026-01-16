@@ -91,6 +91,8 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace mongo {
 namespace {
 
@@ -129,31 +131,66 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         boost::none)};                 // needsRetryImage
 }
 
-repl::OplogEntry makeApplyOpsOplogEntry(repl::OpTime opTime,
-                                        repl::OpTypeEnum opType,
-                                        std::vector<repl::ReplOperation> ops,
-                                        OperationSessionInfo sessionInfo,
-                                        Date_t wallClockTime,
-                                        const std::vector<StmtId>& stmtIds,
-                                        boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
-                                        boost::optional<repl::MultiOplogEntryType> multiOpType) {
+repl::MutableOplogEntry makeNoopMutableOplogEntry(const NamespaceString& nss,
+                                                  UUID uuid,
+                                                  const LogicalSessionId& lsid,
+                                                  TxnNumber txnNumber,
+                                                  const std::vector<StmtId>& stmtIds,
+                                                  repl::OpTime prevOpTime) {
     repl::MutableOplogEntry oplogEntry;
-    oplogEntry.setOpTime(opTime);
-    oplogEntry.setOpType(opType);
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(nss);
+    oplogEntry.setUuid(uuid);
+    oplogEntry.setObject(BSON("TestValue" << 0));
+    oplogEntry.setWallClockTime(Date_t::now());
+    if (stmtIds.front() != kUninitializedStmtId) {
+        oplogEntry.setSessionId(lsid);
+        oplogEntry.setTxnNumber(txnNumber);
+        oplogEntry.setStatementIds(stmtIds);
+        oplogEntry.setPrevWriteOpTimeInTransaction(prevOpTime);
+    }
+    return oplogEntry;
+}
+
+repl::MutableOplogEntry makeApplyOpsMutableOplogEntry(
+    std::vector<repl::ReplOperation> ops,
+    OperationSessionInfo sessionInfo,
+    Date_t wallClockTime,
+    const std::vector<StmtId>& stmtIds,
+    boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+    boost::optional<repl::MultiOplogEntryType> multiOpType = boost::none) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
     oplogEntry.setOperationSessionInfo(sessionInfo);
     oplogEntry.setWallClockTime(wallClockTime);
     oplogEntry.setStatementIds(stmtIds);
     oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
     oplogEntry.setMultiOpType(multiOpType);
-    BSONObjBuilder oField;
-    BSONArrayBuilder applyOpsBuilder = oField.subarrayStart("applyOps");
+
+    BSONObjBuilder applyOpsBuilder;
+    BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
     for (const auto& op : ops) {
-        applyOpsBuilder.append(op.toBSON());
+        opsArrayBuilder.append(op.toBSON());
     }
+    opsArrayBuilder.done();
     applyOpsBuilder.doneFast();
-    oplogEntry.setObject(oField.obj());
-    return uassertStatusOK(repl::OplogEntry::parse(oplogEntry.toBSON()));
+    oplogEntry.setObject(applyOpsBuilder.obj());
+
+    return oplogEntry;
+}
+
+repl::OplogEntry makeApplyOpsOplogEntry(repl::OpTime opTime,
+                                        std::vector<repl::ReplOperation> ops,
+                                        OperationSessionInfo sessionInfo,
+                                        Date_t wallClockTime,
+                                        const std::vector<StmtId>& stmtIds,
+                                        boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+                                        boost::optional<repl::MultiOplogEntryType> multiOpType) {
+    auto mutableOplogEntry = makeApplyOpsMutableOplogEntry(
+        ops, sessionInfo, wallClockTime, stmtIds, prevWriteOpTimeInTransaction, multiOpType);
+    mutableOplogEntry.setOpTime(opTime);
+    return uassertStatusOK(repl::OplogEntry::parse(mutableOplogEntry.toBSON()));
 }
 
 class OpObserverMock : public OpObserverNoop {
@@ -267,34 +304,46 @@ protected:
         MockReplCoordServerFixture::tearDown();
     }
 
-    static repl::OpTime logOp(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              UUID uuid,
-                              const LogicalSessionId& lsid,
-                              TxnNumber txnNumber,
-                              const std::vector<StmtId>& stmtIds) {
-        return logOp(opCtx, nss, uuid, lsid, txnNumber, stmtIds, {});
+    static repl::OpTime logNoopOplogEntry(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          UUID uuid,
+                                          const LogicalSessionId& lsid,
+                                          TxnNumber txnNumber,
+                                          const std::vector<StmtId>& stmtIds) {
+        return logNoopOplogEntry(opCtx, nss, uuid, lsid, txnNumber, stmtIds, {});
     }
 
-    static repl::OpTime logOp(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              UUID uuid,
-                              const LogicalSessionId& lsid,
-                              TxnNumber txnNumber,
-                              const std::vector<StmtId>& stmtIds,
-                              repl::OpTime prevOpTime) {
-        repl::MutableOplogEntry oplogEntry;
-        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-        oplogEntry.setNss(nss);
-        oplogEntry.setUuid(uuid);
-        oplogEntry.setObject(BSON("TestValue" << 0));
-        oplogEntry.setWallClockTime(Date_t::now());
-        if (stmtIds.front() != kUninitializedStmtId) {
-            oplogEntry.setSessionId(lsid);
-            oplogEntry.setTxnNumber(txnNumber);
-            oplogEntry.setStatementIds(stmtIds);
-            oplogEntry.setPrevWriteOpTimeInTransaction(prevOpTime);
+    static repl::OpTime logNoopOplogEntry(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          UUID uuid,
+                                          const LogicalSessionId& lsid,
+                                          TxnNumber txnNumber,
+                                          const std::vector<StmtId>& stmtIds,
+                                          repl::OpTime prevOpTime) {
+        auto oplogEntry =
+            makeNoopMutableOplogEntry(nss, uuid, lsid, txnNumber, stmtIds, prevOpTime);
+        return repl::logOp(opCtx, &oplogEntry);
+    }
+
+    static repl::OpTime logApplyOpsOplogEntry(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              UUID uuid,
+                                              const LogicalSessionId& lsid,
+                                              TxnNumber txnNumber,
+                                              const std::vector<StmtId>& stmtIds,
+                                              repl::OpTime prevOpTime) {
+        std::vector<repl::ReplOperation> ops;
+        for (auto i = 0; i < (int)stmtIds.size(); i++) {
+            auto op = repl::MutableOplogEntry::makeInsertOperation(
+                nss, uuid, BSON("_id" << i << "x" << i), BSON("_id" << i));
+            op.setStatementIds({stmtIds[i]});
+            ops.push_back(op);
         }
+        OperationSessionInfo osi;
+        osi.setSessionId(lsid);
+        osi.setTxnNumber(txnNumber);
+        auto oplogEntry =
+            makeApplyOpsMutableOplogEntry(ops, osi, Date_t::now(), {} /* stmtIds */, prevOpTime);
         return repl::logOp(opCtx, &oplogEntry);
     }
 
@@ -314,8 +363,14 @@ protected:
 
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime =
-            logOp(opCtx(), kNss, uuid, session->getSessionId(), txnNum, stmtIds, prevOpTime);
+        const auto opTime = [&] {
+            if (isInternalSessionForRetryableWrite(*opCtx()->getLogicalSessionId())) {
+                return logApplyOpsOplogEntry(
+                    opCtx(), kNss, uuid, session->getSessionId(), txnNum, stmtIds, prevOpTime);
+            }
+            return logNoopOplogEntry(
+                opCtx(), kNss, uuid, session->getSessionId(), txnNum, stmtIds, prevOpTime);
+        }();
 
         SessionTxnRecord sessionTxnRecord;
         auto sessionId = session->getSessionId();
@@ -594,7 +649,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionN
     WriteUnitOfWork wuow(opCtx());
 
     const auto uuid = UUID::gen();
-    const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, {0});
+    const auto opTime = logNoopOplogEntry(opCtx(), kNss, uuid, sessionId, txnNum, {0});
     SessionTxnRecord sessionTxnRecord;
     sessionTxnRecord.setSessionId(sessionId);
     sessionTxnRecord.setTxnNum(txnNum);
@@ -687,7 +742,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
     // Invalidate both sessions. Verify that refreshing only the child session causes both sessions
     // to be refreshed.
     parentTxnParticipant.invalidate(opCtx());
-    parentTxnParticipant.invalidate(opCtx());
+    childTxnParticipant.invalidate(opCtx());
     childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
 
     ASSERT(parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
@@ -783,7 +838,7 @@ DEATH_TEST_REGEX_F(
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, {0});
+        const auto opTime = logNoopOplogEntry(opCtx(), kNss, uuid, sessionId, txnNum, {0});
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(sessionId);
@@ -797,7 +852,7 @@ DEATH_TEST_REGEX_F(
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum - 1, {0});
+        const auto opTime = logNoopOplogEntry(opCtx(), kNss, uuid, sessionId, txnNum - 1, {0});
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(sessionId);
@@ -828,7 +883,7 @@ DEATH_TEST_REGEX_F(
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, {0, 1});
+        const auto opTime = logNoopOplogEntry(opCtx(), kNss, uuid, sessionId, txnNum, {0, 1});
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(sessionId);
@@ -842,7 +897,7 @@ DEATH_TEST_REGEX_F(
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum - 1, {0, 1});
+        const auto opTime = logNoopOplogEntry(opCtx(), kNss, uuid, sessionId, txnNum - 1, {0, 1});
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(sessionId);
@@ -870,7 +925,8 @@ DEATH_TEST_REGEX_F(
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
     const auto uuid = UUID::gen();
-    const auto opTime = logOp(opCtx(), kNss, uuid, *opCtx()->getLogicalSessionId(), txnNum, {0});
+    const auto opTime =
+        logNoopOplogEntry(opCtx(), kNss, uuid, *opCtx()->getLogicalSessionId(), txnNum, {0});
 
     txnParticipant.invalidate(opCtx());
 
@@ -1143,7 +1199,6 @@ TEST_F(TransactionParticipantRetryableWritesTest, SingleRetryableApplyOps) {
         insert2.setStatementIds({2});
         auto entry0 = makeApplyOpsOplogEntry(
             repl::OpTime(Timestamp(100, 0), 0),  // optime
-            repl::OpTypeEnum::kCommand,          // op type
             {insert0, insert1, insert2},         // operations
             osi,                                 // session info
             Date_t::now(),                       // wall clock time
@@ -1205,7 +1260,6 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
         const repl::OpTime lastOpTime(Timestamp(100, 2), 1);
         auto entry0 = makeApplyOpsOplogEntry(
             firstOpTime,                  // optime
-            repl::OpTypeEnum::kCommand,   // op type
             {insert0, insert1, insert2},  // operations
             osi,                          // session info
             Date_t::now(),                // wall clock time
@@ -1215,7 +1269,6 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
 
         auto entry1 = makeApplyOpsOplogEntry(
             lastOpTime,                   // optime
-            repl::OpTypeEnum::kCommand,   // op type
             {insert3, insert4, insert5},  // operations
             osi,                          // session info
             Date_t::now(),                // wall clock time
@@ -1284,7 +1337,6 @@ TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
         const repl::OpTime lastOpTime(Timestamp(100, 3), 1);
         auto entry0 = makeApplyOpsOplogEntry(
             firstOpTime,                  // optime
-            repl::OpTypeEnum::kCommand,   // op type
             {insert0, insert1, insert2},  // operations
             osi,                          // session info
             Date_t::now(),                // wall clock time
@@ -1294,7 +1346,6 @@ TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
 
         auto entry1 = makeApplyOpsOplogEntry(
             secondOpTime,                 // optime
-            repl::OpTypeEnum::kCommand,   // op type
             {insert3, insert4, insert5},  // operations
             osi,                          // session info
             Date_t::now(),                // wall clock time
@@ -1380,7 +1431,7 @@ TEST_F(ShardTxnParticipantRetryableWritesTest,
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
-        const auto opTime = logOp(opCtx(), kNss, uuid, sessionId, txnNum, {0});
+        const auto opTime = logNoopOplogEntry(opCtx(), kNss, uuid, sessionId, txnNum, {0});
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(sessionId);
