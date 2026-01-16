@@ -4,7 +4,6 @@ import json
 import os
 import pathlib
 import platform
-import re
 import shutil
 import subprocess
 import sys
@@ -129,31 +128,12 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise, atlas):
             )
 
         if persistent_compdb:
-            # We need to adjust the args so actions can be runnable locally
             args = []
             for arg in action["arguments"]:
                 if arg.startswith("bazel-out/"):
-                    arg = f"{symlink_prefix}out/" + arg[len("bazel-out/") :]
+                    arg = f"{symlink_prefix}out" + arg[len("bazel-out/") :]
                 elif arg.startswith("external/"):
                     arg = f"{symlink_prefix}out/../../../external/" + arg[len("external/") :]
-                else:
-                    # Preserve compiler prefixes while rewriting paths.
-                    m = re.match(r"^(-isystem)(bazel-out|external)/(.*)$", arg)
-                    if m:
-                        prefix, root, rest = m.groups()
-                        if root == "bazel-out":
-                            arg = f"{prefix}{symlink_prefix}out/{rest}"
-                        else:
-                            arg = f"{prefix}{symlink_prefix}out/../../../external/{rest}"
-                    else:
-                        # Generic: preserve any two-character prefix (e.g. "-I", "/I").
-                        m = re.match(r"^(.{2})(bazel-out|external)/(.*)$", arg)
-                        if m:
-                            prefix, root, rest = m.groups()
-                            if root == "bazel-out":
-                                arg = f"{prefix}{symlink_prefix}out/{rest}"
-                            else:
-                                arg = f"{prefix}{symlink_prefix}out/../../../external/{rest}"
                 args.append(arg)
 
             output_json.append(
