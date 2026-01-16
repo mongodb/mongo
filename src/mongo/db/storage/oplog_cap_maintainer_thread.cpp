@@ -377,6 +377,18 @@ void OplogCapMaintainerThread::run() {
             _shutdownReason = ex.toStatus();
 
             return;
+        } catch (const DBException& ex) {
+            const auto& err = ex.toStatus();
+            if (_uniqueCtx->get()->checkForInterruptNoAssert().isOK()) {
+                LOGV2_FATAL_NOTRACE(
+                    11650900, "Error in OplogCapMaintainerThread", "error"_attr = err);
+            }
+            LOGV2(11650901, "OplogCapMaintainerThread interrupted", "status"_attr = ex.toStatus());
+            interruptCount.fetchAndAdd(1);
+
+            stdx::lock_guard<stdx::mutex> lk(_stateMutex);
+            _shutdownReason = err;
+            return;
         }
     }
 
