@@ -323,21 +323,22 @@ std::unique_ptr<Pipeline> createOplogFetchingPipelineForResharding(
     // Filter out anything inside of an `applyOps` specifically destined for another shard. This
     // ensures zone restrictions are obeyed. Data will never be sent to a shard that it isn't meant
     // to end up on.
+    // Switched away from init lists because of MSVC bug found in SERVER-116297:
+    // https://developercommunity.visualstudio.com/t/MSVC-1444-v143-extreme-compiler-memor/11028472
     stages.emplace_back(DocumentSourceAddFields::create(
-        Doc{{"o.applyOps",
-             Doc{{"$cond",
-                  Doc{{"if", Doc{{"$eq", Arr{V{"$op"_sd}, V{"c"_sd}}}}},
-                      {"then",
-                       Doc{{"$filter",
-                            Doc{{"input", "$o.applyOps"_sd},
-                                {"cond",
-                                 Doc{{"$and",
-                                      Arr{V{Doc{{"$eq", Arr{V{"$$this.ui"_sd}, V{collUUID}}}}},
-                                          V{Doc{{"$eq",
-                                                 Arr{V{"$$this.destinedRecipient"_sd},
-                                                     V{recipientShard.toString()}}}}}}}}}}}}},
-                      {"else", "$o.applyOps"_sd}}}}}}
-            .toBson(),
+        BSON("o.applyOps" << BSON(
+                 "$cond" << BSON(
+                     "if" << BSON("$eq" << BSON_ARRAY("$op" << "c")) << "then"
+                          << BSON("$filter" << BSON(
+                                      "input"
+                                      << "$o.applyOps"
+                                      << "cond"
+                                      << BSON("$and" << BSON_ARRAY(
+                                                  BSON("$eq" << BSON_ARRAY("$$this.ui" << collUUID))
+                                                  << BSON("$eq" << BSON_ARRAY(
+                                                              "$$this.destinedRecipient"
+                                                              << recipientShard.toString()))))))
+                          << "else" << "$o.applyOps"))),
         expCtx));
 
     return Pipeline::create(std::move(stages), expCtx);

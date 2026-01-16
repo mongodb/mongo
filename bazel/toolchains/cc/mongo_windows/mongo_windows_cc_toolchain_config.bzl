@@ -1616,6 +1616,19 @@ def _impl(ctx):
             ],
         )
 
+        disable_warnings_for_third_party_libraries_msvc_feature = feature(
+            name = "disable_warnings_for_third_party_libraries_msvc",
+            enabled = True,
+            flag_sets = [
+                flag_set(
+                    actions = all_compile_actions,
+                    flag_groups = [flag_group(flags = [
+                        "/wd5286",  # implicit conversion from enum type
+                    ])],
+                ),
+            ],
+        )
+
         features = [
             no_legacy_features_feature,
             nologo_feature,
@@ -1652,6 +1665,7 @@ def _impl(ctx):
             disable_assertions_feature,
             determinism_feature,
             treat_warnings_as_errors_feature,
+            disable_warnings_for_third_party_libraries_msvc_feature,
             smaller_binary_feature,
             remove_unreferenced_code_feature,
             ignore_noisy_warnings_feature,

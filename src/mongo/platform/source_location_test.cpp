@@ -79,13 +79,12 @@ TEST_F(SourceLocationTest, GlobalVariable) {
 }
 
 /*
- * The MSVC version we're dealing with right now is 14.31.31103 -
- * "Visual Studio 2019 - 14.30". It gets current source location
+ * The MSVC version we're dealing with right now is 14.44.35207 -
+ * "Visual Studio 2022 - 17.14.20". It gets current source location
  * wrong in some ways. These tests confirm its incorrect behavior.
  * This condition can be adjusted when we upgrade to a better MSVC.
- * XCode has the same problem.
  */
-#if defined(_MSC_VER) || defined(__apple_build_version__)
+#if defined(_MSC_VER)
 constexpr bool wrongLocation = true;
 #else
 constexpr bool wrongLocation = false;
@@ -103,7 +102,6 @@ TEST_F(SourceLocationTest, DefaultStructMember) {
     ASSERT_EQ(o.loc.line(), wrongLocation ? o.memberLine : o.ctorLine);
 }
 
-int someFunctionSourceLine = __LINE__ + 1;
 SourceLocation someFunction(SourceLocation loc = MONGO_SOURCE_LOCATION()) {
     return loc;
 }
@@ -112,11 +110,10 @@ TEST_F(SourceLocationTest, FunctionReportsCaller) {
     auto reported = someFunction().line();
     auto callSiteLine = __LINE__ - 1;
     // Some compilers incorrectly choose the function source line.
-    ASSERT_EQ(reported, wrongLocation ? someFunctionSourceLine : callSiteLine);
+    ASSERT_EQ(reported, callSiteLine);
 }
 
 struct SomeClass {
-    static constexpr int ctorSiteLine = __LINE__ + 1;
     explicit SomeClass(SourceLocation loc = MONGO_SOURCE_LOCATION()) : loc{loc} {}
     SourceLocation loc;
 };
@@ -125,7 +122,7 @@ TEST_F(SourceLocationTest, ConstructorReportsCaller) {
     auto reported = SomeClass{}.loc.line();
     auto callSiteLine = __LINE__ - 1;
     // Some compilers incorrectly choose the ctor source line.
-    ASSERT_EQ(reported, wrongLocation ? SomeClass::ctorSiteLine : callSiteLine);
+    ASSERT_EQ(reported, callSiteLine);
 }
 
 #define CALL_MONGO_SOURCE_LOCATION() MONGO_SOURCE_LOCATION()
