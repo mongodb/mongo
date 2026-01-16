@@ -10,33 +10,33 @@
 \* the local catalog protocol forbidding the collection incarnation anomaly described at:
 \* https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/README_transactions_and_ddl.md
 \*
-\* The specification models a single database with both TRACKED and UNTRACKED collections, and the 
-\* transitions from one to the other. Explicitly covered DDLs are Create, Drop, Rename, and 
+\* The specification models a single database with both TRACKED and UNTRACKED collections, and the
+\* transitions from one to the other. Explicitly covered DDLs are Create, Drop, Rename, and
 \* MovePrimary. Reshard is implicitly covered  by a back to back Drop (tracked) and Create (tracked)
 \* interleaving.
 \*
 \* A noteworthy fact is that movePrimary differs from the actual implementation in that database locks
 \* are not specified. This allows movePrimary to happen with a transaction active on the namespaces in
-\* the database. The upside of this is that the model is kept simpler while allowing exploration of 
-\* states equivalent to those that can happen in reality, but in practice would require 2 or more 
+\* the database. The upside of this is that the model is kept simpler while allowing exploration of
+\* states equivalent to those that can happen in reality, but in practice would require 2 or more
 \* databases to cause an anomaly (e.g. SERVER-82353).
 \*
-\* The ShardVersion is only partially modelled to consider the timestamp field, referred to as 
-\* 'collectionGen' in this spec. Similarly the DatabaseVersion only considers the timestamp field, 
+\* The ShardVersion is only partially modelled to consider the timestamp field, referred to as
+\* 'collectionGen' in this spec. Similarly the DatabaseVersion only considers the timestamp field,
 \* and is referred to as 'dbVersion'.
-\* 
+\*
 \* To run the model-checker, first edit the constants in MCTxnsCollectionIncarnation.cfg if desired, then:
 \*     cd src/mongo/tla_plus
 \*     ./model-check.sh TxnsCollectionIncarnation
 
 EXTENDS Integers, Sequences, FiniteSets, TLC
-CONSTANTS 
+CONSTANTS
     Shards,
     NameSpaces,
     Keys,
     Txns,
     TXN_STMTS       \* statements per transaction
-    
+
     STALE_DB_VERSION  == "staleDbVersion"
     STALE_SHARD_VERSION  == "staleShardVersion"
     SNAPSHOT_INCOMPATIBLE == "snapshotIncompatible"
@@ -58,12 +58,19 @@ ASSUME TXN_STMTS \in 2..100
 Max(S) == CHOOSE x \in S : \A y \in S : x >= y
 IsInjective(f) == \A a,b \in DOMAIN f : f[a] = f[b] => a = b
 
+\* Database names for tracking created databases
+DatabaseNames == {"db"}
+
+\* Transaction Runtime Context - sent with all requests, but placementConflictTime is only
+\* populated on startTransaction (set to -1 otherwise)
+TxnRuntimeContext == [startTransaction: BOOLEAN, placementConflictTime: Int, createdDatabases: SUBSET DatabaseNames]
+
 DroppedNamespaceUUID == 0
 Stmts == 1..TXN_STMTS
-ReqEntry == [shard: Shards, ns: NameSpaces, dbVersion: Nat, collectionGen: Nat, placementConflictTs: Nat]
+ReqEntry == [shard: Shards, ns: NameSpaces, dbVersion: Nat, collectionGen: Nat, txnRuntimeContext: TxnRuntimeContext]
 
-CreateReqEntry(s, ns, dbVersion, collectionGen, placementConflictTs) == 
-    [shard |->s, ns |-> ns, dbVersion |-> dbVersion, collectionGen |-> collectionGen, placementConflictTs |-> placementConflictTs]
+CreateReqEntry(s, ns, dbVersion, collectionGen, txnCtx) ==
+    [shard |->s, ns |-> ns, dbVersion |-> dbVersion, collectionGen |-> collectionGen, txnRuntimeContext |-> txnCtx]
 
 IsValidDataDistribution(d) ==
     /\ UNION {d[s] : s \in Shards} = Keys
@@ -79,15 +86,15 @@ UntrackedClusterMetadata == [type |-> UNTRACKED, collectionGen |-> UntrackedColl
 CollectionMetadataFormat == [type: {TRACKED}, collectionGen: Nat \ {UntrackedCollectionGen} ] \cup {UntrackedClusterMetadata}
 CreateTrackedCollectionMetadata(g) == [type |-> TRACKED, collectionGen |-> g]
 
-CollectionCacheMetadataFormat == 
+CollectionCacheMetadataFormat ==
     [ type: CollectionMetadataType \cup {UNKNOWN}, collectionGen: Nat, ownership: SUBSET Shards ]
 
 UnknownCollectionCacheMetadata == [type |-> UNKNOWN, collectionGen |-> UntrackedCollectionGen, ownership |-> {}]
 
-EmptyTxnResources == [snapshot |-> <<>>, locks |-> [n \in NameSpaces |-> FALSE]]
-
 NoDatabaseVersion == 0
 DatabaseMetadataFormat == [primaryShard: Shards, dbVersion: Nat]
+
+EmptyTxnResources == [snapshot |-> <<>>, locks |-> [n \in NameSpaces |-> FALSE], placementConflictTime |-> -1, createdDatabases |-> {}]
 
 (* Global and networking variables *)
 VARIABLE databaseMetadata   \* Authoritative metadata source for the database (single).
@@ -100,17 +107,19 @@ VARIABLE nextUUID           \* Auxiliary variable to simulate UUID generation.
 VARIABLE rDatabaseCache         \* Cache of the database metadata.
 VARIABLE rCollectionCache       \* Per Namespace, cache of the metadata.
 VARIABLE rCompletedStmt         \* Router statements acknowledged by the shard.
-VARIABLE rPlacementConflictTs   \* Per-transaction, immutable timestamp that the router forwards
-                                \* with each statement. Used to detect generation anomalies for 
-                                \* tracked namespaces.
+VARIABLE rPlacementConflictTime \* Per-transaction, immutable timestamp that the router forwards
+                                \* with the first statement (startTransaction). Used to detect
+                                \* generation anomalies for tracked namespaces.
+VARIABLE rCreatedDatabases      \* Per-transaction, set of databases created during the transaction.
 
 (* Shard variables *)
-VARIABLE shardTxnResources  \* Per-shard, data+catalog snapshot and locks held for each transaction.
+VARIABLE shardTxnResources  \* Per-shard, data+catalog snapshot, locks held, placement conflict time
+                            \* and created databases list for each transaction.
 VARIABLE shardData          \* Per-namespace, set of keys held on each shard.
 VARIABLE shardNamespaceUUID \* Per-namespace, UUID on each shard.
 
 global_vars == << databaseMetadata, collectionMetadata, log, response, clusterTime, nextUUID >>
-router_vars == << rDatabaseCache, rCollectionCache, rCompletedStmt, rPlacementConflictTs >>
+router_vars == << rDatabaseCache, rCollectionCache, rCompletedStmt, rPlacementConflictTime, rCreatedDatabases >>
 shard_vars == << shardTxnResources, shardData, shardNamespaceUUID >>
 vars == << global_vars, router_vars, shard_vars >>
 
@@ -125,7 +134,8 @@ Init == (* Global and networking *)
         /\ rDatabaseCache = databaseMetadata
         /\ rCollectionCache = [ n \in NameSpaces |-> UnknownCollectionCacheMetadata ]
         /\ rCompletedStmt = [ t \in Txns |-> 0 ]
-        /\ rPlacementConflictTs = [t \in Txns |-> -1]
+        /\ rPlacementConflictTime = [t \in Txns |-> -1]
+        /\ rCreatedDatabases = [t \in Txns |-> {}]
         (* Shard *)
         /\ shardTxnResources = [s \in Shards |-> [ t \in Txns |-> EmptyTxnResources]]
         /\ shardData = [ n \in NameSpaces |-> [ s \in Shards |-> {}]]
@@ -135,16 +145,16 @@ LatestShardNamespaceUUID == shardNamespaceUUID[Max(DOMAIN shardNamespaceUUID)]
 LatestUUIDForNameSpace(ns) == Max({LatestShardNamespaceUUID[ns][s] : s \in Shards})
 
 HasResponse(stmt) == Cardinality(stmt) # 0
-TxnCommitted(t) == 
+TxnCommitted(t) ==
     /\  HasResponse(response[t][TXN_STMTS])
-    /\  Cardinality(log[t][TXN_STMTS]) = Cardinality(response[t][TXN_STMTS])
+    /\  Cardinality(log[t][TXN_STMTS].reqEntries) = Cardinality(response[t][TXN_STMTS])
     /\  \A rsp \in response[t][TXN_STMTS]: rsp.status = OK
 TxnAborted(t) == \E s \in Stmts : HasResponse(response[t][s]) /\ \E rsp \in response[t][s]: rsp.status # OK
 TxnDone(t) == TxnCommitted(t) \/ TxnAborted(t)
 
 IsNamespaceLocked(ns) == \E s \in Shards, t \in Txns: shardTxnResources[s][t].locks[ns]
 
-ClearResourcesForTxnInShard(t, s) == 
+ClearResourcesForTxnInShard(t, s) ==
     [ tmpTxn \in Txns |-> IF t = tmpTxn THEN EmptyTxnResources ELSE shardTxnResources[s][tmpTxn]]
 ClearResourcesForTxn(t) == [s \in Shards |-> ClearResourcesForTxnInShard(t, s)]
 
@@ -153,43 +163,61 @@ ClearResourcesForTxn(t) == [s \in Shards |-> ClearResourcesForTxnInShard(t, s)]
 GetForShard(s, f) == [ns \in DOMAIN(f) |-> f[ns][s]]
 CreateTxnSnapshot(s) == LET ts == Max(DOMAIN shardNamespaceUUID) IN
     [   ts |-> ts,
-        uuid |-> GetForShard(s, shardNamespaceUUID[clusterTime]), 
+        uuid |-> GetForShard(s, shardNamespaceUUID[clusterTime]),
         data |-> GetForShard(s, shardData)  ]
 
-\* Creates a cache entry for the given namespace, with the latest metadata. It is possible to cache 
-\* the distribution instead of the ownership, but this would increase the state space, as many 
+\* Creates a cache entry for the given namespace, with the latest metadata. It is possible to cache
+\* the distribution instead of the ownership, but this would increase the state space, as many
 \* distributions map to the same ownership.
-RouterCacheLookup(ns) == 
+RouterCacheLookup(ns) ==
     collectionMetadata[ns] @@ [ownership |-> DistributionToOwnership(shardData[ns])]
 OwnershipFromCacheEntry(cached) ==
     IF cached.type = TRACKED THEN cached.ownership ELSE {rDatabaseCache.primaryShard}
 
-TxnStmtLogEntries(t, ns) ==
+TxnStmtLogEntries(t, ns, isStartTransaction) ==
     LET owningShards == OwnershipFromCacheEntry(rCollectionCache'[ns])
         collectionGen == rCollectionCache'[ns].collectionGen
-        dbVersion == IF collectionGen # UntrackedCollectionGen THEN NoDatabaseVersion ELSE rDatabaseCache.dbVersion 
-    IN  {CreateReqEntry(s, ns, dbVersion, collectionGen, rPlacementConflictTs'[t]): s \in owningShards}
-    
-\* Action: the router forwards a transaction statement to the owning shards. If the cache entry for 
+        dbVersion == IF collectionGen # UntrackedCollectionGen THEN NoDatabaseVersion ELSE rDatabaseCache.dbVersion
+        \* Create transaction runtime context for all requests
+        \* startTransaction and placementConflictTime are only set on first statement
+        \* createdDatabases is always included and kept up-to-date
+        txnCtx == [
+            startTransaction |-> isStartTransaction,
+            placementConflictTime |-> IF isStartTransaction THEN rPlacementConflictTime'[t] ELSE -1,
+            createdDatabases |-> rCreatedDatabases'[t]
+        ]
+    IN  [
+        reqEntries |-> {CreateReqEntry(s, ns, dbVersion, collectionGen, txnCtx): s \in owningShards}
+    ]
+
+NamespaceExists(ns) == \E s \in DOMAIN(LatestShardNamespaceUUID[ns]) : LatestShardNamespaceUUID[ns][s] # DroppedNamespaceUUID
+
+\* Action: the router forwards a transaction statement to the owning shards. If the cache entry for
 \* the namespace in the UNKNOWN state, the cache is refreshed before using it to forward statements.
 RouterSendTxnStmt ( t, ns ) ==
-    /\  Len(log[t]) < TXN_STMTS 
+    /\  Len(log[t]) < TXN_STMTS
     /\  rCompletedStmt[t]=Len(log[t])
-    /\  rPlacementConflictTs' = [rPlacementConflictTs EXCEPT ![t] = IF @ = -1 THEN clusterTime ELSE @]
-    /\  rCollectionCache' = [rCollectionCache EXCEPT ![ns] = IF @.type = UNKNOWN THEN RouterCacheLookup(ns) ELSE @]
-    /\  log' = [log EXCEPT ![t] = Append(log[t], TxnStmtLogEntries(t, ns))]
+    /\  LET isStartTransaction == (Len(log[t]) = 0)
+        IN
+        /\ IF isStartTransaction
+            THEN rPlacementConflictTime' = [rPlacementConflictTime EXCEPT ![t] = clusterTime]
+            ELSE UNCHANGED rPlacementConflictTime
+        /\ rCollectionCache' = [rCollectionCache EXCEPT ![ns] = IF @.type = UNKNOWN THEN RouterCacheLookup(ns) ELSE @]
+        \* Track if this transaction creates the database (when cache refresh reveals a new db)
+        /\ rCreatedDatabases' = [rCreatedDatabases EXCEPT ![t] = @ \union {"db"}]
+        /\ log' = [log EXCEPT ![t] = Append(log[t], TxnStmtLogEntries(t, ns, isStartTransaction))]
     /\  UNCHANGED << databaseMetadata, collectionMetadata, response, clusterTime, nextUUID,
             rDatabaseCache, rCompletedStmt, shard_vars >>
 
-\* Action: router processes a non-OK response from a shard. If the response is STALE_SHARD_VERSION 
-\* or STALE_DB_VERSION, this action refreshes the cache for the stale collection or database. This 
-\* action implies the transaction is aborted, and is used as a shortcut to free the shards' resources 
-\* for the transaction. Given that all DDLs require locks be freed on all shards, doing the freeing 
+\* Action: router processes a non-OK response from a shard. If the response is STALE_SHARD_VERSION
+\* or STALE_DB_VERSION, this action refreshes the cache for the stale collection or database. This
+\* action implies the transaction is aborted, and is used as a shortcut to free the shards' resources
+\* for the transaction. Given that all DDLs require locks be freed on all shards, doing the freeing
 \* atomically doesn't preclude any meaningful interleaving.
 RouterHandleAbort ( t, stm ) ==
-    /\ Cardinality(response[t][stm])>0 
+    /\ Cardinality(response[t][stm])>0
     /\ rCompletedStmt[t]<stm
-    /\ \E rsp \in response[t][stm] : 
+    /\ \E rsp \in response[t][stm] :
         /\ rsp.status # OK
         /\  \/  /\ rsp.status = STALE_SHARD_VERSION
                 /\ rCollectionCache' = [ rCollectionCache EXCEPT ![rsp.ns] = RouterCacheLookup(rsp.ns)]
@@ -200,43 +228,46 @@ RouterHandleAbort ( t, stm ) ==
             \/  UNCHANGED << rDatabaseCache, rCollectionCache >>
     /\ rCompletedStmt' = [rCompletedStmt EXCEPT ![t] = TXN_STMTS]
     /\ shardTxnResources' = ClearResourcesForTxn(t)
-    /\ UNCHANGED << global_vars, rPlacementConflictTs, shardData, shardNamespaceUUID >>
+    /\ UNCHANGED << global_vars, rPlacementConflictTime, rCreatedDatabases, shardData, shardNamespaceUUID >>
 
 \* Action: router processes an OK response from a shard. This action may imply the transaction
-\* is committed, in which case it is used as a shortcut to free the shards' resources for the 
-\* transaction. Given that all DDLs require locks be freed on all shards, doing the freeing 
+\* is committed, in which case it is used as a shortcut to free the shards' resources for the
+\* transaction. Given that all DDLs require locks be freed on all shards, doing the freeing
 \* atomically doesn't preclude any meaningful interleaving.
 RouterHandleOK ( t, stm ) ==
-    /\ Cardinality(response[t][stm])>0 
+    /\ Cardinality(response[t][stm])>0
     /\ rCompletedStmt[t]<stm
     \* wait for as many responses OK responses as requests sent
-    /\ Cardinality(log[t][stm]) = Cardinality(response[t][stm])
-    /\ \E rsp \in response[t][stm] : 
+    /\ stm \in DOMAIN log[t]
+    /\ Cardinality(log[t][stm].reqEntries) = Cardinality(response[t][stm])
+    /\ \E rsp \in response[t][stm] :
         /\ rsp.status = OK
         \* /\ \* todo aggregate result
         /\ rCompletedStmt' = [rCompletedStmt EXCEPT ![t] = rCompletedStmt[t]+1]
-    /\ IF TxnDone(t) 
-        THEN shardTxnResources' = ClearResourcesForTxn(t) 
+    /\ IF TxnDone(t)
+        THEN shardTxnResources' = ClearResourcesForTxn(t)
         ELSE UNCHANGED shardTxnResources
-    /\ UNCHANGED << global_vars, rDatabaseCache, rCollectionCache, rPlacementConflictTs, shardData, 
-        shardNamespaceUUID >>
+    /\ UNCHANGED << global_vars, rDatabaseCache, rCollectionCache, rPlacementConflictTime,
+        rCreatedDatabases, shardData, shardNamespaceUUID >>
 
 GetSnapshotForNs(snap, ns) == [uuid |-> snap.uuid[ns], data|->snap.data[ns]]
 
-DatabaseMetadataCheck(self, req) ==
+DatabaseMetadataCheck(self, req, placementConflictTime, createdDatabases) ==
     IF req.dbVersion # databaseMetadata.dbVersion THEN STALE_DB_VERSION
-    ELSE IF req.placementConflictTs < databaseMetadata.dbVersion THEN SNAPSHOT_INCOMPATIBLE
+    \* Skip placementConflictTime check if database was created by this transaction
+    ELSE IF "db" \notin createdDatabases /\ placementConflictTime # -1
+            /\ placementConflictTime < databaseMetadata.dbVersion
+         THEN SNAPSHOT_INCOMPATIBLE
     ELSE OK
 
-ShardingMetadataCheck(req) ==
+ShardingMetadataCheck(req, placementConflictTime) ==
     LET receivedGen == req.collectionGen
-        currentGen == collectionMetadata[req.ns].collectionGen
-        placementConflictTs == req.placementConflictTs IN
+        currentGen == collectionMetadata[req.ns].collectionGen IN
     \* Any difference in generation should result in stale config.
     IF receivedGen # currentGen THEN STALE_SHARD_VERSION
     \* The router always forwards the latest known shard version, so even if the above check passes,
     \* it might be the case that the snapshot is no longer compatible.
-    ELSE IF placementConflictTs < currentGen THEN SNAPSHOT_INCOMPATIBLE
+    ELSE IF placementConflictTime # -1 /\ placementConflictTime < currentGen THEN SNAPSHOT_INCOMPATIBLE
     ELSE OK
 
 LocalMetadataCheck(self, req, txnSnapshot) ==
@@ -244,54 +275,57 @@ LocalMetadataCheck(self, req, txnSnapshot) ==
         latestUUID == LatestShardNamespaceUUID[req.ns][self] IN
     \* UUID == 0 has the special meaning of non-existing / dropped collection.
     \* If a collection was originally tracked, and then dropped (or recreated), an up to date router
-    \* will attach the latest version (UNTRACKED) and pass the shard version check. However, the 
-    \* collection in the snapshot may not necessarily be the same. As there is no way to determine 
-    \* which is the correct UUID (as it is UNTRACKED), if the latest UUID is not the same as in the 
+    \* will attach the latest version (UNTRACKED) and pass the shard version check. However, the
+    \* collection in the snapshot may not necessarily be the same. As there is no way to determine
+    \* which is the correct UUID (as it is UNTRACKED), if the latest UUID is not the same as in the
     \* snapshot, we fail the txn.
     IF snapshotUUID # latestUUID THEN SNAPSHOT_INCOMPATIBLE
     ELSE OK
 
 ResponseFromSnapshot(self, ns, status, txnSnapshot) ==
-    [   shard |-> self, 
-        ns |-> ns, 
-        status |-> status, 
+    [   shard |-> self,
+        ns |-> ns,
+        status |-> status,
         snapshot |-> IF status # OK THEN {} ELSE GetSnapshotForNs(txnSnapshot, ns) ]
 
-MetadataCheck(self, t, req, txnSnapshot) ==
-    LET 
-        databaseVersionStatus == DatabaseMetadataCheck(self, req)
-        shardVersionStatus == ShardingMetadataCheck(req)
-        localStatus == LocalMetadataCheck(self, req, txnSnapshot) 
-    IN 
+MetadataCheck(self, t, req, txnSnapshot, placementConflictTime, createdDatabases) ==
+    LET
+        databaseVersionStatus == DatabaseMetadataCheck(self, req, placementConflictTime, createdDatabases)
+        shardVersionStatus == ShardingMetadataCheck(req, placementConflictTime)
+        localStatus == LocalMetadataCheck(self, req, txnSnapshot)
+    IN
     \* Shard version attached, only check the shard version.
     IF req.collectionGen # UntrackedCollectionGen THEN shardVersionStatus
-    ELSE 
+    ELSE
         IF databaseVersionStatus # OK THEN databaseVersionStatus
         ELSE IF shardVersionStatus # OK THEN shardVersionStatus
         ELSE localStatus
 
 \* Action: shard responds to statements written to log by router addressed to itself.
-ShardResponse( self, t ) == 
-    /\  LET stmt == Len(log[t]) 
-            stmtReqs == log[t][stmt] 
-        IN
+ShardResponse( self, t ) ==
+    /\  LET stmt == Len(log[t]) IN
         /\ stmt > 0
-        \* For simplicity, snapshot cleanup is handled in the router response. Avoid re-opening the 
-        \* snapshot for aborted txns.
         /\ ~TxnAborted(t)
         /\ ~\E rsp \in response[t][stmt] : rsp.shard = self
-        /\ \E req \in stmtReqs : 
+        /\ \E req \in log[t][stmt].reqEntries :
             /\ req.shard = self
-            /\ shardTxnResources' = [shardTxnResources EXCEPT 
+            /\ shardTxnResources' = [shardTxnResources EXCEPT
                 ![self][t].snapshot = IF DOMAIN(@) = {} THEN CreateTxnSnapshot(self) ELSE @,
-                ![self][t].locks[req.ns] = TRUE]
+                ![self][t].locks[req.ns] = TRUE,
+                \* Store placementConflictTime only from first statement (when startTransaction is TRUE)
+                ![self][t].placementConflictTime = IF @ = -1 /\ req.txnRuntimeContext.startTransaction
+                                                    THEN req.txnRuntimeContext.placementConflictTime
+                                                    ELSE @,
+                \* Always update createdDatabases list from every statement
+                ![self][t].createdDatabases = req.txnRuntimeContext.createdDatabases]
             /\  LET txnSnapshot == shardTxnResources'[self][t].snapshot
-                    rspStatus == MetadataCheck(self, t, req, txnSnapshot)
-                IN  /\ response' = [response EXCEPT ![t][stmt] = @ \union {ResponseFromSnapshot(self, req.ns, rspStatus, txnSnapshot)}]
-    /\ UNCHANGED << databaseMetadata, collectionMetadata, log, clusterTime, nextUUID, router_vars, 
+                    placementConflictTime == shardTxnResources'[self][t].placementConflictTime
+                    createdDatabases == shardTxnResources'[self][t].createdDatabases
+                    rspStatus == MetadataCheck(self, t, req, txnSnapshot, placementConflictTime, createdDatabases)
+                IN  response' = [response EXCEPT ![t][stmt] = @ \union {ResponseFromSnapshot(self, req.ns, rspStatus, txnSnapshot)}]
+    /\ UNCHANGED << databaseMetadata, collectionMetadata, log, clusterTime, nextUUID, router_vars,
         shardData, shardNamespaceUUID >>
 
-NamespaceExists(ns) == \E s \in DOMAIN(LatestShardNamespaceUUID[ns]) : LatestShardNamespaceUUID[ns][s] # DroppedNamespaceUUID
 NextClusterTime == clusterTime + 1
 
 \* Action: create the namespace as untracked, the namespaces only lives in the primary shard.
@@ -305,23 +339,23 @@ CreateUntracked(ns) ==
     /\  UNCHANGED << databaseMetadata, collectionMetadata, log, response, router_vars, shardTxnResources >>
 
 \* Action: create the namespace as tracked, the namespaces exists in owning shards + primary shard.
-\* Data can be distributed arbitrarily. The primary shard always having the collection, even if empty, 
-\* ensures the local catalog protocol forbids the collection incarnation anomaly in the case a 
-\* tracked collection is dropped, and a request for the now untracked namespace is forwarded to the 
+\* Data can be distributed arbitrarily. The primary shard always having the collection, even if empty,
+\* ensures the local catalog protocol forbids the collection incarnation anomaly in the case a
+\* tracked collection is dropped, and a request for the now untracked namespace is forwarded to the
 \* primary shard, but the transaction snapshot was established at a time before the drop.
 CreateTracked(ns, distribution) ==
     /\  ~IsNamespaceLocked(ns)
     /\  ~NamespaceExists(ns)
     /\  collectionMetadata' = [collectionMetadata EXCEPT ![ns] = CreateTrackedCollectionMetadata(NextClusterTime)]
     /\  LET ownership == DistributionToOwnership(distribution) \cup {databaseMetadata.primaryShard}
-        IN shardNamespaceUUID' = shardNamespaceUUID @@ [x \in {NextClusterTime} |-> [LatestShardNamespaceUUID EXCEPT 
+        IN shardNamespaceUUID' = shardNamespaceUUID @@ [x \in {NextClusterTime} |-> [LatestShardNamespaceUUID EXCEPT
             ![ns] = [s \in Shards |-> IF s \in ownership THEN nextUUID ELSE DroppedNamespaceUUID]]]
     /\  shardData' = [shardData EXCEPT ![ns] = distribution]
     /\  clusterTime' = NextClusterTime
     /\  nextUUID' = nextUUID + 1
     /\  UNCHANGED << databaseMetadata, log, response, router_vars, shardTxnResources >>
 
-DropCommon(ns, type) == 
+DropCommon(ns, type) ==
     /\  ~IsNamespaceLocked(ns)
     /\  NamespaceExists(ns)
     /\  collectionMetadata[ns].type = type
@@ -347,8 +381,8 @@ RenameCommon(from, to, type) ==
     /\  NamespaceExists(from)
     /\  ~NamespaceExists(to)
     /\  collectionMetadata[from].type = type
-    /\  shardNamespaceUUID' = shardNamespaceUUID @@ [x \in {NextClusterTime} |-> 
-            [LatestShardNamespaceUUID EXCEPT 
+    /\  shardNamespaceUUID' = shardNamespaceUUID @@ [x \in {NextClusterTime} |->
+            [LatestShardNamespaceUUID EXCEPT
                 ![to] = [s \in Shards |-> LatestShardNamespaceUUID[from][s]],
                 ![from] = [s \in Shards |-> DroppedNamespaceUUID ]]
         ]
@@ -361,20 +395,20 @@ RenameUntracked(from, to) ==
     /\  RenameCommon(from, to, UNTRACKED)
     /\  UNCHANGED << collectionMetadata >>
 
-\* Action: rename a tracked namespace. The collection's UUID is preserved on shards, but the 
+\* Action: rename a tracked namespace. The collection's UUID is preserved on shards, but the
 \* generation is bumped.
 RenameTracked(from, to) ==
     /\  RenameCommon(from, to, TRACKED)
-    /\  collectionMetadata' = [collectionMetadata EXCEPT 
+    /\  collectionMetadata' = [collectionMetadata EXCEPT
         ![to] = CreateTrackedCollectionMetadata(NextClusterTime),
         ![from] = UntrackedClusterMetadata ]
 
 IsUntrackedAndExists(ns) ==
     /\ collectionMetadata[ns].type = UNTRACKED
     /\ LatestShardNamespaceUUID[ns][databaseMetadata.primaryShard] # DroppedNamespaceUUID
-    
+
 \* Action: move database to another primary shard. All UNTRACKED collections are migrated to the new
-\* primary shard, and the collections' UUIDs are changed. Tracked collections always exist on the 
+\* primary shard, and the collections' UUIDs are changed. Tracked collections always exist on the
 \* primary shard, if it doesn't exist at the destination, clones the collection metadata.
 MovePrimary(toShard) ==
     LET nsToMove == {ns \in NameSpaces: IsUntrackedAndExists(ns)}
@@ -384,26 +418,26 @@ MovePrimary(toShard) ==
     /\  ~\E ns \in nsToMove: IsNamespaceLocked(ns)
     /\  LET uuidSet == nextUUID..(nextUUID + Cardinality(nsToMove))
             newUUIDForNs == CHOOSE s \in [nsToMove -> uuidSet]: IsInjective(s)
-        IN 
-        /\ shardNamespaceUUID' = shardNamespaceUUID @@ [x \in {NextClusterTime} |-> 
+        IN
+        /\ shardNamespaceUUID' = shardNamespaceUUID @@ [x \in {NextClusterTime} |->
             [ ns \in NameSpaces |-> IF ns \in nsToMove
                 \* UNTRACKED collections, collection is created at destination and removed from source.
                 THEN [ s \in Shards |-> IF s = toShard THEN newUUIDForNs[ns] ELSE DroppedNamespaceUUID ]
-                \* TRACKED collections: if necessary, collection is created at destination as empty, 
+                \* TRACKED collections: if necessary, collection is created at destination as empty,
                 \* but it is not dropped from source even if no chunks were owned. This is to
-                \* prevent ongoing queries from being unnecessarily killed, and to preserve new PIT 
+                \* prevent ongoing queries from being unnecessarily killed, and to preserve new PIT
                 \* reads at a timestamp before movePrimary commits.
-                ELSE [ s \in Shards |-> IF s = toShard THEN LatestUUIDForNameSpace(ns) ELSE LatestShardNamespaceUUID[ns][s] ] 
+                ELSE [ s \in Shards |-> IF s = toShard THEN LatestUUIDForNameSpace(ns) ELSE LatestShardNamespaceUUID[ns][s] ]
             ]   ]
         /\ nextUUID' = nextUUID + Cardinality(nsToMove)
-    /\ shardData' = [ns \in NameSpaces |-> IF ns \in nsToMove 
+    /\ shardData' = [ns \in NameSpaces |-> IF ns \in nsToMove
         THEN [shardData[ns] EXCEPT ![fromShard] = {}, ![toShard] = shardData[ns][fromShard]]
         ELSE shardData[ns]]
     /\ databaseMetadata' = [primaryShard |-> toShard, dbVersion |-> NextClusterTime]
     /\ clusterTime' = NextClusterTime
     /\ UNCHANGED << collectionMetadata, log, response, router_vars, shardTxnResources >>
 
-Next == 
+Next ==
     \* Router actions
     \/ \E t \in Txns, ns \in NameSpaces : RouterSendTxnStmt(t, ns)
     \/ \E t \in Txns, stm \in Stmts: RouterHandleAbort(t, stm)
@@ -444,6 +478,14 @@ Spec == /\ Init /\ [][Next]_vars /\ Fairness
 
 TypeOK ==
     /\  log \in [Txns -> Seq(SUBSET ReqEntry)]
+    /\  \A t \in Txns : \A i \in DOMAIN log[t] :
+            /\ log[t][i].reqEntries \subseteq ReqEntry
+            /\ \A req \in log[t][i].reqEntries :
+                /\ req.txnRuntimeContext.startTransaction \in BOOLEAN
+                /\ req.txnRuntimeContext.placementConflictTime \in Int
+                /\ req.txnRuntimeContext.createdDatabases \subseteq DatabaseNames
+                \* Consistency check: startTransaction=TRUE implies placementConflictTime is set
+                /\ req.txnRuntimeContext.startTransaction => req.txnRuntimeContext.placementConflictTime # -1
     /\  collectionMetadata \in [ NameSpaces -> CollectionMetadataFormat ]
     /\  rCollectionCache \in [ NameSpaces -> CollectionCacheMetadataFormat ]
 
@@ -453,12 +495,12 @@ ShardDataConsistentWithUUID ==
         /\ (\E s \in Shards : shardData[ns][s] # {}) <=> LatestShardNamespaceUUID[ns][databaseMetadata.primaryShard] # DroppedNamespaceUUID
 
 RouterSendsOneStmtRequestPerShard ==
-    /\  \A txn \in Txns : 
+    /\  \A txn \in Txns :
         /\  \A i \in DOMAIN(log[txn]) :
-            LET stmt == log[txn][i]
+            LET stmtReqs == log[txn][i].reqEntries
             IN  \* only one entry per shard
-                /\  \A s \in Shards : Cardinality({entry \in stmt : entry.shard = s}) <= 1
-                
+                /\  \A s \in Shards : Cardinality({entry \in stmtReqs : entry.shard = s}) <= 1
+
 (**************************************************************************************************)
 (* Correctness Properties                                                                         *)
 (**************************************************************************************************)
@@ -470,7 +512,7 @@ UnionCompleteIntersectionNull(keySets) ==
     /\ UNION keySets = Keys
     /\ \A ks1, ks2 \in keySets : ks1 = ks2 \/ ks1 \cap ks2 = {}
 
-StmtResponseDataCompleteAndUnique(stmtRsp) == 
+StmtResponseDataCompleteAndUnique(stmtRsp) ==
     UnionCompleteIntersectionNull({rsp.snapshot.data : rsp \in stmtRsp})
 
 StmtResponsesHaveConsistentKeySet(t, stmt) ==
@@ -485,16 +527,16 @@ StmtResponsesHaveConsistentKeySet(t, stmt) ==
                 \A rsp \in response[t][stmt] : rsp.snapshot.data = {}
 
 CommittedTxnImpliesConsistentKeySet == \A t \in Txns: TxnCommitted(t) =>
-        \A stmt \in Stmts: 
+        \A stmt \in Stmts:
             /\ StmtResponsesHaveConsistentKeySet(t, stmt)
 
 AllTxnsEventuallyDone == <>[] \A t \in Txns : TxnDone(t)
 AcquiredTxnResourcesEventuallyReleased == \A s \in Shards, t \in Txns :
     shardTxnResources[s][t] # EmptyTxnResources ~> shardTxnResources[s][t] = EmptyTxnResources
 
-\* Verifies that a shard responding OK to a request for an untracked collection, only happens when 
-\* the shard is the database primary at that moment (1) and the collection only existed in that 
-\* shard at the snapshot's timestamp (2). (1) checks the database versioning protocol detects 
+\* Verifies that a shard responding OK to a request for an untracked collection, only happens when
+\* the shard is the database primary at that moment (1) and the collection only existed in that
+\* shard at the snapshot's timestamp (2). (1) checks the database versioning protocol detects
 \* staleness, and (2) that there are no anomalies due to the established snapshot being incompatible
 \* with the latest database version (checked with placementConflictTime).
 ResponseForUntrackedNameSpaceIsFromPrimaryShard ==
@@ -506,20 +548,28 @@ ResponseForUntrackedNameSpaceIsFromPrimaryShard ==
                 /\ response[txn][stmt] # response'[txn][stmt]
                 /\ rsp \notin response[txn][stmt]
                 /\ rsp.status = OK
-                /\ \E req \in log[txn][stmt] : req.collectionGen = UntrackedCollectionGen
+                /\ stmt \in DOMAIN log[txn]
+                /\ \E req \in log[txn][stmt].reqEntries : req.collectionGen = UntrackedCollectionGen
             ) => (
                 /\ rsp.shard = databaseMetadata.primaryShard
                 /\ LET  ts == shardTxnResources'[rsp.shard][txn].snapshot.ts IN
-                    ~\E s \in Shards: 
+                    ~\E s \in Shards:
                         /\ s # rsp.shard
                         /\ shardNamespaceUUID[ts][rsp.ns][s] # DroppedNamespaceUUID
-            )                        
+            )
     ]_response
+
 
 (**************************************************************************************************)
 (* Miscellaneous properties for exploring/understanding the spec.                                 *)
 (**************************************************************************************************)
 
+\* The record structure which is used in the spec:
+\* log[t][stmt] = [reqEntries |-> {req1, req2, req3},
+\*                 startTransaction |-> TRUE,
+\*                 txnRuntimeContext |-> ...]
+
+\* Namespaces involved in a transaction
 \* Namespaces involved in a transaction
 NSsetofTxn(t) == { req.ns : req \in UNION {log[t][stmt] : stmt \in 1..Len(log[t])} }
 
