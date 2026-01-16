@@ -8,20 +8,10 @@
 import {getCachedPlan} from "jstests/libs/query/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";
 
 const dbName = "test";
 const collName = "coll";
-
-// Returns whether there is an active index build.
-function indexBuildIsRunning(testDB, indexName) {
-    const indexBuildFilter = {
-        "command.createIndexes": collName,
-        "command.indexes.0.name": indexName,
-        "msg": /^Index Build/,
-    };
-    const curOp = testDB.getSiblingDB("admin").aggregate([{$currentOp: {}}, {$match: indexBuildFilter}]);
-    return curOp.hasNext();
-}
 
 // Returns whether a cached plan exists for 'query'.
 function assertDoesNotHaveCachedPlan(coll, query) {
@@ -97,10 +87,7 @@ function runTest({rst, readDB, writeDB}) {
     }, writeDB.getMongo().port);
 
     // Confirm that the index build has started.
-    assert.soon(
-        () => indexBuildIsRunning(readDB, "most_selective"),
-        "Index build operation not found after starting via parallelShell",
-    );
+    IndexBuildTest.waitForIndexBuildToStart(readDB, collName, "most_selective");
 
     // Confirm that there are no cached plans post index build start.
     assertDoesNotHaveCachedPlan(readColl, filter);
@@ -112,7 +99,7 @@ function runTest({rst, readDB, writeDB}) {
     // Disable the hang and wait for the index build to complete.
     assert.commandWorked(readDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
 
-    assert.soon(() => !indexBuildIsRunning(readDB, "most_selective"));
+    IndexBuildTest.waitForIndexBuildToStop(readDB, collName, "most_selective");
     createIdxShell({checkExitSuccess: true});
 
     rst.awaitReplication();
