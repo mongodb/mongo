@@ -192,10 +192,6 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     auto expCtx = ExpressionContextBuilder{}
                       .fromRequest(opCtx, *findCommand, collator, allowDiskUseByDefault.load())
                       .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
-                      .mainCollPathArrayness(
-                          collection && feature_flags::gFeatureFlagPathArrayness.isEnabled()
-                              ? CollectionQueryInfo::get(collection).getPathArrayness()
-                              : nullptr)
                       .build();
     expCtx->startExpressionCounters();
     auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
@@ -512,10 +508,6 @@ public:
                     .fromRequest(opCtx, *_cmdRequest, collator, allowDiskUseByDefault.load())
                     .explain(verbosity)
                     .tmpDir(boost::filesystem::path(storageGlobalParams.dbpath) / "_tmp")
-                    .mainCollPathArrayness(
-                        collectionPtr && feature_flags::gFeatureFlagPathArrayness.isEnabled()
-                            ? CollectionQueryInfo::get(collectionPtr).getPathArrayness()
-                            : nullptr)
                     .build();
             expCtx->startExpressionCounters();
 

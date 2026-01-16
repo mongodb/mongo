@@ -1019,6 +1019,14 @@ public:
         return _featureFlagMqlJsEngineGap.get(VersionContext::getDecoration(getOperationContext()));
     }
 
+    void setPathArrayness(const std::shared_ptr<const PathArrayness> pathArrayness) {
+        this->_params.mainCollPathArrayness = pathArrayness;
+    }
+
+    bool hasMainCollPathArrayness() {
+        return (this->_params.mainCollPathArrayness != nullptr);
+    }
+
     const PathArrayness& getMainCollPathArrayness() const {
         // mainCollPathArrayness will be unset in cases where we do not do a collection acquisition,
         // e.g. if running on a 'mongos'. In this case, we return an empty instance of

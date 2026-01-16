@@ -1318,6 +1318,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         }
     }
 
+    // Initialize path arrayness in ExpressionContext from the CollectionQueryInfo.
+    // Do not invoke if it has been already initialized.
+    const auto& collection = collections.getMainCollection();
+    if (feature_flags::gFeatureFlagPathArrayness.isEnabled() &&
+        !canonicalQuery->getExpCtx()->hasMainCollPathArrayness() && collection) {
+        canonicalQuery->getExpCtx()->setPathArrayness(
+            CollectionQueryInfo::get(collection).getPathArrayness());
+    }
+
     const bool useSbeEngine = [&] {
         const bool forceClassic =
             canonicalQuery->getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled();
