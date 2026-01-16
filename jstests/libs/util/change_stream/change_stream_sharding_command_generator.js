@@ -485,6 +485,7 @@ class ShardingCommandGenerator {
                 ),
             );
         }
+
         // NOTE: We intentionally do NOT drop indexes before dropping collections.
         // While MongoDB silently removes indexes when dropping a collection (no 'dropIndexes' events),
         // we already get 'dropIndexes' coverage from the post-reshard/unshard cleanup (Step 5).

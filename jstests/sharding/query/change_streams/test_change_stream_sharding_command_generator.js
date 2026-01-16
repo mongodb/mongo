@@ -11,11 +11,13 @@ import {
     InsertDocCommand,
     DropCollectionCommand,
     CreateIndexCommand,
+    DropIndexCommand,
     ShardCollectionCommand,
     ReshardCollectionCommand,
     RenameToNonExistentSameDbCommand,
     UnshardCollectionCommand,
     CreateUntrackedCollectionCommand,
+    CreateUnsplittableCollectionCommand,
 } from "jstests/libs/util/change_stream/change_stream_commands.js";
 import {ShardingCommandGenerator} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator.js";
 import {ShardingCommandGeneratorParams} from "jstests/libs/util/change_stream/change_stream_sharding_command_generator_params.js";
@@ -31,6 +33,36 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
+
+/**
+ * Pseudo-command that only predicts a dropIndexes event without executing anything.
+ * Useful for testing expected events that come from external sources.
+ */
+class ExpectDropIndexEvent {
+    constructor(dbName, collName, indexSpec) {
+        this.dbName = dbName;
+        this.collName = collName;
+        this.indexSpec = indexSpec;
+    }
+
+    execute(connection) {
+        // Do nothing - we're just predicting an event, not causing one.
+    }
+
+    toString() {
+        return `ExpectDropIndexEvent(${JSON.stringify(this.indexSpec)})`;
+    }
+
+    getChangeEvents(watchMode) {
+        // Unsplittable collections emit 1 event (single shard).
+        return [
+            {
+                operationType: "dropIndexes",
+                ns: {db: this.dbName, coll: this.collName},
+            },
+        ];
+    }
+}
 
 /**
  * Helper function to set up writer configuration.
@@ -1025,5 +1057,309 @@ describe("ChangeStreamReader integration", function () {
             });
             runDDLTest(this, "resharded_drop", setupCommands, testCommand, ["drop", "invalidate"]);
         });
+    });
+
+    /*
+     * ================================================================================
+     * FSM EVENT VERIFICATION TESTS
+     * ================================================================================
+     *
+     * The FSM test exercises the complete state machine traversal, verifying
+     * that all transitions produce expected change stream events.
+     *
+     * ================================================================================
+     */
+
+    describe("FSM with event matching", function () {
+        it("verifies FSM-generated commands produce expected change stream events", function () {
+            const dbName = "test_fsm_events";
+            const collName = "test_coll";
+            const seed = 42; // Fixed seed for reproducibility.
+            const readerInstanceName = `reader_${dbName}_${Date.now()}`;
+
+            this.databasesToCleanup.add(dbName);
+            this.instanceNamesToCleanup.push(readerInstanceName);
+
+            // Drop database to start clean.
+            const db = this.st.s.getDB(dbName);
+            db.dropDatabase();
+
+            // Generate commands via FSM.
+            const model = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
+            const params = new ShardingCommandGeneratorParams(dbName, collName, this.shards);
+            const generator = new ShardingCommandGenerator(seed);
+            const commands = generator.generateCommands(model, params);
+
+            // Collect expected events from all commands (collection-level watch).
+            const watchMode = ChangeStreamWatchMode.kCollection;
+            const expectedEvents = [];
+            for (const cmd of commands) {
+                expectedEvents.push(...cmd.getChangeEvents(watchMode));
+            }
+
+            // Get cluster time AFTER cleanup to avoid capturing drop events.
+            const startTime = getClusterTimeAfterNow(this.st.s, "admin");
+
+            // Execute commands.
+            for (const cmd of commands) {
+                cmd.execute(this.st.s);
+            }
+
+            // Read events from collection-level change stream using ChangeStreamReader.
+            const readerConfig = {
+                instanceName: readerInstanceName,
+                watchMode: watchMode,
+                dbName: dbName,
+                collName: collName,
+                numberOfEventsToRead: expectedEvents.length,
+                readingMode: ChangeStreamReadingMode.kContinuous,
+                startAtClusterTime: startTime,
+            };
+
+            ChangeStreamReader.run(this.st.s, readerConfig);
+
+            const capturedRecords = Connector.readAllChangeEvents(this.st.s, readerInstanceName);
+            const actualEvents = capturedRecords.map((r) => r.changeEvent);
+
+            // Use SingleChangeStreamMatcher for subsequence matching (handles per-shard duplicates).
+            // ChangeEventMatcher uses subset matching - only compares fields present in expected.
+            const eventMatchers = expectedEvents.map((e) => new ChangeEventMatcher(e));
+            const matcher = new SingleChangeStreamMatcher(eventMatchers);
+
+            for (const event of actualEvents) {
+                matcher.matches(event, false);
+            }
+
+            const expectedSeq = expectedEvents.map((e) => e.operationType).join(", ");
+            const actualSeq = actualEvents.map((e) => e.operationType).join(", ");
+            assert(matcher.isDone(), `Expected sequence not found.\nExpected: ${expectedSeq}\nActual: ${actualSeq}`);
+        });
+    });
+
+    /**
+     * Helper: Execute commands and verify change stream events using ChangeStreamReader.
+     * Uses SingleChangeStreamMatcher for subsequence matching to handle per-shard duplicate events.
+     * @param {ShardingTest} st - The sharding test instance
+     * @param {string} dbName - Database name
+     * @param {string} collName - Collection name
+     * @param {Array} commands - Array of command objects to execute
+     * @param {Set} databasesToCleanup - Set to register databases for cleanup
+     * @param {Array} instanceNamesToCleanup - Array to register reader instances for cleanup
+     */
+    function executeAndVerifyEvents(st, dbName, collName, commands, databasesToCleanup, instanceNamesToCleanup) {
+        Random.setRandomSeed(12345);
+        databasesToCleanup.add(dbName);
+        const db = st.s.getDB(dbName);
+        db.dropDatabase();
+
+        const readerInstanceName = `reader_${dbName}_${Date.now()}`;
+        instanceNamesToCleanup.push(readerInstanceName);
+
+        // Collect expected events and create matchers.
+        const expectedEvents = [];
+        commands.forEach((cmd) => {
+            expectedEvents.push(...cmd.getChangeEvents(ChangeStreamWatchMode.kCollection));
+        });
+        // Use subset matching via static ChangeEventMatcher.eventModifier.
+        const eventMatchers = expectedEvents.map((e) => new ChangeEventMatcher(e));
+        const matcher = new SingleChangeStreamMatcher(eventMatchers);
+
+        // Get cluster time before execution.
+        const startTime = getClusterTime(st.s, "admin");
+
+        // Execute commands.
+        commands.forEach((cmd) => {
+            cmd.execute(st.s);
+        });
+
+        // Use ChangeStreamReader with kContinuous mode.
+        const readerConfig = {
+            instanceName: readerInstanceName,
+            watchMode: ChangeStreamWatchMode.kCollection,
+            dbName: dbName,
+            collName: collName,
+            readingMode: ChangeStreamReadingMode.kContinuous,
+            startAtClusterTime: startTime,
+            numberOfEventsToRead: expectedEvents.length,
+        };
+
+        ChangeStreamReader.run(st.s, readerConfig);
+
+        // Read captured events from Connector.
+        const capturedRecords = Connector.readAllChangeEvents(st.s, readerInstanceName);
+        const actualEvents = capturedRecords.map((r) => r.changeEvent);
+
+        // Use SingleChangeStreamMatcher for subsequence matching (handles per-shard duplicates).
+        for (const event of actualEvents) {
+            matcher.matches(event, false);
+        }
+
+        const expectedSeq = expectedEvents.map((e) => e.operationType).join(", ");
+        const actualSeq = actualEvents.map((e) => e.operationType).join(", ");
+        assert(matcher.isDone(), `Expected sequence not found.\nExpected: ${expectedSeq}\nActual: ${actualSeq}`);
+    }
+
+    /**
+     * Test: Reshard with double reshard cycle.
+     * Sequence: Create → Shard(range) → Reshard(hashed) → DropOldIndex → Reshard(range) → DropOldIndex
+     *
+     * IMPORTANT: Each command must receive a COPY of ctx ({...ctx}) because ctx is mutated
+     * after command creation. Commands store a reference to collectionCtx, and getChangeEvents()
+     * uses that reference later during verification.
+     */
+    it("verifies reshard events with double reshard cycle", function () {
+        const dbName = "test_reshard_cycle";
+        const collName = "test_coll";
+
+        const commands = [];
+        let ctx = {
+            exists: false,
+            nonEmpty: false,
+            shardKeySpec: null,
+            isSharded: false,
+        };
+
+        // Step 1: Create collection.
+        commands.push(new CreateUntrackedCollectionCommand(dbName, collName, this.shards, {...ctx}));
+        ctx.exists = true;
+
+        // Step 2: Shard with range key {data: 1}.
+        // Before sharding, collection is unsharded (1 event for createIndexes).
+        commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+        commands.push(new ShardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+        ctx.isSharded = true;
+        ctx.shardKeySpec = {data: 1}; // Now range-sharded (1 shard has data).
+
+        // Step 3: Reshard to hashed key.
+        // Current shard key is range (1 event for createIndexes).
+        commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+        commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+        // After reshard, shard key is hashed (data distributed to all shards).
+        ctx.shardKeySpec = {data: "hashed"};
+        // Drop old range index (hashed = 2 events).
+        commands.push(new DropIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+
+        // Step 4: Reshard back to range.
+        // Current shard key is hashed (2 events for createIndexes).
+        commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+        commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+        // After reshard, shard key is range.
+        ctx.shardKeySpec = {data: 1};
+        // Drop old hashed index (range = 1 event).
+        commands.push(new DropIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+
+        executeAndVerifyEvents(
+            this.st,
+            dbName,
+            collName,
+            commands,
+            this.databasesToCleanup,
+            this.instanceNamesToCleanup,
+        );
+    });
+
+    /**
+     * Test: First reshard (no prior reshard) produces expected events.
+     * Sequence: Create → Shard(range) → Reshard(hashed) → DropOldIndex
+     *
+     * IMPORTANT: Each command must receive a COPY of ctx ({...ctx}) because ctx is mutated
+     * after command creation.
+     */
+    it("verifies first reshard events", function () {
+        const dbName = "test_first_reshard";
+        const collName = "test_coll";
+
+        const commands = [];
+        let ctx = {
+            exists: false,
+            nonEmpty: false,
+            shardKeySpec: null,
+            isSharded: false,
+        };
+
+        // Step 1: Create collection.
+        commands.push(new CreateUntrackedCollectionCommand(dbName, collName, this.shards, {...ctx}));
+        ctx.exists = true;
+
+        // Step 2: Shard with range key {data: 1}.
+        commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+        commands.push(new ShardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+        ctx.isSharded = true;
+        ctx.shardKeySpec = {data: 1}; // Now range-sharded.
+
+        // Step 3: Reshard to hashed key.
+        // Current shard key is range (1 event for createIndexes).
+        commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+        commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+        // After reshard, shard key is hashed.
+        ctx.shardKeySpec = {data: "hashed"};
+        // Drop old range index (hashed = 2 events).
+        commands.push(new DropIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+
+        executeAndVerifyEvents(
+            this.st,
+            dbName,
+            collName,
+            commands,
+            this.databasesToCleanup,
+            this.instanceNamesToCleanup,
+        );
+    });
+
+    /**
+     * Test: Full shard → reshard → unshard lifecycle.
+     * Sequence: Create → Shard(range) → Reshard(hashed) → DropOldIndex → Unshard → DropOldIndex
+     *
+     * IMPORTANT: Each command must receive a COPY of ctx ({...ctx}) because ctx is mutated
+     * after command creation.
+     */
+    it("verifies shard → reshard → unshard events", function () {
+        const dbName = "test_full_lifecycle";
+        const collName = "test_coll";
+
+        const commands = [];
+        let ctx = {
+            exists: false,
+            nonEmpty: false,
+            shardKeySpec: null,
+            isSharded: false,
+        };
+
+        // Step 1: Create collection.
+        commands.push(new CreateUntrackedCollectionCommand(dbName, collName, this.shards, {...ctx}));
+        ctx.exists = true;
+
+        // Step 2: Shard with range key {data: 1}.
+        commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+        commands.push(new ShardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+        ctx.isSharded = true;
+        ctx.shardKeySpec = {data: 1}; // Now range-sharded.
+
+        // Step 3: Reshard to hashed key.
+        // Current shard key is range (1 event for createIndexes).
+        commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+        commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+        // After reshard, shard key is hashed.
+        ctx.shardKeySpec = {data: "hashed"};
+        // Drop old range index (hashed = 2 events).
+        commands.push(new DropIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+
+        // Step 4: Unshard collection.
+        // Unshard emits reshardCollection event.
+        commands.push(new UnshardCollectionCommand(dbName, collName, this.shards, {...ctx}));
+        // After unshard, collection is unsplittable (no longer sharded).
+        ctx.isSharded = false;
+        ctx.shardKeySpec = null;
+        // Drop old hashed index (unsharded = 1 event).
+        commands.push(new DropIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+
+        executeAndVerifyEvents(
+            this.st,
+            dbName,
+            collName,
+            commands,
+            this.databasesToCleanup,
+            this.instanceNamesToCleanup,
+        );
     });
 });
