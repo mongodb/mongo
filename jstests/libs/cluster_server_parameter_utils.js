@@ -89,11 +89,6 @@ export const kNonTestOnlyClusterParameters = {
 };
 
 export const kTestOnlyClusterParameters = {
-    cwspTestNeedsFeatureFlagClusterWideToaster: {
-        default: {intData: 16},
-        testValues: [{intData: 17}, {intData: 18}],
-        featureFlag: "ClusterWideToaster",
-    },
     testStrClusterParameter: {
         default: {strData: "off"},
         testValues: [{strData: "on"}, {strData: "sleep"}],

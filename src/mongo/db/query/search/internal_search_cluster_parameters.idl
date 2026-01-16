@@ -39,7 +39,6 @@ global:
 structs:
     InternalSearchOptions:
         description: Clusterwide options for tuning internal search heuristics.
-        strict: false
         inline_chained_structs: true
         chained_structs:
             ClusterServerParameter: clusterServerParameter

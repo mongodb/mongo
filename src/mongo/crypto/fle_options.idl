@@ -37,7 +37,6 @@ structs:
         description:
             "Options related to compaction or cleanup operations in Queryable Encryption
             protocol version 2"
-        strict: false
         inline_chained_structs: true
         chained_structs:
             ClusterServerParameter: clusterServerParameter
@@ -77,7 +76,6 @@ structs:
 
     FLEOverrideTagOverheadData:
         description: "Container for the fleAllowTotalTagOverheadToExceedBSONLimit CSP"
-        strict: false
         inline_chained_structs: true
         chained_structs:
             ClusterServerParameter: clusterServerParameter
@@ -89,7 +87,6 @@ structs:
 
     FLEOverrideSubstringPreviewLimits:
         description: "Container for the fleDisableSubstringPreviewParameterLimits CSP"
-        strict: false
         inline_chained_structs: true
         chained_structs:
             ClusterServerParameter: clusterServerParameter
