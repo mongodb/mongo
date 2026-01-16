@@ -34,8 +34,10 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
 #include "mongo/db/query/query_fcv_environment_for_test.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/util/intrusive_counter.h"
 
 #include <benchmark/benchmark.h>

@@ -2587,6 +2587,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/point_query_bm.cpp @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/**/query_bm_* @10gen/query-execution @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/query_knob_* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/**/query_execution_knobs* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/**/query_integration_knobs* @10gen/query-integration @svc-auto-approve-bot
+/src/mongo/db/query/**/query_optimization_knobs* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/query_request* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/query_test_service_context.* @10gen/query-execution @10gen/query-integration @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/query/**/query_utils* @10gen/query-optimization @svc-auto-approve-bot

@@ -29,7 +29,9 @@
 
 #include "mongo/db/exec/exclusion_projection_executor.h"
 
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 
 #include <algorithm>
 #include <list>

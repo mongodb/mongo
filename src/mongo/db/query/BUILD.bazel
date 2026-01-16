@@ -168,8 +168,26 @@ idl_generator(
 )
 
 idl_generator(
-    name = "query_knobs_gen",
-    src = "query_knobs.idl",
+    name = "query_execution_knobs_gen",
+    src = "query_execution_knobs.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "query_optimization_knobs_gen",
+    src = "query_optimization_knobs.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "query_integration_knobs_gen",
+    src = "query_integration_knobs.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/topology/cluster_parameters:cluster_server_parameter_gen",
@@ -271,8 +289,10 @@ mongo_cc_library(
         "join_reorder_mode.cpp",
         "plan_ranker_mode.cpp",
         "plan_ranking_strategy_for_automatic_query_plan_ranker_mode.cpp",
+        "query_execution_knobs_gen",
         "query_feature_flags_gen",
-        "query_knobs_gen",
+        "query_integration_knobs_gen",
+        "query_optimization_knobs_gen",
         "sampling_ce_method.cpp",
         "sampling_confidence_interval.cpp",
         "sbe_hashAgg_increased_spilling_mode.cpp",

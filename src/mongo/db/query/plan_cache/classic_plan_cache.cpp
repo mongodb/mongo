@@ -37,7 +37,9 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/str.h"
 

@@ -31,7 +31,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"

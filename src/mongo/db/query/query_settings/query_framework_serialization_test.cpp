@@ -30,7 +30,9 @@
 #include "mongo/db/query/query_settings/query_framework_serialization.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

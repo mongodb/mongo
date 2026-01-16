@@ -55,7 +55,9 @@
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranking_decision.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep

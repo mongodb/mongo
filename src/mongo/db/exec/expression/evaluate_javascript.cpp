@@ -29,7 +29,9 @@
 
 #include "mongo/db/exec/expression/evaluate.h"
 #include "mongo/db/pipeline/make_js_function.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {

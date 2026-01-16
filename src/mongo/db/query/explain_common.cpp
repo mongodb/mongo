@@ -31,8 +31,10 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_knob_configuration.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"

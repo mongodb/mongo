@@ -38,7 +38,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/namespace_spec.idl"
     - "mongo/db/query/index_hint.idl"
-    - "mongo/db/query/query_knobs.idl"
+    - "mongo/db/query/query_execution_knobs.idl"
     - "mongo/db/query/query_shape/query_shape_hash.idl"
 
 types:

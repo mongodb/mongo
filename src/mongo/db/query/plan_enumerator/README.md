@@ -274,7 +274,7 @@ Finally, we move to the next enumeration state by calling [`nextMemo()`](https:/
 
 > ### Aside: Lockstep Or Enumeration
 >
-> `$or` enumeration can generate an exponential number of plans, so it is usually limited at some [arbitrary](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/query/query_knobs.idl#L378) cutoff. To maximize our chances of enumerating better plans within this cutoff limit, the lockstep `OR` enumeration prefers plans which use the same index across all branches of a contained `$or`. Consider the following example:
+> `$or` enumeration can generate an exponential number of plans, so it is usually limited at some arbitrary cutoff. To maximize our chances of enumerating better plans within this cutoff limit, the lockstep `OR` enumeration prefers plans which use the same index across all branches of a contained `$or`. Consider the following example:
 >
 > ```
 > // Query
@@ -290,7 +290,7 @@ Finally, we move to the next enumeration state by calling [`nextMemo()`](https:/
 > [a_b, a_b], [a_c, a_c], [a_c, a_b], then [a_b, a_c]
 > ```
 >
-> This behavior is controlled by the [`internalQueryEnumerationPreferLockstepOrEnumeration`](https://github.com/mongodb/mongo/blob/e16bc2248a3410167e39d09bb9bc29a96f026ead/src/mongo/db/query/query_knobs.idl#L389) knob, and is turned on by default.
+> This behavior is controlled by the `internalQueryEnumerationPreferLockstepOrEnumeration` knob, and is turned on by default.
 
 ### 2. Construct data access plan for each tagged tree
 

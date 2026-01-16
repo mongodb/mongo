@@ -45,7 +45,9 @@
 #include "mongo/db/query/compiler/dependency_analysis/match_expression_dependencies.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

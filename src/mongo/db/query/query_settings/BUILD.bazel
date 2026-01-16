@@ -16,7 +16,9 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:namespace_spec_gen",
         "//src/mongo/db/query:index_hint_gen",
-        "//src/mongo/db/query:query_knobs_gen",
+        "//src/mongo/db/query:query_execution_knobs_gen",
+        "//src/mongo/db/query:query_integration_knobs_gen",
+        "//src/mongo/db/query:query_optimization_knobs_gen",
         "//src/mongo/db/query/query_shape:query_shape_hash_gen",
     ],
 )

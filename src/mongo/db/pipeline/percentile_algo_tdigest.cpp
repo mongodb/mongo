@@ -29,7 +29,9 @@
 
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
 
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 

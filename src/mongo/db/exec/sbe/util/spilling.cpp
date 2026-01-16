@@ -31,7 +31,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/shard_role/lock_manager/d_concurrency.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 #include "mongo/db/storage/record_data.h"

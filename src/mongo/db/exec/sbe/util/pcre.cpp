@@ -29,7 +29,9 @@
 
 #include "mongo/db/exec/sbe/util/pcre.h"
 
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 

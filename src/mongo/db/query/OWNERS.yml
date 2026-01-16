@@ -121,6 +121,15 @@ filters:
   - "query_knob_*":
     approvers:
       - 10gen/query-optimization
+  - "query_execution_knobs*":
+    approvers:
+      - 10gen/query-execution
+  - "query_integration_knobs*":
+    approvers:
+      - 10gen/query-integration
+  - "query_optimization_knobs*":
+    approvers:
+      - 10gen/query-optimization
   - "query_request*":
     approvers:
       - 10gen/query-optimization

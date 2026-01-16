@@ -31,7 +31,9 @@
 
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/pipeline/document_source_query_stats.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_execution_knobs_gen.h"
+#include "mongo/db/query/query_integration_knobs_gen.h"
+#include "mongo/db/query/query_optimization_knobs_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 #include "mongo/db/query/query_stats/query_stats_failed_to_record_info.h"
