@@ -97,7 +97,7 @@ void BM_PathArraynessBuild(benchmark::State& state) {
     for (auto _ : state) {
         PathArrayness pathArrayness;
         for (size_t i = 0; i < pathsToInsert.size(); i++) {
-            pathArrayness.addPath(pathsToInsert[i].first, pathsToInsert[i].second);
+            pathArrayness.addPath(pathsToInsert[i].first, pathsToInsert[i].second, true);
         }
     }
 }
@@ -117,7 +117,7 @@ void BM_PathArraynessLookup(benchmark::State& state) {
     // Build the path arrayness data structure.
     PathArrayness pathArrayness;
     for (size_t i = 0; i < pathsToInsert.size(); i++) {
-        pathArrayness.addPath(pathsToInsert[i].first, pathsToInsert[i].second);
+        pathArrayness.addPath(pathsToInsert[i].first, pathsToInsert[i].second, true);
     }
 
     // Number of paths to query.

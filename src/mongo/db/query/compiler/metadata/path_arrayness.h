@@ -63,14 +63,17 @@ public:
     /**
      * Insert a path into the trie.
      */
-    void addPath(const FieldPath& path, const MultikeyComponents& multikeyPath);
+    void addPath(const FieldPath& path, const MultikeyComponents& multikeyPath, bool isFullRebuild);
 
     /**
      * Insert all paths from an index into the trie. This method assumes 'multikeyPaths' is not
      * empty.
+     * The parameter 'isFullRebuild' should be set by the caller if we are building the whole trie
+     * from the full set of indexes.
      */
     void addPathsFromIndexKeyPattern(const BSONObj& indexKeyPattern,
-                                     const MultikeyPaths& multikeyPaths);
+                                     const MultikeyPaths& multikeyPaths,
+                                     bool isFullRebuild);
 
     /**
      * Given a path return whether any component of it is an array.
@@ -121,7 +124,8 @@ private:
          */
         void insertPath(const FieldPath& path,
                         const MultikeyComponents& multikeyPath,
-                        size_t depth);
+                        size_t depth,
+                        bool isFullRebuild);
 
         bool hasChildren() const {
             return _children.size();

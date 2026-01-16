@@ -50,12 +50,15 @@ bool PathArrayness::isIndexEligibleToAddToPathArrayness(const IndexDescriptor& d
         !descriptor.hidden();
 }
 
-void PathArrayness::addPath(const FieldPath& path, const MultikeyComponents& multikeyPath) {
-    _root.insertPath(path, multikeyPath, 0);
+void PathArrayness::addPath(const FieldPath& path,
+                            const MultikeyComponents& multikeyPath,
+                            bool isFullRebuild) {
+    _root.insertPath(path, multikeyPath, 0, isFullRebuild);
 }
 
 void PathArrayness::addPathsFromIndexKeyPattern(const BSONObj& indexKeyPattern,
-                                                const MultikeyPaths& multikeyPaths) {
+                                                const MultikeyPaths& multikeyPaths,
+                                                bool isFullRebuild) {
     if (indexKeyPattern.isEmpty()) {
         // No paths to add if indexKeyPattern is empty.
         return;
@@ -68,7 +71,7 @@ void PathArrayness::addPathsFromIndexKeyPattern(const BSONObj& indexKeyPattern,
     size_t indexCounter = 0;
     for (const auto& key : indexKeyPattern) {
         FieldPath path(key.fieldNameStringData());
-        addPath(path, multikeyPaths[indexCounter]);
+        addPath(path, multikeyPaths[indexCounter], isFullRebuild);
         ++indexCounter;
     }
 }
@@ -161,7 +164,8 @@ void PathArrayness::TrieNode::visualizeTrie_forTest(std::string fieldName, int d
 
 void PathArrayness::TrieNode::insertPath(const FieldPath& path,
                                          const MultikeyComponents& multikeyPath,
-                                         size_t depth) {
+                                         size_t depth,
+                                         bool isFullRebuild) {
     if (depth >= path.getPathLength()) {
         return;
     }
@@ -174,12 +178,20 @@ void PathArrayness::TrieNode::insertPath(const FieldPath& path,
         _children.insert({fieldNameToInsert, TrieNode(multikeyPath.count(depth))});
     } else {
         // This path component already exists in trie so resolve conflicts in arrayness information.
-        // We take the conservative approach, i.e. prefer multikey in case of conflict.
-        // TODO: SERVER-115000: Improve PathArrayness multikey information merge strategy.
-        maybeChild->second._isArray |= (multikeyPath.count(depth) > 0);
+        if (isFullRebuild) {
+            // If we're fully rebuilding the trie from the full set of indexes, we can assume that
+            // if the same path shows up as multikey and non-multikey then the non-multikey index is
+            // more up to date.
+            maybeChild->second._isArray &= (multikeyPath.count(depth) > 0);
+        } else {
+            // Otherwise (if we're inserting a path due to an index catalog update from a document
+            // write operation), we take the conservative approach, i.e. prefer multikey in case of
+            // conflict.
+            maybeChild->second._isArray |= (multikeyPath.count(depth) > 0);
+        }
     }
 
     // Recursively invoke the remaining path.
-    _children.at(fieldNameToInsert).insertPath(path, multikeyPath, ++depth);
+    _children.at(fieldNameToInsert).insertPath(path, multikeyPath, ++depth, isFullRebuild);
 }
 }  // namespace mongo

@@ -85,7 +85,7 @@ TEST(PathArraynessTest, InsertIntoPathArraynessPredefined) {
 
     PathArrayness pathArrayness;
     for (auto&& [fieldPath, multikey] : pathsToInsert) {
-        pathArrayness.addPath(fieldPath, multikey);
+        pathArrayness.addPath(fieldPath, multikey, true);
     }
 
     auto arraynessMapExported = pathArrayness.exportToMap_forTest();
@@ -121,7 +121,7 @@ TEST(PathArraynessTest, InsertIntoPathArraynessGenerated) {
 
     PathArrayness pathArrayness;
     for (auto&& [fieldPath, multikey] : pathsToInsert) {
-        pathArrayness.addPath(fieldPath, multikey);
+        pathArrayness.addPath(fieldPath, multikey, true);
     }
 
     auto arraynessMapExported = pathArrayness.exportToMap_forTest();
@@ -145,7 +145,7 @@ TEST(PathArraynessTest, BuildAndLookupNonExistingFields) {
     PathArrayness pathArrayness;
 
     for (size_t i = 0; i < fields.size(); i++) {
-        pathArrayness.addPath(fields[i], multikeyness[i]);
+        pathArrayness.addPath(fields[i], multikeyness[i], true);
     }
 
     ASSERT_EQ(pathArrayness.isPathArray(field_ABC, &expCtx), true);
@@ -169,7 +169,8 @@ TEST(PathArraynessTest, LookupEmptyTrie) {
     ASSERT_EQ(pathArrayness.isPathArray(field_ABCD, &expCtx), true);
 }
 
-TEST(ArraynessTrie, BuildAndLookupTrieWithConflictingArrayInformation) {
+// When fully rebuilding the trie, we err on the side of non-arrayness when conflicts occur.
+TEST(ArraynessTrie, FullyRebuildAndLookupTrieWithConflictingArrayInformation) {
     ExpressionContextForTest expCtx = ExpressionContextForTest();
 
     // Array: ["a.b"]
@@ -179,22 +180,57 @@ TEST(ArraynessTrie, BuildAndLookupTrieWithConflictingArrayInformation) {
     // Array: ["a.b.c"]. Note in this case "a.b" is not an array.
     FieldPath field_ABC("a.b.c");
     MultikeyComponents multikeyPaths_ABC{2U};
+
     // First add field_AB to trie and then add field_ABC to trie.
     std::vector<FieldPath> fields{field_AB, field_ABC};
     std::vector<MultikeyComponents> multikeyness{multikeyPaths_AB, multikeyPaths_ABC};
 
     PathArrayness pathArrayness;
 
-    pathArrayness.addPath(field_AB, multikeyPaths_AB);
-    pathArrayness.addPath(field_ABC, multikeyPaths_ABC);
+    pathArrayness.addPath(field_AB, multikeyPaths_AB, true);
+    pathArrayness.addPath(field_ABC, multikeyPaths_ABC, true);
+
+    // In the case of conflicts, we assume multikeyness.
+    ASSERT_EQ(pathArrayness.isPathArray(field_AB, &expCtx), false);
+
+    // Now let's flip the insertion order.
+    PathArrayness pathArrayness1;
+    pathArrayness1.addPath(field_ABC, multikeyPaths_ABC, true);
+    pathArrayness1.addPath(field_AB, multikeyPaths_AB, true);
+
+    // We should still get the same result.
+    ASSERT_EQ(pathArrayness1.isPathArray(field_AB, &expCtx), false);
+}
+
+// When updating the trie due to an index catalog update following a write operation, we err on the
+// side of arrayness when conflicts occur.
+TEST(ArraynessTrie, UpdateAndLookupTrieWithConflictingArrayInformation) {
+    ExpressionContextForTest expCtx = ExpressionContextForTest();
+
+    // Array: ["a.b"]
+    FieldPath field_AB("a.b");
+    MultikeyComponents multikeyPaths_AB{1U};
+
+    // Array: ["a.b.c"]. Note in this case "a.b" is not an array.
+    FieldPath field_ABC("a.b.c");
+    MultikeyComponents multikeyPaths_ABC{2U};
+
+    // First add field_AB to trie and then add field_ABC to trie.
+    std::vector<FieldPath> fields{field_AB, field_ABC};
+    std::vector<MultikeyComponents> multikeyness{multikeyPaths_AB, multikeyPaths_ABC};
+
+    PathArrayness pathArrayness;
+
+    pathArrayness.addPath(field_AB, multikeyPaths_AB, false);
+    pathArrayness.addPath(field_ABC, multikeyPaths_ABC, false);
 
     // In the case of conflicts, we assume multikeyness.
     ASSERT_EQ(pathArrayness.isPathArray(field_AB, &expCtx), true);
 
     // Now let's flip the insertion order.
     PathArrayness pathArrayness1;
-    pathArrayness1.addPath(field_ABC, multikeyPaths_ABC);
-    pathArrayness1.addPath(field_AB, multikeyPaths_AB);
+    pathArrayness1.addPath(field_ABC, multikeyPaths_ABC, false);
+    pathArrayness1.addPath(field_AB, multikeyPaths_AB, false);
 
     // We should still get the same result.
     ASSERT_EQ(pathArrayness1.isPathArray(field_AB, &expCtx), true);
@@ -220,8 +256,8 @@ TEST(ArraynessTrie, BuildAndLookupTrieWithSameArrayInformation) {
 
     PathArrayness pathArrayness;
 
-    pathArrayness.addPath(field_AB, multikeyPaths_AB);
-    pathArrayness.addPath(field_ABC, multikeyPaths_ABC);
+    pathArrayness.addPath(field_AB, multikeyPaths_AB, true);
+    pathArrayness.addPath(field_ABC, multikeyPaths_ABC, true);
 
     // Path "a.b" is an array in both of the paths inserted into the trie.
     ASSERT_EQ(pathArrayness.isPathArray(field_AB, &expCtx), true);
@@ -323,7 +359,7 @@ TEST(PathArraynessTest, FieldRefValidPath) {
     auto initialState = pathArrayness.exportToMap_forTest();
 
     // Insert valid path - should succeed and be added to trie.
-    pathArrayness.addPath(FieldPath(validFieldRefString), multikeyPaths);
+    pathArrayness.addPath(FieldPath(validFieldRefString), multikeyPaths, true);
     auto afterInsertState = pathArrayness.exportToMap_forTest();
 
     // Trie should have changed since the path is valid and was added.
@@ -377,8 +413,8 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobDisabled) {
 
     PathArrayness pathArrayness;
 
-    pathArrayness.addPath(field_AB, multikeyPaths_AB);
-    pathArrayness.addPath(field_ABC, multikeyPaths_ABC);
+    pathArrayness.addPath(field_AB, multikeyPaths_AB, true);
+    pathArrayness.addPath(field_ABC, multikeyPaths_ABC, true);
 
     // Path "a" is not an array in either of the paths inserted into the trie, but since the
     // query knob is disabled PathArrayness should conservatively return true.
@@ -421,8 +457,8 @@ TEST(ArraynessTrie, LookupTrieWithQueryKnobEnabled) {
 
     PathArrayness pathArrayness;
 
-    pathArrayness.addPath(field_AB, multikeyPaths_AB);
-    pathArrayness.addPath(field_ABC, multikeyPaths_ABC);
+    pathArrayness.addPath(field_AB, multikeyPaths_AB, true);
+    pathArrayness.addPath(field_ABC, multikeyPaths_ABC, true);
 
     // Path "a" is not an array in either of the paths inserted into the trie and the query knob is
     // enabled so we should see that the path is not an array.
