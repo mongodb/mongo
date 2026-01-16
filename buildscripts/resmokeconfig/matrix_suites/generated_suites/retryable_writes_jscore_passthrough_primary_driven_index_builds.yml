@@ -1,0 +1,79 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/retryable_writes_jscore_passthrough_primary_driven_index_builds.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
+##########################################################
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval:
+        globalThis.testingReplication = true; await import("jstests/libs/override_methods/enable_sessions.js");
+        await import("jstests/libs/override_methods/retry_writes_at_least_once.js");
+      global_vars:
+        TestData:
+          alwaysInjectTransactionNumber: true
+          sessionOptions:
+            retryWrites: true
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
+        featureFlagPrimaryDrivenIndexBuilds: 1
+        featureFlagRecordIdsReplicated: 1
+    num_nodes: 2
+  hooks:
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+    - jstests/core/txns/**/*.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/profile2.js
+    - jstests/core/**/profile3.js
+    - jstests/core/**/profile_findandmodify.js
+    - jstests/core/**/query/top/top.js
+    - jstests/core/catalog/views/views_stats.js
+    - jstests/core/query/bulk/bulk_write_profile.js
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
+    - jstests/core/**/crud_api.js
+    - jstests/core/**/find_and_modify.js
+    - jstests/core/**/find_and_modify_fields.js
+    - jstests/core/**/find_and_modify_pipeline_update.js
+    - jstests/core/**/find_and_modify_positional_new_remove.js
+    - jstests/core/**/fts_find_and_modify.js
+    - jstests/core/**/fts_score_metadata.js
+    - jstests/core/**/project_with_collation.js
+    - jstests/core/**/find_and_modify_metrics.js
+    - jstests/core/**/update_metrics.js
+    - jstests/core/**/failcommand_failpoint.js
+    - jstests/core/**/batch_write_command_w0.js
+  exclude_with_any_tags:
+    - assumes_standalone_mongod
+    - does_not_support_causal_consistency
+    - does_not_support_retryable_writes
+    - primary_driven_index_builds_incompatible
+    - rolling_index_builds
+    - requires_commit_quorum
+    - requires_capped
+    - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
+    - exclude_when_record_ids_replicated
+  roots:
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test
