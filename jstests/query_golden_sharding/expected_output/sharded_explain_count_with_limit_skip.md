@@ -15,6 +15,10 @@
 ```json
 5
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "x_1" ]
+```
 ### Summarized explain executionStats
 Execution Engine: classic
 ```json
@@ -94,6 +98,10 @@ Execution Engine: classic
 ```json
 4
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "x_1" ]
+```
 ### Summarized explain executionStats
 Execution Engine: classic
 ```json
@@ -172,6 +180,10 @@ Execution Engine: classic
 ### Results
 ```json
 5
+```
+### Total indexes on the collection
+```json
+[ "_id_", "x_1" ]
 ```
 ### Summarized explain executionStats
 Execution Engine: classic
@@ -253,6 +265,10 @@ Execution Engine: classic
 ```json
 3
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "x_1" ]
+```
 ### Summarized explain executionStats
 Execution Engine: classic
 ```json
@@ -333,6 +349,10 @@ Execution Engine: classic
 ```json
 4
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "x_1" ]
+```
 ### Summarized explain executionStats
 Execution Engine: classic
 ```json
@@ -412,6 +432,10 @@ Execution Engine: classic
 ```json
 5
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "x_1" ]
+```
 ### Summarized explain executionStats
 Execution Engine: classic
 ```json
@@ -467,6 +491,10 @@ Execution Engine: classic
 ### Results
 ```json
 4
+```
+### Total indexes on the collection
+```json
+[ "_id_", "x_1" ]
 ```
 ### Summarized explain executionStats
 Execution Engine: classic
@@ -524,6 +552,10 @@ Execution Engine: classic
 ### Results
 ```json
 5
+```
+### Total indexes on the collection
+```json
+[ "_id_", "x_1" ]
 ```
 ### Summarized explain executionStats
 Execution Engine: classic

@@ -43,6 +43,10 @@
 {  "a" : 2,  "b" : 3,  "base" : 33,  "x" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 22 } }
 {  "a" : 2,  "b" : 3,  "base" : 33,  "x" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 33 } }
 ```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -221,6 +225,10 @@ rightEmbeddingField: "x"
 {  "a" : 2,  "b" : 3,  "base" : 33,  "x" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 22 } }
 {  "a" : 2,  "b" : 3,  "base" : 33,  "x" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 33 } }
 ```
+### Total indexes on the collection
+```json
+[ "_id_" ]
+```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -393,6 +401,10 @@ rightEmbeddingField: "none"
 {  "a" : 2,  "b" : -11,  "base" : 22,  "x" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 22 } }
 {  "a" : 2,  "b" : 3,  "base" : 22,  "x" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 22 } }
 {  "a" : 2,  "b" : 3,  "base" : 33,  "x" : {  "a" : -1,  "b" : -1,  "base" : 33 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 33 } }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -632,6 +644,10 @@ rightEmbeddingField: "x"
 {  "a" : 2,  "b" : 3,  "base" : 22,  "x" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "z" : {  "a" : 2,  "b" : -11,  "base" : 22 } }
 {  "a" : 2,  "b" : 3,  "base" : 22,  "x" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "z" : {  "a" : 2,  "b" : 3,  "base" : 22 } }
 {  "a" : 2,  "b" : 3,  "base" : 33,  "x" : {  "a" : -1,  "b" : -1,  "base" : 33 },  "y" : {  "a" : 2,  "b" : 3,  "base" : 33 },  "z" : {  "a" : 2,  "b" : 3,  "base" : 33 } }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1139,6 +1155,10 @@ rightEmbeddingField: "z"
 {  "a" : 2,  "aaa" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "b" : 3,  "base" : 22,  "bbb" : {  "a" : 2,  "b" : 3,  "base" : 33 },  "ccc" : {  "a" : 2,  "b" : -11,  "base" : 22 },  "ddd" : {  "a" : 2,  "b" : 3,  "base" : 22 } }
 {  "a" : 2,  "aaa" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "b" : 3,  "base" : 33,  "bbb" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "ccc" : {  "a" : 2,  "b" : -11,  "base" : 22 },  "ddd" : {  "a" : 2,  "b" : 3,  "base" : 33 } }
 {  "a" : 2,  "aaa" : {  "a" : 2,  "b" : 3,  "base" : 22 },  "b" : 3,  "base" : 33,  "bbb" : {  "a" : 2,  "b" : 3,  "base" : 33 },  "ccc" : {  "a" : 2,  "b" : -11,  "base" : 22 },  "ddd" : {  "a" : 2,  "b" : 3,  "base" : 33 } }
+```
+### Total indexes on the collection
+```json
+[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic

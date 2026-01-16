@@ -4,13 +4,34 @@
 
 import {normalizeArray, tojsonMultiLineSortKeys} from "jstests/libs/golden_test.js";
 import {code, codeOneLine, line, linebreak, subSection} from "jstests/libs/query/pretty_md.js";
-import {formatExplainRoot, getEngine, getStableExecutionStats} from "jstests/libs/query/analyze_plan.js";
+import {
+    formatExplainRoot,
+    getEngine,
+    getStableExecutionStats,
+    getWinningPlanFromExplain,
+    getRejectedPlans,
+} from "jstests/libs/query/analyze_plan.js";
+
+/** Helper that outputs all indexes available on the specified collection and the indexes actually
+ * considered by the query planner
+ */
+function outputAvailableIndexes(coll, explain) {
+    const indexes = coll.getIndexes();
+
+    let totalAvailableIndexes = [];
+    for (const index of indexes) {
+        totalAvailableIndexes.push(index.name);
+    }
+
+    subSection("Total indexes on the collection");
+    code(tojson(totalAvailableIndexes));
+}
 
 /**
  * Helper that ensures limit and/or skip appear in the explain output if specified. Also prints out
  * common explain output for queries that specify limit/skip.
  */
-function outputCommonPlanAndResults({querySection, resultsSection, explain, expected}) {
+function outputCommonPlanAndResults(coll, {querySection, resultsSection, explain, expected}) {
     const executionStages = explain.executionStats.executionStages;
 
     // Verify expected results
@@ -31,6 +52,8 @@ function outputCommonPlanAndResults({querySection, resultsSection, explain, expe
     subSection("Results");
     code(resultsSection);
 
+    outputAvailableIndexes(coll, explain);
+
     subSection("Summarized explain executionStats");
     if (!explain.hasOwnProperty("shards")) {
         line("Execution Engine: " + getEngine(explain));
@@ -45,7 +68,7 @@ function outputCommonPlanAndResults({querySection, resultsSection, explain, expe
  * explain to markdown. By default the results will be sorted, but the original order can be kept by
  * setting `shouldSortResults` to false.
  */
-export function outputFindPlanAndResults(cursor, expected, shouldSortResults = true) {
+export function outputFindPlanAndResults(coll, cursor, expected, shouldSortResults = true) {
     const results = cursor.toArray();
     const explain = cursor.explain("executionStats");
     const executionStages = explain.executionStats.executionStages;
@@ -54,7 +77,7 @@ export function outputFindPlanAndResults(cursor, expected, shouldSortResults = t
     assert.eq(actualReturned, explain.executionStats.nReturned);
     assert.eq(actualReturned, executionStages.nReturned);
 
-    outputCommonPlanAndResults({
+    outputCommonPlanAndResults(coll, {
         querySection: tojson(cursor._convertToCommand()),
         resultsSection: normalizeArray(results, shouldSortResults),
         explain,
@@ -66,12 +89,12 @@ export function outputFindPlanAndResults(cursor, expected, shouldSortResults = t
  * Takes a count command, explain output, expected explain fields, and count result. Outputs the
  * query, results and a summary of the explain to markdown.
  */
-export function outputCountPlanAndResults(cmdObj, explain, expected, actualCount) {
+export function outputCountPlanAndResults(coll, cmdObj, explain, expected, actualCount) {
     const executionStages = explain.executionStats.executionStages;
 
     assert.eq(actualCount, executionStages.nCounted);
 
-    outputCommonPlanAndResults({querySection: tojson(cmdObj), resultsSection: actualCount, explain, expected});
+    outputCommonPlanAndResults(coll, {querySection: tojson(cmdObj), resultsSection: actualCount, explain, expected});
 }
 
 /**
@@ -89,6 +112,7 @@ export function outputAggregationPlanAndResults(
 ) {
     const results = coll.aggregate(pipeline, options).toArray();
     const explain = coll.explain().aggregate(pipeline, options);
+
     const flatPlan = formatExplainRoot(explain, shouldFlatten);
 
     subSection("Pipeline");
@@ -101,6 +125,8 @@ export function outputAggregationPlanAndResults(
 
     subSection("Results");
     code(normalizeArray(results, shouldSortResults));
+
+    outputAvailableIndexes(coll, explain);
 
     subSection("Summarized explain");
     if (!explain.hasOwnProperty("shards")) {

@@ -25,6 +25,10 @@
 {  "_id" : "shard0_2" }
 {  "_id" : "shard1_2" }
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "a_1_c_1", "a_1_b_1_c_1" ]
+```
 ### Summarized explain
 ```json
 {
@@ -150,6 +154,10 @@
 {  "_id" : "shard0_1" }
 {  "_id" : "shard0_2" }
 {  "_id" : "shard1_2" }
+```
+### Total indexes on the collection
+```json
+[ "_id_", "a_1_c_1", "a_1_b_1_c_1" ]
 ```
 ### Summarized explain
 ```json
@@ -399,6 +407,10 @@
 {  "_id" : "shard1_1" }
 {  "_id" : "shard1_2" }
 ```
+### Total indexes on the collection
+```json
+[ "_id_", "a_1_c_1", "a_1_b_1_c_1" ]
+```
 ### Summarized explain
 ```json
 {
@@ -644,6 +656,10 @@
 {  "_id" : "shard0_1" }
 {  "_id" : "shard0_2" }
 {  "_id" : "shard1_2" }
+```
+### Total indexes on the collection
+```json
+[ "_id_", "a_1_c_1", "a_1_b_1_c_1", "c_1" ]
 ```
 ### Summarized explain
 ```json
