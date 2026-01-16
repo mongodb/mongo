@@ -106,7 +106,8 @@ def _set_up_modules():
                 _config.MODULE_SUITE_DIRS.append(suite_dir)
 
             for suite_dir in module_config.get("matrix_suite_dirs", []):
-                _config.MODULE_MATRIX_SUITE_DIRS.append(suite_dir)
+                if suite_dir not in _config.MODULE_MATRIX_SUITE_DIRS:
+                    _config.MODULE_MATRIX_SUITE_DIRS.append(suite_dir)
         else:
             for jstest_dir in module_config.get("jstest_dirs", []):
                 _config.MODULE_DISABLED_JSTEST_DIRS.append(jstest_dir)
