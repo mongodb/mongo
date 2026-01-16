@@ -230,7 +230,6 @@
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
-#include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
@@ -923,12 +922,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
             // Sharding is always ready when there is at least one shard at startup (either the
             // config shard or a dedicated shard server).
             ShardingReady::get(startupOpCtx.get())->setIsReadyIfShardExists(startupOpCtx.get());
-        }
-
-        if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-            // Router role should use SEPMongos
-            serviceContext->getService(ClusterRole::RouterServer)
-                ->setServiceEntryPoint(std::make_unique<ServiceEntryPointRouterRole>());
         }
 
         if (replSettings.isReplSet() &&
