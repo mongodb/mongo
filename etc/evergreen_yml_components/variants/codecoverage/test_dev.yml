@@ -51,6 +51,8 @@ buildvariants:
       - name: aggregation_sharded_collections_passthrough
       - name: change_streams_mongos_sessions_passthrough
       - name: fle2_sharding
+      # All streams jstest tasks excluding some that are not compatible at the moment.
+      - name: .streams_release_test !streams_aspio_iceberg_4
 
   # Variant to support Code Coverage on amd64/x86_64
   - name: &rhel-93-64-bit-coverage rhel-93-64-bit-coverage
