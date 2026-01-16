@@ -30,6 +30,11 @@ function getSpillingAttrs(obj) {
             spillingStats[key] = "X";
         } else if (key === "spillStorage") {
             for (let statKey of Object.keys(obj.attr[key]).sort()) {
+                // TODO SERVER-109672 Stop filtering "spillStorage.data" once "bytesRead" is deterministically present.
+                if (statKey === "data") {
+                    continue;
+                }
+
                 spillStorageStats[statKey] = "X";
             }
         }
