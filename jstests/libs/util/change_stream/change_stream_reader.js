@@ -71,9 +71,6 @@ class ChangeStreamReader {
         const changeStreamSpec = {
             showExpandedEvents: config.showExpandedEvents ?? true,
         };
-        if (config.version) {
-            changeStreamSpec.version = config.version;
-        }
         if (config.watchMode === ChangeStreamWatchMode.kCluster) {
             changeStreamSpec.allChangesForCluster = true;
         }
