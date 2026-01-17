@@ -954,10 +954,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -1137,10 +1133,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_0",  "accum" : "3notShardKey_chunk3_s1_0" }
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -1329,10 +1321,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -1520,10 +1508,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -1710,10 +1694,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -1903,10 +1883,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_0" }
 {  "_id" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -2197,10 +2173,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -2391,10 +2363,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_0",  "accum" : "3notShardKey_chunk3_s1_0" }
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -2697,10 +2665,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -3010,10 +2974,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -3213,10 +3173,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1", "notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -3418,16 +3374,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_0",  "accum" : "3notShardKey_chunk3_s1_0" }
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"shardKey_1",
-	"shardKey_1_notShardKey_1",
-	"notShardKey_1",
-	"notShardKey_1_shardKey_1"
-]
 ```
 ### Summarized explain
 ```json
@@ -3641,16 +3587,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"shardKey_1",
-	"shardKey_1_notShardKey_1",
-	"notShardKey_1",
-	"notShardKey_1_shardKey_1"
-]
 ```
 ### Summarized explain
 ```json
@@ -3868,16 +3804,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"shardKey_1",
-	"shardKey_1_notShardKey_1",
-	"notShardKey_1",
-	"notShardKey_1_shardKey_1"
-]
-```
 ### Summarized explain
 ```json
 {
@@ -4091,16 +4017,6 @@
 {  "_id" : "3notShardKey_chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "3notShardKey_chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"shardKey_1",
-	"shardKey_1_notShardKey_1",
-	"notShardKey_1",
-	"notShardKey_1_shardKey_1"
-]
-```
 ### Summarized explain
 ```json
 {
@@ -4281,10 +4197,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -4551,10 +4463,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -4820,10 +4728,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -5088,10 +4992,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -5360,10 +5260,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -5564,10 +5460,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -5771,10 +5663,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "1notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "1notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -5975,10 +5863,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "3notShardKey_chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -6181,10 +6065,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -6343,10 +6223,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -6508,10 +6384,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "1notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "1notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -6670,10 +6542,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "3notShardKey_chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -6835,10 +6703,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -7097,10 +6961,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -7358,10 +7218,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -7618,10 +7474,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -7882,10 +7734,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -8075,10 +7923,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -8267,10 +8111,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "1notShardKey_chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "1notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "1notShardKey_chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -8463,10 +8303,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -8653,10 +8489,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -8813,10 +8645,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -8991,10 +8819,6 @@
 {  "_id" : "chunk3_s1_0",  "l1" : "chunk3_s1_0",  "l2" : "1notShardKey_chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "l1" : "chunk3_s1_1",  "l2" : "1notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "l1" : "chunk3_s1_2",  "l2" : "1notShardKey_chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -9309,10 +9133,6 @@
 {  "_id" : "chunk3_s1_1",  "l1" : "chunk3_s1_1",  "l2" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "l1" : "chunk3_s1_2",  "l2" : "3notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -9611,10 +9431,6 @@
 {  "_id" : "chunk3_s1_1",  "accum" : "1notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "1notShardKey_chunk3_s1_2" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -9783,10 +9599,6 @@
 {  "_id" : "chunk3_s1_0",  "accum" : "3notShardKey_chunk3_s1_0" }
 {  "_id" : "chunk3_s1_1",  "accum" : "3notShardKey_chunk3_s1_1" }
 {  "_id" : "chunk3_s1_2",  "accum" : "3notShardKey_chunk3_s1_2" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -9970,10 +9782,6 @@
 {  "_id" : "chunk3_s1_0",  "r" : {  "_id" : 45,  "notShardKey" : "1notShardKey_chunk3_s1_0",  "shardKey" : "chunk3_s1_0" } }
 {  "_id" : "chunk3_s1_1",  "r" : {  "_id" : 48,  "notShardKey" : "1notShardKey_chunk3_s1_1",  "shardKey" : "chunk3_s1_1" } }
 {  "_id" : "chunk3_s1_2",  "r" : {  "_id" : 51,  "notShardKey" : "1notShardKey_chunk3_s1_2",  "shardKey" : "chunk3_s1_2" } }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -10243,10 +10051,6 @@
 {  "_id" : "chunk3_s1_0",  "r" : {  "_id" : 47,  "notShardKey" : "3notShardKey_chunk3_s1_0",  "shardKey" : "chunk3_s1_0" } }
 {  "_id" : "chunk3_s1_1",  "r" : {  "_id" : 50,  "notShardKey" : "3notShardKey_chunk3_s1_1",  "shardKey" : "chunk3_s1_1" } }
 {  "_id" : "chunk3_s1_2",  "r" : {  "_id" : 53,  "notShardKey" : "3notShardKey_chunk3_s1_2",  "shardKey" : "chunk3_s1_2" } }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1", "shardKey_1_notShardKey_1" ]
 ```
 ### Summarized explain
 ```json

@@ -23,10 +23,6 @@
 {  "_id" : 34,  "x" : 34 }
 {  "_id" : 35,  "x" : 35 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "x_1" ]
-```
 ### Summarized explain executionStats
 Execution Engine: classic
 ```json
@@ -141,10 +137,6 @@ Execution Engine: classic
 {  "_id" : 53,  "x" : 53 }
 {  "_id" : 54,  "x" : 54 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "x_1" ]
-```
 ### Summarized explain executionStats
 Execution Engine: classic
 ```json
@@ -248,10 +240,6 @@ Execution Engine: classic
 {  "_id" : 38,  "x" : 38 }
 {  "_id" : 39,  "x" : 39 }
 {  "_id" : 40,  "x" : 40 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "x_1" ]
 ```
 ### Summarized explain executionStats
 Execution Engine: classic
@@ -367,10 +355,6 @@ Execution Engine: classic
 {  "_id" : 49,  "x" : 49 }
 {  "_id" : 50,  "x" : 50 }
 {  "_id" : 51,  "x" : 51 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "x_1" ]
 ```
 ### Summarized explain executionStats
 Execution Engine: classic
@@ -488,10 +472,6 @@ Execution Engine: classic
 {  "_id" : 54,  "x" : 54 }
 {  "_id" : 55,  "x" : 55 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "x_1" ]
-```
 ### Summarized explain executionStats
 Execution Engine: classic
 ```json
@@ -608,10 +588,6 @@ Execution Engine: classic
 {  "_id" : 94,  "x" : 94 }
 {  "_id" : 95,  "x" : 95 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "x_1" ]
-```
 ### Summarized explain executionStats
 Execution Engine: sbe
 ```json
@@ -676,10 +652,6 @@ Execution Engine: sbe
 {  "_id" : 97,  "x" : 97 }
 {  "_id" : 98,  "x" : 98 }
 {  "_id" : 99,  "x" : 99 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "x_1" ]
 ```
 ### Summarized explain executionStats
 Execution Engine: sbe
@@ -747,10 +719,6 @@ Execution Engine: sbe
 {  "_id" : 97,  "x" : 97 }
 {  "_id" : 98,  "x" : 98 }
 {  "_id" : 99,  "x" : 99 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "x_1" ]
 ```
 ### Summarized explain executionStats
 Execution Engine: sbe

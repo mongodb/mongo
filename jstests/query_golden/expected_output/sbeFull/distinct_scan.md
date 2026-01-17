@@ -33,10 +33,6 @@
 {  "_id" : 4 }
 {  "_id" : 7 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_" ]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -114,10 +110,6 @@ Execution Engine: sbe
 {  "_id" : 3 }
 {  "_id" : 4 }
 {  "_id" : 7 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -237,10 +229,6 @@ Execution Engine: classic
 {  "_id" : 4,  "firstField" : 2 }
 {  "_id" : 7,  "firstField" : 1 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1", "b_1", "a_1_b_1" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -327,10 +315,6 @@ Execution Engine: classic
 {  "_id" : 3,  "firstField" : 7 }
 {  "_id" : 4,  "firstField" : 2 }
 {  "_id" : 7,  "firstField" : 1 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1", "b_1", "a_1_b_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -443,10 +427,6 @@ Execution Engine: classic
 {  "_id" : 3,  "firstField" : 7 }
 {  "_id" : 4,  "firstField" : 2 }
 {  "_id" : 7,  "firstField" : 1 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1", "b_1", "a_1_b_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -612,10 +592,6 @@ Execution Engine: classic
 {  "_id" : 2 }
 {  "_id" : 3 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1", "b_1", "a_1_b_1" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -765,10 +741,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 2 }
 {  "_id" : 4 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1", "b_1", "a_1_b_1" ]
 ```
 ### Summarized explain
 Execution Engine: sbe

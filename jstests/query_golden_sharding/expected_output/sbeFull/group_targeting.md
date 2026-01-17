@@ -15,10 +15,6 @@
 {  "_id" : "shard1_2" }
 {  "_id" : "shard1_3" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -176,10 +172,6 @@
 {  "_id" : "shard0_2",  "otherField" : "b" }
 {  "_id" : "shard0_3",  "otherField" : "c" }
 {  "_id" : "shard1_1",  "otherField" : "a" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -369,10 +361,6 @@
 {  "_id" : "shard1_2",  "avg" : 5 }
 {  "_id" : "shard1_3",  "avg" : 6 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -468,10 +456,6 @@
 {  "_id" : "shard1_1" }
 {  "_id" : "shard1_2" }
 {  "_id" : "shard1_3" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -577,10 +561,6 @@
 {  "_id" : [ "shard1_1", 4.5 ] }
 {  "_id" : [ "shard1_2", 5 ] }
 {  "_id" : [ "shard1_3", 6 ] }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -696,10 +676,6 @@
 {  "_id" : [ "shard0_3", 3.5 ],  "otherField" : "C" }
 {  "_id" : [ "shard1_1", 4 ],  "otherField" : "a" }
 {  "_id" : [ "shard1_1", 4.5 ],  "otherField" : "A" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -866,10 +842,6 @@
 {  "_id" : {  "actualId" : 6,  "secretlyShardKey" : "shard1_3" } }
 {  "_id" : {  "actualId" : 6.5,  "secretlyShardKey" : "shARD1_3" } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -978,10 +950,6 @@
 ### Results
 ```json
 {  "_id" : 1 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -1140,10 +1108,6 @@
 ### Results
 ```json
 
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -1341,10 +1305,6 @@
 {  "_id" : 6 }
 {  "_id" : 6.5 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -1484,10 +1444,6 @@
 {  "_id" : "b" }
 {  "_id" : "c" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -1606,10 +1562,6 @@
 {  "_id" : {  "key" : "shard1_1",  "other" : "a" } }
 {  "_id" : {  "key" : "shard1_2",  "other" : "b" } }
 {  "_id" : {  "key" : "shard1_3",  "other" : "c" } }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -1732,10 +1684,6 @@
 {  "_id" : 6,  "num" : 1 }
 {  "_id" : 6.5,  "num" : 1 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -1843,10 +1791,6 @@
 {  "_id" : "b" }
 {  "_id" : "c" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -1940,10 +1884,6 @@
 {  "_id" : "a" }
 {  "_id" : "b" }
 {  "_id" : "c" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -2055,10 +1995,6 @@
 ### Results
 ```json
 {  "_id" : null }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -2174,10 +2110,6 @@
 {  "_id" : "a" }
 {  "_id" : "b" }
 {  "_id" : "c" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -2300,10 +2232,6 @@
 {  "_id" : {  "_id" : 6,  "otherField" : "c",  "shardKey" : "shard1_3" } }
 {  "_id" : {  "_id" : 6.5,  "otherField" : "c",  "shardKey" : "shARD1_3" } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -2390,10 +2318,6 @@
 {  "_id" : "shard1_1" }
 {  "_id" : "shard1_2" }
 {  "_id" : "shard1_3" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -2545,10 +2469,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : "shard1_2" }
 {  "_id" : "shard1_3" }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -2657,10 +2577,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : "a" }
 {  "_id" : "b" }
 {  "_id" : "c" }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "shardKey_1" ]
 ```
 ### Summarized explain
 ```json
@@ -2809,10 +2725,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "sk0_1_sk1_1_sk2_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -2914,10 +2826,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" },  "setSk2" : [ "z" ],  "sumSk1" : 2 }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" },  "setSk2" : [ "b" ],  "sumSk1" : 6 }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" },  "setSk2" : [ "c" ],  "sumSk1" : 5 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "sk0_1_sk1_1_sk2_1" ]
 ```
 ### Summarized explain
 ```json
@@ -3030,10 +2938,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" },  "root" : {  "_id" : 4,  "otherField" : "abc",  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" },  "root" : {  "_id" : 7,  "otherField" : "def",  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" },  "root" : {  "_id" : 8,  "otherField" : "ghi",  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "sk0_1_sk1_1_sk2_1" ]
 ```
 ### Summarized explain
 ```json
@@ -3148,10 +3052,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "sk0_1_sk1_1_sk2_1" ]
 ```
 ### Summarized explain
 ```json
@@ -3287,10 +3187,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : {  "sk0" : "s0/1",  "sk1" : 3,  "sk2" : "z" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 4,  "sk2" : "b" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 6,  "sk2" : "c" } }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "sk0_1_sk1_1_sk2_1" ]
 ```
 ### Summarized explain
 ```json
@@ -3436,10 +3332,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : {  "sk0" : "s1",  "sk2" : "b" } }
 {  "_id" : {  "sk0" : "s1",  "sk2" : "c" } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "sk0_1_sk1_1_sk2_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -3552,10 +3444,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : {  "otherField" : "def",  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "b" } }
 {  "_id" : {  "otherField" : "def",  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
 {  "_id" : {  "otherField" : "ghi",  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "sk0_1_sk1_1_sk2_1" ]
 ```
 ### Summarized explain
 ```json
@@ -3688,10 +3576,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "sk0_1_sk1_1_sk2_1" ]
-```
 ### Summarized explain
 ```json
 {
@@ -3823,10 +3707,6 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 {  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
 {  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "sk0_1_sk1_1_sk2_1" ]
 ```
 ### Summarized explain
 ```json

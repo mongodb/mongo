@@ -36,10 +36,6 @@
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -331,10 +327,6 @@ rightEmbeddingField: "y"
 ### Results
 ```json
 {  "_id" : "bar",  "count" : 6 }
-```
-### Total indexes on the collection
-```json
-[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -699,10 +691,6 @@ rightEmbeddingField: "y"
 ```json
 {  "_id" : 1,  "count" : 2 }
 {  "_id" : 2,  "count" : 2 }
-```
-### Total indexes on the collection
-```json
-[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1116,10 +1104,6 @@ rightEmbeddingField: "y"
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -1485,10 +1469,6 @@ rightEmbeddingField: "y"
 ### Results
 ```json
 {  "_id" : 2,  "count" : 2 }
-```
-### Total indexes on the collection
-```json
-[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1921,10 +1901,6 @@ rightEmbeddingField: "y"
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -2280,10 +2256,6 @@ rightEmbeddingField: "y"
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -2572,10 +2544,6 @@ rightEmbeddingField: "z"
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
-```
-### Total indexes on the collection
-```json
-[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2951,10 +2919,6 @@ rightEmbeddingField: "z"
 ```json
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "k" : {  "y" : {  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } },  "w" : {  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } },  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -3312,10 +3276,6 @@ rightEmbeddingField: "k.y.z"
 {  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
 {  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -3646,10 +3606,6 @@ rightEmbeddingField: "y"
 {  "_id" : 2,  "a" : 2,  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 {  "_id" : 2,  "a" : 2,  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
 ```
-### Total indexes on the collection
-```json
-[ "_id_" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -3965,10 +3921,6 @@ rightEmbeddingField: "z"
 {  "_id" : 1,  "a" : 1,  "extra" : 1,  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "z" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 } }
 {  "_id" : 2,  "a" : 2,  "extra" : 2,  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 {  "_id" : 2,  "a" : 2,  "extra" : 2,  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
-```
-### Total indexes on the collection
-```json
-[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4293,10 +4245,6 @@ rightEmbeddingField: "z"
 ### Results
 ```json
 {  "_id" : 0,  "a" : 1,  "b" : "foo",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
-```
-### Total indexes on the collection
-```json
-[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4812,10 +4760,6 @@ rightEmbeddingField: "z"
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "z" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
 {  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "z" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
-```
-### Total indexes on the collection
-```json
-[ "_id_" ]
 ```
 ### Summarized explain
 Execution Engine: classic

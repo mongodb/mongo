@@ -23,10 +23,6 @@
 ```json
 {  "_id" : [ 1, 2, 3 ],  "accum" : 5 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1_b_1" ]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -96,10 +92,6 @@ Execution Engine: sbe
 ### Results
 ```json
 {  "_id" : 1,  "accum" : 5 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1_b_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -185,10 +177,6 @@ Execution Engine: classic
 ```json
 {  "_id" : [ 1, 2, 3 ],  "accum" : 5 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1_b_1" ]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -234,10 +222,6 @@ Execution Engine: sbe
 ### Results
 ```json
 {  "_id" : 1,  "accum" : [ 1, 2, 3 ] }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1_b_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -352,10 +336,6 @@ Execution Engine: classic
 ```json
 {  "_id" : null }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1" ]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -395,10 +375,6 @@ Execution Engine: sbe
 ### Results
 ```json
 {  "_id" : null,  "accum" : 5 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1" ]
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -441,10 +417,6 @@ Execution Engine: sbe
 ### Results
 ```json
 {  "_id" : null }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1" ]
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -491,10 +463,6 @@ Execution Engine: sbe
 ### Results
 ```json
 {  "_id" : null }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1", "a_1_b_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -571,10 +539,6 @@ Execution Engine: classic
 ### Results
 ```json
 {  "_id" : null,  "accum" : 5 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1", "a_1_b_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -655,10 +619,6 @@ Execution Engine: classic
 ### Results
 ```json
 {  "_id" : null }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1", "a_1_b_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -742,10 +702,6 @@ Execution Engine: classic
 ```json
 {  "_id" : null,  "accum" : 5 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1_b_1" ]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -808,10 +764,6 @@ Execution Engine: sbe
 ### Results
 ```json
 {  "_id" : null,  "accum" : 5 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1_b_1", "a_1_b_1_c_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic

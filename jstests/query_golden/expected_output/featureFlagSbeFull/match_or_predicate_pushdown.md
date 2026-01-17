@@ -52,10 +52,6 @@ Collection count: 2
 ```json
 {  "_id" : 83,  "a" : 0,  "array" : "",  "b" : 0,  "m" : {  "m1" : 0,  "m2" : ISODate("1970-01-01T00:00:00Z") },  "t" : ISODate("1970-01-01T00:00:00Z") }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "t_1_array_1" ]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json

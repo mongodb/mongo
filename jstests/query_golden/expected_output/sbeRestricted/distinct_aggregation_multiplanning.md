@@ -23,22 +23,6 @@
 {  "_id" : 4,  "accum" : 2 }
 {  "_id" : 5,  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -208,22 +192,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -345,22 +313,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4,  "accum" : 2 }
 {  "_id" : 5,  "accum" : 4 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -531,22 +483,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 7 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -700,22 +636,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 7 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -871,22 +791,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 7 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -988,22 +892,6 @@ Execution Engine: classic
 {  "_id" : 2,  "accum" : 3 }
 {  "_id" : 3,  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -1071,22 +959,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4,  "accum" : 2 }
 {  "_id" : 5,  "accum" : 4 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1210,22 +1082,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -1342,22 +1198,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 2 }
 {  "_id" : 5,  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -1441,22 +1281,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 6 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -1539,22 +1363,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 6 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1644,22 +1452,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 2 }
 {  "_id" : 5,  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -1748,22 +1540,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 2 }
 {  "_id" : 5,  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -1850,22 +1626,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4,  "accum" : 2 }
 {  "_id" : 5,  "accum" : 4 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1955,22 +1715,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 7 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -2051,22 +1795,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 7 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -2127,22 +1855,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4 }
 {  "_id" : 5 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2222,22 +1934,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4,  "accum" : 2 }
 {  "_id" : 5,  "accum" : 4 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2408,22 +2104,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 4 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2601,22 +2281,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accum" : 2 }
 {  "_id" : 5,  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -2700,22 +2364,6 @@ Execution Engine: sbe
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -2765,22 +2413,6 @@ Execution Engine: sbe
 ```json
 {  "_id" : 4 }
 {  "_id" : 5 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2856,22 +2488,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4,  "accumB" : 2,  "accumC" : 3 }
 {  "_id" : 5,  "accumB" : 4,  "accumC" : 7 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2965,22 +2581,6 @@ Execution Engine: classic
 {  "_id" : 4,  "accumB" : 2,  "accumC" : 3,  "accumD" : 4 }
 {  "_id" : 5,  "accumB" : 4,  "accumC" : 7,  "accumD" : 5 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -3062,22 +2662,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4 }
 {  "_id" : 5 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -3610,22 +3194,6 @@ Execution Engine: classic
 {  "_id" : 4 }
 {  "_id" : 5 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -3717,22 +3285,6 @@ Execution Engine: sbe
 ```json
 {  "_id" : 4 }
 {  "_id" : 5 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -3832,22 +3384,6 @@ Execution Engine: sbe
 {  "_id" : 4 }
 {  "_id" : 5 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -3945,10 +3481,6 @@ Execution Engine: sbe
 {  "_id" : 2,  "accum" : -2 }
 {  "_id" : 3,  "accum" : -3 }
 {  "_id" : 4,  "accum" : -4 }
-```
-### Total indexes on the collection
-```json
-[ "_id_", "a_-1_b_1", "a_1_b_1" ]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4097,10 +3629,6 @@ Execution Engine: classic
 {  "_id" : 8,  "accum" : -8 }
 {  "_id" : 9,  "accum" : -9 }
 ```
-### Total indexes on the collection
-```json
-[ "_id_", "a_1_b_1", "b_1_c_1" ]
-```
 ### Summarized explain
 Execution Engine: classic
 ```json
@@ -4244,22 +3772,6 @@ Execution Engine: classic
 ```json
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 7 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -4431,22 +3943,6 @@ Execution Engine: sbe
 {  "_id" : 4,  "accum" : 3 }
 {  "_id" : 5,  "accum" : 7 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -4613,22 +4109,6 @@ Execution Engine: sbe
 {  "_id" : 5,  "accum" : 4 }
 {  "_id" : [ 1, 2, 3 ],  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -4778,22 +4258,6 @@ Execution Engine: sbe
 {  "_id" : 5 }
 {  "_id" : [ 1, 2, 3 ] }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -4842,22 +4306,6 @@ Execution Engine: sbe
 {  "_id" : 5,  "accum" : 4 }
 {  "_id" : [ 1, 2, 3 ],  "accum" : 4 }
 ```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
-```
 ### Summarized explain
 Execution Engine: sbe
 ```json
@@ -4899,22 +4347,6 @@ Execution Engine: sbe
 {  "_id" : 2,  "accum" : 4 }
 {  "_id" : 3,  "accum" : 4 }
 {  "_id" : 4,  "accum" : 5 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4981,22 +4413,6 @@ Execution Engine: classic
 {  "_id" : 2,  "accum" : 4 }
 {  "_id" : 3,  "accum" : 4 }
 {  "_id" : 4,  "accum" : [ 1, 2, 3 ] }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1",
-	"b_1",
-	"a_1_b_1",
-	"a_-1_b_1",
-	"a_1_b_-1",
-	"a_1_b_1_c_1",
-	"a_1_b_1_d_1",
-	"b_1_a_1",
-	"b_1_c_1",
-	"d_1_c_-1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -5069,17 +4485,6 @@ Execution Engine: classic
 {  "_id" : 2 }
 {  "_id" : 3 }
 {  "_id" : 4 }
-```
-### Total indexes on the collection
-```json
-[
-	"_id_",
-	"a_1_b_1_c_1_d_1_e_1",
-	"a_1_b_1_c_1_d_1",
-	"a_1_b_1_c_1",
-	"a_1_b_1",
-	"a_1"
-]
 ```
 ### Summarized explain
 Execution Engine: classic

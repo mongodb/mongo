@@ -52,7 +52,7 @@ function runFindAndExplain({query, options = {}, expected = {}}) {
         cursor = cursor.limit(options.limit);
     }
 
-    outputFindPlanAndResults(coll, cursor, expected);
+    outputFindPlanAndResults(cursor, expected);
 }
 
 section("Simple limit targeting multiple shards");
