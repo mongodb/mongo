@@ -289,11 +289,6 @@ bool isMongotPipeline(const Pipeline* pipeline) {
     return isMongotStage(pipeline->peekFront());
 }
 
-bool isMongotLiteParsedPipeline(const LiteParsedPipeline& lpp) {
-    const auto& stages = lpp.getStages();
-    return !stages.empty() && stages.front()->isSearchStage();
-}
-
 /** Because 'DocumentSourceSearchMeta' inherits from 'DocumentSourceInternalSearchMongotRemote',
  *  to make sure a DocumentSource is a $search stage and not $searchMeta check it is either:
  *    - a 'DocumentSourceSearch'.

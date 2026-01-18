@@ -564,16 +564,16 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         }
     }
 
-    // Clone and desugar the pipeline. If the pipeline is modified by desugaring, a reparse
-    // will be required. Otherwise, we can optimize out the reparse.
-    auto clonedLPP = liteParsedPipeline.clone();
-    const auto wasDesugared = LiteParsedDesugarer::desugar(&clonedLPP);
+    // Clone and desugar the pipeline. If the pipeline is modified by the desugar, a second
+    // parse is required. Otherwise, we can optimize out the second parse.
+    LiteParsedPipeline clonedLPP = liteParsedPipeline.clone();
+    bool needsSecondParse = LiteParsedDesugarer::desugar(&clonedLPP);
 
     // Parse the user's original pipeline pre-desugar to capture query stats. Passing through
-    // wasDesugared will determine whether a StubMongoProcessInterface will be attached to this
+    // needsSecondParse will determine whether a StubMongoProcessInterface will be attached to this
     // parse or not.
     auto pipeline =
-        Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, nullptr, false, wasDesugared);
+        Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, nullptr, false, needsSecondParse);
 
     // Compute QueryShapeHash pre-desugar and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
@@ -614,7 +614,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
             hasChangeStream);
     }
 
-    if (wasDesugared) {
+    if (needsSecondParse) {
         pipeline = Pipeline::parseFromLiteParsed(clonedLPP, expCtx);
     }
 
