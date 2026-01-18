@@ -137,7 +137,11 @@ void throwAppropriateException(bool txnTooLargeEnabled,
     throwWriteConflictException(prefix);
 }
 
-void dumpErrorLog() {
+void dumpErrorLog(int retCode) {
+    if (retCode == WT_ROLLBACK) {
+        return;
+    }
+
     LOGV2(11720300, "Gathering WiredTiger error log");
     int ret = wiredtiger_dump_error_log([](const char* message) -> int {
         LOGV2_FATAL_CONTINUE(11131000, "WiredTiger dump error log", "message"_attr = message);

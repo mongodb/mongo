@@ -33,7 +33,10 @@ WT_DEFINES = [
     "@platforms//cpu:s390x": ["WORDS_BIGENDIAN=1"],
     "//conditions:default": [],
 }) + select({
-    "//bazel/config:dbg_enabled": ["HAVE_DIAGNOSTIC"],
+    "//bazel/config:dbg_enabled": [
+        "HAVE_DIAGNOSTIC",
+        "HAVE_ERROR_LOG",
+    ],
     "//conditions:default": [],
 }) + select({
     "//bazel/config:selected_disable_ref_track": [],

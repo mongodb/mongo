@@ -55,14 +55,14 @@ void throwAppropriateException(bool txnTooLargeEnabled,
 /**
  * Dumps the origin of an error code and the stacktrace from WiredTiger.
  */
-void dumpErrorLog();
+void dumpErrorLog(int retCode);
 
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix);
 Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix);
 
 inline Status wtRCToStatus_error(int retCode, WT_SESSION* session, const char* prefix = nullptr) {
     invariant(retCode != 0);
-    dumpErrorLog();
+    dumpErrorLog(retCode);
     return wtRCToStatus_slow(retCode, session, prefix);
 }
 
@@ -70,7 +70,7 @@ inline Status wtRCToStatus_error(int retCode,
                                  WiredTigerSession& session,
                                  const char* prefix = nullptr) {
     invariant(retCode != 0);
-    dumpErrorLog();
+    dumpErrorLog(retCode);
     return wtRCToStatus_slow(retCode, session, prefix);
 }
 
