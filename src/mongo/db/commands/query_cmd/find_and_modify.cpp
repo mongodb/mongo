@@ -389,10 +389,16 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
 
     // Explain calls of the findAndModify command are read-only, but we take write
     // locks so that the timing information is more accurate.
+    //
+    // In order to correctly serve malformed requests coming from routers affected by SERVER-113997,
+    // we need to make sure that in the case of viewful timeseries collections, we always perform
+    // the shard version checks only after translating the namespace from timeseries view to
+    // timeseries buckets. For this reason, we pass the already translated namespace from
+    // CollectionPreConditions
     const auto collection = preConditions.acquireCollectionAndCheck(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, nss, AcquisitionPrerequisites::OperationType::kWrite),
+            opCtx, preConditions.getTargetNs(nss), AcquisitionPrerequisites::OperationType::kWrite),
         MODE_IX);
 
     // In case of timeseries collection make sure that from now on we refer to the translated
