@@ -35,10 +35,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/jwk_manager.h"
 #include "mongo/crypto/jwt_types_gen.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
-namespace mongo::crypto {
+namespace mongo {
+namespace MONGO_MOD_PUBLIC crypto {
 
 struct IssuerAudiencePair {
     std::string issuer;
@@ -97,4 +99,5 @@ private:
     std::string _originalToken;
 };
 
-}  // namespace mongo::crypto
+}  // namespace MONGO_MOD_PUBLIC crypto
+}  // namespace mongo

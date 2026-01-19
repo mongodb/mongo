@@ -40,6 +40,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/secure_compare_memory.h"
 
 #include <algorithm>
@@ -53,7 +54,7 @@
 #include <vector>
 
 namespace mongo {
-namespace scram {
+namespace MONGO_MOD_PUBLIC scram {
 
 constexpr auto kServerKeyConst = "Server Key"_sd;
 constexpr auto kClientKeyConst = "Client Key"_sd;
@@ -331,5 +332,5 @@ private:
     std::shared_ptr<MemoryPolicy<HashBlock>> _ptr;
 };
 
-}  // namespace scram
+}  // namespace MONGO_MOD_PUBLIC scram
 }  // namespace mongo

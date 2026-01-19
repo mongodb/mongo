@@ -32,9 +32,10 @@
 #include "mongo/base/data_range.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 constexpr int kAssociatedDataLength = 18;
 constexpr size_t kHmacOutSize = 32;
 
@@ -223,4 +224,4 @@ private:
     std::vector<uint8_t> _plaintext;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

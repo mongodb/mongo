@@ -30,12 +30,13 @@
 #pragma once
 
 #include "mongo/crypto/jwt_types_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::crypto {
 
 /** Interface for objects which acquire JWKSes.
  */
-class JWKSFetcher {
+class MONGO_MOD_PUBLIC JWKSFetcher {
 public:
     JWKSFetcher() = default;
     virtual ~JWKSFetcher() = default;

@@ -28,6 +28,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: pub
 
 imports:
     - "mongo/db/topology/cluster_parameters/cluster_server_parameter.idl"

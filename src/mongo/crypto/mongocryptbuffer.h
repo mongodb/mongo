@@ -31,6 +31,7 @@
 
 #include "mongo/base/data_range.h"
 #include "mongo/crypto/mongocrypt_definitions.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

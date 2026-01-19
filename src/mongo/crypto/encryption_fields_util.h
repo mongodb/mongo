@@ -34,13 +34,14 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * Returns whether the supplied BSON type is supported for FLE2 equality indexed encryption.
@@ -247,4 +248,4 @@ bool visitQueryTypeConfigs(const EncryptedFieldConfig& efc,
                            const QueryTypeConfigVisitor& visit,
                            const UnindexedEncryptedFieldVisitor& onEmptyField = nullptr);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

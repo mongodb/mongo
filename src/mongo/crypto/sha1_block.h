@@ -33,12 +33,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/hash_block.h"
 #include "mongo/util/make_array_type.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * A Traits type for adapting HashBlock to sha1 hashes.
@@ -64,4 +65,4 @@ struct SHA1BlockTraits {
 
 using SHA1Block = HashBlock<SHA1BlockTraits>;
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

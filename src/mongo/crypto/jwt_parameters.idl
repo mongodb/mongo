@@ -27,6 +27,7 @@
 
 global:
     cpp_namespace: "mongo::crypto"
+    mod_visibility: private
 
 server_parameters:
     JWKSMinimumQuiescePeriodSecs:

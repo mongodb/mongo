@@ -38,6 +38,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/secure_compare_memory.h"
 
 #include <array>
@@ -51,7 +52,7 @@
 #include <openssl/hmac.h>
 #endif
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 struct BSONBinData;
 class BSONObjBuilder;
@@ -392,4 +393,4 @@ std::ostream& operator<<(std::ostream& os, const HashBlock<Traits>& sha) {
     return os << sha.toString();
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

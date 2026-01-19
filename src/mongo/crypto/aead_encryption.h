@@ -36,12 +36,13 @@
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
 
 namespace mongo {
-namespace crypto {
+namespace MONGO_MOD_PUBLIC crypto {
 
 /**
  * Constants used in the AEAD function
@@ -141,5 +142,5 @@ StatusWith<std::size_t> aeadDecryptLocalKMS(const SymmetricKey& key,
                                             ConstDataRange cipher,
                                             DataRange out);
 
-}  // namespace crypto
+}  // namespace MONGO_MOD_PUBLIC crypto
 }  // namespace mongo

@@ -55,6 +55,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <array>
@@ -71,7 +72,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  * ESC Collection schema
@@ -183,7 +184,7 @@ struct ESCDocument {
 /**
  * Basic set of functions to read/query data from state collections to perform EmuBinary.
  */
-class FLETagQueryInterface {
+class MONGO_MOD_OPEN FLETagQueryInterface {
 public:
     enum class TagQueryType { kInsert, kQuery, kCompact, kCleanup, kPadding };
 
@@ -213,7 +214,7 @@ public:
 /**
  * Interface for reading from a collection for the "EmuBinary" algorithm
  */
-class FLEStateCollectionReader {
+class MONGO_MOD_OPEN FLEStateCollectionReader {
 public:
     virtual ~FLEStateCollectionReader() = default;
 
@@ -447,7 +448,7 @@ public:
  *
  * Keys are identified by UUID in the key vault.
  */
-class FLEKeyVault {
+class MONGO_MOD_OPEN FLEKeyVault {
 public:
     virtual ~FLEKeyVault();
 
@@ -1366,4 +1367,4 @@ QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryTyp
  * sparsity
  */
 std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t sparsity);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

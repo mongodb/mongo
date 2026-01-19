@@ -32,6 +32,7 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -43,7 +44,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class Status;
 
 class SymmetricKeyId {
@@ -156,4 +157,4 @@ private:
 };
 
 using UniqueSymmetricKey = std::unique_ptr<SymmetricKey>;
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

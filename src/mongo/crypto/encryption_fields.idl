@@ -30,6 +30,7 @@ global:
     cpp_includes:
         - "mongo/db/exec/document_value/value.h"
         - "mongo/crypto/encryption_fields_validation.h"
+    mod_visibility: pub
 
 imports:
     - "mongo/db/basic_types.idl"

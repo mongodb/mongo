@@ -29,6 +29,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/crypto/fle_fields_util.h"
+    mod_visibility: pub
 
 imports:
     - "mongo/db/basic_types.idl"

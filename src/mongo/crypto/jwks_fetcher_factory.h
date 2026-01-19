@@ -31,13 +31,14 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/jwks_fetcher.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /** A Factory which creates objects needed to interact with Identity Providers.
  */
 
-class JWKSFetcherFactory {
+class MONGO_MOD_OPEN JWKSFetcherFactory {
 public:
     virtual ~JWKSFetcherFactory() = default;
     virtual std::unique_ptr<crypto::JWKSFetcher> makeJWKSFetcher(StringData issuer) const = 0;

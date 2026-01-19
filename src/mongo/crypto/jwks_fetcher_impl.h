@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/jwks_fetcher.h"
 #include "mongo/crypto/jwt_types_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/time_support.h"
 
@@ -44,7 +45,7 @@ namespace crypto {
 
 /** JWKSFetcher implementation which acquires keys via HTTP.
  */
-class JWKSFetcherImpl : public JWKSFetcher {
+class MONGO_MOD_PUBLIC JWKSFetcherImpl : public JWKSFetcher {
 public:
     JWKSFetcherImpl(ClockSource* clock, StringData issuer);
 

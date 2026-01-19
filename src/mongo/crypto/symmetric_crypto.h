@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/crypto/symmetric_key.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -41,7 +42,7 @@
 #include <string>
 
 namespace mongo {
-namespace crypto {
+namespace MONGO_MOD_PUBLIC crypto {
 
 /**
  * Encryption algorithm identifiers and block sizes
@@ -192,5 +193,5 @@ std::set<std::string> getSupportedSymmetricAlgorithms();
  */
 Status engineRandBytes(DataRange buffer);
 
-}  // namespace crypto
+}  // namespace MONGO_MOD_PUBLIC crypto
 }  // namespace mongo

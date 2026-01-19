@@ -32,6 +32,7 @@
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <vector>
@@ -45,19 +46,20 @@ class FLETagQueryInterface;
 
 namespace mongo::fle {
 
-std::vector<std::vector<FLEEdgeCountInfo>> getCountInfoSets(FLETagQueryInterface* queryImpl,
-                                                            const NamespaceString& nssEsc,
-                                                            ESCDerivedFromDataToken s,
-                                                            EDCDerivedFromDataToken d,
-                                                            boost::optional<int64_t> cm);
+MONGO_MOD_PUBLIC std::vector<std::vector<FLEEdgeCountInfo>> getCountInfoSets(
+    FLETagQueryInterface* queryImpl,
+    const NamespaceString& nssEsc,
+    ESCDerivedFromDataToken s,
+    EDCDerivedFromDataToken d,
+    boost::optional<int64_t> cm);
 
 /**
  * Read a list of binary tags given ESC and and EDC derived tokens and a maximum contention
  * factor.
  */
-std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
-                               const NamespaceString& nssEsc,
-                               ESCDerivedFromDataToken s,
-                               EDCDerivedFromDataToken d,
-                               boost::optional<int64_t> cm);
+MONGO_MOD_PUBLIC std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
+                                                const NamespaceString& nssEsc,
+                                                ESCDerivedFromDataToken s,
+                                                EDCDerivedFromDataToken d,
+                                                boost::optional<int64_t> cm);
 }  // namespace mongo::fle

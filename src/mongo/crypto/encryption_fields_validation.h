@@ -32,11 +32,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 class EncryptedField;
 class EncryptedFieldConfig;
 class QueryTypeConfig;
@@ -118,4 +119,4 @@ void validateTextSearchIndex(BSONType fieldType,
                              boost::optional<bool> previousCaseSensitivity,
                              boost::optional<bool> previousDiacriticSensitivity,
                              boost::optional<int64_t> previousContention);
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

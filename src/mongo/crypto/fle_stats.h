@@ -37,10 +37,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/timer.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 namespace FLEStatsUtil {
 static void accumulateStats(ECStats& left, const ECStats& right) {
@@ -156,4 +157,4 @@ private:
     FLEIndexTypeStats _indexTypeStats;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

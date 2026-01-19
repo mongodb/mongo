@@ -33,11 +33,12 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_tokens.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 class ConstFLE2TagAndEncryptedMetadataBlock;
 class EncryptedPredicateEvaluatorV2 {
@@ -64,4 +65,4 @@ private:
     std::vector<ServerZerosEncryptionToken> _zerosDecryptionTokens;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

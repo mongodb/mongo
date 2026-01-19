@@ -34,6 +34,7 @@
 #include "mongo/crypto/fle_key_types.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/crypto/fle_tokens.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <array>
@@ -42,7 +43,7 @@
 
 #include <fmt/format.h>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 constexpr auto kSafeContent = "__safeContent__"_sd;
 constexpr auto kSafeContentString = "__safeContent__";
@@ -124,4 +125,4 @@ struct FLEEdgeCountInfo {
     boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edc;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

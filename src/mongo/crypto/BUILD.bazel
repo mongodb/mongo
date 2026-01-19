@@ -65,7 +65,6 @@ mongo_cc_library(
     name = "mongocryptutil",
     srcs = [
         "fle_util.cpp",
-        "libbsonvalue.cpp",
         "mongocryptbuffer.cpp",
         "mongocryptstatus.cpp",
     ],
@@ -357,7 +356,6 @@ mongo_cc_unit_test(
         "fle_field_schema_test.cpp",
         "fle_numeric_test.cpp",
         "fle_stats_test.cpp",
-        "libbsonvalue_test.cpp",
         "mechanism_scram_test.cpp",
         "mongocryptbuffer_test.cpp",
         "sha1_block_test.cpp",

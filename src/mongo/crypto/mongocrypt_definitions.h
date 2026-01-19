@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 #pragma once
+#include "mongo/util/modules.h"
+
 // Forward declarations of our mongocrypt dependencies. Required because we don't want
 // mongocrypt headers transitively included by other targets, polluting the global namespace.
 extern "C" {

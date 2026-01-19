@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/crypto/mongocrypt_definitions.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

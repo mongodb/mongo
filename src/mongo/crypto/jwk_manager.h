@@ -36,6 +36,7 @@
 #include "mongo/crypto/jwks_fetcher.h"
 #include "mongo/crypto/jws_validator.h"
 #include "mongo/crypto/jwt_types_gen.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <map>
@@ -45,7 +46,7 @@
 
 namespace mongo::crypto {
 
-class JWKManager {
+class MONGO_MOD_PUBLIC JWKManager {
 public:
     using SharedValidator = std::shared_ptr<JWSValidator>;
     using KeyMap = std::map<std::string, BSONObj>;

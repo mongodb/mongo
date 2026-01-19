@@ -34,7 +34,7 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status.h"
 #include "mongo/crypto/symmetric_crypto.h"
-
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace crypto {

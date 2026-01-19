@@ -34,6 +34,7 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <vector>
 

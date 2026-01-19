@@ -32,6 +32,7 @@
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/fle_key_types.h"
+#include "mongo/util/modules.h"
 
 #include <array>
 #include <vector>
@@ -122,7 +123,7 @@
  * ServerTextPrefixDerivedFromDataToken = HMAC(ServerTextPrefixToken, v)
  */
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 // Forward declare to avoid including the header file.
 class MongoCryptBuffer;
 
@@ -141,7 +142,7 @@ public:
     virtual ConstDataRange toCDR() const = 0;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo
 
 #define FLE_TOKEN_TYPE_MC(TokenType) mc_##TokenType##_t
 #define FLE_CRYPTO_TOKEN_FWD(TokenType) \
@@ -152,7 +153,7 @@ public:
     /* Forward declare the type name */                                        \
     FLE_CRYPTO_TOKEN_FWD(TokenType)                                            \
     namespace mongo {                                                          \
-    class TokenType : public FLEToken {                                        \
+    class MONGO_MOD_PUBLIC TokenType : public FLEToken {                       \
     public:                                                                    \
         /* Default constructor */                                              \
         TokenType();                                                           \
@@ -329,7 +330,7 @@ FLE_TOKEN_DECL_CLASS(ServerTextPrefixDerivedFromDataToken,
 #undef FLE_CRYPTO_TOKEN_FWD
 #undef FLE_TOKEN_DECL_CLASS
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 // Some keys have slightly different names in the server repo compared to libmongocrypt.
 using EDCDerivedFromDataTokenAndContentionFactorToken = EDCDerivedFromDataTokenAndContentionFactor;
 using ESCDerivedFromDataTokenAndContentionFactorToken = ESCDerivedFromDataTokenAndContentionFactor;
@@ -499,4 +500,4 @@ private:
     boost::optional<uint32_t> _msize;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo

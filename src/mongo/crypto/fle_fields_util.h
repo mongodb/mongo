@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class FLE2EncryptionPlaceholder;
