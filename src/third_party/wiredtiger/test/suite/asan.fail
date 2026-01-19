@@ -6,8 +6,8 @@
 
 test_corrupt01.py
 test_layered66.py
+test_salvage03.py
 test_tiered06.py
 test_txn18.py
 test_txn19.py
-test_txn22.py
 test_verify_disagg.py

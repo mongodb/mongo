@@ -34,6 +34,8 @@ from wtdataset import SimpleDataSet
 import wttest
 from wtscenario import make_scenarios
 
+# FIXME-WT-16455: Re-enable once disaggregated storage works with long-running snapshots.
+@wttest.skip_for_hook("disagg", "Fails with disaggregated storage.")
 class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'verbose=[transaction]'
     tablename = 'test_txn06'

@@ -920,7 +920,6 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
     cgname = filename = NULL;
     table = NULL;
 
-    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE));
 
     tablename = uri;
@@ -1012,23 +1011,6 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
         table = NULL;
     }
 
-    /*
-     * Update the table info in the shared metadata if this is a layered table. This has to get done
-     * after the column groups are created, so that the metadata is complete.
-     *
-     * FIXME-WT-16462 We should determine if there is a better way to determine if this is a layered
-     * table and to determine the stable component's URI. The correct logic works well with the
-     * current implementation, but may not be robust to future changes.
-     */
-    if (__wt_conn_is_disagg(session) && S2C(session)->layered_table_manager.leader)
-        if (__wt_config_getones(session, config, "type", &cval) == 0 &&
-          WT_CONFIG_LIT_MATCH("layered", cval)) {
-            __wt_scr_free(session, &tmp);
-            WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-            WT_ERR(__wt_buf_fmt(session, tmp, "file:%s.wt_stable", tablename));
-            WT_ERR(__wt_disagg_update_metadata_later(session, tmp->data, tablename));
-        }
-
 err:
     WT_TRET(__wt_schema_release_table(session, &table));
     __wt_scr_free(session, &tmp);
@@ -1070,8 +1052,6 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
     constituent_cfg = NULL;
     tablecfg = NULL;
     meta_value = NULL;
-
-    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
 
     ret = __wt_config_getones(session, config, "log.enabled", &cval);
     WT_RET_NOTFOUND_OK(ret);
@@ -1145,12 +1125,10 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
         __wt_free(session, constituent_cfg);
 
         /*
-         * Update the shared metadata for the disaggregated storage.
-         *
-         * FIXME-WT-14725: We should make this more efficient in the future. If this creation is a
-         * part of a table creation, it would result in doing extra work.
+         * Ensure that the new table's metadata would be included in the checkpoint even if it is
+         * empty, in order for the new table to appear in the shared metadata table.
          */
-        WT_ERR(__wt_disagg_update_metadata_later(session, stable_uri, tablename));
+        WT_ERR(__wt_disagg_copy_metadata_later(session, stable_uri, tablename));
     }
 
 err:

@@ -48,8 +48,6 @@ test_timestamp26.py # FIXME: WT-16182
 test_truncate01.py # FIXME: WT-15474
 test_truncate21.py # FIXME: WT-15472
 test_truncate24.py # FIXME: WT-15473
-test_txn06.py
-test_txn22.py
 test_util01.py
 test_util02.py
 test_util04.py
