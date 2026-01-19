@@ -30,6 +30,8 @@
 #include "mongo/db/service_entry_point_shard_role.h"
 
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_bm_fixture.h"
 
@@ -44,6 +46,10 @@ public:
         repl::ReplicationCoordinator::set(sc, std::move(replCoordMock));
         sc->getService(getClusterRole())
             ->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+
+        auto persistenceProvider = std::make_unique<rss::AttachedPersistenceProvider>();
+        rss::ReplicatedStorageService::get(getGlobalServiceContext())
+            .setPersistenceProvider(std::move(persistenceProvider));
     }
 
     ClusterRole getClusterRole() const override {

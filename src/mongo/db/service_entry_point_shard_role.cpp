@@ -1366,6 +1366,12 @@ void RunCommandAndWaitForWriteConcern::_setup() {
                   fmt::format("unexpected unset provenance on writeConcern: {}",
                               _extractedWriteConcern->toBSON().jsonString()));
 
+        uassert(ErrorCodes::UnsatisfiableWriteConcern,
+                "Unsupported WriteConcernOptions",
+                rss::ReplicatedStorageService::get(opCtx->getServiceContext())
+                    .getPersistenceProvider()
+                    .supportsWriteConcernOptions(_extractedWriteConcern.get()));
+
         opCtx->setWriteConcern(*_extractedWriteConcern);
     }
 }
@@ -1881,6 +1887,10 @@ void ExecCommandDatabase::_initiateCommand() {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             readConcernArgs = std::move(newReadConcernArgs);
         }
+
+        uassert(ErrorCodes::InvalidOptions,
+                "Unsupported ReadConcernLevel",
+                rss.getPersistenceProvider().supportsReadConcernLevel(readConcernArgs.getLevel()));
     }
 
     uassert(ErrorCodes::InvalidOptions,

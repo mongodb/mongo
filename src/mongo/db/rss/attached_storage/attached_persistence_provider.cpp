@@ -131,6 +131,16 @@ bool AttachedPersistenceProvider::supportsTableVerify() const {
     return true;
 }
 
+bool AttachedPersistenceProvider::supportsWriteConcernOptions(
+    const WriteConcernOptions& writeConcernOptions) const {
+    return true;
+}
+
+bool AttachedPersistenceProvider::supportsReadConcernLevel(
+    const repl::ReadConcernLevel& readConcernLevel) const {
+    return true;
+}
+
 bool AttachedPersistenceProvider::shouldDisableTransactionUpdateCoalescing() const {
     // This is only used for testing purposes.
     return gFeatureFlagDisableTransactionUpdateCoalescing.checkEnabled();

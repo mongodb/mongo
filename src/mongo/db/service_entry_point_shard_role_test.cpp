@@ -36,6 +36,8 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/rss/attached_storage/attached_persistence_provider.h"
+#include "mongo/db/rss/replicated_storage_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/rpc/message.h"
@@ -66,6 +68,10 @@ public:
         _replCoordMock = replCoordMock.get();
         invariant(replCoordMock->setFollowerMode(repl::MemberState::RS_PRIMARY));
         repl::ReplicationCoordinator::set(getGlobalServiceContext(), std::move(replCoordMock));
+
+        auto persistenceProvider = std::make_unique<rss::AttachedPersistenceProvider>();
+        rss::ReplicatedStorageService::get(getGlobalServiceContext())
+            .setPersistenceProvider(std::move(persistenceProvider));
 
         getGlobalServiceContext()->getService()->setServiceEntryPoint(
             std::make_unique<ServiceEntryPointShardRole>());

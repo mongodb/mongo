@@ -2886,6 +2886,7 @@ mongo_cc_unit_test(
     ],
     deps = [
         ":service_context_d",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/transport:service_entry_point_test_fixture",
     ],
 )
@@ -3357,6 +3358,7 @@ mongo_cc_benchmark(
         "//src/mongo/db/op_observer",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
+        "//src/mongo/db/rss/attached_storage:attached_persistence_provider",
         "//src/mongo/db/s:sharding_runtime_d",
         "//src/mongo/db/shard_role/shard_catalog:catalog_impl",
         "//src/mongo/db/storage:storage_control",
