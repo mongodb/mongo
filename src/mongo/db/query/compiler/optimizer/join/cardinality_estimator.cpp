@@ -168,14 +168,16 @@ cost_based_ranker::SelectivityEstimate JoinCardinalityEstimator::joinPredicateSe
     bool smallerCardIsLeft = leftCard <= rightCard;
     auto& primaryKeyNode = smallerCardIsLeft ? leftNode : rightNode;
 
-    // Accumulate the field names of the "primary key" of the join edge.
-    std::vector<FieldPath> fields;
+    // Accumulate the field names of the "primary key" of the join edge. Note that we track $expr
+    // predicates as their NDV computation is slightly different due to $expr equality semantics.
+    std::vector<ce::FieldPathAndEqSemantics> fields;
     for (auto&& joinPred : edge.predicates) {
         tassert(11352502,
                 "join predicate selectivity estimation only supported for equality",
                 joinPred.isEquality());
         auto pathId = smallerCardIsLeft ? joinPred.left : joinPred.right;
-        fields.push_back(ctx.resolvedPaths[pathId].fieldName);
+        fields.push_back({.path = ctx.resolvedPaths[pathId].fieldName,
+                          .isExprEq = joinPred.op == JoinPredicate::Operator::ExprEq});
     }
 
     // Get sampling estimator for the "primary key" collection

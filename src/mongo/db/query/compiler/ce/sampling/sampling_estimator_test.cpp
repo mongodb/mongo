@@ -1427,13 +1427,13 @@ void makeNDVAssertions(SamplingEstimatorForTesting& estimator, const size_t samp
 
     // We know the true NDV for each of these fields; see 'createDocumentsForNDVTesting' for
     // details. In most of the cases below, we allow for a 20% buffer.
-    auto ndvId = estimator.estimateNDV({"_id"});
-    auto ndvA = estimator.estimateNDV({"a"});
-    auto ndvB = estimator.estimateNDV({"b"});
-    auto ndvC = estimator.estimateNDV({"c"});
-    auto ndvD = estimator.estimateNDV({"d"});
-    auto ndvE = estimator.estimateNDV({"e"});
-    auto ndvNonexistent = estimator.estimateNDV({"nonexistent"});
+    auto ndvId = estimator.estimateNDV({{.path = "_id"}});
+    auto ndvA = estimator.estimateNDV({{.path = "a"}});
+    auto ndvB = estimator.estimateNDV({{.path = "b"}});
+    auto ndvC = estimator.estimateNDV({{.path = "c"}});
+    auto ndvD = estimator.estimateNDV({{.path = "d"}});
+    auto ndvE = estimator.estimateNDV({{.path = "e"}});
+    auto ndvNonexistent = estimator.estimateNDV({{.path = "nonexistent"}});
 
     // All unique values; true number is 5000.
     assertBetween(ndvId, 4000, 6000);
@@ -1456,9 +1456,9 @@ void makeNDVAssertions(SamplingEstimatorForTesting& estimator, const size_t samp
     assertBetween(ndvNonexistent, .8, 1.2);
 
     // Combination of fields.
-    auto ndvAB = estimator.estimateNDV({"a", "b"});
-    auto ndvBC = estimator.estimateNDV({"b", "c"});
-    auto ndvBD = estimator.estimateNDV({"b", "d"});
+    auto ndvAB = estimator.estimateNDV({{.path = "a"}, {.path = "b"}});
+    auto ndvBC = estimator.estimateNDV({{.path = "b"}, {.path = "c"}});
+    auto ndvBD = estimator.estimateNDV({{.path = "b"}, {.path = "d"}});
 
     // Again: when the sample size is small (here, 1%-2%), we see a lot of unique values for A and
     // B, causing us to overestimate the true number of unique values.
@@ -1544,7 +1544,6 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
     auto coll = acquireCollection(operationContext(), kTestNss);
     auto colls = MultipleCollectionAccessor(
         coll, {}, false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
-
     SamplingEstimatorForTesting samplingEstimator(
         operationContext(),
         colls,
@@ -1555,6 +1554,8 @@ DEATH_TEST_F(SamplingEstimatorTestDeathTest,
         numChunks,
         makeCardinalityEstimate(card));
     samplingEstimator.generateSample(StringSet{"a"});
-    samplingEstimator.estimateNDV({"b.c"});
+    // Ignore $expr semantics for now.
+    absl::flat_hash_set<FieldPath> exprPaths;
+    samplingEstimator.estimateNDV({{.path = "b.c"}});
 }
 }  // namespace mongo::ce

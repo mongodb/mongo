@@ -44,25 +44,29 @@ TEST(CountNDV, VariousUniqueValues) {
                                        fromjson("{a:2, b:2, c:1}"),
                                        fromjson("{a:3, b:3, c:1}"),
                                        fromjson("{a:4, b:1, c:1}")};
-    ASSERT_EQ(4, countNDV({"a"}, docs));
-    ASSERT_EQ(3, countNDV({"b"}, docs));
-    ASSERT_EQ(1, countNDV({"c"}, docs));
-    ASSERT_EQ(2, countNDV({"d"}, docs));
-    ASSERT_EQ(1, countNDV({"e"}, docs));
+    ASSERT_EQ(4, countNDV({{.path = "a"}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "b"}}, docs));
+    ASSERT_EQ(1, countNDV({{.path = "c"}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "d"}}, docs));
+    ASSERT_EQ(1, countNDV({{.path = "e"}}, docs));
 }
 
-TEST(CountNDV, NullAndMissingAreDistinguished) {
-    ASSERT_EQ(2, countNDV({"a"}, {fromjson("{a:null}"), fromjson("{}")}));
+TEST(CountNDV, NullAndMissingAreDistinguishedOnlyForExpr) {
+    ASSERT_EQ(1, countNDV({{.path = "a"}}, {fromjson("{a:null}"), fromjson("{}")}));
+    ASSERT_EQ(2,
+              countNDV({{.path = "a", .isExprEq = true}}, {fromjson("{a:null}"), fromjson("{}")}));
 }
 
 TEST(CountNDV, DifferentObjectFieldOrdersAreDistinct) {
-    ASSERT_EQ(2, countNDV({"a"}, {fromjson("{a: {b: 1, c: 1}}"), fromjson("{a: {c: 1, b: 1}}")}));
+    ASSERT_EQ(
+        2,
+        countNDV({{.path = "a"}}, {fromjson("{a: {b: 1, c: 1}}"), fromjson("{a: {c: 1, b: 1}}")}));
 }
 
 TEST(CountNDV, DifferentArrayOrdersUnderObjectAreDistinct) {
-    ASSERT_EQ(
-        2,
-        countNDV({"a"}, {fromjson("{a: {b: 1, c: [1, 2]}}"), fromjson("{a: {b: 1, c: [2, 1]}}")}));
+    ASSERT_EQ(2,
+              countNDV({{.path = "a"}},
+                       {fromjson("{a: {b: 1, c: [1, 2]}}"), fromjson("{a: {b: 1, c: [2, 1]}}")}));
 }
 
 TEST(CountNDV, VariousBSONTypes) {
@@ -120,12 +124,18 @@ TEST(CountNDV, VariousBSONTypes) {
 
         // MaxKey
         fromjson("{a: {$maxKey: 1}}")};
-    ASSERT_EQ(docs.size(), countNDV({"a"}, docs));
 
     std::vector<BSONObj> doubleDocs;
     doubleDocs.insert(doubleDocs.end(), docs.begin(), docs.end());
     doubleDocs.insert(doubleDocs.end(), docs.begin(), docs.end());
-    ASSERT_EQ(docs.size(), countNDV({"a"}, doubleDocs));
+
+    // For regular $eq, we treat null & missing the same.
+    ASSERT_EQ(docs.size() - 1, countNDV({{.path = "a"}}, docs));
+    ASSERT_EQ(docs.size() - 1, countNDV({{.path = "a"}}, doubleDocs));
+
+    // For $expr eq, null & missing are treated as being distinct.
+    ASSERT_EQ(docs.size(), countNDV({{.path = "a", .isExprEq = true}}, docs));
+    ASSERT_EQ(docs.size(), countNDV({{.path = "a", .isExprEq = true}}, doubleDocs));
 }
 
 TEST(CountNDV, NestedField) {
@@ -134,14 +144,32 @@ TEST(CountNDV, NestedField) {
                                        fromjson("{a: {b: {c: 1}, c: 3}}"),
                                        fromjson("{a: {b: {c: 2}}}"),
                                        fromjson("{a: {c: [1,2,3]}}")};
-    ASSERT_EQ(5, countNDV({"a"}, docs));
-    ASSERT_EQ(3, countNDV({"a.b"}, docs));
-    ASSERT_EQ(3, countNDV({"a.b.c"}, docs));
+    ASSERT_EQ(5, countNDV({{.path = "a"}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "a.b"}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "a.b.c"}}, docs));
+}
+
+TEST(CountNDV, NestedFieldNull) {
+    const std::vector<BSONObj> docs = {fromjson("{}"),
+                                       fromjson("{a: null}"),
+                                       fromjson("{a: {}}"),
+                                       fromjson("{a: {b: null}}"),
+                                       fromjson("{a: {b: {}}}"),
+                                       fromjson("{a: {b: {c: null}}}")};
+    // Regular eq semantics.
+    ASSERT_EQ(5, countNDV({{.path = "a"}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "a.b"}}, docs));
+    ASSERT_EQ(1, countNDV({{.path = "a.b.c"}}, docs));
+
+    // Regular $expr eq semantics.
+    ASSERT_EQ(6, countNDV({{.path = "a", .isExprEq = true}}, docs));
+    ASSERT_EQ(4, countNDV({{.path = "a.b", .isExprEq = true}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "a.b.c", .isExprEq = true}}, docs));
 }
 
 TEST(CountNDV, DifferentNumericTypesAreNotDistinguished) {
     ASSERT_EQ(1,
-              countNDV({"a"},
+              countNDV({{.path = "a"}},
                        {fromjson("{a: 1}"),
                         fromjson("{a: NumberLong(1)}"),
                         fromjson("{a: NumberInt(1)}"),
@@ -149,29 +177,29 @@ TEST(CountNDV, DifferentNumericTypesAreNotDistinguished) {
 }
 
 DEATH_TEST(CountNDVDeathTest, ThrowsOnEmptyArray, "unexpected array in NDV computation") {
-    countNDV({"a"}, {fromjson("{a: []}")});
+    countNDV({{.path = "a"}}, {fromjson("{a: []}")});
 }
 
 DEATH_TEST(CountNDVDeathTest, ThrowsOnNonEmptyArray, "unexpected array in NDV computation") {
-    countNDV({"a"}, {fromjson("{a: [1, 2, 3]}")});
+    countNDV({{.path = "a"}}, {fromjson("{a: [1, 2, 3]}")});
 }
 
 DEATH_TEST(CountNDVDeathTest, ThrowsOnNestedEmptyArray, "unexpected array in NDV computation") {
-    countNDV({"a.b"}, {fromjson("{a: {b: []}}")});
+    countNDV({{.path = "a.b"}}, {fromjson("{a: {b: []}}")});
 }
 
 DEATH_TEST(CountNDVDeathTest, ThrowsOnNestedArray, "unexpected array in NDV computation") {
-    countNDV({"a.b"}, {fromjson("{a: {b: [1, 2, 3]}}")});
+    countNDV({{.path = "a.b"}}, {fromjson("{a: {b: [1, 2, 3]}}")});
 }
 
 DEATH_TEST(CountNDVDeathTest,
            ThrowsOnEmptyArrayInTraversal,
            "unexpected array in NDV computation") {
-    countNDV({"a.b"}, {fromjson("{a: []}")});
+    countNDV({{.path = "a.b"}}, {fromjson("{a: []}")});
 }
 
 DEATH_TEST(CountNDVDeathTest, ThrowsOnArrayInTraversal, "unexpected array in NDV computation") {
-    countNDV({"a.b"}, {fromjson("{a: [{b: 1}]}")});
+    countNDV({{.path = "a.b"}}, {fromjson("{a: [{b: 1}]}")});
 }
 
 TEST(CountNDV, BasicMultiField) {
@@ -182,9 +210,9 @@ TEST(CountNDV, BasicMultiField) {
                                        fromjson("{a: 3}"),
                                        fromjson("{c: 3}"),
                                        fromjson("{}")};
-    ASSERT_EQ(4, countNDV({"a"}, docs));
-    ASSERT_EQ(3, countNDV({"b"}, docs));
-    ASSERT_EQ(5, countNDV({"a", "b"}, docs));
+    ASSERT_EQ(4, countNDV({{.path = "a"}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "b"}}, docs));
+    ASSERT_EQ(5, countNDV({{.path = "a"}, {.path = "b"}}, docs));
 }
 
 TEST(CountNDV, MultiFieldManyFields) {
@@ -199,14 +227,16 @@ TEST(CountNDV, MultiFieldManyFields) {
         fromjson("{a: 1, b: 2, c: 2, d: 2, e: 2}"),
         fromjson("{e: 2, c: 2, b: 2, d: 2, a: 1}"),
     };
-    ASSERT_EQ(1, countNDV({"a"}, docs));
-    ASSERT_EQ(2, countNDV({"b"}, docs));
-    ASSERT_EQ(2, countNDV({"c"}, docs));
-    ASSERT_EQ(2, countNDV({"d"}, docs));
-    ASSERT_EQ(2, countNDV({"e"}, docs));
-    ASSERT_EQ(2, countNDV({"a", "b"}, docs));
-    ASSERT_EQ(2, countNDV({"b", "c"}, docs));
-    ASSERT_EQ(3, countNDV({"a", "b", "c", "d", "e"}, docs));
+    ASSERT_EQ(1, countNDV({{.path = "a"}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "b"}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "c"}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "d"}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "e"}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "a"}, {.path = "b"}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "b"}, {.path = "c"}}, docs));
+    ASSERT_EQ(3,
+              countNDV({{.path = "a"}, {.path = "b"}, {.path = "c"}, {.path = "d"}, {.path = "e"}},
+                       docs));
 }
 
 TEST(CountNDV, MultiFieldOrderInsensitive) {
@@ -216,10 +246,10 @@ TEST(CountNDV, MultiFieldOrderInsensitive) {
                                        fromjson("{b: 2, a: 1}"),
                                        fromjson("{a: 2, b: 2}"),
                                        fromjson("{b: 2, a: 2}")};
-    ASSERT_EQ(2, countNDV({"a"}, docs));
-    ASSERT_EQ(2, countNDV({"b"}, docs));
-    ASSERT_EQ(3, countNDV({"a", "b"}, docs));
-    ASSERT_EQ(3, countNDV({"b", "a"}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "a"}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "b"}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "a"}, {.path = "b"}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "b"}, {.path = "a"}}, docs));
 }
 
 TEST(CountNDV, MultiFieldNullMissing) {
@@ -231,10 +261,25 @@ TEST(CountNDV, MultiFieldNullMissing) {
                                        fromjson("{a: 1, b: null}"),
                                        fromjson("{a: null, b: null}"),
                                        fromjson("{}")};
-    ASSERT_EQ(3, countNDV({"a"}, docs));
-    ASSERT_EQ(3, countNDV({"b"}, docs));
-    ASSERT_EQ(8, countNDV({"a", "b"}, docs));
-    ASSERT_EQ(8, countNDV({"b", "a"}, docs));
+    // No $expr: count null/missing as the same.
+    ASSERT_EQ(2, countNDV({{.path = "a"}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "b"}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "a"}, {.path = "b"}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "b"}, {.path = "a"}}, docs));
+
+    // Only "a" in $expr; treat null/missing as different for "a".
+    ASSERT_EQ(3, countNDV({{.path = "a", .isExprEq = true}}, docs));
+    ASSERT_EQ(2, countNDV({{.path = "b"}}, docs));
+    ASSERT_EQ(5, countNDV({{.path = "a", .isExprEq = true}, {.path = "b"}}, docs));
+    ASSERT_EQ(5, countNDV({{.path = "b"}, {.path = "a", .isExprEq = true}}, docs));
+
+    // Both $expr. Treat null/missing as different for both.
+    ASSERT_EQ(3, countNDV({{.path = "a", .isExprEq = true}}, docs));
+    ASSERT_EQ(3, countNDV({{.path = "b", .isExprEq = true}}, docs));
+    ASSERT_EQ(8,
+              countNDV({{.path = "a", .isExprEq = true}, {.path = "b", .isExprEq = true}}, docs));
+    ASSERT_EQ(8,
+              countNDV({{.path = "b", .isExprEq = true}, {.path = "a", .isExprEq = true}}, docs));
 }
 
 TEST(CountNDV, MultiFieldDuplicateAndNestedFields) {
@@ -247,13 +292,13 @@ TEST(CountNDV, MultiFieldDuplicateAndNestedFields) {
         fromjson("{a: {b: 20}}"),
         fromjson("{b: {b: 10}}"),
     };
-    ASSERT_EQ(5, countNDV({"a"}, docs));
-    ASSERT_EQ(4, countNDV({"b"}, docs));
+    ASSERT_EQ(5, countNDV({{.path = "a"}}, docs));
+    ASSERT_EQ(4, countNDV({{.path = "b"}}, docs));
 
     // Arguably these queries don't make the most sense, but we handle them correctly.
-    ASSERT_EQ(5, countNDV({"a", "a"}, docs));
-    ASSERT_EQ(5, countNDV({"a", "a.b"}, docs));
-    ASSERT_EQ(5, countNDV({"a.b", "a"}, docs));
-    ASSERT_EQ(5, countNDV({"a.b", "b"}, docs));
+    ASSERT_EQ(5, countNDV({{.path = "a"}, {.path = "a"}}, docs));
+    ASSERT_EQ(5, countNDV({{.path = "a"}, {.path = "a.b"}}, docs));
+    ASSERT_EQ(5, countNDV({{.path = "a.b"}, {.path = "a"}}, docs));
+    ASSERT_EQ(5, countNDV({{.path = "a.b"}, {.path = "b"}}, docs));
 }
 }  // namespace mongo::ce

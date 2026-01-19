@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/util/modules.h"
@@ -97,8 +98,11 @@ public:
     /**
      * Estimates the number of distinct values of tuples of the given field names in the collection.
      * Does not support estimating NDV over array-valued fields.
+     * 'fields' specifies which fields should follow strict, $expr-style equality (null !=
+     * missing) vs. regular equality semantics (null == missing).
      */
-    virtual CardinalityEstimate estimateNDV(const std::vector<FieldPath>& fieldNames) const = 0;
+    virtual CardinalityEstimate estimateNDV(
+        const std::vector<FieldPathAndEqSemantics>& fields) const = 0;
 
     virtual double getCollCard() const = 0;
 };

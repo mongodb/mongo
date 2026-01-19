@@ -82,12 +82,28 @@ inline bool reversedInterval(sbe::value::TypeTags tagLow,
 }
 
 /**
+ * Helper struct to indicate semantics of an equality predicate on the given FieldPath.
+ */
+struct FieldPathAndEqSemantics {
+    FieldPath path;
+    // Indicates the type of equality:
+    //  - true => $expr eq, strict equality, null != missing.
+    //  - false => regular eq, null == missing.
+    bool isExprEq = false;
+
+    // Used for logging.
+    BSONObj toBSON() const;
+};
+
+/**
  * Returns the number of distinct values of tuples of the given field names in the input documents.
  * For example, given documents [{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 2}, {a: 2, b: 2}], the NDV of
  * ["a","b"] is 3.
  *
  * Important notes on what is treated as "distinct":
- * - Null and missing are treated as distinct: given documents [{a: null}, {}], the NDV of "a" is 2.
+ * - Null and missing are treated as distinct only for fields marked as isExprEq=true: e.g. given
+ *   documents [{a: null}, {}], the NDV of "a" is 2 if it is specified as a $expr field- otherwise,
+ *   the NDV is 1.
  * - When values are objects, field order matters: given documents [{a: {b: 1, c: 1}}, {a: {c: 1, b:
  *   1}}], the NDV of "a" is 2.
  * - The field order of fields in 'fieldNames' in the documents in 'docs' is not significant: given
@@ -96,6 +112,7 @@ inline bool reversedInterval(sbe::value::TypeTags tagLow,
  * Does not support counting NDV over array-valued fields; tasserts if any of 'fieldNames' are
  * array-valued in 'docs'.
  */
-size_t countNDV(const std::vector<FieldPath>& fieldNames, const std::vector<BSONObj>& docs);
+size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
+                const std::vector<BSONObj>& docs);
 
 }  // namespace mongo::ce

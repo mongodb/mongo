@@ -165,8 +165,13 @@ public:
      * Uses the results assigned from 'addFakeNDVEstimate()'. If an estimate for a particular
      * 'fieldNames' is not set, this function will throw an exception.
      */
-    CardinalityEstimate estimateNDV(const std::vector<FieldPath>& fieldNames) const override {
-        return _fakeEstimates.at(fieldNames);
+    CardinalityEstimate estimateNDV(
+        const std::vector<ce::FieldPathAndEqSemantics>& fields) const override {
+        std::vector<FieldPath> fieldPaths;
+        for (auto&& field : fields) {
+            fieldPaths.push_back(field.path);
+        }
+        return _fakeEstimates.at(fieldPaths);
     }
 
     double getCollCard() const override {

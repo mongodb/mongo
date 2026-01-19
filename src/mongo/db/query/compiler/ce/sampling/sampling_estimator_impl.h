@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/sampling/ce_multikey_dotted_path_support.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -132,10 +133,13 @@ public:
         const std::vector<const MatchExpression*>& expressions) const override;
 
     /**
-     * Estimates the number of distinct values of tuples of the given field names in the collection.
-     * Does not support estimating NDV over array-valued fields.
+     * Estimates the number of distinct values of tuples of the given field names in the collection,
+     * according to the equality semantics specified by each field in 'fields'.
+     *
+     * Note: Does not support estimating NDV over array-valued fields.
      */
-    CardinalityEstimate estimateNDV(const std::vector<FieldPath>& fieldNames) const override;
+    CardinalityEstimate estimateNDV(
+        const std::vector<FieldPathAndEqSemantics>& fields) const override;
 
     /*
      * Generates a sample using a random cursor. The caller can call this function to draw a sample

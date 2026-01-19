@@ -493,6 +493,9 @@ void SamplingAccuracyTest::runNDVSamplingEstimatorTestConfiguration(
     const auto dataBSON = getDataBSON(dataConfig);
     const auto collection = createColl(dataBSON, operationContext());
 
+    // Ignore $expr semantics for now.
+    absl::flat_hash_set<FieldPath> exprPaths;
+
     for (auto samplingAlgoAndChunk : samplingAlgoAndChunks) {
         for (auto sampleSize : sampleSizes) {
             double actualSampleSize = translateSampleDefToActualSampleSize(sampleSize);
@@ -516,8 +519,8 @@ void SamplingAccuracyTest::runNDVSamplingEstimatorTestConfiguration(
                     samplingEstimator.generateSample(ce::NoProjection{});
 
 
-                    auto actualNDV = countNDV({fieldName}, dataBSON);
-                    auto estimatedNDV = samplingEstimator.estimateNDV({fieldName});
+                    auto actualNDV = countNDV({{.path = fieldName}}, dataBSON);
+                    auto estimatedNDV = samplingEstimator.estimateNDV({{.path = fieldName}});
 
                     errors.push_back({.actualNDV = actualNDV,
                                       .estimatedNDV = fmax(estimatedNDV.toDouble(), 1.0)});

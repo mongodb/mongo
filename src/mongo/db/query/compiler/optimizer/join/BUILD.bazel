@@ -45,6 +45,7 @@ mongo_cc_library(
     deps = [
         ":join_ordering",
         ":solution_storage",
+        "//src/mongo/db/query/compiler/ce:ce_common",
         "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
     ],

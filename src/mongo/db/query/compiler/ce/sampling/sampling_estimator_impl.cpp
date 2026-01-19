@@ -804,26 +804,26 @@ SamplingEstimatorImpl::SamplingEstimatorImpl(OperationContext* opCtx,
 SamplingEstimatorImpl::~SamplingEstimatorImpl() {}
 
 CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
-    const std::vector<FieldPath>& fieldNames) const {
+    const std::vector<FieldPathAndEqSemantics>& fields) const {
     tassert(11158504, "Sample must be generated before calling estimateNDV()", _isSampleGenerated);
 
     if (!_topLevelSampleFieldNames.empty()) {
-        for (const auto& fieldName : fieldNames) {
+        for (const auto& field : fields) {
             tassert(11158505,
                     "Sample must include the NDV fieldName as a top-level field.",
-                    _topLevelSampleFieldNames.contains(fieldName.front()));
+                    _topLevelSampleFieldNames.contains(field.path.front()));
         }
     }
 
     // Obtain the NDV for the sample. If this is equal to the sample size, don't bother with NR
     // iteration, since it is likely to diverge. The best guess is that each element in the
     // collection is unique.
-    size_t sampleNDV = countNDV(fieldNames, _sample);
+    size_t sampleNDV = countNDV(fields, _sample);
     if (sampleNDV == _sampleSize) {
         LOGV2_DEBUG(11228302,
                     5,
                     "SamplingCE NDV is equal to the sample size, outputting collection size",
-                    "fieldNames"_attr = fieldNames,
+                    "fields"_attr = fields,
                     "sampleNDV"_attr = sampleNDV,
                     "collectionCard"_attr = _collectionCard);
         return _collectionCard;
@@ -833,7 +833,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
     LOGV2_DEBUG(11158506,
                 5,
                 "SamplingCE ndv (# unique values) for field",
-                "fieldNames"_attr = fieldNames,
+                "fields"_attr = fields,
                 "sampleNDV"_attr = sampleNDV,
                 "estimate"_attr = estimate);
 
@@ -841,7 +841,7 @@ CardinalityEstimate SamplingEstimatorImpl::estimateNDV(
         LOGV2_DEBUG(11158507,
                     5,
                     "SamplingCE ndv exceeds collection size, rounding down",
-                    "fieldNames"_attr = fieldNames,
+                    "fields"_attr = fields,
                     "sampleNDV"_attr = sampleNDV,
                     "estimate"_attr = estimate,
                     "collectionCard"_attr = _collectionCard);

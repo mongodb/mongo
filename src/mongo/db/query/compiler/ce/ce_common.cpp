@@ -52,19 +52,24 @@ public:
 };
 }  // namespace
 
+BSONObj FieldPathAndEqSemantics::toBSON() const {
+    return BSON("path" << path.fullPath() << "isExprEq" << isExprEq);
+}
+
 // TODO SERVER-112198: Compute all NDVs in a single pass over the sample.
-size_t countNDV(const std::vector<FieldPath>& fieldNames, const std::vector<BSONObj>& docs) {
-    tassert(11214700, "Field names cannot be empty", !fieldNames.empty());
+size_t countNDV(const std::vector<FieldPathAndEqSemantics>& fields,
+                const std::vector<BSONObj>& docs) {
+    tassert(11214700, "Field names cannot be empty", !fields.empty());
     std::set<std::vector<BSONElement>, SameSizeVectorBSONElementCmp> distinctValues;
 
     std::vector<BSONElement> fieldsInDoc;
-    fieldsInDoc.reserve(fieldNames.size());
+    fieldsInDoc.reserve(fields.size());
 
     for (auto&& doc : docs) {
         fieldsInDoc.clear();
-        for (const auto& fieldName : fieldNames) {
+        for (const auto& field : fields) {
             // These "array behavior" settings ensure we stop and return any arrays we encounter.
-            const ElementPath eltPath(fieldName.fullPath(),
+            const ElementPath eltPath(field.path.fullPath(),
                                       ElementPath::LeafArrayBehavior::kNoTraversal,
                                       ElementPath::NonLeafArrayBehavior::kMatchSubpath);
             BSONElementIterator it(&eltPath, doc);
@@ -75,12 +80,19 @@ size_t countNDV(const std::vector<FieldPath>& fieldNames, const std::vector<BSON
             tassert(11158502,
                     "Encountered unexpected array in NDV computation",
                     elt.element().type() != BSONType::array);
-            fieldsInDoc.push_back(elt.element());
+            if (elt.element().isNull() && !field.isExprEq) {
+                // Use $eq equality semantics, which consider null & missing to be equal. We don't
+                // set this field in the doc when it is null, which results in us treating missing &
+                // null the same.
+                fieldsInDoc.push_back(BSONElement());
+            } else {
+                // Use $expr equality semantics.
+                fieldsInDoc.push_back(elt.element());
+            }
         }
 
-        tassert(11214701,
-                "Unexpected number of fields in tuple",
-                fieldsInDoc.size() == fieldNames.size());
+        tassert(
+            11214701, "Unexpected number of fields in tuple", fieldsInDoc.size() == fields.size());
         distinctValues.insert(fieldsInDoc);
     }
     return distinctValues.size();
