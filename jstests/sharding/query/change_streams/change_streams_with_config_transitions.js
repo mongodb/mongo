@@ -21,7 +21,7 @@ const kTransitionType = Object.freeze({
     fromDedicatedConfigServer: "transition from dedicated config server",
 });
 
-// Enum for the types of collection that may defined on test setup
+// Enum for the types of collection that may defined on test setup.
 const kCollSetupType = Object.freeze({unsharded: "unsharded collection", sharded: "sharded collection"});
 
 // Initial cluster topology.
@@ -35,7 +35,7 @@ const st = new ShardingTest({
 const configShardName = "config";
 const otherShardName = st.shard0.shardName === configShardName ? st.shard1.shardName : st.shard0.shardName;
 
-function runtTransitionTestCases(transitionType, watchMode, collSetupType) {
+function runTransitionTestCases(transitionType, watchMode, collSetupType) {
     jsTest.log(
         `Testing ${transitionType} against changestreams of mode ${watchMode} on a cluster with a ${collSetupType}.`,
     );
@@ -139,8 +139,8 @@ function runtTransitionTestCases(transitionType, watchMode, collSetupType) {
 
 for (let watchMode of Object.values(ChangeStreamWatchMode)) {
     for (let collSetupType of Object.values(kCollSetupType)) {
-        runtTransitionTestCases(kTransitionType.toDedicatedConfigServer, watchMode, collSetupType);
-        runtTransitionTestCases(kTransitionType.fromDedicatedConfigServer, watchMode, collSetupType);
+        runTransitionTestCases(kTransitionType.toDedicatedConfigServer, watchMode, collSetupType);
+        runTransitionTestCases(kTransitionType.fromDedicatedConfigServer, watchMode, collSetupType);
     }
 }
 
