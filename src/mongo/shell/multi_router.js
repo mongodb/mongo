@@ -194,6 +194,9 @@ function requiresBroadcast(cmd) {
     if (cmd.refreshLogicalSessionCacheNow) {
         return true;
     }
+    if (cmd.flushRouterConfig) {
+        return true;
+    }
     // setParameter is node-specific and in every core test the command sets the parameter on a mongos.
     // To run setParameter against a shard there are specific helpers to do so.
     // In production, a user must choose the node that requires that server parameter.
