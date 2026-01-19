@@ -1108,7 +1108,7 @@ error_codes:
   - {
       code: 470,
       name: StreamProcessorAtlasConnectionErrorDuringFirstStart,
-      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+      categories: [StreamProcessorRetryableError],
     }
   - {
       code: 471,
