@@ -1772,6 +1772,22 @@ def _impl(ctx):
         ],
     )
 
+    glibcxx_assertions_feature = feature(
+        name = "glibcxx_assertions",
+        # The v5 toolchain gcc reports several spurious array-bounds and
+        # stringop-overflow errors, particularly with _GLIBCXX_ASSERTIONS enabled, so this
+        # is only enabled for clang.
+        enabled = ctx.attr.dbg and ctx.attr.compiler == COMPILERS.CLANG,
+        flag_sets = [
+            flag_set(
+                actions = all_compile_actions,
+                flag_groups = [flag_group(flags = [
+                    "-D_GLIBCXX_ASSERTIONS",
+                ])],
+            ),
+        ],
+    )
+
     disable_warnings_for_third_party_libraries_clang_feature = feature(
         name = "disable_warnings_for_third_party_libraries_clang",
         enabled = ctx.attr.compiler == COMPILERS.CLANG,
@@ -1912,6 +1928,7 @@ def _impl(ctx):
         first_party_gcc_or_clang_warnings_feature,
         first_party_gcc_warnings_feature,
         trivial_auto_var_init_pattern_feature,
+        glibcxx_assertions_feature,
     ] + get_common_features(ctx) + [
         # These flags are at the bottom so they get applied after anything else.
         # These are things like the flags people apply directly on cc_library through copts/linkopts
