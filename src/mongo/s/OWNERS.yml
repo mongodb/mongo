@@ -38,7 +38,6 @@ filters:
       - 10gen/server-programmability
   - "service_entry_point*":
     approvers:
-      - 10gen/server-catalog-and-routing-routing-and-topology
       - 10gen/server-programmability
   - "balancer_configuration*":
     approvers:

@@ -3115,7 +3115,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/s/**/mongos.cpp @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/s/**/mongos_main* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/s/**/mongos_options_* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/s/**/service_entry_point* @10gen/server-catalog-and-routing-routing-and-topology @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/s/**/service_entry_point* @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/s/**/balancer_configuration* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/cluster_cursor_stats.cpp @10gen/query-execution-router @svc-auto-approve-bot
 /src/mongo/s/**/cluster_write* @10gen/query-execution-router @svc-auto-approve-bot
