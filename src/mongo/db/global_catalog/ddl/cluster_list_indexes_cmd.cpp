@@ -157,8 +157,8 @@ public:
                     // we'll use the CollectionRouter to handle StaleConfig errors but will ignore
                     // its RoutingContext. Instead, we'll use a CollectionRoutingInfoTargeter object
                     // to properly get the RoutingContext when the collection is timeseries.
-                    // TODO (SPM-3830) Use the RoutingContext provided by the CollectionRouter once
-                    // all timeseries collections become viewless.
+                    // TODO (SERVER-117193) Use the RoutingContext provided by the CollectionRouter
+                    // once all timeseries collections become viewless.
                     unusedRoutingCtx.skipValidation();
 
                     // The command's IDL definition permits namespace or UUID, but mongos requires a

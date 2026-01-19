@@ -49,6 +49,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/client/shard.h"
 #include "mongo/db/sharding_environment/shard_id.h"
+#include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_requests_sender.h"
@@ -129,7 +130,7 @@ bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
             // we'll use the CollectionRouter to handle StaleConfig errors but will ignore
             // its RoutingContext. Instead, we'll use a CollectionRoutingInfoTargeter object
             // to properly get the RoutingContext when the collection is timeseries.
-            // TODO (SPM-3830) Use the RoutingContext provided by the CollectionRouter once
+            // TODO (SERVER-117193) Use the RoutingContext provided by the CollectionRouter once
             // all timeseries collections become viewless.
             unusedRoutingCtx.skipValidation();
 
@@ -143,6 +144,17 @@ bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
                     // router cache is stale.
                     result.resetToEmpty();
 
+                    auto cmdToSend = [&] {
+                        if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
+                            return timeseries::makeTimeseriesCommand(
+                                cmdObj,
+                                nss,
+                                getName(),
+                                timeseries::kIsTimeseriesNamespaceFieldName);
+                        }
+                        return cmdObj;
+                    }();
+
                     auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                         opCtx,
                         routingCtx,
@@ -150,7 +162,7 @@ bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
                         applyReadWriteConcern(
                             opCtx,
                             this,
-                            CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
+                            CommandHelpers::filterCommandRequestForPassthrough(cmdToSend)),
                         ReadPreferenceSetting::get(opCtx),
                         Shard::RetryPolicy::kIdempotent,
                         query,

@@ -108,7 +108,7 @@ public:
                 // will ignore its RoutingContext. Instead, we'll use a
                 // CollectionRoutingInfoTargeter object to properly get the RoutingContext
                 // when the collection is timeseries.
-                // TODO (SPM-3830) Use the RoutingContext provided by the CollectionRouter
+                // TODO (SERVER-117193) Use the RoutingContext provided by the CollectionRouter
                 // once all timeseries collections become viewless.
                 unusedRoutingCtx.skipValidation();
 
@@ -124,7 +124,7 @@ public:
                             providedCmdObj,
                             nss,
                             getName(),
-                            CreateIndexesCommand::kIsTimeseriesNamespaceFieldName);
+                            timeseries::kIsTimeseriesNamespaceFieldName);
                     }
                     return providedCmdObj;
                 }();

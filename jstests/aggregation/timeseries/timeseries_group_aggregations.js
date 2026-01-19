@@ -73,7 +73,7 @@ function compareClassicAndBP(pipeline, allowDiskUse) {
 
     const classicResults = classicColl.aggregate(pipeline, {allowDiskUse}).toArray();
     // Clear the plan cache so each query is unaffected by state.
-    db.system.buckets[bpColl.getName()].getPlanCache().clear();
+    bpColl.getPlanCache().clear();
     const bpResults = bpColl.aggregate(pipeline, {allowDiskUse}).toArray();
 
     function errFn() {

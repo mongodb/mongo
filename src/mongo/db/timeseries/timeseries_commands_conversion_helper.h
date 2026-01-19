@@ -42,8 +42,13 @@ MONGO_MOD_PUBLIC;
 
 namespace mongo::timeseries {
 
+// TODO SERVER-101896 remove this constant once 9.0 becomes last LTS and all timeseries are viewless
+inline constexpr StringData kIsTimeseriesNamespaceFieldName = "isTimeseriesNamespace"_sd;
+
 /**
  * Returns a command object with time-series view namespace translated to bucket namespace.
+ *
+ * TODO SERVER-101896 remove this function once 9.0 becomes last LTS and all tiemseries are viewless
  */
 BSONObj makeTimeseriesCommand(const BSONObj& origCmd,
                               const NamespaceString& ns,
