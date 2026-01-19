@@ -160,6 +160,10 @@ function assertIsSupportedCommand(cmd) {
     }
     if (cmd.aggregate && Array.isArray(cmd.pipeline)) {
         for (const stage of cmd.pipeline) {
+            // stages might be null if the pipeline is malformed.
+            if (!stage) {
+                continue;
+            }
             if (stage.$currentOp && stage.$currentOp.localOps === true) {
                 throwCommandNotSupportedError(
                     "'$currentOp' with 'localOps: true'",

@@ -2,6 +2,10 @@
 import {dropWithoutImplicitRecreate} from "jstests/aggregation/extras/merge_helpers.js";
 import {assertArrayEq, generateCollection} from "jstests/aggregation/extras/utils.js";
 
+// TODO SERVER-45186 remove the mongos pinning once the underling issue is solved.
+// $out doesn't allow to output to a sharded collection. The check is based on routing informations, which can be stale.
+TestData.pinToSingleMongos = true;
+
 const source = db[`${jsTest.name()}_source`];
 source.drop();
 const target = db[`${jsTest.name()}_target`];

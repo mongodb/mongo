@@ -11,6 +11,11 @@
 import {getExplainedPipelineFromAggregation} from "jstests/aggregation/extras/utils.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
+// The test sets a failpoint on a specific mongos and expects subsequent commands to hit that same mongos.
+// In case of multiple mongos cluster fixture, force every command to run against the same one.
+// pinToSingleMongos due to configureFailPoint command.
+TestData.pinToSingleMongos = true;
+
 function checkResults(pipeline, expectedNumberOfStatesInPipeline) {
     FixtureHelpers.runCommandOnEachPrimary({
         db: admin,
@@ -46,6 +51,7 @@ function checkResults(pipeline, expectedNumberOfStatesInPipeline) {
 const dbName = "test";
 const testDB = db.getSiblingDB(dbName);
 const coll = testDB[jsTestName()];
+coll.drop();
 const admin = testDB.getSiblingDB("admin");
 
 let collection = [
