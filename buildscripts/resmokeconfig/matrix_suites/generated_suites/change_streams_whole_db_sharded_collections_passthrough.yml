@@ -34,6 +34,7 @@ executor:
       bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
+    num_mongos: 3
     num_shards: 2
   hooks:
     - class: CheckReplDBHash

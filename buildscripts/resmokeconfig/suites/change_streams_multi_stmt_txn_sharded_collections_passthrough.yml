@@ -69,3 +69,4 @@ executor:
         writePeriodicNoops: 1
         periodicNoopIntervalSecs: 1
     num_shards: 2
+    num_mongos: 3

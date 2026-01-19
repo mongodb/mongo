@@ -35,6 +35,7 @@ executor:
       bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
+    num_mongos: 3
     num_rs_nodes_per_shard: 2
     num_shards: 2
     old_bin_version: last_lts
