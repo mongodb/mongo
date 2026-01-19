@@ -550,15 +550,12 @@ class DropIndexCommand extends Command {
     }
 
     getChangeEvents(watchMode) {
-        // Use the OLD shard key (the index being dropped) to determine event count.
-        // When dropping an index after unshard, the old index still exists on all shards
-        // that had data before unshard. Each shard emits its own dropIndexes event.
         return generatePerShardIndexEvents(
             "dropIndexes",
             this.dbName,
             this.collName,
             this.collectionCtx.isSharded || false,
-            this.indexSpec, // Use old shard key, not current
+            this.collectionCtx.shardKeySpec || null,
             this.shardSet,
         );
     }

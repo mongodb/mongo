@@ -5,7 +5,7 @@
 
 /**
  * SingleChangeStreamMatcher - Matches events from a single change stream.
- * Supports tolerant matching for per-shard events that can arrive out of order.
+ * Validates that events arrive in the expected order.
  */
 class SingleChangeStreamMatcher {
     /**
@@ -14,60 +14,23 @@ class SingleChangeStreamMatcher {
     constructor(eventMatchers) {
         this.matchers = eventMatchers;
         this.index = 0;
-        this.deferred = []; // Per-shard events that arrived out of order
     }
 
     /**
-     * Consume deferred events that match subsequent expected events.
-     *
-     * In a sharded cluster, operations like createIndexes and dropIndexes execute
-     * independently on each shard, emitting separate events. These per-shard events
-     * may arrive interleaved with subsequent command events due to async execution:
-     *
-     *   Expected: [drop, drop, create, shard]  (2 drops from 2 shards)
-     *   Actual:   [drop, create, drop, shard]  (shard 2's drop arrives late)
-     *
-     * This method handles reordering by consuming deferred events that now match
-     * the current expected position after a successful match advances the index.
-     *
-     * @param {boolean} cursorClosed - Whether the cursor has been closed
-     */
-    _consumeDeferred(cursorClosed) {
-        let consumed = true;
-        while (consumed && this.index < this.matchers.length && this.deferred.length > 0) {
-            consumed = false;
-            const matcher = this.matchers[this.index];
-            for (let i = 0; i < this.deferred.length; i++) {
-                if (matcher.matches(this.deferred[i], cursorClosed)) {
-                    this.deferred.splice(i, 1);
-                    this.index++;
-                    consumed = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    /**
-     * Process a single change event.
-     * If matched, advances and tries to consume any deferred per-shard events.
-     * If not matched, defers the event (may be a per-shard event arriving early).
+     * Process a single change event. Advances to the next matcher if matched.
      * @param {Object} event - The change event to process
      * @param {boolean} cursorClosed - Whether the cursor has been closed
      * @returns {boolean} True if the event matched, false otherwise
      */
     matches(event, cursorClosed) {
         if (this.isDone()) {
-            return false; // Extra event beyond expected
+            return false;
         }
         const matcher = this.matchers[this.index];
         if (matcher.matches(event, cursorClosed)) {
             this.index++;
-            this._consumeDeferred(cursorClosed);
             return true;
         }
-        // Didn't match current expected - may be a per-shard event arriving early
-        this.deferred.push(event);
         return false;
     }
 
@@ -77,7 +40,7 @@ class SingleChangeStreamMatcher {
      * @param {boolean} cursorClosed - Whether the cursor has been closed
      */
     assertMatches(event, cursorClosed) {
-        assert(this.index < this.matchers.length, "No more expected events");
+        assert(!this.isDone(), "No more expected events");
         const matcher = this.matchers[this.index];
         assert(matcher.matches(event, cursorClosed), `Event mismatch at index ${this.index}`);
         this.index++;
@@ -85,11 +48,9 @@ class SingleChangeStreamMatcher {
 
     /**
      * Check if all expected events have been matched.
-     * Tries to consume any remaining deferred events before checking.
-     * @returns {boolean} True if all events matched
+     * @returns {boolean} True if all events matched, false otherwise
      */
     isDone() {
-        this._consumeDeferred(false);
         return this.index === this.matchers.length;
     }
 
