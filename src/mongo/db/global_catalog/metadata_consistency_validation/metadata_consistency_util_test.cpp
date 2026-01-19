@@ -805,6 +805,8 @@ TEST_F(MetadataConsistencyTest, FindInconsistentDurableDatabaseMetadataInShard) 
 
     assertOneInconsistencyFound(
         MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog, inconsistencies);
+    ASSERT_EQ(inconsistencies[0].getDetails().getStringField("reason"),
+              "BSON field 'DatabaseType.primary' is missing but a required field");
 }
 
 TEST_F(MetadataConsistencyTest, ShardUntrackedCollectionInconsistencyTest) {

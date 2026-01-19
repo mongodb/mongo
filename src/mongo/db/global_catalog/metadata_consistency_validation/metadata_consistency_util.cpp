@@ -668,11 +668,13 @@ std::vector<MetadataInconsistencyItem> checkDatabaseMetadataConsistencyInShardCa
     try {
         dbInShardCatalog =
             DatabaseType::parse(cursor->nextSafe().getOwned(), IDLParserContext("DatabaseType"));
-    } catch (const DBException&) {
+    } catch (const DBException& ex) {
+        MissingDatabaseMetadataInShardCatalogDetails details{
+            dbName, primaryShard, dbVersionInGlobalCatalog};
+        details.setReason(ex.reason());
         inconsistencies.emplace_back(
             makeInconsistency(MetadataInconsistencyTypeEnum::kMissingDatabaseMetadataInShardCatalog,
-                              MissingDatabaseMetadataInShardCatalogDetails{
-                                  dbName, primaryShard, dbVersionInGlobalCatalog}));
+                              std::move(details)));
         return inconsistencies;
     }
 

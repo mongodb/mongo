@@ -491,6 +491,10 @@ structs:
             dbVersionInGlobalCatalog:
                 description: "The database version of the global catalog."
                 type: database_version
+            reason:
+                description: "The reason why the entry is considered missing or corrupted."
+                type: string
+                optional: true
 
     MissingDatabaseMetadataInShardCatalogCacheDetails:
         description: "Details about a missing database metadata entry in the shard catalog cache compared to the one in global catalog"
