@@ -2,7 +2,7 @@
  * Tests metrics and logging for the maintenance port.
  *
  * @tags: [
- *   featureFlagDedicatedPortForMaintenanceOperations,
+ *   requires_fcv_83,
  * ]
  */
 import {describe, before, after, it} from "jstests/libs/mochalite.js";

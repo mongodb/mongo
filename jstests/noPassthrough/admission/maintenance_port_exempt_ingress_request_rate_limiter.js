@@ -5,7 +5,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   featureFlagDedicatedPortForMaintenanceOperations,
+ *   requires_fcv_83,
  * ]
  */
 

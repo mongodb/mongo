@@ -5,7 +5,7 @@
  * @tags: [
  *      grpc_incompatible,
  *      requires_sharding,
- *      featureFlagDedicatedPortForMaintenanceOperations,
+ *      requires_fcv_83,
  * ]
  */
 import {MaxConnsOverrideHelpers} from "jstests/noPassthrough/libs/max_conns_override_helpers.js";
