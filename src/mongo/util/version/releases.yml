@@ -64,6 +64,7 @@ eolVersions:
   - "7.1" # 2024-01
   - "7.2" # 2024-04
   - "7.3" # 2024-10
+  - "8.1" # 2025-09
 
 # Optional.
 # Using this special override extends FCV constant generation down to the previous value of
