@@ -357,3 +357,6 @@ etc/trimmed_system_perf.yml
 
 # Generated Typescript type declarations from IDLs
 src/mongo/shell/*_gen.d.ts
+
+# devcontainer uses pnpm which results in a large amount of environment files that aren't intended for git commits
+.pnpm-store
