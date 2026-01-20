@@ -246,6 +246,10 @@ public:
         // after optimizations. This metric is expected to be positive regardless of whether the
         // plan came from (e.g. multi-planner, cost-based ranker, plan cache).
         boost::optional<Microseconds> planningTime;
+
+        // Number of documents sampled by cost-based ranker (CBR) when using sampling method to pick
+        // the best plan.
+        boost::optional<long long> nDocsSampled;
     };
 
     MONGO_MOD_PRIVATE OpDebug() = default;

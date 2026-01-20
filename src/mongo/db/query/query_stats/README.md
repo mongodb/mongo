@@ -235,6 +235,9 @@ following way:
   any internal query generated as part of its execution did not use the plan cache.
 - `metrics.planningTimeMicros`: The wall-clock time in microseconds from the moment a planning
   request is received to the moment the winning plan is finalized. This metric is expected to be positive regardless of whether the plan came from (e.g. multi-planner, cost-based ranker, plan cache).
+- `metrics.costBasedRanker.nDocsSampled`: The number of documents sampled when using cost-based ranker (CBR)
+  with sampling method. This metric is expected to be 0 if CBR was not used to generate the plan or another CE
+  method was used, like histogram.
 - `metrics.bytesRead`: Various broken down statistics for the number of bytes read from disk while
   executing this query, including getMores.
 - `metrics.readingTime`: Various broken down statistics for the amount of time spent reading from disk

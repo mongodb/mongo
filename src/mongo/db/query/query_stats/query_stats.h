@@ -248,6 +248,7 @@ struct QueryStatsSnapshot {
     bool fromMultiPlanner;
     bool fromPlanCache;
     int64_t planningTimeMicros;
+    uint64_t nDocsSampled;
 
     uint64_t nMatched;
     uint64_t nUpserted;

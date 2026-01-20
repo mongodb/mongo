@@ -59,6 +59,7 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     fromMultiPlanner: true,
     fromPlanCache: true,
     planningTimeMicros: {"$numberLong": "0"},
+    nDocsSampled: {"$numberLong": "4"},
     cpuNanos: {"$numberLong": "18"},
     delinquentAcquisitions: {"$numberLong": "0"},
     totalAcquisitionDelinquencyMillis: {"$numberLong": "0"},
@@ -324,6 +325,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_TRUE(metrics.getFromMultiPlanner());
     ASSERT_TRUE(metrics.getFromPlanCache());
     ASSERT_EQ(metrics.getPlanningTimeMicros(), 0);
+    ASSERT_EQ(metrics.getNDocsSampled(), 4);
     ASSERT_EQ(metrics.getCpuNanos(), 18);
     ASSERT_EQ(metrics.getDelinquentAcquisitions(), 0);
     ASSERT_EQ(metrics.getTotalAcquisitionDelinquencyMillis(), 0);
@@ -374,6 +376,7 @@ TEST(CursorResponseTest, parseFromBSONCursorMetricsIncomplete) {
                                    CursorMetrics::kFromMultiPlannerFieldName,
                                    CursorMetrics::kFromPlanCacheFieldName,
                                    CursorMetrics::kPlanningTimeMicrosFieldName,
+                                   CursorMetrics::kNDocsSampledFieldName,
                                    CursorMetrics::kCpuNanosFieldName,
                                    CursorMetrics::kNumInterruptChecksFieldName,
                                    CursorMetrics::kNMatchedFieldName,
@@ -963,6 +966,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
                           true /* fromMultiPlanner */,
                           false /* fromPlanCache */,
                           26 /* planningTimeMicros */,
+                          15 /* nDocsSampled */,
                           -1 /* cpuNanos */,
                           15 /* numInterruptChecks */,
                           1 /* nMatched */,
@@ -999,6 +1003,7 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_TRUE(parsedMetrics->getFromMultiPlanner());
     ASSERT_FALSE(parsedMetrics->getFromPlanCache());
     ASSERT_EQ(parsedMetrics->getPlanningTimeMicros(), 26);
+    ASSERT_EQ(parsedMetrics->getNDocsSampled(), 15);
     ASSERT_EQ(parsedMetrics->getCpuNanos(), -1);
     ASSERT_EQ(parsedMetrics->getDelinquentAcquisitions(), 0);
     ASSERT_EQ(parsedMetrics->getTotalAcquisitionDelinquencyMillis(), 0);

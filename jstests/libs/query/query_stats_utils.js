@@ -489,7 +489,7 @@ export function getQueryPlannerMetrics(metrics) {
         return metrics[queryPlannerSectionName];
     }
 
-    // Include planningTimeMicros if present (when CBR feature flag is on).
+    // Include CBR metrics if present.
     const result = {
         hasSortStage: metrics.hasSortStage,
         usedDisk: metrics.usedDisk,
@@ -498,6 +498,9 @@ export function getQueryPlannerMetrics(metrics) {
     };
     if (metrics.hasOwnProperty("planningTimeMicros")) {
         result.planningTimeMicros = metrics.planningTimeMicros;
+    }
+    if (metrics.hasOwnProperty("costBasedRanker")) {
+        result.costBasedRanker = metrics.costBasedRanker;
     }
     return result;
 }

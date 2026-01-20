@@ -48,7 +48,7 @@ function validatePlanningTimeMicros(metrics) {
 /**
  * Runs the test suite against a specific topology.
  */
-function runPlanningTimeMicrosTests(topologyName, setupFn, teardownFn) {
+function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
     describe(`planningTimeMicros in query stats (${topologyName})`, function () {
         let fixture;
         let conn;
@@ -146,12 +146,101 @@ function runPlanningTimeMicrosTests(topologyName, setupFn, teardownFn) {
                 `planningTime (${planningTimeMillis}ms) should be >= failpoint delay (${waitTimeMillis}ms)`,
             );
 
+            // The costBasedRanker section should be present with 0 nDocsSampled and empty
+            // cardinalityEstimationMethods array when only multiplanning was used.
+            assert(
+                queryPlannerSection.hasOwnProperty("costBasedRanker"),
+                `costBasedRanker section should be present: ${tojson(queryPlannerSection)}`,
+            );
+            const cbrSection = queryPlannerSection.costBasedRanker;
+            assert.eq(
+                0,
+                cbrSection.nDocsSampled.sum,
+                `nDocsSampled should be empty when CBR not used: ${tojson(cbrSection)}`,
+            );
+
             failPoints.forEach((failPoint) => failPoint.off());
+        });
+
+        it("should have costBasedRanker section with nDocsSampled when CBR uses sampling to pick the best plan", function () {
+            // Choose maximum allowed margin of error (10%) and 95% CI for predictability.
+            // This should result in a sample size of 96 documents.
+            const samplingMarginOfError = 10.0;
+            const confidenceInterval = "95";
+            const zScore = 1.96; // Z-score for 95% confidence interval.
+
+            let previousPlanRankerMode;
+            let previousSequentialScanFlag;
+            let previousMarginOfError;
+            let previousConfidenceInterval;
+            try {
+                FixtureHelpers.mapOnEachShardNode({
+                    db: testDB.getSiblingDB("admin"),
+                    func: (db) => {
+                        previousPlanRankerMode = assert.commandWorked(
+                            db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"}),
+                        ).was;
+                        // Use sequential scan to make sampled documents deterministic for the assertion.
+                        previousSequentialScanFlag = assert.commandWorked(
+                            db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
+                        ).was;
+                        previousMarginOfError = assert.commandWorked(
+                            db.adminCommand({setParameter: 1, samplingMarginOfError: samplingMarginOfError}),
+                        ).was;
+                        previousConfidenceInterval = assert.commandWorked(
+                            db.adminCommand({setParameter: 1, samplingConfidenceInterval: confidenceInterval}),
+                        ).was;
+                    },
+                    primaryNodeOnly: true,
+                });
+
+                // Execute a query that will trigger the cost-based ranker sampling CE path.
+                coll.find({}).toArray();
+
+                // Verify that the nDocsSampled metric matches the expected sample size for the given margin of error and confidence interval.
+                const stats = getQueryStats(conn, {collName: collName});
+                const queryPlannerSection = getQueryPlannerMetrics(stats[0].metrics);
+                const cbrSection = queryPlannerSection.costBasedRanker;
+
+                const expectedSampleSize = Math.round(zScore ** 2 / ((2 * samplingMarginOfError) / 100.0) ** 2);
+                const nDocsSampled = Number(cbrSection.nDocsSampled.sum);
+                assert.eq(
+                    nDocsSampled,
+                    expectedSampleSize,
+                    `Expected nDocsSampled == ${expectedSampleSize} (CI=${confidenceInterval}%, MoE=${samplingMarginOfError}%) but got ${tojson(cbrSection)}`,
+                );
+            } finally {
+                // Reset knobs to defaults on all nodes.
+                FixtureHelpers.mapOnEachShardNode({
+                    db: testDB.getSiblingDB("admin"),
+                    func: (db) => {
+                        assert.commandWorked(
+                            db.adminCommand({setParameter: 1, planRankerMode: previousPlanRankerMode}),
+                        );
+                        assert.commandWorked(
+                            db.adminCommand({
+                                setParameter: 1,
+                                internalQuerySamplingBySequentialScan: previousSequentialScanFlag,
+                            }),
+                        );
+                        assert.commandWorked(
+                            db.adminCommand({setParameter: 1, samplingMarginOfError: previousMarginOfError}),
+                        );
+                        assert.commandWorked(
+                            db.adminCommand({
+                                setParameter: 1,
+                                samplingConfidenceInterval: previousConfidenceInterval,
+                            }),
+                        );
+                    },
+                    primaryNodeOnly: true,
+                });
+            }
         });
     });
 }
 
-runPlanningTimeMicrosTests(
+runCBRMetricsTests(
     "Standalone",
     () => {
         const conn = MongoRunner.runMongod({
@@ -163,7 +252,7 @@ runPlanningTimeMicrosTests(
     (fixture) => MongoRunner.stopMongod(fixture),
 );
 
-runPlanningTimeMicrosTests(
+runCBRMetricsTests(
     "Sharded",
     () => {
         const st = new ShardingTest({

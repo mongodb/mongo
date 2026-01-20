@@ -100,6 +100,15 @@ struct QueryExecEntry {
     AggregatedMetric<int64_t> overdueInterruptApproxMaxMillis;
 };
 
+struct CostBasedRankerEntry {
+    void toBSON(BSONObjBuilder& queryStatsBuilder) const;
+
+    /**
+     * Aggregates the number of documents sampled by the cost-based ranker.
+     */
+    AggregatedMetric<uint64_t> nDocsSampled;
+};
+
 struct QueryPlannerEntry {
     void toBSON(BSONObjBuilder& queryStatsBuilder,
                 bool buildAsSubsection,
@@ -129,6 +138,12 @@ struct QueryPlannerEntry {
      * Aggregates the planning time in microseconds including getMore requests.
      */
     AggregatedMetric<int64_t> planningTimeMicros;
+
+    /**
+     * Query stats relevant to the cost based ranker. This is only
+     * collected if includeCBRMetrics is true.
+     */
+    CostBasedRankerEntry costBasedRankerStats;
 };
 
 struct WritesEntry {

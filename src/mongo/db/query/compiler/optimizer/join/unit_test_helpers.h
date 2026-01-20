@@ -178,6 +178,10 @@ public:
         return _collCard.toDouble();
     }
 
+    size_t getSampleSize() const override {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     CardinalityEstimate _collCard;
     stdx::unordered_map<std::vector<FieldPath>, CardinalityEstimate> _fakeEstimates;

@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/plan_ranking/cbr_plan_ranking.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 #include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
@@ -82,6 +83,9 @@ StatusWith<QueryPlanner::PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
             topLevelSampleFieldNames.empty()
                 ? ce::ProjectionParams{ce::NoProjection{}}
                 : ce::TopLevelFieldsProjection{std::move(topLevelSampleFieldNames)});
+
+        auto n = samplingEstimator->getSampleSize();
+        CurOp::get(opCtx)->debug().getAdditiveMetrics().nDocsSampled = static_cast<uint64_t>(n);
     }
 
     return QueryPlanner::planWithCostBasedRanking(query,

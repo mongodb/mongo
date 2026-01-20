@@ -1543,6 +1543,9 @@ struct QueryStatsBSONParams {
     BSONObj nMatched = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj nModified = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj planningTimeMicros = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
+
+    // CBR-specific metrics.
+    BSONObj nDocsSampled = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
 };
 
 void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& params = {}) {
@@ -1596,6 +1599,9 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
 
     if (params.includeCBRMetrics) {
         subsectionBuilder->append("planningTimeMicros", params.planningTimeMicros);
+
+        BSONObjBuilder cbrStatsBuilder = subsectionBuilder->subobjStart("costBasedRanker");
+        cbrStatsBuilder.append("nDocsSampled", params.nDocsSampled);
     }
 
     if (params.useSubsections) {
@@ -1701,10 +1707,11 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
             metrics->execCount += 1;
             metrics->lastExecutionMicros += 100;
             metrics->queryPlannerStats.planningTimeMicros.aggregate(500);
+            metrics->queryPlannerStats.costBasedRankerStats.nDocsSampled.aggregate(15);
         }
 
         // With CBR metrics.
-        // TODO SERVER-115607 and SERVER-SERVER-115606 Add cases for nDocsSampled and CE method.
+        // TODO SERVER-115606 Add case for CE method.
         {
             auto qse3 = getMetrics(query1);
             verifyQueryStatsBSON(qse3,
@@ -1719,6 +1726,7 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
                                      .nMatched = intMetricBson(1, 1, 1, 1),
                                      .nModified = intMetricBson(1, 1, 1, 1),
                                      .planningTimeMicros = intMetricBson(500, 500, 500, 250000),
+                                     .nDocsSampled = intMetricBson(15, 15, 15, 225),
                                  });
         }
     }

@@ -105,6 +105,8 @@ public:
         const std::vector<FieldPathAndEqSemantics>& fields) const = 0;
 
     virtual double getCollCard() const = 0;
+
+    virtual size_t getSampleSize() const = 0;
 };
 
 }  // namespace mongo::ce
