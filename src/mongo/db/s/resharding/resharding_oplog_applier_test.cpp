@@ -1195,11 +1195,6 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApplyBasic) {
 TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_EmptyBatch) {
     auto batchSize = 2;
 
-    // Not set the 'reshardingRemainingTimeEstimateBasedOnMovingAverage' server parameter to verify
-    // that it defaults to true.
-    const RAIIServerParameterControllerForTest movingAvgFeatureFlagRAII{
-        "featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage", true};
-
     // Verify that the average started out uninitialized.
     ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(sourceId().getShardId()));
 
@@ -1228,11 +1223,6 @@ TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_EmptyBatch) {
 
 TEST_F(ReshardingOplogApplierTest, UpdateAverageTimeToApply_ClockSkew) {
     auto batchSize = 2;
-
-    // Not set the 'reshardingRemainingTimeEstimateBasedOnMovingAverage' server parameter to verify
-    // that it defaults to true.
-    const RAIIServerParameterControllerForTest movingAvgFeatureFlagRAII{
-        "featureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage", true};
 
     // Verify that the average started out uninitialized.
     ASSERT_FALSE(metrics()->getAverageTimeToApplyOplogEntries(sourceId().getShardId()));

@@ -135,7 +135,8 @@ feature_flags:
             "Feature flag to enable using exponential moving average when estimating the
             remaining time to reach strict consistency."
         cpp_varname: gFeatureFlagReshardingRemainingTimeEstimateBasedOnMovingAverage
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
     featureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites:
         mod_visibility: public
