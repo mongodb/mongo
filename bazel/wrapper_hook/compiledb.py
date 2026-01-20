@@ -4,6 +4,7 @@ import json
 import os
 import pathlib
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,18 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise, atlas):
         output_base = pathlib.Path(info_proc.stdout.strip() + "_bazel_compiledb")
         os.makedirs(REPO_ROOT / ".compiledb", exist_ok=True)
         symlink_prefix = REPO_ROOT / ".compiledb" / "compiledb-"
+        # Prefer real paths in compile_commands.json (avoid symlink forest paths like
+        # ".compiledb/compiledb-out/..."). We resolve the symlink targets once and
+        # substitute those roots when rewriting args.
+        symlink_out_root = pathlib.Path(f"{symlink_prefix}out")
+        real_out_root = pathlib.Path(os.path.realpath(symlink_out_root))
+        # "external" sits alongside "bazel-out" under the execroot.
+        real_external_root = pathlib.Path(
+            os.path.realpath(real_out_root / ".." / ".." / ".." / "external")
+        )
+        # Use forward slashes consistently in compile_commands.json across platforms.
+        real_out_root_str = real_out_root.as_posix()
+        real_external_root_str = real_external_root.as_posix()
 
     compiledb_bazelrc = []
     compiledb_config = []
@@ -128,20 +141,47 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise, atlas):
             )
 
         if persistent_compdb:
+            # We need to adjust the args so actions can be runnable locally
             args = []
             for arg in action["arguments"]:
                 if arg.startswith("bazel-out/"):
-                    arg = f"{symlink_prefix}out" + arg[len("bazel-out/") :]
+                    arg = real_out_root_str + "/" + arg[len("bazel-out/") :]
                 elif arg.startswith("external/"):
-                    arg = f"{symlink_prefix}out/../../../external/" + arg[len("external/") :]
+                    arg = real_external_root_str + "/" + arg[len("external/") :]
+                else:
+                    # Preserve compiler prefixes while rewriting paths.
+                    m = re.match(r"^(/external:I)(bazel-out|external)/(.*)$", arg)
+                    if m:
+                        prefix, root, rest = m.groups()
+                        if root == "bazel-out":
+                            arg = f"{prefix}{real_out_root_str}/{rest}"
+                        else:
+                            arg = f"{prefix}{real_external_root_str}/{rest}"
+                    else:
+                        m = re.match(r"^(-isystem)(bazel-out|external)/(.*)$", arg)
+                        if m:
+                            prefix, root, rest = m.groups()
+                            if root == "bazel-out":
+                                arg = f"{prefix}{real_out_root_str}/{rest}"
+                            else:
+                                arg = f"{prefix}{real_external_root_str}/{rest}"
+                        else:
+                            # Generic: preserve any two-character prefix (e.g. "-I", "/I").
+                            m = re.match(r"^(.{2})(bazel-out|external)/(.*)$", arg)
+                            if m:
+                                prefix, root, rest = m.groups()
+                                if root == "bazel-out":
+                                    arg = f"{prefix}{real_out_root_str}/{rest}"
+                                else:
+                                    arg = f"{prefix}{real_external_root_str}/{rest}"
                 args.append(arg)
 
             output_json.append(
                 {
-                    "file": input_file.replace("bazel-out", f"{symlink_prefix}out"),
+                    "file": input_file.replace("bazel-out", real_out_root_str),
                     "arguments": args,
                     "directory": repo_root_resolved,
-                    "output": output_file.replace("bazel-out", f"{symlink_prefix}out"),
+                    "output": output_file.replace("bazel-out", real_out_root_str),
                 }
             )
         else:
