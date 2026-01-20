@@ -5,6 +5,7 @@
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 // Drop and recreate collections to assure a clean run.
 const collName = "report_post_batch_resume_token";
@@ -156,21 +157,25 @@ if (FixtureHelpers.isSharded(testCollection) && rcCmdRes.code === ErrorCodes.Rea
     quit();
 }
 
-// Test that the PBRT is correctly updated when reading events from within a transaction.
-const session = db.getMongo().startSession();
-const sessionDB = session.getDatabase(db.getName());
+withRetryOnTransientTxnError(() => {
+    // Test that the PBRT is correctly updated when reading events from within a transaction.
+    const session = db.getMongo().startSession();
 
-const sessionColl = sessionDB[testCollection.getName()];
-const sessionOtherColl = sessionDB[otherCollection.getName()];
-session.startTransaction();
+    const sessionDB = session.getDatabase(db.getName());
 
-// Write 3 documents to testCollection and 1 to the unrelated collection within the transaction.
-for (let i = 0; i < 3; ++i) {
-    assert.commandWorked(sessionColl.insert({_id: docId++}));
-}
-assert.commandWorked(sessionOtherColl.insert({_id: docId}));
-assert.commandWorked(session.commitTransaction_forTesting());
-session.endSession();
+    const sessionColl = sessionDB[testCollection.getName()];
+    const sessionOtherColl = sessionDB[otherCollection.getName()];
+
+    session.startTransaction();
+
+    // Write 3 documents to testCollection and 1 to the unrelated collection within the transaction.
+    for (let i = 0; i < 3; ++i) {
+        assert.commandWorked(sessionColl.insert({_id: docId++}));
+    }
+    assert.commandWorked(sessionOtherColl.insert({_id: docId}));
+    assert.commandWorked(session.commitTransaction_forTesting());
+    session.endSession();
+});
 
 // Grab the next 2 events, which should be the first 2 events in the transaction. As of SERVER-37364
 // the co-ordinator of a distributed transaction returns before all participants have acknowledged

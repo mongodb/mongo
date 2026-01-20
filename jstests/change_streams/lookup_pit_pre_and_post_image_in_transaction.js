@@ -10,6 +10,7 @@ import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recr
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ChangeStreamTest} from "jstests/libs/query/change_stream_util.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const cst = new ChangeStreamTest(testDB);
@@ -61,10 +62,12 @@ function getCollections(db) {
 }
 
 jsTestLog("Testing a transaction consisting of a single 'applyOps' entry.");
-TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
-    assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
-    assert.commandWorked(coll.replaceOne({_id: 2}, {a: "Long string"}));
-    assert.commandWorked(coll.deleteOne({_id: 3}));
+withRetryOnTransientTxnError(() => {
+    TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
+        assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
+        assert.commandWorked(coll.replaceOne({_id: 2}, {a: "Long string"}));
+        assert.commandWorked(coll.deleteOne({_id: 3}));
+    });
 });
 assertChangeEventsReturned(changeStreamCursor, [
     {_id: 1, operationType: "update", preImage: {_id: 1, a: 1}, postImage: {_id: 1, a: 2}},
@@ -81,19 +84,22 @@ jsTestLog("Testing a transaction consisting of multiple 'applyOps' entries.");
 const largeStringSizeInBytes = 15 * 1024 * 1024;
 const largeString = "b".repeat(largeStringSizeInBytes);
 assert.commandWorked(coll.insert([{_id: 3, a: 1}]));
-TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
-    assert.commandWorked(otherColl.insert({b: largeString}));
-    assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
+withRetryOnTransientTxnError(() => {
+    TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
+        assert.commandWorked(otherColl.insert({b: largeString}));
+        assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
 
-    assert.commandWorked(otherColl.insert({b: largeString}));
-    assert.commandWorked(coll.replaceOne({_id: 2}, {a: 1}));
+        assert.commandWorked(otherColl.insert({b: largeString}));
+        assert.commandWorked(coll.replaceOne({_id: 2}, {a: 1}));
 
-    // Issue a second modification operation on the same document within the transaction.
-    assert.commandWorked(coll.updateOne({_id: 2}, {$inc: {a: 1}}));
+        // Issue a second modification operation on the same document within the transaction.
+        assert.commandWorked(coll.updateOne({_id: 2}, {$inc: {a: 1}}));
 
-    assert.commandWorked(coll.deleteOne({_id: 3}));
-    assert.commandWorked(otherColl.insert({b: largeString}));
+        assert.commandWorked(coll.deleteOne({_id: 3}));
+        assert.commandWorked(otherColl.insert({b: largeString}));
+    });
 });
+
 assertChangeEventsReturned(changeStreamCursor, [
     {_id: 3, operationType: "insert", postImage: {_id: 3, a: 1}},
     {_id: 1, operationType: "update", preImage: {_id: 1, a: 2}, postImage: {_id: 1, a: 3}},
@@ -111,9 +117,11 @@ jsTestLog("Testing a transaction consisting of multiple 'applyOps' entries with 
 const largePreImageSizeInBytes = 7 * 1024 * 1024;
 const largePreImageValue = "c".repeat(largePreImageSizeInBytes);
 assert.commandWorked(coll.insert([{_id: 3, a: largePreImageValue}]));
-TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
-    assert.commandWorked(coll.updateOne({_id: 3}, {$set: {b: 1}}));
-    assert.commandWorked(coll.deleteOne({_id: 3}));
+withRetryOnTransientTxnError(() => {
+    TxnUtil.runInTransaction(testDB, getCollections, function (db, {coll, otherColl}) {
+        assert.commandWorked(coll.updateOne({_id: 3}, {$set: {b: 1}}));
+        assert.commandWorked(coll.deleteOne({_id: 3}));
+    });
 });
 assertChangeEventsReturned(changeStreamCursor, [
     {_id: 3, operationType: "insert", postImage: {_id: 3, a: largePreImageValue}},
