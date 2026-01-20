@@ -5,13 +5,13 @@
 ```
 ### Results
 ```json
-{  "_id" : 0,  "num" : 1,  "sub" : {  "num" : 5 } }
-{  "_id" : 1,  "num" : 100,  "sub" : {  "num" : 5 } }
-{  "_id" : 11,  "str" : "1",  "sub" : {  "num" : 9 } }
-{  "_id" : 12,  "str" : "not_matching",  "sub" : {  "num" : 9 } }
-{  "_id" : 13,  "str" : "1",  "sub" : {  "num" : 11 } }
-{  "_id" : 3,  "num" : 1,  "sub" : [ { "num" : 5 } ] }
-{  "_id" : 5,  "num" : 1,  "sub" : {  "num" : [ 5 ] } }
+{ "_id" : 0, "num" : 1, "sub" : { "num" : 5 } }
+{ "_id" : 1, "num" : 100, "sub" : { "num" : 5 } }
+{ "_id" : 11, "str" : "1", "sub" : { "num" : 9 } }
+{ "_id" : 12, "str" : "not_matching", "sub" : { "num" : 9 } }
+{ "_id" : 13, "str" : "1", "sub" : { "num" : 11 } }
+{ "_id" : 3, "num" : 1, "sub" : [ { "num" : 5 } ] }
+{ "_id" : 5, "num" : 1, "sub" : { "num" : [ 5 ] } }
 ```
 ### Index Scans
 ```json
@@ -45,9 +45,9 @@
 ```
 ### Results
 ```json
-{  "_id" : 0,  "num" : 1,  "sub" : {  "num" : 5 } }
-{  "_id" : 3,  "num" : 1,  "sub" : [ { "num" : 5 } ] }
-{  "_id" : 5,  "num" : 1,  "sub" : {  "num" : [ 5 ] } }
+{ "_id" : 0, "num" : 1, "sub" : { "num" : 5 } }
+{ "_id" : 3, "num" : 1, "sub" : [ { "num" : 5 } ] }
+{ "_id" : 5, "num" : 1, "sub" : { "num" : [ 5 ] } }
 ```
 ### Index Scans
 ```json
@@ -90,7 +90,7 @@
 ```
 ### Results
 ```json
-{  "_id" : 3,  "num" : 1,  "sub" : [ { "num" : 5 } ] }
+{ "_id" : 3, "num" : 1, "sub" : [ { "num" : 5 } ] }
 ```
 ### Index Scans
 ```json
@@ -124,7 +124,7 @@
 ```
 ### Results
 ```json
-{  "_id" : 5,  "num" : 1,  "sub" : {  "num" : [ 5 ] } }
+{ "_id" : 5, "num" : 1, "sub" : { "num" : [ 5 ] } }
 ```
 ### Index Scans
 ```json
@@ -158,11 +158,11 @@
 ```
 ### Results
 ```json
-{  "_id" : 0,  "num" : 1,  "sub" : {  "num" : 5 } }
-{  "_id" : 2,  "num" : 1,  "sub" : {  "num" : 0 } }
-{  "_id" : 3,  "num" : 1,  "sub" : [ { "num" : 5 } ] }
-{  "_id" : 4,  "num" : 1,  "sub" : [ { "num" : 0 } ] }
-{  "_id" : 5,  "num" : 1,  "sub" : {  "num" : [ 5 ] } }
+{ "_id" : 0, "num" : 1, "sub" : { "num" : 5 } }
+{ "_id" : 2, "num" : 1, "sub" : { "num" : 0 } }
+{ "_id" : 3, "num" : 1, "sub" : [ { "num" : 5 } ] }
+{ "_id" : 4, "num" : 1, "sub" : [ { "num" : 0 } ] }
+{ "_id" : 5, "num" : 1, "sub" : { "num" : [ 5 ] } }
 ```
 ### Index Scans
 ```json
@@ -193,9 +193,9 @@
 ```
 ### Results
 ```json
-{  "_id" : 0,  "num" : 1,  "sub" : {  "num" : 5 } }
-{  "_id" : 3,  "num" : 1,  "sub" : [ { "num" : 5 } ] }
-{  "_id" : 5,  "num" : 1,  "sub" : {  "num" : [ 5 ] } }
+{ "_id" : 0, "num" : 1, "sub" : { "num" : 5 } }
+{ "_id" : 3, "num" : 1, "sub" : [ { "num" : 5 } ] }
+{ "_id" : 5, "num" : 1, "sub" : { "num" : [ 5 ] } }
 ```
 ### Index Scans
 ```json
@@ -240,15 +240,15 @@
 ```
 ### Results
 ```json
-{  "_id" : 0,  "num" : 1,  "sub" : {  "num" : 5 } }
-{  "_id" : 1,  "num" : 100,  "sub" : {  "num" : 5 } }
-{  "_id" : 11,  "str" : "1",  "sub" : {  "num" : 9 } }
-{  "_id" : 12,  "str" : "not_matching",  "sub" : {  "num" : 9 } }
-{  "_id" : 13,  "str" : "1",  "sub" : {  "num" : 11 } }
-{  "_id" : 2,  "num" : 1,  "sub" : {  "num" : 0 } }
-{  "_id" : 3,  "num" : 1,  "sub" : [ { "num" : 5 } ] }
-{  "_id" : 4,  "num" : 1,  "sub" : [ { "num" : 0 } ] }
-{  "_id" : 5,  "num" : 1,  "sub" : {  "num" : [ 5 ] } }
+{ "_id" : 0, "num" : 1, "sub" : { "num" : 5 } }
+{ "_id" : 1, "num" : 100, "sub" : { "num" : 5 } }
+{ "_id" : 11, "str" : "1", "sub" : { "num" : 9 } }
+{ "_id" : 12, "str" : "not_matching", "sub" : { "num" : 9 } }
+{ "_id" : 13, "str" : "1", "sub" : { "num" : 11 } }
+{ "_id" : 2, "num" : 1, "sub" : { "num" : 0 } }
+{ "_id" : 3, "num" : 1, "sub" : [ { "num" : 5 } ] }
+{ "_id" : 4, "num" : 1, "sub" : [ { "num" : 0 } ] }
+{ "_id" : 5, "num" : 1, "sub" : { "num" : [ 5 ] } }
 ```
 ### Index Scans
 ```json
@@ -305,10 +305,10 @@
 ```
 ### Results
 ```json
-{  "_id" : 0,  "num" : 1,  "sub" : {  "num" : 5 } }
-{  "_id" : 11,  "str" : "1",  "sub" : {  "num" : 9 } }
-{  "_id" : 3,  "num" : 1,  "sub" : [ { "num" : 5 } ] }
-{  "_id" : 5,  "num" : 1,  "sub" : {  "num" : [ 5 ] } }
+{ "_id" : 0, "num" : 1, "sub" : { "num" : 5 } }
+{ "_id" : 11, "str" : "1", "sub" : { "num" : 9 } }
+{ "_id" : 3, "num" : 1, "sub" : [ { "num" : 5 } ] }
+{ "_id" : 5, "num" : 1, "sub" : { "num" : [ 5 ] } }
 ```
 ### Index Scans
 ```json
@@ -388,15 +388,15 @@
 ```
 ### Results
 ```json
-{  "_id" : 0,  "num" : 1,  "sub" : {  "num" : 5 } }
-{  "_id" : 1,  "num" : 100,  "sub" : {  "num" : 5 } }
-{  "_id" : 11,  "str" : "1",  "sub" : {  "num" : 9 } }
-{  "_id" : 12,  "str" : "not_matching",  "sub" : {  "num" : 9 } }
-{  "_id" : 13,  "str" : "1",  "sub" : {  "num" : 11 } }
-{  "_id" : 2,  "num" : 1,  "sub" : {  "num" : 0 } }
-{  "_id" : 3,  "num" : 1,  "sub" : [ { "num" : 5 } ] }
-{  "_id" : 4,  "num" : 1,  "sub" : [ { "num" : 0 } ] }
-{  "_id" : 5,  "num" : 1,  "sub" : {  "num" : [ 5 ] } }
+{ "_id" : 0, "num" : 1, "sub" : { "num" : 5 } }
+{ "_id" : 1, "num" : 100, "sub" : { "num" : 5 } }
+{ "_id" : 11, "str" : "1", "sub" : { "num" : 9 } }
+{ "_id" : 12, "str" : "not_matching", "sub" : { "num" : 9 } }
+{ "_id" : 13, "str" : "1", "sub" : { "num" : 11 } }
+{ "_id" : 2, "num" : 1, "sub" : { "num" : 0 } }
+{ "_id" : 3, "num" : 1, "sub" : [ { "num" : 5 } ] }
+{ "_id" : 4, "num" : 1, "sub" : [ { "num" : 0 } ] }
+{ "_id" : 5, "num" : 1, "sub" : { "num" : [ 5 ] } }
 ```
 ### Index Scans
 ```json
@@ -456,10 +456,10 @@
 ```
 ### Results
 ```json
-{  "_id" : 0,  "num" : 0,  "str" : "myRegex",  "z" : 0 }
-{  "_id" : 1,  "num" : 100,  "str" : "not_matching",  "z" : 1 }
-{  "_id" : 2,  "num" : 0,  "str" : "not_matching",  "z" : 1 }
-{  "_id" : 3,  "num" : 100,  "str" : "myRegex",  "z" : 1 }
+{ "_id" : 0, "num" : 0, "str" : "myRegex", "z" : 0 }
+{ "_id" : 1, "num" : 100, "str" : "not_matching", "z" : 1 }
+{ "_id" : 2, "num" : 0, "str" : "not_matching", "z" : 1 }
+{ "_id" : 3, "num" : 100, "str" : "myRegex", "z" : 1 }
 ```
 ### Index Scans
 ```json

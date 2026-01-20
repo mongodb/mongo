@@ -25,11 +25,11 @@
 ```
 ### Results
 ```json
-{  "_id" : 1 }
-{  "_id" : 2 }
-{  "_id" : 3 }
-{  "_id" : 4 }
-{  "_id" : 7 }
+{ "_id" : 1 }
+{ "_id" : 2 }
+{ "_id" : 3 }
+{ "_id" : 4 }
+{ "_id" : 7 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -105,11 +105,11 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{  "_id" : 1 }
-{  "_id" : 2 }
-{  "_id" : 3 }
-{  "_id" : 4 }
-{  "_id" : 7 }
+{ "_id" : 1 }
+{ "_id" : 2 }
+{ "_id" : 3 }
+{ "_id" : 4 }
+{ "_id" : 7 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -227,11 +227,11 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{  "_id" : 1,  "firstField" : 1 }
-{  "_id" : 2,  "firstField" : 3 }
-{  "_id" : 3,  "firstField" : 7 }
-{  "_id" : 4,  "firstField" : 2 }
-{  "_id" : 7,  "firstField" : 1 }
+{ "_id" : 1, "firstField" : 1 }
+{ "_id" : 2, "firstField" : 3 }
+{ "_id" : 3, "firstField" : 7 }
+{ "_id" : 4, "firstField" : 2 }
+{ "_id" : 7, "firstField" : 1 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -316,11 +316,11 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{  "_id" : 1,  "firstField" : 1 }
-{  "_id" : 2,  "firstField" : 3 }
-{  "_id" : 3,  "firstField" : 7 }
-{  "_id" : 4,  "firstField" : 2 }
-{  "_id" : 7,  "firstField" : 1 }
+{ "_id" : 1, "firstField" : 1 }
+{ "_id" : 2, "firstField" : 3 }
+{ "_id" : 3, "firstField" : 7 }
+{ "_id" : 4, "firstField" : 2 }
+{ "_id" : 7, "firstField" : 1 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -431,11 +431,11 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{  "_id" : 1,  "firstField" : 1 }
-{  "_id" : 2,  "firstField" : 3 }
-{  "_id" : 3,  "firstField" : 7 }
-{  "_id" : 4,  "firstField" : 2 }
-{  "_id" : 7,  "firstField" : 1 }
+{ "_id" : 1, "firstField" : 1 }
+{ "_id" : 2, "firstField" : 3 }
+{ "_id" : 3, "firstField" : 7 }
+{ "_id" : 4, "firstField" : 2 }
+{ "_id" : 7, "firstField" : 1 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -603,9 +603,9 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{  "_id" : 1 }
-{  "_id" : 2 }
-{  "_id" : 3 }
+{ "_id" : 1 }
+{ "_id" : 2 }
+{ "_id" : 3 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -760,8 +760,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{  "_id" : 2 }
-{  "_id" : 4 }
+{ "_id" : 2 }
+{ "_id" : 4 }
 ```
 ### Summarized explain
 Execution Engine: sbe
