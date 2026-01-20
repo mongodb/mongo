@@ -188,24 +188,43 @@ private:
 };
 
 /**
- * Tests that assert on join order enumeration but not the winning plan typically need
- * statistics that will provide consistent CE results, but they need not be meaningful.
- * This helper gives all node sets representing bitset 'b' a CE of b.to_ullong().
+ * Fake implementation of JoinCardinalityEstimator useful for tests which need to inject artificial
+ * cardinality estimates to verify the behavior of other components in isolation.
  */
-class FakeJoinCardinalityEstimator : public JoinCardinalityEstimator {
+class FakeJoinCardinalityEstimator final : public JoinCardinalityEstimator {
 public:
+    /**
+     * This constructor causes the fake to return consistent but not meaningful CE results for
+     * 'getOrEstimateSubsetCardinality()'. This is useful for enumeration tests.
+     */
     FakeJoinCardinalityEstimator(const JoinReorderingContext& jCtx)
         : JoinCardinalityEstimator(
               jCtx,
               EdgeSelectivities(jCtx.joinGraph.numEdges(), cost_based_ranker::zeroSel),
               NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::oneCE),
-              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::zeroCE)) {};
+              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::zeroCE)) {
+        for (uint64_t i = 0; i < std::pow(2, jCtx.joinGraph.numNodes()); ++i) {
+            _subsetCardinalities.emplace(
+                NodeSet{i},
+                // Convert the bitset to a double to get a consistent estimate.
+                CardinalityEstimate{CardinalityType{static_cast<double>(i)},
+                                    EstimationSource::Code});
+        }
+    }
 
-    cost_based_ranker::CardinalityEstimate getOrEstimateSubsetCardinality(
-        const NodeSet& nodes) override {
-        return cost_based_ranker::CardinalityEstimate(
-            cost_based_ranker::CardinalityType(nodes.to_ullong()),
-            cost_based_ranker::EstimationSource::Code);
+    /**
+     * This constuctor allows the caller to control the results of
+     * 'getOrEstimateSubsetCardinality()' and 'getCollCardinality()'.
+     */
+    FakeJoinCardinalityEstimator(const JoinReorderingContext& jCtx,
+                                 SubsetCardinalities subsetCards,
+                                 NodeCardinalities collCards)
+        : JoinCardinalityEstimator(
+              jCtx,
+              EdgeSelectivities(jCtx.joinGraph.numEdges(), cost_based_ranker::zeroSel),
+              NodeCardinalities(jCtx.joinGraph.numNodes(), cost_based_ranker::oneCE),
+              std::move(collCards)) {
+        _subsetCardinalities = std::move(subsetCards);
     }
 };
 

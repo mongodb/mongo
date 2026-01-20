@@ -86,7 +86,7 @@ public:
      */
     CardinalityEstimate getCollCardinality(NodeId node);
 
-private:
+protected:
     const JoinReorderingContext& _ctx;
     const EdgeSelectivities _edgeSelectivities;
     // Stores cardinality estimates for nodes after single-table predicates are applied.
