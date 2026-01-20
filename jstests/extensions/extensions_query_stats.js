@@ -5,6 +5,11 @@
  */
 import {kDefaultQueryStatsHmacKey, getQueryStatsWithTransform} from "jstests/libs/query/query_stats_utils.js";
 
+// $queryStats is node-local, when multiple mongos are deployed in the cluster, each mongos will have its own
+// separate query stats store. To avoid test failures due to this, we pin the test to a single mongos.
+// pinToSingleMongos due to $queryStats command.
+TestData.pinToSingleMongos = true;
+
 // Use a unique db and coll for every test so burn_in_tests can run this test multiple times.
 const collName = jsTestName() + Random.srand();
 const testDb = db.getSiblingDB("extensions_query_stats_db" + Random.srand());

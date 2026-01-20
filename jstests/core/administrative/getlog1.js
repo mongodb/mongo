@@ -7,6 +7,11 @@
 // to run:
 //   ./mongo jstests/<this-file>
 
+// getLog command is unsupported with multiple mongoses given that a log may not be present on all nodes.
+// Note this test specifically would still run correctly, but we pin to a single mongos to be consistent with other tests involving getLog.
+// pinToSingleMongos due to getLog command.
+TestData.pinToSingleMongos = true;
+
 let contains = function (arr, obj) {
     let i = arr.length;
     while (i--) {
