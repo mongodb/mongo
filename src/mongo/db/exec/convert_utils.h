@@ -34,6 +34,8 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/util/modules.h"
 
+#include <cstddef>
+
 #include <boost/optional.hpp>
 
 namespace mongo::exec::expression::convert_utils {
@@ -44,5 +46,31 @@ namespace mongo::exec::expression::convert_utils {
  * $toObject.
  */
 Value parseJson(StringData data, boost::optional<BSONType> expectedType);
+
+/**
+ * Data type for BinData vectors (per BinDataVector specification). See:
+ * https://github.com/mongodb/specifications/blob/9d0d3f0042a8cf5faeb47ae7765716151bfca9ef/source/bson-binary-vector/bson-binary-vector.md#data-types-dtype.
+ * More types may eventually be useful. Note that the order of these enum values is important,
+ * because we do less-than/greater-than comparisons with enum values when determining what vector
+ * type to convert to.
+ */
+enum class dType {
+    PACKED_BIT,
+    INT8,
+    FLOAT32  // Note this will truncate doubles.
+};
+
+/**
+ * Data type byte constants for BinData vectors.
+ */
+constexpr std::byte kPackedBitDataTypeByte{0x10};
+constexpr std::byte kInt8DataTypeByte{0x03};
+constexpr std::byte kFloat32DataTypeByte{0x27};
+
+/**
+ * Convert a binData vector Value to a std::vector<Value>.
+ * The input must be a binData with BinDataType::Vector subtype.
+ */
+std::vector<Value> convertBinDataVectorToArray(const Value& val, bool isLittleEndian = true);
 
 }  // namespace mongo::exec::expression::convert_utils

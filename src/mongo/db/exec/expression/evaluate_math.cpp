@@ -1592,22 +1592,15 @@ private:
         return Value(BSONBinData{binData.data, binData.length, binData.type});
     }
 
-    // More types may eventually be useful. Note that the order of these enum values is important,
-    // because we do less-than/greater-than comparisons with enum values when determining what
-    // vector type to convert to.
-    enum dType {
-        PACKED_BIT,
-        INT8,
-        FLOAT32  // Note this will truncate doubles.
-    };
+    using dType = convert_utils::dType;
 
     static std::string toString(dType v) {
         switch (v) {
-            case PACKED_BIT:
+            case dType::PACKED_BIT:
                 return "PACKED_BIT";
-            case INT8:
+            case dType::INT8:
                 return "INT8";
-            case FLOAT32:
+            case dType::FLOAT32:
                 return "FLOAT32";
         }
         MONGO_UNREACHABLE_TASSERT(10506611);
@@ -1650,38 +1643,16 @@ private:
                   "Converting array to BinData requires an array with numeric or bool content");
     }
 
-    // Note that these constants are defined in the BinDataVector specification here:
-    // https://github.com/mongodb/specifications/blob/9d0d3f0042a8cf5faeb47ae7765716151bfca9ef/source/bson-binary-vector/bson-binary-vector.md#data-types-dtype.
-    static const std::byte kPackedBitDataTypeByte = std::byte{0x10};
-    static const std::byte kInt8DataTypeByte = std::byte{0x03};
-    static const std::byte kFloat32DataTypeByte = std::byte{0x27};
-
     static std::byte getByteForDType(dType t) {
         switch (t) {
             case dType::PACKED_BIT:
-                return kPackedBitDataTypeByte;
+                return convert_utils::kPackedBitDataTypeByte;
             case dType::INT8:
-                return kInt8DataTypeByte;
+                return convert_utils::kInt8DataTypeByte;
             case dType::FLOAT32:
-                return kFloat32DataTypeByte;
+                return convert_utils::kFloat32DataTypeByte;
         }
         MONGO_UNREACHABLE_TASSERT(10506604);
-    }
-
-    static dType getTypeFromHex(std::byte b) {
-        if (b == kPackedBitDataTypeByte) {
-            return dType::PACKED_BIT;
-        }
-        if (b == kInt8DataTypeByte) {
-            return dType::INT8;
-        }
-        if (b == kFloat32DataTypeByte) {
-            return dType::FLOAT32;
-        }
-
-        uasserted(10506600,
-                  "Invalid dType for provided BinData vector. Valid options are 0x10 for "
-                  "PACKED_BIT, 0x03 for INT8, or 0x27 for FLOAT32.");
     }
 
     static size_t bitsRequiredForDType(int numElements, dType t) {
@@ -1700,51 +1671,6 @@ private:
         MONGO_UNREACHABLE_TASSERT(10506605);
     }
 
-    static void readAndAppendNextByteNumber(std::vector<Value>& result,
-                                            const std::byte* dataPointer,
-                                            int* indexInArray,
-                                            dType d,
-                                            int requiredPadding,
-                                            ByteOrderArg byteOrder) {
-        switch (d) {
-            case PACKED_BIT: {
-                std::byte thisByte = dataPointer[*indexInArray];
-                std::byte comparisonByte{0b10000000};
-                // Remove the extra bits.
-                thisByte = thisByte >> requiredPadding;
-                comparisonByte = comparisonByte >> requiredPadding;
-                for (int numDone = 0; numDone < 8 - requiredPadding; ++numDone) {
-                    if ((thisByte & comparisonByte) == std::byte{0}) {
-                        result.push_back(Value(false));
-                    } else {
-                        result.push_back(Value(true));
-                    }
-                    comparisonByte = comparisonByte >> 1;
-                }
-                // Move the comparison byte to check the next bit. The values left of the comparison
-                // will be zero-d out.
-                comparisonByte = comparisonByte >> 1;
-
-                *indexInArray += 1;
-                break;
-            }
-            case dType::INT8: {
-                std::int8_t convertedVal;
-                memcpy(&convertedVal, &(dataPointer[*indexInArray]), sizeof(convertedVal));
-                result.push_back(Value(static_cast<int>(static_cast<int8_t>(convertedVal))));
-                *indexInArray += sizeof(convertedVal);
-                break;
-            }
-            case dType::FLOAT32: {
-                float convertedVal = readNumberAccordingToEndianness<float, float>(
-                    ConstDataView(reinterpret_cast<const char*>(dataPointer + *indexInArray)),
-                    byteOrder);
-                result.push_back(Value(static_cast<double>(convertedVal)));
-                *indexInArray += sizeof(convertedVal);
-            }
-        }
-    }
-
     static Value performConvertBinDataToArray(ExpressionContext* const expCtx,
                                               Value inputValue,
                                               ByteOrderArg byteOrder,
@@ -1761,43 +1687,8 @@ private:
                 "subtype",
                 binData.type == BinDataType::Vector);
 
-        auto dataBlob = binData.data;
-        if (binData.length == 0) {
-            // If bindata is empty, we return an empty array.
-            return Value(std::vector<Value>());
-        }
-        // If the binData isn't empty, it must contain a dType and a padding byte.
-        uassert(10506601, "binData length invalid", binData.length >= 2);
-        const std::byte* dataPointer = static_cast<const std::byte*>(dataBlob);
-
-        // First byte is the type.
-        auto dTypeCur = getTypeFromHex(dataPointer[0]);
-
-        // Second byte is the padding.
-        uint8_t paddingByte;
-        std::memcpy(&paddingByte, &(dataPointer[1]), sizeof(paddingByte));
-        int padding = static_cast<int>(paddingByte);
-        uassert(10506606,
-                "Padding should only be set for PACKED_BIT vectors",
-                padding == 0 || dTypeCur == dType::PACKED_BIT);
-
-        // The rest of the binData vector is the elements.
-        std::vector<Value> results;
-        for (int i = 2; i < binData.length;
-             /* Note that the 'readAndAppendNextByteNumber handles incrementing i*/) {
-            uassert(10506602,
-                    "BinData vector of type FLOAT32 was malformed - expected to have at least four "
-                    "bytes left to read a FLOAT32 array element.",
-                    (dTypeCur != dType::FLOAT32) || (i < (binData.length - 3)));
-            // Padding only applies if this is the last element, and we're in PACKED_BIT.
-            int thisPadding = 0;
-            if (dTypeCur == dType::PACKED_BIT && i == binData.length - 1) {
-                thisPadding = padding;  // Number of least-significant bits that should be discarded
-                                        // at the end of the byte
-            }
-            readAndAppendNextByteNumber(results, dataPointer, &i, dTypeCur, thisPadding, byteOrder);
-        }
-        return Value(std::move(results));
+        bool isLittleEndian = (byteOrder == ConvertByteOrderType::little);
+        return Value(convert_utils::convertBinDataVectorToArray(inputValue, isLittleEndian));
     }
 
     static Value performConvertArrayToBinData(ExpressionContext* const expCtx,

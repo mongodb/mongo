@@ -39,34 +39,7 @@
 
 namespace mongo {
 
-class ExpressionVectorSimilarityTest : public AggregationContextFixture {
-public:
-    ExpressionVectorSimilarityTest() {
-        // TODO SERVER-106924: Delete this once featureFlagVectorSimilarityExpressions defaults to
-        // true or is removed. Uses logic similar to registerSigmoidExpression to register the
-        // vector similarity expressions even though the feature flag defaults to off. These
-        // expressions are gated behind a feature flag and therefore do not get put into the
-        // parserMap. Changing the value of the feature flag with
-        // RAIIServerParameterControllerForTest() does not solve the issue because the registration
-        // logic is not re-hit.
-        std::vector<std::pair<std::string, Expression::Parser>> expressions = {
-            {"$similarityDotProduct", ExpressionSimilarityDotProduct::parse},
-            {"$similarityCosine", ExpressionSimilarityCosine::parse},
-            {"$similarityEuclidean", ExpressionSimilarityEuclidean::parse}};
-
-        for (const auto& expr : expressions) {
-            try {
-                Expression::registerExpression(expr.first,
-                                               expr.second,
-                                               AllowedWithApiStrict::kNeverInVersion1,
-                                               AllowedWithClientType::kAny,
-                                               nullptr /* featureFlag */);
-            } catch (const DBException& e) {
-                ASSERT(e.reason() == "Duplicate expression (" + expr.first + ") registered.");
-            }
-        }
-    }
-};
+using ExpressionVectorSimilarityTest = AggregationContextFixture;
 
 TEST_F(ExpressionVectorSimilarityTest, ParseAssertConstraintsForDotProduct) {
     // Assert that the inputs are arrays / vectors.
@@ -122,7 +95,7 @@ TEST_F(ExpressionVectorSimilarityTest, ParseAssertConstraintsForDotProduct) {
             fromjson("{ $similarityDotProduct: [ [ 1, 2, 3 ], \"z\" ]}"),
             expCtx->variablesParseState);
         ASSERT_THROWS_CODE(
-            expr->evaluate(Document{}, &expCtx->variables), AssertionException, 10413201);
+            expr->evaluate(Document{}, &expCtx->variables), AssertionException, 10413200);
     }
 
     {
@@ -240,7 +213,7 @@ TEST_F(ExpressionVectorSimilarityTest, ParseAssertConstraintsForCosineSimilarity
                                         fromjson("{ $similarityCosine: [ [ 1, 2, 3 ], \"z\" ]}"),
                                         expCtx->variablesParseState);
         ASSERT_THROWS_CODE(
-            expr->evaluate(Document{}, &expCtx->variables), AssertionException, 10413201);
+            expr->evaluate(Document{}, &expCtx->variables), AssertionException, 10413200);
     }
 
     {
@@ -368,7 +341,7 @@ TEST_F(ExpressionVectorSimilarityTest, ParseAssertConstraintsEuclideanDistance) 
                                         fromjson("{ $similarityEuclidean: [ [ 1, 2, 3 ], \"z\" ]}"),
                                         expCtx->variablesParseState);
         ASSERT_THROWS_CODE(
-            expr->evaluate(Document{}, &expCtx->variables), AssertionException, 10413201);
+            expr->evaluate(Document{}, &expCtx->variables), AssertionException, 10413200);
     }
 
     {
@@ -434,4 +407,152 @@ TEST_F(ExpressionVectorSimilarityTest, EvaluateEuclideanDistanceNegative) {
     ASSERT_APPROX_EQUAL(result.coerceToDouble(), static_cast<double>(12.73774), 0.0001);
 }
 
+// Creates a PACKED_BIT binData vector from a list of boolean values.
+Value createPackedBitBinDataVector(const std::vector<bool>& values) {
+    // Calculate padding: unused bits in the last byte.
+    char padding = values.empty() ? 0 : (8 - (values.size() % 8)) % 8;
+    std::vector<char> data = {0x10, padding};  // PACKED_BIT dType + padding
+    for (size_t i = 0; i < values.size(); i += 8) {
+        char byte = 0;
+        for (size_t bit = 0; bit < 8 && (i + bit) < values.size(); ++bit) {
+            if (values[i + bit]) {
+                byte |= (1 << (7 - bit));  // MSB first.
+            }
+        }
+        data.push_back(byte);
+    }
+    return Value(BSONBinData(data.data(), data.size(), BinDataType::Vector));
+}
+
+// Creates an INT8 binData vector from a list of int8 values.
+Value createInt8BinDataVector(const std::vector<int8_t>& values) {
+    std::vector<char> data = {0x03, 0x00};  // INT8 dType + padding.
+    data.insert(data.end(), values.begin(), values.end());
+    return Value(BSONBinData(data.data(), data.size(), BinDataType::Vector));
+}
+
+// Creates a FLOAT32 binData vector from a list of float values.
+Value createFloat32BinDataVector(const std::vector<float>& values) {
+    std::vector<char> data = {0x27, 0x00};  // FLOAT32 dType + padding.
+    for (auto v : values) {
+        auto* bytes = reinterpret_cast<const char*>(&v);
+        data.insert(data.end(), bytes, bytes + sizeof(float));
+    }
+    return Value(BSONBinData(data.data(), data.size(), BinDataType::Vector));
+}
+
+TEST_F(ExpressionVectorSimilarityTest, EvaluateDotProductWithPackedBitVectors) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createPackedBitBinDataVector({true, true, false, true});
+    auto vec2 = createPackedBitBinDataVector({true, false, true, true});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_VALUE_EQ(result, Value(2.0));
+}
+
+TEST_F(ExpressionVectorSimilarityTest, EvaluateCosineWithPackedBitVectors) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createPackedBitBinDataVector({true, true, false, false});
+    auto vec2 = createPackedBitBinDataVector({true, false, true, false});
+
+    auto expr = Expression::parseExpression(expCtx.get(),
+                                            BSON("$similarityCosine" << BSON_ARRAY(vec1 << vec2)),
+                                            expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_APPROX_EQUAL(result.coerceToDouble(), 0.5, 0.0001);
+}
+
+TEST_F(ExpressionVectorSimilarityTest, EvaluateEuclideanWithPackedBitVectors) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createPackedBitBinDataVector({true, false, true});
+    auto vec2 = createPackedBitBinDataVector({false, true, false});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityEuclidean" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_APPROX_EQUAL(result.coerceToDouble(), 1.732, 0.001);
+}
+
+TEST_F(ExpressionVectorSimilarityTest, EvaluateDotProductWithBinDataVectors) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createInt8BinDataVector({1, 2, 3});
+    auto vec2 = createInt8BinDataVector({4, 5, 6});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_VALUE_EQ(result, Value(32.0));
+}
+
+TEST_F(ExpressionVectorSimilarityTest, EvaluateDotProductWithFloat32BinDataVectors) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createFloat32BinDataVector({1.0f, 2.0f, 3.0f});
+    auto vec2 = createFloat32BinDataVector({4.0f, 5.0f, 6.0f});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_VALUE_EQ(result, Value(32.0));
+}
+
+TEST_F(ExpressionVectorSimilarityTest, EvaluateCosineWithBinDataVectors) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createInt8BinDataVector({1, 2, 3});
+    auto vec2 = createInt8BinDataVector({4, 5, 6});
+
+    auto expr = Expression::parseExpression(expCtx.get(),
+                                            BSON("$similarityCosine" << BSON_ARRAY(vec1 << vec2)),
+                                            expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_APPROX_EQUAL(result.coerceToDouble(), static_cast<double>(0.97463), 0.0001);
+}
+
+TEST_F(ExpressionVectorSimilarityTest, EvaluateEuclideanWithBinDataVectors) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createInt8BinDataVector({1, 2, 3});
+    auto vec2 = createInt8BinDataVector({4, 5, 6});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityEuclidean" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_APPROX_EQUAL(result.coerceToDouble(), static_cast<double>(5.19615), 0.0001);
+}
+
+TEST_F(ExpressionVectorSimilarityTest, EvaluateDotProductEmptyBinDataVectors) {
+    auto expCtx = getExpCtx();
+    Value emptyVec(BSONBinData(nullptr, 0, BinDataType::Vector));
+
+    auto expr = Expression::parseExpression(
+        expCtx.get(),
+        BSON("$similarityDotProduct" << BSON_ARRAY(emptyVec << emptyVec)),
+        expCtx->variablesParseState);
+    auto result = expr->evaluate(Document{}, &expCtx->variables);
+    ASSERT_VALUE_EQ(result, Value(0.0));
+}
+
+// Tests that binData vectors of different sizes throws an error.
+TEST_F(ExpressionVectorSimilarityTest, BinDataVectorsDifferentSizesThrows) {
+    auto expCtx = getExpCtx();
+    auto vec1 = createInt8BinDataVector({1, 2, 3});
+    auto vec2 = createInt8BinDataVector({4, 5});
+
+    auto expr =
+        Expression::parseExpression(expCtx.get(),
+                                    BSON("$similarityDotProduct" << BSON_ARRAY(vec1 << vec2)),
+                                    expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(
+        expr->evaluate(Document{}, &expCtx->variables), AssertionException, 10413202);
+}
 }  // namespace mongo

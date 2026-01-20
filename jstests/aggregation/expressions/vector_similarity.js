@@ -1,9 +1,9 @@
 /**
- * Tests the $similarityCosine expression in aggregation pipelines.
+ * Tests the vector similarity family of expressions in aggregation pipelines.
  *
  * @tags: [
  *   featureFlagVectorSimilarityExpressions,
- *   requires_fcv_82,
+ *   requires_fcv_83,
  * ]
  */
 
@@ -30,7 +30,12 @@ const coll = db[jsTestName()];
 
     const testCases = [
         {
-            document: {left: [NumberInt(1), NumberInt(2)], right: [NumberInt(3), NumberInt(4)]},
+            document: {
+                left: [NumberInt(1), NumberInt(2)],
+                right: [NumberInt(3), NumberInt(4)],
+                leftVector: BinData(9, "AwABAg=="),
+                rightVector: BinData(9, "AwADBA=="),
+            },
             expectedCosine: 0.98387,
             expectedNormalizedCosine: 0.991935,
             expectedDotProduct: 11,
@@ -39,7 +44,12 @@ const coll = db[jsTestName()];
             expectedNormalizedEuclidean: 0.2612,
         },
         {
-            document: {left: [NumberInt(1), 2.5], right: [NumberInt(3), NumberInt(5)]},
+            document: {
+                left: [NumberInt(1), 2.5],
+                right: [NumberInt(3), NumberInt(5)],
+                leftVector: BinData(9, "JwAAAIA/AAAgQA=="),
+                rightVector: BinData(9, "AwADBQ=="),
+            },
             expectedCosine: 0.98724,
             expectedNormalizedCosine: 0.99362,
             expectedDotProduct: 15.5,
@@ -48,7 +58,12 @@ const coll = db[jsTestName()];
             expectedNormalizedEuclidean: 0.23801,
         },
         {
-            document: {left: [NumberInt(1)], right: [NumberInt(2)]},
+            document: {
+                left: [NumberInt(1)],
+                right: [NumberInt(2)],
+                leftVector: BinData(9, "EAeA"),
+                rightVector: BinData(9, "AwAC"),
+            },
             expectedCosine: 1,
             expectedNormalizedCosine: 1,
             expectedDotProduct: 2,
@@ -57,7 +72,12 @@ const coll = db[jsTestName()];
             expectedNormalizedEuclidean: 0.5,
         },
         {
-            document: {left: [NumberInt(2), NumberInt(3)], right: [NumberInt(4), NumberInt(5)]},
+            document: {
+                left: [NumberInt(2), NumberInt(3)],
+                right: [NumberInt(4), NumberInt(5)],
+                leftVector: BinData(9, "AwACAw=="),
+                rightVector: BinData(9, "AwAEBQ=="),
+            },
             expectedCosine: 0.99624,
             expectedNormalizedCosine: 0.99812,
             expectedDotProduct: 23,
@@ -69,6 +89,8 @@ const coll = db[jsTestName()];
             document: {
                 left: [NumberInt(1), NumberInt(2), NumberInt(3)],
                 right: [NumberInt(4), NumberInt(5), NumberInt(6)],
+                leftVector: BinData(9, "AwABAgM="),
+                rightVector: BinData(9, "AwAEBQY="),
             },
             expectedCosine: 0.974632,
             expectedNormalizedCosine: 0.987316,
@@ -78,7 +100,12 @@ const coll = db[jsTestName()];
             expectedNormalizedEuclidean: 0.16139,
         },
         {
-            document: {left: [], right: []},
+            document: {
+                left: [],
+                right: [],
+                leftVector: BinData(9, "EAA="),
+                rightVector: BinData(9, "EAA="),
+            },
             expectedCosine: 0,
             expectedNormalizedCosine: 0.5,
             expectedDotProduct: 0,
@@ -92,39 +119,66 @@ const coll = db[jsTestName()];
         assert.commandWorked(coll.insertOne(testCase.document));
 
         similarityOperators.forEach(function ({operator, expectedRawKey, expectedNormalizedKey}) {
-            const resultRaw = coll.aggregate([{$project: {computed: {[operator]: ["$left", "$right"]}}}]).toArray();
-
-            assert.eq(resultRaw.length, 1, `${operator} raw result should return one document`);
-            assert.close(resultRaw[0].computed, testCase[expectedRawKey], `${operator} raw score mismatch`);
-
-            const resultNormalized = coll
+            // Test with standard numeric array input.
+            const result = coll
                 .aggregate([
                     {
-                        $project: {computed: {[operator]: {vectors: ["$left", "$right"], score: true}}},
+                        $project: {
+                            computedRaw: {[operator]: ["$left", "$right"]},
+                            computedNormalized: {[operator]: {vectors: ["$left", "$right"], score: true}},
+                        },
                     },
                 ])
                 .toArray();
 
-            assert.eq(resultNormalized.length, 1, `${operator} normalized result should return one document`);
+            assert.eq(result.length, 1, `${operator} result should return one document`);
+            assert.close(result[0].computedRaw, testCase[expectedRawKey], `${operator} raw score mismatch`);
             assert.close(
-                resultNormalized[0].computed,
+                result[0].computedNormalized,
                 testCase[expectedNormalizedKey],
                 `${operator} normalized score mismatch`,
+            );
+
+            // Test with binData vector input.
+            const resultBinData = coll
+                .aggregate([
+                    {
+                        $project: {
+                            computedRaw: {[operator]: ["$leftVector", "$rightVector"]},
+                            computedNormalized: {
+                                [operator]: {
+                                    vectors: ["$leftVector", "$rightVector"],
+                                    score: true,
+                                },
+                            },
+                        },
+                    },
+                ])
+                .toArray();
+
+            assert.eq(resultBinData.length, 1, `${operator} binData result should return one document`);
+            assert.close(
+                resultBinData[0].computedRaw,
+                testCase[expectedRawKey],
+                `${operator} binData raw score mismatch`,
+            );
+            assert.close(
+                resultBinData[0].computedNormalized,
+                testCase[expectedNormalizedKey],
+                `${operator} binData normalized score mismatch`,
             );
         });
 
         assert(coll.drop());
     });
-
-    assert(coll.drop());
 }
 
 {
-    // Test error codes on incorrect use of $similarityCosine.
+    // Test error codes on incorrect use of similarity operators.
     const errorTestCases = [
         // Type mismatch - non-array inputs.
         {document: {left: 1, right: [1, 2]}, errorCode: 10413200},
-        {document: {left: [1, 2], right: "string"}, errorCode: 10413201},
+        {document: {left: [1, 2], right: "string"}, errorCode: 10413200},
         {document: {left: {object: true}, right: [1, 2]}, errorCode: 10413200},
 
         // Arrays of different lengths.

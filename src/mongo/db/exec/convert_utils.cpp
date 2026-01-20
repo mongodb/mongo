@@ -33,6 +33,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/util/overloaded_visitor.h"
 
+#include <cstdint>
 #include <stack>
 
 #include <nlohmann/json.hpp>
@@ -235,6 +236,93 @@ Value parseJson(StringData data, boost::optional<BSONType> expectedType) {
     }
 
     return result;
+}
+
+std::vector<Value> convertBinDataVectorToArray(const Value& val, bool isLittleEndian) {
+    auto binData = val.getBinData();
+    tassert(11300101, "Expected binData with vector subtype", binData.type == BinDataType::Vector);
+
+    if (binData.length == 0) {
+        // If bindata is empty, we return an empty array.
+        return {};
+    }
+
+    // If the binData isn't empty, it must contain a dType and a padding byte.
+    uassert(10506601, "binData length invalid", binData.length >= 2);
+    const std::byte* dataPointer = static_cast<const std::byte*>(binData.data);
+
+    // First byte is the type.
+    auto dTypeCur = [&]() {
+        if (dataPointer[0] == kPackedBitDataTypeByte)
+            return dType::PACKED_BIT;
+        if (dataPointer[0] == kInt8DataTypeByte)
+            return dType::INT8;
+        if (dataPointer[0] == kFloat32DataTypeByte)
+            return dType::FLOAT32;
+        uasserted(10506600,
+                  "Invalid dType for provided BinData vector. Valid options are 0x10 for "
+                  "PACKED_BIT, 0x03 for INT8, or 0x27 for FLOAT32.");
+    }();
+
+    // Second byte is the padding.
+    uint8_t paddingByte;
+    std::memcpy(&paddingByte, &(dataPointer[1]), sizeof(paddingByte));
+    int padding = static_cast<int>(paddingByte);
+    uassert(10506606,
+            "Padding must be between 0 and 7 for PACKED_BIT vectors, or 0 otherwise",
+            padding == 0 || (dTypeCur == dType::PACKED_BIT && padding <= 7));
+
+    // The rest of the binData vector is the elements.
+    std::vector<Value> results;
+    int i = 2;
+    while (i < binData.length) {
+        uassert(10506602,
+                "BinData vector of type FLOAT32 was malformed - expected to have at least four "
+                "bytes left to read a FLOAT32 array element.",
+                (dTypeCur != dType::FLOAT32) ||
+                    (i <= (binData.length - static_cast<int>(sizeof(float)))));
+
+        // Padding only applies if this is the last element and we're in PACKED_BIT.
+        int thisPadding = 0;
+        if (dTypeCur == dType::PACKED_BIT && i == binData.length - 1) {
+            thisPadding = padding;  // Number of least-significant bits that should be discarded at
+                                    // the end of the byte.
+        }
+
+        switch (dTypeCur) {
+            case dType::PACKED_BIT: {
+                std::byte thisByte = dataPointer[i];
+                std::byte comparisonByte{0b10000000};
+                // Remove the extra bits.
+                thisByte = thisByte >> thisPadding;
+                comparisonByte = comparisonByte >> thisPadding;
+                for (int numDone = 0; numDone < 8 - thisPadding; ++numDone) {
+                    results.push_back(Value((thisByte & comparisonByte) != std::byte{0}));
+                    // Move the comparison byte to check the next bit. The values left of the
+                    // comparison will be zero-d out.
+                    comparisonByte = comparisonByte >> 1;
+                }
+                ++i;
+                break;
+            }
+            case dType::INT8: {
+                std::int8_t convertedVal;
+                std::memcpy(&convertedVal, &(dataPointer[i]), sizeof(convertedVal));
+                results.push_back(Value(static_cast<int>(convertedVal)));
+                i += sizeof(convertedVal);
+                break;
+            }
+            case dType::FLOAT32: {
+                ConstDataView dataView(reinterpret_cast<const char*>(&dataPointer[i]));
+                float convertedVal = isLittleEndian ? dataView.read<LittleEndian<float>>()
+                                                    : dataView.read<BigEndian<float>>();
+                results.push_back(Value(static_cast<double>(convertedVal)));
+                i += sizeof(convertedVal);
+                break;
+            }
+        }
+    }
+    return results;
 }
 
 }  // namespace mongo::exec::expression::convert_utils

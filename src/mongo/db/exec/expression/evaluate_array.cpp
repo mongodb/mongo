@@ -29,6 +29,7 @@
 
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/convert_utils.h"
 #include "mongo/db/exec/expression/evaluate.h"
 
 namespace mongo {
@@ -744,44 +745,65 @@ Value evaluate(const ExpressionSetUnion& expr, const Document& root, Variables* 
 
 namespace {
 /*
- * Ensure both arguments to a vector similarity algorithm are arrays of numeric values of the same
- * size.
+ * Convert a Value to an array. Accepts both arrays and binData vectors.
+ */
+std::vector<Value> toArray(const Value& val, const std::string& opName) {
+    if (val.isArray()) {
+        return val.getArray();
+    }
+    if (val.getType() == BSONType::binData && val.getBinData().type == BinDataType::Vector) {
+        return convert_utils::convertBinDataVectorToArray(val);
+    }
+    uasserted(10413200,
+              str::stream() << "Arguments to " << opName
+                            << " must be arrays or binData vectors, but found type: "
+                            << typeName(val.getType()));
+}
+
+/*
+ * Ensure both arguments to a vector similarity algorithm are arrays or binData vectors
+ * of numeric or boolean values of the same size.
  */
 std::pair<std::vector<Value>, std::vector<Value>> validate(const Value& val1,
                                                            const Value& val2,
                                                            const std::string& opName) {
-
-    uassert(10413200,
-            str::stream() << "First argument to " << opName
-                          << " must be an array, but is of type: " << typeName(val1.getType()),
-            val1.isArray());
-
-    uassert(10413201,
-            str::stream() << "Second argument to " << opName
-                          << " must be an array, but is of type: " << typeName(val2.getType()),
-            val2.isArray());
-
-    const auto& array1 = val1.getArray();
-    const auto& array2 = val2.getArray();
+    auto array1 = toArray(val1, opName);
+    auto array2 = toArray(val2, opName);
 
     uassert(10413202,
-            str::stream() << "Array arguments to " << opName
+            str::stream() << "Arguments to " << opName
                           << " must be the same size, but the first is of size "
                           << std::to_string(array1.size()) << " and the second is of size "
                           << std::to_string(array2.size()),
             array1.size() == array2.size());
 
+    auto numericOrBoolean = [](const std::vector<Value>& arr) {
+        return std::all_of(arr.begin(), arr.end(), [](const auto& e) {
+            return e.numeric() || e.getType() == BSONType::boolean;
+        });
+    };
+
     uassert(10413203,
             str::stream() << "All elements in the first argument to " << opName
-                          << " must be numeric",
-            std::all_of(array1.begin(), array1.end(), [](const auto& e) { return e.numeric(); }));
+                          << " must be numeric or boolean",
+            numericOrBoolean(array1));
 
     uassert(10413204,
             str::stream() << "All elements in the second argument to " << opName
-                          << " must be numeric",
-            std::all_of(array2.begin(), array2.end(), [](const auto& e) { return e.numeric(); }));
+                          << " must be numeric or boolean",
+            numericOrBoolean(array2));
 
-    return {array1, array2};
+    return {std::move(array1), std::move(array2)};
+}
+
+/*
+ * Coerces to double, including boolean values for PACKED_BIT vectors.
+ */
+double toDouble(const Value& val) {
+    if (val.getType() == BSONType::boolean) {
+        return val.getBool() ? 1 : 0;
+    }
+    return val.coerceToDouble();
 }
 
 /*
@@ -790,7 +812,7 @@ std::pair<std::vector<Value>, std::vector<Value>> validate(const Value& val1,
 double calculateDotProduct(const std::vector<Value>& array1, const std::vector<Value>& array2) {
     double sum = 0;
     for (size_t i = 0; i < array1.size(); i++) {
-        sum += array1[i].coerceToDouble() * array2[i].coerceToDouble();
+        sum += toDouble(array1[i]) * toDouble(array2[i]);
     }
 
     return sum;
@@ -803,8 +825,8 @@ double calculateEuclideanDistance(const std::vector<Value>& array1,
                                   const std::vector<Value>& array2) {
     double sum = 0;
     for (size_t i = 0; i < array1.size(); i++) {
-        auto difference = array1[i].coerceToDouble() - array2[i].coerceToDouble();
-        sum += std::pow(difference, 2);
+        double diff = toDouble(array1[i]) - toDouble(array2[i]);
+        sum += diff * diff;
     }
 
     return std::sqrt(sum);
@@ -816,8 +838,8 @@ double calculateEuclideanDistance(const std::vector<Value>& array1,
 double calculateMagnitude(const std::vector<Value>& vector) {
     double sum = 0;
     for (size_t i = 0; i < vector.size(); ++i) {
-        double d = vector[i].coerceToDouble();
-        sum += std::pow(d, 2);
+        double d = toDouble(vector[i]);
+        sum += d * d;
     }
     return std::sqrt(sum);
 }
