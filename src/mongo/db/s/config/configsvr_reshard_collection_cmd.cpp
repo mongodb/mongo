@@ -198,8 +198,8 @@ public:
                 // (Generic FCV reference): To run this command and ensure the consistency of
                 // the metadata we need to make sure we are on a stable state.
                 uassert(ErrorCodes::CommandNotSupported,
-                        "Resharding is not supported for this version, please update the FCV to "
-                        "latest.",
+                        "Resharding is not supported during FCV changes, please wait for the FCV "
+                        "change to complete.",
                         !fcvSnapshot.isUpgradingOrDowngrading());
 
                 // We only want to use provenance in resharding if FCV is latest but it's still
