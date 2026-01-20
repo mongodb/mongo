@@ -8,8 +8,8 @@ ShardingTest.prototype.checkRoutingTableConsistency = function () {
     }
 
     let mongos;
-    if (this.s.maintenancePort > 0) {
-        mongos = new Mongo(this.s.maintenanceHost);
+    if (this.s.priorityPort > 0) {
+        mongos = new Mongo(this.s.priorityHost);
     } else {
         mongos = new Mongo(this.s.host);
     }

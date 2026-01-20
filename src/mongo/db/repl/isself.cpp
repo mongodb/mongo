@@ -235,16 +235,16 @@ bool canConnectToHostAndPort(const HostAndPort& hostAndPort,
 }  // namespace
 
 bool isSelf(const HostAndPort& hostAndPort,
-            const boost::optional<int>& maintenancePort,
+            const boost::optional<int>& priorityPort,
             ServiceContext* const ctx,
             Milliseconds timeout) {
-    if (isSelfFastPath(hostAndPort, maintenancePort)) {
+    if (isSelfFastPath(hostAndPort, priorityPort)) {
         return true;
     }
-    return isSelfSlowPath(hostAndPort, maintenancePort, ctx, timeout);
+    return isSelfSlowPath(hostAndPort, priorityPort, ctx, timeout);
 }
 
-bool isSelfFastPath(const HostAndPort& hostAndPort, const boost::optional<int>& maintenancePort) {
+bool isSelfFastPath(const HostAndPort& hostAndPort, const boost::optional<int>& priorityPort) {
     if (MONGO_unlikely(failIsSelfCheck.shouldFail())) {
         LOGV2(356490,
               "failIsSelfCheck failpoint activated, returning false from isSelfFastPath",
@@ -254,9 +254,9 @@ bool isSelfFastPath(const HostAndPort& hostAndPort, const boost::optional<int>& 
 
     // Fastpath: check if the host&port in question is bound to one of the interfaces on this
     // machine. No need for ip match if the ports do not match. Since the bind_ip is used for both
-    // main and maintenance ports, if both ports match we only need to check the hosts once.
+    // main and priority ports, if both ports match we only need to check the hosts once.
     if (hostAndPort.port() == serverGlobalParams.port &&
-        (!maintenancePort.has_value() || *maintenancePort == serverGlobalParams.maintenancePort)) {
+        (!priorityPort.has_value() || *priorityPort == serverGlobalParams.priorityPort)) {
         std::vector<std::string> myAddrs = serverGlobalParams.bind_ips;
 
         // If any of the bound addresses is the default route (0.0.0.0 on IPv4) it means we are
@@ -308,7 +308,7 @@ bool isSelfFastPath(const HostAndPort& hostAndPort, const boost::optional<int>& 
 }
 
 bool isSelfSlowPath(const HostAndPort& hostAndPort,
-                    const boost::optional<int>& maintenancePort,
+                    const boost::optional<int>& priorityPort,
                     ServiceContext* const ctx,
                     Milliseconds timeout) {
     ctx->waitForStartupComplete();
@@ -319,13 +319,13 @@ bool isSelfSlowPath(const HostAndPort& hostAndPort,
         return false;
     }
 
-    // If a maintenance port is specified, we need to verify that we can connect both to the
-    // hostAndPort but also to the host and maintenance port.
+    // If a priority port is specified, we need to verify that we can connect both to the
+    // hostAndPort but also to the host and priority port.
     bool canConnectToMainPort = canConnectToHostAndPort(hostAndPort, ctx, timeout);
-    bool canConnectToMaintenancePort = !maintenancePort.has_value() ||
-        canConnectToHostAndPort(HostAndPort(hostAndPort.host(), *maintenancePort), ctx, timeout);
+    bool canConnectToPriorityPort = !priorityPort.has_value() ||
+        canConnectToHostAndPort(HostAndPort(hostAndPort.host(), *priorityPort), ctx, timeout);
 
-    return canConnectToMainPort && canConnectToMaintenancePort;
+    return canConnectToMainPort && canConnectToPriorityPort;
 }
 
 /**

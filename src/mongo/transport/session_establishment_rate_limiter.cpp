@@ -84,8 +84,8 @@ SessionEstablishmentRateLimiter* SessionEstablishmentRateLimiter::get(ServiceCon
 }
 
 Status SessionEstablishmentRateLimiter::throttleIfNeeded(Client* client) {
-    // Exempt maintenance port sessions from rate limiters
-    if (client->isMaintenancePortClient()) {
+    // Exempt priority port sessions from rate limiters
+    if (client->isPriorityPortClient()) {
         _rateLimiter.recordExemption();
         return Status::OK();
     }

@@ -113,8 +113,8 @@ private:
     bool _isExempted(Client* client) {
         // The rate limiter applies only requests when the client is authenticated to prevent DoS
         // attacks caused by many unauthenticated requests. Requests from clients connected to the
-        // maintenance port or related unix socket bypass the rate limiter.
-        if (_isAuthorizationExempt(client) || client->isMaintenancePortClient()) {
+        // priority port or related unix socket bypass the rate limiter.
+        if (_isAuthorizationExempt(client) || client->isPriorityPortClient()) {
             return true;
         }
 

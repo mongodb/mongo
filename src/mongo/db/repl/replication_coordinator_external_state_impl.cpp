@@ -958,22 +958,22 @@ StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastO
 }
 
 bool ReplicationCoordinatorExternalStateImpl::isSelf(const HostAndPort& host,
-                                                     const boost::optional<int>& maintenancePort,
+                                                     const boost::optional<int>& priorityPort,
                                                      ServiceContext* ctx) {
-    return repl::isSelf(host, maintenancePort, ctx);
+    return repl::isSelf(host, priorityPort, ctx);
 }
 
 bool ReplicationCoordinatorExternalStateImpl::isSelfFastPath(
-    const HostAndPort& host, const boost::optional<int>& maintenancePort) {
-    return repl::isSelfFastPath(host, maintenancePort);
+    const HostAndPort& host, const boost::optional<int>& priorityPort) {
+    return repl::isSelfFastPath(host, priorityPort);
 }
 
 bool ReplicationCoordinatorExternalStateImpl::isSelfSlowPath(
     const HostAndPort& host,
-    const boost::optional<int>& maintenancePort,
+    const boost::optional<int>& priorityPort,
     ServiceContext* ctx,
     Milliseconds timeout) {
-    return repl::isSelfSlowPath(host, maintenancePort, ctx, timeout);
+    return repl::isSelfSlowPath(host, priorityPort, ctx, timeout);
 }
 
 HostAndPort ReplicationCoordinatorExternalStateImpl::getClientHostAndPort(

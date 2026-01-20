@@ -341,7 +341,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         // Arbiters are always expected to report null durable optimes (and wall times).
         // If that is not the case here, make sure to correct these times before ingesting them.
         // Use the strict version of findMemberByHostAndPort since heartbeats should always happen
-        // via the maintenance port.
+        // via the priority port.
         auto memberInConfig = _rsConfig.unsafePeek().findMemberByHostAndPort(target, true);
         if ((hbResponse.hasState() && hbResponse.getState().arbiter()) ||
             (_rsConfig.unsafePeek().isInitialized() && memberInConfig &&
@@ -417,7 +417,7 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         if (remoteState == MemberState::RS_SECONDARY || remoteState == MemberState::RS_RECOVERING ||
             remoteState == MemberState::RS_ROLLBACK) {
             // Use the strict version of findMemberByHostAndPort since heartbeats should always
-            // happen via the maintenance port.
+            // happen via the priority port.
             const auto mem = _rsConfig.unsafePeek().findMemberByHostAndPort(target, true);
             if (mem && mem->isNewlyAdded()) {
                 const auto memId = mem->getId();
@@ -771,7 +771,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         return validateConfigForHeartbeatReconfig(_externalState.get(),
                                                   newConfig,
                                                   getMyHostAndPort(),
-                                                  getMyMaintenancePort(),
+                                                  getMyPriorityPort(),
                                                   cc().getServiceContext());
     }();
 
@@ -1147,7 +1147,7 @@ void ReplicationCoordinatorImpl::_startHeartbeats(WithLock lk) {
         if (i == _selfIndex) {
             continue;
         }
-        auto target = rsc.getMemberAt(i).getHostAndPortMaintenance();
+        auto target = rsc.getMemberAt(i).getHostAndPortPriority();
         _scheduleHeartbeatToTarget(lk, target, now, std::string{rsc.getReplSetName()});
         _topCoord->restartHeartbeat(now, target);
     }

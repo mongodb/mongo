@@ -89,9 +89,9 @@ configs:
         description: "Set socket listen backlog size"
         short_name: listenBacklog
         arg_vartype: Int
-    "net.maintenancePort":
-        description: "Dedicated port for internal high-priority maintenance operations."
-        short_name: maintenancePort
+    "net.priorityPort":
+        description: "Dedicated port for internal high-priority operations."
+        short_name: priorityPort
         arg_vartype: Int
         source: [cli, yaml]
         validator: {gte: 1, lte: 65535}

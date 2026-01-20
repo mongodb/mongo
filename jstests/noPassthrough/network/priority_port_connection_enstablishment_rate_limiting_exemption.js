@@ -1,13 +1,13 @@
 /**
- *  Test that connections on the maintenance port through TCP or Unix socket (only on non-Windows platforms)
+ *  Test that connections on the priority port through TCP or Unix socket (only on non-Windows platforms)
  *  are exempt from connection (session) establishment rate limiting
  *
  * @tags: [
- *      # The maintenance port is based on ASIO, so gRPC testing is excluded
+ *      # The priority port is based on ASIO, so gRPC testing is excluded
  *      grpc_incompatible,
  *      requires_replication,
  *      requires_sharding,
- *      featureFlagDedicatedPortForMaintenanceOperations,
+ *      featureFlagDedicatedPortForPriorityOperations,
  * ]
  */
 
@@ -16,7 +16,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 
-describe("Tests for maintenance port exemption from connection (session) establishment rate limiter within JS test replica set and sharded cluster helpers", function () {
+describe("Tests for priority port exemption from connection (session) establishment rate limiter within JS test replica set and sharded cluster helpers", function () {
     this.nonExemptIP = get_ipaddr();
     this.exemptIP = "127.0.0.1";
 
@@ -66,13 +66,13 @@ describe("Tests for maintenance port exemption from connection (session) establi
             return this.getEstablishmentRateLimitStats(conn)["rejected"] == 1;
         });
 
-        // Check new connection over a non exempt IP on the maintenance port
+        // Check new connection over a non exempt IP on the priority port
         // succeeds
-        const connToMaintenancePort = rs
-            ? new Mongo(`mongodb://${this.nonExemptIP}:${rs.getMaintenancePort(conn)}`)
-            : new Mongo(`mongodb://${this.nonExemptIP}:${conn.maintenancePort}`);
-        assert.commandWorked(connToMaintenancePort.getDB("admin").runCommand({ping: 1}));
-        jsTest.log.info("Request to maintenance port successful");
+        const connToPriorityPort = rs
+            ? new Mongo(`mongodb://${this.nonExemptIP}:${rs.getPriorityPort(conn)}`)
+            : new Mongo(`mongodb://${this.nonExemptIP}:${conn.priorityPort}`);
+        assert.commandWorked(connToPriorityPort.getDB("admin").runCommand({ping: 1}));
+        jsTest.log.info("Request to priority port successful");
 
         // Check that the exempted count has increased
         assert(this.getEstablishmentRateLimitStats(conn)["exempted"] >= 1);
@@ -86,11 +86,11 @@ describe("Tests for maintenance port exemption from connection (session) establi
         );
     };
 
-    it("Starting up a replica set with maintenance port enabled on all nodes", () => {
+    it("Starting up a replica set with priority port enabled on all nodes", () => {
         const rs = new ReplSetTest({
             // TODO (SERVER-115960): Increase the number of nodes
             nodes: 1,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
             nodeOptions: {
                 setParameter: {
                     ...this.kParamsConnectionEstablishmentRateLimiter,
@@ -113,7 +113,7 @@ describe("Tests for maintenance port exemption from connection (session) establi
         rs.stopSet();
     });
 
-    it("Starting up a sharded cluster with maintenance port enabled on all nodes", () => {
+    it("Starting up a sharded cluster with priority port enabled on all nodes", () => {
         const opts = {
             setParameter: {
                 ...this.kParamsConnectionEstablishmentRateLimiter,
@@ -125,7 +125,7 @@ describe("Tests for maintenance port exemption from connection (session) establi
             shards: 1,
             mongos: 2,
             useHostname: false,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
             keyFile: this.keyFile,
             other: {mongosOptions: opts, rsOptions: opts, configOptions: opts},
         });

@@ -132,7 +132,7 @@ Client::Client(std::string desc,
       _operationKillable(killable),
       _prng(generateSeed(_desc)),
       _uuid(UUID::gen()),
-      _isMaintenancePortClient(_session && _session->isConnectedToMaintenancePort()),
+      _isPriorityPortClient(_session && _session->isConnectedToPriorityPort()),
       _tags(kPending) {}
 
 Client::~Client() = default;

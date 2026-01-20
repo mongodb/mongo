@@ -168,9 +168,9 @@ public:
     void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) final;
 
     /**
-     * The maintenance port is unavailable with grpc enabled.
+     * The priority port is unavailable with grpc enabled.
      */
-    bool isConnectedToMaintenancePort() const final {
+    bool isConnectedToPriorityPort() const final {
         return false;
     }
 

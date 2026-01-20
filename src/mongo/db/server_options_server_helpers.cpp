@@ -462,8 +462,8 @@ Status storeServerOptions(const moe::Environment& params) {
         }
     }
 
-    if (params.count("net.maintenancePort")) {
-        serverGlobalParams.maintenancePort = params["net.maintenancePort"].as<int>();
+    if (params.count("net.priorityPort")) {
+        serverGlobalParams.priorityPort = params["net.priorityPort"].as<int>();
     }
 
     return Status::OK();

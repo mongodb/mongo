@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_reconfig_jscore_stepdown_passthrough_maintenance_ports.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_reconfig_kill_stepdown_terminate_jscore_passthrough_priority_ports.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
@@ -18,6 +18,8 @@ executor:
         globalThis.testingReplication = true; await import('jstests/libs/override_methods/network_error_and_txn_override.js');
         globalThis.db = connect(TestData.connectionString); await import("jstests/libs/override_methods/enable_sessions.js");
         await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+        await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+        await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
       global_vars:
         TestData:
           alwaysInjectTransactionNumber: true
@@ -43,23 +45,32 @@ executor:
     class: ReplicaSetFixture
     mongod_options:
       set_parameters:
+        enableElectionHandoff: 0
         enableTestCommands: 1
         logComponentVerbosity:
           replication:
             heartbeats: 2
+      wiredTigerEngineConfigString: debug_mode=(table_logging=true)
     num_nodes: 5
-    use_maintenance_ports: true
+    use_priority_ports: true
   hooks:
     - class: DoReconfigInBackground
       shell_options:
         global_vars:
           TestData:
-            usingMaintenancePorts: true
+            usingPriorityPorts: true
         nodb: ""
-    - class: ContinuousStepdown
+    - background_reconfig: true
+      class: ContinuousStepdown
+      randomize_kill: true
+      stepdown_interval_ms: 15000
     - class: CheckReplOplogs
     - class: CheckReplDBHash
     - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipEnforceFastCountOnValidate: true
     - class: CleanEveryN
       n: 20
 matrix_suite: true
@@ -84,21 +95,25 @@ selector:
     - jstests/core/**/currentop.js
     - jstests/core/**/fsync.js
     - jstests/core/**/shell_connection_strings.js
+    - jstests/core/**/explain_upsert.js
     - jstests/core/**/indexes_multiple_commands.js
     - jstests/core/**/create_indexes.js
     - jstests/core/**/objid5.js
     - jstests/core/**/batch_write_command_w0.js
     - jstests/core/**/bench_test*.js
     - jstests/core/**/benchrun_pipeline_updates.js
+    - jstests/core/**/connection_string_validation.js
     - jstests/core/**/list_collections_filter.js
     - jstests/core/**/query/top/top.js
-    - jstests/core/ddl/drop_collection_cursors.js
+    - jstests/core/**/drop_collection_cursors.js
     - jstests/core/**/list_collections_filter.js
     - jstests/core/**/explain_large_bounds.js
     - jstests/core/**/query/collation/collation.js
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/find_and_modify_concurrent_update.js
     - jstests/core/**/shellstartparallel.js
+    - jstests/core/**/geo_s2ordering.js
+    - jstests/core/testing/mixed_version_replica_set.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_getmore
@@ -114,6 +129,7 @@ selector:
     - requires_dbstats
     - requires_sharding
     - uses_parallel_shell
+    - requires_fastcount
   roots:
     - jstests/core/**/*.js
 test_kind: js_test

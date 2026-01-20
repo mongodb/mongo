@@ -1,9 +1,9 @@
 /*
  * Tests replication internals (such as heartbeats, initial sync, elections, etc.) via the
- * maintenance port.
+ * priority port.
  *
  * @tags: [
- *  featureFlagReplicationUsageOfMaintenancePort,
+ *  featureFlagReplicationUsageOfPriorityPort,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -12,10 +12,10 @@ import {configureFailPointForRS, configureFailPoint} from "jstests/libs/fail_poi
 import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 import newMongoWithRetry from "jstests/libs/retryable_mongo.js";
 
-describe("Tests for maintenance port usage within replication internals", function () {
+describe("Tests for priority port usage within replication internals", function () {
     beforeEach(() => {
         let verbosity = {setParameter: {logComponentVerbosity: {replication: {heartbeats: 2}}}};
-        this.rs = new ReplSetTest({nodes: 3, useMaintenancePorts: true, nodeOptions: verbosity});
+        this.rs = new ReplSetTest({nodes: 3, usePriorityPorts: true, nodeOptions: verbosity});
         this.rs.startSet();
     });
 
@@ -47,14 +47,14 @@ describe("Tests for maintenance port usage within replication internals", functi
         });
     }
 
-    function getHostsAndMaintenancePorts(config) {
-        let hostAndMaintenancePorts = [];
+    function getHostsAndPriorityPorts(config) {
+        let hostAndPriorityPorts = [];
         config.members.forEach((member) => {
             let host = member.host.slice(0, member.host.indexOf(":"));
-            let hostAndMaintenancePort = host + ":" + member.maintenancePort;
-            hostAndMaintenancePorts.push(hostAndMaintenancePort);
+            let hostAndPriorityPort = host + ":" + member.priorityPort;
+            hostAndPriorityPorts.push(hostAndPriorityPort);
         });
-        return hostAndMaintenancePorts;
+        return hostAndPriorityPorts;
     }
 
     function checkSyncingViaHostAndPorts(rs, hostAndPorts) {
@@ -93,7 +93,7 @@ describe("Tests for maintenance port usage within replication internals", functi
         });
     }
 
-    it("Election via maintenance port", () => {
+    it("Election via priority port", () => {
         this.rs.initiate();
 
         jsTest.log.info("Wait for replication so that we can step up a new primary");
@@ -104,9 +104,9 @@ describe("Tests for maintenance port usage within replication internals", functi
         let fps = configureFailPointForRS(this.rs.nodes, "rejectNewNonPriorityConnections");
         dropAllConns(this.rs);
 
-        jsTest.log.info("Make a connection to a secondary's maintenance port and step it up");
+        jsTest.log.info("Make a connection to a secondary's priority port and step it up");
         let secondary = this.rs.getSecondary();
-        let connstring = secondary.hostNoPort + ":" + secondary.maintenancePort;
+        let connstring = secondary.hostNoPort + ":" + secondary.priorityPort;
         let conn = newMongoWithRetry(connstring);
         assert.soon(() => {
             assert.commandWorked(conn.adminCommand({replSetStepUp: 1}));
@@ -119,7 +119,7 @@ describe("Tests for maintenance port usage within replication internals", functi
         fps.off();
     });
 
-    it("Heartbeats via maintenance port", () => {
+    it("Heartbeats via priority port", () => {
         let config = this.rs.getReplSetConfig();
         config.settings = {
             heartbeatTimeoutSecs: 1,
@@ -148,8 +148,8 @@ describe("Tests for maintenance port usage within replication internals", functi
         });
 
         for (let i = 0; i < this.rs.nodes.length; i++) {
-            let maintenanceConnString = host + ":" + this.rs.getMaintenancePort(i);
-            let conn = newMongoWithRetry(maintenanceConnString);
+            let priorityConnString = host + ":" + this.rs.getPriorityPort(i);
+            let conn = newMongoWithRetry(priorityConnString);
             let res = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1}));
             assert(
                 res.members.some((member) => {
@@ -161,7 +161,7 @@ describe("Tests for maintenance port usage within replication internals", functi
         fps.off();
     });
 
-    it("Steady state replication via maintenance port", () => {
+    it("Steady state replication via priority port", () => {
         this.rs.initiate();
 
         jsTest.log.info("Block connections and kill ongoing oplog fetching to force a new connection");
@@ -199,7 +199,7 @@ describe("Tests for maintenance port usage within replication internals", functi
         fp.off();
     });
 
-    it("Initial sync via maintenance port", () => {
+    it("Initial sync via priority port", () => {
         this.rs.initiate();
 
         jsTest.log.info("Block new connections");
@@ -208,7 +208,7 @@ describe("Tests for maintenance port usage within replication internals", functi
         jsTest.log.info("Add a new node to the replica set configuration");
         let newNode = this.rs.add();
         let config = this.rs.getReplSetConfigFromNode();
-        config.members.push({_id: 3, host: newNode.host, maintenancePort: parseInt(newNode.maintenancePort)});
+        config.members.push({_id: 3, host: newNode.host, priorityPort: parseInt(newNode.priorityPort)});
         config.version++;
         assert.commandWorked(this.rs.getPrimary().adminCommand({replSetReconfig: config}));
 
@@ -218,7 +218,7 @@ describe("Tests for maintenance port usage within replication internals", functi
         fps.off();
     });
 
-    it("Election handoff via maintenance port", () => {
+    it("Election handoff via priority port", () => {
         this.rs.initiate();
 
         jsTest.log.info("Block connections on the main port and drop all existing connections from within the RS");
@@ -231,11 +231,11 @@ describe("Tests for maintenance port usage within replication internals", functi
         fps.off();
     });
 
-    it("Replication will switch to the maintenance port if it is added", () => {
+    it("Replication will switch to the priority port if it is added", () => {
         let config = this.rs.getReplSetConfig(true);
         this.rs.initiate(config);
 
-        jsTest.log.info("Reconfigure with maintenance ports");
+        jsTest.log.info("Reconfigure with priority ports");
         let newConfig = this.rs.getReplSetConfigFromNode();
         newConfig.members = this.rs.getReplSetConfig().members;
         newConfig.version += 1;
@@ -244,29 +244,29 @@ describe("Tests for maintenance port usage within replication internals", functi
         jsTest.log.info("Do some writes to make sure there is someone to sync from which is ahead of us");
         doWritesAndCheckReplication(this.rs.getPrimary(), this.rs.getSecondaries());
 
-        jsTest.log.info("Check that we switch to replicating via the maintenance port");
-        let hostsAndMaintenancePorts = getHostsAndMaintenancePorts(newConfig);
-        checkSyncingViaHostAndPorts(this.rs, hostsAndMaintenancePorts);
+        jsTest.log.info("Check that we switch to replicating via the priority port");
+        let hostsAndPriorityPorts = getHostsAndPriorityPorts(newConfig);
+        checkSyncingViaHostAndPorts(this.rs, hostsAndPriorityPorts);
     });
 
-    it("Replication will switch back to the main port if the maintenance port is removed", () => {
+    it("Replication will switch back to the main port if the priority port is removed", () => {
         this.rs.initiate();
 
-        jsTest.log.info("Check that current syncing is being done via maintenance ports");
-        let hostsAndMaintenancePorts = getHostsAndMaintenancePorts(this.rs.getReplSetConfigFromNode());
-        checkSyncingViaHostAndPorts(this.rs, hostsAndMaintenancePorts);
+        jsTest.log.info("Check that current syncing is being done via priority ports");
+        let hostsAndPriorityPorts = getHostsAndPriorityPorts(this.rs.getReplSetConfigFromNode());
+        checkSyncingViaHostAndPorts(this.rs, hostsAndPriorityPorts);
 
-        jsTest.log.info("Reconfigure without the maintenance ports");
+        jsTest.log.info("Reconfigure without the priority ports");
         let config = this.rs.getReplSetConfigFromNode();
         config.members.forEach((member) => {
-            delete member.maintenancePort;
+            delete member.priorityPort;
         });
         config.version += 1;
         assert.commandWorked(this.rs.getPrimary().adminCommand({replSetReconfig: config}));
 
         this.rs.awaitReplication();
 
-        jsTest.log.info("Do a rolling restart to remove the maintenance ports");
+        jsTest.log.info("Do a rolling restart to remove the priority ports");
         jsTest.log.info("Restarting secondaries");
         this.rs.getSecondaries().forEach((secondary) => {
             const id = this.rs.getNodeId(secondary);
@@ -278,7 +278,7 @@ describe("Tests for maintenance port usage within replication internals", functi
                     ", node options: " +
                     tojson(this.rs.nodeOptions["n" + id]),
             );
-            delete this.rs.nodes[id].fullOptions.maintenancePort;
+            delete this.rs.nodes[id].fullOptions.priorityPort;
             jsTest.log.info("Starting node " + id);
             assert.doesNotThrow(() => {
                 this.rs.start(id, {restart: true, remember: true});
@@ -297,7 +297,7 @@ describe("Tests for maintenance port usage within replication internals", functi
                 waitPid: true,
             },
         );
-        delete this.rs.nodes[primaryId].fullOptions.maintenancePort;
+        delete this.rs.nodes[primaryId].fullOptions.priorityPort;
         assert.doesNotThrow(() => {
             this.rs.start(primaryId, {restart: true, remember: true});
         });

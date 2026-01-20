@@ -184,9 +184,9 @@ public:
     virtual void setisLoadBalancerPeer(bool helloHasLoadBalancedOption) = 0;
 
     /**
-     * Returns true if the connection is on the maintenance port or corresponding unix socket.
+     * Returns true if the connection is on the priority port or corresponding unix socket.
      */
-    virtual bool isConnectedToMaintenancePort() const = 0;
+    virtual bool isConnectedToPriorityPort() const = 0;
 
 
     /**

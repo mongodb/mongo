@@ -1,8 +1,8 @@
 /*
- * Tests ReplSetReconfig with maintenancePort specified.
+ * Tests ReplSetReconfig with priorityPort specified.
  *
  * @tags: [
- *  featureFlagReplicationUsageOfMaintenancePort,
+ *  featureFlagReplicationUsageOfPriorityPort,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
@@ -11,15 +11,15 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 
-describe("Tests for maintenance port usage within JS test helpers", function () {
+describe("Tests for priority port usage within JS test helpers", function () {
     beforeEach(() => {
         // TODO (SERVER-112863) Remove tests of old LTS once 9.0 becomes lastLTS.
         this.checkShouldRunFCVGatedTest = function (conn) {
-            let maintenancePortEnabledFCV = FeatureFlagUtil.getFeatureFlagDoc(
+            let priorityPortEnabledFCV = FeatureFlagUtil.getFeatureFlagDoc(
                 conn,
-                "ReplicationUsageOfMaintenancePort",
+                "ReplicationUsageOfPriorityPort",
             ).version;
-            return MongoRunner.compareBinVersions(lastLTSFCV, maintenancePortEnabledFCV) == -1;
+            return MongoRunner.compareBinVersions(lastLTSFCV, priorityPortEnabledFCV) == -1;
         };
 
         this.dropAllConns = function (rs) {
@@ -31,10 +31,10 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         };
     });
 
-    it("ReplSetInitiate with maintenance port on FCV 8.0 will fail", () => {
+    it("ReplSetInitiate with priority port on FCV 8.0 will fail", () => {
         const rs = new ReplSetTest({
             nodes: 1,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
             nodeOptions: {setParameter: {defaultStartupFCV: lastLTSFCV}},
         });
         let conns = rs.startSet();
@@ -49,15 +49,15 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         rs.stopSet();
     });
 
-    it("Reconfig with maintenance port on FCV 8.0 will fail", () => {
+    it("Reconfig with priority port on FCV 8.0 will fail", () => {
         const rs = new ReplSetTest({
             nodes: 1,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
             nodeOptions: {setParameter: {defaultStartupFCV: lastLTSFCV}},
         });
         rs.startSet();
-        // Initiate without maintenance port since including on FCV 8.0 would fail.
-        let config = rs.getReplSetConfig(true /* ignoreMaintenancePort */);
+        // Initiate without priority port since including on FCV 8.0 would fail.
+        let config = rs.getReplSetConfig(true /* ignorePriorityPort */);
         rs.initiate(config);
 
         if (this.checkShouldRunFCVGatedTest(rs.getPrimary())) {
@@ -75,15 +75,15 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         rs.stopSet();
     });
 
-    it("Initiate with incorrect port for maintenance port should fail", () => {
+    it("Initiate with incorrect port for priority port should fail", () => {
         const rs = new ReplSetTest({
             nodes: 1,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
         });
         let conns = rs.startSet();
         let config = rs.getReplSetConfig();
-        // Change the maintenance port to the wrong port
-        config.members[0].maintenancePort += 1;
+        // Change the priority port to the wrong port
+        config.members[0].priorityPort += 1;
 
         assert.commandFailedWithCode(
             conns[0].adminCommand({replSetInitiate: config}),
@@ -92,14 +92,14 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         rs.stopSet();
     });
 
-    it("Initiate with maintenance port when none is available should fail", () => {
+    it("Initiate with priority port when none is available should fail", () => {
         const rs = new ReplSetTest({
             nodes: 1,
         });
         let conns = rs.startSet();
         let config = rs.getReplSetConfig();
-        // Specify a maintenance port
-        config.members[0].maintenancePort = 30;
+        // Specify a priority port
+        config.members[0].priorityPort = 30;
 
         assert.commandFailedWithCode(
             conns[0].adminCommand({replSetInitiate: config}),
@@ -108,17 +108,17 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         rs.stopSet();
     });
 
-    it("Reconfig with incorrect port for maintenance port should fail", () => {
+    it("Reconfig with incorrect port for priority port should fail", () => {
         const rs = new ReplSetTest({
             nodes: 1,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
         });
         rs.startSet();
         let config = rs.getReplSetConfig();
         rs.initiate(config);
 
         let newConfig = rs.getReplSetConfigFromNode();
-        newConfig.members[0].maintenancePort += 1;
+        newConfig.members[0].priorityPort += 1;
         newConfig.version += 1;
 
         assert.commandFailedWithCode(
@@ -129,33 +129,29 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         rs.stopSet();
     });
 
-    it("Initiate with wrong maintenance port on a majority of nodes should fail", () => {
-        const rs = new ReplSetTest({nodes: [{maintenancePort: allocatePort()}, {}, {}]});
+    it("Initiate with wrong priority port on a majority of nodes should fail", () => {
+        const rs = new ReplSetTest({nodes: [{priorityPort: allocatePort()}, {}, {}]});
         rs.startSet();
 
-        jsTest.log.info(
-            "Initiate should fail because we specify maintenance ports which are not open on the secondaries",
-        );
+        jsTest.log.info("Initiate should fail because we specify priority ports which are not open on the secondaries");
         let config = rs.getReplSetConfig();
-        config.members[1].maintenancePort = 27022;
-        config.members[2].maintenancePort = 27023;
+        config.members[1].priorityPort = 27022;
+        config.members[2].priorityPort = 27023;
 
         assert.commandFailedWithCode(rs.nodes[0].adminCommand({replSetInitiate: config}), ErrorCodes.NodeNotFound);
 
         rs.stopSet();
     });
 
-    it("Reconfig with wrong maintenance port on a majority of nodes should fail", () => {
-        const rs = new ReplSetTest({nodes: [{maintenancePort: allocatePort()}, {}, {}]});
+    it("Reconfig with wrong priority port on a majority of nodes should fail", () => {
+        const rs = new ReplSetTest({nodes: [{priorityPort: allocatePort()}, {}, {}]});
         rs.startSet();
         rs.initiate();
 
-        jsTest.log.info(
-            "Initiate should fail because we specify maintenance ports which are not open on the secondaries",
-        );
+        jsTest.log.info("Initiate should fail because we specify priority ports which are not open on the secondaries");
         let config = rs.getReplSetConfigFromNode();
-        config.members[1].maintenancePort = 27022;
-        config.members[2].maintenancePort = 27023;
+        config.members[1].priorityPort = 27022;
+        config.members[2].priorityPort = 27023;
         config.version += 1;
 
         assert.commandFailedWithCode(rs.getPrimary().adminCommand({replSetReconfig: config}), ErrorCodes.NodeNotFound);
@@ -163,22 +159,22 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         rs.stopSet();
     });
 
-    it("Initiate when we can only reach the maintenance port on a majority of nodes should fail", () => {
-        const rs = new ReplSetTest({nodes: 3, useMaintenancePorts: true});
+    it("Initiate when we can only reach the priority port on a majority of nodes should fail", () => {
+        const rs = new ReplSetTest({nodes: 3, usePriorityPorts: true});
         rs.startSet();
 
         jsTest.log.info("Block connections on the main ports");
         let fps = configureFailPointForRS(rs.nodes, "rejectNewNonPriorityConnections");
 
-        jsTest.log.info("Initiate should fail because we can only connect on the maintenance ports");
+        jsTest.log.info("Initiate should fail because we can only connect on the priority ports");
         let config = rs.getReplSetConfig();
         assert.commandFailedWithCode(rs.nodes[0].adminCommand({replSetInitiate: config}), ErrorCodes.NodeNotFound);
 
         rs.stopSet();
     });
 
-    it("Reconfig when we can only reach the maintenance port on a majority of nodes should fail", () => {
-        const rs = new ReplSetTest({nodes: 3, useMaintenancePorts: true});
+    it("Reconfig when we can only reach the priority port on a majority of nodes should fail", () => {
+        const rs = new ReplSetTest({nodes: 3, usePriorityPorts: true});
         rs.startSet();
         rs.initiate();
 
@@ -188,7 +184,7 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         let fps = configureFailPointForRS(rs.nodes, "rejectNewNonPriorityConnections");
         this.dropAllConns(rs);
 
-        jsTest.log.info("Reconfig should fail because we can only connect on the maintenance ports");
+        jsTest.log.info("Reconfig should fail because we can only connect on the priority ports");
         config.version += 1;
         assert.commandFailedWithCode(rs.getPrimary().adminCommand({replSetReconfig: config}), ErrorCodes.NodeNotFound);
 
@@ -196,11 +192,11 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         rs.stopSet();
     });
 
-    it("Initiate with maintenance port plus bindIp works when fast resolution works", () => {
+    it("Initiate with priority port plus bindIp works when fast resolution works", () => {
         let ips = "localhost," + get_ipaddr();
         const rs = new ReplSetTest({
             nodes: 1,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
             nodeOptions: {bind_ip: ips},
         });
         rs.startSet();
@@ -209,11 +205,11 @@ describe("Tests for maintenance port usage within JS test helpers", function () 
         rs.stopSet();
     });
 
-    it("Initiate with maintenance port plus bindIp works when fast resolution does not", () => {
+    it("Initiate with priority port plus bindIp works when fast resolution does not", () => {
         let ips = "localhost," + getHostName();
         const rs = new ReplSetTest({
             nodes: 1,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
             nodeOptions: {bind_ip: ips},
         });
         rs.startSet();

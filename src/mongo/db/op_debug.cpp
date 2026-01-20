@@ -198,10 +198,9 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     pAttrs->add("isFromUserConnection", client && client->isFromUserConnection());
-    if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
-        pAttrs->add("isFromMaintenancePortConnection",
-                    client && client->session() &&
-                        client->session()->isConnectedToMaintenancePort());
+    if (gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
+        pAttrs->add("isFromPriorityPortConnection",
+                    client && client->session() && client->session()->isConnectedToPriorityPort());
     }
     pAttrs->addDeepCopy("ns", toStringForLogging(curop.getNSS()));
     pAttrs->addDeepCopy("collectionType", getCollectionType(opCtx, curop.getNSS()));
@@ -567,10 +566,10 @@ void OpDebug::append(OperationContext* opCtx,
 
     b.append("ns", curop.getNS());
 
-    if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
-        b.append("isFromMaintenancePortConnection",
+    if (gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
+        b.append("isFromPriorityPortConnection",
                  opCtx->getClient() && opCtx->getClient()->session() &&
-                     opCtx->getClient()->session()->isConnectedToMaintenancePort());
+                     opCtx->getClient()->session()->isConnectedToPriorityPort());
     }
 
     if (!omitCommand) {
@@ -897,11 +896,11 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(OperationConte
     });
     addIfNeeded("ns", [](auto field, auto args, auto& b) { b.append(field, args.curop.getNS()); });
 
-    addIfNeeded("isFromMaintenancePortConnection", [](auto field, auto args, auto& b) {
-        bool isFromMaintenanceConnection = args.opCtx->getClient() &&
+    addIfNeeded("isFromPriorityPortConnection", [](auto field, auto args, auto& b) {
+        bool isFromPriorityConnection = args.opCtx->getClient() &&
             args.opCtx->getClient()->session() &&
-            args.opCtx->getClient()->session()->isConnectedToMaintenancePort();
-        b.append(field, isFromMaintenanceConnection);
+            args.opCtx->getClient()->session()->isConnectedToPriorityPort();
+        b.append(field, isFromPriorityConnection);
     });
 
     addIfNeeded("command", [](auto field, auto args, auto& b) {

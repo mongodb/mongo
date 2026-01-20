@@ -58,12 +58,12 @@ cursor.next(); // Perform initial query and retrieve first document in batch.
 
 let cursorid = getLatestProfilerEntry(testDB).cursorid;
 
-let maintenancePortFFEnabled = FeatureFlagUtil.isPresentAndEnabled(testDB, "DedicatedPortForMaintenanceOperations");
+let priorityPortFFEnabled = FeatureFlagUtil.isPresentAndEnabled(testDB, "DedicatedPortForPriorityOperations");
 
-let logLine = maintenancePortFFEnabled
+let logLine = priorityPortFFEnabled
     ? [
           '"msg":"Slow query","attr":{"type":"command",',
-          '"isFromUserConnection":true,"isFromMaintenancePortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
+          '"isFromUserConnection":true,"isFromPriorityPortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
           '"command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
           '"planCacheShapeHash":',
       ]
@@ -93,10 +93,10 @@ function cursorIdToString(cursorId) {
     return cursorIdString.substring('NumberLong("'.length, cursorIdString.length - '")'.length);
 }
 
-logLine = maintenancePortFFEnabled
+logLine = priorityPortFFEnabled
     ? [
           '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"isFromMaintenancePortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell"',
+          '"attr":{"type":"command","isFromUserConnection":true,"isFromPriorityPortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell"',
           `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
           '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
           '"planCacheShapeHash":',
@@ -117,10 +117,10 @@ cursorid = getLatestProfilerEntry(testDB).cursorid;
 
 assert.eq(cursor.itcount(), 10);
 
-logLine = maintenancePortFFEnabled
+logLine = priorityPortFFEnabled
     ? [
           '"msg":"Slow query"',
-          '"attr":{"type":"command","isFromUserConnection":true,"isFromMaintenancePortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
+          '"attr":{"type":"command","isFromUserConnection":true,"isFromPriorityPortConnection":false,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell",',
           `"command":{"getMore":${cursorIdToString(cursorid)},"collection":"test"`,
           '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}',
       ]

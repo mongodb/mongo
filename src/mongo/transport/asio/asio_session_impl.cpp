@@ -184,13 +184,13 @@ CommonAsioSession::CommonAsioSession(
         if (tl->loadBalancerPort()) {
             _isConnectedToLoadBalancerPort = _local.port() == *tl->loadBalancerPort();
         }
-        if (tl->maintenancePort()) {
+        if (tl->priorityPort()) {
 #ifdef __linux__
-            _isConnectedToMaintenancePort = _localAddr.isIP()
-                ? _local.port() == *tl->maintenancePort()
-                : parsePortFromUnixSockPath(_localAddr.toString(true)) == *tl->maintenancePort();
+            _isConnectedToPriorityPort = _localAddr.isIP()
+                ? _local.port() == *tl->priorityPort()
+                : parsePortFromUnixSockPath(_localAddr.toString(true)) == *tl->priorityPort();
 #else
-            _isConnectedToMaintenancePort = _local.port() == *tl->maintenancePort();
+            _isConnectedToPriorityPort = _local.port() == *tl->priorityPort();
 #endif
         }
     } catch (...) {
@@ -231,8 +231,8 @@ bool CommonAsioSession::isConnectedToLoadBalancerPort() const {
         _isConnectedToLoadBalancerPort;
 }
 
-bool CommonAsioSession::isConnectedToMaintenancePort() const {
-    return _isConnectedToMaintenancePort;
+bool CommonAsioSession::isConnectedToPriorityPort() const {
+    return _isConnectedToPriorityPort;
 }
 
 bool CommonAsioSession::isLoadBalancerPeer() const {

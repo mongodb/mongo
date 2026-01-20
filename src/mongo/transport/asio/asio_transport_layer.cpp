@@ -389,8 +389,8 @@ AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
       _egressReactor(std::make_shared<AsioReactor>()),
       _listenerInterfaceMainPort(
           std::make_unique<ListenerInterface>(_mutex, std::make_shared<AsioReactor>(), this)),
-      _listenerInterfaceMaintenancePort(
-          opts.maintenancePort
+      _listenerInterfacePriorityPort(
+          opts.priorityPort
               ? std::make_unique<ListenerInterface>(_mutex, std::make_shared<AsioReactor>(), this)
               : nullptr),
       _sessionManager(std::move(sessionManager)),
@@ -776,7 +776,7 @@ void AsioTransportLayer::ListenerInterface::_runListener(std::string threadName)
     // Because multiple listener interfaces can be active at the same time (one thread per
     // interface), we must hold the lock when accessing the shared state in the following
     // operations.  Currently, listener threads run for _listenerInterfaceMainPort and
-    // _listenerInterfaceMaintenancePort.
+    // _listenerInterfacePriorityPort.
     _startListening(lk);
 
     _listener.state = Listener::State::kActive;
@@ -1334,7 +1334,7 @@ Status AsioTransportLayer::ListenerInterface::setup(
 
 Status AsioTransportLayer::setup() {
     // Since the load balancer port value is set to zero to disable the port entirely and the
-    // maintenance port cannot be zero (range of possible value starting from 1), the main port is
+    // priority port cannot be zero (range of possible value starting from 1), the main port is
     // the only port which could be specified as ephemeral.
     if (_listenerOptions.port == 0 && _listenerOptions.ipList.size() > 1) {
         return Status(ErrorCodes::BadValue,
@@ -1382,10 +1382,10 @@ Status AsioTransportLayer::setup() {
         return status;
     }
 
-    if (_listenerInterfaceMaintenancePort) {
-        std::vector<int> ports = {*_listenerOptions.maintenancePort};
+    if (_listenerInterfacePriorityPort) {
+        std::vector<int> ports = {*_listenerOptions.priorityPort};
         const auto listenUnixDomainSocketAddrs = getUnixDomainSocketAddrs(ports);
-        auto status = _listenerInterfaceMaintenancePort->setup(
+        auto status = _listenerInterfacePriorityPort->setup(
             ports, listenIPAddrs, listenUnixDomainSocketAddrs, _listenerOptions);
     }
     if (!status.isOK()) {
@@ -1409,8 +1409,8 @@ std::vector<std::pair<SockAddr, int>> AsioTransportLayer::getListenerSocketBackl
     for (auto&& record : _listenerInterfaceMainPort->getAcceptorRecords()) {
         queueDepths.push_back({SockAddr(record->address), record->backlogQueueDepth.load()});
     }
-    if (_listenerInterfaceMaintenancePort) {
-        for (auto&& record : _listenerInterfaceMaintenancePort->getAcceptorRecords()) {
+    if (_listenerInterfacePriorityPort) {
+        for (auto&& record : _listenerInterfacePriorityPort->getAcceptorRecords()) {
             queueDepths.push_back({SockAddr(record->address), record->backlogQueueDepth.load()});
         }
     }
@@ -1428,8 +1428,8 @@ void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
         BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
             record->address.toString(), record->backlogQueueDepth.load());
     }
-    if (_listenerInterfaceMaintenancePort) {
-        for (const auto& record : _listenerInterfaceMaintenancePort->getAcceptorRecords()) {
+    if (_listenerInterfacePriorityPort) {
+        for (const auto& record : _listenerInterfacePriorityPort->getAcceptorRecords()) {
             BSONObjBuilder{queueDepthsArrayBuilder.subobjStart()}.append(
                 record->address.toString(), record->backlogQueueDepth.load());
         }
@@ -1461,22 +1461,22 @@ Status AsioTransportLayer::start() {
     if (_listenerOptions.isIngress()) {
         // Only start the listener threads if the TL wasn't shut down before start() was invoked.
         if (_listenerInterfaceMainPort->getListenerState() == Listener::State::kNew &&
-            (!_listenerInterfaceMaintenancePort ||
-             _listenerInterfaceMaintenancePort->getListenerState() == Listener::State::kNew)) {
+            (!_listenerInterfacePriorityPort ||
+             _listenerInterfacePriorityPort->getListenerState() == Listener::State::kNew)) {
             invariant(_sessionManager);
             _listenerInterfaceMainPort->startListener("listener");
-            if (_listenerInterfaceMaintenancePort) {
-                _listenerInterfaceMaintenancePort->startListener("listenerForMaintenance");
+            if (_listenerInterfacePriorityPort) {
+                _listenerInterfacePriorityPort->startListener("listenerForPriority");
             }
             _listenerInterfaceMainPort->waitUntilListenerStarted(lk);
-            if (_listenerInterfaceMaintenancePort) {
-                _listenerInterfaceMaintenancePort->waitUntilListenerStarted(lk);
+            if (_listenerInterfacePriorityPort) {
+                _listenerInterfacePriorityPort->waitUntilListenerStarted(lk);
             }
         }
     } else {
         invariant(_listenerInterfaceMainPort->getAcceptorRecords().empty());
-        if (_listenerInterfaceMaintenancePort) {
-            invariant(_listenerInterfaceMaintenancePort->getAcceptorRecords().empty());
+        if (_listenerInterfacePriorityPort) {
+            invariant(_listenerInterfacePriorityPort->getAcceptorRecords().empty());
         }
     }
 
@@ -1510,13 +1510,12 @@ void AsioTransportLayer::stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::m
     }
 
     _listenerInterfaceMainPort->stopListenerWithLock(lk);
-    if (_listenerInterfaceMaintenancePort) {
-        _listenerInterfaceMaintenancePort->stopListenerWithLock(lk);
+    if (_listenerInterfacePriorityPort) {
+        _listenerInterfacePriorityPort->stopListenerWithLock(lk);
     }
 
     if (!_listenerInterfaceMainPort->isListenerStarted() &&
-        (!_listenerInterfaceMaintenancePort ||
-         !_listenerInterfaceMaintenancePort->isListenerStarted())) {
+        (!_listenerInterfacePriorityPort || !_listenerInterfacePriorityPort->isListenerStarted())) {
         // If the listeners never started, then we can return now
         return;
     }
@@ -1524,9 +1523,8 @@ void AsioTransportLayer::stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::m
     // Release the lock and wait for the threads to die
     lk.unlock();
     _listenerInterfaceMainPort->waitListenerThreadJoin();
-    if (_listenerInterfaceMaintenancePort &&
-        _listenerInterfaceMaintenancePort->isListenerStarted()) {
-        _listenerInterfaceMaintenancePort->waitListenerThreadJoin();
+    if (_listenerInterfacePriorityPort && _listenerInterfacePriorityPort->isListenerStarted()) {
+        _listenerInterfacePriorityPort->waitListenerThreadJoin();
     }
 }
 
@@ -1681,15 +1679,15 @@ void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(GenericAcceptor&
             _listenerInterfaceMainPort->getAcceptorRecords(), [&](const auto& record) {
                 return acceptor.local_endpoint() == record->acceptor.local_endpoint();
             });
-        if (_listenerInterfaceMaintenancePort &&
+        if (_listenerInterfacePriorityPort &&
             matchingRecord == std::end(_listenerInterfaceMainPort->getAcceptorRecords())) {
-            // No match with the main ports acceptors, search over the maintenance port acceptors
+            // No match with the main ports acceptors, search over the priority port acceptors
             matchingRecord = std::ranges::find_if(
-                _listenerInterfaceMaintenancePort->getAcceptorRecords(), [&](const auto& record) {
+                _listenerInterfacePriorityPort->getAcceptorRecords(), [&](const auto& record) {
                     return acceptor.local_endpoint() == record->acceptor.local_endpoint();
                 });
             invariant(matchingRecord !=
-                      std::ranges::end(_listenerInterfaceMaintenancePort->getAcceptorRecords()));
+                      std::ranges::end(_listenerInterfacePriorityPort->getAcceptorRecords()));
         } else {
             invariant(matchingRecord !=
                       std::ranges::end(_listenerInterfaceMainPort->getAcceptorRecords()));

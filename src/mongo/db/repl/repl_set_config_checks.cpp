@@ -311,33 +311,32 @@ Status validateOldAndNewConfigsCompatible(const VersionContext& vCtx,
     return Status::OK();
 }
 
-// Ensure that maintenance port can only be specified in a ReplSetConfig if the feature flag is
+// Ensure that priority port can only be specified in a ReplSetConfig if the feature flag is
 // enabled. This should not be checked in the heartbeat reconfiguration or the startup config checks
 // to ensure that lagged secondaries that have not yet upgraded their FCV do not encounter issues.
-// We also ensure that no maintenance port is added if this is a force reconfig. This is to ensure
+// We also ensure that no priority port is added if this is a force reconfig. This is to ensure
 // that we properly serialize with FCV downgrade without having to drain replSetReconfig commands on
 // secondaries during setFCV.
 // TODO (SERVER-112863) Remove these checks.
-Status validateMaintenancePortSettings(const VersionContext& vCtx,
-                                       const boost::optional<ReplSetConfig>& oldConfig,
-                                       const ReplSetConfig& newConfig,
-                                       bool force) {
-    auto maintenancePortFeatureEnabled =
-        feature_flags::gFeatureFlagReplicationUsageOfMaintenancePort.isEnabled(
+Status validatePriorityPortSettings(const VersionContext& vCtx,
+                                    const boost::optional<ReplSetConfig>& oldConfig,
+                                    const ReplSetConfig& newConfig,
+                                    bool force) {
+    auto priorityPortFeatureEnabled =
+        feature_flags::gFeatureFlagReplicationUsageOfPriorityPort.isEnabled(
             vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    if (maintenancePortFeatureEnabled && !force) {
+    if (priorityPortFeatureEnabled && !force) {
         return Status::OK();
     }
 
     for (size_t i = 0; i < newConfig.members().size(); i++) {
         const auto& newMember = newConfig.getMemberAt(i);
-        if (newMember.getMaintenancePort().has_value()) {
-            if (!maintenancePortFeatureEnabled) {
+        if (newMember.getPriorityPort().has_value()) {
+            if (!priorityPortFeatureEnabled) {
                 return {ErrorCodes::InvalidOptions,
-                        "Maintenance port is not supported on the current FCV"};
-            } else if (force && !oldConfig->getMemberAt(i).getMaintenancePort().has_value()) {
-                return {ErrorCodes::InvalidOptions,
-                        "Cannot add maintenance ports via force reconfig"};
+                        "Priority port is not supported on the current FCV"};
+            } else if (force && !oldConfig->getMemberAt(i).getPriorityPort().has_value()) {
+                return {ErrorCodes::InvalidOptions, "Cannot add priority ports via force reconfig"};
             }
         }
     }
@@ -383,7 +382,7 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
     for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
          iter != newConfig.membersEnd();
          ++iter) {
-        if (externalState->isSelfFastPath(iter->getHostAndPort(), iter->getMaintenancePort())) {
+        if (externalState->isSelfFastPath(iter->getHostAndPort(), iter->getPriorityPort())) {
             meConfigs.push_back(iter);
         }
     }
@@ -393,7 +392,7 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
              iter != newConfig.membersEnd();
              ++iter) {
             if (externalState->isSelfSlowPath(
-                    iter->getHostAndPort(), iter->getMaintenancePort(), ctx, Seconds(30))) {
+                    iter->getHostAndPort(), iter->getPriorityPort(), ctx, Seconds(30))) {
                 meConfigs.push_back(iter);
             }
         }
@@ -440,7 +439,7 @@ StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState*
 
 int findOwnHostInConfigQuick(const ReplSetConfig& newConfig,
                              HostAndPort host,
-                             boost::optional<int> maintenancePort) {
+                             boost::optional<int> priorityPort) {
     if (host.empty()) {
         return -1;
     }
@@ -453,7 +452,7 @@ int findOwnHostInConfigQuick(const ReplSetConfig& newConfig,
          ++iter) {
 
         if (iter->getHostAndPort() == host &&
-            (!iter->getMaintenancePort() || iter->getMaintenancePort() == maintenancePort)) {
+            (!iter->getPriorityPort() || iter->getPriorityPort() == priorityPort)) {
             firstMatchIndex = currIndex;
             invariant(firstMatchIndex >= 0);
             break;
@@ -502,7 +501,7 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
                               "instead to set a cluster-wide default writeConcern."});
     }
 
-    status = validateMaintenancePortSettings(
+    status = validatePriorityPortSettings(
         VersionContext::getDecoration(opCtx), boost::none, newConfig, false /* force */);
     if (!status.isOK()) {
         return StatusWith<int>(status);
@@ -551,7 +550,7 @@ Status validateConfigForReconfig(const VersionContext& vCtx,
             "set a cluster-wide default writeConcern.",
             !newConfig.containsCustomizedGetLastErrorDefaults());
 
-    status = validateMaintenancePortSettings(vCtx, oldConfig, newConfig, force);
+    status = validatePriorityPortSettings(vCtx, oldConfig, newConfig, force);
     if (!status.isOK()) {
         return status;
     }
@@ -583,7 +582,7 @@ StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,
     const ReplSetConfig& newConfig,
     HostAndPort ownHost,
-    boost::optional<int> ownMaintenancePort,
+    boost::optional<int> ownPriorityPort,
     ServiceContext* ctx) {
     Status status = newConfig.validateAllowingSplitHorizonIP();
     if (!status.isOK()) {
@@ -597,7 +596,7 @@ StatusWith<int> validateConfigForHeartbeatReconfig(
             "set a cluster-wide default writeConcern.",
             !newConfig.containsCustomizedGetLastErrorDefaults());
 
-    auto quickIndex = findOwnHostInConfigQuick(newConfig, ownHost, ownMaintenancePort);
+    auto quickIndex = findOwnHostInConfigQuick(newConfig, ownHost, ownPriorityPort);
     if (quickIndex >= 0) {
         LOGV2(6475001,
               "Was able to quickly find new index in config. Skipping full isSelf checks",

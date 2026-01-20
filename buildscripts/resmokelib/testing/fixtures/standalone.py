@@ -37,7 +37,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         port: Optional[int] = None,
         launch_mongot: bool = False,
         load_all_extensions: bool = False,
-        use_maintenance_port: bool = False,
+        use_priority_port: bool = False,
     ):
         """Initialize MongoDFixture with different options for the mongod process.
 
@@ -53,7 +53,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             port (Optional[int], optional): Port to use for mongod. Defaults to None.
             launch_mongot (bool, optional): Should mongot be launched as well. Defaults to False.
             load_all_extensions (bool, optional): Whether to load all test extensions upon startup. Defaults to False.
-            use_maintenance_port (bool, optional): Whether to open a maintenance port on this node at startup. Defaults to False.
+            use_priority_port (bool, optional): Whether to open a priority port on this node at startup. Defaults to False.
 
         Raises
             ValueError: _description_
@@ -105,10 +105,10 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.port = port or fixturelib.get_next_port(job_num)
         self.mongod_options["port"] = self.port
 
-        self.use_maintenance_port = use_maintenance_port
-        if self.use_maintenance_port:
-            self.maintenance_port = fixturelib.get_next_port(job_num)
-            self.mongod_options["maintenancePort"] = self.maintenance_port
+        self.use_priority_port = use_priority_port
+        if self.use_priority_port:
+            self.priority_port = fixturelib.get_next_port(job_num)
+            self.mongod_options["priorityPort"] = self.priority_port
 
         if launch_mongot:
             self.launch_mongot_bool = True

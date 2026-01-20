@@ -49,27 +49,27 @@ namespace repl {
 extern OID instanceId;
 
 /**
- * Returns true if "hostAndPort" and "maintenancePort" identify this instance. If no maintenancePort
+ * Returns true if "hostAndPort" and "priorityPort" identify this instance. If no priorityPort
  * is specified then the checks on that field will be skipped.
  */
 bool isSelf(const HostAndPort& hostAndPort,
-            const boost::optional<int>& maintenancePort,
+            const boost::optional<int>& priorityPort,
             ServiceContext* ctx,
             Milliseconds timeout = Seconds(30));
 
 /**
- * Returns true if "hostAndPort" and "maintenancePort" identify this instance by checking our bound
+ * Returns true if "hostAndPort" and "priorityPort" identify this instance by checking our bound
  * IP addresses, without going out to the network and running the _isSelf command on the node.
  */
-bool isSelfFastPath(const HostAndPort& hostAndPort, const boost::optional<int>& maintenancePort);
+bool isSelfFastPath(const HostAndPort& hostAndPort, const boost::optional<int>& priorityPort);
 
 /**
- * Returns true if "hostAndPort" and "maintenancePort" identify this instance by running the _isSelf
- * command on the node. If the "maintenancePort" is specified, will also run _isSelf against
- * host:maintenancePort.
+ * Returns true if "hostAndPort" and "priorityPort" identify this instance by running the _isSelf
+ * command on the node. If the "priorityPort" is specified, will also run _isSelf against
+ * host:priorityPort.
  */
 bool isSelfSlowPath(const HostAndPort& hostAndPort,
-                    const boost::optional<int>& maintenancePort,
+                    const boost::optional<int>& priorityPort,
                     ServiceContext* ctx,
                     Milliseconds timeout);
 

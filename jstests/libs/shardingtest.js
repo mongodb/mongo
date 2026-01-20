@@ -908,34 +908,34 @@ export class ShardingTest {
     }
 
     /**
-     * TODO (SERVER-112863) Remove this once the maintenance port is supported on lastLTS.
+     * TODO (SERVER-112863) Remove this once the priority port is supported on lastLTS.
      *
      * Returns true if:
-     *  1. A maintenance port is specified in any of the replica set configurations in the cluster
-     *  2. LastLTS FCV is less than the FCV on which featureFlagReplicationUsageOfMaintenancePort is
+     *  1. A priority port is specified in any of the replica set configurations in the cluster
+     *  2. LastLTS FCV is less than the FCV on which featureFlagReplicationUsageOfPriorityPort is
      *     enabled.
      * Note that we compare the FCVs directly rather than checking the feature flag on the replica
      * sets because the FCV isn't known until replSetInitiate.
      */
-    _shouldSkipMaintenancePortDuringInitialization() {
-        const mpFeatureFlag = "ReplicationUsageOfMaintenancePort";
-        let skipInitiatingWithMaintenancePort = false;
-        const containsMaintenancePort = this._rs.some(rs => {
+    _shouldSkipPriorityPortDuringInitialization() {
+        const mpFeatureFlag = "ReplicationUsageOfPriorityPort";
+        let skipInitiatingWithPriorityPort = false;
+        const containsPriorityPort = this._rs.some(rs => {
             return bsonUnorderedFieldsCompare(rs.test.getReplSetConfig(true), rs.test.getReplSetConfig(false)) != 0;
         });
-        if (containsMaintenancePort) {
-            let maintenancePortEnabledFCV;
+        if (containsPriorityPort) {
+            let priorityPortEnabledFCV;
             let node = this.configRS.nodes[0];
             if (this.configRS.keyFile) {
                 authutil.asCluster(node, this.configRS.keyFile, function() {
-                    maintenancePortEnabledFCV = FeatureFlagUtil.getFeatureFlagDoc(node, mpFeatureFlag).version;
+                    priorityPortEnabledFCV = FeatureFlagUtil.getFeatureFlagDoc(node, mpFeatureFlag).version;
                 });
             } else {
-                maintenancePortEnabledFCV = FeatureFlagUtil.getFeatureFlagDoc(node, mpFeatureFlag).version;
+                priorityPortEnabledFCV = FeatureFlagUtil.getFeatureFlagDoc(node, mpFeatureFlag).version;
             }
-            skipInitiatingWithMaintenancePort = MongoRunner.compareBinVersions(lastLTSFCV, maintenancePortEnabledFCV) == -1;
+            skipInitiatingWithPriorityPort = MongoRunner.compareBinVersions(lastLTSFCV, priorityPortEnabledFCV) == -1;
         }
-        return skipInitiatingWithMaintenancePort;
+        return skipInitiatingWithPriorityPort;
     }
 
     /**
@@ -960,7 +960,7 @@ export class ShardingTest {
      * @property {Object} [bridgeOptions={}] Options to apply to all mongobridge processes.
      * @property {Object} [rsOptions] Same as the `rs` parameter to ShardingTest constructor. Can be
      * used to specify options that are common all replica members.
-     * @property {boolean} [useMaintenancePorts=false] If true, then a maintenance port will be
+     * @property {boolean} [usePriorityPorts=false] If true, then a priority port will be
      * specified for each node in the cluster.
      *
      * // replica Set only:
@@ -1150,7 +1150,7 @@ export class ShardingTest {
         otherParams.useBridge = otherParams.useBridge || false;
         otherParams.bridgeOptions = otherParams.bridgeOptions || {};
         otherParams.causallyConsistent = otherParams.causallyConsistent || false;
-        otherParams.useMaintenancePorts = otherParams.useMaintenancePorts ?? false;
+        otherParams.usePriorityPorts = otherParams.usePriorityPorts ?? false;
 
         if (jsTestOptions().networkMessageCompressors) {
             otherParams.bridgeOptions["networkMessageCompressors"] =
@@ -1177,7 +1177,7 @@ export class ShardingTest {
                 "useBridge cannot be true when using TLS. Add the requires_mongobridge tag to the test to ensure it will be skipped on variants that use TLS.",
             );
         }
-        this._useMaintenancePorts = otherParams.useMaintenancePorts;
+        this._usePriorityPorts = otherParams.usePriorityPorts;
 
         this._unbridgedMongos = [];
         let _allocatePortForMongos;
@@ -1257,7 +1257,7 @@ export class ShardingTest {
                     host: hostName,
                     useBridge: otherParams.useBridge,
                     bridgeOptions: otherParams.bridgeOptions,
-                    useMaintenancePorts: otherParams.useMaintenancePorts,
+                    usePriorityPorts: otherParams.usePriorityPorts,
                     keyFile: this.keyFile,
                     waitForKeys: false,
                     name: testName + "-configRS",
@@ -1396,7 +1396,7 @@ export class ShardingTest {
                     useHostName: otherParams.useHostname,
                     useBridge: otherParams.useBridge,
                     bridgeOptions: otherParams.bridgeOptions,
-                    useMaintenancePorts: otherParams.useMaintenancePorts,
+                    usePriorityPorts: otherParams.usePriorityPorts,
                     keyFile: this.keyFile,
                     protocolVersion: protocolVersion,
                     waitForKeys: false,
@@ -1455,7 +1455,7 @@ export class ShardingTest {
                 delete jsTest.options().setParameters.maxTransactionLockRequestTimeoutMillis;
             }
 
-            let skipInitiatingWithMaintenancePort = this._shouldSkipMaintenancePortDuringInitialization();
+            let skipInitiatingWithPriorityPort = this._shouldSkipPriorityPortDuringInitialization();
 
             //
             // Initiate each shard replica set and wait for replication. Also initiate the config
@@ -1470,7 +1470,7 @@ export class ShardingTest {
             }
 
             const replicaSetsToInitiate = replSetToIntiateArr.map((rst) => {
-                const rstConfig = rst.getReplSetConfig(skipInitiatingWithMaintenancePort);
+                const rstConfig = rst.getReplSetConfig(skipInitiatingWithPriorityPort);
 
                 // The mongo shell cannot authenticate as the internal __system user in tests that
                 // use x509 for cluster authentication. Choosing the default value for
@@ -1687,8 +1687,8 @@ export class ShardingTest {
                 }
 
                 options.port = options.port || _allocatePortForMongos();
-                if (this._useMaintenancePorts || options.hasOwnProperty("maintenancePort")) {
-                    options.maintenancePort = options.hasOwnProperty("maintenancePort") ? options.maintenancePort : _allocatePortForMongos();
+                if (this._usePriorityPorts || options.hasOwnProperty("priorityPort")) {
+                    options.priorityPort = options.hasOwnProperty("priorityPort") ? options.priorityPort : _allocatePortForMongos();
                 }
                 if (jsTestOptions().shellGRPC) {
                     options.grpcPort = options.grpcPort || _allocatePortForMongos();
@@ -1886,9 +1886,9 @@ export class ShardingTest {
                 throw e;
             }
 
-            // TODO (SERVER-112863) Remove this once the maintenance port is supported on lastLTS.
+            // TODO (SERVER-112863) Remove this once the priority port is supported on lastLTS.
             this._rs.forEach((rs) => {
-                if (skipInitiatingWithMaintenancePort) {
+                if (skipInitiatingWithPriorityPort) {
                     if (this.keyFile) {
                         authutil.asCluster(rs.test.nodes, this.keyFile, () => {
                             rs.test.reInitiate();

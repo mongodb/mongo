@@ -422,7 +422,7 @@ HostAndPort ReplicationCoordinatorMock::getMyHostAndPort() const {
     return HostAndPort("test1", 1234);
 }
 
-boost::optional<int> ReplicationCoordinatorMock::getMyMaintenancePort() const {
+boost::optional<int> ReplicationCoordinatorMock::getMyPriorityPort() const {
     return boost::none;
 }
 

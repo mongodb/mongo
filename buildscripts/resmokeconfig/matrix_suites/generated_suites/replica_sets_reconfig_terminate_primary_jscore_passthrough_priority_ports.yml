@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_reconfig_terminate_primary_jscore_passthrough_maintenance_ports.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_reconfig_terminate_primary_jscore_passthrough_priority_ports.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
@@ -52,13 +52,13 @@ executor:
             heartbeats: 2
       wiredTigerEngineConfigString: debug_mode=(table_logging=true)
     num_nodes: 5
-    use_maintenance_ports: true
+    use_priority_ports: true
   hooks:
     - class: DoReconfigInBackground
       shell_options:
         global_vars:
           TestData:
-            usingMaintenancePorts: true
+            usingPriorityPorts: true
         nodb: ""
     - background_reconfig: true
       class: ContinuousStepdown

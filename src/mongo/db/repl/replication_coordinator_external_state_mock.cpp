@@ -98,19 +98,19 @@ ThreadPool* ReplicationCoordinatorExternalStateMock::getDbWorkThreadPool() const
 void ReplicationCoordinatorExternalStateMock::forwardSecondaryProgress(bool prioritized) {}
 
 bool ReplicationCoordinatorExternalStateMock::isSelf(const HostAndPort& host,
-                                                     const boost::optional<int>& maintenancePort,
+                                                     const boost::optional<int>& priorityPort,
                                                      ServiceContext* const service) {
     return sequenceContains(_selfHosts, host) || _selfHostsSlow.find(host) != _selfHostsSlow.end();
 }
 
 bool ReplicationCoordinatorExternalStateMock::isSelfFastPath(
-    const HostAndPort& host, const boost::optional<int>& maintenancePort) {
+    const HostAndPort& host, const boost::optional<int>& priorityPort) {
     return sequenceContains(_selfHosts, host);
 }
 
 bool ReplicationCoordinatorExternalStateMock::isSelfSlowPath(
     const HostAndPort& host,
-    const boost::optional<int>& maintenancePort,
+    const boost::optional<int>& priorityPort,
     ServiceContext* const service,
     Milliseconds timeout) {
     if (sequenceContains(_selfHosts, host))

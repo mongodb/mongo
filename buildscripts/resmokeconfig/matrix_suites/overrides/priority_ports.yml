@@ -1,5 +1,5 @@
 # We can't override just one suite so we need to enumerate all of the suite combinations here
-- name: replica_sets_reconfig_maintenance_port_hooks
+- name: replica_sets_reconfig_priority_port_hooks
   value:
     executor:
       hooks:
@@ -7,7 +7,7 @@
           shell_options:
             global_vars:
               TestData:
-                usingMaintenancePorts: true
+                usingPriorityPorts: true
             nodb: ""
         - class: CheckReplOplogs
         - class: CheckReplDBHash
@@ -15,7 +15,7 @@
         - class: CleanEveryN
           n: 20
 
-- name: replica_sets_reconfig_stepdown_maintenance_port_hooks
+- name: replica_sets_reconfig_stepdown_priority_port_hooks
   value:
     executor:
       hooks:
@@ -23,7 +23,7 @@
           shell_options:
             global_vars:
               TestData:
-                usingMaintenancePorts: true
+                usingPriorityPorts: true
             nodb: ""
         - class: ContinuousStepdown
         - class: CheckReplOplogs
@@ -32,7 +32,7 @@
         - class: CleanEveryN
           n: 20
 
-- name: replica_sets_reconfig_kill_maintenance_port_hooks
+- name: replica_sets_reconfig_kill_priority_port_hooks
   value:
     executor:
       hooks:
@@ -40,7 +40,7 @@
           shell_options:
             global_vars:
               TestData:
-                usingMaintenancePorts: true
+                usingPriorityPorts: true
             nodb: ""
         - class: ContinuousStepdown
           kill: true
@@ -55,7 +55,7 @@
         - class: CleanEveryN
           n: 20
 
-- name: replica_sets_reconfig_terminate_maintenance_port_hooks
+- name: replica_sets_reconfig_terminate_priority_port_hooks
   value:
     executor:
       hooks:
@@ -63,7 +63,7 @@
           shell_options:
             global_vars:
               TestData:
-                usingMaintenancePorts: true
+                usingPriorityPorts: true
             nodb: ""
         - class: ContinuousStepdown
           terminate: true
@@ -79,7 +79,7 @@
         - class: CleanEveryN
           n: 20
 
-- name: replica_sets_reconfig_kill_terminate_stepdown_maintenance_port_hooks
+- name: replica_sets_reconfig_kill_terminate_stepdown_priority_port_hooks
   value:
     executor:
       hooks:
@@ -87,7 +87,7 @@
           shell_options:
             global_vars:
               TestData:
-                usingMaintenancePorts: true
+                usingPriorityPorts: true
             nodb: ""
         - class: ContinuousStepdown
           randomize_kill: true
@@ -103,15 +103,14 @@
         - class: CleanEveryN
           n: 20
 
-- name: replica_sets_reconfig_fixture_maintenance_ports
+- name: replica_sets_reconfig_fixture_priority_ports
   value:
     executor:
       fixture:
-        use_maintenance_ports: true
-
+        use_priority_ports: true
 # Because we can't base off of another matrix suite, the kill primary suite is based off of the
 # normal replica_sets_jscore_passthrough and thus we need to modify more of the fixture options
-- name: replica_sets_reconfig_kill_primary_fixture_maintenance_ports
+- name: replica_sets_reconfig_kill_primary_fixture_priority_ports
   value:
     executor:
       fixture:
@@ -125,5 +124,5 @@
               replication:
                 heartbeats: 2
         all_nodes_electable: true
-        use_maintenance_ports: true
+        use_priority_ports: true
         num_nodes: 5

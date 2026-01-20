@@ -150,7 +150,7 @@ public:
      * Returns true if "host" is one of the network identities of this node.
      */
     virtual bool isSelf(const HostAndPort& host,
-                        const boost::optional<int>& maintenancePort,
+                        const boost::optional<int>& priorityPort,
                         ServiceContext* service) = 0;
 
     /**
@@ -158,14 +158,14 @@ public:
      * going out to the network and checking.
      */
     virtual bool isSelfFastPath(const HostAndPort& host,
-                                const boost::optional<int>& maintenancePort) = 0;
+                                const boost::optional<int>& priorityPort) = 0;
 
     /**
      * Returns true if "host" is one of the network identities of this node, without
      * checking the fast path first.
      */
     virtual bool isSelfSlowPath(const HostAndPort& host,
-                                const boost::optional<int>& maintenancePort,
+                                const boost::optional<int>& priorityPort,
                                 ServiceContext* service,
                                 Milliseconds timeout) = 0;
 

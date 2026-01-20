@@ -936,8 +936,8 @@ TEST(CurOpTest, ShouldReportIsFromUserConnection) {
     ASSERT_TRUE(bsonObjUserConn.getField("isFromUserConnection").Bool());
 }
 
-TEST(CurOpTest, ShouldNotReportIsFromMaintenancePortConnectionWhenFFDisabled) {
-    gFeatureFlagDedicatedPortForMaintenanceOperations.setForServerParameter(false);
+TEST(CurOpTest, ShouldNotReportIsFromPriorityPortConnectionWhenFFDisabled) {
+    gFeatureFlagDedicatedPortForPriorityOperations.setForServerParameter(false);
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
@@ -946,15 +946,15 @@ TEST(CurOpTest, ShouldNotReportIsFromMaintenancePortConnectionWhenFFDisabled) {
     // Mock a client with a user connection.
     transport::TransportLayerMock transportLayer;
     transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
-        return std::make_shared<transport::MockMaintenanceSession>(tl);
+        return std::make_shared<transport::MockPrioritySession>(tl);
     };
-    auto clientMaintenanceConn = serviceContext.getServiceContext()->getService()->makeClient(
-        "maintenanceConn", transportLayer.createSession());
+    auto clientPriorityConn = serviceContext.getServiceContext()->getService()->makeClient(
+        "priorityConn", transportLayer.createSession());
 
     auto curop = CurOp::get(*opCtx);
 
     BSONObjBuilder curOpObj;
-    BSONObjBuilder curOpObjMaintenanceConn;
+    BSONObjBuilder curOpObjPriorityConn;
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
@@ -968,17 +968,17 @@ TEST(CurOpTest, ShouldNotReportIsFromMaintenancePortConnectionWhenFFDisabled) {
 
         curop->reportCurrentOpForClient(expCtx, client, false, &curOpObj);
         curop->reportCurrentOpForClient(
-            expCtx, clientMaintenanceConn.get(), false, &curOpObjMaintenanceConn);
+            expCtx, clientPriorityConn.get(), false, &curOpObjPriorityConn);
     }
     auto bsonObj = curOpObj.done();
-    auto bsonObjMaintenanceConn = curOpObjMaintenanceConn.done();
+    auto bsonObjPriorityConn = curOpObjPriorityConn.done();
 
-    ASSERT_FALSE(bsonObj.hasField("isFromMaintenancePortConnection"));
-    ASSERT_FALSE(bsonObjMaintenanceConn.hasField("isFromMaintenancePortConnection"));
+    ASSERT_FALSE(bsonObj.hasField("isFromPriorityPortConnection"));
+    ASSERT_FALSE(bsonObjPriorityConn.hasField("isFromPriorityPortConnection"));
 }
 
-TEST(CurOpTest, ShouldReportIsFromMaintenancePortConnection) {
-    gFeatureFlagDedicatedPortForMaintenanceOperations.setForServerParameter(true);
+TEST(CurOpTest, ShouldReportIsFromPriorityPortConnection) {
+    gFeatureFlagDedicatedPortForPriorityOperations.setForServerParameter(true);
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
@@ -987,15 +987,15 @@ TEST(CurOpTest, ShouldReportIsFromMaintenancePortConnection) {
     // Mock a client with a user connection.
     transport::TransportLayerMock transportLayer;
     transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
-        return std::make_shared<transport::MockMaintenanceSession>(tl);
+        return std::make_shared<transport::MockPrioritySession>(tl);
     };
-    auto clientMaintenanceConn = serviceContext.getServiceContext()->getService()->makeClient(
-        "maintenanceConn", transportLayer.createSession());
+    auto clientPriorityConn = serviceContext.getServiceContext()->getService()->makeClient(
+        "priorityConn", transportLayer.createSession());
 
     auto curop = CurOp::get(*opCtx);
 
     BSONObjBuilder curOpObj;
-    BSONObjBuilder curOpObjMaintenanceConn;
+    BSONObjBuilder curOpObjPriorityConn;
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
@@ -1009,15 +1009,15 @@ TEST(CurOpTest, ShouldReportIsFromMaintenancePortConnection) {
 
         curop->reportCurrentOpForClient(expCtx, client, false, &curOpObj);
         curop->reportCurrentOpForClient(
-            expCtx, clientMaintenanceConn.get(), false, &curOpObjMaintenanceConn);
+            expCtx, clientPriorityConn.get(), false, &curOpObjPriorityConn);
     }
     auto bsonObj = curOpObj.done();
-    auto bsonObjMaintenanceConn = curOpObjMaintenanceConn.done();
+    auto bsonObjPriorityConn = curOpObjPriorityConn.done();
 
-    ASSERT_TRUE(bsonObj.hasField("isFromMaintenancePortConnection"));
-    ASSERT_TRUE(bsonObjMaintenanceConn.hasField("isFromMaintenancePortConnection"));
-    ASSERT_FALSE(bsonObj.getField("isFromMaintenancePortConnection").Bool());
-    ASSERT_TRUE(bsonObjMaintenanceConn.getField("isFromMaintenancePortConnection").Bool());
+    ASSERT_TRUE(bsonObj.hasField("isFromPriorityPortConnection"));
+    ASSERT_TRUE(bsonObjPriorityConn.hasField("isFromPriorityPortConnection"));
+    ASSERT_FALSE(bsonObj.getField("isFromPriorityPortConnection").Bool());
+    ASSERT_TRUE(bsonObjPriorityConn.getField("isFromPriorityPortConnection").Bool());
 }
 
 TEST(CurOpTest, ElapsedTimeReflectsTickSource) {

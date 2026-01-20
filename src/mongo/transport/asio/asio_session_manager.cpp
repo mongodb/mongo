@@ -102,9 +102,8 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
     // Currently all sessions are threaded, so this number is redundant.
     appendInt("threaded", sessionCount - _sessionEstablishmentRateLimiter.queued());
     auto maxIncomingConnsOverride = serverGlobalParams.maxIncomingConnsOverride.makeSnapshot();
-    const bool maintenancePortEnabled = serverGlobalParams.maintenancePort.has_value();
-    if (maintenancePortEnabled ||
-        (maxIncomingConnsOverride && !maxIncomingConnsOverride->empty())) {
+    const bool priorityPortEnabled = serverGlobalParams.priorityPort.has_value();
+    if (priorityPortEnabled || (maxIncomingConnsOverride && !maxIncomingConnsOverride->empty())) {
         appendInt("limitExempt", serviceExecutorStats.limitExempt.load());
     }
 
@@ -117,8 +116,8 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
     }
 
     bob->append("loadBalanced", _loadBalancedConnections.get());
-    if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
-        bob->append("maintenance", _maintenancePortConnections.get());
+    if (gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
+        bob->append("priority", _priorityPortConnections.get());
     }
 }
 
@@ -130,12 +129,12 @@ void AsioSessionManager::decrementLBConnections() {
     _loadBalancedConnections.decrement();
 }
 
-void AsioSessionManager::incrementMaintenanceConnections() {
-    _maintenancePortConnections.increment();
+void AsioSessionManager::incrementPriorityConnections() {
+    _priorityPortConnections.increment();
 }
 
-void AsioSessionManager::decrementMaintenanceConnections() {
-    _maintenancePortConnections.decrement();
+void AsioSessionManager::decrementPriorityConnections() {
+    _priorityPortConnections.decrement();
 }
 
 /**
@@ -157,8 +156,8 @@ void AsioSessionManager::onClientConnect(Client* client) {
     if (session && session->isLoadBalancerPeer()) {
         incrementLBConnections();
     }
-    if (session && session->isConnectedToMaintenancePort()) {
-        incrementMaintenanceConnections();
+    if (session && session->isConnectedToPriorityPort()) {
+        incrementPriorityConnections();
     }
 }
 
@@ -167,8 +166,8 @@ void AsioSessionManager::onClientDisconnect(Client* client) {
     if (session && session->isLoadBalancerPeer()) {
         decrementLBConnections();
     }
-    if (session && session->isConnectedToMaintenancePort()) {
-        decrementMaintenanceConnections();
+    if (session && session->isConnectedToPriorityPort()) {
+        decrementPriorityConnections();
     }
 }
 

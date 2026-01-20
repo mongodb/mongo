@@ -89,7 +89,7 @@ public:
         return false;
     };
 
-    bool isConnectedToMaintenancePort() const override {
+    bool isConnectedToPriorityPort() const override {
         return false;
     }
 
@@ -229,11 +229,11 @@ protected:
     std::list<Promise<void>> _waitForDataQueue;
 };
 
-class MockMaintenanceSession : public MockSession {
+class MockPrioritySession : public MockSession {
 public:
-    explicit MockMaintenanceSession(TransportLayer* tl) : MockSession(tl) {}
+    explicit MockPrioritySession(TransportLayer* tl) : MockSession(tl) {}
 
-    bool isConnectedToMaintenancePort() const override {
+    bool isConnectedToPriorityPort() const override {
         return true;
     }
 };

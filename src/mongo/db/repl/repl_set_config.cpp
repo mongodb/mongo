@@ -203,13 +203,13 @@ Status ReplSetConfig::_initialize(bool forInitiate,
     _addInternalWriteConcernModes();
     _initializeConnectionString();
 
-    // Count how many members can vote and how many members have maintenance ports available.
+    // Count how many members can vote and how many members have priority ports available.
     for (const MemberConfig& m : getMembers()) {
         if (m.getNumVotes() > 0) {
             ++_votingMemberCount;
         }
-        if (m.getMaintenancePort()) {
-            ++_maintenancePortCount;
+        if (m.getPriorityPort()) {
+            ++_priorityPortCount;
         }
     }
 
@@ -336,16 +336,16 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                                   << MemberConfig::kHostFieldName
                                   << " == " << memberI.getHostAndPort().toString());
             }
-            if (memberI.getHostAndPortMaintenance() == memberJ.getHostAndPortMaintenance()) {
+            if (memberI.getHostAndPortPriority() == memberJ.getHostAndPortPriority()) {
                 return Status(ErrorCodes::BadValue,
                               str::stream()
                                   << "Found two member configurations with same "
-                                  << MemberConfig::kMaintenancePortFieldName
+                                  << MemberConfig::kPriorityPortFieldName
                                   << " field and same hostname, " << kMembersFieldName << "." << i
-                                  << "." << MemberConfig::kMaintenancePortFieldName
+                                  << "." << MemberConfig::kPriorityPortFieldName
                                   << " == " << kMembersFieldName << "." << j << "."
-                                  << MemberConfig::kMaintenancePortFieldName << " == "
-                                  << memberI.getMaintenancePort() << " and " << kMembersFieldName
+                                  << MemberConfig::kPriorityPortFieldName << " == "
+                                  << memberI.getPriorityPort() << " and " << kMembersFieldName
                                   << "." << i << ".hostname == " << kMembersFieldName << "." << j
                                   << ".hostname == " << memberI.getHostAndPort().host());
             }
@@ -566,7 +566,7 @@ int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap, bool str
     for (std::vector<MemberConfig>::const_iterator it = getMembers().begin();
          it != getMembers().end();
          ++it) {
-        if (it->getHostAndPortMaintenance() == hap || (!strict && it->getHostAndPort() == hap)) {
+        if (it->getHostAndPortPriority() == hap || (!strict && it->getHostAndPort() == hap)) {
             return x;
         }
         ++x;

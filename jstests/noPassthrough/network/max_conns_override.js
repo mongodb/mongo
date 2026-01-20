@@ -99,7 +99,7 @@ function runTest(useProxy, useMongos, useAdminThreads) {
         conn,
         host,
         proxyServer,
-        false /* useMaintenance */,
+        false /* usePriority */,
         useAdminThreads ? kConfiguredReadyAdminThreads : 0,
         kConfiguredMaxConns,
         shutdown,

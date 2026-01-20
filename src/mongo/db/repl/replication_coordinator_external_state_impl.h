@@ -109,11 +109,11 @@ public:
     OpTime onTransitionToPrimary(OperationContext* opCtx) override;
     void forwardSecondaryProgress(bool prioritized = false) override;
     bool isSelf(const HostAndPort& host,
-                const boost::optional<int>& maintenancePort,
+                const boost::optional<int>& priorityPort,
                 ServiceContext* service) override;
-    bool isSelfFastPath(const HostAndPort& host, const boost::optional<int>& maintenancePort) final;
+    bool isSelfFastPath(const HostAndPort& host, const boost::optional<int>& priorityPort) final;
     bool isSelfSlowPath(const HostAndPort& host,
-                        const boost::optional<int>& maintenancePort,
+                        const boost::optional<int>& priorityPort,
                         ServiceContext* service,
                         Milliseconds timeout) final;
     Status createLocalLastVoteCollection(OperationContext* opCtx) final;

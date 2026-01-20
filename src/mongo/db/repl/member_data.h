@@ -189,16 +189,16 @@ public:
         return _hostAndPort;
     }
 
-    HostAndPort getHostAndPortMaintenance() const {
-        if (getMaintenancePort()) {
-            return HostAndPort(getHostAndPort().host(), *getMaintenancePort());
+    HostAndPort getHostAndPortPriority() const {
+        if (getPriorityPort()) {
+            return HostAndPort(getHostAndPort().host(), *getPriorityPort());
         } else {
             return getHostAndPort();
         }
     }
 
-    boost::optional<int> getMaintenancePort() const {
-        return _maintenancePort;
+    boost::optional<int> getPriorityPort() const {
+        return _priorityPort;
     }
 
     /*
@@ -310,8 +310,8 @@ public:
         _hostAndPort = hostAndPort;
     }
 
-    void setMaintenancePort(boost::optional<int> maintenancePort) {
-        _maintenancePort = maintenancePort;
+    void setPriorityPort(boost::optional<int> priorityPort) {
+        _priorityPort = priorityPort;
     }
 
     void setMemberId(MemberId memberId) {
@@ -391,8 +391,8 @@ private:
     // Client address of this member.
     HostAndPort _hostAndPort;
 
-    // Optional maintenance port for this member.
-    boost::optional<int> _maintenancePort;
+    // Optional priority port for this member.
+    boost::optional<int> _priorityPort;
 };
 
 }  // namespace repl

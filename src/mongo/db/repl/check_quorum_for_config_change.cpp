@@ -70,17 +70,17 @@ QuorumChecker::QuorumChecker(const ReplSetConfig* rsConfig, int myIndex, long lo
       _numResponses(1),  // We "responded" to ourself already.
       _numElectable(0),
       _numResponsesRequired(_rsConfig->getNumMembers() +
-                            _rsConfig->getCountOfMembersWithMaintenancePort()),
+                            _rsConfig->getCountOfMembersWithPriorityPort()),
       _vetoStatus(Status::OK()),
       _finalStatus(ErrorCodes::CallbackCanceled, "Quorum check canceled") {
     invariant(myIndex < _rsConfig->getNumMembers());
     const MemberConfig& myConfig = _rsConfig->getMemberAt(_myIndex);
 
-    _responses.at(myIndex) = {true, myConfig.getMaintenancePort().is_initialized(), true};
+    _responses.at(myIndex) = {true, myConfig.getPriorityPort().is_initialized(), true};
     if (myConfig.isVoter()) {
         _successfulVoterCount++;
     }
-    if (myConfig.getMaintenancePort()) {
+    if (myConfig.getPriorityPort()) {
         _numResponses++;
     }
     if (myConfig.isElectable()) {
@@ -115,9 +115,9 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
     }
     // hbArgs allows (but doesn't require) us to pass the current primary id as an optimization,
     // but it is not readily available within QuorumChecker.
-    // Use the maintenance port because the recipient may send a heartbeat back to get a newer
-    // configuration and we want them to use the maintenance port if it is available.
-    hbArgs.setSenderHost(myConfig.getHostAndPortMaintenance());
+    // Use the priority port because the recipient may send a heartbeat back to get a newer
+    // configuration and we want them to use the priority port if it is available.
+    hbArgs.setSenderHost(myConfig.getHostAndPortPriority());
     hbArgs.setSenderId(myConfig.getId().getData());
     hbArgs.setTerm(_term);
     hbRequest = hbArgs.toBSON();
@@ -139,10 +139,10 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
                                                 nullptr,
                                                 _rsConfig->getHeartbeatTimeoutPeriodMillis()));
 
-        // If a member has a maintenance port specified then we need to check connectivity to both
-        // the main and the maintenance ports.
-        if (member.getMaintenancePort()) {
-            requests.push_back(RemoteCommandRequest(member.getHostAndPortMaintenance(),
+        // If a member has a priority port specified then we need to check connectivity to both
+        // the main and the priority ports.
+        if (member.getPriorityPort()) {
+            requests.push_back(RemoteCommandRequest(member.getHostAndPortPriority(),
                                                     DatabaseName::kAdmin,
                                                     hbRequest,
                                                     BSON(rpc::kReplSetMetadataFieldName << 1),
@@ -295,18 +295,18 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
     for (int i = 0; i < _rsConfig->getNumMembers(); ++i) {
         const MemberConfig& memberConfig = _rsConfig->getMemberAt(i);
         if (memberConfig.getHostAndPort() != request.target &&
-            memberConfig.getHostAndPortMaintenance() != request.target) {
+            memberConfig.getHostAndPortPriority() != request.target) {
             continue;
         }
-        if (memberConfig.getMaintenancePort() &&
-            memberConfig.getHostAndPortMaintenance() == request.target) {
-            _responses.at(i).maintenanceResponseReceived = true;
+        if (memberConfig.getPriorityPort() &&
+            memberConfig.getHostAndPortPriority() == request.target) {
+            _responses.at(i).priorityResponseReceived = true;
         } else {
             _responses.at(i).mainResponseReceived = true;
         }
         // Check if we have now received both responses for this node.
         _responses.at(i).fullySuccessful = _responses.at(i).mainResponseReceived &&
-            (!memberConfig.getMaintenancePort() || _responses.at(i).maintenanceResponseReceived);
+            (!memberConfig.getPriorityPort() || _responses.at(i).priorityResponseReceived);
         // If we have received both responses for this node then update our global counters.
         if (_responses.at(i).fullySuccessful) {
             if (memberConfig.isVoter()) {

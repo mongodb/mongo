@@ -72,7 +72,7 @@ struct ClientSummary {
           sourceClient(c->session()->getSourceRemoteEndpoint()),
           id(c->session()->id()),
           isLoadBalanced(c->session()->isConnectedToLoadBalancerPort()),
-          isMaintenance(c->session()->isConnectedToMaintenancePort()) {}
+          isPriority(c->session()->isConnectedToPriorityPort()) {}
 
     friend logv2::DynamicAttributes logAttrs(const ClientSummary& m) {
         logv2::DynamicAttributes attrs;
@@ -81,8 +81,8 @@ struct ClientSummary {
         if (m.isLoadBalanced) {
             attrs.add("sourceClient", m.sourceClient);
         }
-        if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
-            attrs.add("isMaintenance", m.isMaintenance);
+        if (gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
+            attrs.add("isPriority", m.isPriority);
         }
         attrs.add("uuid", m.uuid);
         attrs.add("connectionId", m.id);
@@ -95,7 +95,7 @@ struct ClientSummary {
     HostAndPort sourceClient;
     SessionId id;
     bool isLoadBalanced;
-    bool isMaintenance;
+    bool isPriority;
 };
 
 bool quiet() {
@@ -287,7 +287,7 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
     connectionsProcessedCounter.add(1);
 
     serverGlobalParams.maxIncomingConnsOverride.refreshSnapshot(maxIncomingConnsOverride);
-    const bool isPrivilegedSession = session->isConnectedToMaintenancePort() ||
+    const bool isPrivilegedSession = session->isConnectedToPriorityPort() ||
         (maxIncomingConnsOverride && session->isExemptedByCIDRList(*maxIncomingConnsOverride));
     const bool verbose = !quiet();
 

@@ -232,7 +232,7 @@ BSONObj makeHeartbeatRequest(const ReplSetConfig& rsConfig, int myConfigIndex) {
     if (rsConfig.getConfigVersion() == 1) {
         hbArgs.setCheckEmpty();
     }
-    hbArgs.setSenderHost(myConfig.getHostAndPortMaintenance());
+    hbArgs.setSenderHost(myConfig.getHostAndPortPriority());
     hbArgs.setSenderId(myConfig.getId().getData());
     hbArgs.setTerm(0);
     return hbArgs.toBSON();
@@ -500,30 +500,30 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
     ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
 }
 
-TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToMaintenancePortUnreachable) {
+TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToPriorityPortUnreachable) {
     // In this test, "we" are host "h1:1".  All nodes respond successfully to their heartbeat
-    // requests on the main port but "we" don't respond via our maintenance port.
+    // requests on the main port but "we" don't respond via our priority port.
 
-    const ReplSetConfig rsConfig = assertMakeRSConfig(
-        BSON("_id" << "rs0"
-                   << "version" << 1 << "protocolVersion" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                            << "h1:1")
-                                 << BSON("_id" << 2 << "host"
-                                               << "h2:1")
-                                 << BSON("_id" << 3 << "host"
-                                               << "h3:1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 4 << "host"
-                                               << "h4:1")
-                                 << BSON("_id" << 5 << "host"
-                                               << "h5:1"))));
+    const ReplSetConfig rsConfig =
+        assertMakeRSConfig(BSON("_id" << "rs0"
+                                      << "version" << 1 << "protocolVersion" << 1 << "members"
+                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                               << "h1:1")
+                                                    << BSON("_id" << 2 << "host"
+                                                                  << "h2:1")
+                                                    << BSON("_id" << 3 << "host"
+                                                                  << "h3:1" << "priorityPort" << 2)
+                                                    << BSON("_id" << 4 << "host"
+                                                                  << "h4:1")
+                                                    << BSON("_id" << 5 << "host"
+                                                                  << "h5:1"))));
     const int myConfigIndex = 0;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
     startQuorumCheck(rsConfig, myConfigIndex);
     const Date_t startDate = getNet()->now();
     const int numCommandsExpected =
-        rsConfig.getNumMembers();  // One more than normal because one maintenance port.
+        rsConfig.getNumMembers();  // One more than normal because one priority port.
     stdx::unordered_set<HostAndPort> seenHosts;
     getNet()->enterNetwork();
     for (int i = 0; i < numCommandsExpected; ++i) {
@@ -720,26 +720,26 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientVoters) {
     ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
 }
 
-TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientMaintenancePortResponses) {
+TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientPriorityPortResponses) {
     // In this test, "we" are host "h4".  All nodes respond via their main port but only "h1"
-    // responds via its maintenance port.
+    // responds via its priority port.
 
     const ReplSetConfig rsConfig = assertMakeRSConfig(BSON(
         "_id" << "rs0"
               << "version" << 2 << "protocolVersion" << 1 << "members"
-              << BSON_ARRAY(
-                     BSON("_id" << 1 << "host"
-                                << "h1:1" << "maintenancePort" << 2)
-                     << BSON("_id" << 2 << "host"
-                                   << "h2:1" << "maintenancePort" << 2)
-                     << BSON("_id" << 3 << "host"
-                                   << "h3:1" << "maintenancePort" << 2)
-                     << BSON("_id" << 4 << "host"
-                                   << "h4:1"
-                                   << "votes" << 0 << "priority" << 0 << "maintenancePort" << 2)
-                     << BSON("_id" << 5 << "host"
-                                   << "h5:1"
-                                   << "votes" << 0 << "priority" << 0 << "maintenancePort" << 2))));
+              << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                       << "h1:1" << "priorityPort" << 2)
+                            << BSON("_id" << 2 << "host"
+                                          << "h2:1" << "priorityPort" << 2)
+                            << BSON("_id" << 3 << "host"
+                                          << "h3:1" << "priorityPort" << 2)
+                            << BSON("_id" << 4 << "host"
+                                          << "h4:1"
+                                          << "votes" << 0 << "priority" << 0 << "priorityPort" << 2)
+                            << BSON("_id" << 5 << "host"
+                                          << "h5:1"
+                                          << "votes" << 0 << "priority" << 0 << "priorityPort"
+                                          << 2))));
     const int myConfigIndex = 3;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -781,25 +781,25 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientMaintenancePortR
 }
 
 TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientMainPortResponses) {
-    // In this test, "we" are host "h4".  All nodes respond via their maintenance port but only "h1"
+    // In this test, "we" are host "h4".  All nodes respond via their priority port but only "h1"
     // responds via its main port.
 
     const ReplSetConfig rsConfig = assertMakeRSConfig(BSON(
         "_id" << "rs0"
               << "version" << 2 << "protocolVersion" << 1 << "members"
-              << BSON_ARRAY(
-                     BSON("_id" << 1 << "host"
-                                << "h1:1" << "maintenancePort" << 2)
-                     << BSON("_id" << 2 << "host"
-                                   << "h2:1" << "maintenancePort" << 2)
-                     << BSON("_id" << 3 << "host"
-                                   << "h3:1" << "maintenancePort" << 2)
-                     << BSON("_id" << 4 << "host"
-                                   << "h4:1"
-                                   << "votes" << 0 << "priority" << 0 << "maintenancePort" << 2)
-                     << BSON("_id" << 5 << "host"
-                                   << "h5:1"
-                                   << "votes" << 0 << "priority" << 0 << "maintenancePort" << 2))));
+              << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                       << "h1:1" << "priorityPort" << 2)
+                            << BSON("_id" << 2 << "host"
+                                          << "h2:1" << "priorityPort" << 2)
+                            << BSON("_id" << 3 << "host"
+                                          << "h3:1" << "priorityPort" << 2)
+                            << BSON("_id" << 4 << "host"
+                                          << "h4:1"
+                                          << "votes" << 0 << "priority" << 0 << "priorityPort" << 2)
+                            << BSON("_id" << 5 << "host"
+                                          << "h5:1"
+                                          << "votes" << 0 << "priority" << 0 << "priorityPort"
+                                          << 2))));
     const int myConfigIndex = 3;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -840,26 +840,26 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientMainPortResponse
     ASSERT_NOT_REASON_CONTAINS(status, "h5:1");
 }
 
-TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNonOverlappingMainAndMaintenancePortResponses) {
+TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNonOverlappingMainAndPriorityPortResponses) {
     // In this test, "we" are host "h3".  Nodes 1 and 2 respond via their main port but not
-    // maintenance port and hosts 4 and 5 respond via their maintenance port not main port. Thus we
+    // priority port and hosts 4 and 5 respond via their priority port not main port. Thus we
     // have no overlapping majority.
 
-    const ReplSetConfig rsConfig = assertMakeRSConfig(
-        BSON("_id" << "rs0"
-                   << "version" << 2 << "protocolVersion" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                            << "h1:1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 2 << "host"
-                                               << "h2:1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 3 << "host"
-                                               << "h3:1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 4 << "host"
-                                               << "h4:1"
-                                               << "maintenancePort" << 2)
-                                 << BSON("_id" << 5 << "host"
-                                               << "h5:1"
-                                               << "maintenancePort" << 2))));
+    const ReplSetConfig rsConfig =
+        assertMakeRSConfig(BSON("_id" << "rs0"
+                                      << "version" << 2 << "protocolVersion" << 1 << "members"
+                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                               << "h1:1" << "priorityPort" << 2)
+                                                    << BSON("_id" << 2 << "host"
+                                                                  << "h2:1" << "priorityPort" << 2)
+                                                    << BSON("_id" << 3 << "host"
+                                                                  << "h3:1" << "priorityPort" << 2)
+                                                    << BSON("_id" << 4 << "host"
+                                                                  << "h4:1"
+                                                                  << "priorityPort" << 2)
+                                                    << BSON("_id" << 5 << "host"
+                                                                  << "h5:1"
+                                                                  << "priorityPort" << 2))));
     const int myConfigIndex = 2;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
 
@@ -953,25 +953,25 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
     ASSERT_REASON_CONTAINS(status, "no electable nodes responded");
 }
 
-TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeRespondingViaMaintenancePort) {
+TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeRespondingViaPriorityPort) {
     // In this test, "we" are host "h4".  Only "h1", "h2" and "h3" are electable,
-    // and none of them respond via their maintenance ports
+    // and none of them respond via their priority ports
 
     const ReplSetConfig rsConfig = assertMakeRSConfig(
         BSON("_id" << "rs0"
                    << "version" << 2 << "protocolVersion" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                            << "h1:1" << "maintenancePort" << 2)
+                                            << "h1:1" << "priorityPort" << 2)
                                  << BSON("_id" << 2 << "host"
-                                               << "h2:1" << "maintenancePort" << 2)
+                                               << "h2:1" << "priorityPort" << 2)
                                  << BSON("_id" << 3 << "host"
-                                               << "h3:1" << "maintenancePort" << 2)
+                                               << "h3:1" << "priorityPort" << 2)
                                  << BSON("_id" << 4 << "host"
                                                << "h4:1"
-                                               << "priority" << 0 << "maintenancePort" << 2)
+                                               << "priority" << 0 << "priorityPort" << 2)
                                  << BSON("_id" << 5 << "host"
                                                << "h5:1"
-                                               << "priority" << 0 << "maintenancePort" << 2))));
+                                               << "priority" << 0 << "priorityPort" << 2))));
     const int myConfigIndex = 3;
     const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
     std::set<HostAndPort> respondFailure = {

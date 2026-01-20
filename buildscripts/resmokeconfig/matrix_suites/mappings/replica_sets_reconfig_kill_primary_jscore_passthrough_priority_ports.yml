@@ -2,8 +2,8 @@ base_suite: replica_sets_jscore_passthrough
 overrides:
   - "kill_primary.replica_sets_shell_options"
   - "kill_primary.replica_sets_reconfig_shell_options_TestData"
-  - "maintenance_ports.replica_sets_reconfig_kill_maintenance_port_hooks"
+  - "priority_ports.replica_sets_reconfig_kill_priority_port_hooks"
   - "kill_primary.replica_sets_archive"
-  - "maintenance_ports.replica_sets_reconfig_kill_primary_fixture_maintenance_ports"
+  - "priority_ports.replica_sets_reconfig_kill_primary_fixture_priority_ports"
   - "replica_sets_stepdown_selector.reconfig_kill_primary_jscore_passthrough_exclude_files"
   - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"

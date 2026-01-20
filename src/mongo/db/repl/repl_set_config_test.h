@@ -60,7 +60,7 @@ inline bool operator==(const MemberConfig& a, const MemberConfig& b) {
         }
     }
     return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
-        a.getMaintenancePort() == b.getMaintenancePort() && a.getPriority() == b.getPriority() &&
+        a.getPriorityPort() == b.getPriorityPort() && a.getPriority() == b.getPriority() &&
         a.getSecondaryDelay() == b.getSecondaryDelay() && a.isVoter() == b.isVoter() &&
         a.isArbiter() == b.isArbiter() && a.isNewlyAdded() == b.isNewlyAdded() &&
         a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&

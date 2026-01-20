@@ -68,7 +68,7 @@ export class ReplSetTest {
      *     ShardingTest, the seed is generated as part of ShardingTest.
      * @param {boolean} [opts.useAutoBootstrapProcedure] If true, follow the procedure for
      *     auto-bootstrapped replica sets.
-     * @param {boolean} [opts.useMaintenancePorts=false] If true, then a maintenance port will be
+     * @param {boolean} [opts.usePriorityPorts=false] If true, then a priority port will be
      *     opened for each node in the replica set.
      * @param {number} [opts.timeoutMS] Timeout value in milliseconds.
      */
@@ -308,22 +308,22 @@ export class ReplSetTest {
         return this.ports[n];
     }
 
-    getMaintenancePort(n) {
+    getPriorityPort(n) {
         const translatedN = this.getNodeId(n);
-        if (this._maintenancePorts?.[translatedN] < 1) {
-            throw new Error("Maintenance port not set for node");
+        if (this._priorityPorts?.[translatedN] < 1) {
+            throw new Error("Priority port not set for node");
         }
-        return this._maintenancePorts[translatedN];
+        return this._priorityPorts[translatedN];
     }
 
-    getNewConnectionToMaintenancePort(node) {
-        const maintenancePort = this.getMaintenancePort(node);
-        return new Mongo(node.host.split(":")[0] + ":" + maintenancePort);
+    getNewConnectionToPriorityPort(node) {
+        const priorityPort = this.getPriorityPort(node);
+        return new Mongo(node.host.split(":")[0] + ":" + priorityPort);
     }
 
-    getNewConnectionToMaintenanceSocket(node) {
-        const maintenancePort = this.getMaintenancePort(node);
-        return new Mongo("/tmp/mongodb-" + maintenancePort + ".sock");
+    getNewConnectionToPrioritySocket(node) {
+        const priorityPort = this.getPriorityPort(node);
+        return new Mongo("/tmp/mongodb-" + priorityPort + ".sock");
     }
 
     getDbPath(node) {
@@ -341,11 +341,11 @@ export class ReplSetTest {
         return p;
     }
 
-    // TODO (SERVER-112863): The ignoreMaintenancePort parameter is used to allow sharded clusters
-    // to initiate without the maintenance port and then reconfigure with it since shard servers
-    // start up with FCV lastLTS in which the maintenance port is not allowed. This can be removed
-    // once sharded clusters can initiate with the maintenance port.
-    getReplSetConfig(ignoreMaintenancePort = false) {
+    // TODO (SERVER-112863): The ignorePriorityPort parameter is used to allow sharded clusters
+    // to initiate without the priority port and then reconfigure with it since shard servers
+    // start up with FCV lastLTS in which the priority port is not allowed. This can be removed
+    // once sharded clusters can initiate with the priority port.
+    getReplSetConfig(ignorePriorityPort = false) {
         let cfg = {};
         cfg._id = this.name;
         cfg.protocolVersion = 1;
@@ -361,8 +361,8 @@ export class ReplSetTest {
                 member.host += ":" + this.ports[i];
             }
 
-            if (!ignoreMaintenancePort && this._maintenancePorts?.[i] > 0) {
-                member.maintenancePort = this._maintenancePorts[i];
+            if (!ignorePriorityPort && this._priorityPorts?.[i] > 0) {
+                member.priorityPort = this._priorityPorts[i];
             }
 
             let nodeOpts = this.nodeOptions["n" + i];
@@ -1035,8 +1035,8 @@ export class ReplSetTest {
             this._unbridgedPorts.push(this._allocatePortForBridge());
         }
 
-        if (this._useMaintenancePorts) {
-            this._maintenancePorts.push(this._allocatePortForNode());
+        if (this._usePriorityPorts) {
+            this._priorityPorts.push(this._allocatePortForNode());
         }
 
         if (jsTestOptions().shellGRPC) {
@@ -1069,8 +1069,8 @@ export class ReplSetTest {
             this._unbridgedNodes.splice(nodeId, 1);
         }
 
-        if (this._maintenancePorts) {
-            this._maintenancePorts.splice(nodeId, 1);
+        if (this._priorityPorts) {
+            this._priorityPorts.splice(nodeId, 1);
         }
     }
 
@@ -2829,8 +2829,8 @@ export class ReplSetTest {
             port: this._useBridge ? this._unbridgedPorts[n] : this.ports[n],
             dbpath: "$set-$node",
         };
-        if (this._maintenancePorts?.[n] > 0) {
-            defaults.maintenancePort = this._maintenancePorts[n];
+        if (this._priorityPorts?.[n] > 0) {
+            defaults.priorityPort = this._priorityPorts[n];
         }
         if (jsTestOptions().shellGRPC) {
             defaults.grpcPort = this.grpcPorts[n];
@@ -3576,9 +3576,9 @@ function _constructStartNewInstances(rst, opts) {
 
     rst._bridgeOptions = opts.bridgeOptions || {};
 
-    rst._useMaintenancePorts = opts.useMaintenancePorts ?? false;
-    if (rst._useMaintenancePorts) {
-        assert(!rst._useBridge, "useMaintenancePorts is not supported when using MongoBridge.");
+    rst._usePriorityPorts = opts.usePriorityPorts ?? false;
+    if (rst._usePriorityPorts) {
+        assert(!rst._useBridge, "usePriorityPorts is not supported when using MongoBridge.");
     }
 
     rst._causalConsistency = opts.causallyConsistent || false;
@@ -3654,8 +3654,8 @@ function _constructStartNewInstances(rst, opts) {
         rst._unbridgedNodes = [];
     } else {
         rst.ports = opts.ports || Array.from({length: numNodes}, rst._allocatePortForNode);
-        if (rst._useMaintenancePorts) {
-            rst._maintenancePorts = Array.from({length: numNodes}, rst._allocatePortForNode);
+        if (rst._usePriorityPorts) {
+            rst._priorityPorts = Array.from({length: numNodes}, rst._allocatePortForNode);
         }
     }
 
@@ -3668,11 +3668,11 @@ function _constructStartNewInstances(rst, opts) {
                 rst.ports[i] = nodeOpts.port;
             }
         }
-        if (nodeOpts?.hasOwnProperty("maintenancePort")) {
-            if (!rst._maintenancePorts) {
-                rst._maintenancePorts = Array(numNodes).fill(-1);
+        if (nodeOpts?.hasOwnProperty("priorityPort")) {
+            if (!rst._priorityPorts) {
+                rst._priorityPorts = Array(numNodes).fill(-1);
             }
-            rst._maintenancePorts[i] = nodeOpts.maintenancePort;
+            rst._priorityPorts[i] = nodeOpts.priorityPort;
         }
     }
 

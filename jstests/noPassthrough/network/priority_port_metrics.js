@@ -1,14 +1,14 @@
 /**
- * Tests metrics and logging for the maintenance port.
+ * Tests metrics and logging for the priority port.
  *
  * @tags: [
- *   featureFlagDedicatedPortForMaintenanceOperations,
+ *   featureFlagDedicatedPortForPriorityOperations,
  * ]
  */
 import {describe, before, after, it} from "jstests/libs/mochalite.js";
 import {checkLog} from "src/mongo/shell/check_log.js";
 
-describe("Tests metrics and logging for connections via the maintenance port", function () {
+describe("Tests metrics and logging for connections via the priority port", function () {
     const logID = 22943;
 
     function assertDoesNotContain(conn, id, msg) {
@@ -23,17 +23,17 @@ describe("Tests metrics and logging for connections via the maintenance port", f
         assert.neq(containsLog, true, "Found log line when none should exist" + tojson(msg));
     }
 
-    function assertMaintenancePortConnCountServerStatusMetricMatches(conn, expectedCount) {
+    function assertPriorityPortConnCountServerStatusMetricMatches(conn, expectedCount) {
         let currentCount;
         assert.soon(
             () => {
                 let connectionMetrics = assert.commandWorked(conn.adminCommand({serverStatus: 1})).connections;
-                currentCount = connectionMetrics.maintenance;
+                currentCount = connectionMetrics.priority;
                 return currentCount == expectedCount;
             },
             () => {
                 return (
-                    "Incorrect number of maintenance port connections: expected " +
+                    "Incorrect number of priority port connections: expected " +
                     expectedCount +
                     ", but serverStatus() reports " +
                     currentCount
@@ -43,44 +43,44 @@ describe("Tests metrics and logging for connections via the maintenance port", f
     }
 
     before(() => {
-        this.conn = MongoRunner.runMongod({maintenancePort: allocatePort(), bind_ip: "127.0.0.1", useHostname: false});
+        this.conn = MongoRunner.runMongod({priorityPort: allocatePort(), bind_ip: "127.0.0.1", useHostname: false});
         this.host = this.conn.hostNoPort;
         this.mainPort = this.conn.port;
-        this.maintenancePort = this.conn.maintenancePort;
+        this.priorityPort = this.conn.priorityPort;
     });
 
     after(() => {
         MongoRunner.stopMongod(this.conn);
     });
 
-    it("Check that normal connections don't log or increment the maintenance metrics", () => {
+    it("Check that normal connections don't log or increment the priority metrics", () => {
         let conn = new Mongo(this.host + ":" + this.mainPort);
 
-        const msg = /"isMaintenance":"true"/;
+        const msg = /"isPriority":"true"/;
         assertDoesNotContain(conn, logID, msg);
-        assertMaintenancePortConnCountServerStatusMetricMatches(conn, 0);
+        assertPriorityPortConnCountServerStatusMetricMatches(conn, 0);
 
         conn.close();
     });
 
-    it("Check that maintenance port connections log and increment stats", () => {
+    it("Check that priority port connections log and increment stats", () => {
         let mainConn = new Mongo(this.host + ":" + this.mainPort);
         let conns = [];
         for (let i = 1; i < 5; i++) {
-            let newConn = new Mongo(this.host + ":" + this.maintenancePort);
+            let newConn = new Mongo(this.host + ":" + this.priorityPort);
 
-            const msg = /"isMaintenance":"true"/;
+            const msg = /"isPriority":"true"/;
             assert(
-                checkLog.checkContainsWithCountJson(mainConn, logID, {"isMaintenance": true}, i),
+                checkLog.checkContainsWithCountJson(mainConn, logID, {"isPriority": true}, i),
                 "Expecting to see " + i + " instances of log " + logID + " with " + msg,
             );
-            assertMaintenancePortConnCountServerStatusMetricMatches(mainConn, i);
+            assertPriorityPortConnCountServerStatusMetricMatches(mainConn, i);
 
             conns.push(newConn);
         }
         conns.forEach((conn) => {
             conn.close();
         });
-        assertMaintenancePortConnCountServerStatusMetricMatches(mainConn, 0);
+        assertPriorityPortConnCountServerStatusMetricMatches(mainConn, 0);
     });
 });

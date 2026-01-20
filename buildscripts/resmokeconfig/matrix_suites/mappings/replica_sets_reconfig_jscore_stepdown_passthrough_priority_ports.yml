@@ -1,0 +1,4 @@
+base_suite: replica_sets_reconfig_jscore_stepdown_passthrough
+overrides:
+  - "priority_ports.replica_sets_reconfig_stepdown_priority_port_hooks"
+  - "priority_ports.replica_sets_reconfig_fixture_priority_ports"

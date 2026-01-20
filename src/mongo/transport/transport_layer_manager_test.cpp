@@ -134,12 +134,12 @@ TEST_F(TransportLayerManagerTest, ShutdownAfterSetup) {
 }
 
 DEATH_TEST(PortsTestDeathTest,
-           ShouldFailIfMainAndMaintenancePortsCollide,
+           ShouldFailIfMainAndPriorityPortsCollide,
            "Port collision, ports must be unique.") {
     serverGlobalParams.port = 20017;
-    serverGlobalParams.maintenancePort = 20017;
+    serverGlobalParams.priorityPort = 20017;
 
-    gFeatureFlagDedicatedPortForMaintenanceOperations.setForServerParameter(true);
+    gFeatureFlagDedicatedPortForPriorityOperations.setForServerParameter(true);
 
     auto svcCtx = ServiceContext::make();
     svcCtx->setPeriodicRunner(makePeriodicRunner(svcCtx.get()));
@@ -155,7 +155,7 @@ DEATH_TEST(PortsTestDeathTest,
     serverGlobalParams.port = 20017;
     serverGlobalParams.proxyPort = 20017;
 
-    gFeatureFlagDedicatedPortForMaintenanceOperations.setForServerParameter(true);
+    gFeatureFlagDedicatedPortForPriorityOperations.setForServerParameter(true);
 
     auto svcCtx = ServiceContext::make();
     svcCtx->setPeriodicRunner(makePeriodicRunner(svcCtx.get()));
@@ -167,11 +167,11 @@ DEATH_TEST(PortsTestDeathTest,
 
 DEATH_TEST(PortsTestDeathTest,
            ShouldFailIfFeatureFlagIsNotEnabled,
-           "Maintenance port support is not enabled") {
+           "Priority port support is not enabled") {
     serverGlobalParams.port = 27017;
-    serverGlobalParams.maintenancePort = 27018;
+    serverGlobalParams.priorityPort = 27018;
 
-    gFeatureFlagDedicatedPortForMaintenanceOperations.setForServerParameter(false);
+    gFeatureFlagDedicatedPortForPriorityOperations.setForServerParameter(false);
 
     auto svcCtx = ServiceContext::make();
     svcCtx->setPeriodicRunner(makePeriodicRunner(svcCtx.get()));

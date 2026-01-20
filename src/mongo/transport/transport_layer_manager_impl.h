@@ -89,7 +89,7 @@ public:
         ServiceContext* ctx,
         bool useEgressGRPC = false,
         boost::optional<int> loadBalancerPort = {},
-        boost::optional<int> maintenancePort = {},
+        boost::optional<int> priorityPort = {},
         std::shared_ptr<ClientTransportObserver> observer = nullptr);
 
     static std::unique_ptr<TransportLayerManager> makeDefaultEgressTransportLayer();

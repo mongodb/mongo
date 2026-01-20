@@ -59,7 +59,7 @@ class MemberConfig : private MemberConfigBase {
 public:
     // Expose certain member functions used externally.
     using MemberConfigBase::getId;
-    using MemberConfigBase::getMaintenancePort;
+    using MemberConfigBase::getPriorityPort;
 
     using MemberConfigBase::kArbiterOnlyFieldName;
     using MemberConfigBase::kBuildIndexesFieldName;
@@ -67,9 +67,9 @@ public:
     using MemberConfigBase::kHorizonsFieldName;
     using MemberConfigBase::kHostFieldName;
     using MemberConfigBase::kIdFieldName;
-    using MemberConfigBase::kMaintenancePortFieldName;
     using MemberConfigBase::kNewlyAddedFieldName;
     using MemberConfigBase::kPriorityFieldName;
+    using MemberConfigBase::kPriorityPortFieldName;
     using MemberConfigBase::kSecondaryDelaySecsFieldName;
     using MemberConfigBase::kTagsFieldName;
     using MemberConfigBase::kVotesFieldName;
@@ -107,20 +107,20 @@ public:
     }
 
     /**
-     * Gets the host and maintenance port if the maintenance port is specified and the host and main
+     * Gets the host and priority port if the priority port is specified and the host and main
      * port if not. Always returns the value for the default horizon since this is only intended for
      * use by internal replication systems.
      */
-    HostAndPort getHostAndPortMaintenance() const {
-        if (getMaintenancePort()) {
-            return HostAndPort(getHostAndPort().host(), *getMaintenancePort());
+    HostAndPort getHostAndPortPriority() const {
+        if (getPriorityPort()) {
+            return HostAndPort(getHostAndPort().host(), *getPriorityPort());
         } else {
             return getHostAndPort();
         }
     }
 
-    bool isUsingMaintenancePort(const HostAndPort& hap) const {
-        return getMaintenancePort() == hap.port();
+    bool isUsingPriorityPort(const HostAndPort& hap) const {
+        return getPriorityPort() == hap.port();
     }
 
     /**

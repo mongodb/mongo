@@ -1,11 +1,11 @@
 /**
- * Test that we can connect to the maintenance port either through TCP or Unix socket (only on non-Windows
+ * Test that we can connect to the priority port either through TCP or Unix socket (only on non-Windows
  * platforms) and they can handle connections in parallel with the main port.
  *
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   featureFlagDedicatedPortForMaintenanceOperations,
+ *   featureFlagDedicatedPortForPriorityOperations,
  * ]
  */
 
@@ -14,25 +14,25 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {describe, before, it} from "jstests/libs/mochalite.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
-describe("Tests for maintenance port usage within JS test replica set helper", function () {
+describe("Tests for priority port usage within JS test replica set helper", function () {
     before(function () {
-        // Check that each node has the maintenance port and the corresponding unix socket set and listening
-        this.checkMaintenancePortSetAndListening = (conn, rs) => {
-            jsTest.log.info(`Checking maintenance port and corresponding unix socket are set and listening`);
+        // Check that each node has the priority port and the corresponding unix socket set and listening
+        this.checkPriorityPortSetAndListening = (conn, rs) => {
+            jsTest.log.info(`Checking priority port and corresponding unix socket are set and listening`);
             // Checking connection through TCP
-            const connToMaintenancePort = rs
-                ? rs.getNewConnectionToMaintenancePort(conn)
-                : new Mongo(conn.host.split(":")[0] + ":" + conn.maintenancePort);
-            const dbThroughPort = connToMaintenancePort.getDB("admin");
+            const connToPriorityPort = rs
+                ? rs.getNewConnectionToPriorityPort(conn)
+                : new Mongo(conn.host.split(":")[0] + ":" + conn.priorityPort);
+            const dbThroughPort = connToPriorityPort.getDB("admin");
             assert.commandWorked(dbThroughPort.runCommand({ping: 1}));
 
             /**  TODO(SERVER-115111): Enable unix domain socket connection testing.
             if (!_isWindows()) {
                 // Checking connection through unix socket
-                const connToMaintenanceSocket = rs
-                    ? rs.getNewConnectionToMaintenanceSocket(conn)
-                    : new Mongo("/tmp/mongodb-" + conn.maintenancePort + ".sock");
-                const dbThroughSocket = connToMaintenanceSocket.getDB("admin");
+                const connToPrioritySocket = rs
+                    ? rs.getNewConnectionToPrioritySocket(conn)
+                    : new Mongo("/tmp/mongodb-" + conn.priorityPort + ".sock");
+                const dbThroughSocket = connToPrioritySocket.getDB("admin");
                 assert.commandWorked(dbThroughSocket.runCommand({ping: 1}));
             }
             */
@@ -69,14 +69,14 @@ describe("Tests for maintenance port usage within JS test replica set helper", f
             );
         };
 
-        // Check that we can run parallel connections on both main and maintenance ports without
+        // Check that we can run parallel connections on both main and priority ports without
         // race conditions
         this.runParallelConnections = (conn, rs) => {
-            jsTest.log.info(`Checking parallel connections on main and maintenance ports`);
+            jsTest.log.info(`Checking parallel connections on main and priority ports`);
             const host = conn.host.split(":")[0];
             const workers = [];
 
-            // Spawning threads for both main and maintenance ports (a low number of threads allows to check that
+            // Spawning threads for both main and priority ports (a low number of threads allows to check that
             // we are not triggering any thread sanitizer race condition while avoiding port exhaustion)
             const numThreadsPerPort = 4;
             for (let i = 0; i < numThreadsPerPort; i++) {
@@ -84,15 +84,15 @@ describe("Tests for maintenance port usage within JS test replica set helper", f
             }
             for (let i = 0; i < numThreadsPerPort; i++) {
                 workers.push({
-                    portName: "maintenance",
+                    portName: "priority",
                     thread: this.spawnThreadForParallelConnections(
                         host,
-                        rs ? rs.getMaintenancePort(conn) : conn.maintenancePort,
+                        rs ? rs.getPriorityPort(conn) : conn.priorityPort,
                     ),
                 });
             }
 
-            // Running parallel connections on both main and maintenance ports
+            // Running parallel connections on both main and priority ports
             workers.forEach((worker) => worker.thread.start());
 
             // Joining threads
@@ -107,74 +107,74 @@ describe("Tests for maintenance port usage within JS test replica set helper", f
         };
     });
 
-    it("Starting up a replica set with maintenance port enabled on all nodes", () => {
+    it("Starting up a replica set with priority port enabled on all nodes", () => {
         const rs = new ReplSetTest({
             nodes: 3,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
         });
         rs.startSet();
         rs.initiate();
 
-        jsTest.log.info("Testing replica set nodes for maintenance port availability");
+        jsTest.log.info("Testing replica set nodes for priority port availability");
         rs.nodes.forEach((conn) => {
-            this.checkMaintenancePortSetAndListening(conn, rs);
+            this.checkPriorityPortSetAndListening(conn, rs);
             this.runParallelConnections(conn, rs);
         });
 
         rs.stopSet();
     });
 
-    it("Starting up a replica set with a specific node having a maintenance port", () => {
-        // The choice of which node has the maintenance port is arbitrary. Here we choose the second node
-        // (index 1). The purpose of this test is to verify that only the node with the maintenance port
+    it("Starting up a replica set with a specific node having a priority port", () => {
+        // The choice of which node has the priority port is arbitrary. Here we choose the second node
+        // (index 1). The purpose of this test is to verify that only the node with the priority port
         // set can be listening to the port.
-        const rs = new ReplSetTest({nodes: [{}, {maintenancePort: allocatePort()}, {}]});
+        const rs = new ReplSetTest({nodes: [{}, {priorityPort: allocatePort()}, {}]});
         rs.startSet();
         rs.initiate();
 
         let countFoundPorts = 0;
 
-        jsTest.log.info("Testing replica set nodes for maintenance port availability when it is set");
+        jsTest.log.info("Testing replica set nodes for priority port availability when it is set");
         rs.nodes.forEach((conn) => {
             try {
-                this.checkMaintenancePortSetAndListening(conn, rs);
+                this.checkPriorityPortSetAndListening(conn, rs);
                 countFoundPorts += 1;
             } catch (e) {
-                // This should throw if the maintenance port is not set for the node.
-                assert(!conn.maintenancePort);
+                // This should throw if the priority port is not set for the node.
+                assert(!conn.priorityPort);
             }
         });
 
         assert.eq(countFoundPorts, 1);
 
-        jsTest.log.info("Testing parallel connections to maintenance port on the node that has it set");
+        jsTest.log.info("Testing parallel connections to priority port on the node that has it set");
         this.runParallelConnections(rs.nodes[1], rs);
 
         rs.stopSet();
     });
 
-    it("Starting up a sharded cluster with maintenance port enabled on all nodes", () => {
+    it("Starting up a sharded cluster with priority port enabled on all nodes", () => {
         const st = new ShardingTest({
             shards: 1,
             mongos: 2,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
         });
 
         jsTest.log.info("Testing config server nodes");
         st.configRS.nodes.forEach((conn) => {
-            this.checkMaintenancePortSetAndListening(conn, st.configRS);
+            this.checkPriorityPortSetAndListening(conn, st.configRS);
             this.runParallelConnections(conn, st.configRS);
         });
 
         jsTest.log.info("Testing shard server nodes");
         st.rs0.nodes.forEach((conn) => {
-            this.checkMaintenancePortSetAndListening(conn, st.rs0);
+            this.checkPriorityPortSetAndListening(conn, st.rs0);
             this.runParallelConnections(conn, st.rs0);
         });
 
         jsTest.log.info("Testing mongos nodes");
         st._mongos.forEach((conn) => {
-            this.checkMaintenancePortSetAndListening(conn);
+            this.checkPriorityPortSetAndListening(conn);
             this.runParallelConnections(conn);
         });
 

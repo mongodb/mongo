@@ -108,9 +108,9 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_memberId) {
 }
 
 // TODO (SERVER-112863): Remove feature flag controller and FF Disabled test
-TEST_F(ServiceContextTest, ValidateConfigForInitiate_MaintenancePortFFEnabled) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_PriorityPortFFEnabled) {
     RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicationUsageOfMaintenancePort", true);
+        "featureFlagReplicationUsageOfPriorityPort", true);
     ReplicationCoordinatorExternalStateMock rses;
     rses.addSelf(HostAndPort("h1"));
 
@@ -119,15 +119,15 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_MaintenancePortFFEnabled) {
         BSON("_id" << "rs0"
                    << "version" << 1 << "protocolVersion" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 256 << "host"
-                                            << "h1" << "maintenancePort" << 20))),
+                                            << "h1" << "priorityPort" << 20))),
         newReplSetId);
     ASSERT_OK(
         validateConfigForInitiate(&rses, validConfig, makeOperationContext().get()).getStatus());
 }
 
-TEST_F(ServiceContextTest, ValidateConfigForInitiate_MaintenancePortFFDisabled) {
+TEST_F(ServiceContextTest, ValidateConfigForInitiate_PriorityPortFFDisabled) {
     RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagReplicationUsageOfMaintenancePort", false);
+        "featureFlagReplicationUsageOfPriorityPort", false);
     ReplicationCoordinatorExternalStateMock rses;
     rses.addSelf(HostAndPort("h1"));
 
@@ -136,7 +136,7 @@ TEST_F(ServiceContextTest, ValidateConfigForInitiate_MaintenancePortFFDisabled) 
         BSON("_id" << "rs0"
                    << "version" << 1 << "protocolVersion" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 256 << "host"
-                                            << "h1" << "maintenancePort" << 20))),
+                                            << "h1" << "priorityPort" << 20))),
         newReplSetId);
     ASSERT_EQUALS(
         ErrorCodes::InvalidOptions,
@@ -1382,16 +1382,16 @@ TEST_F(ServiceContextTest, FindOwnHostInConfigQuick) {
                                  << BSON("_id" << 4 << "host"
                                                << "h2:1234")
                                  << BSON("_id" << 5 << "host"
-                                               << "h4:1234" << "maintenancePort" << 5678))));
+                                               << "h4:1234" << "priorityPort" << 5678))));
 
     // Does not exist.
     ASSERT_EQUALS(-1,
                   findOwnHostInConfigQuick(newConfig, HostAndPort("non-existent"), boost::none));
 
-    // Maintenance port specified when none exists locally.
+    // Priority port specified when none exists locally.
     ASSERT_EQUALS(-1, findOwnHostInConfigQuick(newConfig, HostAndPort("h4:1234"), boost::none));
 
-    // Maintenance port wrong.
+    // Priority port wrong.
     ASSERT_EQUALS(-1, findOwnHostInConfigQuick(newConfig, HostAndPort("h4:1234"), 2345));
 
     // First in config, not duplicated.
@@ -1403,10 +1403,10 @@ TEST_F(ServiceContextTest, FindOwnHostInConfigQuick) {
     // First match in a tie.
     ASSERT_EQUALS(1, findOwnHostInConfigQuick(newConfig, HostAndPort("h2:1234"), boost::none));
 
-    // Match with maintenance port.
+    // Match with priority port.
     ASSERT_EQUALS(4, findOwnHostInConfigQuick(newConfig, HostAndPort("h4:1234"), 5678));
 
-    // Maintenance port not in config but open locally is fine.
+    // Priority port not in config but open locally is fine.
     ASSERT_EQUALS(0, findOwnHostInConfigQuick(newConfig, HostAndPort("h1:1234"), 5678));
 }
 

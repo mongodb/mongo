@@ -105,8 +105,7 @@ private:
      * format:
      * "<host:port>, <host:port>"
      * A fully successful voting node is one which replied success over its main port and either
-     * does not have a maintenance port configured or also replied success over the maintenance
-     * port.
+     * does not have a priority port configured or also replied success over the priority port.
      */
     void _appendFullySuccessfulVotingHostAndPorts(str::stream& stream, int expectedResponses);
 
@@ -121,15 +120,15 @@ private:
 
     struct ResponseStatus {
         bool mainResponseReceived;
-        bool maintenanceResponseReceived;
+        bool priorityResponseReceived;
         bool fullySuccessful;
     };
-    // Tracks main and maintenance port responses for each member. The indexes into this vector will
+    // Tracks main and priority port responses for each member. The indexes into this vector will
     // be the same as that of the _rsConfig and entries for non-voters will be all false.
     std::vector<ResponseStatus> _responses;
     // Tracks the number of voters for which their state is fully successful (meaning they have
-    // responded on the main port and do not have a maintenance port configured or have responded
-    // on both main and maintenance ports).
+    // responded on the main port and do not have a priority port configured or have responded
+    // on both main and priority ports).
     int _successfulVoterCount;
 
     // List of nodes with bad responses and the bad response status they returned.
@@ -139,11 +138,11 @@ private:
     int _numResponses;
 
     // Number of electable nodes that have responded affirmatively (on both their main and
-    // maintenance ports).
+    // priority ports).
     int _numElectable;
 
     // Number of responses required. This will be equal to the number of members in the config plus
-    // the number of members that have maintenance ports specified since we need to contact both
+    // the number of members that have priority ports specified since we need to contact both
     // ports in that case.
     int _numResponsesRequired;
 

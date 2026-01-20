@@ -233,12 +233,11 @@ protected:
         return _selfIndex;
     }
 
-    std::vector<HostAndPort> getMemberHostAndPorts(bool maintenance) {
+    std::vector<HostAndPort> getMemberHostAndPorts(bool priority) {
         std::vector<HostAndPort> res;
         for (auto i = 0; i < getCurrentConfig().getNumMembers(); i++) {
-            res.push_back(maintenance
-                              ? getCurrentConfig().getMemberAt(i).getHostAndPortMaintenance()
-                              : getCurrentConfig().getMemberAt(i).getHostAndPort());
+            res.push_back(priority ? getCurrentConfig().getMemberAt(i).getHostAndPortPriority()
+                                   : getCurrentConfig().getMemberAt(i).getHostAndPort());
         }
         return res;
     }
@@ -378,45 +377,46 @@ protected:
 
     void testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(BSONObj config,
                                                                 int selfIndex,
-                                                                bool expectMaintenance);
-    void testNodeReturnsClosestValidSyncSource(BSONObj config,
-                                               int selfIndex,
-                                               bool expectMaintenance);
+                                                                bool expectPriority);
+    void testNodeReturnsClosestValidSyncSource(BSONObj config, int selfIndex, bool expectPriority);
     void testNodeWontChooseSyncSourceFromOlderTerm(BSONObj config,
                                                    int selfIndex,
-                                                   bool expectMaintenance);
+                                                   bool expectPriority);
     void testChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter(BSONObj config,
                                                           int selfIndex,
-                                                          bool expectMaintenance);
+                                                          bool expectPriority);
     void testChooseSameSyncSourceEvenWhenPrimary(BSONObj config,
                                                  int selfIndex,
-                                                 bool expectMaintenance);
+                                                 bool expectPriority);
     void testChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet(
-        BSONObj config, int selfIndex, bool expectMaintenance);
+        BSONObj config, int selfIndex, bool expectPriority);
     void testNodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires(BSONObj config,
                                                                           int selfIndex,
-                                                                          bool expectMaintenance);
-    void testChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly(
-        BSONObj config, int selfIndex, bool expectMaintenance);
+                                                                          bool expectPriority);
+    void testChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly(BSONObj config,
+                                                                             int selfIndex,
+                                                                             bool expectPriority);
 
     void testChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly(BSONObj config,
                                                                           int selfIndex,
-                                                                          bool expectMaintenance);
-    void testChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly(
-        BSONObj config, int selfIndex, bool expectMaintenance);
+                                                                          bool expectPriority);
+    void testChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly(BSONObj config,
+                                                                              int selfIndex,
+                                                                              bool expectPriority);
     void testPreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred(BSONObj config,
                                                                            int selfIndex,
-                                                                           bool expectMaintenance);
-    void testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(
-        BSONObj config, int selfIndex, bool expectMaintenance);
+                                                                           bool expectPriority);
+    void testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(BSONObj config,
+                                                                               int selfIndex,
+                                                                               bool expectPriority);
     void testNodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp(BSONObj config,
                                                                    int selfIndex,
-                                                                   bool expectMaintenance);
-    void testReplSetGetStatus(BSONObj config, bool expectMaintenance);
+                                                                   bool expectPriority);
+    void testReplSetGetStatus(BSONObj config, bool expectPriority);
     void testMemberReplicationProgressAfterReconfig(BSONObj initialConfig,
                                                     BSONObj changedConfig,
                                                     int selfIndex,
-                                                    bool expectMaintenance);
+                                                    bool expectPriority);
 
 private:
     HeartbeatResponseAction _receiveHeartbeatHelper(Status responseStatus,
@@ -496,7 +496,7 @@ TEST_F(TopoCoordTest, TopologyVersionInitializedAtStartup) {
 
 void TopoCoordTest::testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(BSONObj config,
                                                                            int selfIndex,
-                                                                           bool expectMaintenance) {
+                                                                           bool expectPriority) {
     // if we do not have an index in the config, we should get an empty syncsource
     HostAndPort newSyncSource =
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
@@ -506,12 +506,10 @@ void TopoCoordTest::testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(BSONO
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto& hp1 = expectMaintenance
-        ? getCurrentConfig().getMemberAt(1).getHostAndPortMaintenance()
-        : getCurrentConfig().getMemberAt(1).getHostAndPort();
-    const auto& hp2 = expectMaintenance
-        ? getCurrentConfig().getMemberAt(2).getHostAndPortMaintenance()
-        : getCurrentConfig().getMemberAt(2).getHostAndPort();
+    const auto& hp1 = expectPriority ? getCurrentConfig().getMemberAt(1).getHostAndPortPriority()
+                                     : getCurrentConfig().getMemberAt(1).getHostAndPort();
+    const auto& hp2 = expectPriority ? getCurrentConfig().getMemberAt(2).getHostAndPortPriority()
+                                     : getCurrentConfig().getMemberAt(2).getHostAndPort();
 
     // member at index 1 is the furthest ahead
     heartbeatFromMember(hp1, setName, MemberState::RS_SECONDARY, OpTime(Timestamp(1, 0), 0));
@@ -570,34 +568,34 @@ TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
         false);
 }
 
-TEST_F(TopoCoordTest, MostRecentDataWithMaintenancePortSpecified) {
+TEST_F(TopoCoordTest, MostRecentDataWithPriorityPortSpecified) {
     testNodeReturnsSecondaryWithMostRecentDataAsSyncSource(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 2)
-                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 3)
-                                 << BSON("_id" << 30 << "host" << "h3" << "maintenancePort" << 4))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 2)
+                                 << BSON("_id" << 20 << "host" << "h2" << "priorityPort" << 3)
+                                 << BSON("_id" << 30 << "host" << "h3" << "priorityPort" << 4))),
         0,
         true);
 }
 
 void TopoCoordTest::testNodeReturnsClosestValidSyncSource(BSONObj config,
                                                           int selfIndex,
-                                                          bool expectMaintenance) {
+                                                          bool expectPriority) {
     updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
     OpTime lastOpTimeWeApplied = OpTime(Timestamp(100, 0), 0);
 
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto members = getMemberHostAndPorts(expectPriority);
     const auto& primaryMember =
         getCurrentConfig().getMemberAt(getCurrentConfig().getNumMembers() - 1);
 
     auto runHeartbeats = [&](bool checkPrimary) {
         int roundTripTime = 700;
         for (auto i = 1; i < getCurrentConfig().getNumMembers() - 2; i++) {
-            heartbeatFromMember(expectMaintenance
-                                    ? getCurrentConfig().getMemberAt(i).getHostAndPortMaintenance()
+            heartbeatFromMember(expectPriority
+                                    ? getCurrentConfig().getMemberAt(i).getHostAndPortPriority()
                                     : getCurrentConfig().getMemberAt(i).getHostAndPort(),
                                 setName,
                                 MemberState::RS_SECONDARY,
@@ -605,10 +603,10 @@ void TopoCoordTest::testNodeReturnsClosestValidSyncSource(BSONObj config,
                                 Milliseconds(roundTripTime));
             roundTripTime -= 100;
         }
-        heartbeatFromMember(expectMaintenance
+        heartbeatFromMember(expectPriority
                                 ? getCurrentConfig()
                                       .getMemberAt(getCurrentConfig().getNumMembers() - 2)
-                                      .getHostAndPortMaintenance()
+                                      .getHostAndPortPriority()
                                 : getCurrentConfig()
                                       .getMemberAt(getCurrentConfig().getNumMembers() - 2)
                                       .getHostAndPort(),
@@ -621,8 +619,8 @@ void TopoCoordTest::testNodeReturnsClosestValidSyncSource(BSONObj config,
         if (checkPrimary) {
             ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         }
-        heartbeatFromMember(expectMaintenance ? primaryMember.getHostAndPortMaintenance()
-                                              : primaryMember.getHostAndPort(),
+        heartbeatFromMember(expectPriority ? primaryMember.getHostAndPortPriority()
+                                           : primaryMember.getHostAndPort(),
                             setName,
                             MemberState::RS_PRIMARY,
                             OpTime(Timestamp(600, 0), 0),
@@ -638,13 +636,13 @@ void TopoCoordTest::testNodeReturnsClosestValidSyncSource(BSONObj config,
 
     // Should choose primary first; it's closest
     getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied, ReadPreference::Nearest);
-    ASSERT_EQUALS(expectMaintenance ? primaryMember.getHostAndPortMaintenance()
-                                    : primaryMember.getHostAndPort(),
+    ASSERT_EQUALS(expectPriority ? primaryMember.getHostAndPortPriority()
+                                 : primaryMember.getHostAndPort(),
                   getTopoCoord().getSyncSourceAddress());
 
     // Primary goes far far away
-    heartbeatFromMember(expectMaintenance ? primaryMember.getHostAndPortMaintenance()
-                                          : primaryMember.getHostAndPort(),
+    heartbeatFromMember(expectPriority ? primaryMember.getHostAndPortPriority()
+                                       : primaryMember.getHostAndPort(),
                         setName,
                         MemberState::RS_PRIMARY,
                         OpTime(Timestamp(600, 0), 0),
@@ -701,9 +699,9 @@ TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSource) {
         false);
 }
 
-TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSourceMaintenanceDisabledButUsed) {
-    // When no maintenance ports are specified, the maintenance port responses and the
-    // non-maintenance port responses should be the same.
+TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSourcePriorityDisabledButUsed) {
+    // When no priority ports are specified, the priority port responses and the
+    // non-priority port responses should be the same.
     testNodeReturnsClosestValidSyncSource(
         BSON("_id" << "rs0" << "version" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 1 << "host" << "hself")
@@ -721,36 +719,36 @@ TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSourceMaintenanceDi
         true);
 }
 
-TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSourceWithMaintenance) {
+TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSourceWithPriority) {
     testNodeReturnsClosestValidSyncSource(
         BSON("_id" << "rs0" << "version" << 1 << "members"
                    << BSON_ARRAY(
-                          BSON("_id" << 1 << "host" << "hself" << "maintenancePort" << 2)
-                          << BSON("_id" << 10 << "host" << "h1" << "maintenancePort" << 3)
+                          BSON("_id" << 1 << "host" << "hself" << "priorityPort" << 2)
+                          << BSON("_id" << 10 << "host" << "h1" << "priorityPort" << 3)
                           << BSON("_id" << 20 << "host" << "h2" << "buildIndexes" << false
-                                        << "priority" << 0 << "maintenancePort" << 4)
+                                        << "priority" << 0 << "priorityPort" << 4)
                           << BSON("_id" << 30 << "host" << "h3" << "hidden" << true << "priority"
-                                        << 0 << "votes" << 0 << "maintenancePort" << 2)
+                                        << 0 << "votes" << 0 << "priorityPort" << 2)
                           << BSON("_id" << 40 << "host" << "h4" << "arbiterOnly" << true
-                                        << "maintenancePort" << 1)
+                                        << "priorityPort" << 1)
                           << BSON("_id" << 50 << "host" << "h5" << "secondaryDelaySecs" << 1
-                                        << "priority" << 0 << "maintenancePort" << 3)
-                          << BSON("_id" << 60 << "host" << "h6" << "maintenancePort" << 4)
-                          << BSON("_id" << 70 << "host" << "hprimary" << "maintenancePort" << 2))),
+                                        << "priority" << 0 << "priorityPort" << 3)
+                          << BSON("_id" << 60 << "host" << "h6" << "priorityPort" << 4)
+                          << BSON("_id" << 70 << "host" << "hprimary" << "priorityPort" << 2))),
         0,
         true);
 }
 
 void TopoCoordTest::testNodeWontChooseSyncSourceFromOlderTerm(BSONObj config,
                                                               int selfIndex,
-                                                              bool expectMaintenance) {
+                                                              bool expectPriority) {
     updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
     OpTime lastOpTimeWeApplied = OpTime(Timestamp(100, 0), 3);
 
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    auto members = getMemberHostAndPorts(expectMaintenance);
+    auto members = getMemberHostAndPorts(expectPriority);
 
     heartbeatFromMember(members[1],
                         setName,
@@ -794,25 +792,25 @@ TEST_F(TopoCoordTest, NodeWontChooseSyncSourceFromOlderTerm) {
         false);
 }
 
-TEST_F(TopoCoordTest, NodeWontChooseSyncSourceFromOlderTermMaintenancePort) {
+TEST_F(TopoCoordTest, NodeWontChooseSyncSourceFromOlderTermPriorityPort) {
     testNodeWontChooseSyncSourceFromOlderTerm(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 1 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 10 << "host" << "h1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 3))),
+                   << BSON_ARRAY(BSON("_id" << 1 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 10 << "host" << "h1" << "priorityPort" << 2)
+                                 << BSON("_id" << 20 << "host" << "h2" << "priorityPort" << 3))),
         0,
         true);
 }
 
 void TopoCoordTest::testChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter(BSONObj config,
                                                                      int selfIndex,
-                                                                     bool expectMaintenance) {
+                                                                     bool expectPriority) {
     updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto members = getMemberHostAndPorts(expectPriority);
     Timestamp t1(1, 0), t5(5, 0), t10(10, 0);
     OpTime ot1(t1, 0), ot5(t5, 0), ot10(t10, 0);
     Milliseconds hbRTT100(100), hbRTT300(300);
@@ -858,12 +856,12 @@ TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter) {
         false);
 }
 
-TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoterMaintenance) {
+TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoterPriority) {
     testChooseOnlyVotersAsSyncSourceWhenNodeIsAVoter(
         fromjson("{_id:'rs0', version:1, members:["
-                 "{_id:10, host:'hself', maintenancePort: 1}, "
-                 "{_id:20, host:'h1', maintenancePort: 2, votes:0, priority:0}, "
-                 "{_id:30, host:'h2', maintenancePort: 3} "
+                 "{_id:10, host:'hself', priorityPort: 1}, "
+                 "{_id:20, host:'h1', priorityPort: 2, votes:0, priority:0}, "
+                 "{_id:30, host:'h2', priorityPort: 3} "
                  "]}"),
         0,
         true);
@@ -871,13 +869,13 @@ TEST_F(TopoCoordTest, ChooseOnlyVotersAsSyncSourceWhenNodeIsAVoterMaintenance) {
 
 void TopoCoordTest::testChooseSameSyncSourceEvenWhenPrimary(BSONObj config,
                                                             int selfIndex,
-                                                            bool expectMaintenance) {
+                                                            bool expectPriority) {
     updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto members = getMemberHostAndPorts(expectPriority);
 
     // Two rounds of heartbeat pings from each member.
     heartbeatFromMember(members[1],
@@ -926,18 +924,18 @@ TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimary) {
         false);
 }
 
-TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimaryMaintenance) {
+TEST_F(TopoCoordTest, ChooseSameSyncSourceEvenWhenPrimaryPriority) {
     testChooseSameSyncSourceEvenWhenPrimary(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 2)
-                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 3)
-                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 4))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 2)
+                                 << BSON("_id" << 20 << "host" << "h1" << "priorityPort" << 3)
+                                 << BSON("_id" << 30 << "host" << "h2" << "priorityPort" << 4))),
         0,
         true);
 }
 
 void TopoCoordTest::testChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet(
-    BSONObj config, int selfIndex, bool expectMaintenance) {
+    BSONObj config, int selfIndex, bool expectPriority) {
     updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -945,7 +943,7 @@ void TopoCoordTest::testChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSou
     OpTime newOpTime = OpTime(Timestamp(2, 0), 0);
 
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto members = getMemberHostAndPorts(expectPriority);
 
     // two rounds of heartbeat pings from each member
     heartbeatFromMember(
@@ -986,22 +984,22 @@ TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourc
 }
 
 TEST_F(TopoCoordTest,
-       ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySetMaintenance) {
+       ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySetPriority) {
     testChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourceIsForciblySet(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "priorityPort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "priorityPort" << 3))),
         0,
         true);
 }
 
-TEST_F(TopoCoordTest, DownedHeartbeatOnMainPortDoesNotAffectMaintenancePortSelection) {
+TEST_F(TopoCoordTest, DownedHeartbeatOnMainPortDoesNotAffectPriorityPortSelection) {
     updateConfig(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "priorityPort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "priorityPort" << 3))),
         0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -1033,21 +1031,21 @@ TEST_F(TopoCoordTest, DownedHeartbeatOnMainPortDoesNotAffectMaintenancePortSelec
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
     ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 
-    // Receive a down hearbeat on members[2] but on the main port, not the maintenance port
+    // Receive a down hearbeat on members[2] but on the main port, not the priority port
     receiveDownHeartbeat(HostAndPort("h2"), setName, ErrorCodes::NetworkTimeout);
 
-    // members[2] should still be valid since we received no down heartbeat on the maintenance port
+    // members[2] should still be valid since we received no down heartbeat on the priority port
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
     ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 }
 
 void TopoCoordTest::testNodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires(
-    BSONObj config, int selfIndex, bool expectMaintenance) {
+    BSONObj config, int selfIndex, bool expectPriority) {
     updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto members = getMemberHostAndPorts(expectPriority);
 
     // Two rounds of heartbeat pings from each member.
     heartbeatFromMember(members[1],
@@ -1095,23 +1093,22 @@ TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpir
         false);
 }
 
-TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpiresMaintenance) {
+TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpiresPriority) {
     testNodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "priorityPort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "priorityPort" << 3))),
         0,
         true);
 }
 
-TEST_F(TopoCoordTest,
-       NodeDoesNotChooseDenylistedSyncSourceOnMaintenancePortIfMainPortWasDenylisted) {
+TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceOnPriorityPortIfMainPortWasDenylisted) {
     updateConfig(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "priorityPort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "priorityPort" << 3))),
         0);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
@@ -1144,7 +1141,7 @@ TEST_F(TopoCoordTest,
     ASSERT_EQUALS(members[2], getTopoCoord().getSyncSourceAddress());
 
     Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
-    // Denylist using main port, not maintenance port
+    // Denylist using main port, not priority port
     getTopoCoord().denylistSyncSource(HostAndPort("h2"), expireTime);
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
     // Should choose second best choice now that h3 is denylisted.
@@ -1156,12 +1153,12 @@ TEST_F(TopoCoordTest,
 }
 
 void TopoCoordTest::testChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly(
-    BSONObj config, int selfIndex, bool expectMaintenance) {
+    BSONObj config, int selfIndex, bool expectPriority) {
     updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto members = getMemberHostAndPorts(expectPriority);
 
     heartbeatFromMember(members[1],
                         setName,
@@ -1210,24 +1207,24 @@ TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimar
         false);
 }
 
-TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnlyMaintenance) {
+TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnlyPriority) {
     testChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 2)
-                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 3))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "priorityPort" << 2)
+                                 << BSON("_id" << 30 << "host" << "h2" << "priorityPort" << 3))),
         0,
         true);
 }
 
 void TopoCoordTest::testChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly(
-    BSONObj config, int selfIndex, bool expectMaintenance) {
+    BSONObj config, int selfIndex, bool expectPriority) {
     updateConfig(config, selfIndex);
 
     // We use readPreference nearest only when in initialSync
     setSelfMemberState(MemberState::RS_STARTUP2);
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto members = getMemberHostAndPorts(expectPriority);
 
     heartbeatFromMember(members[1],
                         setName,
@@ -1323,24 +1320,24 @@ TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOn
         false);
 }
 
-TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnlyMaintenance) {
+TEST_F(TopoCoordTest, ChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnlyPriority) {
     testChooseOnlyPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryOnly(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 1)
-                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 1))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "priorityPort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h2" << "priorityPort" << 1))),
         0,
         true);
 }
 
 void TopoCoordTest::testChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly(
-    BSONObj config, int selfIndex, bool expectMaintenance) {
+    BSONObj config, int selfIndex, bool expectPriority) {
     updateConfig(config, selfIndex);
 
     // We use readPreference nearest only when in initialSync
     setSelfMemberState(MemberState::RS_STARTUP2);
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto members = getMemberHostAndPorts(expectPriority);
 
     heartbeatFromMember(members[1],
                         setName,
@@ -1421,24 +1418,24 @@ TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSeconda
         false);
 }
 
-TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnlyMaintenance) {
+TEST_F(TopoCoordTest, ChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnlyPriority) {
     testChooseOnlySecondaryAsSyncSourceWhenReadPreferenceIsSecondaryOnly(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h1" << "maintenancePort" << 1)
-                                 << BSON("_id" << 30 << "host" << "h2" << "maintenancePort" << 1))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h1" << "priorityPort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h2" << "priorityPort" << 1))),
         0,
         true);
 }
 
 void TopoCoordTest::testPreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred(
-    BSONObj config, int selfIndex, bool expectMaintenance) {
+    BSONObj config, int selfIndex, bool expectPriority) {
     updateConfig(config, selfIndex);
 
     // We use readPreference nearest only when in initialSync
     setSelfMemberState(MemberState::RS_STARTUP2);
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto members = getMemberHostAndPorts(expectMaintenance);
+    const auto members = getMemberHostAndPorts(expectPriority);
 
     heartbeatFromMember(members[1],
                         setName,
@@ -1547,25 +1544,25 @@ TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPrefer
         false);
 }
 
-TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferredMaintenance) {
+TEST_F(TopoCoordTest, PreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferredPriority) {
     testPreferPrimaryAsSyncSourceWhenReadPreferenceIsPrimaryPreferred(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 1)
-                                 << BSON("_id" << 30 << "host" << "h3" << "maintenancePort" << 1))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h2" << "priorityPort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h3" << "priorityPort" << 1))),
         0,
         true);
 }
 
 void TopoCoordTest::testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(
-    BSONObj config, int selfIndex, bool expectMaintenance) {
+    BSONObj config, int selfIndex, bool expectPriority) {
     updateConfig(config, selfIndex);
 
     // We use readPreference nearest only when in initialSync
     setSelfMemberState(MemberState::RS_STARTUP2);
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
     const auto members =
-        getMemberHostAndPorts(expectMaintenance);  // members[1] is h2, members[2] is h3
+        getMemberHostAndPorts(expectPriority);  // members[1] is h2, members[2] is h3
 
 
     heartbeatFromMember(members[1],  // h2
@@ -1661,25 +1658,25 @@ TEST_F(TopoCoordTest, PreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPr
         false);
 }
 
-TEST_F(TopoCoordTest,
-       PreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferredMaintenance) {
+TEST_F(TopoCoordTest, PreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferredPriority) {
     testPreferSecondaryAsSyncSourceWhenReadPreferenceIsSecondaryPreferred(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 1)
-                                 << BSON("_id" << 30 << "host" << "h3" << "maintenancePort" << 1))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h2" << "priorityPort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h3" << "priorityPort" << 1))),
         0,
         true);
 }
 
-void TopoCoordTest::testNodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp(
-    BSONObj config, int selfIndex, bool expectMaintenance) {
+void TopoCoordTest::testNodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp(BSONObj config,
+                                                                              int selfIndex,
+                                                                              bool expectPriority) {
     updateConfig(config, selfIndex);
 
     setSelfMemberState(MemberState::RS_SECONDARY);
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
     const auto members =
-        getMemberHostAndPorts(expectMaintenance);  // members[1] is h2, members[2] is h3
+        getMemberHostAndPorts(expectPriority);  // members[1] is h2, members[2] is h3
 
     // Generate enough heartbeats to select a sync source below
     heartbeatFromMember(members[1],  // h2
@@ -1745,12 +1742,12 @@ TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp) {
         false);
 }
 
-TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUpMaintenance) {
+TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUpPriority) {
     testNodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "maintenancePort" << 1)
-                                 << BSON("_id" << 20 << "host" << "h2" << "maintenancePort" << 1)
-                                 << BSON("_id" << 30 << "host" << "h3" << "maintenancePort" << 1))),
+                   << BSON_ARRAY(BSON("_id" << 10 << "host" << "hself" << "priorityPort" << 1)
+                                 << BSON("_id" << 20 << "host" << "h2" << "priorityPort" << 1)
+                                 << BSON("_id" << 30 << "host" << "h3" << "priorityPort" << 1))),
         0,
         true);
 }
@@ -1869,13 +1866,13 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsSelf) {
     ASSERT_EQUALS("I cannot sync from myself", result.reason());
 }
 
-TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsSelfMaintenance) {
+TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsSelfPriority) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
     updateConfig(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself" << "maintenancePort" << 1)
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself" << "priorityPort" << 1)
                                  << BSON("_id" << 1 << "host" << "h1" << "arbiterOnly" << true)
                                  << BSON("_id" << 2 << "host" << "h2" << "priority" << 0
                                                << "buildIndexes" << false)
@@ -1886,7 +1883,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsSelfMaintenan
         0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    // Try to sync from self via maintenance port
+    // Try to sync from self via priority port
     getTopoCoord().prepareSyncFromResponse(HostAndPort("hself", 1), &response, &result);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
     ASSERT_EQUALS("I cannot sync from myself", result.reason());
@@ -1916,13 +1913,13 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsArbiter) {
     ASSERT_EQUALS("Cannot sync from \"h1:27017\" because it is an arbiter", result.reason());
 }
 
-TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsArbiterMaintenace) {
+TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsArbiterPriority) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
     updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
-                                          << BSON("_id" << 1 << "host" << "h1" << "maintenancePort"
+                                          << BSON("_id" << 1 << "host" << "h1" << "priorityPort"
                                                         << 1 << "arbiterOnly" << true)
                                           << BSON("_id" << 2 << "host" << "h2" << "priority" << 0
                                                         << "buildIndexes" << false)
@@ -1933,7 +1930,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsArbiterMainte
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    // Try to sync from an arbiter via maintenance port
+    // Try to sync from an arbiter via priority port
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h1", 1), &response, &result);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
     ASSERT_EQUALS("Cannot sync from \"h1:1\" because it is an arbiter", result.reason());
@@ -1963,7 +1960,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbui
                   result.reason());
 }
 
-TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbuilderMaintenance) {
+TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbuilderPriority) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
@@ -1971,7 +1968,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbui
         BSON("_id" << "rs0" << "version" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
                                  << BSON("_id" << 1 << "host" << "h1" << "arbiterOnly" << true)
-                                 << BSON("_id" << 2 << "host" << "h2" << "maintenancePort" << 1
+                                 << BSON("_id" << 2 << "host" << "h2" << "priorityPort" << 1
                                                << "priority" << 0 << "buildIndexes" << false)
                                  << BSON("_id" << 3 << "host" << "h3")
                                  << BSON("_id" << 4 << "host" << "h4")
@@ -1980,13 +1977,13 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenSyncFromRequestsAnIndexNonbui
         0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    // Try to sync from a node that doesn't build indexes via maintenance port
+    // Try to sync from a node that doesn't build indexes via priority port
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h2", 1), &response, &result);
     ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
     ASSERT_EQUALS("Cannot sync from \"h2:1\" because it does not build indexes", result.reason());
 }
 
-TEST_F(TopoCoordTest, NodeReturnsNodeNotFoundWhenSyncFromRequestsMainPortAndMaintenancePortExists) {
+TEST_F(TopoCoordTest, NodeReturnsNodeNotFoundWhenSyncFromRequestsMainPortAndPriorityPortExists) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
@@ -1994,7 +1991,7 @@ TEST_F(TopoCoordTest, NodeReturnsNodeNotFoundWhenSyncFromRequestsMainPortAndMain
         BSON("_id" << "rs0" << "version" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
                                  << BSON("_id" << 1 << "host" << "h1" << "arbiterOnly" << true)
-                                 << BSON("_id" << 2 << "host" << "h2" << "maintenancePort" << 1
+                                 << BSON("_id" << 2 << "host" << "h2" << "priorityPort" << 1
                                                << "priority" << 0 << "buildIndexes" << false)
                                  << BSON("_id" << 3 << "host" << "h3")
                                  << BSON("_id" << 4 << "host" << "h4")
@@ -2003,7 +2000,7 @@ TEST_F(TopoCoordTest, NodeReturnsNodeNotFoundWhenSyncFromRequestsMainPortAndMain
         0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    // Try to sync from a node that doesn't build indexes via maintenance port
+    // Try to sync from a node that doesn't build indexes via priority port
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h2"), &response, &result);
     ASSERT_EQUALS(ErrorCodes::NodeNotFound, result);
     ASSERT_EQUALS("Could not find member \"h2:27017\" in replica set", result.reason());
@@ -2034,7 +2031,7 @@ TEST_F(TopoCoordTest, NodeReturnsHostUnreachableWhenSyncFromRequestsADownNode) {
     ASSERT_EQUALS("I cannot reach the requested member: h4:27017", result.reason());
 }
 
-TEST_F(TopoCoordTest, NodeReturnsHostUnreachableWhenSyncFromRequestsADownNodeMaintenance) {
+TEST_F(TopoCoordTest, NodeReturnsHostUnreachableWhenSyncFromRequestsADownNodePriority) {
     Status result = Status::OK();
     BSONObjBuilder response;
 
@@ -2045,7 +2042,7 @@ TEST_F(TopoCoordTest, NodeReturnsHostUnreachableWhenSyncFromRequestsADownNodeMai
                                  << BSON("_id" << 2 << "host" << "h2" << "priority" << 0
                                                << "buildIndexes" << false)
                                  << BSON("_id" << 3 << "host" << "h3")
-                                 << BSON("_id" << 4 << "host" << "h4" << "maintenancePort" << 1)
+                                 << BSON("_id" << 4 << "host" << "h4" << "priorityPort" << 1)
                                  << BSON("_id" << 5 << "host" << "h5")
                                  << BSON("_id" << 6 << "host" << "h6"))),
         0);
@@ -2256,7 +2253,7 @@ TEST_F(TopoCoordTest,
     ASSERT_EQUALS(HostAndPort("h5").toString(), response2Obj["prevSyncTarget"].String());
 }
 
-void TopoCoordTest::testReplSetGetStatus(BSONObj config, bool expectMaintenance) {
+void TopoCoordTest::testReplSetGetStatus(BSONObj config, bool expectPriority) {
     // This test starts by configuring a TopologyCoordinator as a member of a 4 node replica
     // set, with each node in a different state.
     // The first node is DOWN, as if we tried heartbeating them and it failed in some way.
@@ -2301,7 +2298,7 @@ void TopoCoordTest::testReplSetGetStatus(BSONObj config, bool expectMaintenance)
     StatusWith<ReplSetHeartbeatResponse> hbResponseGood = StatusWith<ReplSetHeartbeatResponse>(hb);
 
     updateConfig(config, 3, startupTime + Milliseconds(1));
-    auto members = getMemberHostAndPorts(expectMaintenance);
+    auto members = getMemberHostAndPorts(expectPriority);
 
     // Now that the replica set is setup, put the members into the states we want them in.
     HostAndPort member = members[0];
@@ -2501,17 +2498,16 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
                          false);
 }
 
-TEST_F(TopoCoordTest, ReplSetGetStatusMaintenance) {
-    // Tests that we do NOT report the name of the member with the maintenenance port but with the
-    // main port even when the maintenance port is present.
+TEST_F(TopoCoordTest, ReplSetGetStatusPriority) {
+    // Tests that we do NOT report the name of the member with the priority port but with the
+    // main port even when the priority port is present.
     testReplSetGetStatus(
         BSON("_id" << "mySet" << "version" << 1 << "members"
                    << BSON_ARRAY(
-                          BSON("_id" << 0 << "host" << "test0:1234" << "maintenancePort" << 5678)
-                          << BSON("_id" << 1 << "host" << "test1:1234" << "maintenancePort" << 5678)
-                          << BSON("_id" << 2 << "host" << "test2:1234" << "maintenancePort" << 5678)
-                          << BSON("_id" << 3 << "host" << "test3:1234" << "maintenancePort"
-                                        << 5678))),
+                          BSON("_id" << 0 << "host" << "test0:1234" << "priorityPort" << 5678)
+                          << BSON("_id" << 1 << "host" << "test1:1234" << "priorityPort" << 5678)
+                          << BSON("_id" << 2 << "host" << "test2:1234" << "priorityPort" << 5678)
+                          << BSON("_id" << 3 << "host" << "test3:1234" << "priorityPort" << 5678))),
         true);
 }
 
@@ -3155,17 +3151,15 @@ TEST_F(TopoCoordTest, RespondToHeartbeatsWithNullLastAppliedAndLastDurableWhileI
 void TopoCoordTest::testMemberReplicationProgressAfterReconfig(BSONObj initialConfig,
                                                                BSONObj changedConfig,
                                                                int selfIndex,
-                                                               bool expectMaintenance) {
+                                                               bool expectPriority) {
     updateConfig(initialConfig, selfIndex);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
     const auto& setName = std::string(getCurrentConfig().getReplSetName());
-    const auto& hp1 = expectMaintenance
-        ? getCurrentConfig().getMemberAt(1).getHostAndPortMaintenance()
-        : getCurrentConfig().getMemberAt(1).getHostAndPort();
-    const auto& hp2 = expectMaintenance
-        ? getCurrentConfig().getMemberAt(2).getHostAndPortMaintenance()
-        : getCurrentConfig().getMemberAt(2).getHostAndPort();
+    const auto& hp1 = expectPriority ? getCurrentConfig().getMemberAt(1).getHostAndPortPriority()
+                                     : getCurrentConfig().getMemberAt(1).getHostAndPort();
+    const auto& hp2 = expectPriority ? getCurrentConfig().getMemberAt(2).getHostAndPortPriority()
+                                     : getCurrentConfig().getMemberAt(2).getHostAndPort();
     const auto term = getTopoCoord().getTerm();
 
     std::vector<std::tuple<OpTime, OpTime, OpTime>> times = {{OpTime(Timestamp(50, 1), term),
@@ -3223,26 +3217,26 @@ void TopoCoordTest::testMemberReplicationProgressAfterReconfig(BSONObj initialCo
     assertCorrectData();
 }
 
-TEST_F(TopoCoordTest, ReconfigAddingMaintenancePortsDoesNotAffectReplicationProgressMetrics) {
+TEST_F(TopoCoordTest, ReconfigAddingPriorityPortsDoesNotAffectReplicationProgressMetrics) {
     testMemberReplicationProgressAfterReconfig(
         BSON("_id" << "rs0" << "version" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
                                  << BSON("_id" << 1 << "host" << "h2")
                                  << BSON("_id" << 2 << "host" << "h3"))),
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself" << "maintenancePort" << 2)
-                                 << BSON("_id" << 1 << "host" << "h2" << "maintenancePort" << 2)
-                                 << BSON("_id" << 2 << "host" << "h3" << "maintenancePort" << 2))),
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself" << "priorityPort" << 2)
+                                 << BSON("_id" << 1 << "host" << "h2" << "priorityPort" << 2)
+                                 << BSON("_id" << 2 << "host" << "h3" << "priorityPort" << 2))),
         0,
         false);
 }
 
-TEST_F(TopoCoordTest, ReconfigRemovingMaintenancePortsDoesNotAffectReplicationProgressMetrics) {
+TEST_F(TopoCoordTest, ReconfigRemovingPriorityPortsDoesNotAffectReplicationProgressMetrics) {
     testMemberReplicationProgressAfterReconfig(
         BSON("_id" << "rs0" << "version" << 1 << "members"
-                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself" << "maintenancePort" << 2)
-                                 << BSON("_id" << 1 << "host" << "h2" << "maintenancePort" << 2)
-                                 << BSON("_id" << 2 << "host" << "h3" << "maintenancePort" << 2))),
+                   << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself" << "priorityPort" << 2)
+                                 << BSON("_id" << 1 << "host" << "h2" << "priorityPort" << 2)
+                                 << BSON("_id" << 2 << "host" << "h3" << "priorityPort" << 2))),
         BSON("_id" << "rs0" << "version" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 0 << "host" << "hself")
                                  << BSON("_id" << 1 << "host" << "h2")
@@ -3460,7 +3454,7 @@ TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigIfNodeRemainsElecta
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 }
 
-TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigWhenAddingMaintenancePort) {
+TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigWhenAddingPriorityPort) {
     ASSERT_TRUE(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
     updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
@@ -3484,7 +3478,7 @@ TEST_F(TopoCoordTest, NodeMaintainsPrimaryStateAcrossReconfigWhenAddingMaintenan
     updateConfig(
         BSON("_id" << "rs0" << "version" << 2 << "members"
                    << BSON_ARRAY(
-                          BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
+                          BSON("_id" << 0 << "host" << "host1:27017" << "priorityPort" << 27018)
                           << BSON("_id" << 1 << "host" << "host2:27017")
                           << BSON("_id" << 2 << "host" << "host3:27017"))),
         0,
@@ -3513,7 +3507,7 @@ TEST_F(TopoCoordTest, NodeMaintainsSecondaryStateAcrossReconfig) {
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 }
 
-TEST_F(TopoCoordTest, NodeMaintainsSecondaryStateAcrossReconfigWhenAddingMaintenenacePort) {
+TEST_F(TopoCoordTest, NodeMaintainsSecondaryStateAcrossReconfigWhenAddingPriorityPort) {
     updateConfig(BSON("_id" << "rs0" << "version" << 1 << "members"
                             << BSON_ARRAY(BSON("_id" << 1 << "host" << "host1:27017")
                                           << BSON("_id" << 2 << "host" << "host2:27017"))),
@@ -3527,7 +3521,7 @@ TEST_F(TopoCoordTest, NodeMaintainsSecondaryStateAcrossReconfigWhenAddingMainten
     updateConfig(
         BSON("_id" << "rs0" << "version" << 2 << "members"
                    << BSON_ARRAY(
-                          BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
+                          BSON("_id" << 0 << "host" << "host1:27017" << "priorityPort" << 27018)
                           << BSON("_id" << 1 << "host" << "host2:27017")
                           << BSON("_id" << 2 << "host" << "host3:27017"))),
         0);
@@ -4262,20 +4256,19 @@ protected:
                                  << BSON("_id" << 1 << "host" << "host2:27017")
                                  << BSON("_id" << 2 << "host" << "host3:27017"))
                    << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5));
-    bool _expectsMaintenance = false;
+    bool _expectsPriority = false;
 };
 
-class HeartbeatResponseTestV1Maintenance : public HeartbeatResponseTestV1 {
+class HeartbeatResponseTestV1Priority : public HeartbeatResponseTestV1 {
     void setUp() override {
         _config = BSON(
-            "_id"
-            << "rs0" << "version" << 5 << "term" << 1 << "members"
-            << BSON_ARRAY(
-                   BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
-                   << BSON("_id" << 1 << "host" << "host2:27017" << "maintenancePort" << 27018)
-                   << BSON("_id" << 2 << "host" << "host3:27017" << "maintenancePort" << 27018))
-            << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5));
-        _expectsMaintenance = true;
+            "_id" << "rs0" << "version" << 5 << "term" << 1 << "members"
+                  << BSON_ARRAY(
+                         BSON("_id" << 0 << "host" << "host1:27017" << "priorityPort" << 27018)
+                         << BSON("_id" << 1 << "host" << "host2:27017" << "priorityPort" << 27018)
+                         << BSON("_id" << 2 << "host" << "host3:27017" << "priorityPort" << 27018))
+                  << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5));
+        _expectsPriority = true;
         HeartbeatResponseTestV1::setUp();
     }
 };
@@ -4380,7 +4373,7 @@ void HeartbeatResponseTestV1::testShouldChangeSyncSourceWhenSyncSourceFormsCycle
     // Set lastOpTimeFetched to be same as the sync source's OpTime.
     OpTime lastOpTimeFetched = OpTime(Timestamp(400, 0), 0);
 
-    auto members = getMemberHostAndPorts(_expectsMaintenance);
+    auto members = getMemberHostAndPorts(_expectsPriority);
 
     // Show we like host2 while it is not syncing from us.
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
@@ -4456,7 +4449,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAn
     testShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary();
 }
 
-TEST_F(HeartbeatResponseTestV1Maintenance,
+TEST_F(HeartbeatResponseTestV1Priority,
        ShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary) {
     testShouldChangeSyncSourceWhenSyncSourceFormsCycleAndWeArePrimary();
 }
@@ -4971,16 +4964,15 @@ TEST_F(HeartbeatResponseTestV1,
         now()));
 }
 
-TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenAddingMaintenancePorts) {
-    // Same config as before just add maintenance ports for each node
+TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenAddingPriorityPorts) {
+    // Same config as before just add priority ports for each node
     updateConfig(
-        BSON("_id"
-             << "rs0" << "version" << 6 << "term" << 1 << "members"
-             << BSON_ARRAY(
-                    BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
-                    << BSON("_id" << 1 << "host" << "host2:27017" << "maintenancePort" << 27018)
-                    << BSON("_id" << 2 << "host" << "host3:27017" << "maintenancePort" << 27018))
-             << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+        BSON("_id" << "rs0" << "version" << 6 << "term" << 1 << "members"
+                   << BSON_ARRAY(
+                          BSON("_id" << 0 << "host" << "host1:27017" << "priorityPort" << 27018)
+                          << BSON("_id" << 1 << "host" << "host2:27017" << "priorityPort" << 27018)
+                          << BSON("_id" << 2 << "host" << "host3:27017" << "priorityPort" << 27018))
+                   << "protocolVersion" << 1 << "settings" << BSON("heartbeatTimeoutSecs" << 5)),
         0);
 
     OpTime staleOpTime = OpTime(Timestamp(4, 0), 0);
@@ -5220,19 +5212,18 @@ TEST_F(ReevalSyncSourceTest, ChangeWhenPrimaryPrefAndNotCurrentlySyncingFromPrim
                 numSyncSourceChangesDueToSignificantlyCloserNode.get());
 }
 
-TEST_F(TopoCoordTest, ChangeDueToPingTimeEvenIfWeNowHaveMaintenancePorts) {
+TEST_F(TopoCoordTest, ChangeDueToPingTimeEvenIfWeNowHavePriorityPorts) {
     const Milliseconds pingTime = Milliseconds(7);
     const Milliseconds significantlyCloserPingTime = Milliseconds(1);
 
     auto syncSrcChangeMetricInitial = numSyncSourceChangesDueToSignificantlyCloserNode.get();
     updateConfig(
-        BSON("_id"
-             << "rs0" << "version" << 5 << "term" << 1 << "members"
-             << BSON_ARRAY(
-                    BSON("_id" << 0 << "host" << "host1:27017" << "maintenancePort" << 27018)
-                    << BSON("_id" << 1 << "host" << "host2:27017" << "maintenancePort" << 27018)
-                    << BSON("_id" << 2 << "host" << "host3:27017" << "maintenancePort" << 27018))
-             << "protocolVersion" << 1),
+        BSON("_id" << "rs0" << "version" << 5 << "term" << 1 << "members"
+                   << BSON_ARRAY(
+                          BSON("_id" << 0 << "host" << "host1:27017" << "priorityPort" << 27018)
+                          << BSON("_id" << 1 << "host" << "host2:27017" << "priorityPort" << 27018)
+                          << BSON("_id" << 2 << "host" << "host3:27017" << "priorityPort" << 27018))
+                   << "protocolVersion" << 1),
         0);
 
     // Set 'changeSyncSourceThresholdMillis' to a non-zero value to allow evaluating if the node
@@ -5241,7 +5232,7 @@ TEST_F(TopoCoordTest, ChangeDueToPingTimeEvenIfWeNowHaveMaintenancePorts) {
 
     auto lastFetched = OpTime(Timestamp(3, 0), 0);
 
-    // Set pings but on the main port, not the maintenance port.
+    // Set pings but on the main port, not the priority port.
     getTopoCoord().setPing_forTest(HostAndPort("host2", 27017), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3", 27017), significantlyCloserPingTime);
 

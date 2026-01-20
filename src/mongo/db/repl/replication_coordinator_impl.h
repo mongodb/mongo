@@ -317,7 +317,7 @@ public:
 
     HostAndPort getMyHostAndPort() const override;
 
-    boost::optional<int> getMyMaintenancePort() const override;
+    boost::optional<int> getMyPriorityPort() const override;
 
     Status setFollowerMode(const MemberState& newState) override;
 

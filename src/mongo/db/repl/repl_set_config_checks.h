@@ -80,7 +80,7 @@ StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState*
  */
 int findOwnHostInConfigQuick(const ReplSetConfig& newConfig,
                              HostAndPort host,
-                             boost::optional<int> maintenancePort);
+                             boost::optional<int> priorityPort);
 
 /**
  * Validates that "newConfig" is a legal configuration that the current
@@ -132,7 +132,7 @@ StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,
     const ReplSetConfig& newConfig,
     HostAndPort ownHost,
-    boost::optional<int> ownMaintenancePort,
+    boost::optional<int> ownPriorityPort,
     ServiceContext* ctx);
 }  // namespace repl
 }  // namespace MONGO_MOD_PUB mongo

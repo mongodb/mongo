@@ -10,8 +10,8 @@ ShardingTest.prototype.checkShardFilteringMetadata = function () {
     // Use a new connection so we don't have to worry about existing users logged in to the
     // connection.
     let mongosConn;
-    if (this.s.maintenancePort > 0) {
-        mongosConn = new Mongo(this.s.maintenanceHost);
+    if (this.s.priorityPort > 0) {
+        mongosConn = new Mongo(this.s.priorityHost);
     } else {
         mongosConn = new Mongo(this.s.host);
     }

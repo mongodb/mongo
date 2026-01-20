@@ -477,15 +477,15 @@ TEST(ReplSetConfig, ParseFailsWithDuplicateHost) {
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 }
 
-TEST(ReplSetConfig, ParseFailsWithDuplicateMaintenancePort) {
+TEST(ReplSetConfig, ParseFailsWithDuplicatePriorityPort) {
     ReplSetConfig config;
     const BSONObj configBson =
         BSON("_id" << "rs0"
                    << "version" << 1 << "protocolVersion" << 1 << "members"
                    << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                            << "localhost:1" << "maintenancePort" << 3)
+                                            << "localhost:1" << "priorityPort" << 3)
                                  << BSON("_id" << 1 << "host"
-                                               << "localhost:2" << "maintenancePort" << 3)));
+                                               << "localhost:2" << "priorityPort" << 3)));
     config = ReplSetConfig::parse(configBson);
     auto res = config.validate();
     ASSERT_EQUALS(ErrorCodes::BadValue, res.code());

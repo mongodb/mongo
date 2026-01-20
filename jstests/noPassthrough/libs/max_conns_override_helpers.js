@@ -89,15 +89,15 @@ export var MaxConnsOverrideHelpers = (function () {
         }
     }
 
-    function runTest(conn, hosts, proxyServer, useMaintenance, adminThreads, maxConns, shutdown) {
+    function runTest(conn, hosts, proxyServer, usePriority, adminThreads, maxConns, shutdown) {
         try {
             let adminConns = [];
             let normalConns = [];
 
-            // In the non-maintenance port tests, the connections from test setup are exempt whereas
-            // in the maintenance port tests those connections are normal connections.
-            let exemptStartCount = useMaintenance ? 0 : 1;
-            let normalStartCount = useMaintenance ? 1 : 0;
+            // In the non-priority port tests, the connections from test setup are exempt whereas
+            // in the priority port tests those connections are normal connections.
+            let exemptStartCount = usePriority ? 0 : 1;
+            let normalStartCount = usePriority ? 1 : 0;
             let exemptCount = exemptStartCount;
             let normalCount = normalStartCount;
 

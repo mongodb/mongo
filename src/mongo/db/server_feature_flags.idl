@@ -207,9 +207,9 @@ feature_flags:
         default: true
         version: 8.3
         fcv_gated: true
-    featureFlagDedicatedPortForMaintenanceOperations:
-        description: "Feature flag to enable a dedicated port for high priority maintenance operations on mongoD and mongoS"
-        cpp_varname: gFeatureFlagDedicatedPortForMaintenanceOperations
+    featureFlagDedicatedPortForPriorityOperations:
+        description: "Feature flag to enable a dedicated port for high priority operations on mongoD and mongoS"
+        cpp_varname: gFeatureFlagDedicatedPortForPriorityOperations
         default: false
         fcv_gated: false
     featureFlagPreparedTransactionsPreciseCheckpoints:

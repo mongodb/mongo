@@ -1,9 +1,9 @@
 /**
- * Test that downgrading is forbidden when a maintenancePort is present in the ReplSetConfig and that
+ * Test that downgrading is forbidden when a priorityPort is present in the ReplSetConfig and that
  * reconfigs are drained correctly to ensure stability of these checks.
  *
  * @tags: [
- *      featureFlagReplicationUsageOfMaintenancePort
+ *      featureFlagReplicationUsageOfPriorityPort
  * ]
  */
 
@@ -14,22 +14,20 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const numNodes = 3;
 
-const rs = new ReplSetTest({nodes: numNodes, useMaintenancePorts: true});
+const rs = new ReplSetTest({nodes: numNodes, usePriorityPorts: true});
 rs.startSet();
 rs.initiate();
 
-jsTest.log.info("Test that replica set with maintenance ports enabled cannot downgrade");
+jsTest.log.info("Test that replica set with priority ports enabled cannot downgrade");
 assert.commandFailedWithCode(
     rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}),
     ErrorCodes.CannotDowngrade,
 );
 
-jsTest.log.info(
-    "Remove the maintenance ports one by one and ensure downgrade is only possible once they are all removed",
-);
+jsTest.log.info("Remove the priority ports one by one and ensure downgrade is only possible once they are all removed");
 for (let i = 0; i < numNodes; i++) {
     let config = rs.getReplSetConfigFromNode();
-    delete config.members[i].maintenancePort;
+    delete config.members[i].priorityPort;
     config.version += 1;
     assert.commandWorked(rs.getPrimary().adminCommand({replSetReconfig: config}));
     if (i == numNodes - 1) {
@@ -70,10 +68,10 @@ reconfigFP.off();
 awaitReconfig();
 timeoutOFCVDrainFP.off();
 
-jsTest.log.info("Check that we cannot reconfig adding maintenance ports while we are in downgrading");
-let membersWithMP = rs.getReplSetConfig().members;
+jsTest.log.info("Check that we cannot reconfig adding priority ports while we are in downgrading");
+let membersWithPP = rs.getReplSetConfig().members;
 newConfig = rs.getReplSetConfigFromNode();
-newConfig.members = membersWithMP;
+newConfig.members = membersWithPP;
 newConfig.version += 1;
 assert.commandFailedWithCode(
     rs.getPrimary().adminCommand({replSetReconfig: newConfig}),
@@ -83,7 +81,7 @@ assert.commandFailedWithCode(
 jsTest.log.info("Reset FCV to fully upgraded");
 assert.commandWorked(rs.getPrimary().adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
 
-jsTest.log.info("Check that we cannot reconfig adding maintenance ports with force reconfig");
+jsTest.log.info("Check that we cannot reconfig adding priority ports with force reconfig");
 assert.commandFailedWithCode(
     rs.getPrimary().adminCommand({replSetReconfig: newConfig, force: true}),
     ErrorCodes.NewReplicaSetConfigurationIncompatible,

@@ -1561,13 +1561,13 @@ private:
             }
         }
 
-        if (repl::feature_flags::gFeatureFlagReplicationUsageOfMaintenancePort
+        if (repl::feature_flags::gFeatureFlagReplicationUsageOfPriorityPort
                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
             const auto& replConfig = repl::ReplicationCoordinator::get(opCtx)->getConfig();
             uassert(ErrorCodes::CannotDowngrade,
-                    "Cannot downgrade when maintenance ports are present in the replSetConfig. "
-                    "Please run ReplSetReconfig to remove maintenance ports prior to downgrade",
-                    replConfig.getCountOfMembersWithMaintenancePort() == 0);
+                    "Cannot downgrade when priority ports are present in the replSetConfig. "
+                    "Please run ReplSetReconfig to remove priority ports prior to downgrade",
+                    replConfig.getCountOfMembersWithPriorityPort() == 0);
         }
     }
 

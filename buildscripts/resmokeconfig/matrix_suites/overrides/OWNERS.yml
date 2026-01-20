@@ -51,6 +51,6 @@ filters:
   - "execution_control_params.yml":
     approvers:
       - 10gen/server-workload-resilience
-  - "maintenance_ports.yml":
+  - "priority_ports.yml":
     approvers:
       - 10gen/server-replication-reviewers

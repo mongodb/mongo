@@ -1,11 +1,11 @@
 /**
- * Test that connections on the maintenance port through TCP or Unix socket (only on non-Windows
+ * Test that connections on the priority port through TCP or Unix socket (only on non-Windows
  * platforms) are exempt from ingress admission rate limiting
  *
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   featureFlagDedicatedPortForMaintenanceOperations,
+ *   featureFlagDedicatedPortForPriorityOperations,
  * ]
  */
 
@@ -14,7 +14,7 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {assertContainsExpectedErrorLabels} from "jstests/noPassthrough/admission/libs/ingress_request_rate_limiter_helper.js";
 
-describe("Tests for maintenance port exemption from ingress request rate limiter within JS test replica set and sharded cluster helpers", function () {
+describe("Tests for priority port exemption from ingress request rate limiter within JS test replica set and sharded cluster helpers", function () {
     this.maxBurstRequests = 5;
     // An abnormally slow refresh rate to assure that a refresh doesn't trigger during the
     // test
@@ -40,7 +40,7 @@ describe("Tests for maintenance port exemption from ingress request rate limiter
         },
     };
     this.extraRequests = 3;
-    this.maintenancePortRequests = 3;
+    this.priorityPortRequests = 3;
 
     this.keyFile = "jstests/libs/key1";
 
@@ -58,28 +58,28 @@ describe("Tests for maintenance port exemption from ingress request rate limiter
     };
 
     this.testIngressRequestRateLimiter = (conn, rs) => {
-        // Creating connections to main and maintenance port, as well as maintenance unix
+        // Creating connections to main and priority port, as well as priority unix
         // socket if not on Windows system
         const connToMainPort = new Mongo(conn.host);
         assert(connToMainPort.getDB("admin").auth("user", "y"), "Authentication on main port for regular user failed");
 
-        const connToMaintenancePort = rs
-            ? rs.getNewConnectionToMaintenancePort(conn)
-            : new Mongo(conn.host.split(":")[0] + ":" + conn.maintenancePort);
+        const connToPriorityPort = rs
+            ? rs.getNewConnectionToPriorityPort(conn)
+            : new Mongo(conn.host.split(":")[0] + ":" + conn.priorityPort);
         assert(
-            connToMaintenancePort.getDB("admin").auth("user", "y"),
-            "Authentication on maintenance port for regular user failed",
+            connToPriorityPort.getDB("admin").auth("user", "y"),
+            "Authentication on priority port for regular user failed",
         );
 
         /**  TODO(SERVER-115111): Enable unix domain socket connection testing.
-        let connToMaintenanceSocket = null;
+        let connToPrioritySocket = null;
         if (!_isWindows()) {
-            connToMaintenanceSocket = rs
-                ? rs.getNewConnectionToMaintenanceSocket(conn)
-                : new Mongo("/tmp/mongodb-" + conn.maintenancePort + ".sock");
+            connToPrioritySocket = rs
+                ? rs.getNewConnectionToPrioritySocket(conn)
+                : new Mongo("/tmp/mongodb-" + conn.priorityPort + ".sock");
             assert(
-                connToMaintenanceSocket.getDB("admin").auth("user", "y"),
-                "Authentication on maintenance socket for regular user failed",
+                connToPrioritySocket.getDB("admin").auth("user", "y"),
+                "Authentication on priority socket for regular user failed",
             );
         }
         */
@@ -111,31 +111,31 @@ describe("Tests for maintenance port exemption from ingress request rate limiter
             }
         }
 
-        // Store the amount of exempted admissions before making requests to maintenance port
+        // Store the amount of exempted admissions before making requests to priority port
         const initialStatus = exemptConn.adminCommand({serverStatus: 1});
         assert(initialStatus, "Failed to get initial server status");
         const initialExemptedAdmissions = initialStatus.network.ingressRequestRateLimiter.exemptedAdmissions;
 
         // Test that when hitting the ingress request rate limiting, connections to the
-        // maintenance port through TCP and unix socket are exempted from rate limiting
-        for (let i = 0; i < this.maintenancePortRequests; i++) {
-            assert.commandWorked(connToMaintenancePort.getDB("admin").runCommand({ping: 1}));
+        // priority port through TCP and unix socket are exempted from rate limiting
+        for (let i = 0; i < this.priorityPortRequests; i++) {
+            assert.commandWorked(connToPriorityPort.getDB("admin").runCommand({ping: 1}));
             jsTest.log.info(
-                "Request number " + (i + 1) + "/" + this.maintenancePortRequests + " to maintenance port successful",
+                "Request number " + (i + 1) + "/" + this.priorityPortRequests + " to priority port successful",
             );
         }
 
         /**  TODO(SERVER-115111): Enable unix domain socket connection testing.
-        // Test that connections to maintenance unix socket are successful
+        // Test that connections to priority unix socket are successful
         if (!_isWindows()) {
-            for (let i = 0; i < this.maintenancePortRequests; i++) {
-                assert.commandWorked(connToMaintenanceSocket.getDB("admin").runCommand({ping: 1}));
+            for (let i = 0; i < this.priorityPortRequests; i++) {
+                assert.commandWorked(connToPrioritySocket.getDB("admin").runCommand({ping: 1}));
                 jsTest.log.info(
                     "Request number " +
                         (i + 1) +
                         "/" +
-                        this.maintenancePortRequests +
-                        " to maintenance unix socket successful",
+                        this.priorityPortRequests +
+                        " to priority unix socket successful",
                 );
             }
         }
@@ -146,14 +146,14 @@ describe("Tests for maintenance port exemption from ingress request rate limiter
         assert(finalStatus, "Failed to get final server status");
         const finalExemptedAdmissions = finalStatus.network.ingressRequestRateLimiter.exemptedAdmissions;
         jsTest.log.info("Final ingress request rate limiter stats: " + finalExemptedAdmissions);
-        assert(finalExemptedAdmissions - initialExemptedAdmissions >= this.maintenancePortRequests);
+        assert(finalExemptedAdmissions - initialExemptedAdmissions >= this.priorityPortRequests);
 
         // Closing all the connections
         connToMainPort.close();
-        connToMaintenancePort.close();
+        connToPriorityPort.close();
         /**  TODO(SERVER-115111): Enable unix domain socket connection testing.
         if (!_isWindows()) {
-            connToMaintenanceSocket.close();
+            connToPrioritySocket.close();
         }
         */
 
@@ -167,10 +167,10 @@ describe("Tests for maintenance port exemption from ingress request rate limiter
         exemptConn.close();
     };
 
-    it("Starting up a replica set with maintenance port enabled on all nodes", () => {
+    it("Starting up a replica set with priority port enabled on all nodes", () => {
         const rs = new ReplSetTest({
             nodes: 3,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
             keyFile: this.keyFile,
             nodeOptions: {
                 auth: "",
@@ -197,14 +197,14 @@ describe("Tests for maintenance port exemption from ingress request rate limiter
         rs.stopSet();
     });
 
-    it("Starting up a sharded cluster with maintenance port enabled on all nodes", () => {
+    it("Starting up a sharded cluster with priority port enabled on all nodes", () => {
         const opts = {
             setParameter: {...this.kParamsIngressRequestRateLimiter},
         };
         const st = new ShardingTest({
             shards: 1,
             mongos: 2,
-            useMaintenancePorts: true,
+            usePriorityPorts: true,
             other: {keyFile: this.keyFile, auth: "", mongosOptions: opts, rsOptions: opts, configOptions: opts},
         });
 

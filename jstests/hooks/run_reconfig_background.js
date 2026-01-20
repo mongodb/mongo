@@ -76,60 +76,60 @@ function getVotingReconfig(config, primaryIndex, numNodes) {
 }
 
 /**
- * This reconfig command randomly chooses to add or remove a maintenance port from a single node. If
- * there are no nodes currently configured with a maintenance port, it will add one. If all nodes
- * are currently configured with a maintenance port, we will remove one. Otherwise, we will randomly
+ * This reconfig command randomly chooses to add or remove a priority port from a single node. If
+ * there are no nodes currently configured with a priority port, it will add one. If all nodes
+ * are currently configured with a priority port, we will remove one. Otherwise, we will randomly
  * choose to add or remove.
  *
  * Changing this continuously in the background ensures that the replica set maintains connectivity
  * during these changes.
  */
-function getMaintenancePortReconfig(config, maintenancePorts) {
+function getPriorityPortReconfig(config, priorityPorts) {
     let memberIndexesWith = [];
     let memberIndexesWithout = [];
     for (let i = 0; i < config.members.length; i++) {
-        if ("maintenancePort" in config.members[i]) {
+        if ("priorityPort" in config.members[i]) {
             memberIndexesWith.push(i);
         } else {
             memberIndexesWithout.push(i);
         }
     }
 
-    let addMaintenancePortTo = (memberIndex, config, maintenancePorts) => {
-        jsTest.log.info(`Running reconfig to add maintenance port to node at index ${memberIndex}`);
-        config.members[memberIndex].maintenancePort = maintenancePorts[memberIndex];
+    let addPriorityPortTo = (memberIndex, config, priorityPorts) => {
+        jsTest.log.info(`Running reconfig to add priority port to node at index ${memberIndex}`);
+        config.members[memberIndex].priorityPort = priorityPorts[memberIndex];
         config.version++;
         return config;
     };
 
-    let removeMaintenancePortFrom = (memberIndex, config) => {
-        jsTest.log.info(`Running reconfig to remove maintenance port from node at index ${memberIndex}`);
-        delete config.members[memberIndex].maintenancePort;
+    let removePriorityPortFrom = (memberIndex, config) => {
+        jsTest.log.info(`Running reconfig to remove priority port from node at index ${memberIndex}`);
+        delete config.members[memberIndex].priorityPort;
         config.version++;
         return config;
     };
 
-    // If no members have the maintenance port, add it. If all nodes have the maintenance port,
+    // If no members have the priority port, add it. If all nodes have the priority port,
     // remove it. Otherwise, we choose randomly.
     if (memberIndexesWith.length == 0) {
-        return addMaintenancePortTo(
+        return addPriorityPortTo(
             memberIndexesWithout[Random.randInt(memberIndexesWithout.length)],
             config,
-            maintenancePorts,
+            priorityPorts,
         );
     } else if (memberIndexesWithout.length == 0) {
-        return removeMaintenancePortFrom(memberIndexesWith[Random.randInt(memberIndexesWith.length)], config);
+        return removePriorityPortFrom(memberIndexesWith[Random.randInt(memberIndexesWith.length)], config);
     } else {
         // Otherwise, choose randomly.
         let shouldAdd = Random.rand() > 0.5;
         if (shouldAdd) {
-            return addMaintenancePortTo(
+            return addPriorityPortTo(
                 memberIndexesWithout[Random.randInt(memberIndexesWithout.length)],
                 config,
-                maintenancePorts,
+                priorityPorts,
             );
         } else {
-            return removeMaintenancePortFrom(memberIndexesWith[Random.randInt(memberIndexesWith.length)], config);
+            return removePriorityPortFrom(memberIndexesWith[Random.randInt(memberIndexesWith.length)], config);
         }
     }
 }
@@ -143,7 +143,7 @@ function getMaintenancePortReconfig(config, maintenancePorts) {
  *
  * This function should not throw if everything is working properly.
  */
-function reconfigBackground(primary, numNodes, maintenancePorts) {
+function reconfigBackground(primary, numNodes, priorityPorts) {
     // Calls 'func' with the print() function overridden to be a no-op.
     Random.setRandomSeed();
     const quietly = (func) => {
@@ -183,8 +183,8 @@ function reconfigBackground(primary, numNodes, maintenancePorts) {
     jsTestLog(`primaryIndex is ${primaryIndex}`);
     jsTestLog(`primary's config: (configVersion: ${config.version}, configTerm: ${config.term})`);
 
-    let newConfig = maintenancePorts
-        ? getMaintenancePortReconfig(config, maintenancePorts)
+    let newConfig = priorityPorts
+        ? getPriorityPortReconfig(config, priorityPorts)
         : getVotingReconfig(config, primaryIndex, numNodes);
 
     let reconfigRes = conn.getDB("admin").runCommand({replSetReconfig: newConfig});
@@ -209,7 +209,7 @@ try {
     }
 
     const numNodes = topology.nodes.length;
-    res = reconfigBackground(topology.primary, numNodes, TestData.maintenancePorts);
+    res = reconfigBackground(topology.primary, numNodes, TestData.priorityPorts);
 } catch (e) {
     // If the ReplicaSetMonitor cannot find a primary because it has stepped down or
     // been killed, it may take longer than 15 seconds for a new primary to step up.

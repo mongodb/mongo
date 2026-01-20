@@ -2146,7 +2146,7 @@ bool ReplicationCoordinatorImpl::_haveNumNodesSatisfiedCommitQuorum(
     WithLock lk, int numNodes, const std::vector<mongo::HostAndPort>& members) const {
     for (auto&& member : members) {
         // Use lenient version of findMemberByHostAndPort since a node can still be part of a quorum
-        // via its main port (not just its maintenance port).
+        // via its main port (not just its priority port).
         auto memberConfig = _rsConfig.unsafePeek().findMemberByHostAndPort(member);
         // We do not count arbiters and members that aren't part of replica set config,
         // towards the commit quorum.
@@ -2170,7 +2170,7 @@ bool ReplicationCoordinatorImpl::_haveTaggedNodesSatisfiedCommitQuorum(
 
     for (auto&& member : members) {
         // Use lenient version of findMemberByHostAndPort since a node can still be part of a quorum
-        // via its main port (not just its maintenance port).
+        // via its main port (not just its priority port).
         auto memberConfig = _rsConfig.unsafePeek().findMemberByHostAndPort(member);
         // We do not count arbiters and members that aren't part of replica set config,
         // towards the commit quorum.
@@ -2796,13 +2796,13 @@ void ReplicationCoordinatorImpl::_performElectionHandoff() {
     }
 
     const auto& targetConfig = _rsConfig.unsafePeek().getMemberAt(candidateIndex);
-    auto target = targetConfig.getHostAndPortMaintenance();
+    auto target = targetConfig.getHostAndPortPriority();
     executor::RemoteCommandRequest request(
         target, DatabaseName::kAdmin, BSON("replSetStepUp" << 1 << "skipDryRun" << true), nullptr);
     LOGV2(21347,
           "Handing off election",
           "target"_attr = target,
-          "usingMaintenancePort"_attr = targetConfig.isUsingMaintenancePort(target));
+          "usingPriorityPort"_attr = targetConfig.isUsingPriorityPort(target));
 
     auto callbackHandleSW = _replExecutor->scheduleRemoteCommand(
         request, [target](const executor::TaskExecutor::RemoteCommandCallbackArgs& callbackData) {
@@ -3074,12 +3074,12 @@ HostAndPort ReplicationCoordinatorImpl::getMyHostAndPort() const {
     return _rsConfig.unsafePeek().getMemberAt(_selfIndex).getHostAndPort();
 }
 
-boost::optional<int> ReplicationCoordinatorImpl::getMyMaintenancePort() const {
+boost::optional<int> ReplicationCoordinatorImpl::getMyPriorityPort() const {
     stdx::unique_lock lk(_mutex);
     if (_selfIndex == -1) {
         return boost::none;
     }
-    return _rsConfig.unsafePeek().getMemberAt(_selfIndex).getMaintenancePort();
+    return _rsConfig.unsafePeek().getMemberAt(_selfIndex).getPriorityPort();
 }
 
 int ReplicationCoordinatorImpl::_getMyId(WithLock lk) const {
@@ -3199,7 +3199,7 @@ ConfigVersionAndTerm ReplicationCoordinatorImpl::getConfigVersionAndTerm() const
 
 // This is only used by the index build coordinator and is deprecated so we do not support strict
 // and lenient versions. We only include the lenient version since index builds do not use the
-// maintenance port.
+// priority port.
 boost::optional<MemberConfig> ReplicationCoordinatorImpl::findConfigMemberByHostAndPort_deprecated(
     const HostAndPort& hap) const {
     const MemberConfig* result = _getReplSetConfig().findMemberByHostAndPort(hap);
@@ -3739,7 +3739,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     // implies matching isSelf, and it is actually preferrable to avoid checking the latter as it is
     // susceptible to transient DNS errors.
     auto quickIndex = _selfIndex >= 0
-        ? findOwnHostInConfigQuick(newConfig, getMyHostAndPort(), getMyMaintenancePort())
+        ? findOwnHostInConfigQuick(newConfig, getMyHostAndPort(), getMyPriorityPort())
         : -1;
     if (quickIndex >= 0) {
         if (!force) {
@@ -4650,7 +4650,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         LOGV2(21393,
               "Found self in config",
               "hostAndPort"_attr = selfMember.getHostAndPort(),
-              "maintenancePort"_attr = selfMember.getMaintenancePort());
+              "priorityPort"_attr = selfMember.getPriorityPort());
     } else {
         LOGV2(21394, "This node is not a member of the config");
     }
@@ -4890,7 +4890,7 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     // If read preference is SecondaryOnly, we should never choose the primary. If the sync source
     // was forced through unsupportedSyncSource, we may sync from any node, so skip this check.
     invariant(readPreference != ReadPreference::SecondaryOnly || !primary ||
-              primary->getHostAndPortMaintenance() != newSyncSource ||
+              primary->getHostAndPortPriority() != newSyncSource ||
               !repl::unsupportedSyncSource.empty());
 
     // If we lost our sync source, schedule new heartbeats immediately to update our knowledge

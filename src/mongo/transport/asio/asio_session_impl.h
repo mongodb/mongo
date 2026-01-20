@@ -137,7 +137,7 @@ public:
 
     bool isConnectedToLoadBalancerPort() const override;
 
-    bool isConnectedToMaintenancePort() const override;
+    bool isConnectedToPriorityPort() const override;
 
     bool isLoadBalancerPeer() const override;
 
@@ -323,11 +323,11 @@ protected:
     bool _isLoadBalancerPeer = false;
 
     /**
-     * Indicates whether the connection targets the maintenance port or its corresponding unix
+     * Indicates whether the connection targets the priority port or its corresponding unix
      * socket. These connection are intended to allow high-priority operations during connection
      * storms.
      */
-    bool _isConnectedToMaintenancePort = false;
+    bool _isConnectedToPriorityPort = false;
 
     boost::optional<HostAndPort> _proxiedSrcEndpoint;
     boost::optional<HostAndPort> _proxiedDstEndpoint;

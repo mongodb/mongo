@@ -103,23 +103,22 @@ DEATH_TEST_REGEX_F(ClientTestDeathTest, OverwriteThreadsClient, "Invariant failu
     Client::setCurrent(std::move(client2));
 }
 
-TEST_F(ClientTest, ShouldNotBeConnectedToMaintenancePort) {
+TEST_F(ClientTest, ShouldNotBeConnectedToPriorityPort) {
     transport::TransportLayerMock transportLayer;
     transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
         return std::make_shared<transport::MockSession>(tl);
     };
     auto mainPortClient = makeClient("mainPortClient", transportLayer.createSession());
-    ASSERT_FALSE(mainPortClient->isMaintenancePortClient());
+    ASSERT_FALSE(mainPortClient->isPriorityPortClient());
 }
 
-TEST_F(ClientTest, ShouldBeConnectedToMaintenancePort) {
+TEST_F(ClientTest, ShouldBeConnectedToPriorityPort) {
     transport::TransportLayerMock transportLayer;
     transportLayer.createSessionHook = [](transport::TransportLayer* tl) {
-        return std::make_shared<transport::MockMaintenanceSession>(tl);
+        return std::make_shared<transport::MockPrioritySession>(tl);
     };
-    auto maintenancePortClient =
-        makeClient("maintenancePortClient", transportLayer.createSession());
-    ASSERT_TRUE(maintenancePortClient->isMaintenancePortClient());
+    auto priorityPortClient = makeClient("priorityPortClient", transportLayer.createSession());
+    ASSERT_TRUE(priorityPortClient->isPriorityPortClient());
 }
 
 }  // namespace

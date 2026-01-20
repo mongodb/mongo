@@ -1,11 +1,11 @@
 /**
- * Tests that the max connections overrides are respected for connections via the maintenance port.
+ * Tests that the max connections overrides are respected for connections via the priority port.
  *
  * Maximum connection overrides are not implemented for gRPC.
  * @tags: [
  *      grpc_incompatible,
  *      requires_sharding,
- *      featureFlagDedicatedPortForMaintenanceOperations,
+ *      featureFlagDedicatedPortForPriorityOperations,
  * ]
  */
 import {MaxConnsOverrideHelpers} from "jstests/noPassthrough/libs/max_conns_override_helpers.js";
@@ -22,17 +22,17 @@ function getOptions(useAdminThreads) {
             ? "jstests/noPassthrough/libs/max_conns_config.yaml"
             : "jstests/noPassthrough/libs/max_conns_config_no_admin_threads.yaml",
         port: allocatePort(),
-        maintenancePort: allocatePort(),
+        priorityPort: allocatePort(),
     };
 
     const host = {
-        admin: `${ip}:${opts.maintenancePort}`,
+        admin: `${ip}:${opts.priorityPort}`,
         normal: `${ip}:${opts.port}`,
     };
 
     const proxyServer = {};
 
-    jsTest.log(`Listening: ${opts.port}, ${opts.maintenancePort}`);
+    jsTest.log(`Listening: ${opts.port}, ${opts.priorityPort}`);
 
     return {opts: opts, hosts: host, proxyServer: proxyServer};
 }
@@ -60,7 +60,7 @@ jsTest.log.info("Testing replica set with reserved admin threads");
         args.conn,
         args.hosts,
         args.proxyServer,
-        true /* useMaintenance */,
+        true /* usePriority */,
         kConfiguredReadyAdminThreads,
         kConfiguredMaxConns,
         args.shutdown,
@@ -74,7 +74,7 @@ jsTest.log.info("Testing replica set without reserved admin threads");
         args.conn,
         args.hosts,
         args.proxyServer,
-        true /* useMaintenance */,
+        true /* usePriority */,
         0 /* reservedAdminThreads */,
         kConfiguredMaxConns,
         args.shutdown,
@@ -88,7 +88,7 @@ jsTest.log.info("Testing sharded cluster with reserved admin threads");
         args.conn,
         args.hosts,
         args.proxyServer,
-        true /* useMaintenance */,
+        true /* usePriority */,
         kConfiguredReadyAdminThreads,
         kConfiguredMaxConns,
         args.shutdown,
@@ -102,7 +102,7 @@ jsTest.log.info("Testing sharded cluster without reserved admin threads");
         args.conn,
         args.hosts,
         args.proxyServer,
-        true /* useMaintenance */,
+        true /* usePriority */,
         0 /* reservedAdminThreads */,
         kConfiguredMaxConns,
         args.shutdown,

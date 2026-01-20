@@ -620,14 +620,14 @@ TEST(SetupOptions, SlowMsCommandLineParamParsesSuccessfully) {
     ASSERT_EQ(::mongo::serverGlobalParams.slowMS.load(), 300);
 }
 
-TEST(SetupOptions, MaintenancePortParsingFromCLI) {
+TEST(SetupOptions, PriorityPortParsingFromCLI) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
 
     ASSERT_OK(::mongo::addGeneralServerOptions(&options));
 
-    const std::vector<std::string> argv = {"binaryname", "--maintenancePort", "123"};
+    const std::vector<std::string> argv = {"binaryname", "--priorityPort", "123"};
 
     ASSERT_OK(parser.run(options, argv, &environment));
 
@@ -636,10 +636,10 @@ TEST(SetupOptions, MaintenancePortParsingFromCLI) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.maintenancePort, 123);
+    ASSERT_EQ(::mongo::serverGlobalParams.priorityPort, 123);
 }
 
-TEST(SetupOptions, MaintenancePortParsingFromYAMLConfigFile) {
+TEST(SetupOptions, PriorityPortParsingFromYAMLConfigFile) {
     OptionsParserTester parser;
     moe::Environment environment;
     moe::OptionSection options;
@@ -650,7 +650,7 @@ TEST(SetupOptions, MaintenancePortParsingFromYAMLConfigFile) {
 
     parser.setConfig("config.yaml",
                      R"(net:  
-                            maintenancePort: 345)");
+                            priorityPort: 345)");
 
     ASSERT_OK(parser.run(options, argv, &environment));
 
@@ -659,7 +659,7 @@ TEST(SetupOptions, MaintenancePortParsingFromYAMLConfigFile) {
     ASSERT_OK(::mongo::setupServerOptions(argv));
     ASSERT_OK(::mongo::storeServerOptions(environment));
 
-    ASSERT_EQ(::mongo::serverGlobalParams.maintenancePort, 345);
+    ASSERT_EQ(::mongo::serverGlobalParams.priorityPort, 345);
 }
 
 TEST(SetupOptions, SlowMsParamInitializedSuccessfullyFromINIConfigFile) {

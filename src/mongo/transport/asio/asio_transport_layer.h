@@ -105,7 +105,7 @@ public:
 
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
         boost::optional<int> loadBalancerPort;         // accepts load balancer connections
-        boost::optional<int> maintenancePort;          // accepts maintenance connections
+        boost::optional<int> priorityPort;             // accepts priority connections
         std::vector<std::string> ipList;               // addresses to bind to
 #ifndef _WIN32
         bool useUnixSockets = true;  // whether to allow UNIX sockets in ipList
@@ -222,8 +222,8 @@ public:
         return _listenerOptions.loadBalancerPort;
     }
 
-    boost::optional<int> maintenancePort() const {
-        return _listenerOptions.maintenancePort;
+    boost::optional<int> priorityPort() const {
+        return _listenerOptions.priorityPort;
     }
 
     SessionManager* getSessionManager() const override {
@@ -419,12 +419,12 @@ private:
 
     // AsioTransportLayer should run its own thread that calls run() on _listenerInterfaceMainPort's
     // _acceptorReactor to process calls to async_accept on the main port - this is the equivalent
-    // of the "listener" thread in other TransportLayers. If the maintenance port is specified,
+    // of the "listener" thread in other TransportLayers. If the priority port is specified,
     // AsioTransportLayer should run a second thread that calls run() on
-    // _listenerInterfaceMaintenancePort's _acceptorReactor to process calls to async_accept on the
-    // maintenance port.
+    // _listenerInterfacePriorityPort's _acceptorReactor to process calls to async_accept on the
+    // priority port.
     const std::unique_ptr<ListenerInterface> _listenerInterfaceMainPort;
-    const std::unique_ptr<ListenerInterface> _listenerInterfaceMaintenancePort;
+    const std::unique_ptr<ListenerInterface> _listenerInterfacePriorityPort;
 
     std::shared_ptr<SessionManager> _sessionManager;
 

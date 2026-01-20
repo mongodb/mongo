@@ -79,7 +79,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         load_all_extensions=False,
         router_endpoint_for_mongot: Optional[int] = None,
         disagg_base_config=None,
-        use_maintenance_ports=False,
+        use_priority_ports=False,
     ):
         """Initialize ReplicaSetFixture."""
 
@@ -152,7 +152,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
         self.disagg_base_config = disagg_base_config
 
-        self.use_maintenance_ports = use_maintenance_ports
+        self.use_priority_ports = use_priority_ports
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
@@ -1166,11 +1166,11 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             output += self.initial_sync_node.get_node_info()
         return output
 
-    def get_maintenance_ports(self):
-        """Return a list of maintenance ports."""
+    def get_priority_ports(self):
+        """Return a list of priority ports."""
         output = []
         for node in self.nodes:
-            output.append(node.maintenance_port)
+            output.append(node.priority_port)
         return output
 
     def get_driver_connection_url(self):

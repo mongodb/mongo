@@ -57,9 +57,9 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv4) {
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
         ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port),
-                              serverGlobalParams.maintenancePort));
+                              serverGlobalParams.priorityPort));
         ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port),
-                      serverGlobalParams.maintenancePort,
+                      serverGlobalParams.priorityPort,
                       getGlobalServiceContext()));
     }
 #else
@@ -78,9 +78,9 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv6) {
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
         ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port),
-                              serverGlobalParams.maintenancePort));
+                              serverGlobalParams.priorityPort));
         ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port),
-                      serverGlobalParams.maintenancePort,
+                      serverGlobalParams.priorityPort,
                       getGlobalServiceContext()));
     }
 #else
@@ -104,7 +104,7 @@ TEST_F(ServiceContextTest, RetryOnTransientDNSErrorsInFastPathEnoughAttempts) {
     // the addresses even with the (transient) failures.
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
         ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port),
-                              serverGlobalParams.maintenancePort));
+                              serverGlobalParams.priorityPort));
     }
 #else
     ASSERT(true);
@@ -126,7 +126,7 @@ TEST_F(ServiceContextTest, RetryOnTransientDNSErrorsInFastPathAttemptsExhausted)
     // Fastpath should not be able to resolve any of the addresses.
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
         ASSERT_FALSE(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port),
-                                    serverGlobalParams.maintenancePort));
+                                    serverGlobalParams.priorityPort));
     }
 #else
     ASSERT(true);

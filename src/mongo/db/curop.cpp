@@ -337,10 +337,10 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
     }
 
     infoBuilder->appendBool("isFromUserConnection", client->isFromUserConnection());
-    if (gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
-        infoBuilder->appendBool("isFromMaintenancePortConnection",
+    if (gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
+        infoBuilder->appendBool("isFromPriorityPortConnection",
                                 client->session() &&
-                                    client->session()->isConnectedToMaintenancePort());
+                                    client->session()->isConnectedToPriorityPort());
     }
 
     if (transport::ServiceExecutorContext::get(client)) {

@@ -763,10 +763,10 @@ feature_flags:
         fcv_gated: false
 
     # TODO (SERVER-112863): Remove this feature flag once 9.0 becomes last LTS.
-    featureFlagReplicationUsageOfMaintenancePort:
+    featureFlagReplicationUsageOfPriorityPort:
         description:
             When enabled, allows replica set configuration with and internal replication usage of
-            the dedicated maintenance port.
-        cpp_varname: feature_flags::gFeatureFlagReplicationUsageOfMaintenancePort
+            the dedicated priority port.
+        cpp_varname: feature_flags::gFeatureFlagReplicationUsageOfPriorityPort
         default: false
         fcv_gated: true

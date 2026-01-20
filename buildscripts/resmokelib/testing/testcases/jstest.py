@@ -78,8 +78,8 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         test_data["alwaysUseLogFiles"] = config.ALWAYS_USE_LOG_FILES
         test_data["ignoreUnterminatedProcesses"] = False
         test_data["ignoreChildProcessErrorCode"] = False
-        if test_data.get("usingMaintenancePorts", False):
-            test_data["maintenancePorts"] = self.fixture.get_maintenance_ports()
+        if test_data.get("usingPriorityPorts", False):
+            test_data["priorityPorts"] = self.fixture.get_priority_ports()
 
         if config.MOZJS_JS_GC_ZEAL:
             test_data["mozJSGCZeal"] = config.MOZJS_JS_GC_ZEAL

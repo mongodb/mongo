@@ -1814,7 +1814,7 @@ void ExecCommandDatabase::_initiateCommand() {
                       "Rejection from the 'failIngressRequestRateLimiting' fail point");
         },
         [&](const BSONObj& data) {
-            // Because we don't have a maintenance port yet, we must only simulate the rate limiter
+            // Because we don't have a priority port yet, we must only simulate the rate limiter
             // on non critical operations.
             // TODO(SERVER-114130): Move this fail point to the ingress request rate limiter and
             // remove this condition.
@@ -1822,8 +1822,8 @@ void ExecCommandDatabase::_initiateCommand() {
                 return false;
             }
 
-            // Because we don't have a maintenance port yet, we must only simulate the rate limiter
-            // on requests directly coming from mongod and mongos. As the maintenance port is
+            // Because we don't have a priority port yet, we must only simulate the rate limiter
+            // on requests directly coming from mongod and mongos. As the priority port is
             // implemented, background checks and heatbeat won't interfere with rate-limiting
             // behavior.
             // TODO(SERVER-114130): Move this fail point to the ingress request rate limiter and

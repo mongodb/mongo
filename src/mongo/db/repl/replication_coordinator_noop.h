@@ -206,7 +206,7 @@ public:
 
     HostAndPort getMyHostAndPort() const final;
 
-    boost::optional<int> getMyMaintenancePort() const final;
+    boost::optional<int> getMyPriorityPort() const final;
 
     Status setFollowerMode(const MemberState&) final;
 

@@ -176,7 +176,7 @@ bool shouldGRPCIngressBeEnabled() {
 std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
     ServiceContext* svcCtx, bool isUseGrpc, std::shared_ptr<ClientTransportObserver> observer) {
     boost::optional<int> proxyPort;
-    boost::optional<int> maintenancePort;
+    boost::optional<int> priorityPort;
 
     using PortMap = std::unordered_map<int, StringData>;
     auto addUniquePort = [](PortMap& uniquePorts, int port, StringData role) {
@@ -209,15 +209,15 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
         }
     }
 
-    if (serverGlobalParams.maintenancePort) {
-        if (!gFeatureFlagDedicatedPortForMaintenanceOperations.isEnabled()) {
+    if (serverGlobalParams.priorityPort) {
+        if (!gFeatureFlagDedicatedPortForPriorityOperations.isEnabled()) {
             LOGV2_ERROR(11438200,
-                        "Maintenance port support is not enabled",
-                        "maintenancePort"_attr = serverGlobalParams.maintenancePort);
+                        "Priority port support is not enabled",
+                        "priorityPort"_attr = serverGlobalParams.priorityPort);
             quickExit(ExitCode::badOptions);
         }
-        maintenancePort = serverGlobalParams.maintenancePort;
-        addUniquePort(uniquePorts, *maintenancePort, "maintenance"_sd);
+        priorityPort = serverGlobalParams.priorityPort;
+        addUniquePort(uniquePorts, *priorityPort, "priority"_sd);
     }
 
     // Check ingress GRPC
@@ -247,7 +247,7 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::make(
                                                                   svcCtx,
                                                                   useEgressGRPC,
                                                                   std::move(proxyPort),
-                                                                  std::move(maintenancePort),
+                                                                  std::move(priorityPort),
                                                                   std::move(observer));
 }
 
@@ -266,7 +266,7 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
     ServiceContext* svcCtx,
     bool useEgressGRPC,
     boost::optional<int> loadBalancerPort,
-    boost::optional<int> maintenancePort,
+    boost::optional<int> priorityPort,
     std::shared_ptr<ClientTransportObserver> observer) {
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
@@ -278,7 +278,7 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
     {
         AsioTransportLayer::Options opts(config);
         opts.loadBalancerPort = std::move(loadBalancerPort);
-        opts.maintenancePort = std::move(maintenancePort);
+        opts.priorityPort = std::move(priorityPort);
 
         auto sm = std::make_unique<AsioSessionManager>(svcCtx, observers);
         auto tl = std::make_unique<AsioTransportLayer>(opts, std::move(sm));
