@@ -20,8 +20,8 @@
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -195,8 +195,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -321,8 +321,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -496,8 +496,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 7 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 7 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -654,8 +654,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 7 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 7 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -812,8 +812,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 7 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 7 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -914,9 +914,9 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 1, "accum" : 2 }
-{ "_id" : 2, "accum" : 3 }
-{ "_id" : 3, "accum" : 4 }
+{  "_id" : 1,  "accum" : 2 }
+{  "_id" : 2,  "accum" : 3 }
+{  "_id" : 3,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -984,8 +984,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1110,8 +1110,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1230,8 +1230,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1315,8 +1315,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 6 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 6 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1400,8 +1400,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 6 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 6 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1490,8 +1490,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1580,8 +1580,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1669,8 +1669,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1759,8 +1759,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 7 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 7 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1840,8 +1840,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 7 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 7 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1902,8 +1902,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4 }
-{ "_id" : 5 }
+{  "_id" : 4 }
+{  "_id" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1983,8 +1983,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2159,8 +2159,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2341,8 +2341,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -2424,8 +2424,8 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 4 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -2474,8 +2474,8 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 4 }
-{ "_id" : 5 }
+{  "_id" : 4 }
+{  "_id" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2551,8 +2551,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accumB" : 2, "accumC" : 3 }
-{ "_id" : 5, "accumB" : 4, "accumC" : 7 }
+{  "_id" : 4,  "accumB" : 2,  "accumC" : 3 }
+{  "_id" : 5,  "accumB" : 4,  "accumC" : 7 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2645,8 +2645,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accumB" : 2, "accumC" : 3, "accumD" : 4 }
-{ "_id" : 5, "accumB" : 4, "accumC" : 7, "accumD" : 5 }
+{  "_id" : 4,  "accumB" : 2,  "accumC" : 3,  "accumD" : 4 }
+{  "_id" : 5,  "accumB" : 4,  "accumC" : 7,  "accumD" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2728,8 +2728,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4 }
-{ "_id" : 5 }
+{  "_id" : 4 }
+{  "_id" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -3287,8 +3287,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4 }
-{ "_id" : 5 }
+{  "_id" : 4 }
+{  "_id" : 5 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -3379,8 +3379,8 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 4 }
-{ "_id" : 5 }
+{  "_id" : 4 }
+{  "_id" : 5 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -3477,8 +3477,8 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 4 }
-{ "_id" : 5 }
+{  "_id" : 4 }
+{  "_id" : 5 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -3573,10 +3573,10 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 1, "accum" : -1 }
-{ "_id" : 2, "accum" : -2 }
-{ "_id" : 3, "accum" : -3 }
-{ "_id" : 4, "accum" : -4 }
+{  "_id" : 1,  "accum" : -1 }
+{  "_id" : 2,  "accum" : -2 }
+{  "_id" : 3,  "accum" : -3 }
+{  "_id" : 4,  "accum" : -4 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -3711,23 +3711,23 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 1, "accum" : -1 }
-{ "_id" : 10, "accum" : -10 }
-{ "_id" : 11, "accum" : -11 }
-{ "_id" : 12, "accum" : -12 }
-{ "_id" : 13, "accum" : -13 }
-{ "_id" : 14, "accum" : -14 }
-{ "_id" : 15, "accum" : -15 }
-{ "_id" : 16, "accum" : -16 }
-{ "_id" : 17, "accum" : -17 }
-{ "_id" : 2, "accum" : -2 }
-{ "_id" : 3, "accum" : -3 }
-{ "_id" : 4, "accum" : -4 }
-{ "_id" : 5, "accum" : -5 }
-{ "_id" : 6, "accum" : -6 }
-{ "_id" : 7, "accum" : -7 }
-{ "_id" : 8, "accum" : -8 }
-{ "_id" : 9, "accum" : -9 }
+{  "_id" : 1,  "accum" : -1 }
+{  "_id" : 10,  "accum" : -10 }
+{  "_id" : 11,  "accum" : -11 }
+{  "_id" : 12,  "accum" : -12 }
+{  "_id" : 13,  "accum" : -13 }
+{  "_id" : 14,  "accum" : -14 }
+{  "_id" : 15,  "accum" : -15 }
+{  "_id" : 16,  "accum" : -16 }
+{  "_id" : 17,  "accum" : -17 }
+{  "_id" : 2,  "accum" : -2 }
+{  "_id" : 3,  "accum" : -3 }
+{  "_id" : 4,  "accum" : -4 }
+{  "_id" : 5,  "accum" : -5 }
+{  "_id" : 6,  "accum" : -6 }
+{  "_id" : 7,  "accum" : -7 }
+{  "_id" : 8,  "accum" : -8 }
+{  "_id" : 9,  "accum" : -9 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -3875,8 +3875,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 7 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 7 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -4051,8 +4051,8 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 3 }
-{ "_id" : 5, "accum" : 7 }
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 7 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -4222,9 +4222,9 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
-{ "_id" : [ 1, 2, 3 ], "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
+{  "_id" : [ 1, 2, 3 ],  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -4377,9 +4377,9 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 4 }
-{ "_id" : 5 }
-{ "_id" : [ 1, 2, 3 ] }
+{  "_id" : 4 }
+{  "_id" : 5 }
+{  "_id" : [ 1, 2, 3 ] }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -4425,9 +4425,9 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 4, "accum" : 2 }
-{ "_id" : 5, "accum" : 4 }
-{ "_id" : [ 1, 2, 3 ], "accum" : 4 }
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
+{  "_id" : [ 1, 2, 3 ],  "accum" : 4 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -4467,9 +4467,9 @@ Execution Engine: sbe
 ```
 ### Results
 ```json
-{ "_id" : 2, "accum" : 4 }
-{ "_id" : 3, "accum" : 4 }
-{ "_id" : 4, "accum" : 5 }
+{  "_id" : 2,  "accum" : 4 }
+{  "_id" : 3,  "accum" : 4 }
+{  "_id" : 4,  "accum" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4534,9 +4534,9 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 2, "accum" : 4 }
-{ "_id" : 3, "accum" : 4 }
-{ "_id" : 4, "accum" : [ 1, 2, 3 ] }
+{  "_id" : 2,  "accum" : 4 }
+{  "_id" : 3,  "accum" : 4 }
+{  "_id" : 4,  "accum" : [ 1, 2, 3 ] }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4606,10 +4606,10 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 1 }
-{ "_id" : 2 }
-{ "_id" : 3 }
-{ "_id" : 4 }
+{  "_id" : 1 }
+{  "_id" : 2 }
+{  "_id" : 3 }
+{  "_id" : 4 }
 ```
 ### Summarized explain
 Execution Engine: classic

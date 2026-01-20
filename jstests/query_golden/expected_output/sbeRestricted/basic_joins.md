@@ -29,12 +29,12 @@
 ```
 ### Results
 ```json
-{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{  "_id" : 1,  "a" : 1,  "b" : "bar",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
+{  "_id" : 1,  "a" : 1,  "b" : "bar",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -238,7 +238,7 @@ rightEmbeddingField: "x"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -267,7 +267,7 @@ rightEmbeddingField: "y"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
+  |  keyPattern: {  "b" : 1 }
   |  indexName: "b_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -282,7 +282,7 @@ rightEmbeddingField: "y"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -326,7 +326,7 @@ rightEmbeddingField: "y"
 ```
 ### Results
 ```json
-{ "_id" : "bar", "count" : 6 }
+{  "_id" : "bar",  "count" : 6 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -416,7 +416,7 @@ rightEmbeddingField: "y"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "a" : true, "b" : true, "_id" : false }
+  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -437,7 +437,7 @@ rightEmbeddingField: "none"
   |  |  direction: "forward"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -464,7 +464,7 @@ rightEmbeddingField: "y"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "a" : true, "b" : true, "_id" : false }
+  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -485,7 +485,7 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -509,7 +509,7 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -533,7 +533,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -557,7 +557,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -577,7 +577,7 @@ rightEmbeddingField: "x"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -589,7 +589,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -609,7 +609,7 @@ rightEmbeddingField: "y"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
+  |  keyPattern: {  "b" : 1 }
   |  indexName: "b_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -624,7 +624,7 @@ rightEmbeddingField: "y"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -632,7 +632,7 @@ rightEmbeddingField: "y"
   |  isPartial: false
   |
   PROJECTION_SIMPLE
-  transformBy: { "a" : true, "b" : true, "_id" : false }
+  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -689,8 +689,8 @@ rightEmbeddingField: "y"
 ```
 ### Results
 ```json
-{ "_id" : 1, "count" : 2 }
-{ "_id" : 2, "count" : 2 }
+{  "_id" : 1,  "count" : 2 }
+{  "_id" : 2,  "count" : 2 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -794,7 +794,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
@@ -802,11 +802,11 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "a" : true, "b" : true, "_id" : false }
+  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -824,17 +824,17 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "x"
   |  |  |
   |  |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  |  filter: { "d" : { "$lt" : 3 } }
+  |  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |  direction: "forward"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With bottom-up plan enumeration (zig-zag)
@@ -846,7 +846,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
@@ -854,11 +854,11 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "a" : true, "b" : true, "_id" : false }
+  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -872,7 +872,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
@@ -880,13 +880,13 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign1]
-  filter: { "d" : { "$lt" : 3 } }
+  filter: {  "d" : {  "$lt" : 3 } }
   direction: "forward"
 ```
 ### With random order, seed 44, hash join enabled
@@ -898,7 +898,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
@@ -906,13 +906,13 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign1]
-  filter: { "d" : { "$lt" : 3 } }
+  filter: {  "d" : {  "$lt" : 3 } }
   direction: "forward"
 ```
 ### With random order, seed 45, nested loop joins
@@ -924,7 +924,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [b = b]
@@ -932,13 +932,13 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With random order, seed 45, hash join enabled
@@ -950,7 +950,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [b = b]
@@ -958,13 +958,13 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With fixed order, index join
@@ -976,10 +976,10 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -991,7 +991,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -1000,15 +1000,15 @@ rightEmbeddingField: "x"
   
   |
   IXSCAN [test.basic_joins_md_foreign2]
-  keyPattern: { "b" : 1 }
+  keyPattern: {  "b" : 1 }
   indexName: "b_1"
   isMultiKey: false
-  multiKeyPaths: { "b" : [ ] }
+  multiKeyPaths: {  "b" : [ ] }
   isUnique: false
   isSparse: false
   isPartial: false
   direction: "forward"
-  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
+  indexBounds: {  "b" : [ "(\"aaa\", {})" ] }
 ```
 ### With bottom-up plan enumeration and indexes
 usedJoinOptimization: true
@@ -1019,10 +1019,10 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  FETCH [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
+  |  keyPattern: {  "b" : 1 }
   |  indexName: "b_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -1034,10 +1034,10 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -1045,7 +1045,7 @@ rightEmbeddingField: "y"
   |  isPartial: false
   |
   PROJECTION_SIMPLE
-  transformBy: { "a" : true, "b" : true, "_id" : false }
+  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -1099,10 +1099,10 @@ rightEmbeddingField: "y"
 ```
 ### Results
 ```json
-{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{  "_id" : 1,  "a" : 1,  "b" : "bar",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
+{  "_id" : 1,  "a" : 1,  "b" : "bar",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1180,7 +1180,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
@@ -1188,7 +1188,7 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
@@ -1207,14 +1207,14 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "x"
   |  |  |
   |  |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  |  filter: { "d" : { "$lt" : 3 } }
+  |  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |  direction: "forward"
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With bottom-up plan enumeration (zig-zag)
@@ -1226,7 +1226,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
@@ -1234,7 +1234,7 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
@@ -1249,7 +1249,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
@@ -1260,7 +1260,7 @@ rightEmbeddingField: "y"
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign1]
-  filter: { "d" : { "$lt" : 3 } }
+  filter: {  "d" : {  "$lt" : 3 } }
   direction: "forward"
 ```
 ### With random order, seed 44, hash join enabled
@@ -1272,7 +1272,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
@@ -1283,7 +1283,7 @@ rightEmbeddingField: "y"
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign1]
-  filter: { "d" : { "$lt" : 3 } }
+  filter: {  "d" : {  "$lt" : 3 } }
   direction: "forward"
 ```
 ### With random order, seed 45, nested loop joins
@@ -1295,7 +1295,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [b = b]
@@ -1306,7 +1306,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With random order, seed 45, hash join enabled
@@ -1318,7 +1318,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [b = b]
@@ -1329,7 +1329,7 @@ rightEmbeddingField: "x"
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With fixed order, index join
@@ -1341,10 +1341,10 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -1362,15 +1362,15 @@ rightEmbeddingField: "x"
   
   |
   IXSCAN [test.basic_joins_md_foreign2]
-  keyPattern: { "b" : 1 }
+  keyPattern: {  "b" : 1 }
   indexName: "b_1"
   isMultiKey: false
-  multiKeyPaths: { "b" : [ ] }
+  multiKeyPaths: {  "b" : [ ] }
   isUnique: false
   isSparse: false
   isPartial: false
   direction: "forward"
-  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
+  indexBounds: {  "b" : [ "(\"aaa\", {})" ] }
 ```
 ### With bottom-up plan enumeration and indexes
 usedJoinOptimization: true
@@ -1381,10 +1381,10 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  FETCH [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
+  |  keyPattern: {  "b" : 1 }
   |  indexName: "b_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -1396,10 +1396,10 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -1468,7 +1468,7 @@ rightEmbeddingField: "y"
 ```
 ### Results
 ```json
-{ "_id" : 2, "count" : 2 }
+{  "_id" : 2,  "count" : 2 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1577,7 +1577,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
@@ -1585,14 +1585,14 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "a" : true, "b" : true, "_id" : false }
+  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "a" : { "$gt" : 1 } }
+  filter: {  "a" : {  "$gt" : 1 } }
   direction: "forward"
 ```
 ### With bottom-up plan enumeration (right-deep)
@@ -1608,18 +1608,18 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "x"
   |  |  |
   |  |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  |  filter: { "d" : { "$lt" : 3 } }
+  |  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |  direction: "forward"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With bottom-up plan enumeration (zig-zag)
@@ -1631,7 +1631,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
@@ -1639,14 +1639,14 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "a" : true, "b" : true, "_id" : false }
+  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "a" : { "$gt" : 1 } }
+  filter: {  "a" : {  "$gt" : 1 } }
   direction: "forward"
 ```
 ### With random order, seed 44, nested loop joins
@@ -1658,7 +1658,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
@@ -1666,14 +1666,14 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign1]
-  filter: { "d" : { "$lt" : 3 } }
+  filter: {  "d" : {  "$lt" : 3 } }
   direction: "forward"
 ```
 ### With random order, seed 44, hash join enabled
@@ -1685,7 +1685,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
@@ -1693,14 +1693,14 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign1]
-  filter: { "d" : { "$lt" : 3 } }
+  filter: {  "d" : {  "$lt" : 3 } }
   direction: "forward"
 ```
 ### With random order, seed 45, nested loop joins
@@ -1712,7 +1712,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [b = b]
@@ -1720,14 +1720,14 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With random order, seed 45, hash join enabled
@@ -1739,7 +1739,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [b = b]
@@ -1747,14 +1747,14 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With fixed order, index join
@@ -1766,10 +1766,10 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -1781,25 +1781,25 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "a" : true, "b" : true, "_id" : false }
+  |  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   FETCH [test.basic_joins_md_foreign2]
   
   |
   IXSCAN [test.basic_joins_md_foreign2]
-  keyPattern: { "b" : 1 }
+  keyPattern: {  "b" : 1 }
   indexName: "b_1"
   isMultiKey: false
-  multiKeyPaths: { "b" : [ ] }
+  multiKeyPaths: {  "b" : [ ] }
   isUnique: false
   isSparse: false
   isPartial: false
   direction: "forward"
-  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
+  indexBounds: {  "b" : [ "(\"aaa\", {})" ] }
 ```
 ### With bottom-up plan enumeration and indexes
 usedJoinOptimization: true
@@ -1810,10 +1810,10 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  FETCH [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
+  |  keyPattern: {  "b" : 1 }
   |  indexName: "b_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -1825,10 +1825,10 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -1836,10 +1836,10 @@ rightEmbeddingField: "y"
   |  isPartial: false
   |
   PROJECTION_SIMPLE
-  transformBy: { "a" : true, "b" : true, "_id" : false }
+  transformBy: {  "a" : true,  "b" : true,  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "a" : { "$gt" : 1 } }
+  filter: {  "a" : {  "$gt" : 1 } }
   direction: "forward"
 ```
 ## 6. Example with two joins and sub-pipeline with un-correlated $match and $match prefix
@@ -1898,8 +1898,8 @@ rightEmbeddingField: "y"
 ```
 ### Results
 ```json
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -1982,7 +1982,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
@@ -1990,11 +1990,11 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "a" : { "$gt" : 1 } }
+  filter: {  "a" : {  "$gt" : 1 } }
   direction: "forward"
 ```
 ### With bottom-up plan enumeration (right-deep)
@@ -2010,15 +2010,15 @@ rightEmbeddingField: "none"
   |  rightEmbeddingField: "x"
   |  |  |
   |  |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  |  filter: { "d" : { "$lt" : 3 } }
+  |  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |  direction: "forward"
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With bottom-up plan enumeration (zig-zag)
@@ -2030,7 +2030,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
@@ -2038,11 +2038,11 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "a" : { "$gt" : 1 } }
+  filter: {  "a" : {  "$gt" : 1 } }
   direction: "forward"
 ```
 ### With random order, seed 44, nested loop joins
@@ -2054,7 +2054,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   NESTED_LOOP_JOIN_EMBEDDING [a = a]
@@ -2062,11 +2062,11 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign1]
-  filter: { "d" : { "$lt" : 3 } }
+  filter: {  "d" : {  "$lt" : 3 } }
   direction: "forward"
 ```
 ### With random order, seed 44, hash join enabled
@@ -2078,7 +2078,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [a = a]
@@ -2086,11 +2086,11 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign1]
-  filter: { "d" : { "$lt" : 3 } }
+  filter: {  "d" : {  "$lt" : 3 } }
   direction: "forward"
 ```
 ### With random order, seed 45, nested loop joins
@@ -2102,7 +2102,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [b = b]
@@ -2110,11 +2110,11 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With random order, seed 45, hash join enabled
@@ -2126,7 +2126,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  direction: "forward"
   |
   HASH_JOIN_EMBEDDING [b = b]
@@ -2134,11 +2134,11 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign2]
-  filter: { "b" : { "$gt" : "aaa" } }
+  filter: {  "b" : {  "$gt" : "aaa" } }
   direction: "forward"
 ```
 ### With fixed order, index join
@@ -2150,10 +2150,10 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "x"
   |  |
   |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -2165,22 +2165,22 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "a" : { "$gt" : 1 } }
+  |  filter: {  "a" : {  "$gt" : 1 } }
   |  direction: "forward"
   |
   FETCH [test.basic_joins_md_foreign2]
   
   |
   IXSCAN [test.basic_joins_md_foreign2]
-  keyPattern: { "b" : 1 }
+  keyPattern: {  "b" : 1 }
   indexName: "b_1"
   isMultiKey: false
-  multiKeyPaths: { "b" : [ ] }
+  multiKeyPaths: {  "b" : [ ] }
   isUnique: false
   isSparse: false
   isPartial: false
   direction: "forward"
-  indexBounds: { "b" : [ "(\"aaa\", {})" ] }
+  indexBounds: {  "b" : [ "(\"aaa\", {})" ] }
 ```
 ### With bottom-up plan enumeration and indexes
 usedJoinOptimization: true
@@ -2191,10 +2191,10 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "y"
   |  |
   |  FETCH [test.basic_joins_md_foreign2]
-  |  filter: { "b" : { "$gt" : "aaa" } }
+  |  filter: {  "b" : {  "$gt" : "aaa" } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
+  |  keyPattern: {  "b" : 1 }
   |  indexName: "b_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -2206,10 +2206,10 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "x"
   |  |
   |  FETCH [test.basic_joins_md_foreign1]
-  |  filter: { "d" : { "$lt" : 3 } }
+  |  filter: {  "d" : {  "$lt" : 3 } }
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -2217,7 +2217,7 @@ rightEmbeddingField: "y"
   |  isPartial: false
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "a" : { "$gt" : 1 } }
+  filter: {  "a" : {  "$gt" : 1 } }
   direction: "forward"
 ```
 ## 7. Basic example with referencing field from previous lookup
@@ -2251,10 +2251,10 @@ rightEmbeddingField: "y"
 ```
 ### Results
 ```json
-{ "_id" : 0, "a" : 1, "b" : "foo", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
-{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{  "_id" : 0,  "a" : 1,  "b" : "foo",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "z" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 } }
+{  "_id" : 1,  "a" : 1,  "b" : "bar",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "z" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2486,7 +2486,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -2538,12 +2538,12 @@ rightEmbeddingField: "z"
 ```
 ### Results
 ```json
-{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
-{ "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
-{ "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{  "_id" : 1,  "a" : 1,  "b" : "bar",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 },  "z" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 } }
+{  "_id" : 1,  "a" : 1,  "b" : "bar",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 },  "z" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -2807,7 +2807,7 @@ rightEmbeddingField: "y"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
+  |  keyPattern: {  "b" : 1 }
   |  indexName: "b_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -2850,7 +2850,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
+  |  keyPattern: {  "b" : 1 }
   |  indexName: "b_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -2865,7 +2865,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -2917,7 +2917,7 @@ rightEmbeddingField: "z"
 ```
 ### Results
 ```json
-{ "_id" : 2, "a" : 2, "b" : "bar", "k" : { "y" : { "z" : { "_id" : 0, "b" : "bar", "d" : 2 } } }, "w" : { "y" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }, "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "b" : "bar",  "k" : {  "y" : {  "z" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } } },  "w" : {  "y" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } },  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -3223,7 +3223,7 @@ rightEmbeddingField: "k.y.z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -3269,12 +3269,12 @@ rightEmbeddingField: "k.y.z"
 ```
 ### Results
 ```json
-{ "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
-{ "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
-{ "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{  "a" : 1,  "b" : "bar",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
+{  "a" : 1,  "b" : "bar",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
+{  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
+{  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
+{  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 0,  "b" : "bar",  "d" : 2 } }
+{  "a" : 2,  "b" : "bar",  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -3344,7 +3344,7 @@ rightEmbeddingField: "y"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false }
+  transformBy: {  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -3365,7 +3365,7 @@ rightEmbeddingField: "none"
   |  |  direction: "forward"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: {  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3392,7 +3392,7 @@ rightEmbeddingField: "y"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false }
+  transformBy: {  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -3413,7 +3413,7 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: {  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3437,7 +3437,7 @@ rightEmbeddingField: "y"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: {  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3461,7 +3461,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: {  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3485,7 +3485,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: {  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3505,7 +3505,7 @@ rightEmbeddingField: "x"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -3517,7 +3517,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : false }
+  |  transformBy: {  "_id" : false }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3537,7 +3537,7 @@ rightEmbeddingField: "y"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "b" : 1 }
+  |  keyPattern: {  "b" : 1 }
   |  indexName: "b_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -3552,7 +3552,7 @@ rightEmbeddingField: "y"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -3560,7 +3560,7 @@ rightEmbeddingField: "y"
   |  isPartial: false
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : false }
+  transformBy: {  "_id" : false }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -3601,10 +3601,10 @@ rightEmbeddingField: "y"
 ```
 ### Results
 ```json
-{ "_id" : 0, "a" : 1, "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
-{ "_id" : 1, "a" : 1, "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
-{ "_id" : 2, "a" : 2, "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
-{ "_id" : 2, "a" : 2, "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{  "_id" : 0,  "a" : 1,  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "z" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 } }
+{  "_id" : 1,  "a" : 1,  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "z" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 } }
+{  "_id" : 2,  "a" : 2,  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -3675,7 +3675,7 @@ rightEmbeddingField: "z"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : true, "a" : true }
+  transformBy: {  "_id" : true,  "a" : true }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -3696,7 +3696,7 @@ rightEmbeddingField: "none"
   |  |  direction: "forward"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : true, "a" : true }
+  |  transformBy: {  "_id" : true,  "a" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3723,7 +3723,7 @@ rightEmbeddingField: "z"
   |  direction: "forward"
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : true, "a" : true }
+  transformBy: {  "_id" : true,  "a" : true }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -3744,7 +3744,7 @@ rightEmbeddingField: "z"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : true, "a" : true }
+  |  transformBy: {  "_id" : true,  "a" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3768,7 +3768,7 @@ rightEmbeddingField: "z"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : true, "a" : true }
+  |  transformBy: {  "_id" : true,  "a" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3785,7 +3785,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : true, "a" : true }
+  |  transformBy: {  "_id" : true,  "a" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3809,7 +3809,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : true, "a" : true }
+  |  transformBy: {  "_id" : true,  "a" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3833,7 +3833,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "none"
   |  |
   |  PROJECTION_SIMPLE
-  |  transformBy: { "_id" : true, "a" : true }
+  |  transformBy: {  "_id" : true,  "a" : true }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -3867,7 +3867,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -3875,7 +3875,7 @@ rightEmbeddingField: "z"
   |  isPartial: false
   |
   PROJECTION_SIMPLE
-  transformBy: { "_id" : true, "a" : true }
+  transformBy: {  "_id" : true,  "a" : true }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -3917,10 +3917,10 @@ rightEmbeddingField: "z"
 ```
 ### Results
 ```json
-{ "_id" : 0, "a" : 1, "extra" : 1, "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
-{ "_id" : 1, "a" : 1, "extra" : 1, "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
-{ "_id" : 2, "a" : 2, "extra" : 2, "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
-{ "_id" : 2, "a" : 2, "extra" : 2, "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{  "_id" : 0,  "a" : 1,  "extra" : 1,  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "z" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 } }
+{  "_id" : 1,  "a" : 1,  "extra" : 1,  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "z" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 } }
+{  "_id" : 2,  "a" : 2,  "extra" : 2,  "x" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
+{  "_id" : 2,  "a" : 2,  "extra" : 2,  "x" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 },  "z" : {  "_id" : 2,  "a" : 2,  "c" : "x",  "d" : 3 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -3992,7 +3992,7 @@ rightEmbeddingField: "z"
   |  direction: "forward"
   |
   PROJECTION_DEFAULT
-  transformBy: { "_id" : true, "a" : true, "extra" : "$a" }
+  transformBy: {  "_id" : true,  "a" : true,  "extra" : "$a" }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -4013,7 +4013,7 @@ rightEmbeddingField: "none"
   |  |  direction: "forward"
   |  |
   |  PROJECTION_DEFAULT
-  |  transformBy: { "_id" : true, "a" : true, "extra" : "$a" }
+  |  transformBy: {  "_id" : true,  "a" : true,  "extra" : "$a" }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -4040,7 +4040,7 @@ rightEmbeddingField: "z"
   |  direction: "forward"
   |
   PROJECTION_DEFAULT
-  transformBy: { "_id" : true, "a" : true, "extra" : "$a" }
+  transformBy: {  "_id" : true,  "a" : true,  "extra" : "$a" }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -4061,7 +4061,7 @@ rightEmbeddingField: "z"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_DEFAULT
-  |  transformBy: { "_id" : true, "a" : true, "extra" : "$a" }
+  |  transformBy: {  "_id" : true,  "a" : true,  "extra" : "$a" }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -4085,7 +4085,7 @@ rightEmbeddingField: "z"
   rightEmbeddingField: "none"
   |  |
   |  PROJECTION_DEFAULT
-  |  transformBy: { "_id" : true, "a" : true, "extra" : "$a" }
+  |  transformBy: {  "_id" : true,  "a" : true,  "extra" : "$a" }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -4102,7 +4102,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "none"
   |  |
   |  PROJECTION_DEFAULT
-  |  transformBy: { "_id" : true, "a" : true, "extra" : "$a" }
+  |  transformBy: {  "_id" : true,  "a" : true,  "extra" : "$a" }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -4126,7 +4126,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "none"
   |  |
   |  PROJECTION_DEFAULT
-  |  transformBy: { "_id" : true, "a" : true, "extra" : "$a" }
+  |  transformBy: {  "_id" : true,  "a" : true,  "extra" : "$a" }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -4150,7 +4150,7 @@ leftEmbeddingField: "none"
 rightEmbeddingField: "none"
   |  |
   |  PROJECTION_DEFAULT
-  |  transformBy: { "_id" : true, "a" : true, "extra" : "$a" }
+  |  transformBy: {  "_id" : true,  "a" : true,  "extra" : "$a" }
   |  |
   |  COLLSCAN [test.basic_joins_md]
   |  direction: "forward"
@@ -4184,7 +4184,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -4192,7 +4192,7 @@ rightEmbeddingField: "z"
   |  isPartial: false
   |
   PROJECTION_DEFAULT
-  transformBy: { "_id" : true, "a" : true, "extra" : "$a" }
+  transformBy: {  "_id" : true,  "a" : true,  "extra" : "$a" }
   |
   COLLSCAN [test.basic_joins_md]
   direction: "forward"
@@ -4244,7 +4244,7 @@ rightEmbeddingField: "z"
 ```
 ### Results
 ```json
-{ "_id" : 0, "a" : 1, "b" : "foo", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
+{  "_id" : 0,  "a" : 1,  "b" : "foo",  "x" : {  "_id" : 0,  "a" : 1,  "c" : "zoo",  "d" : 1 },  "y" : {  "_id" : 1,  "b" : "bar",  "d" : 6 },  "z" : {  "_id" : 1,  "a" : 2,  "c" : "blah",  "d" : 2 } }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -4317,7 +4317,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign3]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4332,7 +4332,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4347,7 +4347,7 @@ rightEmbeddingField: "z"
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "b" : { "$eq" : "foo" } }
+  filter: {  "b" : {  "$eq" : "foo" } }
   direction: "forward"
 ```
 ### With bottom-up plan enumeration (right-deep)
@@ -4370,7 +4370,7 @@ rightEmbeddingField: "none"
   |  |  |  direction: "forward"
   |  |  |
   |  |  COLLSCAN [test.basic_joins_md]
-  |  |  filter: { "b" : { "$eq" : "foo" } }
+  |  |  filter: {  "b" : {  "$eq" : "foo" } }
   |  |  direction: "forward"
   |  |
   |  COLLSCAN [test.basic_joins_md_foreign2]
@@ -4391,7 +4391,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign3]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4406,7 +4406,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4421,7 +4421,7 @@ rightEmbeddingField: "z"
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "b" : { "$eq" : "foo" } }
+  filter: {  "b" : {  "$eq" : "foo" } }
   direction: "forward"
 ```
 ### With random order, seed 44, nested loop joins
@@ -4436,7 +4436,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign3]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4451,7 +4451,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4466,7 +4466,7 @@ rightEmbeddingField: "z"
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "b" : { "$eq" : "foo" } }
+  filter: {  "b" : {  "$eq" : "foo" } }
   direction: "forward"
 ```
 ### With random order, seed 44, hash join enabled
@@ -4481,7 +4481,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign3]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4496,7 +4496,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4511,7 +4511,7 @@ rightEmbeddingField: "z"
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "b" : { "$eq" : "foo" } }
+  filter: {  "b" : {  "$eq" : "foo" } }
   direction: "forward"
 ```
 ### With random order, seed 45, nested loop joins
@@ -4533,7 +4533,7 @@ rightEmbeddingField: "x"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4545,7 +4545,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "b" : { "$eq" : "foo" } }
+  |  filter: {  "b" : {  "$eq" : "foo" } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign3]
@@ -4570,7 +4570,7 @@ rightEmbeddingField: "x"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4582,7 +4582,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "b" : { "$eq" : "foo" } }
+  |  filter: {  "b" : {  "$eq" : "foo" } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign3]
@@ -4600,7 +4600,7 @@ rightEmbeddingField: "x"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -4615,7 +4615,7 @@ rightEmbeddingField: "x"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4627,7 +4627,7 @@ rightEmbeddingField: "x"
   rightEmbeddingField: "none"
   |  |
   |  COLLSCAN [test.basic_joins_md]
-  |  filter: { "b" : { "$eq" : "foo" } }
+  |  filter: {  "b" : {  "$eq" : "foo" } }
   |  direction: "forward"
   |
   COLLSCAN [test.basic_joins_md_foreign3]
@@ -4645,7 +4645,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign3]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4660,7 +4660,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign2]
-  |  keyPattern: { "_id" : 1 }
+  |  keyPattern: {  "_id" : 1 }
   |  indexName: "_id_"
   |  isMultiKey: false
   |  isUnique: true
@@ -4675,7 +4675,7 @@ rightEmbeddingField: "z"
   |  
   |  |
   |  INDEX_PROBE_NODE [test.basic_joins_md_foreign1]
-  |  keyPattern: { "a" : 1 }
+  |  keyPattern: {  "a" : 1 }
   |  indexName: "a_1"
   |  isMultiKey: false
   |  isUnique: false
@@ -4683,7 +4683,7 @@ rightEmbeddingField: "z"
   |  isPartial: false
   |
   COLLSCAN [test.basic_joins_md]
-  filter: { "b" : { "$eq" : "foo" } }
+  filter: {  "b" : {  "$eq" : "foo" } }
   direction: "forward"
 ```
 ## 14. Basic example with $expr predicates

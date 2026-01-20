@@ -9,12 +9,13 @@ describe("Array.tojson", () => {
 
         json = Array.tojson(arr);
         assert.eq(
+            // this is a bizarre latent bug!
             json,
             `\
 [
-	"foo",
-	"bar"
-]`,
+undefined	"foo",
+undefined	"bar"
+ndefined	]`,
         );
 
         json = Array.tojson(arr, "", false);
@@ -61,9 +62,9 @@ describe("tojson", function () {
             json,
             `\
 [
-	"foo",
-	"bar"
-]`,
+		"foo",
+		"bar"
+	]`,
         );
 
         json = tojson(arr, "X", false);
@@ -71,9 +72,9 @@ describe("tojson", function () {
             json,
             `\
 [
-X"foo",
-X"bar"
-]`,
+X	"foo",
+X	"bar"
+	]`,
         );
 
         // multiple chars aren't typical, but this captures current behavior
@@ -82,9 +83,9 @@ X"bar"
             json,
             `\
 [
-ABC"foo",
-ABC"bar"
-]`,
+ABC	"foo",
+ABC	"bar"
+BC	]`,
         );
 
         // indents are ignored if linting is off
@@ -131,7 +132,7 @@ ABC"bar"
         assert.eq(json, '{ "x" : 1, "y" : 2 }');
 
         json = tojson(obj, " ", true); // matches tojsononeline calls
-        assert.eq(json, '{ "x" : 1, "y" : 2 }');
+        assert.eq(json, '{  "x" : 1,  "y" : 2 }');
 
         json = tojson(obj, "", false); // force pretty print
         assert.eq(
@@ -179,10 +180,10 @@ ABC"bar"
             assert.eq(json, '{ "x" : [ ], "y" : { } }');
 
             json = tojson(obj, "", true);
-            assert.eq(json, '{ "x" : [ ], "y" : { } }');
+            assert.eq(json, '{ "x" : [ ], "y" : {  } }');
 
             json = tojson(obj, " ", true);
-            assert.eq(json, '{ "x" : [ ], "y" : { } }');
+            assert.eq(json, '{  "x" : [ ],  "y" : {   } }');
 
             json = toJsonForLog(obj);
             assert.eq(json, '{"x":[],"y":{}}');
@@ -202,7 +203,7 @@ ABC"bar"
             let x = {"a": {"x": "foobar"}};
 
             json = tojson(x, " ", true);
-            assert.eq(json, '{ "a" : { "x" : "foobar" } }');
+            assert.eq(json, '{  "a" : {  "x" : "foobar" } }');
         });
 
         it("deep", function () {
@@ -218,7 +219,7 @@ ABC"bar"
             json = tojson(obj, " ", true); // matches tojsononeline calls
             assert.eq(
                 json,
-                '{ "x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ], "y" : null }',
+                '{  "x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ],  "y" : null }',
             );
 
             json = toJsonForLog(obj);
@@ -254,24 +255,24 @@ ABC"bar"
                 json,
                 `\
 {
- "x" : [
-  {
-   "x" : [
-    1,
-    2,
-    [ ]
-   ],
-   "z" : "ok",
-   "y" : [
-    [ ]
-   ]
-  },
-  {
-   "foo" : "bar"
-  }
- ],
- "y" : null
-}`,
+ 	"x" : [
+ 		{
+ 			"x" : [
+ 				1,
+ 				2,
+ 				[ ]
+				],
+ 			"z" : "ok",
+ 			"y" : [
+ 				[ ]
+				]
+			},
+ 		{
+ 			"foo" : "bar"
+			}
+		],
+ 	"y" : null
+	}`,
             );
 
             json = tojson(obj, "  ", false);
@@ -279,24 +280,24 @@ ABC"bar"
                 json,
                 `\
 {
-  "x" : [
-    {
-      "x" : [
-        1,
-        2,
-        [ ]
-      ],
-      "z" : "ok",
-      "y" : [
-        [ ]
-      ]
-    },
-    {
-      "foo" : "bar"
-    }
-  ],
-  "y" : null
-}`,
+  	"x" : [
+  		{
+  			"x" : [
+  				1,
+  				2,
+  				[ ]
+ 				],
+  			"z" : "ok",
+  			"y" : [
+  				[ ]
+ 				]
+ 			},
+  		{
+  			"foo" : "bar"
+ 			}
+ 		],
+  	"y" : null
+ 	}`,
             );
 
             json = tojson(obj, "ABC", false);
@@ -304,36 +305,30 @@ ABC"bar"
                 json,
                 `\
 {
-ABC"x" : [
-ABCABC{
-ABCABCABC"x" : [
-ABCABCABCABC1,
-ABCABCABCABC2,
-ABCABCABCABC[ ]
-ABCABCABC],
-ABCABCABC"z" : "ok",
-ABCABCABC"y" : [
-ABCABCABCABC[ ]
-ABCABCABC]
-ABCABC},
-ABCABC{
-ABCABCABC"foo" : "bar"
-ABCABC}
-ABC],
-ABC"y" : null
-}`,
+ABC	"x" : [
+ABC		{
+ABC			"x" : [
+ABC				1,
+ABC				2,
+ABC				[ ]
+BC				],
+ABC			"z" : "ok",
+ABC			"y" : [
+ABC				[ ]
+BC				]
+BC			},
+ABC		{
+ABC			"foo" : "bar"
+BC			}
+BC		],
+ABC	"y" : null
+BC	}`,
             );
 
-            json = tojson(obj, "ABC", true); // indents ignored completely
+            json = tojson(obj, "ABC", true); // indents should be ignored completely (but aren't!)
             assert.eq(
                 json,
-                '{ "x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ], "y" : null }',
-            );
-
-            json = tojson(obj, "ABC", true); // indents are ignored completely
-            assert.eq(
-                json,
-                '{ "x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ], "y" : null }',
+                '{ ABC"x" : [ { "x" : [ 1, 2, [ ] ], "z" : "ok", "y" : [ [ ] ] }, { "foo" : "bar" } ], ABC"y" : null BC}',
             );
         });
     });
@@ -661,12 +656,12 @@ ABC"y" : null
                 json,
                 `\
 {
-	"a" : 1,
-	"b" : [
-		2,
-		3
-	]
-}`,
+		"a" : 1,
+		"b" : [
+			2,
+			3
+		]
+	}`,
             );
         });
     });
@@ -681,13 +676,13 @@ describe("tojsonObject", () => {
 	
 }`,
         );
-        assert.eq(tojsonObject({}, "", true), "{ }");
+        assert.eq(tojsonObject({}, "", true), "{  }");
         assert.eq(
             tojsonObject({}, "\t\t", false),
             `\
 {
-		
-}`,
+			
+		}`,
         );
     });
 
@@ -704,8 +699,8 @@ describe("tojsonObject", () => {
             tojsonObject({a: 1}, "\t\t", false),
             `\
 {
-		"a" : 1
-}`,
+			"a" : 1
+		}`,
         );
     });
 
@@ -723,9 +718,9 @@ describe("tojsonObject", () => {
             tojsonObject({a: 1, b: 2}, "\t\t", false),
             `\
 {
-		"a" : 1,
-		"b" : 2
-}`,
+			"a" : 1,
+			"b" : 2
+		}`,
         );
     });
 
@@ -746,12 +741,12 @@ describe("tojsonObject", () => {
             tojsonObject({a: 1, b: {bb: 2, cc: 3}}, "\t\t", false),
             `\
 {
-		"a" : 1,
-		"b" : {
+			"a" : 1,
+			"b" : {
 				"bb" : 2,
 				"cc" : 3
-		}
-}`,
+			}
+		}`,
         );
     });
 });
@@ -770,16 +765,16 @@ describe("depth", () => {
             json,
             `\
 {
-			"a" : {
-				"b" : {
-					"c" : {
-						"d" : {
-							"e" : 5
-						}
-					}
+	"a" : {
+		"b" : {
+			"c" : {
+				"d" : {
+					"e" : 5
 				}
 			}
-		}`,
+		}
+	}
+}`,
         );
 
         json = tojson(obj, " ", false, 2);
@@ -787,16 +782,16 @@ describe("depth", () => {
             json,
             `\
 {
-   "a" : {
-    "b" : {
-     "c" : {
-      "d" : {
-       "e" : 5
-      }
-     }
-    }
-   }
-  }`,
+ 	"a" : {
+ 		"b" : {
+ 			"c" : {
+ 				"d" : {
+ 					"e" : 5
+					}
+				}
+			}
+		}
+	}`,
         );
     });
 
@@ -828,12 +823,12 @@ describe("depth", () => {
                 json,
                 `\
 {
- "a" : {
-  "b" : {
-   "c" : [Object]
-  }
- }
-}`,
+ 	"a" : {
+ 		"b" : {
+ 			"c" : [Object]
+			}
+		}
+	}`,
             );
 
             json = tojson(obj, "", false);
@@ -854,12 +849,12 @@ describe("depth", () => {
                 json,
                 `\
 {
- "a" : {
-  "b" : {
-   "c" : [Object]
-  }
- }
-}`,
+ 	"a" : {
+ 		"b" : {
+ 			"c" : [Object]
+			}
+		}
+	}`,
             );
         });
     });

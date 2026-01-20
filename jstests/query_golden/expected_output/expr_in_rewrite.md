@@ -1,18 +1,18 @@
 ## 1. Find filter
 ```json
-{ "$expr" : { "$in" : [ 1, "$m" ] } }
+{  "$expr" : {  "$in" : [ 1, "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] },
- { "m" : [ 1, 2 ] },
- { "m" : [ 5, 2, 1, 3, 6 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] },
+ {  "m" : [ 1, 2 ] },
+ {  "m" : [ 5, 2, 1, 3, 6 ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : 1 }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : 1 }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -48,14 +48,14 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] },
- { "m" : [ 1, 2 ] },
- { "m" : [ 5, 2, 1, 3, 6 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] },
+ {  "m" : [ 1, 2 ] },
+ {  "m" : [ 5, 2, 1, 3, 6 ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : 1 } }, { "$expr" : { "$in" : [ { "$const" : 1 }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : 1 } }, { "$expr" : { "$in" : [ { "$const" : 1 }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -112,18 +112,18 @@ Summarized explain
 
 ## 2. Find filter
 ```json
-{ "$expr" : { "$in" : [ null, "$m" ] } }
+{  "$expr" : {  "$in" : [ null, "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ 4, 5, 6, null, 10 ] },
- { "m" : [ null, null, null ] },
- { "m" : [ [ null ], null ] }]
+[{  "m" : [ 4, 5, 6, null, 10 ] },
+ {  "m" : [ null, null, null ] },
+ {  "m" : [ [ null ], null ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : null }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : null }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -159,13 +159,13 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ 4, 5, 6, null, 10 ] },
- { "m" : [ null, null, null ] },
- { "m" : [ [ null ], null ] }]
+[{  "m" : [ 4, 5, 6, null, 10 ] },
+ {  "m" : [ null, null, null ] },
+ {  "m" : [ [ null ], null ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : null } }, { "$expr" : { "$in" : [ { "$const" : null }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : null } }, { "$expr" : { "$in" : [ { "$const" : null }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -231,16 +231,16 @@ Summarized explain
 
 ## 3. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ ] ] }]
+[{  "m" : [ [ ] ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -276,11 +276,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ ] ] }]
+[{  "m" : [ [ ] ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ ] } }, { "$expr" : { "$in" : [ { "$const" : [ ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ ] } }, { "$expr" : { "$in" : [ { "$const" : [ ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -347,17 +347,17 @@ Summarized explain
 
 ## 4. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ 1 ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ 1 ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ 1 ] ] },
- { "m" : [ [ 1 ], [ 2 ] ] }]
+[{  "m" : [ [ 1 ] ] },
+ {  "m" : [ [ 1 ], [ 2 ] ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ 1 ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ 1 ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -395,12 +395,12 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ 1 ] ] },
- { "m" : [ [ 1 ], [ 2 ] ] }]
+[{  "m" : [ [ 1 ] ] },
+ {  "m" : [ [ 1 ], [ 2 ] ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ 1 ] } }, { "$expr" : { "$in" : [ { "$const" : [ 1 ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ 1 ] } }, { "$expr" : { "$in" : [ { "$const" : [ 1 ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -471,17 +471,17 @@ Summarized explain
 
 ## 5. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ 2 ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ 2 ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ 2 ] ] },
- { "m" : [ [ 1 ], [ 2 ] ] }]
+[{  "m" : [ [ 2 ] ] },
+ {  "m" : [ [ 1 ], [ 2 ] ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ 2 ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ 2 ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -519,12 +519,12 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ 2 ] ] },
- { "m" : [ [ 1 ], [ 2 ] ] }]
+[{  "m" : [ [ 2 ] ] },
+ {  "m" : [ [ 1 ], [ 2 ] ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ 2 ] } }, { "$expr" : { "$in" : [ { "$const" : [ 2 ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ 2 ] } }, { "$expr" : { "$in" : [ { "$const" : [ 2 ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -595,16 +595,16 @@ Summarized explain
 
 ## 6. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ null ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ null ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ null ], null ] }]
+[{  "m" : [ [ null ], null ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ null ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ null ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -642,11 +642,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ null ], null ] }]
+[{  "m" : [ [ null ], null ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ null ] } }, { "$expr" : { "$in" : [ { "$const" : [ null ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ null ] } }, { "$expr" : { "$in" : [ { "$const" : [ null ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -717,17 +717,17 @@ Summarized explain
 
 ## 7. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ 1, 2 ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ 1, 2 ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ 1, 2 ] ] },
- { "m" : [ [ 1, 2, 3, 4 ], [ 1, 2 ] ] }]
+[{  "m" : [ [ 1, 2 ] ] },
+ {  "m" : [ [ 1, 2, 3, 4 ], [ 1, 2 ] ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ 1, 2 ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ 1, 2 ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -766,12 +766,12 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ 1, 2 ] ] },
- { "m" : [ [ 1, 2, 3, 4 ], [ 1, 2 ] ] }]
+[{  "m" : [ [ 1, 2 ] ] },
+ {  "m" : [ [ 1, 2, 3, 4 ], [ 1, 2 ] ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ 1, 2 ] } }, { "$expr" : { "$in" : [ { "$const" : [ 1, 2 ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ 1, 2 ] } }, { "$expr" : { "$in" : [ { "$const" : [ 1, 2 ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -844,17 +844,17 @@ Summarized explain
 
 ## 8. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ [ 1 ] ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ [ 1 ] ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ [ 1 ] ] ] },
- { "m" : [ [ [ 1 ] ], [ [ 2 ] ] ] }]
+[{  "m" : [ [ [ 1 ] ] ] },
+ {  "m" : [ [ [ 1 ] ], [ [ 2 ] ] ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ [ 1 ] ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ [ 1 ] ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -894,12 +894,12 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ [ 1 ] ] ] },
- { "m" : [ [ [ 1 ] ], [ [ 2 ] ] ] }]
+[{  "m" : [ [ [ 1 ] ] ] },
+ {  "m" : [ [ [ 1 ] ], [ [ 2 ] ] ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ [ 1 ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ 1 ] ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ [ 1 ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ 1 ] ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -974,16 +974,16 @@ Summarized explain
 
 ## 9. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ [ 1, 2 ] ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ [ 1, 2 ] ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ [ 1, 2 ] ] ] }]
+[{  "m" : [ [ [ 1, 2 ] ] ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ [ 1, 2 ] ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ [ 1, 2 ] ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -1024,11 +1024,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ [ 1, 2 ] ] ] }]
+[{  "m" : [ [ [ 1, 2 ] ] ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ [ 1, 2 ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ 1, 2 ] ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ [ 1, 2 ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ 1, 2 ] ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -1105,7 +1105,7 @@ Summarized explain
 
 ## 10. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ [ [ 1 ] ] ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ [ [ 1 ] ] ], "$m" ] } }
 ```
 ### Query knob off
 Find results
@@ -1114,7 +1114,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ [ [ 1 ] ] ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ [ [ 1 ] ] ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -1160,7 +1160,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ [ [ 1 ] ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ [ 1 ] ] ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ [ [ 1 ] ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ [ 1 ] ] ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -1239,16 +1239,16 @@ Summarized explain
 
 ## 11. Find filter
 ```json
-{ "$expr" : { "$in" : [ { }, "$m" ] } }
+{  "$expr" : {  "$in" : [ {  }, "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ { } ] }]
+[{  "m" : [ {  } ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : { } }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : {  } }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -1286,11 +1286,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ { } ] }]
+[{  "m" : [ {  } ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : { } } }, { "$expr" : { "$in" : [ { "$const" : { } }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : {  } } }, { "$expr" : { "$in" : [ { "$const" : {  } }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -1349,16 +1349,16 @@ Summarized explain
 
 ## 12. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ { } ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ {  } ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ { } ] ] }]
+[{  "m" : [ [ {  } ] ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ { } ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ {  } ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -1398,11 +1398,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ { } ] ] }]
+[{  "m" : [ [ {  } ] ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ { } ] } }, { "$expr" : { "$in" : [ { "$const" : [ { } ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ {  } ] } }, { "$expr" : { "$in" : [ { "$const" : [ {  } ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -1477,16 +1477,16 @@ Summarized explain
 
 ## 13. Find filter
 ```json
-{ "$expr" : { "$in" : [ { "a" : 1 }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "a" : 1 }, "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ { "a" : 1 } ] }]
+[{  "m" : [ { "a" : 1 } ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : { "a" : 1 } }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : { "a" : 1 } }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -1524,11 +1524,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ { "a" : 1 } ] }]
+[{  "m" : [ { "a" : 1 } ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : { "a" : 1 } } }, { "$expr" : { "$in" : [ { "$const" : { "a" : 1 } }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : { "a" : 1 } } }, { "$expr" : { "$in" : [ { "$const" : { "a" : 1 } }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -1587,16 +1587,16 @@ Summarized explain
 
 ## 14. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ { "a" : 1 } ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ { "a" : 1 } ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ { "a" : 1 } ] ] }]
+[{  "m" : [ [ { "a" : 1 } ] ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ { "a" : 1 } ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ { "a" : 1 } ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -1636,11 +1636,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ { "a" : 1 } ] ] }]
+[{  "m" : [ [ { "a" : 1 } ] ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ { "a" : 1 } ] } }, { "$expr" : { "$in" : [ { "$const" : [ { "a" : 1 } ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ { "a" : 1 } ] } }, { "$expr" : { "$in" : [ { "$const" : [ { "a" : 1 } ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -1715,16 +1715,16 @@ Summarized explain
 
 ## 15. Find filter
 ```json
-{ "$expr" : { "$in" : [ { "a" : 1, "b" : 1 }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "a" : 1, "b" : 1 }, "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ { "a" : 1, "b" : 1 } ] }]
+[{  "m" : [ { "a" : 1, "b" : 1 } ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : { "a" : 1, "b" : 1 } }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : { "a" : 1, "b" : 1 } }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -1763,11 +1763,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ { "a" : 1, "b" : 1 } ] }]
+[{  "m" : [ { "a" : 1, "b" : 1 } ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : { "a" : 1, "b" : 1 } } }, { "$expr" : { "$in" : [ { "$const" : { "a" : 1, "b" : 1 } }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : { "a" : 1, "b" : 1 } } }, { "$expr" : { "$in" : [ { "$const" : { "a" : 1, "b" : 1 } }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -1827,16 +1827,16 @@ Summarized explain
 
 ## 16. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ { } ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ {  } ], "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ [ { } ] ] }]
+[{  "m" : [ [ {  } ] ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ { } ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ {  } ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -1876,11 +1876,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ [ { } ] ] }]
+[{  "m" : [ [ {  } ] ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ { } ] } }, { "$expr" : { "$in" : [ { "$const" : [ { } ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ {  } ] } }, { "$expr" : { "$in" : [ { "$const" : [ {  } ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -1955,16 +1955,16 @@ Summarized explain
 
 ## 17. Find filter
 ```json
-{ "$expr" : { "$in" : [ "a", "$m" ] } }
+{  "$expr" : {  "$in" : [ "a", "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ "a", "b", "c" ] }]
+[{  "m" : [ "a", "b", "c" ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : "a" }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : "a" }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -2000,11 +2000,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ "a", "b", "c" ] }]
+[{  "m" : [ "a", "b", "c" ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : "a" } }, { "$expr" : { "$in" : [ { "$const" : "a" }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : "a" } }, { "$expr" : { "$in" : [ { "$const" : "a" }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -2061,7 +2061,7 @@ Summarized explain
 
 ## 18. Find filter
 ```json
-{ "$expr" : { "$in" : [ "ab", "$m" ] } }
+{  "$expr" : {  "$in" : [ "ab", "$m" ] } }
 ```
 ### Query knob off
 Find results
@@ -2070,7 +2070,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : "ab" }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : "ab" }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -2110,7 +2110,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : "ab" } }, { "$expr" : { "$in" : [ { "$const" : "ab" }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : "ab" } }, { "$expr" : { "$in" : [ { "$const" : "ab" }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -2167,17 +2167,17 @@ Summarized explain
 
 ## 19. Find filter
 ```json
-{ "$expr" : { "$in" : [ "abc", "$m" ] } }
+{  "$expr" : {  "$in" : [ "abc", "$m" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ "abc" ] },
- { "m" : [ "ghi", "abc", "def" ] }]
+[{  "m" : [ "abc" ] },
+ {  "m" : [ "ghi", "abc", "def" ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : "abc" }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : "abc" }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -2213,12 +2213,12 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ "abc" ] },
- { "m" : [ "ghi", "abc", "def" ] }]
+[{  "m" : [ "abc" ] },
+ {  "m" : [ "ghi", "abc", "def" ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : "abc" } }, { "$expr" : { "$in" : [ { "$const" : "abc" }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : "abc" } }, { "$expr" : { "$in" : [ { "$const" : "abc" }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -2275,7 +2275,7 @@ Summarized explain
 
 ## 20. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ "a" ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ "a" ], "$m" ] } }
 ```
 ### Query knob off
 Find results
@@ -2284,7 +2284,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ "a" ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ "a" ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -2326,7 +2326,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ "a" ] } }, { "$expr" : { "$in" : [ { "$const" : [ "a" ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ "a" ] } }, { "$expr" : { "$in" : [ { "$const" : [ "a" ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -2397,7 +2397,7 @@ Summarized explain
 
 ## 21. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ "ab" ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ "ab" ], "$m" ] } }
 ```
 ### Query knob off
 Find results
@@ -2406,7 +2406,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ "ab" ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ "ab" ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -2448,7 +2448,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ "ab" ] } }, { "$expr" : { "$in" : [ { "$const" : [ "ab" ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ "ab" ] } }, { "$expr" : { "$in" : [ { "$const" : [ "ab" ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -2519,7 +2519,7 @@ Summarized explain
 
 ## 22. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ "abc" ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ "abc" ], "$m" ] } }
 ```
 ### Query knob off
 Find results
@@ -2528,7 +2528,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ "abc" ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ "abc" ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -2570,7 +2570,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ "abc" ] } }, { "$expr" : { "$in" : [ { "$const" : [ "abc" ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ "abc" ] } }, { "$expr" : { "$in" : [ { "$const" : [ "abc" ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -2641,7 +2641,7 @@ Summarized explain
 
 ## 23. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ /a/ ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ /a/ ], "$m" ] } }
 ```
 ### Query knob off
 Find results
@@ -2650,7 +2650,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ /a/ ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ /a/ ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -2692,7 +2692,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ /a/ ] } }, { "$expr" : { "$in" : [ { "$const" : [ /a/ ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ /a/ ] } }, { "$expr" : { "$in" : [ { "$const" : [ /a/ ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -2763,7 +2763,7 @@ Summarized explain
 
 ## 24. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ /b/ ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ /b/ ], "$m" ] } }
 ```
 ### Query knob off
 Find results
@@ -2772,7 +2772,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ /b/ ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ /b/ ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -2814,7 +2814,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ /b/ ] } }, { "$expr" : { "$in" : [ { "$const" : [ /b/ ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ /b/ ] } }, { "$expr" : { "$in" : [ { "$const" : [ /b/ ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -2885,7 +2885,7 @@ Summarized explain
 
 ## 25. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ /abc/ ], "$m" ] } }
+{  "$expr" : {  "$in" : [ [ /abc/ ], "$m" ] } }
 ```
 ### Query knob off
 Find results
@@ -2894,7 +2894,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ /abc/ ] }, "$m" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ /abc/ ] }, "$m" ] } }
 ```
 Summarized explain
 ```json
@@ -2936,7 +2936,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : [ /abc/ ] } }, { "$expr" : { "$in" : [ { "$const" : [ /abc/ ] }, "$m" ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : [ /abc/ ] } }, { "$expr" : { "$in" : [ { "$const" : [ /abc/ ] }, "$m" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -3007,19 +3007,19 @@ Summarized explain
 
 ## 26. Find filter
 ```json
-{ "$expr" : { "$or" : [ { "$in" : [ 1, "$m" ] } ] } }
+{  "$expr" : {  "$or" : [ { "$in" : [ 1, "$m" ] } ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] },
- { "m" : [ 1, 2 ] },
- { "m" : [ 5, 2, 1, 3, 6 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] },
+ {  "m" : [ 1, 2 ] },
+ {  "m" : [ 5, 2, 1, 3, 6 ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] } ] } }
+{  "$expr" : {  "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] } ] } }
 ```
 Summarized explain
 ```json
@@ -3059,14 +3059,14 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] },
- { "m" : [ 1, 2 ] },
- { "m" : [ 5, 2, 1, 3, 6 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] },
+ {  "m" : [ 1, 2 ] },
+ {  "m" : [ 5, 2, 1, 3, 6 ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$eq" : 1 } }, { "$expr" : { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] } ] } } ] }
+{  "$and" : [ { "m" : { "$eq" : 1 } }, { "$expr" : { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] } ] } } ] }
 ```
 Summarized explain
 ```json
@@ -3127,21 +3127,21 @@ Summarized explain
 
 ## 27. Find filter
 ```json
-{ "$expr" : { "$or" : [ { "$in" : [ 1, "$m" ] }, { "$in" : [ 2, "$m" ] } ] } }
+{  "$expr" : {  "$or" : [ { "$in" : [ 1, "$m" ] }, { "$in" : [ 2, "$m" ] } ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] },
- { "m" : [ 1, 2 ] },
- { "m" : [ 2 ] },
- { "m" : [ 5, 2, 3, 6 ] },
- { "m" : [ 5, 2, 1, 3, 6 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] },
+ {  "m" : [ 1, 2 ] },
+ {  "m" : [ 2 ] },
+ {  "m" : [ 5, 2, 3, 6 ] },
+ {  "m" : [ 5, 2, 1, 3, 6 ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] } }
+{  "$expr" : {  "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] } }
 ```
 Summarized explain
 ```json
@@ -3189,16 +3189,16 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] },
- { "m" : [ 1, 2 ] },
- { "m" : [ 5, 2, 1, 3, 6 ] },
- { "m" : [ 2 ] },
- { "m" : [ 5, 2, 3, 6 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] },
+ {  "m" : [ 1, 2 ] },
+ {  "m" : [ 5, 2, 1, 3, 6 ] },
+ {  "m" : [ 2 ] },
+ {  "m" : [ 5, 2, 3, 6 ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$in" : [ 1, 2 ] } }, { "$expr" : { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] } } ] }
+{  "$and" : [ { "m" : { "$in" : [ 1, 2 ] } }, { "$expr" : { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] } } ] }
 ```
 Summarized explain
 ```json
@@ -3268,21 +3268,21 @@ Summarized explain
 
 ## 28. Find filter
 ```json
-{ "$expr" : { "$or" : [ { "$in" : [ 1, "$m" ] }, { "$in" : [ 2, "$m" ] }, { "$in" : [ "$a", [ 1, 2, 10 ] ] } ] } }
+{  "$expr" : {  "$or" : [ { "$in" : [ 1, "$m" ] }, { "$in" : [ 2, "$m" ] }, { "$in" : [ "$a", [ 1, 2, 10 ] ] } ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] },
- { "m" : [ 1, 2 ] },
- { "m" : [ 2 ] },
- { "m" : [ 5, 2, 3, 6 ] },
- { "m" : [ 5, 2, 1, 3, 6 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] },
+ {  "m" : [ 1, 2 ] },
+ {  "m" : [ 2 ] },
+ {  "m" : [ 5, 2, 3, 6 ] },
+ {  "m" : [ 5, 2, 1, 3, 6 ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] }, { "$in" : [ "$a", { "$const" : [ 1, 2, 10 ] } ] } ] } }
+{  "$expr" : {  "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] }, { "$in" : [ "$a", { "$const" : [ 1, 2, 10 ] } ] } ] } }
 ```
 Summarized explain
 ```json
@@ -3342,16 +3342,16 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] },
- { "m" : [ 1, 2 ] },
- { "m" : [ 2 ] },
- { "m" : [ 5, 2, 3, 6 ] },
- { "m" : [ 5, 2, 1, 3, 6 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] },
+ {  "m" : [ 1, 2 ] },
+ {  "m" : [ 2 ] },
+ {  "m" : [ 5, 2, 3, 6 ] },
+ {  "m" : [ 5, 2, 1, 3, 6 ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "$or" : [ { "a" : { "$in" : [ 1, 2, 10 ] } }, { "m" : { "$in" : [ 1, 2 ] } } ] }, { "$expr" : { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] }, { "$in" : [ "$a", { "$const" : [ 1, 2, 10 ] } ] } ] } } ] }
+{  "$and" : [ { "$or" : [ { "a" : { "$in" : [ 1, 2, 10 ] } }, { "m" : { "$in" : [ 1, 2 ] } } ] }, { "$expr" : { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] }, { "$in" : [ "$a", { "$const" : [ 1, 2, 10 ] } ] } ] } } ] }
 ```
 Summarized explain
 ```json
@@ -3435,17 +3435,17 @@ Summarized explain
 
 ## 29. Find filter
 ```json
-{ "$expr" : { "$and" : [ { "$in" : [ "$a", [ 1, 2 ] ] }, { "$or" : [ { "$in" : [ 1, "$m" ] }, { "$in" : [ 2, "$m" ] } ] } ] } }
+{  "$expr" : {  "$and" : [ { "$in" : [ "$a", [ 1, 2 ] ] }, { "$or" : [ { "$in" : [ 1, "$m" ] }, { "$in" : [ 2, "$m" ] } ] } ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "a" : { "$in" : [ 1, 2 ] } }, { "$expr" : { "$and" : [ { "$in" : [ "$a", { "$const" : [ 1, 2 ] } ] }, { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] } ] } } ] }
+{  "$and" : [ { "a" : { "$in" : [ 1, 2 ] } }, { "$expr" : { "$and" : [ { "$in" : [ "$a", { "$const" : [ 1, 2 ] } ] }, { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] } ] } } ] }
 ```
 Summarized explain
 ```json
@@ -3520,12 +3520,12 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "a" : 1, "m" : [ 1 ] },
- { "a" : 2, "m" : [ 1, 2, 3 ] }]
+[{  "a" : 1,  "m" : [ 1 ] },
+ {  "a" : 2,  "m" : [ 1, 2, 3 ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "a" : { "$in" : [ 1, 2 ] } }, { "m" : { "$in" : [ 1, 2 ] } }, { "$expr" : { "$and" : [ { "$in" : [ "$a", { "$const" : [ 1, 2 ] } ] }, { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] } ] } } ] }
+{  "$and" : [ { "a" : { "$in" : [ 1, 2 ] } }, { "m" : { "$in" : [ 1, 2 ] } }, { "$expr" : { "$and" : [ { "$in" : [ "$a", { "$const" : [ 1, 2 ] } ] }, { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] } ] } } ] }
 ```
 Summarized explain
 ```json
@@ -3622,7 +3622,7 @@ Summarized explain
 
 ## 30. Find filter
 ```json
-{ "$expr" : { "$and" : [ { "$or" : [ { "$in" : [ 1, "$m" ] }, { "$in" : [ 2, "$m" ] } ] }, { "$in" : [ "$a", [ null ] ] } ] } }
+{  "$expr" : {  "$and" : [ { "$or" : [ { "$in" : [ 1, "$m" ] }, { "$in" : [ 2, "$m" ] } ] }, { "$in" : [ "$a", [ null ] ] } ] } }
 ```
 ### Query knob off
 Find results
@@ -3631,7 +3631,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$and" : [ { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] }, { "$in" : [ "$a", { "$const" : [ null ] } ] } ] } }
+{  "$expr" : {  "$and" : [ { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] }, { "$in" : [ "$a", { "$const" : [ null ] } ] } ] } }
 ```
 Summarized explain
 ```json
@@ -3697,7 +3697,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m" : { "$in" : [ 1, 2 ] } }, { "$expr" : { "$and" : [ { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] }, { "$in" : [ "$a", { "$const" : [ null ] } ] } ] } } ] }
+{  "$and" : [ { "m" : { "$in" : [ 1, 2 ] } }, { "$expr" : { "$and" : [ { "$or" : [ { "$in" : [ { "$const" : 1 }, "$m" ] }, { "$in" : [ { "$const" : 2 }, "$m" ] } ] }, { "$in" : [ "$a", { "$const" : [ null ] } ] } ] } } ] }
 ```
 Summarized explain
 ```json
@@ -3781,17 +3781,17 @@ Summarized explain
 
 ## 31. Find filter
 ```json
-{ "$expr" : { "$in" : [ 1, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ 1, "$m.a" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ { "a" : 1 } ] },
- { "m" : [ { "a" : 1, "b" : 1 } ] }]
+[{  "m" : [ { "a" : 1 } ] },
+ {  "m" : [ { "a" : 1, "b" : 1 } ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : 1 }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : 1 }, "$m.a" ] } }
 ```
 Summarized explain
 ```json
@@ -3827,12 +3827,12 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ { "a" : 1 } ] },
- { "m" : [ { "a" : 1, "b" : 1 } ] }]
+[{  "m" : [ { "a" : 1 } ] },
+ {  "m" : [ { "a" : 1, "b" : 1 } ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m.a" : { "$eq" : 1 } }, { "$expr" : { "$in" : [ { "$const" : 1 }, "$m.a" ] } } ] }
+{  "$and" : [ { "m.a" : { "$eq" : 1 } }, { "$expr" : { "$in" : [ { "$const" : 1 }, "$m.a" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -3890,16 +3890,16 @@ Summarized explain
 
 ## 32. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ 1 ], "$m.a" ] } }
+{  "$expr" : {  "$in" : [ [ 1 ], "$m.a" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ { "a" : [ 1 ] } ] }]
+[{  "m" : [ { "a" : [ 1 ] } ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ 1 ] }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ 1 ] }, "$m.a" ] } }
 ```
 Summarized explain
 ```json
@@ -3937,11 +3937,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ { "a" : [ 1 ] } ] }]
+[{  "m" : [ { "a" : [ 1 ] } ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m.a" : { "$eq" : [ 1 ] } }, { "$expr" : { "$in" : [ { "$const" : [ 1 ] }, "$m.a" ] } } ] }
+{  "$and" : [ { "m.a" : { "$eq" : [ 1 ] } }, { "$expr" : { "$in" : [ { "$const" : [ 1 ] }, "$m.a" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -4013,7 +4013,7 @@ Summarized explain
 
 ## 33. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ [ 1 ] ], "$m.a" ] } }
+{  "$expr" : {  "$in" : [ [ [ 1 ] ], "$m.a" ] } }
 ```
 ### Query knob off
 Find results
@@ -4022,7 +4022,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ [ 1 ] ] }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ [ 1 ] ] }, "$m.a" ] } }
 ```
 Summarized explain
 ```json
@@ -4066,7 +4066,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m.a" : { "$eq" : [ [ 1 ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ 1 ] ] }, "$m.a" ] } } ] }
+{  "$and" : [ { "m.a" : { "$eq" : [ [ 1 ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ 1 ] ] }, "$m.a" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -4142,16 +4142,16 @@ Summarized explain
 
 ## 34. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ ], "$m.a" ] } }
+{  "$expr" : {  "$in" : [ [ ], "$m.a" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ { "a" : [ ] } ] }]
+[{  "m" : [ { "a" : [ ] } ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ ] }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ ] }, "$m.a" ] } }
 ```
 Summarized explain
 ```json
@@ -4187,11 +4187,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ { "a" : [ ] } ] }]
+[{  "m" : [ { "a" : [ ] } ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m.a" : { "$eq" : [ ] } }, { "$expr" : { "$in" : [ { "$const" : [ ] }, "$m.a" ] } } ] }
+{  "$and" : [ { "m.a" : { "$eq" : [ ] } }, { "$expr" : { "$in" : [ { "$const" : [ ] }, "$m.a" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -4259,7 +4259,7 @@ Summarized explain
 
 ## 35. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ [ ] ], "$m.a" ] } }
+{  "$expr" : {  "$in" : [ [ [ ] ], "$m.a" ] } }
 ```
 ### Query knob off
 Find results
@@ -4268,7 +4268,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ [ ] ] }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ [ ] ] }, "$m.a" ] } }
 ```
 Summarized explain
 ```json
@@ -4310,7 +4310,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m.a" : { "$eq" : [ [ ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ ] ] }, "$m.a" ] } } ] }
+{  "$and" : [ { "m.a" : { "$eq" : [ [ ] ] } }, { "$expr" : { "$in" : [ { "$const" : [ [ ] ] }, "$m.a" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -4382,16 +4382,16 @@ Summarized explain
 
 ## 36. Find filter
 ```json
-{ "$expr" : { "$in" : [ { }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ {  }, "$m.a" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ { "a" : { } } ] }]
+[{  "m" : [ { "a" : {  } } ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : { } }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : {  } }, "$m.a" ] } }
 ```
 Summarized explain
 ```json
@@ -4429,11 +4429,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ { "a" : { } } ] }]
+[{  "m" : [ { "a" : {  } } ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m.a" : { "$eq" : { } } }, { "$expr" : { "$in" : [ { "$const" : { } }, "$m.a" ] } } ] }
+{  "$and" : [ { "m.a" : { "$eq" : {  } } }, { "$expr" : { "$in" : [ { "$const" : {  } }, "$m.a" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -4493,7 +4493,7 @@ Summarized explain
 
 ## 37. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ { } ], "$m.a" ] } }
+{  "$expr" : {  "$in" : [ [ {  } ], "$m.a" ] } }
 ```
 ### Query knob off
 Find results
@@ -4502,7 +4502,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ { } ] }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ {  } ] }, "$m.a" ] } }
 ```
 Summarized explain
 ```json
@@ -4546,7 +4546,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m.a" : { "$eq" : [ { } ] } }, { "$expr" : { "$in" : [ { "$const" : [ { } ] }, "$m.a" ] } } ] }
+{  "$and" : [ { "m.a" : { "$eq" : [ {  } ] } }, { "$expr" : { "$in" : [ { "$const" : [ {  } ] }, "$m.a" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -4622,16 +4622,16 @@ Summarized explain
 
 ## 38. Find filter
 ```json
-{ "$expr" : { "$in" : [ null, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ null, "$m.a" ] } }
 ```
 ### Query knob off
 Find results
 ```json
-[{ "m" : [ { "a" : null } ] }]
+[{  "m" : [ { "a" : null } ] }]
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : null }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : null }, "$m.a" ] } }
 ```
 Summarized explain
 ```json
@@ -4667,11 +4667,11 @@ Summarized explain
 ### Query knob on
 Find results
 ```json
-[{ "m" : [ { "a" : null } ] }]
+[{  "m" : [ { "a" : null } ] }]
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m.a" : { "$eq" : null } }, { "$expr" : { "$in" : [ { "$const" : null }, "$m.a" ] } } ] }
+{  "$and" : [ { "m.a" : { "$eq" : null } }, { "$expr" : { "$in" : [ { "$const" : null }, "$m.a" ] } } ] }
 ```
 Summarized explain
 ```json
@@ -4738,7 +4738,7 @@ Summarized explain
 
 ## 39. Find filter
 ```json
-{ "$expr" : { "$in" : [ [ null ], "$m.a" ] } }
+{  "$expr" : {  "$in" : [ [ null ], "$m.a" ] } }
 ```
 ### Query knob off
 Find results
@@ -4747,7 +4747,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$expr" : { "$in" : [ { "$const" : [ null ] }, "$m.a" ] } }
+{  "$expr" : {  "$in" : [ { "$const" : [ null ] }, "$m.a" ] } }
 ```
 Summarized explain
 ```json
@@ -4789,7 +4789,7 @@ Find results
 ```
 Parsed find query
 ```json
-{ "$and" : [ { "m.a" : { "$eq" : [ null ] } }, { "$expr" : { "$in" : [ { "$const" : [ null ] }, "$m.a" ] } } ] }
+{  "$and" : [ { "m.a" : { "$eq" : [ null ] } }, { "$expr" : { "$in" : [ { "$const" : [ null ] }, "$m.a" ] } } ] }
 ```
 Summarized explain
 ```json

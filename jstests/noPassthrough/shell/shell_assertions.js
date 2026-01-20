@@ -894,12 +894,12 @@ expected [ [Array] ] to equal [ [Array] ]
 \u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
 
  [
-   [
-     "a",
-\u001b[32m+    "b",\u001b[0m
-     "c"
-   ]
- ]
+  	[
+  		"a",
+\u001b[32m+ 		"b",\u001b[0m
+  		"c"
+ 		]
+ 	]
 `,
     );
 
@@ -912,12 +912,12 @@ expected [ [Object] ] to equal [ [Object] ]
 \u001b[32m+ expected\u001b[0m \u001b[31m- actual\u001b[0m
 
  [
-   {
-     "a" : 1,
-\u001b[32m+    "b" : 2,\u001b[0m
-     "c" : 3
-   }
- ]
+  	{
+  		"a" : 1,
+\u001b[32m+ 		"b" : 2,\u001b[0m
+  		"c" : 3
+ 		}
+ 	]
 `,
     );
 });

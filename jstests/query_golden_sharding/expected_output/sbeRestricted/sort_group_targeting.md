@@ -16,12 +16,12 @@
 ```
 ### Results
 ```json
-{ "_id" : "shard0_1" }
-{ "_id" : "shard0_2" }
-{ "_id" : "shard0_3" }
-{ "_id" : "shard1_1" }
-{ "_id" : "shard1_2" }
-{ "_id" : "shard1_3" }
+{  "_id" : "shard0_1" }
+{  "_id" : "shard0_2" }
+{  "_id" : "shard0_3" }
+{  "_id" : "shard1_1" }
+{  "_id" : "shard1_2" }
+{  "_id" : "shard1_3" }
 ```
 ### Summarized explain
 ```json
@@ -93,12 +93,12 @@
 ```
 ### Results
 ```json
-{ "_id" : "shard0_1" }
-{ "_id" : "shard0_2" }
-{ "_id" : "shard0_3" }
-{ "_id" : "shard1_1" }
-{ "_id" : "shard1_2" }
-{ "_id" : "shard1_3" }
+{  "_id" : "shard0_1" }
+{  "_id" : "shard0_2" }
+{  "_id" : "shard0_3" }
+{  "_id" : "shard1_1" }
+{  "_id" : "shard1_2" }
+{  "_id" : "shard1_3" }
 ```
 ### Summarized explain
 ```json
@@ -249,12 +249,12 @@
 ```
 ### Results
 ```json
-{ "_id" : "shard0_1", "first" : "a" }
-{ "_id" : "shard0_2", "first" : "b" }
-{ "_id" : "shard0_3", "first" : "c" }
-{ "_id" : "shard1_1", "first" : "a" }
-{ "_id" : "shard1_2", "first" : "b" }
-{ "_id" : "shard1_3", "first" : "c" }
+{  "_id" : "shard0_1",  "first" : "a" }
+{  "_id" : "shard0_2",  "first" : "b" }
+{  "_id" : "shard0_3",  "first" : "c" }
+{  "_id" : "shard1_1",  "first" : "a" }
+{  "_id" : "shard1_2",  "first" : "b" }
+{  "_id" : "shard1_3",  "first" : "c" }
 ```
 ### Summarized explain
 ```json
@@ -413,10 +413,10 @@
 ```
 ### Results
 ```json
-{ "_id" : "shard0_1", "last" : "a" }
-{ "_id" : "shard0_2", "last" : "b" }
-{ "_id" : "shard0_3", "last" : "c" }
-{ "_id" : "shard1_1", "last" : "a" }
+{  "_id" : "shard0_1",  "last" : "a" }
+{  "_id" : "shard0_2",  "last" : "b" }
+{  "_id" : "shard0_3",  "last" : "c" }
+{  "_id" : "shard1_1",  "last" : "a" }
 ```
 ### Summarized explain
 ```json
@@ -610,9 +610,9 @@
 ```
 ### Results
 ```json
-{ "_id" : "a" }
-{ "_id" : "b" }
-{ "_id" : "c" }
+{  "_id" : "a" }
+{  "_id" : "b" }
+{  "_id" : "c" }
 ```
 ### Summarized explain
 ```json
@@ -767,9 +767,9 @@
 ```
 ### Results
 ```json
-{ "_id" : "a" }
-{ "_id" : "b" }
-{ "_id" : "c" }
+{  "_id" : "a" }
+{  "_id" : "b" }
+{  "_id" : "c" }
 ```
 ### Summarized explain
 ```json

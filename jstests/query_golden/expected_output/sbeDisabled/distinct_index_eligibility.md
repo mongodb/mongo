@@ -21,7 +21,7 @@
 ```
 ### Results
 ```json
-{ "_id" : [ 1, 2, 3 ], "accum" : 5 }
+{  "_id" : [ 1, 2, 3 ],  "accum" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -111,7 +111,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 1, "accum" : 5 }
+{  "_id" : 1,  "accum" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -195,7 +195,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : [ 1, 2, 3 ], "accum" : 5 }
+{  "_id" : [ 1, 2, 3 ],  "accum" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -264,7 +264,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 1, "accum" : [ 1, 2, 3 ] }
+{  "_id" : 1,  "accum" : [ 1, 2, 3 ] }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -377,7 +377,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : null }
+{  "_id" : null }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -430,7 +430,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : null, "accum" : 5 }
+{  "_id" : null,  "accum" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -489,7 +489,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : null }
+{  "_id" : null }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -541,7 +541,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : null }
+{  "_id" : null }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -617,7 +617,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : null, "accum" : 5 }
+{  "_id" : null,  "accum" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -697,7 +697,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : null }
+{  "_id" : null }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -779,7 +779,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : null, "accum" : 5 }
+{  "_id" : null,  "accum" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -851,7 +851,7 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : null, "accum" : 5 }
+{  "_id" : null,  "accum" : 5 }
 ```
 ### Summarized explain
 Execution Engine: classic

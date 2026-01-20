@@ -163,14 +163,14 @@
 ```
 ### Query
 ```json
-{ "other_id" : 42 }
+{  "other_id" : 42 }
 ```
 ### Results
 ```json
-{ "B_data" : { "_id" : 2, "b" : 4, "indicator" : "Y" }, "C_data" : { "_id" : 2, "b" : 4, "code" : "bar", "other_id" : 42 }, "_id" : 1, "b" : 4, "m" : { "c" : 42 }, "my_id" : 100, "other_id" : 42 }
-{ "B_data" : { "_id" : 2, "b" : 4, "indicator" : "Y" }, "C_data" : { "_id" : 2, "b" : 4, "code" : "bar", "other_id" : 42 }, "_id" : 3, "b" : 4, "my_id" : 100, "other_id" : 42 }
-{ "B_data" : { "_id" : 2, "b" : 4, "indicator" : "Y" }, "C_data" : { "_id" : 3, "b" : 4, "other_id" : 42 }, "_id" : 1, "b" : 4, "m" : { "c" : 42 }, "my_id" : 100, "other_id" : 42 }
-{ "B_data" : { "_id" : 2, "b" : 4, "indicator" : "Y" }, "C_data" : { "_id" : 3, "b" : 4, "other_id" : 42 }, "_id" : 3, "b" : 4, "my_id" : 100, "other_id" : 42 }
+{  "B_data" : {  "_id" : 2,  "b" : 4,  "indicator" : "Y" },  "C_data" : {  "_id" : 2,  "b" : 4,  "code" : "bar",  "other_id" : 42 },  "_id" : 1,  "b" : 4,  "m" : {  "c" : 42 },  "my_id" : 100,  "other_id" : 42 }
+{  "B_data" : {  "_id" : 2,  "b" : 4,  "indicator" : "Y" },  "C_data" : {  "_id" : 2,  "b" : 4,  "code" : "bar",  "other_id" : 42 },  "_id" : 3,  "b" : 4,  "my_id" : 100,  "other_id" : 42 }
+{  "B_data" : {  "_id" : 2,  "b" : 4,  "indicator" : "Y" },  "C_data" : {  "_id" : 3,  "b" : 4,  "other_id" : 42 },  "_id" : 1,  "b" : 4,  "m" : {  "c" : 42 },  "my_id" : 100,  "other_id" : 42 }
+{  "B_data" : {  "_id" : 2,  "b" : 4,  "indicator" : "Y" },  "C_data" : {  "_id" : 3,  "b" : 4,  "other_id" : 42 },  "_id" : 3,  "b" : 4,  "my_id" : 100,  "other_id" : 42 }
 ```
 ### Explain
 ```json
@@ -238,12 +238,12 @@
 
 ### Query
 ```json
-{ "other_id.zip" : 42 }
+{  "other_id.zip" : 42 }
 ```
 ### Results
 ```json
-{ "B_data" : { "_id" : 2, "b" : 4, "indicator" : "Y" }, "C_data" : { "_id" : 6, "b" : 4, "code" : "bar", "other_id" : { "zap" : 20, "zip" : 42 } }, "_id" : 1, "b" : 4, "m" : { "c" : 42 }, "my_id" : 100, "other_id" : { "zap" : 20, "zip" : 42 } }
-{ "B_data" : { "_id" : 2, "b" : 4, "indicator" : "Y" }, "C_data" : { "_id" : 6, "b" : 4, "code" : "bar", "other_id" : { "zap" : 20, "zip" : 42 } }, "_id" : 3, "b" : 4, "my_id" : 100, "other_id" : { "zap" : 20, "zip" : 42 } }
+{  "B_data" : {  "_id" : 2,  "b" : 4,  "indicator" : "Y" },  "C_data" : {  "_id" : 6,  "b" : 4,  "code" : "bar",  "other_id" : {  "zap" : 20,  "zip" : 42 } },  "_id" : 1,  "b" : 4,  "m" : {  "c" : 42 },  "my_id" : 100,  "other_id" : {  "zap" : 20,  "zip" : 42 } }
+{  "B_data" : {  "_id" : 2,  "b" : 4,  "indicator" : "Y" },  "C_data" : {  "_id" : 6,  "b" : 4,  "code" : "bar",  "other_id" : {  "zap" : 20,  "zip" : 42 } },  "_id" : 3,  "b" : 4,  "my_id" : 100,  "other_id" : {  "zap" : 20,  "zip" : 42 } }
 ```
 ### Explain
 ```json
@@ -353,12 +353,12 @@
 ```
 ### Query
 ```json
-{ "zip" : 42 }
+{  "zip" : 42 }
 ```
 ### Results
 ```json
-{ "B_data" : { "_id" : 2, "b" : 4, "indicator" : "Y" }, "C_data" : { "_id" : 6, "b" : 4, "code" : "bar", "other_id" : { "zap" : 20, "zip" : 42 } }, "_id" : 1, "b" : 4, "m" : { "c" : 42 }, "my_id" : 100, "zip" : 42 }
-{ "B_data" : { "_id" : 2, "b" : 4, "indicator" : "Y" }, "C_data" : { "_id" : 6, "b" : 4, "code" : "bar", "other_id" : { "zap" : 20, "zip" : 42 } }, "_id" : 3, "b" : 4, "my_id" : 100, "zip" : 42 }
+{  "B_data" : {  "_id" : 2,  "b" : 4,  "indicator" : "Y" },  "C_data" : {  "_id" : 6,  "b" : 4,  "code" : "bar",  "other_id" : {  "zap" : 20,  "zip" : 42 } },  "_id" : 1,  "b" : 4,  "m" : {  "c" : 42 },  "my_id" : 100,  "zip" : 42 }
+{  "B_data" : {  "_id" : 2,  "b" : 4,  "indicator" : "Y" },  "C_data" : {  "_id" : 6,  "b" : 4,  "code" : "bar",  "other_id" : {  "zap" : 20,  "zip" : 42 } },  "_id" : 3,  "b" : 4,  "my_id" : 100,  "zip" : 42 }
 ```
 ### Explain
 ```json
@@ -465,14 +465,14 @@
 ```
 ### Query
 ```json
-{ "other_id" : 42 }
+{  "other_id" : 42 }
 ```
 ### Results
 ```json
-{ "_id" : 1, "other_id" : 42 }
-{ "_id" : 1, "other_id" : 42 }
-{ "_id" : 3, "other_id" : 42 }
-{ "_id" : 3, "other_id" : 42 }
+{  "_id" : 1,  "other_id" : 42 }
+{  "_id" : 1,  "other_id" : 42 }
+{  "_id" : 3,  "other_id" : 42 }
+{  "_id" : 3,  "other_id" : 42 }
 ```
 ### Explain
 ```json
@@ -542,12 +542,12 @@
 
 ### Query
 ```json
-{ "other_id.zip" : 42 }
+{  "other_id.zip" : 42 }
 ```
 ### Results
 ```json
-{ "_id" : 1, "other_id" : { "zap" : 20, "zip" : 42 } }
-{ "_id" : 3, "other_id" : { "zap" : 20, "zip" : 42 } }
+{  "_id" : 1,  "other_id" : {  "zap" : 20,  "zip" : 42 } }
+{  "_id" : 3,  "other_id" : {  "zap" : 20,  "zip" : 42 } }
 ```
 ### Explain
 ```json
@@ -661,12 +661,12 @@
 ```
 ### Query
 ```json
-{ "zip" : 42 }
+{  "zip" : 42 }
 ```
 ### Results
 ```json
-{ "_id" : 1, "zip" : 42 }
-{ "_id" : 3, "zip" : 42 }
+{  "_id" : 1,  "zip" : 42 }
+{  "_id" : 3,  "zip" : 42 }
 ```
 ### Explain
 ```json
@@ -775,7 +775,7 @@
 ```
 ### Query
 ```json
-{ "indicator.Z" : "Y" }
+{  "indicator.Z" : "Y" }
 ```
 ### Results
 ```json

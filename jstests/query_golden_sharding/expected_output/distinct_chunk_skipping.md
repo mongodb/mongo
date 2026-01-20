@@ -21,9 +21,9 @@
 ```
 ### Results
 ```json
-{ "_id" : "shard0_1" }
-{ "_id" : "shard0_2" }
-{ "_id" : "shard1_2" }
+{  "_id" : "shard0_1" }
+{  "_id" : "shard0_2" }
+{  "_id" : "shard1_2" }
 ```
 ### Summarized explain
 ```json
@@ -147,9 +147,9 @@
 ```
 ### Results
 ```json
-{ "_id" : "shard0_1" }
-{ "_id" : "shard0_2" }
-{ "_id" : "shard1_2" }
+{  "_id" : "shard0_1" }
+{  "_id" : "shard0_2" }
+{  "_id" : "shard1_2" }
 ```
 ### Summarized explain
 ```json
@@ -393,11 +393,11 @@
 ```
 ### Results
 ```json
-{ "_id" : "shard0_1" }
-{ "_id" : "shard0_2" }
-{ "_id" : "shard0_3" }
-{ "_id" : "shard1_1" }
-{ "_id" : "shard1_2" }
+{  "_id" : "shard0_1" }
+{  "_id" : "shard0_2" }
+{  "_id" : "shard0_3" }
+{  "_id" : "shard1_1" }
+{  "_id" : "shard1_2" }
 ```
 ### Summarized explain
 ```json
@@ -641,9 +641,9 @@
 ```
 ### Results
 ```json
-{ "_id" : "shard0_1" }
-{ "_id" : "shard0_2" }
-{ "_id" : "shard1_2" }
+{  "_id" : "shard0_1" }
+{  "_id" : "shard0_2" }
+{  "_id" : "shard1_2" }
 ```
 ### Summarized explain
 ```json

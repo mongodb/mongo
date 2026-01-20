@@ -21,8 +21,8 @@
 ```
 ### Results
 ```json
-{ "_id" : 1, "accum" : 1 }
-{ "_id" : 2, "accum" : 3 }
+{  "_id" : 1,  "accum" : 1 }
+{  "_id" : 2,  "accum" : 3 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -106,8 +106,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 1, "accum" : 1 }
-{ "_id" : 2, "accum" : 3 }
+{  "_id" : 1,  "accum" : 1 }
+{  "_id" : 2,  "accum" : 3 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -191,8 +191,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 1, "accum" : 1 }
-{ "_id" : 2, "accum" : 3 }
+{  "_id" : 1,  "accum" : 1 }
+{  "_id" : 2,  "accum" : 3 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -268,9 +268,9 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 5, "accum" : 4 }
-{ "_id" : 6, "accum" : 7 }
-{ "_id" : 7, "accum" : 3 }
+{  "_id" : 5,  "accum" : 4 }
+{  "_id" : 6,  "accum" : 7 }
+{  "_id" : 7,  "accum" : 3 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -345,8 +345,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 1 }
-{ "_id" : 2 }
+{  "_id" : 1 }
+{  "_id" : 2 }
 ```
 ### Summarized explain
 Execution Engine: classic
@@ -408,8 +408,8 @@ Execution Engine: classic
 ```
 ### Results
 ```json
-{ "_id" : 1 }
-{ "_id" : 2 }
+{  "_id" : 1 }
+{  "_id" : 2 }
 ```
 ### Summarized explain
 Execution Engine: classic

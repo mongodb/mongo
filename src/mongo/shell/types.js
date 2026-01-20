@@ -179,28 +179,30 @@ Array.tojson = function (a, indent, nolint, depth = 0, sortKeys) {
 
     if (globalThis.TestData?.logFormat === "json" && typeof nolint !== "boolean") {
         nolint = true;
-    }
-
-    indent ||= "";
-    if (nolint) {
         indent = "";
     }
-    if (!nolint && indent === "") {
-        indent = "\t";
-    }
-    const leadingPad = indent.repeat(depth);
 
-    let elements = [];
-    for (let i = 0; i < a.length; i++) {
-        elements.push(leadingPad + indent + tojson(a[i], indent, nolint, depth + 1, sortKeys));
+    if (nolint) {
+        indent = "";
+    } else {
+        // add to indent if we are pretty
+        indent += "\t";
     }
 
-    const elementSeparator = nolint ? " " : "\n";
-
+    let elementSeparator = nolint ? " " : "\n";
     let s = "[" + elementSeparator;
-    s += elements.join("," + elementSeparator);
-    s += elementSeparator + leadingPad + "]";
 
+    for (let i = 0; i < a.length; i++) {
+        s += indent + tojson(a[i], indent, nolint, depth + 1, sortKeys);
+        if (i < a.length - 1) {
+            s += "," + elementSeparator;
+        }
+    }
+
+    // remove from indent if we are pretty
+    if (!nolint) indent = indent.substring(1);
+
+    s += elementSeparator + indent + "]";
     return s;
 };
 
@@ -643,6 +645,8 @@ tojsonObject = function (x, indent, nolint, depth = 0, sortKeys = false) {
         nolint = true;
         indent = "";
     }
+    let lineEnding = nolint ? " " : "\n";
+    let tabSpace = nolint ? "" : "\t";
     assert.eq(typeof x, "object", "tojsonObject needs object, not [" + typeof x + "]");
 
     if (typeof x.tojson == "function" && x.tojson != tojson) {
@@ -668,14 +672,10 @@ tojsonObject = function (x, indent, nolint, depth = 0, sortKeys = false) {
         return "[Object]";
     }
 
-    indent ||= "";
-    if (nolint) {
-        indent = "";
-    }
-    if (!nolint && indent === "") {
-        indent = "\t";
-    }
-    const leadingPad = indent.repeat(depth);
+    let s = "{" + lineEnding;
+
+    // push one level of indent
+    indent += tabSpace;
 
     let keys = x;
     if (typeof x._simpleKeys == "function") keys = x._simpleKeys();
@@ -686,32 +686,26 @@ tojsonObject = function (x, indent, nolint, depth = 0, sortKeys = false) {
     if (sortKeys) keyNames.sort();
 
     let fieldStrings = [];
-    for (const key of keyNames) {
-        let val = x[key];
+    for (const k of keyNames) {
+        let val = x[k];
 
         // skip internal DB types to avoid issues with interceptors
         if (val == globalThis.DB?.prototype) continue;
         if (val == globalThis.DBCollection?.prototype) continue;
 
-        fieldStrings.push(`${leadingPad}${indent}"${key}" : ` + tojson(val, indent, nolint, depth + 1, sortKeys));
+        fieldStrings.push(indent + '"' + k + '" : ' + tojson(val, indent, nolint, depth + 1, sortKeys));
     }
 
-    if (fieldStrings.length === 0) {
-        if (!nolint) {
-            // The following is a hack to match old behavior to avoid lots of multi-line whitespace churn in golden tests
-            // Remove with SERVER-117304
-            return "{" + "\n" + indent + "\t".repeat(depth) + "\n" + leadingPad + "}";
-        }
-        return "{ }";
+    if (fieldStrings.length > 0) {
+        s += fieldStrings.join("," + lineEnding);
+    } else {
+        s += indent;
     }
+    s += lineEnding;
 
-    const elementSeparator = nolint ? " " : "\n";
-
-    let s = "{" + elementSeparator;
-    s += fieldStrings.join("," + elementSeparator);
-    s += elementSeparator + leadingPad + "}";
-
-    return s;
+    // pop one level of indent
+    indent = indent.substring(1);
+    return s + indent + "}";
 };
 
 /**
