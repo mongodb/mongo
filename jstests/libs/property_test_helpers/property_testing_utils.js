@@ -83,7 +83,7 @@ const okIndexCreationErrorCodes = [
  * TODO SERVER-98132 redesign getQuery to be more opaque about how many query shapes and constants
  * there are.
  */
-function runProperty(propertyFn, namespaces, workload) {
+function runProperty(propertyFn, namespaces, workload, sortArrays) {
     let {collSpec, queries, extraParams} = workload;
     const {controlColl, experimentColl} = namespaces;
 
@@ -106,7 +106,7 @@ function runProperty(propertyFn, namespaces, workload) {
     });
 
     const testHelpers = {
-        comp: _resultSetsEqualUnordered,
+        comp: sortArrays === true ? _resultSetsEqualUnorderedWithUnorderedArrays : _resultSetsEqualUnordered,
         numQueryShapes: queries.length,
         leafParametersPerFamily,
     };
@@ -145,7 +145,7 @@ function reporter(propertyFn, namespaces) {
  * failure, `runProperty` is called again in the reporter, and prints out more details about the
  * failed property.
  */
-export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples) {
+export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples, sortArrays) {
     assert.eq(typeof propertyFn, "function");
     assert(Object.keys(namespaces).every((collName) => collName === "controlColl" || collName === "experimentColl"));
     assert.eq(typeof numRuns, "number");
@@ -165,7 +165,7 @@ export function testProperty(propertyFn, namespaces, workloadModel, numRuns, exa
         fc.property(workloadModel, (workload) => {
             // Only return if the property passed or not. On failure,
             // `runProperty` is called again and more details are exposed.
-            const result = runProperty(propertyFn, namespaces, workload);
+            const result = runProperty(propertyFn, namespaces, workload, sortArrays);
             // If it failed for the first time, print that out so we have the first failure available
             // in case shrinking fails.
             if (!result.passed && alwaysPassed) {
