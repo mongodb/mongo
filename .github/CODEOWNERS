@@ -3133,9 +3133,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/s/change_streams/OWNERS.yml
 /src/mongo/s/change_streams/**/* @10gen/query-execution-change-streams @10gen/server-catalog-and-routing @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/s/client/OWNERS.yml
-/src/mongo/s/client/**/* @10gen/server-catalog-and-routing @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/s/commands/OWNERS.yml
 /src/mongo/s/commands/**/cluster_build_info.cpp @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/s/commands/**/cluster_hello_cmd.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot

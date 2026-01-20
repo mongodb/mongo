@@ -1933,7 +1933,7 @@ mongo_cc_library(
         ":rs_local_client",
         ":server_base",
         "//src/mongo/db/global_catalog:sharding_catalog_client",
-        "//src/mongo/s/client:shard_interface",
+        "//src/mongo/db/sharding_environment/client:shard_interface",
     ],
 )
 

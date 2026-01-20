@@ -104,10 +104,10 @@ mongo_cc_library(
         ":grid",
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/sharding_environment:mongos_server_parameters",
+        "//src/mongo/db/sharding_environment/client:shard_interface",
+        "//src/mongo/db/sharding_environment/client:sharding_client",
         "//src/mongo/executor:scoped_task_executor",
         "//src/mongo/executor:task_executor_interface",
-        "//src/mongo/s/client:shard_interface",
-        "//src/mongo/s/client:sharding_client",
     ],
 )
 
@@ -157,10 +157,10 @@ mongo_cc_library(
         "//src/mongo/db/exec:scoped_timer",
         "//src/mongo/db/repl:replica_set_messages",
         "//src/mongo/db/shard_role/lock_manager",
+        "//src/mongo/db/sharding_environment/client:shard_interface",
         "//src/mongo/db/topology/vector_clock:logical_time_metadata_hook",
         "//src/mongo/db/update:update_common",
         "//src/mongo/executor:task_executor_pool",
-        "//src/mongo/s/client:shard_interface",
         "//src/mongo/s/query/exec:cluster_cursor_manager",
         "//src/mongo/util:caching",
         "//src/mongo/util/concurrency:spin_lock",
@@ -392,8 +392,8 @@ mongo_cc_library(
         ":sharding_router_api",
         "//src/mongo/db:operation_time_tracker",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/sharding_environment/client:sharding_client",
         "//src/mongo/executor:thread_pool_task_executor",
-        "//src/mongo/s/client:sharding_client",
     ],
 )
 
@@ -622,7 +622,7 @@ mongo_cc_library(
         "//src/mongo/util:allocator_thread",
         "//src/mongo/util:periodic_runner_factory",
         "//src/mongo/util:signal_handlers",
-        "//src/mongo/s/client:sharding_client",
+        "//src/mongo/db/sharding_environment/client:sharding_client",
         "//src/mongo/s/change_streams",
         "//src/mongo/s/commands:cluster_commands",
         "//src/mongo/s/commands:cluster_commands_common",

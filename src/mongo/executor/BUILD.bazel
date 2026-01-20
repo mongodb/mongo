@@ -353,8 +353,8 @@ mongo_cc_library(
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:kill_common",
+        "//src/mongo/db/sharding_environment/client:shard_interface",
         "//src/mongo/rpc:command_status",
-        "//src/mongo/s/client:shard_interface",
     ],
 )
 

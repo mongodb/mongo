@@ -35,10 +35,10 @@ mongo_cc_library(
         "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/query:query_common",
         "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/sharding_environment/client:sharding_client",
         "//src/mongo/executor:async_multicaster",
         "//src/mongo/executor:task_executor_interface",
         "//src/mongo/s:sharding_router_api",
-        "//src/mongo/s/client:sharding_client",
     ],
 )
 

@@ -13,3 +13,34 @@ idl_generator(
     name = "shard_gen",
     src = "shard.idl",
 )
+
+mongo_cc_library(
+    name = "shard_interface",
+    srcs = [
+        "shard.cpp",
+        "shard_gen",
+    ],
+    deps = [
+        "//src/mongo/client:remote_command_retry_scheduler",
+        "//src/mongo/client:retry_strategy",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/sharding_environment:shard_shared_state_cache",
+        "//src/mongo/s/write_ops:batch_write_types",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharding_client",
+    srcs = [
+        "num_hosts_targeted_metrics.cpp",
+        "shard_remote.cpp",
+    ],
+    deps = [
+        ":shard_interface",
+        "//src/mongo/client:fetcher",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/executor:task_executor_pool",
+        "//src/mongo/s:grid",
+    ],
+)

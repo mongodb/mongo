@@ -144,11 +144,11 @@ mongo_cc_library(
         "//src/mongo/db/query/compiler/logical_model/projection:projection_ast",
         "//src/mongo/db/repl:read_concern_args",
         "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/sharding_environment/client:sharding_client",
         "//src/mongo/db/storage:duplicate_key_error_info",
         "//src/mongo/executor:network_interface",
         "//src/mongo/s:common_s",
         "//src/mongo/s:grid",
-        "//src/mongo/s/client:sharding_client",
         "//src/mongo/util:pcre_wrapper",
     ],
 )
@@ -160,7 +160,7 @@ mongo_cc_library(
     ],
     deps = [
         ":sharding_catalog_client",
-        "//src/mongo/s/client:shard_interface",
+        "//src/mongo/db/sharding_environment/client:shard_interface",
     ],
 )
 
