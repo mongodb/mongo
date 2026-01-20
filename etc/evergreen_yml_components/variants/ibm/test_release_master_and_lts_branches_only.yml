@@ -33,6 +33,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: ppc64le-enterprise-rhel81
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       repo_edition: enterprise
       multiversion_platform: rhel81
       multiversion_architecture: ppc64le
@@ -105,6 +107,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: ppc64le-enterprise-rhel9
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       repo_edition: enterprise
       multiversion_platform: rhel9
       multiversion_architecture: ppc64le
@@ -178,6 +182,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: s390x-enterprise-rhel83
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       repo_edition: enterprise
       multiversion_platform: rhel83
       multiversion_architecture: s390x
@@ -247,6 +253,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: s390x-enterprise-rhel9
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       repo_edition: enterprise
       multiversion_platform: rhel9
       multiversion_architecture: s390x

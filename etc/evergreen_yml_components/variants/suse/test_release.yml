@@ -21,6 +21,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-suse15
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=suse15
         --build_otel=False
@@ -67,6 +69,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-suse15
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=suse15
         --build_otel=False

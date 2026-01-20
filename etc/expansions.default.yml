@@ -29,6 +29,8 @@ cmake_path: /opt/cmake/bin/cmake
 content_type: application/x-gzip
 mciuploads_binary_permissions: public-read
 mciuploads_binary_visibility: public
+mciuploads_binary_permissions_push: private
+mciuploads_binary_visibility_push: signed
 jstestfuzz_concurrent_num_files: "10"
 curator_release: "latest"
 ext: tgz

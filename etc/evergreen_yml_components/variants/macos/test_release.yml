@@ -21,6 +21,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: macos
       push_arch: arm64
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: --build_enterprise=False
       resmoke_jobs_max: 6
       compile_variant: macos-arm64
@@ -47,6 +49,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: macos
       push_arch: arm64-enterprise
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       resmoke_jobs_max: 6
       compile_variant: enterprise-macos-arm64
     tasks:
@@ -71,6 +75,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: macos
       push_arch: x86_64
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: --build_enterprise=False
       resmoke_jobs_max: 6
       compile_variant: macos
@@ -97,6 +103,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: macos
       push_arch: x86_64-enterprise
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       resmoke_jobs_max: 6
       compile_variant: enterprise-macos
     tasks:

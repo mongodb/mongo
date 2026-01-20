@@ -20,6 +20,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: windows
       push_arch: x86_64
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       multiversion_platform: windows
       multiversion_edition: base
       content_type: application/zip
@@ -87,6 +89,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: windows
       push_arch: x86_64-enterprise
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source
       exec_timeout_secs: 14400 # 3 hour timeout
       external_auth_jobs_max: 1

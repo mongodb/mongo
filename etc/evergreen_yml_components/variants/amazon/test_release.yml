@@ -20,6 +20,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-amazon2
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
         --build_enterprise=False
@@ -71,6 +73,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-amazon2
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
       compile_all_but_not_unittests_flags: >-
@@ -119,6 +123,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-amazon2
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
         --build_enterprise=False
@@ -170,6 +176,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-amazon2
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
       compile_all_but_not_unittests_flags: >-
@@ -216,6 +224,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-amazon2023
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --build_enterprise=False
@@ -264,6 +274,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-amazon2023
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
       compile_all_but_not_unittests_flags: >-
@@ -353,6 +365,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-amazon2023
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --build_enterprise=False
@@ -397,6 +411,8 @@ buildvariants:
     expansions: &enterprise-amazon2023-arm64-dynamic-expansions
       mciuploads_binary_permissions: private
       mciuploads_binary_visibility: signed
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug
       push_path: linux
       push_bucket: downloads.10gen.com
@@ -499,6 +515,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-amazon2023-streams
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --streams_release_build=True
@@ -549,6 +567,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-amazon2023-streams
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --streams_release_build=True

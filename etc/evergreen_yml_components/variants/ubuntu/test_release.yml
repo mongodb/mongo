@@ -19,6 +19,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-ubuntu2204
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2204
         --build_enterprise=False
@@ -79,6 +81,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-ubuntu2404
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2404
         --build_enterprise=False
@@ -138,6 +142,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-ubuntu2004
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2004
         --build_enterprise=False
@@ -192,6 +198,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-ubuntu2004
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2004
       compile_all_but_not_unittests_flags: >-
@@ -256,6 +264,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-ubuntu2204
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2204
       compile_all_but_not_unittests_flags: >-
@@ -349,6 +359,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-ubuntu2004
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2004
       compile_all_but_not_unittests_flags: >-
@@ -397,6 +409,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-ubuntu2004
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2004
         --build_enterprise=False
@@ -449,6 +463,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-ubuntu2204
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: --define=MONGO_DISTMOD=ubuntu2204
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
@@ -496,6 +512,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-ubuntu2204
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2204
         --build_enterprise=False
@@ -551,6 +569,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-ubuntu2404
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2404
       compile_all_but_not_unittests_flags: >-
@@ -600,6 +620,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-ubuntu2404
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=ubuntu2404
         --build_enterprise=False
@@ -652,6 +674,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-ubuntu2404
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: --define=MONGO_DISTMOD=ubuntu2404
       test_flags: --excludeWithAnyTags=requires_external_data_source,requires_updated_oscrypto
       resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers

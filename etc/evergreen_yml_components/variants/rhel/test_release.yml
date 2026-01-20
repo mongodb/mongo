@@ -46,6 +46,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-rhel8
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
         --build_enterprise=False
@@ -97,6 +99,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-rhel8
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
       compile_all_but_not_unittests_flags: >-
@@ -151,6 +155,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-rhel8
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
         --build_enterprise=False
@@ -202,6 +208,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-rhel8
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
       compile_all_but_not_unittests_flags: >-
@@ -246,6 +254,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: x86_64-rhel93
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel93
         --build_enterprise=False
@@ -297,6 +307,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: x86_64-enterprise-rhel93
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: --define=MONGO_DISTMOD=rhel93
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
@@ -344,6 +356,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-community
       push_name: linux
       push_arch: aarch64-rhel93
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel93
         --build_enterprise=False
@@ -394,6 +408,8 @@ buildvariants:
       push_role_arn: arn:aws:iam::119629040606:role/s3-access.cdn-origin-mongodb-server-enterprise
       push_name: linux
       push_arch: aarch64-enterprise-rhel93
+      mciuploads_binary_permissions_push: public-read
+      mciuploads_binary_visibility_push: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel93
       compile_all_but_not_unittests_flags: >-
