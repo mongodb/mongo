@@ -904,7 +904,11 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 }
 
 /**
- * Runs startup recovery after system startup, will restart index builds if in replSet mode
+ * Runs startup recovery after system startup.
+ * If we are in replSet mode, index builds will be restarted.
+ * If we deferred storage engine initialization because we had to load a WT checkpoint, we
+ * will also need this function to complete server startup. The PersistenceProvider can
+ * be used to detect this scenario.
  * In no case will it create an FCV document nor run repair or read-only recovery.
  */
 void runStartupRecovery(OperationContext* opCtx,
@@ -917,7 +921,8 @@ void runStartupRecovery(OperationContext* opCtx,
     invariant(!storageGlobalParams.repair);
     const bool usingReplication =
         repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
-    invariant(usingReplication);
+    auto& provider = rss::ReplicatedStorageService::get(opCtx).getPersistenceProvider();
+    invariant(usingReplication || provider.shouldDelayDataAccessDuringStartup());
     startupRecovery(opCtx, storageEngine, lastShutdownState, nullptr, afterDataReady);
 }
 
