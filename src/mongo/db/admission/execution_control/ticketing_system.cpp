@@ -694,16 +694,20 @@ void TicketingSystem::startThroughputProbe() {
 }
 
 TicketHolder* TicketingSystem::_getHolder(AdmissionContext::Priority p, OperationType o) const {
-    if (p == AdmissionContext::Priority::kExempt) {
-        // Redirect kExempt priority to the normal ticket pool as it bypasses acquisition.
-        return _getHolder(AdmissionContext::Priority::kNormal, o);
+    switch (p) {
+        case AdmissionContext::Priority::kExempt:
+            // Redirect kExempt priority to the normal ticket pool as it bypasses acquisition.
+            return _getHolder(AdmissionContext::Priority::kNormal, o);
+        case AdmissionContext::Priority::kNormal:
+        case AdmissionContext::Priority::kLow: {
+            const auto index = static_cast<size_t>(p);
+            const auto& rwHolder = _holders[index];
+            return (o == OperationType::kRead) ? rwHolder.read.get() : rwHolder.write.get();
+        }
+        case AdmissionContext::Priority::kPrioritiesCount:
+            MONGO_UNREACHABLE_TASSERT(11697500);
     }
-
-    const auto index = static_cast<size_t>(p);
-    invariant(index < _holders.size());
-
-    const auto& rwHolder = _holders[index];
-    return (o == OperationType::kRead) ? rwHolder.read.get() : rwHolder.write.get();
+    MONGO_UNREACHABLE;
 }
 
 bool TicketingSystem::TicketingState::usesPrioritization() const {
