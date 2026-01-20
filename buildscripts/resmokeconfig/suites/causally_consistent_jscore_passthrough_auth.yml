@@ -176,6 +176,11 @@ executor:
         <<: *authOptions
   fixture:
     class: ShardedClusterFixture
+    # This suite is equivalent to causally_consistent_jscore_passthrough but it authenticates a new user.
+    # On multiple mongoses, a newly created user may not be present on all nodes' in-memory cache right away.
+    # To avoid authentication failures due to this, and considering that we already have equivalent coverage for
+    # implicit causal consistency with multiple mongos, we only launch one mongos in this suite.
+    num_mongos: 1
     mongos_options:
       keyFile: *keyFile
       set_parameters:
