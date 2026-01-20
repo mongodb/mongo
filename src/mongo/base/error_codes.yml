@@ -1146,5 +1146,8 @@ error_codes:
       categories: [StreamProcessorUserError, StreamProcessorRetryableError],
     }
 
+  # Planner errors
+  - {code: 482, name: MaxNumberOfOrPlansExceeded}
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

@@ -8044,11 +8044,11 @@
     "rows" :  15283},
 
 {">>>pipeline": [{"$match":{"$or":[{"field43_str":{"$type":"string"},"field29_Timestamp_idx":{"$lte":{"$timestamp":{"t":1743534449,"i":0}}},"field39_Decimal128":{"$lt":{"$numberDecimal":"37.1"}},"field4_list_idx":{"$eq":"d"}},{"$or":[{"$or":[{"field8_int_idx":{"$gte":175},"field35_int_idx":{"$type":"int"},"field47_Timestamp":{"$ne":{"$timestamp":{"t":1743091829,"i":0}}}},{"field45_bool":{"$eq":false},"field13_list_idx":{"$all":[16,42,54,20,69,3,32,37]},"field7_str_idx":{"$type":"string"},"field31_list_idx":75,"field17_int_idx":{"$lt":606}}]},{"field17_int_idx":{"$lte":299},"field9_bool_idx":{"$gte":false}},{"field47_Timestamp":{"$eq":{"$timestamp":{"t":1756917908,"i":0}}},"field3_Decimal128_idx":{"$lt":{"$numberDecimal":"3.3"}}},{"field13_list_idx":{"$ne":8},"field36_bool":{"$gte":false}}]},{"$and":[{"field9_bool_idx":{"$gte":false},"field22_list_idx":{"$size":1},"field44_int":{"$gte":53}},{"field31_list_idx":{"$lte":80},"field21_Decimal128_idx":{"$gt":{"$numberDecimal":"46.1"}},"field26_int_idx":{"$lte":36},"field29_Timestamp_idx":{"$eq":{"$timestamp":{"t":1747742273,"i":0}}}},{"$and":[{"field0_bool_idx":{"$eq":false},"field10_datetime_idx":{"$gt":"2024-02-15T00:00:00.000Z"},"field41_dict":{"$type":"objectId"}},{"field23_dict_idx":{"$gt":{"c":6}},"field8_int_idx":{"$lt":404}}]},{"field44_int":{"$eq":99},"field0_bool_idx":{"$gte":false},"field31_list_idx":{"$gt":18},"field6_mixed_idx":{"$all":[32326,5576,77256,67120,75037,20336,10386,85477]}}]}]}},{"$sort":{"field7_str_idx":1}}],
-    "winningPlan": {"stage":"SUBPLAN","inputStage":{"stage":"SORT","inputStage":{"stage":"OR","inputStages":[{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field3_Decimal128_idx_1_field18_bool_idx_-1","indexBounds":{"field3_Decimal128_idx":["[-inf, 3.3)"],"field18_bool_idx":["[MaxKey, MinKey]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field4_list_idx_-1_field9_bool_idx_1","indexBounds":{"field4_list_idx":["[\"d\", \"d\"]"],"field9_bool_idx":["[MinKey, MaxKey]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field6_mixed_idx_1","indexBounds":{"field6_mixed_idx":["[32326.0, 32326.0]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field8_int_idx_1_field9_bool_idx_1","indexBounds":{"field8_int_idx":["[175.0, inf]"],"field9_bool_idx":["[MinKey, MaxKey]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field13_list_idx_1_field28_datetime_idx_-1","indexBounds":{"field13_list_idx":["[MinKey, 8.0)","(8.0, MaxKey]"],"field28_datetime_idx":["[MaxKey, MinKey]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field17_int_idx_-1","indexBounds":{"field17_int_idx":["[299.0, -inf]"]}}},{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field31_list_idx_-1_field7_str_idx_-1","indexBounds":{"field31_list_idx":["[75.0, 75.0]"],"field7_str_idx":["({}, \"\"]"]}}}]}}},
-    "keys" : 166836,
-    "docs" : 151926,
-    "sorts": 550185,
-    "plans":      1,
+    "winningPlan": {"stage":"SUBPLAN","inputStage":{"stage":"FETCH","filter":true,"inputStage":{"stage":"IXSCAN","indexName":"field7_str_idx_1_field20_Timestamp_idx_-1_field6_mixed_idx_-1","indexBounds":{"field7_str_idx":["[MinKey, MaxKey]"],"field20_Timestamp_idx":["[MaxKey, MinKey]"],"field6_mixed_idx":["[MaxKey, MinKey]"]}}}},
+    "keys" : 101541,
+    "docs" : 100000,
+    "sorts":      0,
+    "plans":     11,
     "rows" :  46809},
 
 {">>>pipeline": [{"$match":{"$or":[{"field13_list_idx":{"$lte":58},"field40_list":{"$eq":"h"}},{"field27_bool_idx":{"$lt":false},"field14_dict_idx":{"$lt":{"b":4}}}]}},{"$sort":{"field15_mixed_idx":1}},{"$project":{"field46_datetime":1,"_id":0}}],
@@ -8268,7 +8268,7 @@
     "rows" :  96224}
 
 ],
-">>>totals": {"pipelines": 1032, "plans": 7948, "keys": 31399660, "docs": 30897266, "sorts": 13272680, "rows": 10011323, "errors":      0},
+">>>totals": {"pipelines": 1032, "plans": 7958, "keys": 31334365, "docs": 30845340, "sorts": 12722495, "rows": 10011323, "errors":      0},
 ">>>parameters": {"planRankerMode":"automaticCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"chunk","internalQuerySamplingBySequentialScan":true}}
 
 
