@@ -3,7 +3,7 @@
  * on a sharded cluster. Mongos will add a let expression with the system variable to the command
  * for the shards. This let expression shouldn't be included in query stats because of known reparse
  * errors. However, user defined variables should appear in the query shape on the shards.
- * @tags: [featureFlagQueryStatsForInternalClients]
+ * @tags: [requires_fcv_83]
  */
 
 import {after, before, describe, it} from "jstests/libs/mochalite.js";

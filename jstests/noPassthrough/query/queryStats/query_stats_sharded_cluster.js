@@ -5,7 +5,7 @@
  * - Unsharded collection
  * - Sharded collection with data on one shard
  * - Sharded collection with data on two shards
- * @tags: [featureFlagQueryStatsForInternalClients]
+ * @tags: [requires_fcv_83]
  */
 
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
