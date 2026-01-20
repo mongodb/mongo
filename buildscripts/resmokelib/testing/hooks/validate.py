@@ -11,6 +11,7 @@ import pymongo.mongo_client
 from pymongo.collection import Collection
 from pymongo.database import Database
 
+from buildscripts.resmokelib import config
 from buildscripts.resmokelib.testing.fixtures.external import ExternalFixture
 from buildscripts.resmokelib.testing.fixtures.interface import build_client
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
@@ -135,7 +136,12 @@ def validate_node(
         auth_options = None
         if shell_options and "authenticationMechanism" in shell_options:
             auth_options = shell_options
-        client = build_client(node, auth_options, pymongo.ReadPreference.PRIMARY_PREFERRED)
+        if config.IS_ASAN:
+            client = build_client(
+                node, auth_options, pymongo.ReadPreference.PRIMARY_PREFERRED, timeout_millis=120000
+            )
+        else:
+            client = build_client(node, auth_options, pymongo.ReadPreference.PRIMARY_PREFERRED)
 
         # Skip validating collections for arbiters.
         admin_db = client.get_database("admin")

@@ -217,7 +217,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
 
     def mongo_client(
         self, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000, **kwargs
-    ):
+    ) -> pymongo.MongoClient:
         """Return a pymongo.MongoClient connecting to this fixture with specified 'read_preference'.
 
         The PyMongo driver will wait up to 'timeout_millis' milliseconds
@@ -524,7 +524,9 @@ def create_fixture_table(fixture):
     return "Fixture status:\n" + table
 
 
-def build_client(node, auth_options=None, read_preference=pymongo.ReadPreference.PRIMARY):
+def build_client(
+    node, auth_options=None, read_preference=pymongo.ReadPreference.PRIMARY, **kwargs
+) -> pymongo.MongoClient:
     """Authenticate client for the 'authenticationDatabase' and return the client."""
     if auth_options is not None:
         return node.mongo_client(
@@ -533,9 +535,10 @@ def build_client(node, auth_options=None, read_preference=pymongo.ReadPreference
             authSource=auth_options["authenticationDatabase"],
             authMechanism=auth_options["authenticationMechanism"],
             read_preference=read_preference,
+            **kwargs,
         )
     else:
-        return node.mongo_client(read_preference=read_preference)
+        return node.mongo_client(read_preference=read_preference, **kwargs)
 
 
 # Represents a row in a node info table.

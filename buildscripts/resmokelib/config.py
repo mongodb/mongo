@@ -3,7 +3,7 @@
 import collections
 import datetime
 import itertools
-import os.path
+import os
 import time
 
 import buildscripts.resmokelib.setup_multiversion.config as multiversion_config
@@ -866,3 +866,6 @@ LOAD_ALL_EXTENSIONS = False
 
 # Avoids running hooks as part of the suite.
 NO_HOOKS = False
+
+# Whether ASAN (AddressSanitizer) is enabled, determined by the presence of ASAN_OPTIONS.
+IS_ASAN = bool(os.environ.get("ASAN_OPTIONS"))
