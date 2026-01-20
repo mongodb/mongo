@@ -636,13 +636,18 @@ void IndexBuildsCoordinatorMongod::_sendCommitQuorumSatisfiedSignal(
 bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
 
-    // TODO SERVER-99706: Investigate if this is safe. Other commit quorum operations take the
-    // RSTL lock before locking the commit quorum lock. However, this operation follows the
-    // inverse order.
-    DisableLockerRuntimeOrderingChecks disable{opCtx};
+    // Read the most up to date commit quorum state. This is safe even on a secondary during batch
+    // application because we query a specific key by UUID, so that document cannot be written
+    // out-of-order. Temporarily relax constraints to bypass the collection check.
+    ScopeGuard guard{[opCtx, isEnforcingConstraints = opCtx->isEnforcingConstraints()] {
+        opCtx->setEnforceConstraints(isEnforcingConstraints);
+    }};
+    opCtx->setEnforceConstraints(false);
 
     // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
     // after reading it from config.system.indexBuilds collection.
+    AutoGetCollection indexBuildsCollection(
+        opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IS);
     Lock::SharedLock commitQuorumLk(opCtx, *replState->commitQuorumLock);
 
     // Read the index builds entry from config.system.indexBuilds collection.
@@ -1085,9 +1090,12 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
 
     invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() ||
               gFeatureFlagIntentRegistration.isEnabled());
-    // About to update the commit quorum value on-disk. So, take the lock in exclusive mode to
-    // prevent readers from reading the commit quorum value and making decision on commit quorum
-    // satisfied with the stale read commit quorum value.
+    // About to update the commit quorum value on-disk. So, take the commit quorum lock in
+    // exclusive mode to prevent readers from reading the commit quorum value and making a
+    // decision with stale data. Config.system.indexBuilds is locked first to maintain a consistent
+    // lock ordering.
+    AutoGetCollection indexBuildsCollection(
+        opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
     Lock::ExclusiveLock commitQuorumLk(opCtx, *replState->commitQuorumLock);
     {
         if (auto action = replState->getNextActionNoWait()) {
