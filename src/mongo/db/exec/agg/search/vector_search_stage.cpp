@@ -44,7 +44,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceVectorSearchToStageFn(
 
     // Increment legacyVectorSearchQueryCount when DocumentSourceVectorSearch is converted to
     // executable stage.
-    sVectorSearchMetrics.legacyVectorSearchQueryCount.addAndFetch(1);
+    vector_search_metrics::legacyVectorSearchQueryCount.increment(1);
 
     auto execStatsWrapper = std::make_shared<DSVectorSearchExecStatsWrapper>();
     documentSource->_execStatsWrapper = execStatsWrapper;

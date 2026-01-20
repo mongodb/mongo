@@ -1519,7 +1519,7 @@ Status runAggregate(
     auto onIFRError =
         [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
             stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {
-            sVectorSearchMetrics.onViewKickbackRetryCount.addAndFetch(1);
+            vector_search_metrics::onViewKickbackRetryCount.increment(1);
             ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
                 ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
         };
