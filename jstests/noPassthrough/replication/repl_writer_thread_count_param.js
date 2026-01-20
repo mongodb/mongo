@@ -4,6 +4,7 @@
 //       3) is actually set to the passed in value
 //       4) can be altered at run time
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {Thread} from "jstests/libs/parallelTester.js";
 
 function testSettingParameter() {
     // too low a count
@@ -13,10 +14,7 @@ function testSettingParameter() {
         MongoRunner.runMongod({replSet: "rs0", setParameter: "replWriterThreadCount=" + tooLowThreadCount.toString()}),
     );
     assert.soon(
-        () =>
-            rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount: ").match(
-                tooLowThreadCount.toString() + " is not greater than or equal to 1",
-            ),
+        () => rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount"),
         "mongod started with too low a value for replWriterThreadCount",
     );
 
@@ -27,10 +25,7 @@ function testSettingParameter() {
         MongoRunner.runMongod({replSet: "rs0", setParameter: "replWriterThreadCount=" + tooHighThreadCount.toString()}),
     );
     assert.soon(
-        () =>
-            rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount: ").match(
-                tooHighThreadCount.toString() + " is not less than or equal to 256",
-            ),
+        () => rawMongoProgramOutput("Invalid value for parameter replWriterThreadCount"),
         "mongod started with too high a value for replWriterThreadCount",
     );
 
@@ -232,6 +227,78 @@ function testSettingParameter() {
                 ).match(matchParameters),
             "mongod did not warn the user that the value will not take effect due to exceeding the number of cores times two",
         );
+    }
+
+    // Concurrent update
+    {
+        for (let i = 0; i < 10; i++) {
+            jsTest.log.info("Concurrent update start: " + i);
+
+            const initMaxThreadCount = 8;
+            const initMinThreadCount = 6;
+            assert.commandWorked(adminDB.runCommand({setParameter: 1, replWriterThreadCount: initMaxThreadCount}));
+            assert.commandWorked(adminDB.runCommand({setParameter: 1, replWriterMinThreadCount: initMinThreadCount}));
+            let result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1});
+            assert.eq(initMaxThreadCount, result.replWriterThreadCount, "replWriterThreadCount was not set internally");
+            result = adminDB.runCommand({getParameter: 1, replWriterMinThreadCount: 1});
+            assert.eq(
+                initMinThreadCount,
+                result.replWriterMinThreadCount,
+                "replWriterMinThreadCount was not set internally",
+            );
+
+            function newConn(port) {
+                const mongo = new Mongo("localhost:" + port);
+                assert(mongo);
+                const db = mongo.getDB("admin");
+                assert(db);
+                return db;
+            }
+
+            function setMaxThreadCount(newConn, port, value) {
+                const db = newConn(port);
+                db.runCommand({setParameter: 1, replWriterThreadCount: value});
+            }
+
+            function setMinThreadCount(newConn, port, value) {
+                const db = newConn(port);
+                db.runCommand({setParameter: 1, replWriterMinThreadCount: value});
+            }
+
+            const newMaxThreadCount = 5;
+            const newMinThreadCount = 1;
+            const maxThread = new Thread(setMaxThreadCount, newConn, conn.port, newMaxThreadCount);
+            const minThread = new Thread(setMinThreadCount, newConn, conn.port, newMinThreadCount);
+            maxThread.start();
+            minThread.start();
+
+            maxThread.join();
+            minThread.join();
+
+            // We don't assert that both params were successfully set since setting the max might
+            // have happened before setting the min, which would make it fail.
+            result = adminDB.runCommand({getParameter: 1, replWriterThreadCount: 1});
+            const resMaxThreadCount = result.replWriterThreadCount;
+            result = adminDB.runCommand({getParameter: 1, replWriterMinThreadCount: 1});
+            const resMinThreadCount = result.replWriterMinThreadCount;
+            assert.eq(
+                newMinThreadCount,
+                resMinThreadCount,
+                "replWriterMinThreadCount was not correctly set, " +
+                    "replWriterMinThreadCount=" +
+                    resMinThreadCount +
+                    "replWriterThreadCount=" +
+                    resMaxThreadCount,
+            );
+            assert(
+                resMaxThreadCount === initMaxThreadCount || resMaxThreadCount === newMaxThreadCount,
+                "replWriterThreadCount was incorrectly set, " +
+                    "replWriterMinThreadCount=" +
+                    resMinThreadCount +
+                    "replWriterThreadCount=" +
+                    resMaxThreadCount,
+            );
+        }
     }
 
     MongoRunner.stopMongod(conn);

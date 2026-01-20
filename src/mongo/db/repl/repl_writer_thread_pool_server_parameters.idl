@@ -47,6 +47,8 @@ server_parameters:
         on_update: onUpdateReplWriterThreadCount
         default: 16
         validator:
+            # This range is also enforced in validateUpdateReplWriterThreadCount(),
+            # both should validate the same range.
             gte: 1
             lte: 256
             callback: validateUpdateReplWriterThreadCount
@@ -60,6 +62,8 @@ server_parameters:
         on_update: onUpdateReplWriterMinThreadCount
         default: 0
         validator:
+            # This range is also enforced in validateUpdateReplWriterMinThreadCount(),
+            # both should validate the same range.
             gte: 0
             lte: 256
             callback: validateUpdateReplWriterMinThreadCount

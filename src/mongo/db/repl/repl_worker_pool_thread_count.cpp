@@ -35,6 +35,9 @@
 #include "mongo/util/processinfo.h"
 
 #include <algorithm>
+#include <mutex>
+
+#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -51,17 +54,42 @@ size_t getThreadCountForReplWorkerPool() {
                     static_cast<size_t>(2 * ProcessInfo::getNumAvailableCores()));
 }
 
+
+namespace {
+/* Mutex used to prevent concurrent setting of replWriterThreadCount and replWriterMinThreadCount.
+ * This is the workflow of setting one of the parameters:
+ * 1. validateUpdateXXX() is called before setting the param value. We lock the mutex.
+ * 2. param is set.
+ * 3. onUpdateXXX() is called after setting the param value. We unlock the mutex.
+ */
+stdx::mutex threadCountParamsMutex;
+// We are using a boost::optional in order to hold the unique_lock between step 1 and 3.
+boost::optional<stdx::unique_lock<stdx::mutex>> threadCountParamsLocker;
+}  // namespace
+
 Status validateUpdateReplWriterThreadCount(const int count, const boost::optional<TenantId>&) {
+    // This range check must be the same as in the repl_writer_thread_pool_server_parameters.idl
+    // file. We validate it here to avoid locking the mutex if the value is out of range.
+    if (count <= 0) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid value for parameter replWriterThreadCount: "
+                                       "must be greater than 0");
+    }
+    if (count > 256) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid value for parameter replWriterThreadCount: "
+                                       "must be less than or equal to 256");
+    }
+
+    stdx::unique_lock<stdx::mutex> lk(threadCountParamsMutex);
+
     if (count < replWriterMinThreadCount) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "replWriterThreadCount must be greater or equal to '"
                                     << replWriterMinThreadCount
                                     << "', which is the current value of replWriterMinThreadCount");
     }
-    if (!std::in_range<size_t>(count)) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "replWriterThreadCount must be greater than 0'");
-    }
+
     size_t newCount = static_cast<size_t>(count);
     size_t numCores = ProcessInfo::getNumAvailableCores();
     size_t maxThreads = 2 * numCores;
@@ -75,13 +103,27 @@ Status validateUpdateReplWriterThreadCount(const int count, const boost::optiona
                       "numCores"_attr = std::to_string(numCores));
     }
 
+    // Moving ownership of the lock while leaving the mutex locked
+    threadCountParamsLocker.emplace(std::move(lk));
     return Status::OK();
 }
+
 Status validateUpdateReplWriterMinThreadCount(const int count, const boost::optional<TenantId>&) {
-    if (!std::in_range<size_t>(count)) {
+    // This range check must be the same as in the repl_writer_thread_pool_server_parameters.idl
+    // file. We validate it here to avoid locking the mutex if the value is out of range.
+    if (count < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "replWriterMinThreadCount must be greater than 0'");
+                      str::stream() << "Invalid value for parameter replWriterMinThreadCount: "
+                                       "must be greater or equal to 0");
     }
+    if (count > 256) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid value for parameter replWriterMinThreadCount: "
+                                       "must be less than or equal to 256");
+    }
+
+    stdx::unique_lock<stdx::mutex> lk(threadCountParamsMutex);
+
     size_t newCount = static_cast<size_t>(count);
     // May be replWriterThreadCount, or may be capped by the number of CPUs
     size_t poolActualSize = getThreadCountForReplWorkerPool();
@@ -91,12 +133,20 @@ Status validateUpdateReplWriterMinThreadCount(const int count, const boost::opti
                                     << poolActualSize
                                     << "', which is the current max threads for the thread pool");
     }
+
+    // Moving ownership of the lock while leaving the mutex locked
+    threadCountParamsLocker.emplace(std::move(lk));
     return Status::OK();
 }
 
 Status onUpdateReplWriterThreadCount(const int) {
     // Reduce content pinned in cache by single oplog batch on small machines by reducing the number
     // of threads of ReplWriter to reduce the number of concurrent open WT transactions.
+
+    // Here we adopt the ownership of the locker without locking the underlying mutex as it was
+    // previously locked by validateUpdateReplWriterThreadCount().
+    stdx::unique_lock<stdx::mutex> lk(std::move(threadCountParamsLocker.get()));
+    threadCountParamsLocker.reset();
 
     if (hasGlobalServiceContext()) {
         // If the global service context is set, then we're past startup, so we need to update the
@@ -112,6 +162,11 @@ Status onUpdateReplWriterThreadCount(const int) {
 }
 
 Status onUpdateReplWriterMinThreadCount(const int) {
+    // Here we adopt the ownership of the locker without locking the underlying mutex as it was
+    // previously locked by validateUpdateReplWriterMinThreadCount().
+    stdx::unique_lock<stdx::mutex> lk(std::move(threadCountParamsLocker.get()));
+    threadCountParamsLocker.reset();
+
     if (hasGlobalServiceContext()) {
         // If the global service context is set, then we're past startup, so we need to update the
         // repl worker thread pool.
