@@ -143,7 +143,7 @@ struct CostCoefficientTagParam {
     static constexpr double kMin = 11.67_ms;
     // The maximum value of a cost coefficient is the most expensive operation per
     // document according to the cost model.
-    static constexpr double kMax = 24067.01_ms;
+    static constexpr double kMax = 1000000.0_ms;
     // TODO (SERVER-94981): Define this value based on cost model sensitivity.
     static constexpr double kEpsilon = 1.0e-5;
 };

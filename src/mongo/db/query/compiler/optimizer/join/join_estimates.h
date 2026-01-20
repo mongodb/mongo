@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 
 namespace mongo::join_ordering {

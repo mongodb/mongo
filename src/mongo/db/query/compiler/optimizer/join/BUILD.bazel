@@ -37,12 +37,12 @@ mongo_cc_library(
 mongo_cc_library(
     name = "plan_enumerator",
     srcs = [
-        "cardinality_estimator.cpp",
         "join_plan.cpp",
         "plan_enumerator.cpp",
         "plan_enumerator_helpers.cpp",
     ],
     deps = [
+        ":join_estimates",
         ":join_ordering",
         ":solution_storage",
         "//src/mongo/db/query/compiler/ce:ce_common",
@@ -57,6 +57,7 @@ mongo_cc_unit_test(
         "agg_join_model_test.cpp",
         "cardinality_estimator_join_test.cpp",
         "graph_cycle_breaker_test.cpp",
+        "join_cost_estimator_test.cpp",
         "join_graph_test.cpp",
         "path_resolver_test.cpp",
         "plan_enumerator_test.cpp",
@@ -70,6 +71,7 @@ mongo_cc_unit_test(
     ],
     tags = ["mongo_unittest_third_group"],
     deps = [
+        ":join_estimates",
         ":join_ordering",
         ":plan_enumerator",
         ":reorder_joins",
@@ -159,9 +161,14 @@ mongo_cc_library(
 mongo_cc_library(
     name = "join_estimates",
     srcs = [
+        "cardinality_estimator.cpp",
+        "join_cost_estimator_impl.cpp",
         "join_estimates.cpp",
     ],
     deps = [
+        ":join_ordering",
+        "//src/mongo/db/query/compiler/ce:ce_common",
+        "//src/mongo/db/query/compiler/ce/sampling:sampling_estimator_interface",
         "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:estimates",
     ],
 )
