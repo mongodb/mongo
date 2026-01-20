@@ -46,6 +46,17 @@ def _choose_pool(pools, cpus):
     fail("Requested {cpus} CPUs by tag 'cpu:{cpus}', but there is no remote execution pool that can satisfy this.".format(cpus = cpus))
 
 def test_exec_properties(tags):
+    """Returns execution properties for selecting the appropriate remote execution pool based on CPU requirements.
+
+    Args:
+        tags: A list of tags that may include CPU resource requirements (e.g., 'cpu:2').
+
+    Returns:
+        A select() statement that maps platform configurations to execution properties,
+        or an empty dict if no CPU tags are found.
+
+    Tags themselves are not modified.
+    """
     cpus = _parse_cpu_tag(tags)
     if not cpus:
         return {}

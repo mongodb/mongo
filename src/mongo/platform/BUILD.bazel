@@ -57,6 +57,7 @@ mongo_cc_unit_test(
     srcs = ["visibility_test1.cpp"],
     provides_main = True,
     tags = [
+        "cpu:2",
         "mongo_unittest_third_group",
         "server-programmability",
     ],

@@ -710,7 +710,14 @@ def _mongo_cc_binary_and_test(
     # we dont want the intermediate build targets to be picked up by tags
     # so we empty it out
     original_tags = list(args["tags"])
-    args["tags"] = ["intermediate_debug"] + [tag + "_debug" for tag in original_tags]
+    args["tags"] = ["intermediate_debug"] + [
+        tag + "_debug" if
+        # Transformations via `test_exec_properties` have already been applied at this point.
+        # Need to leave cpu tags unchanged, since more parsing validation is done deeper in bazel.
+        not tag.startswith(("resources:cpu:", "cpu:")) else tag
+        for tag in original_tags
+    ]
+
     if _program_type == "binary":
         cc_binary(**args)
         extract_debuginfo_binary(
