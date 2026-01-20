@@ -87,7 +87,7 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId,
                                     boost::optional<Timestamp> resumeToken) {
     TestCodeBlock tcb(this);
     {
-        stdx::lock_guard lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (!_isActive(lock)) {
             return;
         }
@@ -136,7 +136,7 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId,
         }
         auto lastDoc = lastDocRes.getValue();
 
-        stdx::lock_guard lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _lastFetched = lastDoc;
     }
 
@@ -157,7 +157,7 @@ void OplogFetcherMock::simulateResponseError(Status status) {
 
 void OplogFetcherMock::shutdownWith(Status status) {
     {
-        stdx::lock_guard lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         // Noop if the OplogFetcher is not active or is already shutting down.
         if (!_isActive(lock) || _isShuttingDown(lock)) {
             return;
@@ -194,7 +194,7 @@ void OplogFetcherMock::_doStartup(WithLock) {
     _waitForFinishThread = stdx::thread([this]() {
         auto future = [&] {
             Client::initThread("OplogFetcherMock", getGlobalServiceContext()->getService());
-            stdx::lock_guard lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             return _finishPromise->getFuture();
         }();
         // Wait for the finish signal and call _finishCallback once.
@@ -211,12 +211,12 @@ void OplogFetcherMock::_doShutdown(WithLock) noexcept {
     }
 }
 
-ObservableMutex<stdx::mutex>* OplogFetcherMock::_getMutex() noexcept {
+stdx::mutex* OplogFetcherMock::_getMutex() noexcept {
     return &_mutex;
 }
 
 OpTime OplogFetcherMock::getLastOpTimeFetched() const {
-    stdx::lock_guard lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _lastFetched;
 }
 
@@ -228,7 +228,7 @@ void OplogFetcherMock::_finishCallback(Status status) {
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     decltype(_oplogFetcherRestartDecision) oplogFetcherRestartDecision;
-    stdx::lock_guard lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _transitionToComplete(lock);
 
     // Release any resources that might be held by the '_onShutdownCallbackFn' function object.

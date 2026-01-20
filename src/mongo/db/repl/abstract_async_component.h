@@ -35,14 +35,12 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 #include <iosfwd>
 #include <memory>
-#include <ostream>
 #include <string>
 #include <type_traits>
 
@@ -57,91 +55,38 @@ namespace repl {
  * The _state variable in this class is protected by the concrete class's mutex (returned by
  * _getMutex()).
  */
-template <typename Mutex = stdx::mutex>
 class MONGO_MOD_OPEN AbstractAsyncComponent {
     AbstractAsyncComponent(const AbstractAsyncComponent&) = delete;
     AbstractAsyncComponent& operator=(const AbstractAsyncComponent&) = delete;
 
 public:
-    AbstractAsyncComponent(executor::TaskExecutor* executor, const std::string& componentName)
-        : _executor(executor), _componentName(componentName) {
-        uassert(ErrorCodes::BadValue, "task executor cannot be null", executor);
-    }
+    AbstractAsyncComponent(executor::TaskExecutor* executor, const std::string& componentName);
 
     virtual ~AbstractAsyncComponent() = default;
 
     /**
      * Returns true if this component is currently running or in the process of shutting down.
      */
-    bool isActive() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
-        return _isActive(lock);
-    }
+    bool isActive() noexcept;
 
     /**
      * Starts the component. If the transition from PreStart to Running is allowed, this invokes
      * _doStartup() defined in the concrete class. If _doStartup() fails, this
      * component will transition to Complete and any restarts after this will be disallowed.
      */
-    Status startup() {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
-        switch (_state) {
-            case State::kPreStart:
-                _state = State::kRunning;
-                break;
-            case State::kRunning:
-                return Status(ErrorCodes::IllegalOperation,
-                              str::stream() << _componentName << " already started");
-            case State::kShuttingDown:
-                return Status(ErrorCodes::ShutdownInProgress,
-                              str::stream() << _componentName << " shutting down");
-            case State::kComplete:
-                return Status(ErrorCodes::ShutdownInProgress,
-                              str::stream() << _componentName << " completed");
-        }
-
-        try {
-            _doStartup(lock);
-        } catch (const DBException& ex) {
-            _state = State::kComplete;
-            return ex.toStatus();
-        }
-
-        return Status::OK();
-    }
+    Status startup();
 
     /**
      * Signals this component to begin shutting down. If the transition from Running to ShuttingDown
      * is allowed, this invokes _doShutdown() defined in the concrete class.
      * Transition directly from PreStart to Complete if not started yet.
      */
-    void shutdown() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
-        switch (_state) {
-            case State::kPreStart:
-                // Transition directly from PreStart to Complete if not started yet.
-                _state = State::kComplete;
-                return;
-            case State::kRunning:
-                _state = State::kShuttingDown;
-                break;
-            case State::kShuttingDown:
-            case State::kComplete:
-                // Nothing to do if we are already in ShuttingDown or Complete state.
-                return;
-        }
-
-        _doShutdown(lock);
-    }
+    void shutdown() noexcept;
 
     /**
      * Blocks until inactive.
      */
-    void join() noexcept {
-        _preJoin();
-        stdx::unique_lock<Mutex> lk(*_getMutex());
-        _stateCondition.wait(lk, [&]() { return !_isActive(lk); });
-    }
+    void join() noexcept;
 
     /**
      * State transitions:
@@ -155,52 +100,31 @@ public:
      * Returns current component state.
      * For testing only.
      */
-    State getState_forTest() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
-        return _state;
-    }
+    State getState_forTest() noexcept;
 
 protected:
     /**
      * Returns task executor.
      */
-    executor::TaskExecutor* _getExecutor() {
-        return _executor;
-    }
+    executor::TaskExecutor* _getExecutor();
 
     /**
      * Returns true if this component is currently running or in the process of shutting down.
      */
-    bool _isActive(WithLock lk) noexcept {
-        return State::kRunning == _state || State::kShuttingDown == _state;
-    }
+    bool _isActive(WithLock lk) noexcept;
 
     /**
      * Returns true if this component has received a shutdown request ('_state' is ShuttingDown).
      */
-    bool _isShuttingDown() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
-        return _isShuttingDown(lock);
-    }
-
-    bool _isShuttingDown(WithLock lock) noexcept {
-        return State::kShuttingDown == _state;
-    }
+    bool _isShuttingDown() noexcept;
+    bool _isShuttingDown(WithLock lock) noexcept;
 
     /**
      * Transitions this component to complete and notifies any waiters on '_stateCondition'.
      * May be called at most once.
      */
-    void _transitionToComplete() noexcept {
-        stdx::lock_guard<Mutex> lock(*_getMutex());
-        _transitionToComplete(lock);
-    }
-
-    void _transitionToComplete(WithLock lk) noexcept {
-        invariant(State::kComplete != _state);
-        _state = State::kComplete;
-        _stateCondition.notify_all();
-    }
+    void _transitionToComplete() noexcept;
+    void _transitionToComplete(WithLock lk) noexcept;
 
     /**
      * Checks the given status (or embedded status inside the callback args) and current component
@@ -212,33 +136,13 @@ protected:
     Status _checkForShutdownAndConvertStatus(
         WithLock lk,
         const executor::TaskExecutor::CallbackArgs& callbackArgs,
-        const std::string& message) {
-        return _checkForShutdownAndConvertStatus(lk, callbackArgs.status, message);
-    }
-
+        const std::string& message);
     Status _checkForShutdownAndConvertStatus(WithLock lk,
                                              const Status& status,
-                                             const std::string& message) {
-
-        if (_isShuttingDown(lk)) {
-            return Status(ErrorCodes::CallbackCanceled,
-                          str::stream()
-                              << message << ": " << _componentName << " is shutting down");
-        }
-
-        return status.withContext(message);
-    }
-
+                                             const std::string& message);
     Status _checkForShutdownAndConvertStatus(
-        const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message) {
-        stdx::unique_lock<Mutex> lk(*_getMutex());
-        return _checkForShutdownAndConvertStatus(lk, callbackArgs, message);
-    }
-
-    Status _checkForShutdownAndConvertStatus(const Status& status, const std::string& message) {
-        stdx::unique_lock<Mutex> lk(*_getMutex());
-        return _checkForShutdownAndConvertStatus(lk, status, message);
-    }
+        const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message);
+    Status _checkForShutdownAndConvertStatus(const Status& status, const std::string& message);
 
     /**
      * Schedules work to be run by the task executor.
@@ -248,52 +152,17 @@ protected:
     Status _scheduleWorkAndSaveHandle(WithLock lk,
                                       executor::TaskExecutor::CallbackFn work,
                                       executor::TaskExecutor::CallbackHandle* handle,
-                                      const std::string& name) {
-        invariant(handle);
-        if (_isShuttingDown(lk)) {
-            return Status(ErrorCodes::CallbackCanceled,
-                          str::stream() << "failed to schedule work " << name << ": "
-                                        << _componentName << " is shutting down");
-        }
-        auto result = _executor->scheduleWork(std::move(work));
-        if (!result.isOK()) {
-            return result.getStatus().withContext(str::stream()
-                                                  << "failed to schedule work " << name);
-        }
-        *handle = result.getValue();
-        return Status::OK();
-    }
-
+                                      const std::string& name);
     Status _scheduleWorkAtAndSaveHandle(WithLock lk,
                                         Date_t when,
                                         executor::TaskExecutor::CallbackFn work,
                                         executor::TaskExecutor::CallbackHandle* handle,
-                                        const std::string& name) {
-        invariant(handle);
-        if (_isShuttingDown(lk)) {
-            return Status(ErrorCodes::CallbackCanceled,
-                          str::stream()
-                              << "failed to schedule work " << name << " at " << when.toString()
-                              << ": " << _componentName << " is shutting down");
-        }
-        auto result = _executor->scheduleWorkAt(when, std::move(work));
-        if (!result.isOK()) {
-            return result.getStatus().withContext(
-                str::stream() << "failed to schedule work " << name << " at " << when.toString());
-        }
-        *handle = result.getValue();
-        return Status::OK();
-    }
+                                        const std::string& name);
 
     /**
      * Cancels task executor callback handle if not null.
      */
-    void _cancelHandle(WithLock lk, executor::TaskExecutor::CallbackHandle handle) {
-        if (!handle) {
-            return;
-        }
-        _executor->cancel(handle);
-    }
+    void _cancelHandle(WithLock lk, executor::TaskExecutor::CallbackHandle handle);
 
     /**
      * Starts up a component, owned by us, and checks our shutdown state at the same time. If the
@@ -346,7 +215,7 @@ private:
     /**
      * Returns mutex to guard this component's state variable.
      */
-    virtual Mutex* _getMutex() noexcept = 0;
+    virtual stdx::mutex* _getMutex() noexcept = 0;
 
 private:
     // All member variables are labeled with one of the following codes indicating the
@@ -374,29 +243,11 @@ private:
  * Insertion operator for AbstractAsyncComponent::State. Formats state for output stream.
  * For testing only.
  */
-template <typename Mutex>
-std::ostream& operator<<(std::ostream& os,
-                         const typename AbstractAsyncComponent<Mutex>::State& state) {
-    using State = typename AbstractAsyncComponent<Mutex>::State;
-    switch (state) {
-        case State::kPreStart:
-            return os << "PreStart";
-        case State::kRunning:
-            return os << "Running";
-        case State::kShuttingDown:
-            return os << "ShuttingDown";
-        case State::kComplete:
-            return os << "Complete";
-    }
-    MONGO_UNREACHABLE;
-}
+std::ostream& operator<<(std::ostream& os, const AbstractAsyncComponent::State& state);
 
-template <typename Mutex>
 template <typename T>
-Status AbstractAsyncComponent<Mutex>::_startupComponent(WithLock lk,
-                                                        std::unique_ptr<T>& component) {
-    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent<Mutex>, T>::value ||
-                        std::is_base_of<AbstractAsyncComponent<stdx::mutex>, T>::value);
+Status AbstractAsyncComponent::_startupComponent(WithLock lk, std::unique_ptr<T>& component) {
+    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
 
     if (_isShuttingDown(lk)) {
         // Save name of 'component' before resetting unique_ptr.
@@ -414,19 +265,15 @@ Status AbstractAsyncComponent<Mutex>::_startupComponent(WithLock lk,
     return status;
 }
 
-template <typename Mutex>
 template <typename T>
-Status AbstractAsyncComponent<Mutex>::_startupComponent(std::unique_ptr<T>& component) {
-    stdx::lock_guard<Mutex> lock(*_getMutex());
+Status AbstractAsyncComponent::_startupComponent(std::unique_ptr<T>& component) {
+    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
     return _startupComponent(lock, component);
 }
 
-template <typename Mutex>
 template <typename T>
-void AbstractAsyncComponent<Mutex>::_shutdownComponent(WithLock lk,
-                                                       const std::unique_ptr<T>& component) {
-    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent<Mutex>, T>::value ||
-                        std::is_base_of<AbstractAsyncComponent<stdx::mutex>, T>::value);
+void AbstractAsyncComponent::_shutdownComponent(WithLock lk, const std::unique_ptr<T>& component) {
+    MONGO_STATIC_ASSERT(std::is_base_of<AbstractAsyncComponent, T>::value);
 
     if (!component) {
         return;
@@ -434,10 +281,9 @@ void AbstractAsyncComponent<Mutex>::_shutdownComponent(WithLock lk,
     component->shutdown();
 }
 
-template <typename Mutex>
 template <typename T>
-void AbstractAsyncComponent<Mutex>::_shutdownComponent(const std::unique_ptr<T>& component) {
-    stdx::lock_guard<Mutex> lock(*_getMutex());
+void AbstractAsyncComponent::_shutdownComponent(const std::unique_ptr<T>& component) {
+    stdx::lock_guard<stdx::mutex> lock(*_getMutex());
     _shutdownComponent(lock, component);
 }
 

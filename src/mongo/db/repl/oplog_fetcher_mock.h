@@ -99,7 +99,7 @@ private:
 
     void _preJoin() noexcept override {}
 
-    ObservableMutex<stdx::mutex>* _getMutex() noexcept override;
+    stdx::mutex* _getMutex() noexcept override;
 
     // ============= End AbstractAsyncComponent overrides ==============
     class TestCodeBlock {
@@ -123,7 +123,7 @@ private:
 
     void _finishCallback(Status status);
 
-    mutable ObservableMutex<stdx::mutex> _mutex;
+    mutable stdx::mutex _mutex;
 
     std::unique_ptr<OplogFetcherRestartDecision> _oplogFetcherRestartDecision;
 
