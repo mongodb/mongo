@@ -216,7 +216,7 @@ public:
         return kExplainVersion;
     }
 
-    bool areThereRejectedPlansToExplain() const override {
+    bool isMultiPlan() const override {
         return false;
     }
 

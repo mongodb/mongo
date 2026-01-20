@@ -43,7 +43,7 @@ class CBRPlanRankingStrategy {
 public:
     ~CBRPlanRankingStrategy() = default;
 
-    StatusWith<plan_ranking::PlanRankingResult> rankPlans(
+    StatusWith<QueryPlanner::PlanRankingResult> rankPlans(
         OperationContext* opCtx,
         CanonicalQuery& query,
         const QueryPlannerParams& plannerParams,

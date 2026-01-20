@@ -550,41 +550,6 @@ bool MultiPlanStage::hasBackupPlan() const {
     return kNoSuchPlan != _backupPlanIdx;
 }
 
-[[nodiscard]] std::vector<SolutionWithPlanStage> MultiPlanStage::extractRejectedPlansAndStages() {
-    tassert(11540200,
-            "expected some plans to have been rejected before extracting their explain data",
-            _rejected.size() > 0 || (hasBackupPlan() && _candidates.size() == 2));
-    std::vector<SolutionWithPlanStage> rejectedPlansData;
-    rejectedPlansData.reserve(_rejected.size());
-
-    // If a best plan has been chosen, the candidates vector has been reordered such that the
-    // best plan is at index 0, and the backup plan (if one exists) is at index 1. The rejected
-    // plans follow.
-    size_t candidateOffset = 0;
-    if (bestPlanChosen()) {
-        candidateOffset = 1;
-        if (hasBackupPlan()) {
-            // TODO SERVER-117371. Not considering the backup plan as rejected means it won't be
-            // explained. It also means that if the best plan fails due to memory limits and we
-            // switch to the backup plan, we won't be able to explain that either.
-            candidateOffset = 2;
-        }
-    }
-
-    for (size_t i = 0; i < _rejected.size(); ++i) {
-        rejectedPlansData.push_back(
-            {std::move(_candidates[i + candidateOffset].solution), std::move(_rejected[i])});
-    }
-    return rejectedPlansData;
-}
-
-void MultiPlanStage::abandonTrials() {
-    tassert(11542002, "cannot abandon trials after best plan has been chosen", !bestPlanChosen());
-    for (size_t i = 0; i < _candidates.size(); ++i) {
-        rejectPlan(i);
-    }
-}
-
 bool MultiPlanStage::bestPlanChosen() const {
     return kNoSuchPlan != _bestPlanIdx;
 }

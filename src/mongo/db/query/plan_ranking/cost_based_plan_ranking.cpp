@@ -83,23 +83,25 @@ CostEstimate estimateCBRCost(const CanonicalQuery& query,
  * based on whatever information was collected so far. The function is mostly a wrapper for
  * pickBestPlan, and the logic that extracts the best plan from the MultiPlanner.
  */
-StatusWith<PlanRankingResult> getBestMPPlan(classic_runtime_planner::MultiPlanner& mp) {
+StatusWith<QueryPlanner::PlanRankingResult> getBestMPPlan(
+    classic_runtime_planner::MultiPlanner& mp) {
     auto status = mp.pickBestPlan();
     if (!status.isOK()) {
         return status;
     }
-    plan_ranking::PlanRankingResult out;
+    QueryPlanner::PlanRankingResult out;
     auto soln = mp.extractQuerySolution();
     tassert(11306811, "Expected multi-planner to have returned a solution!", soln);
     out.solutions.push_back(std::move(soln));
-    return std::move(out);
+    return out;
 }
 
-StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
-                                             CanonicalQuery& query,
-                                             QueryPlannerParams& plannerParams,
-                                             PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                             const MultipleCollectionAccessor& collections) {
+StatusWith<QueryPlanner::PlanRankingResult> getBestCBRPlan(
+    OperationContext* opCtx,
+    CanonicalQuery& query,
+    QueryPlannerParams& plannerParams,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    const MultipleCollectionAccessor& collections) {
     CBRPlanRankingStrategy cbrStrategy;
     plannerParams.planRankerMode = QueryPlanRankerModeEnum::kSamplingCE;
     auto result = cbrStrategy.rankPlans(opCtx, query, plannerParams, yieldPolicy, collections);
@@ -107,8 +109,7 @@ StatusWith<PlanRankingResult> getBestCBRPlan(OperationContext* opCtx,
     return result;
 }
 
-// TODO SERVER-117372. Populate explains output.
-StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
+StatusWith<QueryPlanner::PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
     OperationContext* opCtx,
     CanonicalQuery& query,
     QueryPlannerParams& plannerParams,
@@ -143,10 +144,10 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
     if (solutions.size() == 1) {
         // TODO SERVER-115496 Make sure this short circuit logic is also taken to main plan_ranking
         // so it applies everywhere. Only one solution, no need to rank.
-        plan_ranking::PlanRankingResult out;
+        QueryPlanner::PlanRankingResult out;
         out.solutions.push_back(std::move(solutions.front()));
         _ws = std::move(plannerData.workingSet);
-        return std::move(out);
+        return out;
     }
 
     // Analyze all solutions for some structural properties
@@ -169,8 +170,11 @@ StatusWith<PlanRankingResult> CostBasedPlanRankingStrategy::rankPlans(
     const auto cbrCost = estimateCBRCost(query, solutions);
     tassert(11306808, "CBR cannot have 0 cost", cbrCost > zeroCost);
 
-    auto mp = classic_runtime_planner::MultiPlanner(
-        std::move(plannerData), std::move(solutions), PlanExplainerData{});
+    auto mp = classic_runtime_planner::MultiPlanner(std::move(plannerData),
+                                                    std::move(solutions),
+                                                    // Empty PlanRakingResult used as an out param
+                                                    // to return rejected plans.
+                                                    QueryPlanner::PlanRankingResult{});
 
     auto trialConfig = mp.getTrialPhaseConfig();
     // These are the trial limits based on MP defaults or user-set requirements.

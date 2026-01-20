@@ -247,8 +247,7 @@ void generateExecutionInfo(PlanExecutor* exec,
 
     auto&& explainer = exec->getPlanExplainer();
 
-    if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans &&
-        explainer.areThereRejectedPlansToExplain()) {
+    if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans && explainer.isMultiPlan()) {
         tassert(11320912,
                 "winningPlanTrialStats must be present when requesting all execution stats",
                 winningPlanTrialStats);
@@ -281,7 +280,7 @@ void generateExecutionInfo(PlanExecutor* exec,
         BSONArrayBuilder allPlansBob(execBob.subarrayStart("allPlansExecution"));
 
         // If the winning plan was uncontested, leave the `allPlansExecution` array empty.
-        if (explainer.areThereRejectedPlansToExplain()) {
+        if (explainer.isMultiPlan()) {
             BSONObjBuilder planBob(allPlansBob.subobjStart());
             generateSinglePlanExecutionInfo(
                 *winningPlanTrialStats, boost::none, &planBob, true /* isTrialPeriodInfo */);

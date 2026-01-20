@@ -97,15 +97,20 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    NamespaceString nss,
                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
                                    boost::optional<size_t> cachedPlanHash,
-                                   boost::optional<PlanExplainerData> maybeExplainData)
+                                   QueryPlanner::PlanRankingResult planRankingResult,
+                                   stage_builder::PlanStageToQsnMap planStageQsnMap,
+                                   std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _expCtx(_cq ? _cq->getExpCtx() : expCtx),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
-      _planExplainer(
-          plan_explainer_factory::make(_root.get(), cachedPlanHash, std::move(maybeExplainData))),
+      _planExplainer(plan_explainer_factory::make(_root.get(),
+                                                  cachedPlanHash,
+                                                  std::move(planRankingResult),
+                                                  std::move(planStageQsnMap),
+                                                  std::move(cbrRejectedPlanStages))),
       _mustReturnOwnedBson(returnOwnedBson),
       _nss(std::move(nss)) {
     invariant(!_expCtx || _expCtx->getOperationContext() == _opCtx);

@@ -50,9 +50,7 @@ protected:
                                       std::string indexName);
 
     std::pair<std::unique_ptr<CanonicalQuery>, PlannerData> createCQAndPlannerData(
-        const MultipleCollectionAccessor& collections,
-        BSONObj findFilter,
-        std::function<void(FindCommandRequest&)> modifyFindCmd = [](FindCommandRequest&) {});
+        const MultipleCollectionAccessor& collections, BSONObj findFilter);
 
 
     MultipleCollectionAccessor getCollsAccessor();

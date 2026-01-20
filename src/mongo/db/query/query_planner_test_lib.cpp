@@ -132,9 +132,7 @@ Status nodeHasMatchingFilter(const BSONObj& testFilter,
                              const BSONObj& testCollation,
                              const QuerySolutionNode* trueFilterNode) {
     if (nullptr == trueFilterNode->filter) {
-        return {ErrorCodes::Error{5619210},
-                str::stream() << "No filter found in query solution node"
-                              << trueFilterNode->toString()};
+        return {ErrorCodes::Error{5619210}, "No filter found in query solution node"};
     }
 
     std::unique_ptr<CollatorInterface> testCollator;
@@ -930,10 +928,8 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONElement child = fetchObj["node"];
         if (child.eoo() || !child.isABSONObj()) {
             return {ErrorCodes::Error{5619262},
-                    str::stream() << "found a fetch stage in the solution but no 'node' sub-object "
-                                     "in the provided "
-                                     "JSON"
-                                  << fetchObj.toString(false)};
+                    "found a fetch stage in the solution but no 'node' sub-object in the provided "
+                    "JSON"};
         }
         return solutionMatches(child.Obj(), fn->children[0].get(), relaxBoundsCheck)
             .withContext("mismatch beneath fetch node");

@@ -42,8 +42,7 @@
 namespace mongo {
 namespace plan_ranking {
 
-
-StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
+StatusWith<QueryPlanner::PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
     CanonicalQuery& query,
     QueryPlannerParams& plannerParams,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
@@ -52,7 +51,6 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
     PlannerData plannerData) {
     auto statusWithMultiPlanSolns = QueryPlanner::plan(query, plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
-        _ws = std::move(plannerData.workingSet);
         return statusWithMultiPlanSolns.getStatus();
     }
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
@@ -69,13 +67,14 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
     if (solutions.size() == 1) {
         // TODO SERVER-115496. Make sure this short circuit logic is also taken to main plan_ranking
         // so it applies everywhere. Only one solution, no need to rank.
-        plan_ranking::PlanRankingResult out;
+        QueryPlanner::PlanRankingResult out;
         out.solutions.push_back(std::move(solutions.front()));
         _ws = std::move(plannerData.workingSet);
-        return std::move(out);
+        return out;
     }
     auto solutionsSize = solutions.size();  // Caching the value before moving it.
-    _multiPlanner.emplace(std::move(plannerData), std::move(solutions), PlanExplainerData{});
+    _multiPlanner.emplace(
+        std::move(plannerData), std::move(solutions), QueryPlanner::PlanRankingResult{});
     ON_BLOCK_EXIT([&] { _ws = _multiPlanner->extractWorkingSet(); });
     // Cap the number of works per plan during this first trials phase so that the total works
     // across all plans does not exceed internalQueryPlanEvaluationWorks.
@@ -95,21 +94,7 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
         plannerParams.planRankerMode = QueryPlanRankerModeEnum::kSamplingCE;
         auto result = cbrStrategy.rankPlans(opCtx, query, plannerParams, yieldPolicy, collections);
         plannerParams.planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
-        if (!result.isOK()) {
-            return result.getStatus();
-        }
-
-        // Having onlny a single solution means that CBR was able to pick a best plan.
-        if (result.getValue().solutions.size() == 1) {
-            _multiPlanner->abandonTrials();
-            // TODO SERVER-117373. Only if explain is needed.
-            auto resultValue = std::move(result.getValue());
-            resultValue.maybeExplainData << _multiPlanner->extractExplainData();
-
-            return std::move(resultValue);
-        } else {
-            // TODO SERVER-117370. Populate the CBR plans as rejected plans.
-        }
+        return result;
     }
     if (!stats->earlyExit) {
         // Previous multi-planning phase didn't exit early.
@@ -127,14 +112,11 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
         return status;
     }
 
-    plan_ranking::PlanRankingResult result;
-    result.solutions.push_back(_multiPlanner->extractQuerySolution());
-    tassert(
-        11540202, "Expected multi-planner to have returned a solution!", !result.solutions.empty());
-
-    // TODO SERVER-117373. Only if explain is needed.
-    result.maybeExplainData.emplace(_multiPlanner->extractExplainData());
-    return std::move(result);
+    QueryPlanner::PlanRankingResult out;
+    auto soln = _multiPlanner->extractQuerySolution();
+    tassert(11451401, "Expected multi-planner to have returned a solution!", soln);
+    out.solutions.push_back(std::move(soln));
+    return out;
 }
 
 std::unique_ptr<WorkingSet> CBRForNoMPResultsStrategy::extractWorkingSet() {

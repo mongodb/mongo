@@ -810,10 +810,8 @@ const PlanExplainer::ExplainVersion& PlanExplainerImpl::getVersion() const {
     return kExplainVersion;
 }
 
-bool PlanExplainerImpl::areThereRejectedPlansToExplain() const {
-    return _explainData.rejectedPlansWithStages.size() > 0 ||
-        getStageByType(_root, STAGE_MULTI_PLAN) != nullptr;
-    ;
+bool PlanExplainerImpl::isMultiPlan() const {
+    return getStageByType(_root, STAGE_MULTI_PLAN) != nullptr;
 }
 
 std::string PlanExplainerImpl::getPlanSummary() const {
@@ -1018,8 +1016,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
     if (internalQueryAllowForcedPlanByHash.load() && _solution) {
         bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
     }
-    statsToBSON(_explainData.planStageQsnMap,
-                _explainData.estimates,
+    statsToBSON(_planStageQsnMap,
+                _planRankingResult.estimates,
                 *stats,
                 verbosity,
                 winningPlanIdx,
@@ -1036,8 +1034,6 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanTrialStats() co
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlansStats(
     ExplainOptions::Verbosity verbosity) const {
     std::vector<PlanStatsDetails> res;
-    // TODO SERVER-117119. Delete to make plan explainer multiplanner unaware. Leverage
-    // _explainsData's contents.
     auto mps = getMultiPlanStage(_root);
     if (mps) {
         auto bestPlanIdx = mps->bestPlanIdx();
@@ -1058,8 +1054,8 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
                     bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
                 }
                 auto stats = _root->getStats();
-                statsToBSON(_explainData.planStageQsnMap,
-                            _explainData.estimates,
+                statsToBSON(_planStageQsnMap,
+                            _planRankingResult.estimates,
                             *stats,
                             verbosity,
                             i,
@@ -1081,9 +1077,13 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
         }
     }
 
-    for (size_t i = 0; i < _explainData.rejectedPlansWithStages.size(); ++i) {
-        auto&& rejectedPlan = _explainData.rejectedPlansWithStages[i].planStage;
-        auto&& rejectedSoln = _explainData.rejectedPlansWithStages[i].solution;
+    // For each rejected plan via CBR, explain it, and look up the corresponding cost and CE.
+    tassert(10872501,
+            "CBR PlanStage and QuerySolution vectors must have equal length.",
+            _cbrRejectedPlanStages.size() == _planRankingResult.rejectedPlans.size());
+    for (size_t i = 0; i < _cbrRejectedPlanStages.size(); ++i) {
+        auto&& rejectedPlan = _cbrRejectedPlanStages[i];
+        auto&& rejectedSoln = _planRankingResult.rejectedPlans[i];
         const auto candidateSolutionHash = rejectedSoln->hash();
         bool isCached = _cachedPlanHash && (*_cachedPlanHash == candidateSolutionHash);
         BSONObjBuilder bob;
@@ -1091,25 +1091,15 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
             bob.append("solutionHashUnstable", (long long)candidateSolutionHash);
         }
         auto stats = rejectedPlan->getStats();
-        statsToBSON(_explainData.planStageQsnMap,
-                    _explainData.estimates,
+        statsToBSON(_planStageQsnMap,
+                    _planRankingResult.estimates,
                     *stats,
                     verbosity,
                     i,
                     &bob,
                     &bob,
                     isCached);
-        auto summary = [&]() -> boost::optional<PlanSummaryStats> {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                auto summary = collectExecutionStatsSummary(stats.get(), i);
-                if (verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
-                    summary.score = rejectedSoln->score;
-                }
-                return summary;
-            }
-            return {};
-        }();
-        res.push_back({bob.obj(), summary});
+        res.push_back({bob.obj(), boost::none /*summary*/});
     }
 
     return res;

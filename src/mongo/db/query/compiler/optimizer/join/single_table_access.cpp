@@ -124,11 +124,7 @@ StatusWith<SingleTableAccessPlansResult> singleTableAccessPlans(
         }
         // Save solution and corresponding estimates for the best plan
         solns[node.accessPath.get()] = std::move(cbrResult.solutions.front());
-        tassert(11540201,
-                "Expected to have estimation data for single table access plan",
-                cbrResult.maybeExplainData.has_value());
-        estimates.insert(cbrResult.maybeExplainData->estimates.begin(),
-                         cbrResult.maybeExplainData->estimates.end());
+        estimates.insert(cbrResult.estimates.begin(), cbrResult.estimates.end());
     }
 
     return SingleTableAccessPlansResult{

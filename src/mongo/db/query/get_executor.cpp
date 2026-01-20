@@ -368,7 +368,7 @@ public:
             } else {
                 planCacheCounters.incrementClassicSkippedCounter();
             }
-            return buildSingleSolutionPlan(std::move(solution), boost::none);
+            return buildSingleSolutionPlan(std::move(solution), QueryPlanner::PlanRankingResult{});
         }
 
         // Tailable: If the query requests tailable the collection must be capped.
@@ -477,9 +477,8 @@ public:
                                 2,
                                 "Using fast count",
                                 "query"_attr = redact(_queryStringForDebugLog));
-                    return buildSingleSolutionPlan(
-                        std::move(solutions[i]),
-                        std::move(rankerResult.getValue().maybeExplainData));
+                    return buildSingleSolutionPlan(std::move(solutions[i]),
+                                                   std::move(rankerResult.getValue()));
                 }
             }
         }
@@ -493,10 +492,9 @@ public:
             // Only one possible plan. Build the stages from the solution.
             solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
             return buildSingleSolutionPlan(std::move(solutions[0]),
-                                           std::move(rankerResult.getValue().maybeExplainData));
+                                           std::move(rankerResult.getValue()));
         }
-        return buildMultiPlan(std::move(solutions),
-                              std::move(rankerResult.getValue().maybeExplainData));
+        return buildMultiPlan(std::move(solutions), std::move(rankerResult.getValue()));
     }
 
     const QueryPlannerParams& getPlannerParams() {
@@ -540,7 +538,7 @@ protected:
      */
     virtual std::unique_ptr<ResultType> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
-        boost::optional<PlanExplainerData> maybeExplainData) = 0;
+        QueryPlanner::PlanRankingResult planRankingResult) = 0;
 
     /**
      * Either constructs a PlanStage tree from a cached plan (if exists in the plan cache), or
@@ -573,7 +571,7 @@ protected:
      */
     virtual std::unique_ptr<ResultType> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
-        boost::optional<PlanExplainerData> maybeExplainData) = 0;
+        QueryPlanner::PlanRankingResult planRankingResult) = 0;
 
     /**
      * Helper for getting the QuerySolution hash from the plan caches.
@@ -662,13 +660,10 @@ private:
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
-        boost::optional<PlanExplainerData> maybeExplainData) final {
+        QueryPlanner::PlanRankingResult planRankingResult) final {
         auto result = releaseResult();
         result->runtimePlanner = std::make_unique<crp_classic::SingleSolutionPassthroughPlanner>(
-            makePlannerData(),
-            std::move(solution),
-            maybeExplainData.has_value() ? std::move(maybeExplainData.value())
-                                         : PlanExplainerData{});
+            makePlannerData(), std::move(solution), std::move(planRankingResult));
         return result;
     }
 
@@ -724,13 +719,10 @@ private:
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
-        boost::optional<PlanExplainerData> maybeExplainData) final {
+        QueryPlanner::PlanRankingResult planRankingResult) final {
         auto result = releaseResult();
         result->runtimePlanner = std::make_unique<crp_classic::MultiPlanner>(
-            makePlannerData(),
-            std::move(solutions),
-            maybeExplainData.has_value() ? std::move(maybeExplainData.value())
-                                         : PlanExplainerData{});
+            makePlannerData(), std::move(solutions), std::move(planRankingResult));
         return result;
     }
 
@@ -819,8 +811,7 @@ protected:
     }
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSingleSolutionPlan(
-        std::unique_ptr<QuerySolution> solution,
-        boost::optional<PlanExplainerData> maybeExplainData) final {
+        std::unique_ptr<QuerySolution> solution, QueryPlanner::PlanRankingResult) final {
         // TODO SERVER-92589: Support CBR with SBE plans
         auto result = this->releaseResult();
         result->runtimePlanner = std::make_unique<crp_sbe::SingleSolutionPassthroughPlanner>(
@@ -836,7 +827,7 @@ protected:
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
-        boost::optional<PlanExplainerData> maybeExplainData) final {
+        QueryPlanner::PlanRankingResult planRankingResult) final {
         // TODO SERVER-92589: Support CBR with SBE plans
         for (auto&& solution : solutions) {
             solution->indexFilterApplied = this->_plannerParams->indexFiltersApplied;
@@ -854,7 +845,7 @@ protected:
             return result;
         } else {
             return this->buildSingleSolutionPlan(std::move(solutions[0]),
-                                                 std::move(maybeExplainData));
+                                                 std::move(planRankingResult));
         }
     }
 

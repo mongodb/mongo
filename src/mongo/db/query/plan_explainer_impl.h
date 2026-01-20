@@ -31,14 +31,18 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/classic/multi_plan.h"
 #include "mongo/db/exec/classic/plan_stage.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
@@ -59,13 +63,16 @@ public:
         : PlanExplainer{explainInfo}, _root{root} {}
     PlanExplainerImpl(PlanStage* root,
                       boost::optional<size_t> cachedPlanHash,
-                      boost::optional<PlanExplainerData> maybeExplainData)
+                      QueryPlanner::PlanRankingResult planRankingResult,
+                      stage_builder::PlanStageToQsnMap planStageQsnMap,
+                      std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages)
         : _root{root},
           _cachedPlanHash(cachedPlanHash),
-          _explainData(maybeExplainData.has_value() ? std::move(maybeExplainData.value())
-                                                    : PlanExplainerData{}) {}
+          _planRankingResult(std::move(planRankingResult)),
+          _planStageQsnMap(std::move(planStageQsnMap)),
+          _cbrRejectedPlanStages(std::move(cbrRejectedPlanStages)) {}
     const ExplainVersion& getVersion() const final;
-    bool areThereRejectedPlansToExplain() const final;
+    bool isMultiPlan() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
@@ -78,7 +85,9 @@ public:
 private:
     PlanStage* const _root;
     boost::optional<size_t> _cachedPlanHash;
-    PlanExplainerData _explainData;
+    QueryPlanner::PlanRankingResult _planRankingResult;
+    stage_builder::PlanStageToQsnMap _planStageQsnMap;
+    std::vector<std::unique_ptr<PlanStage>> _cbrRejectedPlanStages;
 };
 
 /**

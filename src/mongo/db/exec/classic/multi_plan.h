@@ -204,18 +204,6 @@ public:
      */
     bool hasBackupPlan() const;
 
-    /**
-     * Extracts all rejected plans along with their PlanStages for explain purposes.
-     */
-    [[nodiscard]] std::vector<SolutionWithPlanStage> extractRejectedPlansAndStages();
-
-    /**
-     * Rejects all candidate plans without picking a best plan. Needed before extracting rejected
-     * plans for explain when no best plan was chosen. Also cannot be used if a best plan was
-     * already chosen.
-     */
-    void abandonTrials();
-
 protected:
     void doSaveStateRequiresCollection() final {}
 

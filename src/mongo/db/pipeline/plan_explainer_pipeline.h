@@ -49,7 +49,7 @@ public:
     PlanExplainerPipeline(const Pipeline* pipeline, const exec::agg::Pipeline* execPipeline)
         : _pipeline{pipeline}, _execPipeline(execPipeline) {}
 
-    bool areThereRejectedPlansToExplain() const final {
+    bool isMultiPlan() const final {
         return false;
     }
 

@@ -44,17 +44,23 @@
 namespace mongo::classic_runtime_planner {
 
 ClassicPlannerInterface::ClassicPlannerInterface(PlannerData plannerData)
-    : ClassicPlannerInterface(std::move(plannerData), PlanExplainerData{}) {}
+    : ClassicPlannerInterface(std::move(plannerData), QueryPlanner::PlanRankingResult{}) {}
 
 ClassicPlannerInterface::ClassicPlannerInterface(PlannerData plannerData,
-                                                 PlanExplainerData explainData)
-    : _plannerData(std::move(plannerData)), _planExplainerData(std::move(explainData)) {
+                                                 QueryPlanner::PlanRankingResult planRankingResult)
+    : _planRankingResult(std::move(planRankingResult)), _plannerData(std::move(plannerData)) {
     if (collections().hasMainCollection()) {
         _nss = collections().getMainCollection()->ns();
     } else {
         invariant(cq());
         const auto nssOrUuid = cq()->getFindCommandRequest().getNamespaceOrUUID();
         _nss = nssOrUuid.isNamespaceString() ? nssOrUuid.nss() : NamespaceString::kEmpty;
+    }
+    if (cq()->getExplain().has_value()) {
+        // Translate CBR rejected plans into PlanStages so they can be explained
+        for (auto&& solution : _planRankingResult.rejectedPlans) {
+            _cbrRejectedPlanStages.push_back(buildExecutableTree(*solution));
+        }
     }
 }
 
@@ -224,21 +230,7 @@ Status ClassicPlannerInterface::plan() {
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::makeExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery) {
     invariant(_state == kInitialized);
-    if (cq()->getExplain().has_value()) {
-        for (auto&& solutionWithPlanStage : _planExplainerData.rejectedPlansWithStages) {
-            if (!solutionWithPlanStage.planStage) {
-                // If planStage is not already built, build it. This will be the case for CBR
-                // rejected plans that are not multi-planned.
-                auto execTree = buildExecutableTree(*solutionWithPlanStage.solution);
-                solutionWithPlanStage.planStage = std::move(execTree);
-            }
-        }
-        for (auto& mapping : _planStageQsnMap) {
-            _planExplainerData.planStageQsnMap.emplace(std::move(mapping));
-        }
-    }
     _state = kDisposed;
-
     return uassertStatusOK(plan_executor_factory::make(opCtx(),
                                                        std::move(_plannerData.workingSet),
                                                        std::move(_root),
@@ -250,7 +242,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> ClassicPlannerInterface::ma
                                                        std::move(_nss),
                                                        yieldPolicy(),
                                                        cachedPlanHash(),
-                                                       std::move(_planExplainerData)));
+                                                       std::move(_planRankingResult),
+                                                       std::move(_planStageQsnMap),
+                                                       std::move(_cbrRejectedPlanStages)));
 }
 
 std::unique_ptr<PlanStage> ClassicPlannerInterface::buildExecutableTree(const QuerySolution& qs) {

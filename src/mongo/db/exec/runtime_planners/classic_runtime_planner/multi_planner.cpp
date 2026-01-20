@@ -36,8 +36,8 @@ namespace mongo::classic_runtime_planner {
 
 MultiPlanner::MultiPlanner(PlannerData plannerData,
                            std::vector<std::unique_ptr<QuerySolution>> solutions,
-                           PlanExplainerData maybeExplainData)
-    : ClassicPlannerInterface(std::move(plannerData), std::move(maybeExplainData)) {
+                           QueryPlanner::PlanRankingResult planRankingResult)
+    : ClassicPlannerInterface(std::move(plannerData), std::move(planRankingResult)) {
     auto stage = std::make_unique<MultiPlanStage>(
         cq()->getExpCtxRaw(),
         collections().getMainCollectionPtrOrAcquisition(),
@@ -91,18 +91,6 @@ std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
         return _multiplanStage->extractBestSolution();
     }
     return nullptr;
-}
-
-PlanExplainerData MultiPlanner::extractExplainData() {
-    PlanExplainerData out;
-    auto rejectedPlansWithStages = _multiplanStage->extractRejectedPlansAndStages();
-    out.rejectedPlansWithStages = std::move(rejectedPlansWithStages);
-    out.planStageQsnMap = std::move(_planStageQsnMap);
-    return out;
-}
-
-void MultiPlanner::abandonTrials() {
-    _multiplanStage->abandonTrials();
 }
 
 }  // namespace mongo::classic_runtime_planner

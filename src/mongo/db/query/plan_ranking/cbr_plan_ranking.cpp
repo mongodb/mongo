@@ -36,7 +36,7 @@
 
 namespace mongo {
 namespace plan_ranking {
-StatusWith<plan_ranking::PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
+StatusWith<QueryPlanner::PlanRankingResult> CBRPlanRankingStrategy::rankPlans(
     OperationContext* opCtx,
     CanonicalQuery& query,
     const QueryPlannerParams& plannerParams,

@@ -41,7 +41,6 @@
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
-#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
@@ -97,6 +96,35 @@ public:
     };
 
     /**
+     * Holds the result of plan ranking.
+     */
+    struct PlanRankingResult {
+        // Query solutions resulting from plan ranking. This set may include one or more solutions.
+        // If there are several that means whichever ranking strategy was used wasn't able to pick a
+        // single best plan and the decision will be deferred to runtime planning by multiplanner.
+        std::vector<std::unique_ptr<QuerySolution>> solutions;
+
+        // For explain purposes.
+
+        // Query solutions which the plan ranker rejects from consideration. Useful for the
+        // implementation of explain to expose why certain plans were not chosen.
+        std::vector<std::unique_ptr<QuerySolution>> rejectedPlans;
+
+        // Only populated if CBR was involved in plan ranking.
+        //
+        // Estimate information for all QuerySolutionNodes in all the plans which we were able to
+        // cost. This may include some plans in 'solutions' and all of the plans in 'rejectedPlans'.
+        // If two plans contain identical QSNs, they are treated as separate entries in this map.
+        cost_based_ranker::EstimateMap estimates;
+
+        // True if these plans were chosen without a pre-execution trial run that measured the
+        // 'work' metric (for example, selected by a non-multiplanner). Such plans must be
+        // run in a pre-execution phase to measure the amount of work done to produce the
+        // first batch, so they can be considered for insertion into the classic plan cache.
+        bool needsWorksMeasured{false};
+    };
+
+    /**
      * Given a CanonicalQuery and a QSN tree, creates QSN nodes for each pipeline stage in 'query'
      * and grafts them on top of the existing QSN tree. If 'query' has an empty pipeline, this
      * function is a noop.
@@ -121,7 +149,7 @@ public:
      * rejected on the basis of cost, as well as any non-rejected plans from which the caller can
      * select a winner.
      */
-    static StatusWith<plan_ranking::PlanRankingResult> planWithCostBasedRanking(
+    static StatusWith<PlanRankingResult> planWithCostBasedRanking(
         const CanonicalQuery& query,
         const QueryPlannerParams& params,
         ce::SamplingEstimator* samplingEstimator,

@@ -69,7 +69,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 std::move(nss),
                 yieldPolicy,
                 cachedPlanHash,
-                boost::none /* maybeExplainData */);
+                QueryPlanner::PlanRankingResult{},
+                {} /* planStageQsnMap */,
+                {} /* cbrRejectedPlanStages */);
 }
 
 
@@ -94,7 +96,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                 std::move(nss),
                 yieldPolicy,
                 boost::none /* cachedPlanHash */,
-                boost::none /* maybeExplainData */);
+                QueryPlanner::PlanRankingResult{},
+                {} /* planStageQsnMap */,
+                {} /* cbrRejectedPlanStages */);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
@@ -109,7 +113,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     boost::optional<size_t> cachedPlanHash,
-    boost::optional<PlanExplainerData> maybeExplainData) {
+    QueryPlanner::PlanRankingResult planRankingResult,
+    stage_builder::PlanStageToQsnMap planStageQsnMap,
+    std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages) {
     try {
         auto execImpl = new PlanExecutorImpl(opCtx,
                                              std::move(ws),
@@ -122,7 +128,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                              std::move(nss),
                                              yieldPolicy,
                                              cachedPlanHash,
-                                             std::move(maybeExplainData));
+                                             std::move(planRankingResult),
+                                             std::move(planStageQsnMap),
+                                             std::move(cbrRejectedPlanStages));
         PlanExecutor::Deleter planDeleter(opCtx);
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(execImpl, std::move(planDeleter));
         return {std::move(exec)};

@@ -34,8 +34,8 @@ namespace mongo::classic_runtime_planner {
 SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
     PlannerData plannerData,
     std::unique_ptr<QuerySolution> querySolution,
-    PlanExplainerData explainData)
-    : ClassicPlannerInterface(std::move(plannerData), std::move(explainData)),
+    QueryPlanner::PlanRankingResult planRankingResult)
+    : ClassicPlannerInterface(std::move(plannerData), std::move(planRankingResult)),
       _querySolution(std::move(querySolution)) {
     auto root = buildExecutableTree(*_querySolution);
     setRoot(std::move(root));

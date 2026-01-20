@@ -43,12 +43,13 @@
 
 namespace mongo {
 namespace plan_ranking {
-StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
-                                                    CanonicalQuery& query,
-                                                    QueryPlannerParams& plannerParams,
-                                                    PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                                    const MultipleCollectionAccessor& collections,
-                                                    PlannerData plannerData) {
+StatusWith<QueryPlanner::PlanRankingResult> PlanRanker::rankPlans(
+    OperationContext* opCtx,
+    CanonicalQuery& query,
+    QueryPlannerParams& plannerParams,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    const MultipleCollectionAccessor& collections,
+    PlannerData plannerData) {
     auto rankerMode = plannerParams.planRankerMode;
     // TODO SERVER-115496. Enumerate solutions here and pass them to the right ranking strategy.
     switch (rankerMode) {
@@ -110,7 +111,7 @@ StatusWith<PlanRankingResult> PlanRanker::rankPlans(OperationContext* opCtx,
             if (!statusWithMultiPlanSolns.isOK()) {
                 return statusWithMultiPlanSolns.getStatus();
             }
-            return plan_ranking::PlanRankingResult{std::move(statusWithMultiPlanSolns.getValue())};
+            return QueryPlanner::PlanRankingResult{std::move(statusWithMultiPlanSolns.getValue())};
         }
         default:
             MONGO_UNREACHABLE;

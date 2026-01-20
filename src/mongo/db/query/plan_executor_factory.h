@@ -119,7 +119,9 @@ MONGO_MOD_PUBLIC StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     boost::optional<size_t> cachedPlanHash,
-    boost::optional<PlanExplainerData> maybeExplainData);
+    QueryPlanner::PlanRankingResult planRankingResult,
+    stage_builder::PlanStageToQsnMap planStageQsnMap,
+    std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages);
 
 /**
  * Constructs a PlanExecutor for the query 'cq' which will execute the SBE plan 'root'. A yield

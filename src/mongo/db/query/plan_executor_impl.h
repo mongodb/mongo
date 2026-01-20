@@ -155,7 +155,9 @@ public:
                      NamespaceString nss,
                      PlanYieldPolicy::YieldPolicy yieldPolicy,
                      boost::optional<size_t> cachedPlanHash,
-                     boost::optional<PlanExplainerData> maybeExplainData);
+                     QueryPlanner::PlanRankingResult planRankingResult,
+                     stage_builder::PlanStageToQsnMap planStageQsnMap,
+                     std::vector<std::unique_ptr<PlanStage>> cbrRejectedPlanStages);
 
     ~PlanExecutorImpl() override;
     CanonicalQuery* getCanonicalQuery() const final;
