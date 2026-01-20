@@ -1197,23 +1197,11 @@ void CommandRegistry::registerCommand(Command* command) {
     }
 }
 
-namespace {
-boost::optional<ClusterRole> getRegistryRole(const CommandRegistry* reg) {
-    if (auto sc = getGlobalServiceContext())
-        for (auto r : {ClusterRole::ShardServer, ClusterRole::RouterServer})
-            if (auto srv = sc->getService(r); srv && getCommandRegistry(srv) == reg)
-                return ClusterRole(r);
-    return {};
-}
-}  // namespace
 Command* CommandRegistry::findCommand(StringData name) const {
     auto it = _commandNames.find(name);
     if (it == _commandNames.end()) {
-        LOGV2_DEBUG(8097101,
-                    kFailedFindCommandDebugLevel,
-                    "Failed findCommand",
-                    "name"_attr = name,
-                    "registryRole"_attr = getRegistryRole(this));
+        LOGV2_DEBUG(
+            8097101, kFailedFindCommandDebugLevel, "Failed findCommand", "name"_attr = name);
         return nullptr;
     }
     return it->second;
