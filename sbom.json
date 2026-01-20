@@ -3,9 +3,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:a973a3fe-5abe-4432-91fa-cc30c1034545",
-  "version": 12,
+  "version": 13,
   "metadata": {
-    "timestamp": "2026-01-07T21:03:18Z",
+    "timestamp": "2026-01-20T18:10:03Z",
     "lifecycles": [
       {
         "phase": "pre-build"
@@ -63,7 +63,7 @@
       "services": [
         {
           "name": "Endor Labs Inc",
-          "version": "v1.7.742"
+          "version": "v1.7.769"
         }
       ]
     }
@@ -167,7 +167,7 @@
         },
         {
           "name": "internal:endor_labs_bom-ref",
-          "value": "pkg:generic/intel-dfp-math@2.0.1?package-id=378bc021cd4ac04e"
+          "value": "pkg:generic/intel-dfp-math@2.0.1?package-id=378bc021cd4ac04e&vcs_url=https%3A%2F%2Fwww.netlib.org%2Fmisc%2Fintel%2FIntelRDFPMathLib20U1.tar.gz"
         }
       ],
       "evidence": {
@@ -414,7 +414,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/apache/avro@release-1.12.0",
+      "bom-ref": "pkg:github/apache/avro@1.12.0",
       "supplier": {
         "name": "The Apache Software Foundation",
         "url": [
@@ -435,7 +435,7 @@
       ],
       "copyright": "Copyright 2010-2024 The Apache Software Foundation",
       "cpe": "cpe:2.3:a:apache:avro:1.12.0:*:*:*:*:*:*:*",
-      "purl": "pkg:github/apache/avro@release-1.12.0",
+      "purl": "pkg:github/apache/avro@1.12.0",
       "externalReferences": [
         {
           "url": "https://github.com/apache/avro.git",
@@ -1453,7 +1453,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
+      "bom-ref": "pkg:github/gperftools/gperftools@2.9.1",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -1474,7 +1474,7 @@
       ],
       "copyright": "Copyright (c) 2005, Google Inc. All rights reserved.",
       "cpe": "cpe:2.3:a:gperftools_project:gperftools:2.9.1:*:*:*:*:*:*:*",
-      "purl": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
+      "purl": "pkg:github/gperftools/gperftools@2.9.1",
       "externalReferences": [
         {
           "url": "https://github.com/gperftools/gperftools.git",
@@ -1849,7 +1849,7 @@
         },
         {
           "name": "internal:endor_labs_bom-ref",
-          "value": "pkg:generic/zlib@1.3.1?package-id=c8022a0449368a5c"
+          "value": "pkg:generic/zlib@1.3.1?package-id=c8022a0449368a5c&vcs_url=https%3A%2F%2Fzlib.net%2Ffossils%2Fzlib-1.3.1.tar.gz"
         }
       ],
       "evidence": {
@@ -2408,7 +2408,7 @@
         },
         {
           "name": "internal:endor_labs_bom-ref",
-          "value": "pkg:generic/libstemmer@1.0.0?package-id=bf7f3ec34662591d"
+          "value": "pkg:generic/libstemmer@1.0.0?package-id=bf7f3ec34662591d&vcs_url=http%3A%2F%2Fsnowball.tartarus.org%2Fdist%2Flibstemmer_c.tgz"
         }
       ],
       "evidence": {
@@ -2619,7 +2619,7 @@
         "pkg:github/arximboldi/immer@0b3aaf699b9d6f2e89f8e2b6d1221c307e02bda3",
         "pkg:github/chriskohlhoff/asio@asio-1-34-2",
         "pkg:github/aws/aws-sdk-cpp@1.11.471",
-        "pkg:github/apache/avro@release-1.12.0",
+        "pkg:github/apache/avro@1.12.0",
         "pkg:github/google/benchmark@v1.5.2",
         "pkg:github/boostorg/boost@boost-1.88.0",
         "pkg:github/c-ares/c-ares@cares-1_27_0",
@@ -2632,7 +2632,7 @@
         "pkg:github/google/s2geometry@a25c502bda9d7e0274b9e2b7825fbddf13cc0306",
         "pkg:github/google/snappy@1.1.10",
         "pkg:github/google/googletest@v1.17.0",
-        "pkg:github/gperftools/gperftools@gperftools-2.9.1",
+        "pkg:github/gperftools/gperftools@2.9.1",
         "pkg:github/grpc/grpc@v1.74.1",
         "pkg:github/unicode-org/icu@icu-release-57-1",
         "pkg:generic/intel/IntelRDFPMathLib@2.0.1",
@@ -2696,7 +2696,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/apache/avro@release-1.12.0",
+      "ref": "pkg:github/apache/avro@1.12.0",
       "dependsOn": []
     },
     {
@@ -2776,7 +2776,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/gperftools/gperftools@gperftools-2.9.1",
+      "ref": "pkg:github/gperftools/gperftools@2.9.1",
       "dependsOn": []
     },
     {

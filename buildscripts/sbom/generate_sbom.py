@@ -329,7 +329,9 @@ def set_component_version(
     component["bom-ref"] = component["bom-ref"].replace("{{VERSION}}", purl_version)
     component["version"] = component["version"].replace("{{VERSION}}", version)
     if component.get("purl"):
-        component["purl"] = component["purl"].replace("{{VERSION}}", purl_version)
+        component["purl"] = component["purl"].replace(
+            "{{VERSION}}", urllib.parse.quote(purl_version)
+        )
         if not is_valid_purl(component["purl"]):
             logger.warning(f"PURL: Invalid PURL ({component['purl']})")
     if component.get("cpe"):

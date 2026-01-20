@@ -438,6 +438,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/avro-cpp/scripts/import.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
@@ -1477,6 +1481,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/gperftools/scripts/import.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
@@ -2130,6 +2138,10 @@
         {
           "name": "import_script_path",
           "value": "src/third_party/opentelemetry-proto/scripts/import.sh"
+        },
+        {
+          "name": "generate_sbom:priority_version_source",
+          "value": "import_script"
         }
       ],
       "evidence": {
