@@ -132,16 +132,36 @@ CollectionType determineCollectionType(const Document& data, const DatabaseName&
     tassert(8814203,
             "'viewOn' should either be missing or a non-empty string",
             viewOn.missing() || viewOn.getType() == BSONType::string);
-    if (viewOn.missing()) {
-        return CollectionType::kCollection;
-    }
-    StringData viewOnNss = viewOn.getStringData();
-    tassert(8814204, "'viewOn' should be a non-empty string", !viewOnNss.empty());
-    if (NamespaceString nss = NamespaceStringUtil::deserialize(dbName, viewOnNss);
-        nss.isTimeseriesBucketsCollection()) {
+
+    const bool isTimeseriesCollection = [&]() {
+        if (viewOn.missing()) {
+            const bool hasTimeseriesAttribute = !data.getField("timeseries"_sd).missing();
+
+            // For backwards compatibility do not classify buckets collections as timeseries.
+            const bool isBucketsCollection = [&]() {
+                auto createField = data.getField("create"_sd);
+                if (createField.missing()) {
+                    return false;
+                }
+
+                return NamespaceStringUtil::deserialize(dbName, createField.getStringData())
+                    .isTimeseriesBucketsCollection();
+            }();
+            return hasTimeseriesAttribute && !isBucketsCollection;
+        }
+
+        StringData viewOnNss = viewOn.getStringData();
+        tassert(8814204, "'viewOn' should be a non-empty string", !viewOnNss.empty());
+        return NamespaceStringUtil::deserialize(dbName, viewOnNss).isTimeseriesBucketsCollection();
+    }();
+
+    if (isTimeseriesCollection) {
         return CollectionType::kTimeseries;
+    } else if (viewOn.missing()) {
+        return CollectionType::kCollection;
+    } else {
+        return CollectionType::kView;
     }
-    return CollectionType::kView;
 }
 
 Document copyDocExceptFields(const Document& source, std::initializer_list<StringData> fieldNames) {
@@ -453,12 +473,13 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 Document opDesc = copyDocExceptFields(oField, {"create"_sd});
                 operationDescription = Value(opDesc);
 
-                // Populate 'nsType' field with collection type (always "collection" here).
+                // Populate 'nsType' field with collection type.
                 auto collectionType = determineCollectionType(oField, nss.dbName());
                 tassert(8814201,
-                        "'operationDescription.type' should always resolve to 'collection' for "
-                        "collection create events",
-                        collectionType == CollectionType::kCollection);
+                        "'nsType' field should always resolve to 'collection' or 'timeseries' for "
+                        "collection creation event",
+                        collectionType == CollectionType::kCollection ||
+                            collectionType == CollectionType::kTimeseries);
                 nsType = toString(collectionType);
             } else if (auto nssField = oField.getField("createIndexes"_sd); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;

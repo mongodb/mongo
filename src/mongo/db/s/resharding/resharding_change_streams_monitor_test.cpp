@@ -1225,6 +1225,10 @@ TEST_F(ReshardingChangeStreamsMonitorTest, TestChangeStreamMonitorSettingsForDon
 
     ASSERT_EQ(donorRequest.getNamespace(), sourceNss.makeTimeseriesBucketsNamespace());
 
+    // Ensure that 'rawData' is passed for change stream aggregate request over timeseries
+    // collection.
+    ASSERT_TRUE(donorRequest.getRawData());
+
     ASSERT_TRUE(!donorRequest.getPipeline().empty());
     BSONObj donorFirstStage = donorRequest.getPipeline().front();
 

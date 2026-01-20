@@ -8,6 +8,8 @@
  *
  * @tags: [
  *   uses_change_streams,
+ *   # Change streams must be opened with rawData: true flag to watch the underlying buckets collection, which was introduced in 8.3.
+ *   requires_fcv_83,
  * ]
  */
 
@@ -106,7 +108,7 @@ assert.commandWorked(
 //
 // Note: the change stream is on the database because watching the change stream events on the
 // raw buckets is not allowed.
-const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
+const mongosDbChangeStream = db.watch([], {showSystemEvents: true, rawData: true});
 
 const shard0DB = st.shard0.getDB(dbName);
 const shard0Coll = shard0DB.getCollection(collName);

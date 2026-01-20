@@ -15,6 +15,9 @@ selector:
 
     # TODO: SERVER-114511 re-enable this test.
     - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+
+    # TODO: SERVER-117391 Ensure change_streams/timeseries.js test passes when running change streams in v2 mode.
+    - jstests/change_streams/timeseries.js
   exclude_with_any_tags:
     ##
     # The next tags correspond to the special errors thrown by the

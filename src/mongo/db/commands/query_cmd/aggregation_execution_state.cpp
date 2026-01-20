@@ -49,6 +49,8 @@
 #include "mongo/db/version_context.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 
+#include <fmt/format.h>
+
 namespace mongo {
 namespace {
 
@@ -276,20 +278,34 @@ public:
     void validate() const override {
         AggCatalogState::validate();
 
-        // Raise an error if original nss is a view. We do not need to check this if we are opening
-        // a stream on an entire db or across the cluster.
+        // Raise an error if original nss is a view or timeseries collection. We do not need to
+        // check this if we are opening a stream on an entire db or across the cluster.
         if (!_aggExState.getOriginalNss().isCollectionlessAggregateNS()) {
-            auto view = _catalog->lookupView(_aggExState.getOpCtx(), _aggExState.getOriginalNss());
-            uassert(ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "Cannot run aggregation on timeseries with namespace "
-                                  << _aggExState.getOriginalNss().toStringForErrorMsg(),
-                    !view || !view->timeseries());
+            // Only allow change streams over timeseries collections when 'rawData' set to true.
+            // This will result in change streams emitting events in the internal bucket format.
+            if (!isRawDataOperation(_aggExState.getOpCtx())) {
+                uassert(ErrorCodes::CommandNotSupported,
+                        fmt::format("Cannot run aggregation on timeseries with namespace {}",
+                                    _aggExState.getOriginalNss().toStringForErrorMsg()),
+                        !isTimeseries());
+            }
             uassert(ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "Namespace "
                                   << _aggExState.getOriginalNss().toStringForErrorMsg()
                                   << " is a view, not a collection",
-                    !view);
+                    !_catalog->lookupView(_aggExState.getOpCtx(), _aggExState.getOriginalNss()));
         }
+    }
+
+    /**
+     * Returns true if the collection is a timeseries collection (backed by view or viewless).
+     */
+    bool isTimeseries() const override {
+        if (auto collPtr = _catalog->lookupCollectionByNamespace(_aggExState.getOpCtx(),
+                                                                 _aggExState.getOriginalNss())) {
+            return collPtr->isTimeseriesCollection();
+        }
+        return false;
     }
 
     std::pair<std::unique_ptr<CollatorInterface>, ExpressionContextCollationMatchesDefault>

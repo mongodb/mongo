@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
@@ -90,6 +91,12 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
 
     if (!expCtx->getChangeStreamSpec()->getShowMigrationEvents()) {
         oplogFilter->add(buildNotFromMigrateFilter(expCtx, userMatch, backingBsonObjs));
+    }
+
+    // If the change stream is opened without the 'rawData' flag, we must filter out events
+    // with 'isTimeseries' set to true.
+    if (!isRawDataOperation(expCtx->getOperationContext())) {
+        oplogFilter->add(buildNotViewlessTimeSeriesFilter(expCtx, userMatch, backingBsonObjs));
     }
 
     // Create an $or filter which only captures relevant events in the oplog.

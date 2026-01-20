@@ -45,6 +45,7 @@
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 
 #include <set>
 #include <string>
@@ -74,6 +75,15 @@ std::unique_ptr<MatchExpression> buildTsFilter(
     std::vector<BSONObj>& backingBsonObjs) {
     return MatchExpressionParser::parseAndNormalize(
         backingBsonObjs.emplace_back(BSON("ts" << GTE << startFromInclusive)), expCtx);
+}
+
+std::unique_ptr<MatchExpression> buildNotViewlessTimeSeriesFilter(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const MatchExpression* userMatch,
+    std::vector<BSONObj>& backingBsonObjs) {
+    auto isTimeseriesFilter = BSON(repl::OplogEntry::kIsTimeseriesFieldName << BSON("$ne" << true));
+    return MatchExpressionParser::parseAndNormalize(
+        backingBsonObjs.emplace_back(isTimeseriesFilter), expCtx);
 }
 
 std::unique_ptr<MatchExpression> buildFromMigrateSystemOpFilter(
@@ -300,6 +310,14 @@ std::unique_ptr<MatchExpression> buildTransactionFilter(
 
     // "o.applyOps" stores the list of operations, so it must be an array.
     applyOpsBuilder.append("o.applyOps", BSON("$type" << "array"));
+
+    // If the change stream is opened without the 'rawData' flag, we must filter out oplog entries
+    // with 'isTimeseries' set to true.
+    if (!isRawDataOperation(expCtx->getOperationContext())) {
+        auto isTimeseriesFieldPath =
+            fmt::format("o.applyOps.{}", repl::OplogEntry::kIsTimeseriesFieldName);
+        applyOpsBuilder.append(isTimeseriesFieldPath, BSON("$ne" << true));
+    }
 
     BSONObj nsMatch = DocumentSourceChangeStream::getNsMatchObjForChangeStream(expCtx);
 

@@ -37,6 +37,7 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -300,6 +301,12 @@ AggregateCommandRequest ReshardingChangeStreamsMonitor::makeAggregateCommandRequ
 
     aggRequest.setComment(
         mongo::IDLAnyTypeOwned(BSON("" << makeAggregateComment(_reshardingUUID)).firstElement()));
+
+    // TODO: SERVER-107180 always set rawData once 9.0 becomes last LTS.
+    if (gFeatureFlagAllBinariesSupportRawDataOperations.isEnabled(
+            kNoVersionContext, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        aggRequest.setRawData(true);
+    }
 
     return aggRequest;
 }

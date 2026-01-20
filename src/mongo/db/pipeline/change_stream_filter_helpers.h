@@ -53,6 +53,16 @@ std::unique_ptr<MatchExpression> buildTsFilter(
     std::vector<BSONObj>& backingBsonObjs);
 
 /**
+ * Produce a filter that excludes time-series oplog entries when rawData flag is not set. These
+ * unsupported operations are marked in the oplog with the "isTimeseries" field. Also populates the
+ * 'backingBsonObjs' vector to store BSONObjs referenced in the returned MatchExpression.
+ */
+std::unique_ptr<MatchExpression> buildNotViewlessTimeSeriesFilter(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const MatchExpression* userMatch,
+    std::vector<BSONObj>& backingBsonObjs);
+
+/**
  * Produce a filter that rejects any operations marked with the "fromMigrate" flag. These operations
  * occur as part of chunk migration and should not be visible to user change streams, because they
  * don't reflect user operations to the database.

@@ -9379,6 +9379,37 @@ export const authCommandsLib = {
                 },
             ],
         },
+        {
+            testname: "aggregate_$changeStream_rawData",
+            command: {
+                aggregate: "foo",
+                pipeline: [{$changeStream: {}}],
+                cursor: {},
+                rawData: true,
+            },
+            skipTest: (conn) => {
+                const isStandalone =
+                    !FixtureHelpers.isReplSet(conn.getDB(adminDbName)) &&
+                    !FixtureHelpers.isMongos(conn.getDB(adminDbName));
+                return isStandalone || !isFeatureEnabled(conn, "featureFlagRawDataCrudOperations");
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: ""},
+                            actions: ["performRawDataOperations", "changeStream", "find"],
+                        },
+                    ],
+                },
+                {
+                    runOnDb: firstDbName,
+                    privileges: [],
+                    expectAuthzFailure: true,
+                },
+            ],
+        },
     ],
 
     /************* SHARED TEST LOGIC ****************/

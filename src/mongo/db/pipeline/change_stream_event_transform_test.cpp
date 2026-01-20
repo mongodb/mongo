@@ -266,6 +266,31 @@ TEST(ChangeStreamEventTransformTest, TestCreateTimeseriesTransform) {
                        expectedDoc);
 }
 
+TEST(
+    ChangeStreamEventTransformTest,
+    Given_CreateTimeseriesCollectionEvent_When_ApplyingTransformation_Then_CollectionTypeIsTimeseries) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+    auto serviceContext = std::make_unique<QueryTestServiceContext>();
+    auto opCtx = serviceContext->makeOperationContext();
+    auto oplogEntry =
+        makeOplogEntry(repl::OpTypeEnum::kCommand,  // op type
+                       nss,                         // namespace
+                       BSON("create" << nss.coll() << "timeseries"
+                                     << BSON("timeField" << "time"
+                                                         << "metaField"
+                                                         << "meta"
+                                                         << "granularity"
+                                                         << "seconds"
+                                                         << "bucketMaxSpanSeconds" << 3600)),  // o
+                       testUuid(),    // uuid
+                       boost::none,   // fromMigrate
+                       boost::none);  // o2
+    Document resultDoc = applyTransformation(oplogEntry, nss);
+
+    ASSERT_EQ(resultDoc[DocumentSourceChangeStream::kNsTypeField].getStringData(), "timeseries"_sd);
+}
+
 TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {
     const NamespaceString systemViewNss = NamespaceString::makeSystemDotViewsNamespace(
         DatabaseName::createDatabaseName_forTest(boost::none, "viewDB"));

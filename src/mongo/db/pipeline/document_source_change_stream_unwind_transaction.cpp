@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
+#include "mongo/db/shard_role/shard_catalog/raw_data_operation.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -94,6 +95,14 @@ std::unique_ptr<MatchExpression> buildUnwindTransactionFilter(
     // explicitly requested in the spec.
     if (!expCtx->getChangeStreamSpec()->getShowMigrationEvents()) {
         unwindFilter->add(buildNotFromMigrateFilter(expCtx, userMatch, bsonObj));
+    }
+
+    // If the change stream is opened without the 'rawData' flag, we must filter out events with
+    // 'isTimeseries' set to true.
+    // While currently transactions cannot contain time-series writes, this filter is included for
+    // future-proofing, in case that changes.
+    if (!isRawDataOperation(expCtx->getOperationContext())) {
+        unwindFilter->add(buildNotViewlessTimeSeriesFilter(expCtx, userMatch, bsonObj));
     }
 
     // Attempt to rewrite the user's filter and combine it with the standard operation filter. We do

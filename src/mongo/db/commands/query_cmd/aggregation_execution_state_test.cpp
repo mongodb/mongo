@@ -269,8 +269,9 @@ protected:
     /**
      * Create an AggExState instance that one might see for change stream query.
      */
-    std::unique_ptr<AggExState> createOplogAggExState(StringData coll) {
+    std::unique_ptr<AggExState> createOplogAggExState(StringData coll, bool rawData = false) {
         auto opCtx = operationContext();
+        isRawDataOperation(opCtx) = rawData;
 
         // We will wait indefinitely in this unit test for the read concern to be set unless we set
         // it explicitly here.
@@ -899,6 +900,77 @@ TEST_F(AggregationExecutionStateTest,
         aggExState->createAggCatalogState(), DBException, ErrorCodes::CommandNotSupportedOnView);
 }
 
+TEST_F(AggregationExecutionStateTest,
+       Given_OplogAggCatalogStateWithViewlessTimeseriesColl_Then_IsTimeseries) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+    StringData timeseriesColl{"timeseries"};
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+
+    auto aggExState = createOplogAggExState(timeseriesColl, true /*rawData*/);
+    auto state = aggExState->createAggCatalogState();
+    ASSERT_TRUE(state->isTimeseries());
+}
+
+TEST_F(
+    AggregationExecutionStateTest,
+    Given_OplogAggCatalogStateWithViewTimeseriesColl_When_CallingValidate_Then_ExceptionIsThrown) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", false);
+    StringData timeseriesColl{"timeseries"};
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+
+    {
+        auto aggExState = createOplogAggExState(timeseriesColl, false /*rawData*/);
+
+        // Do not allow opening a change stream on a timeseries collection.
+        ASSERT_THROWS_CODE(aggExState->createAggCatalogState(),
+                           DBException,
+                           ErrorCodes::CommandNotSupportedOnView);
+    }
+
+    {
+        auto aggExState = createOplogAggExState(timeseriesColl, true /*rawData*/);
+
+        // Do not allow opening a change stream on a timeseries collection.
+        ASSERT_THROWS_CODE(aggExState->createAggCatalogState(),
+                           DBException,
+                           ErrorCodes::CommandNotSupportedOnView);
+    }
+}
+
+TEST_F(
+    AggregationExecutionStateTest,
+    Given_OplogAggCatalogStateWithViewlessTimeseriesCollAndNoRawData_When_CallingValidate_Then_ExceptionIsThrown) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    StringData timeseriesColl{"timeseries"};
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+    auto aggExState = createOplogAggExState(timeseriesColl, false /*rawData*/);
+
+    // Do not allow opening a change stream on a timeseries collection.
+    ASSERT_THROWS_CODE(
+        aggExState->createAggCatalogState(), DBException, ErrorCodes::CommandNotSupported);
+}
+
+TEST_F(
+    AggregationExecutionStateTest,
+    Given_OplogAggCatalogStateWithViewlessTimeseriesCollAndRawData_When_CallingValidate_Then_NoExceptionIsThrown) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagCreateViewlessTimeseriesCollections", true);
+
+    StringData timeseriesColl{"timeseries"};
+    createTimeseriesCollection(
+        timeseriesColl, false /*sharded*/, false /*requiresExtendedRangeSupport*/);
+    auto aggExState = createOplogAggExState(timeseriesColl, true /*rawData*/);
+
+    // Do allow opening a change stream on a timeseries collection if rawData is set to true.
+    ASSERT_DOES_NOT_THROW(aggExState->createAggCatalogState());
+}
 
 }  // namespace
 }  // namespace mongo
