@@ -78,6 +78,12 @@ def _set_up_modules():
         if module not in module_configs:
             raise RuntimeError(f"Could not find configuration for module {module}")
 
+    # It is possible for multiple resmoke invocations to share the same python environment
+    # We reset these variables to ensure we don't double load modules or suite dirs
+    _config.MODULE_SUITE_DIRS = []
+    _config.MODULE_MATRIX_SUITE_DIRS = []
+    _config.MODULE_DISABLED_JSTEST_DIRS = []
+
     # loop through all modules, we need to act on both enabled and disabled modules
     for module in module_configs.keys():
         module_config = module_configs[module]
