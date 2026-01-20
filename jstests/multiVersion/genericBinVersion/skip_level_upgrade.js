@@ -15,6 +15,7 @@
  * @tags: [requires_v4_0]
  */
 
+import {allLtsVersions} from "jstests/multiVersion/libs/lts_versions.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 const dbpath = MongoRunner.dataPath + "skip_level_upgrade";
@@ -36,7 +37,10 @@ const defaultOptions = {
 // format, which older versions don't understand. This requires manual intervention for the user to
 // revert the database back to the older version. (See WT-12869 and WT-10307 for details). That's
 // the reason this test will test from 6.0+.
-const versions = [{binVersion: "6.0", testCollection: "six_zero"}];
+const versions = allLtsVersions.filter((v) => {
+    // Only include LTS versions that would be skip-level upgrades to the current version
+    return MongoRunner.compareBinVersions(v.binVersion, lastLTSFCV) < 0;
+});
 
 // Iterate through versions specified in the versions list, and follow the steps outlined at
 // the top of this test file.

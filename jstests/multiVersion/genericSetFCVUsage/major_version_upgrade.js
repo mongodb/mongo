@@ -14,6 +14,7 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/verify_versions.js";
 
+import {allLtsVersions} from "jstests/multiVersion/libs/lts_versions.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
@@ -27,20 +28,7 @@ const defaultOptions = {
     noCleanData: true,
 };
 
-// This lists all supported releases and needs to be kept up to date as versions are added and
-// dropped.
-// TODO SERVER-76166: Programmatically generate list of LTS versions.
-const versions = [
-    {binVersion: "6.0", featureCompatibilityVersion: "6.0", testCollection: "six_zero"},
-    {binVersion: "7.0", featureCompatibilityVersion: "7.0", testCollection: "seven_zero"},
-    {binVersion: "last-lts", featureCompatibilityVersion: lastLTSFCV, testCollection: "last_lts"},
-    {
-        binVersion: "last-continuous",
-        featureCompatibilityVersion: lastContinuousFCV,
-        testCollection: "last_continuous",
-    },
-    {binVersion: "latest", featureCompatibilityVersion: latestFCV, testCollection: "latest"},
-];
+const versions = allLtsVersions;
 
 // Standalone
 // Iterate from earliest to latest versions specified in the versions list, and follow the steps
