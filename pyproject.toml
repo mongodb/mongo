@@ -143,7 +143,7 @@ cryptography = "^44.0.2"
 
 [tool.poetry.group.testing.dependencies]
 curatorbin = "^1.2.4"
-PyKMIP = "0.10.0"
+PyKMIP = {git = "https://github.com/mongodb-forks/PyKMIP.git", rev = "c48cb01635819e478b573e3245ef840a11d78865"}
 kafka-python = "^2.0.2"
 avro-python3 = "^1.10.2"
 evergreen-py = ">=3.13.0,<3.14.0"

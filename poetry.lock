@@ -3253,16 +3253,15 @@ docs = ["sphinx", "sphinx-rtd-theme", "zope.interface"]
 tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
 
 [[package]]
-name = "pykmip"
-version = "0.10.0"
+name = "PyKMIP"
+version = "0.11.0.dev1"
 description = "KMIP library"
 optional = false
-python-versions = "*"
+python-versions = ">= 3.8"
 groups = ["testing"]
 markers = "platform_machine != \"s390x\" and platform_machine != \"ppc64le\" or platform_machine == \"s390x\" or platform_machine == \"ppc64le\""
-files = [
-    {file = "PyKMIP-0.10.0.tar.gz", hash = "sha256:bb6ff310bba8b1130ffe675347f668f7234d022ba3d51edea5ea7e2ea9523897"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 cryptography = "*"
@@ -3270,6 +3269,12 @@ enum-compat = "*"
 requests = "*"
 six = "*"
 sqlalchemy = "*"
+
+[package.source]
+type = "git"
+url = "https://github.com/mongodb-forks/PyKMIP.git"
+reference = "c48cb01635819e478b573e3245ef840a11d78865"
+resolved_reference = "c48cb01635819e478b573e3245ef840a11d78865"
 
 [[package]]
 name = "pymongo"
@@ -5850,4 +5855,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "a6c93bc106ebcdcda189b2b4f307fee178b888aea15df83525eeeb255ba78300"
+content-hash = "e49289dec8b835ef0ea7669f80b251da77afc4d70bd6fbd8ee4d6a2b0f04677e"
