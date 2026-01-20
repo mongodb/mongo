@@ -642,6 +642,7 @@ mongo_cc_unit_test(
         ":pipeline",
         ":stage_params",
         "//src/mongo:base",
+        "//src/mongo/db/commands/query_cmd:update_metrics",
         "//src/mongo/unittest",
     ],
 )

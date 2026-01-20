@@ -29,7 +29,9 @@
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
+#include "mongo/base/counter.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -592,6 +594,180 @@ TEST(LiteParsedPipelineClone, OriginalRemainsValidAfterCloneIsDestroyed) {
     // Verify we can access computed properties (exercises the deferred caches).
     const auto& involvedNamespaces = original.getInvolvedNamespaces();
     ASSERT_EQ(involvedNamespaces.size(), 1);
+}
+
+//
+// Tests for ExtensionMetrics.
+//
+
+// Define a mock extension stage for testing ExtensionMetrics.
+DEFINE_LITE_PARSED_STAGE_DEFAULT_DERIVED(MockExtensionForMetrics);
+ALLOCATE_STAGE_PARAMS_ID(mockExtensionForMetrics, MockExtensionForMetricsStageParams::id);
+
+class ExtensionMetricsTest : public unittest::Test {
+protected:
+    struct MockMetricResults {
+        long long successDelta;
+        long long failureDelta;
+    };
+
+    void tearDown() override {
+        // Clean up registered parsers after each test.
+        LiteParsedDocumentSource::unregisterParser_forTest(_extensionStageName);
+        LiteParsedDocumentSource::unregisterParser_forTest(_nonExtensionStageName);
+    }
+
+    void registerExtensionParser() {
+        LiteParsedDocumentSource::registerParser(
+            _extensionStageName,
+            {.parser = MockExtensionForMetricsLiteParsed::parse,
+             .fromExtension = true,
+             .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+             .allowedWithClientType = AllowedWithClientType::kAny});
+    }
+
+    void registerNonExtensionParser() {
+        LiteParsedDocumentSource::registerParser(
+            _nonExtensionStageName,
+            {.parser = MockExtensionForMetricsLiteParsed::parse,
+             .fromExtension = false,
+             .allowedWithApiStrict = AllowedWithApiStrict::kAlways,
+             .allowedWithClientType = AllowedWithClientType::kAny});
+    }
+
+    /**
+     * Helper to parse a pipeline with extension metrics tracking. Returns the change in
+     * success and failure counters after the ExtensionMetrics object is destroyed.
+     */
+    MockMetricResults parsePipelineAndGetCounterDeltas(const ExtensionMetricsAllocation& allocation,
+                                                       const std::vector<BSONObj>& pipelineStages,
+                                                       bool markSuccess) {
+
+        const auto successBefore = allocation.successMetricCounter->get();
+        const auto failedBefore = allocation.failedMetricCounter->get();
+
+        {
+            ExtensionMetrics metrics(allocation);
+            LiteParserOptions options;
+            options.extensionMetrics = &metrics;
+
+            LiteParsedPipeline pipeline(kTestNss, pipelineStages, false, options);
+
+            if (markSuccess) {
+                metrics.markSuccess();
+            }
+        }
+        // Metrics destroyed here, counters updated.
+
+        return {allocation.successMetricCounter->get() - successBefore,
+                allocation.failedMetricCounter->get() - failedBefore};
+    }
+
+    MockMetricResults mockSuccess(const ExtensionMetricsAllocation& allocation,
+                                  const std::vector<BSONObj>& pipeline) {
+        return parsePipelineAndGetCounterDeltas(allocation, pipeline, true /* markSuccess */);
+    }
+
+    MockMetricResults mockFailure(const ExtensionMetricsAllocation& allocation,
+                                  const std::vector<BSONObj>& pipeline) {
+        return parsePipelineAndGetCounterDeltas(allocation, pipeline, false /* markSuccess */);
+    }
+
+    /**
+     * Helper to create an ExtensionMetricsAllocation with a unique command name.
+     * Uses the test counter to ensure unique names across tests.
+     */
+    ExtensionMetricsAllocation makeAllocation() {
+        return ExtensionMetricsAllocation(
+            "extensionMetricsTestCmd" + std::to_string(_testCounter++), ClusterRole::None);
+    }
+
+    const std::string _extensionStageName = "$testExtensionMetrics";
+    const std::string _nonExtensionStageName = "$testNonExtensionMetrics";
+
+private:
+    static int _testCounter;
+};
+
+int ExtensionMetricsTest::_testCounter = 0;
+
+TEST_F(ExtensionMetricsTest, NonExtensionStageDoesNotTrackUsedExtensions) {
+    registerNonExtensionParser();
+    auto allocation = makeAllocation();
+
+    auto mockDeltas = mockSuccess(allocation, {BSON("$testNonExtensionMetrics" << BSONObj())});
+
+    // Non-extension stages should not affect counters.
+    ASSERT_EQ(mockDeltas.successDelta, 0);
+    ASSERT_EQ(mockDeltas.failureDelta, 0);
+}
+
+TEST_F(ExtensionMetricsTest, ExtensionStageSuccessIncrementsSuccessCounter) {
+    registerExtensionParser();
+    auto allocation = makeAllocation();
+
+    auto mockDeltas = mockSuccess(allocation, {BSON("$testExtensionMetrics" << BSONObj())});
+
+    ASSERT_EQ(mockDeltas.successDelta, 1);
+    ASSERT_EQ(mockDeltas.failureDelta, 0);
+}
+
+TEST_F(ExtensionMetricsTest, ExtensionStageFailureIncrementsFailureCounter) {
+    registerExtensionParser();
+    auto allocation = makeAllocation();
+
+    auto mockDeltas = mockFailure(allocation, {BSON("$testExtensionMetrics" << BSONObj())});
+
+    ASSERT_EQ(mockDeltas.successDelta, 0);
+    ASSERT_EQ(mockDeltas.failureDelta, 1);
+}
+
+TEST_F(ExtensionMetricsTest, MixedPipelineWithExtensionStageTracksExtension) {
+    registerExtensionParser();
+    auto allocation = makeAllocation();
+
+    std::vector<BSONObj> mixedPipeline = {
+        BSON("$match" << BSON("x" << 1)),
+        BSON("$testExtensionMetrics" << BSONObj()),
+        BSON("$limit" << 10),
+    };
+
+    auto mockDeltas = mockSuccess(allocation, mixedPipeline);
+
+    // Extension was used in pipeline, so success counter should increment.
+    ASSERT_EQ(mockDeltas.successDelta, 1);
+    ASSERT_EQ(mockDeltas.failureDelta, 0);
+}
+
+TEST_F(ExtensionMetricsTest, PipelineWithOnlyBuiltInStagesDoesNotTrackExtension) {
+    // Don't register any extension parsers for this test.
+    auto allocation = makeAllocation();
+
+    std::vector<BSONObj> builtInOnlyPipeline = {
+        BSON("$match" << BSON("x" << 1)),
+        BSON("$limit" << 10),
+    };
+
+    auto mockDeltas = mockSuccess(allocation, builtInOnlyPipeline);
+
+    // No extension was used, so neither counter should change.
+    ASSERT_EQ(mockDeltas.successDelta, 0);
+    ASSERT_EQ(mockDeltas.failureDelta, 0);
+}
+
+TEST_F(ExtensionMetricsTest, NullExtensionMetricsDoesNotCrash) {
+    registerExtensionParser();
+
+    // Parse without any extension metrics tracker (extensionMetrics = nullptr).
+    LiteParserOptions options;
+    // options.extensionMetrics is nullptr by default.
+
+    // Parse a pipeline with an extension stage - should not crash.
+    std::vector<BSONObj> pipelineStages = {BSON("$testExtensionMetrics" << BSONObj())};
+    LiteParsedPipeline pipeline(kTestNss, pipelineStages, false, options);
+
+    // Verify the stage was parsed successfully.
+    ASSERT_EQ(pipeline.getStages().size(), 1);
 }
 
 }  // namespace mongo

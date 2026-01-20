@@ -198,6 +198,9 @@ std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(
             it != parserMap.end());
 
     auto lpInfo = it->second.getParserInfo(options);
+    if (options.extensionMetrics && lpInfo.fromExtension) {
+        options.extensionMetrics->trackThisRequestAsHavingUsedExtensions();
+    }
     auto lpds = lpInfo.parser(nss, specElem, options);
     lpds->setApiStrict(lpInfo.allowedWithApiStrict);
     lpds->setClientType(lpInfo.allowedWithClientType);

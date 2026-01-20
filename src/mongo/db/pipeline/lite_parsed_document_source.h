@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands/query_cmd/extension_metrics.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/stage_params.h"
@@ -78,6 +79,10 @@ struct LiteParserOptions {
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr;
 
     OperationContext* opCtx = nullptr;
+
+    // Optional tracker to note when extensions are used in a given aggregate, and track whether
+    // that command succeeds. Should be owned by the command invocation, not here.
+    ExtensionMetrics* extensionMetrics = nullptr;
 };
 
 namespace exec::agg {
@@ -621,6 +626,7 @@ private:
     friend class extension::host::LoadExtensionsTest;
     friend class extension::host::LoadNativeVectorSearchTest;
     friend class LiteParsedDesugarerTest;
+    friend class ExtensionMetricsTest;
 
     /**
      * Give access to 'getParserMap()' for the implementation of $listMqlEntities but hiding

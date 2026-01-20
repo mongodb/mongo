@@ -206,8 +206,11 @@ public:
               }()),
               _extensionMetrics(
                   static_cast<const PipelineCommand*>(cmd)->getExtensionMetricsAllocation()),
-              _liteParsedPipeline(
-                  _aggregationRequest, false, {.ifrContext = _ifrContext, .opCtx = opCtx}),
+              _liteParsedPipeline(_aggregationRequest,
+                                  false /* isRunningAgainstView_ForHybridSearch */,
+                                  {.ifrContext = _ifrContext,
+                                   .opCtx = opCtx,
+                                   .extensionMetrics = &_extensionMetrics}),
               _privileges(std::move(privileges)) {
             auto externalDataSources = _aggregationRequest.getExternalDataSources();
             // Support collection-less aggregate commands without $_externalDataSources.

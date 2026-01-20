@@ -106,7 +106,9 @@ public:
               _aggregationRequest(std::move(aggregationRequest)),
               _extensionMetrics(static_cast<const ClusterPipelineCommandBase*>(cmd)
                                     ->getExtensionMetricsAllocation()),
-              _liteParsedPipeline(LiteParsedPipeline(_aggregationRequest)),
+              _liteParsedPipeline(_aggregationRequest,
+                                  false /* isRunningAgainstView_ForHybridSearch */,
+                                  {.extensionMetrics = &_extensionMetrics}),
               _privileges(std::move(privileges)) {}
 
         const GenericArguments& getGenericArguments() const override {
