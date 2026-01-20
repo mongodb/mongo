@@ -69,6 +69,7 @@
 #include "mongo/db/pipeline/optimization/optimize.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper.h"
@@ -957,41 +958,76 @@ void computeShapeAndRegisterQueryStats(const AggExState& aggExState,
 }
 
 /**
- * Conditionally re-parses the Pipeline from a desugared LiteParsedPipeline. Returns the desugared
- * pipeline or the original if no desugaring was needed. Certain pipelines don't have desugarable
- * stages, as indicated by needsSecondParse.
+ * Indicates whether and how a pipeline needs to be reparsed after view processing.
+ * TODO SPM-4488 This can be removed once query shape generation is moved to LiteParsed.
  */
-std::unique_ptr<Pipeline> reparseIfDesugared(const AggExState& aggExState,
-                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             std::unique_ptr<Pipeline> pipeline,
-                                             const LiteParsedPipeline& desugaredLPP,
-                                             bool needsSecondParse) {
-    // LiteParsedDesugarer::desugar() is called on the router, so if we're from the router
-    // the pipeline is already desugared.
-    if (expCtx->getFromRouter() || !needsSecondParse) {
-        return pipeline;
+enum class ReparseRequirement { kNone, kReparseFromLPP, kReparseFromBson };
+
+/**
+ * Applies the desugared view pipeline to the user's pipeline if this is a view aggregation.
+ * Returns the reparse requirement indicating whether and how the pipeline needs to be reparsed.
+ */
+ReparseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
+                                          LiteParsedPipeline* desugaredLPP,
+                                          const ReparseRequirement& currentRequirement) {
+    if (!aggExState.isView()) {
+        return currentRequirement;
     }
 
-    return Pipeline::parseFromLiteParsed(desugaredLPP, expCtx);
+    // For timeseries, there may have been rewrites done on the raw BSON pipeline during view
+    // resolution. We must parse the request's full resolved pipeline which will account for those
+    // rewrites.
+    // TODO SERVER-101599 remove this code once 9.0 becomes last LTS. By then only viewless
+    // timeseries collections will exist.
+    if (aggExState.getResolvedView().timeseries()) {
+        return ReparseRequirement::kReparseFromBson;
+    }
+
+    // For search queries on views don't do any of the pipeline stitching that is done for
+    // normal views.
+    // TODO SERVER-115069 Remove this once search queries are desugared at LiteParsed time and
+    // handle the view through a custom ViewPolicy.
+    if (search_helpers::isMongotLiteParsedPipeline(*desugaredLPP)) {
+        return currentRequirement;
+    }
+
+    // Desugar the viewPipeline and apply it to the desugared user pipeline.
+    auto viewInfo = aggExState.getResolvedView().toViewInfo(aggExState.getOriginalNss());
+    LiteParsedDesugarer::desugar(viewInfo.viewPipeline.get());
+
+    desugaredLPP->handleView(viewInfo);
+    return ReparseRequirement::kReparseFromLPP;
 }
 
 /**
- * Applies the view pipeline to the user's pipeline if this is a view aggregation.
+ * Create a new Pipeline object if at least one of the following is true:
+ *
+ * 1. The aggregation is running on a timeseries view, so the final Pipeline object needs to be
+ * rebuilt from the request BSON with timeseries rewrites applied.
+ * 2. The pipeline has desugarable stages, so it needs to be reparsed from the fully desugared
+ * LiteParsedPipeline.
+ * 3. The aggregation runs on a view, and has either had the view pipeline prepended to the user
+ * LiteParsedPipeline or has had the view handled by LiteParsed stages with custom view handling
+ * logic. Since the final LiteParsedPipeline will have been modified with the view, the final
+ * Pipeline needs to be reparsed from the modified LiteParsedPipeline.
+ *
+ * Otherwise, returns the original Pipeline.
  */
-std::unique_ptr<Pipeline> maybeApplyViewPipeline(
-    const AggExState& aggExState,
-    const AggCatalogState& aggCatalogState,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    std::unique_ptr<Pipeline> pipeline) {
-    if (!aggExState.isView()) {
-        return pipeline;
+std::unique_ptr<Pipeline> buildFinalPipeline(const AggExState& aggExState,
+                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             std::unique_ptr<Pipeline> pipeline,
+                                             const LiteParsedPipeline& desugaredLPP,
+                                             const ReparseRequirement& reparseRequirement) {
+    switch (reparseRequirement) {
+        case ReparseRequirement::kReparseFromBson:
+            return pipeline_factory::makePipeline(
+                aggExState.getRequest().getPipeline(), expCtx, pipeline_factory::kOptionsMinimal);
+        case ReparseRequirement::kReparseFromLPP:
+            return Pipeline::parseFromLiteParsed(desugaredLPP, expCtx);
+        case ReparseRequirement::kNone:
+            return pipeline;
     }
-
-    expCtx->startExpressionCounters();
-    pipeline =
-        aggExState.applyViewToPipeline(expCtx, std::move(pipeline), aggCatalogState.getUUID());
-    expCtx->stopExpressionCounters();
-    return pipeline;
+    MONGO_UNREACHABLE;
 }
 
 std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
@@ -1003,35 +1039,44 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
 
     const auto& userRequest = aggExState.getOriginalRequest();
 
-    // Clone and desugar the LiteParsedPipeline. If the pipeline is modified by desugar,
-    // a second parse is required. This is because query shape generation required a full-parsed
-    // pipeline to occur. If there is no second parse required (i.e. desugaring the pipeline doesn't
-    // change it), we can optimize out the second parse.
-    // TODO SPM-4488: Once query shape can be generated from LiteParsed, a second parse will no
+    // Clone and desugar the LiteParsedPipeline. If the pipeline is modified by desugaring, we
+    // initialize the reparse requirement to indicate a reparse from the desugared
+    // LiteParsedPipeline will be needed. This is because query shape generation required a
+    // full-parsed pipeline to occur. The reparse requirement may be further updated by view
+    // processing (e.g., timeseries views require rebuilding from request BSON, regular views
+    // require reparse from the modified LPP).
+    // TODO SPM-4488: Once query shape can be generated from LiteParsed, a reparse will no
     // longer be required. Simplify the logic as such.
-    LiteParsedPipeline desugaredLPP = aggExState.getOriginalLiteParsedPipeline().clone();
-    bool needsSecondParse = LiteParsedDesugarer::desugar(&desugaredLPP);
+    auto desugaredLPP = aggExState.getOriginalLiteParsedPipeline().clone();
 
-    // Parse the user's original pipeline pre-desugar to capture query stats. If the pipeline needs
-    // a second parse, the first parse will be executed with a StubMongoProcessInterface to indicate
-    // that the pipeline isn't expected to execute queries.
+    // LiteParsedDesugarer::desugar() is called on the router, so if we're from the router
+    // the pipeline is already desugared.
+    const auto desugaredHere =
+        !expCtx->getFromRouter() && LiteParsedDesugarer::desugar(&desugaredLPP);
+    auto reparseRequirement =
+        desugaredHere ? ReparseRequirement::kReparseFromLPP : ReparseRequirement::kNone;
+
+    // Parse the user's original pipeline pre-desugar to capture query stats. If the pipeline was
+    // desugared (and thus will need a reparse), this initial parse will be executed with a
+    // StubMongoProcessInterface to indicate that the pipeline isn't expected to execute queries.
     expCtx->startExpressionCounters();
     auto pipeline = Pipeline::parseFromLiteParsed(
-        aggExState.getOriginalLiteParsedPipeline(), expCtx, nullptr, false, needsSecondParse);
+        aggExState.getOriginalLiteParsedPipeline(), expCtx, nullptr, false, desugaredHere);
     expCtx->stopExpressionCounters();
 
     computeShapeAndRegisterQueryStats(aggExState, aggCatalogState, userRequest, *pipeline, expCtx);
-
-    // Reparse the desugared pipeline if applicable.
-    pipeline =
-        reparseIfDesugared(aggExState, expCtx, std::move(pipeline), desugaredLPP, needsSecondParse);
 
     const auto& request = aggExState.getRequest();
     if (request.getTranslatedForViewlessTimeseries()) {
         pipeline->setTranslated();
     }
 
-    pipeline = maybeApplyViewPipeline(aggExState, aggCatalogState, expCtx, std::move(pipeline));
+    reparseRequirement = maybeApplyViewPipeline(aggExState, &desugaredLPP, reparseRequirement);
+
+    expCtx->startExpressionCounters();
+    pipeline = buildFinalPipeline(
+        aggExState, expCtx, std::move(pipeline), desugaredLPP, reparseRequirement);
+    expCtx->stopExpressionCounters();
 
     // Validate the entire pipeline with the view definition.
     if (aggCatalogState.lockAcquired()) {

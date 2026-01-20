@@ -110,6 +110,15 @@ bool isStoredSource(const Pipeline* pipeline);
 bool isMongotPipeline(const Pipeline* pipeline);
 
 /**
+ * Check if this is a search-related pipeline, specifically that the front of the pipeline is a
+ * stage that will rely on calls to mongot.
+ *
+ * TODO SERVER-115069 Remove this once search queries are desugared at LiteParsed time and handle
+ * the view through a custom ViewPolicy.
+ */
+bool isMongotLiteParsedPipeline(const LiteParsedPipeline& lpp);
+
+/**
  * Check if this is a $search stage.
  */
 bool isSearchStage(const DocumentSource* stage);

@@ -236,10 +236,8 @@ public:
                            AggStageAstNodeHandle astNode,
                            const NamespaceString& nss)
             // NOTE: There is no original BSON since this stage is created from an AST node
-            // desugared without BSON. For now we create a dummy spec with the stage name, but it
-            // will go unused since LiteParsedExpanded will not exist at the top-level
-            // LiteParsedPipeline.
-            : LiteParsedDocumentSource(BSON(stageName << BSONObj()).firstElement()),
+            // desugared without BSON.
+            : LiteParsedDocumentSource(BSON(stageName << BSONObj())),
               _astNode(std::move(astNode)),
               _properties(_astNode->getProperties()),
               _nss(nss) {}

@@ -304,6 +304,18 @@ public:
         : _originalBson(originalBson), _parseTimeName(originalBson.fieldNameStringData()) {}
 
     /**
+     * Constructs a LiteParsedDocumentSource that takes ownership of the provided BSONObj. The stage
+     * name is extracted from the first element's field name.
+     *
+     * This constructor is useful when the lifetime of the passed through BSON object cannot be
+     * guaranteed to outlive the lifetime of this LiteParsedDocumentSource.
+     */
+    explicit LiteParsedDocumentSource(BSONObj ownedBson)
+        : _ownedBson(std::move(ownedBson)),
+          _originalBson(_ownedBson->firstElement()),
+          _parseTimeName(_originalBson.fieldNameStringData()) {}
+
+    /**
      * Copy constructor. When the source is owned, the copy shares ownership of the underlying BSON
      * buffer via BSONObj's shared pointer semantics. This ensures the copy's '_originalBson'
      * remains valid even if the source is destroyed.

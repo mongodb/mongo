@@ -273,17 +273,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    /**
-     * Returns the total aggregation pipeline for a view. If called on the base class, returns the
-     * normal pipeline (no op).
-     */
-    virtual std::unique_ptr<Pipeline> applyViewToPipeline(
-        boost::intrusive_ptr<ExpressionContext> expCtx,
-        std::unique_ptr<Pipeline> pipeline,
-        boost::optional<UUID> uuid) const {
-        return pipeline;
-    }
-
     virtual ~AggExState() = default;
 
 protected:
@@ -404,10 +393,6 @@ public:
     const ResolvedView& getResolvedView() const override {
         return _resolvedView;
     }
-
-    std::unique_ptr<Pipeline> applyViewToPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
-                                                  std::unique_ptr<Pipeline> pipeline,
-                                                  boost::optional<UUID> uuid) const override;
 
     ScopedSetShardRole setShardRole(const CollectionRoutingInfo& cri);
 
