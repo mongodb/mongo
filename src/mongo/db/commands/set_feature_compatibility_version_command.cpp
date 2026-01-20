@@ -163,7 +163,6 @@ MONGO_FAIL_POINT_DEFINE(failDowngradeValidationDueToIncompatibleFeature);
 MONGO_FAIL_POINT_DEFINE(failUpgradeValidationDueToIncompatibleFeature);
 MONGO_FAIL_POINT_DEFINE(immediatelyTimeOutWaitForStaleOFCV);
 
-
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
  */
@@ -742,7 +741,6 @@ public:
             (!role || !role->isShardOnly())) {
             processDryRun(opCtx, request, requestedVersion, actualVersion);
         }
-
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
             {
@@ -1561,6 +1559,15 @@ private:
                               "Please remove the shard identity document before proceeding.");
                 }
             }
+        }
+
+        if (repl::feature_flags::gFeatureFlagReplicationUsageOfMaintenancePort
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            const auto& replConfig = repl::ReplicationCoordinator::get(opCtx)->getConfig();
+            uassert(ErrorCodes::CannotDowngrade,
+                    "Cannot downgrade when maintenance ports are present in the replSetConfig. "
+                    "Please run ReplSetReconfig to remove maintenance ports prior to downgrade",
+                    replConfig.getCountOfMembersWithMaintenancePort() == 0);
         }
     }
 

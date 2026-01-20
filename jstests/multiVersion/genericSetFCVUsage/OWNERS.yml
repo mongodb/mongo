@@ -107,3 +107,6 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
       - 10gen/server-fcv
+  - "maintenance_port_downgrade_checks.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

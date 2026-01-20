@@ -430,10 +430,16 @@ public:
         parsedArgs.newConfigObj = cmdObj["replSetReconfig"].Obj();
         parsedArgs.force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
+        // OFCV draining during setFCV relies on the operation being run on the primary. Since force
+        // reconfigs do not have to be run on a primary, we only add the OFCV for non-force
+        // reconfigurations.
+        boost::optional<VersionContext::FixedOperationFCVRegion> fixedOfcvRegion;
+
         // For safe reconfig, wait for the current config to be committed before running a new one.
         // We will check again after acquiring the repl mutex in processReplSetReconfig(), in case
         // of concurrent reconfigs.
         if (!parsedArgs.force) {
+            fixedOfcvRegion.emplace(opCtx);
             // Skip the waiting if the current config is from a force reconfig.
             auto configTerm = replCoord->getConfigTerm();
             auto oplogWait = configTerm != OpTime::kUninitializedTerm;

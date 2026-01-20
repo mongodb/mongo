@@ -314,21 +314,34 @@ Status validateOldAndNewConfigsCompatible(const VersionContext& vCtx,
 // Ensure that maintenance port can only be specified in a ReplSetConfig if the feature flag is
 // enabled. This should not be checked in the heartbeat reconfiguration or the startup config checks
 // to ensure that lagged secondaries that have not yet upgraded their FCV do not encounter issues.
-Status validateMaintenancePortSettings(const VersionContext& vCtx, const ReplSetConfig& newConfig) {
-    // TODO (SERVER-112863) Remove this check.
-    // TODO (SERVER-113217) Ensure FCV stability of this check.
-    // If any member config specifies a maintenance port, ensure that we are in an FCV which can
-    // handle this.
-    for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
-         iter != newConfig.membersEnd();
-         ++iter) {
-        if (iter->getMaintenancePort().has_value() &&
-            !feature_flags::gFeatureFlagReplicationUsageOfMaintenancePort.isEnabled(
-                vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            return {ErrorCodes::InvalidOptions,
-                    "Maintenance port is not supported on the current FCV"};
+// We also ensure that no maintenance port is added if this is a force reconfig. This is to ensure
+// that we properly serialize with FCV downgrade without having to drain replSetReconfig commands on
+// secondaries during setFCV.
+// TODO (SERVER-112863) Remove these checks.
+Status validateMaintenancePortSettings(const VersionContext& vCtx,
+                                       const boost::optional<ReplSetConfig>& oldConfig,
+                                       const ReplSetConfig& newConfig,
+                                       bool force) {
+    auto maintenancePortFeatureEnabled =
+        feature_flags::gFeatureFlagReplicationUsageOfMaintenancePort.isEnabled(
+            vCtx, serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (maintenancePortFeatureEnabled && !force) {
+        return Status::OK();
+    }
+
+    for (size_t i = 0; i < newConfig.members().size(); i++) {
+        const auto& newMember = newConfig.getMemberAt(i);
+        if (newMember.getMaintenancePort().has_value()) {
+            if (!maintenancePortFeatureEnabled) {
+                return {ErrorCodes::InvalidOptions,
+                        "Maintenance port is not supported on the current FCV"};
+            } else if (force && !oldConfig->getMemberAt(i).getMaintenancePort().has_value()) {
+                return {ErrorCodes::InvalidOptions,
+                        "Cannot add maintenance ports via force reconfig"};
+            }
         }
     }
+
     return Status::OK();
 }
 
@@ -489,7 +502,8 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
                               "instead to set a cluster-wide default writeConcern."});
     }
 
-    status = validateMaintenancePortSettings(VersionContext::getDecoration(opCtx), newConfig);
+    status = validateMaintenancePortSettings(
+        VersionContext::getDecoration(opCtx), boost::none, newConfig, false /* force */);
     if (!status.isOK()) {
         return StatusWith<int>(status);
     }
@@ -537,7 +551,7 @@ Status validateConfigForReconfig(const VersionContext& vCtx,
             "set a cluster-wide default writeConcern.",
             !newConfig.containsCustomizedGetLastErrorDefaults());
 
-    status = validateMaintenancePortSettings(vCtx, newConfig);
+    status = validateMaintenancePortSettings(vCtx, oldConfig, newConfig, force);
     if (!status.isOK()) {
         return status;
     }

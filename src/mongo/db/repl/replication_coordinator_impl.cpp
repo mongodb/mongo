@@ -3651,8 +3651,16 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
             if (_externalState->isShardPartOfShardedCluster(opCtx) && currIDWC != newIDWC &&
                 !newIDWC) {
                 try {
-                    // Initiates a remote call to the config server.
-                    if (!_externalState->isCWWCSetOnConfigShard(opCtx)) {
+                    // Initiates a remote call to the config server. We do this on an alternative
+                    // client with a new opCtx to avoid propagating the OFCV from the reconfig
+                    // command. Because the below command is a read command, it is safe to not
+                    // propagate the OFCV across shards.
+                    auto newClient = opCtx->getServiceContext()
+                                         ->getService(ClusterRole::ShardServer)
+                                         ->makeClient("GetCWWCFromConfig");
+                    AlternativeClientRegion acr(newClient);
+                    auto newCtx = Client::getCurrent()->makeOperationContext();
+                    if (!_externalState->isCWWCSetOnConfigShard(newCtx.get())) {
                         return Status(
                             ErrorCodes::NewReplicaSetConfigurationIncompatible,
                             str::stream()
