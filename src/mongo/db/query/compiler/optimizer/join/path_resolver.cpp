@@ -30,16 +30,21 @@
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 
 namespace mongo::join_ordering {
+PathResolver::PathResolver(NodeId baseNode, std::vector<ResolvedPath>& resolvedPaths)
+    : _resolvedPaths(resolvedPaths) {
+    _scopes.emplace_back(baseNode);
+}
+
 void PathResolver::addNode(NodeId nodeId, const FieldPath& embedPath) {
-    if (_nodeMaps.size() <= nodeId) {
-        _nodeMaps.resize(nodeId + 1);
-    }
-    _embedPathToNodeId[embedPath] = nodeId;
+    dassert(!getScopeForNode(nodeId).has_value(), "This node has been already added");
+    _scopes.emplace_back(nodeId, embedPath);
 }
 
 PathId PathResolver::addPath(NodeId nodeId, FieldPath fieldPath) {
+    auto scope = getScopeForNode(nodeId);
+    tassert(11721300, "Unknown node id", scope.has_value());
     auto [it, inserted] =
-        _nodeMaps[nodeId].emplace(std::move(fieldPath), static_cast<PathId>(_resolvedPaths.size()));
+        scope->paths.emplace(std::move(fieldPath), static_cast<PathId>(_resolvedPaths.size()));
     if (inserted) {
         _resolvedPaths.emplace_back(nodeId, it->first);
     }
@@ -53,25 +58,33 @@ PathId PathResolver::resolve(const FieldPath& path) {
 
 std::pair<NodeId, FieldPath> PathResolver::resolveNodeByEmbedPath(
     const FieldPath& fieldPath) const {
-    auto result = _baseNode;
-    size_t longestPrefix = 0;
-    for (const auto& p : _embedPathToNodeId) {
-        if (p.first.isPrefixOf(fieldPath) && longestPrefix < p.first.getPathLength()) {
-            if (p.first.getPathLength() == fieldPath.getPathLength()) {
+    for (auto scopePos = _scopes.rbegin(); scopePos != _scopes.rend(); ++scopePos) {
+        if (!scopePos->embedPath.has_value()) {
+            // Base node case: no prefix substraction is required.
+            return {scopePos->nodeId, fieldPath};
+        } else if (scopePos->embedPath->isPrefixOf(fieldPath)) {
+            if (scopePos->embedPath->getPathLength() == fieldPath.getPathLength()) {
                 uasserted(10985001,
                           str::stream() << "The path '" << fieldPath.fullPath()
                                         << "' cannot be resolved because it coflicts with "
                                            "a previously specified document prefix.");
             }
-            result = p.second;
-            longestPrefix = p.first.getPathLength();
+
+            return {scopePos->nodeId,
+                    fieldPath.subtractPrefix(scopePos->embedPath->getPathLength())};
         }
     }
 
-    if (longestPrefix == 0) {
-        return {result, fieldPath};
-    }
+    // Base node with empty embedPath is a prefix for every path.
+    MONGO_UNREACHABLE_TASSERT(11721301);
+}
 
-    return {result, fieldPath.subtractPrefix(longestPrefix)};
+boost::optional<PathResolver::Scope&> PathResolver::getScopeForNode(NodeId node) {
+    for (auto& scope : _scopes) {
+        if (scope.nodeId == node) {
+            return scope;
+        }
+    }
+    return boost::none;
 }
 }  // namespace mongo::join_ordering

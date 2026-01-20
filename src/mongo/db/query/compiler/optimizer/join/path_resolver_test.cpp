@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
@@ -91,6 +93,96 @@ TEST(PathResolverTests, OverridedEmbedPaths) {
     ASSERT_NE(pathBC0, pathBC3);
     ASSERT_NE(pathBC1, pathBC3);
     ASSERT_EQ(resolvedPaths[pathBC3].nodeId, thirdNodeId);
+}
+
+TEST(PathResolverTests, OverridedLongerEmbedPaths) {
+    constexpr NodeId baseNodeId = 0;
+    std::vector<ResolvedPath> resolvedPaths;
+    PathResolver pathResolver{baseNodeId, resolvedPaths};
+
+    const NodeId nodeAB = 1;
+    pathResolver.addNode(nodeAB, "a.b");
+
+    auto pathABC0 = pathResolver.resolve("a.b.c");
+    ASSERT_EQ(nodeAB, resolvedPaths.at(pathABC0).nodeId);
+
+    const NodeId nodeA = 2;
+    pathResolver.addNode(nodeA, "a");
+    auto pathABC1 = pathResolver.resolve("a.b.c");
+    auto pathAB0 = pathResolver.resolve("a.b");
+    ASSERT_EQ(nodeA, resolvedPaths.at(pathABC1).nodeId);
+    ASSERT_EQ(nodeA, resolvedPaths.at(pathAB0).nodeId);
+
+    // Bring back a.b.
+    const NodeId nodeAB1 = 3;
+    pathResolver.addNode(nodeAB1, "a.b");
+    auto pathABC2 = pathResolver.resolve("a.b.c");
+    auto pathAC0 = pathResolver.resolve("a.c");
+    ASSERT_EQ(nodeAB1, resolvedPaths.at(pathABC2).nodeId);
+    ASSERT_EQ(nodeA, resolvedPaths.at(pathAC0).nodeId);
+
+    // Bring back a.
+    const NodeId nodeA1 = 4;
+    pathResolver.addNode(nodeA1, "a");
+    auto pathABC3 = pathResolver.resolve("a.b.c");
+    auto pathAB1 = pathResolver.resolve("a.b");
+    auto pathAC1 = pathResolver.resolve("a.c");
+    ASSERT_EQ(nodeA1, resolvedPaths.at(pathABC3).nodeId);
+    ASSERT_EQ(nodeA1, resolvedPaths.at(pathAB1).nodeId);
+    ASSERT_EQ(nodeA1, resolvedPaths.at(pathAC1).nodeId);
+
+    // a.b again
+    const NodeId nodeAB2 = 5;
+    pathResolver.addNode(nodeAB2, "a.b");
+    auto pathABC4 = pathResolver.resolve("a.b.c");
+    auto pathAC2 = pathResolver.resolve("a.c");
+    ASSERT_EQ(nodeAB2, resolvedPaths.at(pathABC4).nodeId);
+    ASSERT_EQ(nodeA1, resolvedPaths.at(pathAC2).nodeId);
+
+    // Impossible a.b!
+    const NodeId nodeAB3 = 6;
+    pathResolver.addNode(nodeAB3, "a.b");
+    auto pathABC5 = pathResolver.resolve("a.b.c");
+    auto pathAC3 = pathResolver.resolve("a.c");
+    ASSERT_EQ(nodeAB3, resolvedPaths.at(pathABC5).nodeId);
+    ASSERT_EQ(nodeA1, resolvedPaths.at(pathAC3).nodeId);
+}
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+DEATH_TEST(PathResolverDeathTests, OverrideExistingNode, "This node has been already added") {
+    constexpr NodeId baseNodeId = 0;
+    std::vector<ResolvedPath> resolvedPaths;
+    PathResolver pathResolver{baseNodeId, resolvedPaths};
+
+    const NodeId node = 1;
+    pathResolver.addNode(node, "a.b");
+
+    pathResolver.addNode(node, "a.b");
+}
+#endif
+
+TEST(PathResolverTests, AddPath) {
+    constexpr NodeId baseNodeId = 11;
+    std::vector<ResolvedPath> resolvedPaths;
+    PathResolver pathResolver{baseNodeId, resolvedPaths};
+
+    auto pathABC0 = pathResolver.addPath(baseNodeId, "a.b.c");
+    ASSERT_EQ(pathABC0, pathResolver.addPath(baseNodeId, "a.b.c"));
+
+    const NodeId nodeA0 = 7;
+    pathResolver.addNode(nodeA0, "a");
+    auto pathABC1 = pathResolver.addPath(nodeA0, "a.b.c");
+    ASSERT_NE(pathABC0, pathABC1);
+    ASSERT_EQ(pathABC1, pathResolver.addPath(nodeA0, "a.b.c"));
+    ASSERT_EQ(pathABC1, pathResolver.resolve("a.a.b.c"));
+
+    const NodeId nodeA1 = 10;
+    pathResolver.addNode(nodeA1, "a");
+    auto pathABC2 = pathResolver.addPath(nodeA1, "a.b.c");
+    ASSERT_NE(pathABC1, pathABC2);
+    ASSERT_NE(pathABC0, pathABC2);
+    ASSERT_EQ(pathABC2, pathResolver.addPath(nodeA1, "a.b.c"));
+    ASSERT_EQ(pathABC2, pathResolver.resolve("a.a.b.c"));
 }
 
 TEST(PathResolverTests, OverlappingEmbedPaths) {
