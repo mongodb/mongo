@@ -569,14 +569,8 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateStorageStats) {
 
 TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     // 'basicFields' should always be present in the logs and profiler, for any operation.
-    std::vector<std::string> basicFields{"op",
-                                         "ns",
-                                         "isFromMaintenancePortConnection",
-                                         "command",
-                                         "numYield",
-                                         "locks",
-                                         "millis",
-                                         "flowControl"};
+    std::vector<std::string> basicFields{
+        "op", "ns", "command", "numYield", "locks", "millis", "flowControl"};
 
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();

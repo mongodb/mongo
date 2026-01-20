@@ -210,7 +210,7 @@ feature_flags:
     featureFlagDedicatedPortForMaintenanceOperations:
         description: "Feature flag to enable a dedicated port for high priority maintenance operations on mongoD and mongoS"
         cpp_varname: gFeatureFlagDedicatedPortForMaintenanceOperations
-        default: true
+        default: false
         fcv_gated: false
     featureFlagPreparedTransactionsPreciseCheckpoints:
         description: "Enables logic necessary to recover prepared transactions with precise checkpoints"
