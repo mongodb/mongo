@@ -46,6 +46,7 @@ executor:
     auth_options: *authOptions
     launch_mongot: true
     num_shards: 2
+    num_mongos: 3
     mongod_options:
       keyFile: *keyFile
       set_parameters:
