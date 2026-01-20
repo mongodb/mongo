@@ -79,6 +79,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_diagnostic_printer.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
+#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
@@ -1681,7 +1682,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     return {std::move(out)};
 }  // QueryPlanner::plan
 
-StatusWith<QueryPlanner::PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
+StatusWith<plan_ranking::PlanRankingResult> QueryPlanner::planWithCostBasedRanking(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
     ce::SamplingEstimator* samplingEstimator,
@@ -1752,16 +1753,23 @@ StatusWith<QueryPlanner::PlanRankingResult> QueryPlanner::planWithCostBasedRanki
             "Some plan has fallen into the gray zone between accepted and rejected QSNs.",
             acceptedSoln.size() + rejectedSoln.size() == allSoln.size());
 
-    return QueryPlanner::PlanRankingResult{.solutions = std::move(acceptedSoln),
-                                           .rejectedPlans = std::move(rejectedSoln),
-                                           .estimates = std::move(estimates),
-                                           .needsWorksMeasured = true};
+    std::vector<SolutionWithPlanStage> rejectedSolnWithStages;
+    for (auto&& soln : rejectedSoln) {
+        rejectedSolnWithStages.push_back(
+            SolutionWithPlanStage{std::move(soln), nullptr /* rootStage */});
+    }
+
+    return plan_ranking::PlanRankingResult{
+        std::move(acceptedSoln),
+        PlanExplainerData{.rejectedPlansWithStages = std::move(rejectedSolnWithStages),
+                          .estimates = std::move(estimates)},
+        true};
 }
 
 /**
- * If 'query.cqPipeline()' is non-empty, it contains a prefix of the aggregation pipeline that can
- * be pushed down to SBE. For now, we plan this separately here and attach the agg portion of the
- * plan to the solution(s) via the extendWith() call near the end.
+ * If 'query.cqPipeline()' is non-empty, it contains a prefix of the aggregation pipeline that
+ * can be pushed down to SBE. For now, we plan this separately here and attach the agg portion
+ * of the plan to the solution(s) via the extendWith() call near the end.
  */
 std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     CanonicalQuery& query,
@@ -1836,8 +1844,8 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
             continue;
         }
 
-        // 'projectionStage' pushdown pushes both $project and $addFields to SBE, as the latter is
-        // implemented as a variant of the former.
+        // 'projectionStage' pushdown pushes both $project and $addFields to SBE, as the latter
+        // is implemented as a variant of the former.
         auto projectionStage = dynamic_cast<DocumentSourceInternalProjection*>(innerStage);
         if (projectionStage) {
             solnForAgg = std::make_unique<ProjectionNodeDefault>(
@@ -1900,9 +1908,9 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         auto isSearch = search_helpers::isSearchStage(innerStage);
         auto isSearchMeta = search_helpers::isSearchMetaStage(innerStage);
         if (isSearch || isSearchMeta) {
-            // In the $search case, we create the $search query solution node in QueryPlanner::Plan
-            // instead of here. The empty branch here assures that we don't hit the tassert below
-            // and continue in creating the query plan.
+            // In the $search case, we create the $search query solution node in
+            // QueryPlanner::Plan instead of here. The empty branch here assures that we don't
+            // hit the tassert below and continue in creating the query plan.
             continue;
         }
 
@@ -1965,9 +1973,9 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
             Status tagStatus =
                 tagOrChildAccordingToCache(soln->cacheData.get(), orChild, planningResult.indexMap);
 
-            // Check if 'soln' is a CLUSTERED_IXSCAN. This branch won't be tagged, and 'tagStatus'
-            // will return 'NoQueryExecutionPlans'. However, this plan can be executed by the OR
-            // stage.
+            // Check if 'soln' is a CLUSTERED_IXSCAN. This branch won't be tagged, and
+            // 'tagStatus' will return 'NoQueryExecutionPlans'. However, this plan can be
+            // executed by the OR stage.
             QuerySolutionNode* root = soln->root();
             if (!tagStatus.isOK()) {
                 const bool allowPlanWithoutTag = tagStatus == ErrorCodes::NoQueryExecutionPlans &&
@@ -2014,8 +2022,8 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
                 }
             }
 
-            // If the cached plan is not a clustered collection scan, add the index assignments to
-            // the original query.
+            // If the cached plan is not a clustered collection scan, add the index assignments
+            // to the original query.
             if (!useClusteredCollScan) {
                 Status tagStatus = QueryPlanner::tagAccordingToCache(
                     orChild, bestSoln->cacheData->tree.get(), planningResult.indexMap);

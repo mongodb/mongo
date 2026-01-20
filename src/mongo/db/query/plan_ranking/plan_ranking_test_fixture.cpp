@@ -118,10 +118,13 @@ void PlanRankingTestFixture::createIndexOnEmptyCollection(OperationContext* opCt
 }
 
 std::pair<std::unique_ptr<CanonicalQuery>, PlannerData>
-PlanRankingTestFixture::createCQAndPlannerData(const MultipleCollectionAccessor& collections,
-                                               BSONObj findFilter) {
+PlanRankingTestFixture::createCQAndPlannerData(
+    const MultipleCollectionAccessor& collections,
+    BSONObj findFilter,
+    std::function<void(FindCommandRequest&)> modifyFindCmd) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(findFilter);
+    modifyFindCmd(*findCommand);
 
     auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = expCtx,

@@ -200,7 +200,7 @@ TEST_F(PlanExplainerTest, ClassicSingleSolutionPlanExplain) {
     auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
     auto& explainer = exec->getPlanExplainer();
 
-    ASSERT(!explainer.isMultiPlan());
+    ASSERT(!explainer.areThereRejectedPlansToExplain());
     auto&& [winningPlan, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_STRING_CONTAINS(winningPlan.toString(), "COLLSCAN");
@@ -213,7 +213,7 @@ TEST_F(PlanExplainerTest, SBESingleSolutionPlanExplain) {
     auto exec = buildFindExecAndIter(fromjson("{c: {$eq: 1}}"));
     auto& explainer = exec->getPlanExplainer();
 
-    ASSERT(!explainer.isMultiPlan());
+    ASSERT(!explainer.areThereRejectedPlansToExplain());
     auto&& [winningPlan, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_STRING_CONTAINS(winningPlan.toString(), "COLLSCAN");
@@ -255,7 +255,7 @@ TEST_F(PlanExplainerTest, ClassicMultiPlannerExplain) {
     auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
     auto& explainer = exec->getPlanExplainer();
 
-    ASSERT(explainer.isMultiPlan());
+    ASSERT(explainer.areThereRejectedPlansToExplain());
     auto&& [winningPlan, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_STRING_CONTAINS(winningPlan.toString(), "IXSCAN");
@@ -268,7 +268,7 @@ TEST_F(PlanExplainerTest, SBEMultiPlannerExplain) {
     auto exec = buildFindExecAndIter(fromjson("{a: {$gte: 0}, b: {$gte: 0}}"));
     auto& explainer = exec->getPlanExplainer();
 
-    ASSERT(explainer.isMultiPlan());
+    ASSERT(explainer.areThereRejectedPlansToExplain());
     auto&& [winningPlan, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_STRING_CONTAINS(winningPlan.toString(), "IXSCAN");
@@ -309,7 +309,7 @@ TEST_F(PlanExplainerTest, ExpressPlanIdHackExplain) {
     auto exec = buildFindExecAndIter(fromjson("{_id: 1}"));
     auto& explainer = exec->getPlanExplainer();
 
-    ASSERT(!explainer.isMultiPlan());
+    ASSERT(!explainer.areThereRejectedPlansToExplain());
     auto&& [winningPlan, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_STRING_CONTAINS(winningPlan.toString(), "EXPRESS_IXSCAN");
@@ -321,7 +321,7 @@ TEST_F(PlanExplainerTest, ExpressPlanSingleFieldEqExplain) {
     auto exec = buildFindExecAndIter(fromjson("{a: 1}"), true /* limitOne */);
     auto& explainer = exec->getPlanExplainer();
 
-    ASSERT(!explainer.isMultiPlan());
+    ASSERT(!explainer.areThereRejectedPlansToExplain());
     auto&& [winningPlan, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_STRING_CONTAINS(winningPlan.toString(), "EXPRESS_IXSCAN");

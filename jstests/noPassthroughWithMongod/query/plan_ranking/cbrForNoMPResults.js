@@ -1,7 +1,12 @@
 /*
  * Verify that queries where no results are returned are handled to CBR.
  */
-import {getWinningPlanFromExplain, getExecutionStats, getEngine} from "jstests/libs/query/analyze_plan.js";
+import {
+    getWinningPlanFromExplain,
+    getExecutionStats,
+    getEngine,
+    getRejectedPlans,
+} from "jstests/libs/query/analyze_plan.js";
 import {assertPlanCosted, assertPlanNotCosted} from "jstests/libs/query/cbr_utils.js";
 
 const collName = jsTestName();
@@ -18,36 +23,77 @@ assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}]));
 
 function testNoResultsQueryIsPlannedWithCBR() {
     jsTest.log.info("Running testNoResultsQueryIsPlannedWithCBR");
-    const explain = coll.find({a: {$gte: 1}, b: {$gte: 2}, c: 1}).explain("executionStats");
-    const winningPlan = getWinningPlanFromExplain(explain);
+    const explain = coll.find({a: {$gte: 1}, b: {$gte: 2}, c: 1}).explain("allPlansExecution");
     // TODO SERVER-115958: This test fails with featureFlagSbeFull.
     if (getEngine(explain) === "classic") {
+        const winningPlan = getWinningPlanFromExplain(explain);
         assertPlanCosted(winningPlan);
-        // TODO SERVER-115402. Also verify rejected plans when emitted.
+        const rejectedPlans = getRejectedPlans(explain);
+        assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
+        assertPlanCosted(rejectedPlans[0]);
+        assertPlanNotCosted(rejectedPlans[1]);
+        assertPlanNotCosted(rejectedPlans[2]);
+        const execStats = getExecutionStats(explain)[0];
 
-        assert.eq(getExecutionStats(explain)[0].nReturned, 0, toJsonForLog(explain));
+        assert.eq(execStats.nReturned, 0, toJsonForLog(explain));
+
+        assert.eq(execStats.allPlansExecution.length, 4, toJsonForLog(explain));
+        assertPlanCosted(execStats.allPlansExecution[0].executionStages);
+        assert.eq(execStats.allPlansExecution[0].executionStages.advanced, 0, toJsonForLog(explain));
+        assert.eq(execStats.allPlansExecution[0].executionStages.works, 0, toJsonForLog(explain));
+        assertPlanCosted(execStats.allPlansExecution[1].executionStages);
+        assert.eq(execStats.allPlansExecution[1].executionStages.advanced, 0, toJsonForLog(explain));
+        assert.eq(execStats.allPlansExecution[1].executionStages.works, 0, toJsonForLog(explain));
+        assertPlanNotCosted(execStats.allPlansExecution[2].executionStages);
+        assert.eq(execStats.allPlansExecution[2].executionStages.advanced, 0, toJsonForLog(explain));
+        assert.eq(execStats.allPlansExecution[2].executionStages.works, 5000, toJsonForLog(explain));
+        assertPlanNotCosted(execStats.allPlansExecution[3].executionStages);
+        assert.eq(execStats.allPlansExecution[3].executionStages.advanced, 0, toJsonForLog(explain));
+        assert.eq(execStats.allPlansExecution[3].executionStages.works, 5000, toJsonForLog(explain));
     }
 }
 
 function testResultsQueryIsPlannedWithMultiPlanner() {
     jsTest.log.info("Running testResultsQueryIsPlannedWithMultiPlanner");
-    const explain = coll.find({b: 1}).explain("executionStats");
+    const explain = coll.find({b: 1, a: 1}).explain("allPlansExecution");
     const winningPlan = getWinningPlanFromExplain(explain);
     assertPlanNotCosted(winningPlan);
     assert.eq(getExecutionStats(explain)[0].nReturned, 1, toJsonForLog(explain));
+
+    const execStats = getExecutionStats(explain)[0];
+    assert.eq(execStats.nReturned, 1, toJsonForLog(explain));
+    // TODO SERVER-115958: This test failes with featureFlagSbeFull.
+    if (getEngine(explain) === "classic") {
+        assert.eq(execStats.allPlansExecution.length, 2, toJsonForLog(explain));
+        // TODO SERVER-117369. Fix the winning plan's stats being zero here.
+        assertPlanNotCosted(execStats.allPlansExecution[1].executionStages);
+        assert.eq(execStats.allPlansExecution[1].executionStages.advanced, 1, toJsonForLog(explain));
+        assert.eq(execStats.allPlansExecution[1].executionStages.works, 2, toJsonForLog(explain));
+
+        const rejectedPlans = getRejectedPlans(explain);
+        assert.eq(rejectedPlans.length, 1, toJsonForLog(explain));
+        assertPlanNotCosted(rejectedPlans[0]);
+    }
 }
 
-function testNoResultsQueryWithSinglePlanIsPlannedWithMultiPlanner() {
-    jsTest.log.info("Running testNoResultsQueryWithSinglePlanIsPlannedWithMultiPlanner");
-    const explain = coll.find({c: 1}).explain("executionStats");
+function testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking() {
+    jsTest.log.info("Running testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking");
+    const explain = coll.find({c: 1}).explain("allPlansExecution");
     const winningPlan = getWinningPlanFromExplain(explain);
     assertPlanNotCosted(winningPlan);
     assert.eq(getExecutionStats(explain)[0].nReturned, 0, toJsonForLog(explain));
+
+    const rejectedPlans = getRejectedPlans(explain);
+    assert.eq(rejectedPlans.length, 0, toJsonForLog(explain));
+
+    const execStats = getExecutionStats(explain)[0];
+    assert.eq(execStats.nReturned, 0, toJsonForLog(explain));
+    assert.eq(execStats.allPlansExecution.length, 0, toJsonForLog(explain));
 }
 
 function testEOFIsPlannedWithMultiPlanner() {
     jsTest.log.info("Running testEOFIsPlannedWithMultiPlanner");
-    const explain = coll.find({a: 0, b: 0}).explain("executionStats");
+    const explain = coll.find({a: 0, b: 0}).explain("allPlansExecution");
     const winningPlan = getWinningPlanFromExplain(explain);
     assertPlanNotCosted(winningPlan);
 
@@ -56,6 +102,15 @@ function testEOFIsPlannedWithMultiPlanner() {
     // TODO SERVER-115958: This test failes with featureFlagSbeFull.
     if (getEngine(explain) === "classic") {
         assert.eq(executionStats.executionStages.works, 2 /* seek + advance */, toJsonForLog(explain));
+        assert.eq(executionStats.allPlansExecution.length, 2, toJsonForLog(explain));
+        // TODO SERVER-117369. Fix the winning plan's stats being zero here.
+        assertPlanNotCosted(executionStats.allPlansExecution[1].executionStages);
+        assert.eq(executionStats.allPlansExecution[1].executionStages.advanced, 1, toJsonForLog(explain));
+        assert.eq(executionStats.allPlansExecution[1].executionStages.works, 2, toJsonForLog(explain));
+
+        const rejectedPlans = getRejectedPlans(explain);
+        assert.eq(rejectedPlans.length, 1, toJsonForLog(explain));
+        assertPlanNotCosted(rejectedPlans[0]);
     }
 }
 
@@ -67,7 +122,6 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
     const explain = coll.find(query).returnKey().explain("executionStats");
     const winningPlan = getWinningPlanFromExplain(explain);
     assertPlanNotCosted(winningPlan);
-    // TODO SERVER-115402. Also verify rejected plans when emitted.
 
     assert.eq(getExecutionStats(explain)[0].nReturned, 0, toJsonForLog(explain));
 
@@ -77,6 +131,10 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
     // TODO SERVER-115958: This test failes with featureFlagSbeFull.
     if (getEngine(cbrExplain) === "classic") {
         assertPlanCosted(cbrWinningPlan);
+
+        const rejectedPlans = getRejectedPlans(explain);
+        // TODO SERVER-117370. Populate the CBR plans as rejected plans.
+        assert.eq(rejectedPlans.length, 1, toJsonForLog(explain));
     }
     assert.eq(getExecutionStats(cbrExplain)[0].nReturned, 0, toJsonForLog(cbrExplain));
 }
@@ -87,7 +145,7 @@ const prevAutoPlanRankingStrategy = assert.commandWorked(
 ).was;
 try {
     testNoResultsQueryIsPlannedWithCBR();
-    testNoResultsQueryWithSinglePlanIsPlannedWithMultiPlanner();
+    testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking();
     testResultsQueryIsPlannedWithMultiPlanner();
     testEOFIsPlannedWithMultiPlanner();
     testReturnKeyIsPlannedWithMultiPlanner();

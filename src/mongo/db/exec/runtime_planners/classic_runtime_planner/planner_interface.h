@@ -41,8 +41,8 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranking/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/write_ops/canonical_update.h"
@@ -59,8 +59,7 @@ class ClassicPlannerInterface : public PlannerInterface {
 public:
     ClassicPlannerInterface(PlannerData plannerData);
 
-    ClassicPlannerInterface(PlannerData plannerData,
-                            QueryPlanner::PlanRankingResult planRankingResult);
+    ClassicPlannerInterface(PlannerData plannerData, PlanExplainerData explainData);
 
     /**
      * Function which adds the necessary stages for the generated PlanExecutor to perform deletes.
@@ -113,9 +112,7 @@ protected:
     boost::optional<size_t> cachedPlanHash() const;
     WorkingSet* ws() const;
 
-    QueryPlanner::PlanRankingResult _planRankingResult;
     stage_builder::PlanStageToQsnMap _planStageQsnMap;
-    std::vector<std::unique_ptr<PlanStage>> _cbrRejectedPlanStages;
 
     /**
      * Planner state enum. Describes the planner status:
@@ -138,6 +135,7 @@ private:
     std::unique_ptr<PlanStage> _root;
     NamespaceString _nss;
     PlannerData _plannerData;
+    PlanExplainerData _planExplainerData;
 };
 
 /**
@@ -161,7 +159,7 @@ class SingleSolutionPassthroughPlanner final : public ClassicPlannerInterface {
 public:
     SingleSolutionPassthroughPlanner(PlannerData plannerData,
                                      std::unique_ptr<QuerySolution> querySolution,
-                                     QueryPlanner::PlanRankingResult planRankingResult);
+                                     PlanExplainerData explainData);
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;
@@ -197,7 +195,7 @@ class MultiPlanner final : public ClassicPlannerInterface {
 public:
     MultiPlanner(PlannerData plannerData,
                  std::vector<std::unique_ptr<QuerySolution>> solutions,
-                 QueryPlanner::PlanRankingResult planRankingResult);
+                 PlanExplainerData explainData);
 
     /**
      * Runs the trial period by working all candidate plans for as long as given in 'trialConfig'.
@@ -221,6 +219,17 @@ public:
     MultiPlanStage::EstimationResult estimateAllPlans() const {
         return _multiplanStage->estimateAllPlans();
     }
+
+    /**
+     * Extracts all rejected plans along with its stages and the plan stage to QSN map for explain
+     * purposes
+     */
+    PlanExplainerData extractExplainData();
+
+    /**
+     * Abandons the trial period without picking a best plan thus rejecting all plans.
+     */
+    void abandonTrials();
 
 private:
     Status doPlan(PlanYieldPolicy* planYieldPolicy) override;

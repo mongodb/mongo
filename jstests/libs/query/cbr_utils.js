@@ -24,18 +24,25 @@ export function planEstimatedWithHistogram(plan) {
 }
 
 /**
+ * Returns whether the given plan was costed or not.
+ */
+export function isPlanCosted(plan) {
+    return plan.hasOwnProperty("costEstimate");
+}
+
+/**
  * Assert the given plan was not costed. This is used as an indicator to whether CBR used its
  * fallback to multiplanning for this plan.
  */
 export function assertPlanNotCosted(plan) {
-    assert(!plan.hasOwnProperty("costEstimate"), plan);
+    assert(!isPlanCosted(plan), plan);
 }
 
 /**
  * Assert the given plan was costed.
  */
 export function assertPlanCosted(plan) {
-    assert(plan.hasOwnProperty("costEstimate"), plan);
+    assert(isPlanCosted(plan), plan);
 }
 
 export function getPlanRankerMode(db) {
