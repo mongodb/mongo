@@ -908,7 +908,8 @@ StatusWith<std::pair<OCSPCertIDSet, boost::optional<Date_t>>> parseAndValidateOC
     // Read the overall status of the OCSP response
     if (auto responseStatus = OCSP_response_status(response);
         responseStatus != OCSP_RESPONSE_STATUS_SUCCESSFUL) {
-        auto& stream = str::stream() << "Failed to query the OCSP responder - ";
+        str::stream stream;
+        stream << "Failed to query the OCSP responder - ";
         switch (responseStatus) {
             case OCSP_RESPONSE_STATUS_MALFORMEDREQUEST:
                 return getSSLFailure(stream << "Malformed request.");
