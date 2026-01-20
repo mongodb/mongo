@@ -30,6 +30,7 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 
 #include "mongo/db/exec/sbe/stages/agg_project.h"
+#include "mongo/db/exec/sbe/stages/and_hash.h"
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
 #include "mongo/db/exec/sbe/stages/block_to_row.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
@@ -1038,6 +1039,24 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeSortedMerge(
         std::move(stages), lower(keys), std::move(dirs), lower(slots), lower(outSlots), _nodeId);
 
     return {std::move(sortedMergeStage), std::move(outSlots)};
+}
+
+SbStage SbBuilder::makeAndHash(SbStage outerStage,
+                               SbStage innerStage,
+                               const SbSlotVector& outerCondSlots,
+                               const SbSlotVector& outerProjectSlots,
+                               const SbSlotVector& innerCondSlots,
+                               const SbSlotVector& innerProjectSlots,
+                               boost::optional<sbe::value::SlotId> collatorSlot) {
+    return sbe::makeS<sbe::AndHashStage>(std::move(outerStage),
+                                         std::move(innerStage),
+                                         lower(outerCondSlots),
+                                         lower(outerProjectSlots),
+                                         lower(innerCondSlots),
+                                         lower(innerProjectSlots),
+                                         collatorSlot,
+                                         _state.yieldPolicy,
+                                         _nodeId);
 }
 
 std::pair<SbStage, SbSlotVector> SbBuilder::makeBranch(const VariableTypes& varTypes,

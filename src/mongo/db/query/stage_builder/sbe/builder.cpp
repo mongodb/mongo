@@ -3352,13 +3352,13 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildAndHash(
         outputs.set(kPrefetchedResult, *innerPrefetchedResultSlot);
     }
 
-    auto stage = b.makeHashJoin(std::move(outerStage),
-                                std::move(innerStage),
-                                outerCondSlots,
-                                outerProjectSlots,
-                                innerCondSlots,
-                                innerProjectSlots,
-                                collatorSlot);
+    auto stage = b.makeAndHash(std::move(outerStage),
+                               std::move(innerStage),
+                               outerCondSlots,
+                               outerProjectSlots,
+                               innerCondSlots,
+                               innerProjectSlots,
+                               collatorSlot);
 
     // If there are more than 2 children, iterate all remaining children and hash
     // join together.
@@ -3373,15 +3373,15 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildAndHash(
         condSlots.emplace_back(idSlot);
         projectSlots.emplace_back(resultSlot);
 
-        // The previous HashJoinStage is always set as the inner stage, so that we can reuse the
+        // The previous AndHashStage is always set as the inner stage, so that we can reuse the
         // innerIdSlot and innerResultSlot that have been designated as outputs.
-        stage = b.makeHashJoin(std::move(childStage),
-                               std::move(stage),
-                               condSlots,
-                               projectSlots,
-                               innerCondSlots,
-                               innerProjectSlots,
-                               collatorSlot);
+        stage = b.makeAndHash(std::move(childStage),
+                              std::move(stage),
+                              condSlots,
+                              projectSlots,
+                              innerCondSlots,
+                              innerProjectSlots,
+                              collatorSlot);
     }
 
     return {std::move(stage), std::move(outputs)};

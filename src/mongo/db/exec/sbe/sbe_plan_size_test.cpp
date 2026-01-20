@@ -33,6 +33,7 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
+#include "mongo/db/exec/sbe/stages/and_hash.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/bson_scan.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
@@ -111,6 +112,19 @@ public:
 private:
     std::unique_ptr<value::SlotIdGenerator> _slotIdGenerator;
 };
+
+TEST_F(PlanSizeTest, AndHash) {
+    auto stage = makeS<AndHashStage>(mockS(),
+                                     mockS(),
+                                     mockSV(),
+                                     makeSV(),
+                                     mockSV(),
+                                     makeSV(),
+                                     generateSlotId(),
+                                     nullptr /* yieldPolicy */,
+                                     kEmptyPlanNodeId);
+    assertPlanSize(*stage);
+}
 
 TEST_F(PlanSizeTest, Branch) {
     auto stage = makeS<BranchStage>(

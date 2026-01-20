@@ -593,6 +593,14 @@ public:
                                                      const std::vector<SbSlotVector>& keys,
                                                      std::vector<sbe::value::SortDirection> dirs);
 
+    SbStage makeAndHash(SbStage outerStage,
+                        SbStage innerStage,
+                        const SbSlotVector& outerCondSlots,
+                        const SbSlotVector& outerProjectSlots,
+                        const SbSlotVector& innerCondSlots,
+                        const SbSlotVector& innerProjectSlots,
+                        boost::optional<sbe::value::SlotId> collatorSlot);
+
     std::pair<SbStage, SbSlotVector> makeBranch(SbStage thenStage,
                                                 SbStage elseStage,
                                                 SbExpr conditionExpr,

@@ -104,6 +104,7 @@ mongo_cc_library(
     name = "query_sbe_stages",
     srcs = [
         "//src/mongo/db/exec/sbe/stages:agg_project.cpp",
+        "//src/mongo/db/exec/sbe/stages:and_hash.cpp",
         "//src/mongo/db/exec/sbe/stages:block_hashagg.cpp",
         "//src/mongo/db/exec/sbe/stages:block_to_row.cpp",
         "//src/mongo/db/exec/sbe/stages:branch.cpp",
@@ -232,6 +233,7 @@ mongo_cc_unit_test(
     name = "db_sbe_test",
     srcs = [
         "sbe_agg_project_test.cpp",
+        "sbe_and_hash_test.cpp",
         "sbe_block_hashagg_test.cpp",
         "sbe_block_stages_test.cpp",
         "sbe_code_fragment_test.cpp",
