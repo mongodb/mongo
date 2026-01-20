@@ -34,6 +34,13 @@ py_binary(
     ],
 )
 
+py_binary(
+    name = "gpg_signer",
+    srcs = ["gpg_signer.py"],
+    main = "gpg_signer.py",
+    visibility = ["//visibility:public"],
+)
+
 filegroup(
     name = "test_wrapper",
     srcs = ["test_wrapper.sh"],

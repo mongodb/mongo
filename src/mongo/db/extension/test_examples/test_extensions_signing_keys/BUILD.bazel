@@ -1,0 +1,4 @@
+exports_files(
+    ["test_extensions_signing_private_key.asc"],
+    visibility = ["//visibility:public"],
+)

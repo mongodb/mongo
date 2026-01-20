@@ -1,7 +1,7 @@
 load("//bazel/install_rules:install_rules.bzl", "extensions_with_config")
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_extension_shared_library")
 load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel/config:render_template.bzl", "render_template")
+load("//bazel:signing.bzl", "signed_mongo_cc_extension_shared_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -31,34 +31,34 @@ extensions_with_config(
         # null_chars_string_input.js will break as not all stages from $listMqlEntities
         # will have a null character test. To resolve this, ensure that these new stages
         # are added to the "skips" list in that test.
-        ":bar_mongo_extension",
-        ":foo_mongo_extension",
-        ":limit_mongo_extension",
-        ":logging_mongo_extension",
-        ":debug_logging_mongo_extension",
-        ":parse_options_mongo_extension",
-        ":test_options_mongo_extension",
-        ":toaster_mongo_extension",
-        ":extension_errors_mongo_extension",
-        ":shapify_mongo_extension",
-        ":sharded_execution_serialization_mongo_extension",
-        ":read_n_documents_mongo_extension",
-        ":explain_mongo_extension",
-        ":metadata_mongo_extension",
-        ":idle_threads_mongo_extension",
-        ":interrupt_mongo_extension",
-        ":match_topN_mongo_extension",
-        ":native_vector_search_mongo_extension",
-        ":metrics_mongo_extension",
-        ":other_metrics_mongo_extension",
+        ":bar_mongo_extension_signed_lib",
+        ":foo_mongo_extension_signed_lib",
+        ":limit_mongo_extension_signed_lib",
+        ":logging_mongo_extension_signed_lib",
+        ":debug_logging_mongo_extension_signed_lib",
+        ":parse_options_mongo_extension_signed_lib",
+        ":test_options_mongo_extension_signed_lib",
+        ":toaster_mongo_extension_signed_lib",
+        ":extension_errors_mongo_extension_signed_lib",
+        ":shapify_mongo_extension_signed_lib",
+        ":sharded_execution_serialization_mongo_extension_signed_lib",
+        ":read_n_documents_mongo_extension_signed_lib",
+        ":explain_mongo_extension_signed_lib",
+        ":metadata_mongo_extension_signed_lib",
+        ":idle_threads_mongo_extension_signed_lib",
+        ":interrupt_mongo_extension_signed_lib",
+        ":match_topN_mongo_extension_signed_lib",
+        ":native_vector_search_mongo_extension_signed_lib",
+        ":metrics_mongo_extension_signed_lib",
+        ":other_metrics_mongo_extension_signed_lib",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
         # "_mongo_extension" suffix.
-        ":no_symbol_bad_extension",
-        ":duplicate_stage_descriptor_bad_extension",
-        ":foo_extension_v2",
-        ":vector_search_extension",
+        ":no_symbol_bad_extension_signed_lib",
+        ":duplicate_stage_descriptor_bad_extension_signed_lib",
+        ":foo_extension_v2_signed_lib",
+        ":vector_search_extension_signed_lib",
     ],
 )
 
@@ -71,7 +71,7 @@ pkg_name = "//" + package_name() + "/"
 
 # Extensions under test_examples/
 [
-    mongo_cc_extension_shared_library(
+    signed_mongo_cc_extension_shared_library(
         name = extension_name + "_mongo_extension",
         srcs = [extension_name + ".cpp"],
     )
@@ -86,7 +86,7 @@ pkg_name = "//" + package_name() + "/"
 
 # Extensions under test_examples/desugar/
 [
-    mongo_cc_extension_shared_library(
+    signed_mongo_cc_extension_shared_library(
         name = extension_name + "_mongo_extension",
         srcs = [pkg_name + "desugar:" + extension_name + ".cpp"],
     )
@@ -137,7 +137,7 @@ filegroup(
 
 # Extensions under test_examples/extension_options/
 [
-    mongo_cc_extension_shared_library(
+    signed_mongo_cc_extension_shared_library(
         name = extension_name + "_mongo_extension",
         srcs = [pkg_name + "extension_options:" + extension_name + ".cpp"],
     )
@@ -150,7 +150,7 @@ filegroup(
 
 # Extensions under test_examples/loading/
 [
-    mongo_cc_extension_shared_library(
+    signed_mongo_cc_extension_shared_library(
         name = extension_name + "_mongo_extension",
         srcs = [pkg_name + "loading:" + extension_name + ".cpp"],
     )
@@ -163,7 +163,7 @@ filegroup(
 
 # Extensions under test_examples/host_services/
 [
-    mongo_cc_extension_shared_library(
+    signed_mongo_cc_extension_shared_library(
         name = extension_name + "_mongo_extension",
         srcs = [pkg_name + "host_services:" + extension_name + ".cpp"],
     )
@@ -177,7 +177,7 @@ filegroup(
 
 # Extensions under test_examples/observability/
 [
-    mongo_cc_extension_shared_library(
+    signed_mongo_cc_extension_shared_library(
         name = extension_name + "_mongo_extension",
         srcs = [pkg_name + "observability:" + extension_name + ".cpp"],
     )
@@ -200,7 +200,7 @@ filegroup(
 # Extensions under test_examples/fail_to_load/
 # Each of these should fail startup.
 [
-    mongo_cc_extension_shared_library(
+    signed_mongo_cc_extension_shared_library(
         name = extension_name + "_bad_extension",
         srcs = [pkg_name + "fail_to_load:" + extension_name + ".cpp"],
     )
@@ -224,7 +224,7 @@ filegroup(
 # "foo_v2" is used for testing upgrade scenarios as the upgrade of "foo" from above. We cannot use
 # the "mongo_extension" suffix since loading this extension in passthroughs with "foo" V1 should
 # cause duplicate stage errors.
-mongo_cc_extension_shared_library(
+signed_mongo_cc_extension_shared_library(
     name = "foo_extension_v2",
     srcs = ["foo_v2.cpp"],
 )
@@ -232,12 +232,12 @@ mongo_cc_extension_shared_library(
 # "vector_search" is used to test that we can override the existing $vectorSearch implementation.
 # It must not have the _mongo_extension suffix so that it doesn't get loaded in the
 # Extensions-enabled variant since that would break real $vectorSearch tests.
-mongo_cc_extension_shared_library(
+signed_mongo_cc_extension_shared_library(
     name = "vector_search_extension",
     srcs = ["vector_search.cpp"],
 )
 
-mongo_cc_extension_shared_library(
+signed_mongo_cc_extension_shared_library(
     name = "mongothost_extension",
     srcs = [pkg_name + "extension_options:mongothost.cpp"],
 )

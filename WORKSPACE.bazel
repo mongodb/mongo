@@ -199,3 +199,7 @@ poetry(
 load("//bazel/format:shfmt.bzl", "shfmt")
 
 shfmt()
+
+load("//bazel/gpg:gpg.bzl", "gpg")
+
+gpg()
