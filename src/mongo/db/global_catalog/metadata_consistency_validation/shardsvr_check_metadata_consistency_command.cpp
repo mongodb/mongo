@@ -84,6 +84,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 
 #include <iterator>
@@ -244,6 +245,12 @@ public:
                               str::stream()
                                   << "Exceeded maximum time " << timeout
                                   << " while processing namespace " << nss.toStringForErrorMsg());
+                } else if (TestingProctor::instance().isEnabled()) {
+                    LOGV2(11613900,
+                          "Received timeout error without exceeding our deadline",
+                          "now"_attr = now,
+                          "deadline"_attr = deadline,
+                          "timeout"_attr = timeout);
                 }
                 throw;
             }
