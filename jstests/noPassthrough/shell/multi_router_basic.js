@@ -1062,11 +1062,6 @@ testCase("Testing unsupported commands throw errors", () => {
     assert.throws(() => {
         db.runCommand({getDatabaseVersion: "test.collection"});
     });
-
-    // Test getLog
-    assert.throws(() => {
-        db.runCommand({getLog: "global"});
-    });
 });
 
 // ============================================================================

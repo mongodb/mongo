@@ -186,9 +186,6 @@ function assertIsSupportedCommand(cmd) {
     if (cmd.getDatabaseVersion) {
         throwCommandNotSupportedError("getDatabaseVersion", "It targets a specific mongos instance", cmd);
     }
-    if (cmd.getLog) {
-        throwCommandNotSupportedError("getLog", "It targets a specific mongos instance", cmd);
-    }
 }
 
 // Returns whether the command either set or remove a query settings commands.

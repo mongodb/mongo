@@ -4,11 +4,6 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 
-// The test attempts to run some aggregation stages and expect to see specific log lines on the mongos (via getLog).
-// In case of multiple mongos, the aggregation and the getLog may hit different nodes, causing test failures.
-// pinToSingleMongos due to getLog command.
-TestData.pinToSingleMongos = true;
-
 const coll = db[jsTestName()];
 coll.drop();
 const testData = [

@@ -30,7 +30,6 @@ executor:
   fixture:
     class: ShardedClusterFixture
     num_shards: 2
-    num_mongos: 3
     load_all_extensions: true
     mongod_options:
       set_parameters:
