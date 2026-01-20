@@ -23,6 +23,11 @@ import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js
 
 const collName = jsTestName();
 
+// The 'serverStatus' command is unreliable in test suites with multiple mongos processesgiven that
+// each node has its own metrics. The assertions here would not hold up if run against multiple
+// mongos.
+TestData.pinToSingleMongos = true;
+
 /**
  * Helper function to get the extension-specific metrics from serverStatus.
  * Returns an object with {succeeded, failed} counters for aggregate commands using extensions.
