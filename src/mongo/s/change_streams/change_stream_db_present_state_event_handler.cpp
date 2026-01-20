@@ -100,7 +100,7 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
     // normal fetching mode state, and this state will catch any 'ShardRemoved' exceptions. In case
     // a cursor is opened on a shard that has been removed, the v2 stage will start a new change
     // stream segment.
-    // TODO SERVER-114863 SERVER-115212: verify that this is sensible.
+    // TODO SERVER-115212: verify that this is sensible.
     auto placement =
         ctx.getHistoricalPlacementFetcher().fetch(opCtx,
                                                   readerCtx.getChangeStream().getNamespace(),
@@ -127,8 +127,8 @@ ShardTargeterDecision ChangeStreamShardTargeterDbPresentStateEventHandler::handl
     // Validate status and other fields of historical placement result.
     change_streams::assertHistoricalPlacementStatusOK(placement);
 
-    // TODO SERVER-114863 SERVER-115212: adjust the invariants checked here if it turns out to be
-    // necessary when running more exhaustive tests.
+    // TODO SERVER-115212: adjust the invariants checked here if it turns out to be necessary when
+    // running more exhaustive tests.
     change_streams::assertHistoricalPlacementHasNoSegment(placement);
 
     change_streams::updateActiveShardCursors(clusterTime + 1, shards, readerCtx);

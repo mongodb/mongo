@@ -189,10 +189,7 @@ filters:
   - "concurrency_simultaneous_replication.yml":
     approvers:
       - 10gen/server-replication-reviewers
-  - "change_streams*":
-    approvers:
-      - 10gen/query-execution-change-streams
-  - "sharding_change_streams_v2.yml":
+  - "*change_streams*":
     approvers:
       - 10gen/query-execution-change-streams
   - "*rate_limited.yml":

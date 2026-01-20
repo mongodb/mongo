@@ -252,8 +252,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharding_jscore_passthrough_with_config_shard.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/sharded_collections_jscore_passthrough_with_config_shard.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/concurrency_simultaneous_replication.yml @10gen/server-replication-reviewers @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
-/buildscripts/resmokeconfig/suites/**/sharding_change_streams_v2.yml @10gen/query-execution-change-streams @svc-auto-approve-bot
+/buildscripts/resmokeconfig/suites/**/*change_streams* @10gen/query-execution-change-streams @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/*rate_limited.yml @10gen/server-workload-resilience @svc-auto-approve-bot
 /buildscripts/resmokeconfig/suites/**/secondary_reads_passthrough_with_replica_set_endpoint.yml @10gen/server-cluster-scalability @svc-auto-approve-bot
 
@@ -1057,6 +1056,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/libs/override_methods/**/implicitly_retry_on_conflicting_operation_during_fuzztest.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/libs/override_methods/**/validate_collections_on_shutdown.js @10gen/server-validate @svc-auto-approve-bot
 /jstests/libs/override_methods/**/implicit_change_stream_v2.js @10gen/query-execution-change-streams @svc-auto-approve-bot
+/jstests/libs/override_methods/**/implicit_change_stream_v2_ignore_removed_shards.js @10gen/query-execution-change-streams @svc-auto-approve-bot
 /jstests/libs/override_methods/**/implicitly_retry_on_config_stepdowns.js @10gen/server-catalog-and-routing-routing-and-topology @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/libs/override_methods/**/sharding_csrs_continuous_config_stepdown.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 
