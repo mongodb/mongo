@@ -147,6 +147,11 @@ auto& connectionsProcessedCounter = otel::metrics::MetricsService::instance().cr
     "Total number of ingress connections processed (accepted or rejected)",
     otel::metrics::MetricUnit::kConnections);
 
+auto& openConnectionsGauge = otel::metrics::MetricsService::instance().createInt64Gauge(
+    otel::metrics::MetricNames::kOpenConnections,
+    "Total number of open sessions",
+    otel::metrics::MetricUnit::kConnections);
+
 }  // namespace
 
 /**
@@ -221,6 +226,7 @@ public:
     private:
         void _onSizeChange() {
             _src->_size.store(_src->_byClient.size());
+            openConnectionsGauge.set(_src->_size.load());
             _src->_cv.notify_all();
         }
 

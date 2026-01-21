@@ -26,6 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
+
 #include "mongo/base/string_data.h"
 #include "mongo/util/modules.h"
 
@@ -68,6 +70,7 @@ public:
     static constexpr MetricName kConnectionsProcessed = {"network.connections_processed"};
     static constexpr MetricName kIngressTLSHandshakeLatency = {
         "network.ingress_tls_handshake_latency"};
+    static constexpr MetricName kOpenConnections = {"network.open_ingress_connections"};
     // Test-only
     static constexpr MetricName kTest1 = {"test_only.metric1"};
     static constexpr MetricName kTest2 = {"test_only.metric2"};
