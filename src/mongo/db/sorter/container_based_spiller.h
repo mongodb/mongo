@@ -41,7 +41,9 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/modules.h"
 
+#include <limits>
 #include <memory>
+#include <span>
 #include <utility>
 
 #include <boost/optional.hpp>
@@ -126,7 +128,7 @@ public:
     }
 
     SorterRange getRange() const override {
-        MONGO_UNREACHABLE_TASSERT(10896306);
+        return {_position, _end, static_cast<int64_t>(_originalChecksum)};
     }
 
     bool spillable() const override {
@@ -311,6 +313,12 @@ public:
         _currKey = newKey;
     }
 
+    void remove(int64_t key) {
+        WriteUnitOfWork wuow{&_opCtx};
+        uassertStatusOK(container_write::remove(&_opCtx, _ru, _collection, _container, key));
+        wuow.commit();
+    }
+
 private:
     OperationContext& _opCtx;
     RecoveryUnit& _ru;
@@ -341,11 +349,56 @@ public:
         SorterSpillerBase<Key, Value>::Comparator comp,
         std::size_t numTargetedSpills,
         std::size_t numParallelSpills) override {
-        // TODO (SERVER-117220): Implement merging spills.
+        std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>> oldIters;
+        while (iters.size() > numTargetedSpills) {
+            oldIters.swap(iters);
+            for (size_t i = 0; i < oldIters.size(); i += numParallelSpills) {
+                auto count = std::min(numParallelSpills, oldIters.size() - i);
+                auto spillsToMerge = std::span(oldIters).subspan(i, count);
+                auto mergeIterator = sorter::merge<Key, Value>(spillsToMerge, opts, comp);
+                auto writer = this->_storage->makeWriter(opts, settings);
+
+                int64_t start = std::numeric_limits<int64_t>::max();
+                int64_t end = 0;
+                int64_t numSpilled = 0;
+
+                while (mergeIterator->more()) {
+                    auto range = mergeIterator->iterator().getRange();
+                    if (range.getStartOffset() < start) {
+                        start = range.getStartOffset();
+                    }
+                    if (range.getEndOffset() > end) {
+                        end = range.getEndOffset();
+                    }
+
+                    auto next = mergeIterator->next();
+                    writer->addAlreadySorted(next.first, next.second);
+                    ++numSpilled;
+                }
+                invariant(numSpilled == end - start);
+
+                // TOOD (SERVER-117546): Use a truncate rather than individual deletes.
+                for (int64_t current = start; current < end; ++current) {
+                    _containerBasedStorage().remove(current);
+                }
+
+                iters.push_back(this->_storage->makeIterator(std::move(writer)));
+                _current += numSpilled;
+                _containerBasedStorage().updateCurrKey(_current);
+
+                stats.incrementSpilledRanges();
+                stats.incrementSpilledKeyValuePairs(numSpilled);
+            }
+            oldIters.clear();
+        }
         return std::move(this->_storage);
     }
 
 private:
+    ContainerBasedSorterStorage<Key, Value>& _containerBasedStorage() {
+        return *static_cast<ContainerBasedSorterStorage<Key, Value>*>(this->_storage.get());
+    }
+
     std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(
         const SortOptions& opts,
         const SorterSpillerBase<Key, Value>::Settings& settings,
@@ -356,8 +409,7 @@ private:
             writer->addAlreadySorted(key, value);
             ++_current;
         }
-        static_cast<ContainerBasedSorterStorage<Key, Value>*>(this->_storage.get())
-            ->updateCurrKey(_current);
+        _containerBasedStorage().updateCurrKey(_current);
         return std::move(writer);
     }
 

@@ -568,12 +568,6 @@ std::unique_ptr<SorterStorage<Key, Value>> FileBasedSorterSpiller<Key, Value>::m
     std::size_t numParallelSpills) {
     using File = SorterFile;
 
-    LOGV2_INFO(8203700,
-               "Merging spills",
-               "currentNumSpills"_attr = iters.size(),
-               "targetNumSpills"_attr = numTargetedSpills,
-               "parallelNumSpills"_attr = numParallelSpills);
-
     std::shared_ptr<File> newSpillsFile =
         std::make_shared<File>(sorter::nextFileName(*opts.tempDir), _fileStats);
     FileBasedSorterStorage<Key, Value> sorterStorage(newSpillsFile, *opts.tempDir);

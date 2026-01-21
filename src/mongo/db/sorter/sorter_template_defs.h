@@ -393,6 +393,21 @@ public:
         }
     }
 
+    /**
+     * Returns the underlying iterator of the current position.
+     */
+    Input& iterator() {
+        uassert(11722000,
+                "Cannot get underlying iterator when merge iterator has already been exhausted",
+                _remaining);
+
+        if (!_positioned) {
+            advance();
+            _positioned = true;
+        }
+        return _current->iterator();
+    }
+
 private:
     class STLComparator {  // uses greater rather than less-than to maintain a MinHeap
     public:
@@ -490,6 +505,12 @@ protected:
         }
 
         if (this->_iters.size() > numTargetedSpills) {
+            LOGV2_INFO(8203700,
+                       "Merging spills",
+                       "currentNumSpills"_attr = this->_iters.size(),
+                       "targetNumSpills"_attr = numTargetedSpills,
+                       "parallelNumSpills"_attr = numParallelSpills);
+
             auto storage = _spillHelper->mergeSpills(this->_opts,
                                                      this->_settings,
                                                      this->_stats,
@@ -1506,7 +1527,7 @@ void BoundedSorter<Key, Value, BoundMaker>::_spill(size_t maxMemoryUsageBytes) {
 
 namespace sorter {
 template <typename Key, typename Value>
-std::unique_ptr<Iterator<Key, Value>> merge(
+std::unique_ptr<MergeIterator<Key, Value>> merge(
     std::span<std::shared_ptr<Iterator<Key, Value>>> iters,
     const SortOptions& opts,
     const std::function<int(const Key&, const Key&)>& comp) {

@@ -19,9 +19,11 @@ structs:
         fields:
             startOffset:
                 description: "Tracks where in the file we started writing this data range."
+                # TODO (SERVER-117306): Use a generic cpp_name.
                 type: long
             endOffset:
                 description: "Tracks where in the file we finished writing this data range."
+                # TODO (SERVER-117306): Use a generic cpp_name.
                 type: long
             checksum:
                 description: "Tracks the hash of all data objects spilled to disk."

@@ -267,13 +267,17 @@ public:
     }
 };
 
+template <typename Key, typename Value>
+class MergeIterator;
+
 /**
  * Returns an iterator that merges the passed-in iterators.
  */
 template <typename Key, typename Value>
-std::unique_ptr<Iterator<Key, Value>> merge(std::span<std::shared_ptr<Iterator<Key, Value>>> iters,
-                                            const SortOptions& opts,
-                                            const std::function<int(const Key&, const Key&)>& comp);
+std::unique_ptr<MergeIterator<Key, Value>> merge(
+    std::span<std::shared_ptr<Iterator<Key, Value>>> iters,
+    const SortOptions& opts,
+    const std::function<int(const Key&, const Key&)>& comp);
 
 }  // namespace sorter
 
@@ -515,6 +519,9 @@ public:
 
         _current = _rest->nextWithDeferredValue();
         return true;
+    }
+    sorter::Iterator<Key, Value>& iterator() {
+        return *_rest;
     }
 
     const size_t fileNum;
