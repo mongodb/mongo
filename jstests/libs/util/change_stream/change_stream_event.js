@@ -1,9 +1,30 @@
 import {canonicalizeEventForTesting} from "jstests/libs/query/change_stream_util.js";
 
 /**
+ * Filter event to only contain keys present in expected.
+ * Enables subset matching by keeping only the fields we care about.
+ * @param {Object} event - The actual event to filter.
+ * @param {Object} expected - The expected event (defines which keys to keep).
+ * @returns {Object} Filtered event with only expected keys.
+ */
+function filterToExpectedKeys(event, expected) {
+    // First apply standard canonicalization.
+    canonicalizeEventForTesting(event, expected);
+
+    // Keep only keys that exist in expected.
+    const filtered = {};
+    for (const key in expected) {
+        if (event.hasOwnProperty(key)) {
+            filtered[key] = event[key];
+        }
+    }
+    return filtered;
+}
+
+/**
  * Simple change event matcher used by tests.
  * Uses static eventModifier property to transform actual event before comparison.
- * Default: canonicalizeEventForTesting (removes _id, clusterTime, etc.).
+ * Default: filterToExpectedKeys (removes extra fields, keeps only expected keys).
  *
  * To use custom filtering, set ChangeEventMatcher.eventModifier before creating matchers:
  *   ChangeEventMatcher.eventModifier = myCustomFilter;
@@ -11,9 +32,9 @@ import {canonicalizeEventForTesting} from "jstests/libs/query/change_stream_util
 class ChangeEventMatcher {
     /**
      * Static event modifier function. Override for custom filtering.
-     * Default: canonicalizeEventForTesting
+     * Default: filterToExpectedKeys.
      */
-    static eventModifier = canonicalizeEventForTesting;
+    static eventModifier = filterToExpectedKeys;
 
     /**
      * @param {Object} event - Expected change event.
@@ -35,9 +56,10 @@ class ChangeEventMatcher {
         if (this.cursorClosed !== cursorClosed) {
             return false;
         }
-        const actualCanon = ChangeEventMatcher.eventModifier(Object.assign({}, event), this.event);
-        return friendlyEqual(actualCanon, this.event);
+        const actualFiltered = ChangeEventMatcher.eventModifier(Object.assign({}, event), this.event);
+        // Use bsonUnorderedFieldsCompare to ignore field order (returns 0 if equal)
+        return bsonUnorderedFieldsCompare(actualFiltered, this.event) === 0;
     }
 }
 
-export {ChangeEventMatcher};
+export {ChangeEventMatcher, filterToExpectedKeys};

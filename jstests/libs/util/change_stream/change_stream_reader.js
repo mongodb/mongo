@@ -109,7 +109,12 @@ class ChangeStreamReader {
      * @private
      */
     static _readContinuous(conn, cfg) {
+        const version = cfg.version ?? "default";
+        jsTest.log.info(
+            `ChangeStreamReader [${cfg.instanceName}]: Starting continuous read, expecting ${cfg.numberOfEventsToRead} events, version: ${version}`,
+        );
         let {cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg);
+        const readEventTypes = [];
 
         for (let count = 0; count < cfg.numberOfEventsToRead; count++) {
             // Always use skipFirst=false to check the current batch before issuing getMore.
@@ -120,6 +125,11 @@ class ChangeStreamReader {
             assert(changeEvent._id, `Change event at index ${count} missing _id (resume token)`);
 
             const isInvalidate = isInvalidated(changeEvent);
+            readEventTypes.push(changeEvent.operationType);
+
+            jsTest.log.info(
+                `ChangeStreamReader [${cfg.instanceName}]: Read event ${count + 1}/${cfg.numberOfEventsToRead}: ${changeEvent.operationType}`,
+            );
 
             // cursorClosed is true for invalidate events (server closes cursor after invalidate).
             Connector.writeChangeEvent(conn, cfg.instanceName, {
@@ -134,33 +144,41 @@ class ChangeStreamReader {
             }
         }
 
+        jsTest.log.info(
+            `ChangeStreamReader [${cfg.instanceName}]: Completed reading ${cfg.numberOfEventsToRead} events`,
+        );
+        jsTest.log.info(`ChangeStreamReader [${cfg.instanceName}]: Read events: ${tojson(readEventTypes)}`);
         cst.cleanUp();
     }
 
     /**
-     * Read events one at a time, closing and resuming the cursor after each event.
-     * This mode tests resume token handling.
+     * Read events one at a time, closing and reopening the cursor after each event.
+     * Uses resumeAfter with the previous event's token.
+     * After an invalidate, uses startAfter to reopen the cursor.
      * @private
      */
     static _readFetchOneAndResume(conn, cfg) {
+        const version = cfg.version ?? "default";
+        jsTest.log.info(
+            `ChangeStreamReader [${cfg.instanceName}]: Starting fetch-one-and-resume, expecting ${cfg.numberOfEventsToRead} events, version: ${version}`,
+        );
         let resumeToken = null;
         let useStartAfter = false;
+        const readEventTypes = [];
 
         for (let count = 0; count < cfg.numberOfEventsToRead; count++) {
             const {cst, cursor} = ChangeStreamReader._openChangeStream(conn, cfg, resumeToken, useStartAfter);
 
-            // Use skipFirst=false to not ignore events that may be in firstBatch.
-            // getOneChange() uses skipFirst=true which would drop events in firstBatch.
             const changeEvent = cst.getNextChanges(cursor, 1, false /* skipFirst */)[0];
-
             assert(changeEvent, `Expected change event at index ${count}, but got none`);
             assert(changeEvent._id, `Change event at index ${count} missing _id (resume token)`);
 
             const isInvalidate = isInvalidated(changeEvent);
+            readEventTypes.push(changeEvent.operationType);
 
-            resumeToken = changeEvent._id;
-            // Must use startAfter (not resumeAfter) when resuming from invalidate.
-            useStartAfter = isInvalidate;
+            jsTest.log.info(
+                `ChangeStreamReader [${cfg.instanceName}]: Read event ${count + 1}/${cfg.numberOfEventsToRead}: ${changeEvent.operationType}`,
+            );
 
             // cursorClosed is true for invalidate events (server closes cursor after invalidate).
             Connector.writeChangeEvent(conn, cfg.instanceName, {
@@ -168,8 +186,17 @@ class ChangeStreamReader {
                 cursorClosed: isInvalidate,
             });
 
+            resumeToken = changeEvent._id;
+            // Must use startAfter (not resumeAfter) when resuming from invalidate.
+            useStartAfter = isInvalidate;
+
             cst.cleanUp();
         }
+
+        jsTest.log.info(
+            `ChangeStreamReader [${cfg.instanceName}]: Completed reading ${cfg.numberOfEventsToRead} events`,
+        );
+        jsTest.log.info(`ChangeStreamReader [${cfg.instanceName}]: Read events: ${tojson(readEventTypes)}`);
     }
 }
 

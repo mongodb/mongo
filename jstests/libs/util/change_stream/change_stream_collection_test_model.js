@@ -53,7 +53,9 @@ class CollectionTestModel {
         this.setActions(State.DATABASE_PRESENT_COLLECTION_ABSENT, [
             [Action.INSERT_DOC, State.COLLECTION_PRESENT_UNTRACKED],
             [Action.CREATE_SHARDED_COLLECTION_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
-            [Action.CREATE_SHARDED_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
+            // TODO SERVER-114858: Hashed sharding disabled - chunk distribution is non-deterministic,
+            // causing unpredictable index event counts. Investigate deterministic placement options.
+            // [Action.CREATE_SHARDED_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.CREATE_UNSPLITTABLE_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
             [Action.CREATE_UNTRACKED_COLLECTION, State.COLLECTION_PRESENT_UNTRACKED],
             [Action.DROP_DATABASE, State.DATABASE_ABSENT],
@@ -69,28 +71,26 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             // Cross-database renames not supported for sharded collections.
             [Action.UNSHARD_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
-            // Only allow resharding to different key type (no range→range since we use same key).
-            [Action.RESHARD_COLLECTION_TO_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
+            // TODO SERVER-114858: Hashed sharding disabled - see comment above.
+            // [Action.RESHARD_COLLECTION_TO_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED_RANGE],
             [Action.MOVE_CHUNK, State.COLLECTION_PRESENT_SHARDED_RANGE],
             // MOVE_COLLECTION only works on unsharded collections.
         ]);
 
         // ===== COLLECTION_PRESENT_SHARDED_HASHED state transitions =====
-        this.setActions(State.COLLECTION_PRESENT_SHARDED_HASHED, [
-            [Action.INSERT_DOC, State.COLLECTION_PRESENT_SHARDED_HASHED],
-            [Action.DROP_COLLECTION, State.DATABASE_PRESENT_COLLECTION_ABSENT],
-            [Action.DROP_DATABASE, State.DATABASE_ABSENT],
-            [Action.RENAME_TO_NON_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
-            [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
-            // Cross-database renames not supported for sharded collections.
-            [Action.UNSHARD_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
-            // Only allow resharding to different key type (no hashed→hashed since we use same key).
-            [Action.RESHARD_COLLECTION_TO_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
-            [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED_HASHED],
-            [Action.MOVE_CHUNK, State.COLLECTION_PRESENT_SHARDED_HASHED],
-            // MOVE_COLLECTION only works on unsharded collections.
-        ]);
+        // TODO SERVER-114858: Entire hashed state disabled - chunk distribution is non-deterministic.
+        // this.setActions(State.COLLECTION_PRESENT_SHARDED_HASHED, [
+        //     [Action.INSERT_DOC, State.COLLECTION_PRESENT_SHARDED_HASHED],
+        //     [Action.DROP_COLLECTION, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+        //     [Action.DROP_DATABASE, State.DATABASE_ABSENT],
+        //     [Action.RENAME_TO_NON_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+        //     [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
+        //     [Action.UNSHARD_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
+        //     [Action.RESHARD_COLLECTION_TO_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
+        //     [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_SHARDED_HASHED],
+        //     [Action.MOVE_CHUNK, State.COLLECTION_PRESENT_SHARDED_HASHED],
+        // ]);
 
         // ===== COLLECTION_PRESENT_UNSPLITTABLE state transitions =====
         this.setActions(State.COLLECTION_PRESENT_UNSPLITTABLE, [
@@ -101,7 +101,8 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             // Cross-database renames not supported for tracked collections.
             [Action.SHARD_COLLECTION_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
-            [Action.SHARD_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
+            // TODO SERVER-114858: Hashed sharding disabled - see comment above.
+            // [Action.SHARD_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_UNSPLITTABLE],
             [Action.MOVE_COLLECTION, State.COLLECTION_PRESENT_UNSPLITTABLE],
         ]);
@@ -115,7 +116,8 @@ class CollectionTestModel {
             [Action.RENAME_TO_EXISTENT_SAME_DB, State.DATABASE_PRESENT_COLLECTION_ABSENT],
             // Cross-database renames require source and target on same shard.
             [Action.SHARD_COLLECTION_RANGE, State.COLLECTION_PRESENT_SHARDED_RANGE],
-            [Action.SHARD_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
+            // TODO SERVER-114858: Hashed sharding disabled - see comment above.
+            // [Action.SHARD_COLLECTION_HASHED, State.COLLECTION_PRESENT_SHARDED_HASHED],
             [Action.MOVE_PRIMARY, State.COLLECTION_PRESENT_UNTRACKED],
             [Action.MOVE_COLLECTION, State.COLLECTION_PRESENT_UNTRACKED],
         ]);

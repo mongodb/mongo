@@ -10,6 +10,7 @@ import {CollectionTestModel} from "jstests/libs/util/change_stream/change_stream
 import {
     InsertDocCommand,
     DropCollectionCommand,
+    DropIndexCommand,
     CreateIndexCommand,
     ShardCollectionCommand,
     ReshardCollectionCommand,
@@ -27,9 +28,17 @@ import {
     SingleChangeStreamMatcher,
     MultipleChangeStreamMatcher,
 } from "jstests/libs/util/change_stream/change_stream_matcher.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ChangeStreamReader, ChangeStreamReadingMode} from "jstests/libs/util/change_stream/change_stream_reader.js";
 import {ChangeStreamWatchMode} from "jstests/libs/query/change_stream_util.js";
+import {Verifier, SingleReaderVerificationTestCase} from "jstests/libs/util/change_stream/change_stream_verifier.js";
+import {
+    TEST_DB,
+    TEST_SEED,
+    getCurrentClusterTime,
+    createShardingTest,
+    createMatcher,
+    cleanupTestDatabase,
+} from "jstests/libs/util/change_stream/change_stream_sharding_utils.js";
 import {after, afterEach, before, describe, it} from "jstests/libs/mochalite.js";
 
 /**
@@ -52,31 +61,9 @@ function setupWriterConfig(seed, params, instanceName) {
     };
 }
 
-/**
- * Get the current cluster time from the server.
- */
-function getClusterTime(conn, dbName) {
-    const serverStatus = conn.getDB(dbName).adminCommand({serverStatus: 1});
-    return serverStatus.operationTime;
-}
-
-/**
- * Get a cluster time that is strictly after the current server time.
- * This is useful for starting change streams that should not include any
- * events that have already occurred, since startAtClusterTime is inclusive.
- */
-function getClusterTimeAfterNow(conn, dbName) {
-    const currentTime = getClusterTime(conn, dbName);
-    // Increment the cluster time by 1 to be strictly after the current time.
-    // Cluster time is Timestamp(seconds, increment), so incrementing 'i' by 1
-    // gives us a time that is guaranteed to be after all current operations.
-    return Timestamp(currentTime.t, currentTime.i + 1);
-}
-
 describe("ShardingCommandGenerator", function () {
     before(() => {
-        this.st = new ShardingTest({shards: 2, mongos: 1});
-        this.st.stopBalancer();
+        this.st = createShardingTest();
         this.shards = assert.commandWorked(this.st.s.adminCommand({listShards: 1})).shards;
     });
 
@@ -85,9 +72,8 @@ describe("ShardingCommandGenerator", function () {
     });
 
     it("should generate identical command sequences for the same seed", () => {
-        const seed = 42;
-        const gen1 = new ShardingCommandGenerator(seed);
-        const gen2 = new ShardingCommandGenerator(seed);
+        const gen1 = new ShardingCommandGenerator(TEST_SEED);
+        const gen2 = new ShardingCommandGenerator(TEST_SEED);
 
         const model1 = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
         const model2 = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
@@ -106,14 +92,13 @@ describe("ShardingCommandGenerator", function () {
     });
 
     it("should generate commands", () => {
-        const seed = new Date().getTime();
-        const generator = new ShardingCommandGenerator(seed);
+        const generator = new ShardingCommandGenerator(TEST_SEED);
         const testModel = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
         const params = new ShardingCommandGeneratorParams("test_db_gen", "test_coll", this.shards);
 
         const commands = generator.generateCommands(testModel, params);
 
-        jsTest.log.info(`Generated ${commands.length} commands (seed: ${seed})`);
+        jsTest.log.info(`Generated ${commands.length} commands (seed: ${TEST_SEED})`);
 
         // Verify commands were generated.
         assert.gt(commands.length, 0, "Should generate at least one command");
@@ -125,19 +110,18 @@ describe("ShardingCommandGenerator", function () {
     });
 
     it("should execute commands successfully using Writer", () => {
-        const testSeed = new Date().getTime();
-        const dbName = "test_db_exec";
+        const dbName = TEST_DB;
         const collName = "test_coll_exec";
         const instanceName = "test_instance_1";
 
-        jsTest.log.info(`Testing command execution with Writer (seed: ${testSeed})`);
+        jsTest.log.info(`Testing command execution with Writer (seed: ${TEST_SEED})`);
 
-        const db = this.st.s.getDB(dbName);
-        db.dropDatabase();
+        // Clean database.
+        assert.commandWorked(this.st.s.getDB(dbName).dropDatabase());
 
         // Set up writer config.
         const params = new ShardingCommandGeneratorParams(dbName, collName, this.shards);
-        const config = setupWriterConfig(testSeed, params, instanceName);
+        const config = setupWriterConfig(TEST_SEED, params, instanceName);
 
         // Execute commands using Writer.
         jsTest.log.info(`Executing ${config.commands.length} commands using Writer...`);
@@ -150,24 +134,23 @@ describe("ShardingCommandGenerator", function () {
     });
 
     it("should execute two Writers sequentially on different collections", () => {
-        const testSeed = 12345;
-        const dbName = "test_db_multi_writer_seq";
-        const collName1 = "test_coll_writer1";
-        const collName2 = "test_coll_writer2";
+        const dbName = TEST_DB;
+        const collName1 = "test_coll_multi_writer1";
+        const collName2 = "test_coll_multi_writer2";
         const writerA = "writer_instance_A";
         const writerB = "writer_instance_B";
 
-        jsTest.log.info(`Testing two Writers running sequentially (seed: ${testSeed})`);
+        jsTest.log.info(`Testing two Writers running sequentially (seed: ${TEST_SEED})`);
 
-        const db = this.st.s.getDB(dbName);
-        db.dropDatabase();
+        // Clean database.
+        assert.commandWorked(this.st.s.getDB(dbName).dropDatabase());
 
         // Set up writer configs with same seed but different collections.
         const writerAParams = new ShardingCommandGeneratorParams(dbName, collName1, this.shards);
         const writerBParams = new ShardingCommandGeneratorParams(dbName, collName2, this.shards);
 
-        const writerAConfig = setupWriterConfig(testSeed, writerAParams, writerA);
-        const writerBConfig = setupWriterConfig(testSeed, writerBParams, writerB);
+        const writerAConfig = setupWriterConfig(TEST_SEED, writerAParams, writerA);
+        const writerBConfig = setupWriterConfig(TEST_SEED, writerBParams, writerB);
 
         // Execute writers sequentially.
         Writer.run(this.st.s, writerAConfig);
@@ -178,8 +161,9 @@ describe("ShardingCommandGenerator", function () {
         assert(Connector.isDone(this.st.s, writerB), "Writer B should be done");
 
         // Verify both collections have same count (same command sequence).
-        const coll1 = db.getCollection(collName1);
-        const coll2 = db.getCollection(collName2);
+        const testDb = this.st.s.getDB(dbName);
+        const coll1 = testDb.getCollection(collName1);
+        const coll2 = testDb.getCollection(collName2);
         assert.eq(
             coll1.countDocuments({}),
             coll2.countDocuments({}),
@@ -190,20 +174,19 @@ describe("ShardingCommandGenerator", function () {
     });
 
     it("runs the graph mutator and exercises all FSM transitions", () => {
-        const dbName = "test_db_sharding";
-        const collName = "test_coll_sharding";
-        const seed = 314159;
+        const dbName = TEST_DB;
+        const collName = "test_coll_fsm_transitions";
 
-        const db = this.st.s.getDB(dbName);
-        db.dropDatabase();
+        // Clean database.
+        assert.commandWorked(this.st.s.getDB(dbName).dropDatabase());
 
         const model = new CollectionTestModel().setStartState(State.DATABASE_ABSENT);
         const params = new ShardingCommandGeneratorParams(dbName, collName, this.shards);
-        const generator = new ShardingCommandGenerator(seed);
+        const generator = new ShardingCommandGenerator(TEST_SEED);
         const commands = generator.generateCommands(model, params);
 
         jsTest.log.info(`\n========== Graph mutator - Full FSM traversal ==========`);
-        jsTest.log.info(`Seed: ${seed}, DB: ${dbName}, Coll: ${collName}`);
+        jsTest.log.info(`Seed: ${TEST_SEED}, DB: ${dbName}, Coll: ${collName}`);
         jsTest.log.info(`Total commands: ${commands.length}`);
         jsTest.log.info(`Command list:`);
         commands.forEach((cmd, idx) => {
@@ -347,12 +330,7 @@ describe("ChangeEventMatcher helpers", function () {
 
 describe("ChangeStreamReader integration", function () {
     before(() => {
-        this.st = new ShardingTest({
-            shards: 2,
-            mongos: 1,
-            rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
-        });
-        this.st.stopBalancer();
+        this.st = createShardingTest();
         this.shards = assert.commandWorked(this.st.s.adminCommand({listShards: 1})).shards;
         // Track instance names for cleanup in afterEach.
         this.instanceNamesToCleanup = [];
@@ -373,7 +351,7 @@ describe("ChangeStreamReader integration", function () {
 
         // Drop databases used during the test.
         for (const dbName of this.databasesToCleanup) {
-            this.st.s.getDB(dbName).dropDatabase();
+            assert.commandWorked(this.st.s.getDB(dbName).dropDatabase());
         }
         this.databasesToCleanup.clear();
     });
@@ -385,8 +363,8 @@ describe("ChangeStreamReader integration", function () {
      */
     function testCaptureInsertEvents(ctx, readingMode) {
         const modeName = readingMode === ChangeStreamReadingMode.kContinuous ? "Continuous" : "FetchOneAndResume";
-        const dbName = `test_db_${modeName.toLowerCase()}`;
-        const collName = "test_coll";
+        const dbName = TEST_DB;
+        const collName = `test_coll_${modeName.toLowerCase()}`;
         const writerInstanceName = "writer_test";
         const readerInstanceName = "reader_test";
 
@@ -395,12 +373,11 @@ describe("ChangeStreamReader integration", function () {
 
         // Create collection (drop first to ensure clean state).
         const db = ctx.st.s.getDB(dbName);
-        db.dropDatabase();
+        assert.commandWorked(db.dropDatabase());
         assert.commandWorked(db.createCollection(collName));
 
-        // Get cluster time strictly AFTER the create event so the change stream
-        // only captures the subsequent insert events.
-        const clusterTime = getClusterTimeAfterNow(ctx.st.s, dbName);
+        // Get cluster time strictly AFTER the create event.
+        const clusterTime = getCurrentClusterTime(ctx.st.s, dbName);
 
         // Execute inserts using Writer.
         const numInserts = 3;
@@ -415,6 +392,8 @@ describe("ChangeStreamReader integration", function () {
         Writer.run(ctx.st.s, writerConfig);
 
         // Use ChangeStreamReader with specified mode.
+        // showExpandedEvents: false because this test verifies DML (insert) behavior only.
+        // DDL events like 'create' from collection setup are not relevant here.
         const readerConfig = {
             instanceName: readerInstanceName,
             watchMode: ChangeStreamWatchMode.kCollection,
@@ -452,8 +431,8 @@ describe("ChangeStreamReader integration", function () {
      * Verifies ChangeStreamReader handles invalidate and reopens cursor correctly.
      */
     it("handles multiple inserts and invalidate event", function () {
-        const dbName = "test_reader_invalidate";
-        const collName = "test_coll";
+        const dbName = TEST_DB;
+        const collName = "test_coll_invalidate";
         const writerInstanceName = "writer_invalidate_test";
         const readerInstanceName = "reader_invalidate_test";
 
@@ -480,7 +459,7 @@ describe("ChangeStreamReader integration", function () {
          */
         const setupCollection = () => {
             const db = this.st.s.getDB(dbName);
-            db.dropDatabase();
+            assert.commandWorked(db.dropDatabase());
             assert.commandWorked(db.createCollection(collName));
             return db.getCollection(collName);
         };
@@ -523,13 +502,15 @@ describe("ChangeStreamReader integration", function () {
         setupCollection();
         const db = this.st.s.getDB(dbName);
 
-        // Get cluster time strictly AFTER setup so change stream only captures test operations.
-        const startTime = getClusterTimeAfterNow(this.st.s, dbName);
+        // Get cluster time strictly AFTER setup.
+        const startTime = getCurrentClusterTime(this.st.s, dbName);
         jsTest.log.info(`Start time: ${tojson(startTime)}`);
 
         executeCommands();
 
         // Configure ChangeStreamReader.
+        // showExpandedEvents: false because this test verifies DML (insert/drop/invalidate) behavior.
+        // DDL events like 'create' from collection setup are not relevant here.
         const readerConfig = {
             instanceName: readerInstanceName,
             watchMode: ChangeStreamWatchMode.kCollection,
@@ -537,8 +518,8 @@ describe("ChangeStreamReader integration", function () {
             collName: collName,
             numberOfEventsToRead: expectedEventTypes.length,
             readingMode: ChangeStreamReadingMode.kContinuous,
-            showExpandedEvents: false,
             startAtClusterTime: startTime,
+            showExpandedEvents: false,
         };
 
         jsTest.log.info(`Running ChangeStreamReader.run()...`);
@@ -558,8 +539,8 @@ describe("ChangeStreamReader integration", function () {
      * This mode reopens cursor after each event, testing resume token handling.
      */
     it("handles invalidate in FetchOneAndResume mode", function () {
-        const dbName = "test_reader_resume_invalidate";
-        const collName = "test_coll_resume";
+        const dbName = TEST_DB;
+        const collName = "test_coll_resume_invalidate";
         const writerInstanceName = "writer_resume_inv_test";
         const readerInstanceName = "reader_resume_inv_test";
 
@@ -582,7 +563,7 @@ describe("ChangeStreamReader integration", function () {
 
         const setupCollection = () => {
             const db = this.st.s.getDB(dbName);
-            db.dropDatabase();
+            assert.commandWorked(db.dropDatabase());
             assert.commandWorked(db.createCollection(collName));
         };
 
@@ -621,11 +602,13 @@ describe("ChangeStreamReader integration", function () {
         setupCollection();
         const db = this.st.s.getDB(dbName);
 
-        // Get cluster time strictly AFTER setup so change stream only captures test operations.
-        const startTime = getClusterTimeAfterNow(this.st.s, dbName);
+        // Get cluster time strictly AFTER setup.
+        const startTime = getCurrentClusterTime(this.st.s, dbName);
 
         executeCommands();
 
+        // showExpandedEvents: false because this test verifies DML (insert/drop/invalidate) behavior.
+        // DDL events like 'create' from collection setup are not relevant here.
         const readerConfig = {
             instanceName: readerInstanceName,
             watchMode: ChangeStreamWatchMode.kCollection,
@@ -633,8 +616,8 @@ describe("ChangeStreamReader integration", function () {
             collName: collName,
             numberOfEventsToRead: expectedEventTypes.length,
             readingMode: ChangeStreamReadingMode.kFetchOneAndResume,
-            showExpandedEvents: false,
             startAtClusterTime: startTime,
+            showExpandedEvents: false,
         };
 
         jsTest.log.info(`Running ChangeStreamReader in FetchOneAndResume mode...`);
@@ -652,9 +635,9 @@ describe("ChangeStreamReader integration", function () {
      * Test database-level watch with multiple collections.
      */
     it("handles database-level watch with multiple collections", function () {
-        const dbName = "test_reader_db_watch";
-        const collName1 = "coll_a";
-        const collName2 = "coll_b";
+        const dbName = TEST_DB;
+        const collName1 = "test_coll_db_watch_a";
+        const collName2 = "test_coll_db_watch_b";
         const writerInstanceName = "writer_db_watch_test";
         const readerInstanceName = "reader_db_watch_test";
 
@@ -678,12 +661,12 @@ describe("ChangeStreamReader integration", function () {
 
         // Setup: drop and recreate collections (drop to ensure clean state before test).
         const db = this.st.s.getDB(dbName);
-        db.dropDatabase();
+        assert.commandWorked(db.dropDatabase());
         assert.commandWorked(db.createCollection(collName1));
         assert.commandWorked(db.createCollection(collName2));
 
-        // Get cluster time strictly AFTER setup so change stream only captures test operations.
-        const startTime = getClusterTimeAfterNow(this.st.s, dbName);
+        // Get cluster time strictly AFTER setup.
+        const startTime = getCurrentClusterTime(this.st.s, dbName);
 
         // Execute commands using Writer.
         const writerConfig = {
@@ -692,6 +675,8 @@ describe("ChangeStreamReader integration", function () {
         };
         Writer.run(this.st.s, writerConfig);
 
+        // showExpandedEvents: false because this test verifies DML (insert) behavior only.
+        // DDL events like 'create' from collection setup are not relevant here.
         const readerConfig = {
             instanceName: readerInstanceName,
             watchMode: ChangeStreamWatchMode.kDb,
@@ -699,8 +684,8 @@ describe("ChangeStreamReader integration", function () {
             collName: null, // Not needed for db-level watch.
             numberOfEventsToRead: expectedEventTypes.length,
             readingMode: ChangeStreamReadingMode.kContinuous,
-            showExpandedEvents: false,
             startAtClusterTime: startTime,
+            showExpandedEvents: false,
         };
 
         jsTest.log.info(`Running ChangeStreamReader with database-level watch...`);
@@ -742,23 +727,25 @@ describe("ChangeStreamReader integration", function () {
      * @param {Array<string>} expectedOperationTypes - Expected operationTypes for all events.
      */
     function runDDLTest(ctx, testName, setupCommands, testCommand, expectedOperationTypes) {
-        const dbName = `test_ddl_${testName}`;
-        const collName = "test_coll";
+        Random.setRandomSeed(TEST_SEED);
+
+        const dbName = TEST_DB;
+        const collName = `test_coll_ddl_${testName}`;
         const readerInstanceName = `reader_ddl_${testName}`;
 
         ctx.databasesToCleanup.add(dbName);
         ctx.instanceNamesToCleanup.push(readerInstanceName);
 
-        const db = ctx.st.s.getDB(dbName);
-        db.dropDatabase();
+        // Clean database and flush router config.
+        cleanupTestDatabase(ctx.st.s, dbName);
+
+        // Get cluster time BEFORE running any commands so we capture all events.
+        const startTime = getCurrentClusterTime(ctx.st.s, dbName);
 
         // Run setup commands.
         for (const cmd of setupCommands) {
             cmd.execute(ctx.st.s);
         }
-
-        // Get cluster time strictly after setup.
-        const startTime = getClusterTimeAfterNow(ctx.st.s, dbName);
 
         // Execute test command.
         testCommand.execute(ctx.st.s);
@@ -805,29 +792,31 @@ describe("ChangeStreamReader integration", function () {
     describe("DML", function () {
         it("insert emits insert event", function () {
             const setupCommands = [
-                new CreateUntrackedCollectionCommand("test_ddl_insert", "test_coll", this.shards, {}),
+                new CreateUntrackedCollectionCommand(TEST_DB, "test_coll_ddl_insert", this.shards, {}),
             ];
-            const testCommand = new InsertDocCommand("test_ddl_insert", "test_coll", this.shards, {
+            const testCommand = new InsertDocCommand(TEST_DB, "test_coll_ddl_insert", this.shards, {
                 exists: true,
                 nonEmpty: false,
             });
-            runDDLTest(this, "insert", setupCommands, testCommand, ["insert"]);
+            // Setup: create → Test: insert
+            runDDLTest(this, "insert", setupCommands, testCommand, ["create", "insert"]);
         });
     });
 
     describe("Index", function () {
         it("createIndex emits createIndexes event", function () {
             const setupCommands = [
-                new CreateUntrackedCollectionCommand("test_ddl_create_index", "test_coll", this.shards, {}),
+                new CreateUntrackedCollectionCommand(TEST_DB, "test_coll_ddl_create_index", this.shards, {}),
             ];
             const testCommand = new CreateIndexCommand(
-                "test_ddl_create_index",
-                "test_coll",
+                TEST_DB,
+                "test_coll_ddl_create_index",
                 this.shards,
                 {exists: true},
                 {data: 1}, // indexSpec
             );
-            runDDLTest(this, "create_index", setupCommands, testCommand, ["createIndexes"]);
+            // Setup: create → Test: createIndexes
+            runDDLTest(this, "create_index", setupCommands, testCommand, ["create", "createIndexes"]);
         });
     });
 
@@ -835,195 +824,653 @@ describe("ChangeStreamReader integration", function () {
         it("shardCollection (range) emits shardCollection event", function () {
             const setupCommands = [
                 new CreateIndexCommand(
-                    "test_ddl_shard_coll_range",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_shard_coll_range",
                     this.shards,
                     {exists: false},
                     {data: 1}, // indexSpec
                 ),
             ];
             const testCommand = new ShardCollectionCommand(
-                "test_ddl_shard_coll_range",
-                "test_coll",
+                TEST_DB,
+                "test_coll_ddl_shard_coll_range",
                 this.shards,
                 {exists: true},
                 {data: 1}, // shardKey
             );
-            runDDLTest(this, "shard_coll_range", setupCommands, testCommand, ["shardCollection"]);
+            // Setup: create + createIndexes → Test: shardCollection
+            runDDLTest(this, "shard_coll_range", setupCommands, testCommand, [
+                "create",
+                "createIndexes",
+                "shardCollection",
+            ]);
         });
 
         it("shardCollection (hashed) emits shardCollection event", function () {
             const setupCommands = [
                 new CreateIndexCommand(
-                    "test_ddl_shard_coll_hashed",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_shard_coll_hashed",
                     this.shards,
                     {exists: false},
                     {data: "hashed"}, // indexSpec
                 ),
             ];
             const testCommand = new ShardCollectionCommand(
-                "test_ddl_shard_coll_hashed",
-                "test_coll",
+                TEST_DB,
+                "test_coll_ddl_shard_coll_hashed",
                 this.shards,
                 {exists: true},
                 {data: "hashed"}, // shardKey
             );
-            runDDLTest(this, "shard_coll_hashed", setupCommands, testCommand, ["shardCollection"]);
+            // Setup: create + createIndexes → Test: shardCollection
+            runDDLTest(this, "shard_coll_hashed", setupCommands, testCommand, [
+                "create",
+                "createIndexes",
+                "shardCollection",
+            ]);
         });
 
-        it("reshardCollection emits reshardCollection event", function () {
+        // TODO SERVER-114858: Skipped because hashed sharding has non-deterministic chunk
+        // distribution, causing unpredictable event counts in multi-shard clusters.
+        it.skip("reshardCollection emits reshardCollection event", function () {
             const setupCommands = [
                 new CreateIndexCommand(
-                    "test_ddl_reshard",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_reshard",
                     this.shards,
                     {exists: false},
                     {data: 1}, // indexSpec
                 ),
                 new ShardCollectionCommand(
-                    "test_ddl_reshard",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_reshard",
                     this.shards,
                     {exists: true},
                     {data: 1}, // shardKey
                 ),
                 new CreateIndexCommand(
-                    "test_ddl_reshard",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_reshard",
                     this.shards,
                     {exists: true, shardKeySpec: {data: 1}, isSharded: true},
                     {data: "hashed"}, // indexSpec for new shard key
                 ),
             ];
             const testCommand = new ReshardCollectionCommand(
-                "test_ddl_reshard",
-                "test_coll",
+                TEST_DB,
+                "test_coll_ddl_reshard",
                 this.shards,
                 {exists: true, shardKeySpec: {data: 1}, isSharded: true},
                 {data: "hashed"}, // newShardKey
             );
-            runDDLTest(this, "reshard", setupCommands, testCommand, ["reshardCollection"]);
+            // Setup: create + createIndexes + shardCollection + createIndexes → Test: reshardCollection
+            runDDLTest(this, "reshard", setupCommands, testCommand, [
+                "create",
+                "createIndexes",
+                "shardCollection",
+                "createIndexes",
+                "reshardCollection",
+            ]);
         });
 
         it("unshardCollection emits reshardCollection event", function () {
             const setupCommands = [
                 new CreateIndexCommand(
-                    "test_ddl_unshard",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_unshard",
                     this.shards,
                     {exists: false},
                     {data: 1}, // indexSpec
                 ),
                 new ShardCollectionCommand(
-                    "test_ddl_unshard",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_unshard",
                     this.shards,
                     {exists: true},
                     {data: 1}, // shardKey
                 ),
             ];
-            const testCommand = new UnshardCollectionCommand("test_ddl_unshard", "test_coll", this.shards, {
+            const testCommand = new UnshardCollectionCommand(TEST_DB, "test_coll_ddl_unshard", this.shards, {
                 exists: true,
                 isSharded: true,
                 shardKeySpec: {data: 1},
             });
-            runDDLTest(this, "unshard", setupCommands, testCommand, ["reshardCollection"]);
+            // Setup: create + createIndexes + shardCollection → Test: reshardCollection
+            runDDLTest(this, "unshard", setupCommands, testCommand, [
+                "create",
+                "createIndexes",
+                "shardCollection",
+                "reshardCollection",
+            ]);
         });
     });
 
     describe("Rename", function () {
         it("rename emits rename + invalidate", function () {
             const setupCommands = [
-                new CreateIndexCommand("test_ddl_rename", "test_coll", this.shards, {exists: false}, {data: 1}),
-                new ShardCollectionCommand("test_ddl_rename", "test_coll", this.shards, {exists: true}, {data: 1}),
+                new CreateIndexCommand(TEST_DB, "test_coll_ddl_rename", this.shards, {exists: false}, {data: 1}),
+                new ShardCollectionCommand(TEST_DB, "test_coll_ddl_rename", this.shards, {exists: true}, {data: 1}),
             ];
-            const testCommand = new RenameToNonExistentSameDbCommand("test_ddl_rename", "test_coll", this.shards, {
+            const testCommand = new RenameToNonExistentSameDbCommand(TEST_DB, "test_coll_ddl_rename", this.shards, {
                 exists: true,
             });
-            runDDLTest(this, "rename", setupCommands, testCommand, ["rename", "invalidate"]);
+            // Setup: create + createIndexes + shardCollection → Test: rename + invalidate
+            runDDLTest(this, "rename", setupCommands, testCommand, [
+                "create",
+                "createIndexes",
+                "shardCollection",
+                "rename",
+                "invalidate",
+            ]);
         });
 
-        it("rename (resharded collection) emits rename + invalidate", function () {
+        // TODO SERVER-114858: Skipped because hashed sharding has non-deterministic chunk
+        // distribution, causing unpredictable event counts in multi-shard clusters.
+        it.skip("rename (resharded collection) emits rename + invalidate", function () {
             const setupCommands = [
                 new CreateIndexCommand(
-                    "test_ddl_resharded_rename",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_resharded_rename",
                     this.shards,
                     {exists: false},
                     {data: 1},
                 ),
                 new ShardCollectionCommand(
-                    "test_ddl_resharded_rename",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_resharded_rename",
                     this.shards,
                     {exists: true},
                     {data: 1},
                 ),
                 new CreateIndexCommand(
-                    "test_ddl_resharded_rename",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_resharded_rename",
                     this.shards,
                     {exists: true, shardKeySpec: {data: 1}, isSharded: true},
                     {data: "hashed"},
                 ),
                 new ReshardCollectionCommand(
-                    "test_ddl_resharded_rename",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_resharded_rename",
                     this.shards,
                     {exists: true, shardKeySpec: {data: 1}, isSharded: true},
                     {data: "hashed"},
                 ),
             ];
             const testCommand = new RenameToNonExistentSameDbCommand(
-                "test_ddl_resharded_rename",
-                "test_coll",
+                TEST_DB,
+                "test_coll_ddl_resharded_rename",
                 this.shards,
                 {exists: true},
             );
-            runDDLTest(this, "resharded_rename", setupCommands, testCommand, ["rename", "invalidate"]);
+            // Setup: create + createIndexes + shardCollection + createIndexes + reshardCollection → Test: rename + invalidate
+            runDDLTest(this, "resharded_rename", setupCommands, testCommand, [
+                "create",
+                "createIndexes",
+                "shardCollection",
+                "createIndexes",
+                "reshardCollection",
+                "rename",
+                "invalidate",
+            ]);
         });
     });
 
     describe("Drop", function () {
         it("drop emits drop + invalidate", function () {
             const setupCommands = [
-                new CreateIndexCommand("test_ddl_drop", "test_coll", this.shards, {exists: false}, {data: 1}),
-                new ShardCollectionCommand("test_ddl_drop", "test_coll", this.shards, {exists: true}, {data: 1}),
+                new CreateIndexCommand(TEST_DB, "test_coll_ddl_drop", this.shards, {exists: false}, {data: 1}),
+                new ShardCollectionCommand(TEST_DB, "test_coll_ddl_drop", this.shards, {exists: true}, {data: 1}),
             ];
-            const testCommand = new DropCollectionCommand("test_ddl_drop", "test_coll", this.shards, {exists: true});
-            runDDLTest(this, "drop", setupCommands, testCommand, ["drop", "invalidate"]);
+            const testCommand = new DropCollectionCommand(TEST_DB, "test_coll_ddl_drop", this.shards, {
+                exists: true,
+            });
+            // Setup: create + createIndexes + shardCollection → Test: drop + invalidate
+            runDDLTest(this, "drop", setupCommands, testCommand, [
+                "create",
+                "createIndexes",
+                "shardCollection",
+                "drop",
+                "invalidate",
+            ]);
         });
 
-        it("drop (resharded collection) emits drop + invalidate", function () {
+        // TODO SERVER-114858: Skipped because hashed sharding has non-deterministic chunk
+        // distribution, causing unpredictable event counts in multi-shard clusters.
+        it.skip("drop (resharded collection) emits drop + invalidate", function () {
             const setupCommands = [
-                new CreateIndexCommand("test_ddl_resharded_drop", "test_coll", this.shards, {exists: false}, {data: 1}),
+                new CreateIndexCommand(
+                    TEST_DB,
+                    "test_coll_ddl_resharded_drop",
+                    this.shards,
+                    {exists: false},
+                    {data: 1},
+                ),
                 new ShardCollectionCommand(
-                    "test_ddl_resharded_drop",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_resharded_drop",
                     this.shards,
                     {exists: true},
                     {data: 1},
                 ),
                 new CreateIndexCommand(
-                    "test_ddl_resharded_drop",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_resharded_drop",
                     this.shards,
                     {exists: true, shardKeySpec: {data: 1}, isSharded: true},
                     {data: "hashed"},
                 ),
                 new ReshardCollectionCommand(
-                    "test_ddl_resharded_drop",
-                    "test_coll",
+                    TEST_DB,
+                    "test_coll_ddl_resharded_drop",
                     this.shards,
                     {exists: true, shardKeySpec: {data: 1}, isSharded: true},
                     {data: "hashed"},
                 ),
             ];
-            const testCommand = new DropCollectionCommand("test_ddl_resharded_drop", "test_coll", this.shards, {
+            const testCommand = new DropCollectionCommand(TEST_DB, "test_coll_ddl_resharded_drop", this.shards, {
                 exists: true,
             });
-            runDDLTest(this, "resharded_drop", setupCommands, testCommand, ["drop", "invalidate"]);
+            // Setup: create + createIndexes + shardCollection + createIndexes + reshardCollection → Test: drop + invalidate
+            runDDLTest(this, "resharded_drop", setupCommands, testCommand, [
+                "create",
+                "createIndexes",
+                "shardCollection",
+                "createIndexes",
+                "reshardCollection",
+                "drop",
+                "invalidate",
+            ]);
         });
     });
+
+    /*
+     * ================================================================================
+     * RESHARD LIFECYCLE TESTS
+     * ================================================================================
+     */
+
+    /**
+     * Helper: Execute commands and verify change stream events using Verifier.
+     */
+    function executeAndVerifyEvents(testContext, dbName, collName, commands) {
+        Random.setRandomSeed(TEST_SEED);
+
+        cleanupTestDatabase(testContext.st.s, dbName);
+        testContext.databasesToCleanup.add(dbName);
+
+        const ts = Date.now();
+        const writerInstanceName = `writer_${dbName}_${ts}`;
+        const readerInstanceName = `reader_${dbName}_${ts}`;
+        const verifierInstanceName = `verifier_${dbName}_${ts}`;
+        testContext.instanceNamesToCleanup.push(writerInstanceName, readerInstanceName, verifierInstanceName);
+
+        // Collect expected events.
+        const expectedEvents = commands
+            .flatMap((cmd) => cmd.getChangeEvents(ChangeStreamWatchMode.kCollection))
+            .map((e) => ({event: e, cursorClosed: e.operationType === "invalidate"}));
+
+        // Get cluster time BEFORE executing commands.
+        const startTime = getCurrentClusterTime(testContext.st.s, dbName);
+
+        Writer.run(testContext.st.s, {commands, instanceName: writerInstanceName});
+
+        const readerConfig = {
+            instanceName: readerInstanceName,
+            watchMode: ChangeStreamWatchMode.kCollection,
+            dbName,
+            collName,
+            readingMode: ChangeStreamReadingMode.kContinuous,
+            startAtClusterTime: startTime,
+            numberOfEventsToRead: expectedEvents.length,
+        };
+
+        ChangeStreamReader.run(testContext.st.s, readerConfig);
+
+        new Verifier().run(
+            testContext.st.s,
+            {
+                changeStreamReaderConfigs: {[readerInstanceName]: readerConfig},
+                matcherSpecsByInstance: {[readerInstanceName]: createMatcher(expectedEvents)},
+                instanceName: verifierInstanceName,
+            },
+            [new SingleReaderVerificationTestCase(readerInstanceName)],
+        );
+    }
+
+    /**
+     * Helper: Create initial empty collection context.
+     */
+    function emptyCtx() {
+        return {
+            exists: false,
+            nonEmpty: false,
+            shardKeySpec: null,
+            currentShardKeySpec: null,
+            isSharded: false,
+            wasResharded: false,
+        };
+    }
+
+    describe("Reshard Lifecycle", function () {
+        // TODO SERVER-114858: Skipped because hashed sharding has non-deterministic chunk
+        // distribution, causing unpredictable event counts in multi-shard clusters.
+        it.skip("double reshard cycle", function () {
+            const dbName = TEST_DB;
+            const collName = "test_coll_double_reshard";
+            const commands = [];
+            let ctx = emptyCtx();
+
+            // Create → Shard → Reshard → Reshard again.
+            // IMPORTANT: Each command must receive a COPY of ctx ({...ctx}).
+            commands.push(new CreateUntrackedCollectionCommand(dbName, collName, this.shards, {...ctx}));
+            ctx.exists = true;
+
+            // Shard with range key.
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            commands.push(new ShardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            ctx.isSharded = true;
+            ctx.shardKeySpec = {data: 1};
+
+            // Reshard to hashed.
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            ctx.shardKeySpec = {data: "hashed"};
+
+            // Reshard back to range.
+            // Note: {data: 1} index already exists from initial sharding, no need to create again.
+            commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            ctx.shardKeySpec = {data: 1};
+
+            executeAndVerifyEvents(this, dbName, collName, commands);
+        });
+
+        // TODO SERVER-114858: Skipped because hashed sharding has non-deterministic chunk
+        // distribution, causing unpredictable event counts in multi-shard clusters.
+        it.skip("first reshard", function () {
+            const dbName = TEST_DB;
+            const collName = "test_coll_first_reshard";
+            const commands = [];
+            let ctx = emptyCtx();
+
+            // Create → Shard → Reshard (first time).
+            // IMPORTANT: Each command must receive a COPY of ctx ({...ctx}).
+            commands.push(new CreateUntrackedCollectionCommand(dbName, collName, this.shards, {...ctx}));
+            ctx.exists = true;
+
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            commands.push(new ShardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            ctx.isSharded = true;
+            ctx.shardKeySpec = {data: 1};
+
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            ctx.shardKeySpec = {data: "hashed"};
+
+            executeAndVerifyEvents(this, dbName, collName, commands);
+        });
+
+        // TODO SERVER-114858: Skipped because hashed sharding has non-deterministic chunk
+        // distribution, causing unpredictable event counts in multi-shard clusters.
+        it.skip("shard → reshard → unshard lifecycle", function () {
+            const dbName = TEST_DB;
+            const collName = "test_coll_reshard_unshard";
+            const commands = [];
+            let ctx = emptyCtx();
+
+            // IMPORTANT: Each command must receive a COPY of ctx ({...ctx}).
+            commands.push(new CreateUntrackedCollectionCommand(dbName, collName, this.shards, {...ctx}));
+            ctx.exists = true;
+
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            commands.push(new ShardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            ctx.isSharded = true;
+            ctx.shardKeySpec = {data: 1};
+
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            ctx.shardKeySpec = {data: "hashed"};
+
+            // Unshard collection.
+            commands.push(new UnshardCollectionCommand(dbName, collName, this.shards, {...ctx}));
+
+            executeAndVerifyEvents(this, dbName, collName, commands);
+        });
+    }); // end describe("Reshard Lifecycle")
+
+    /*
+     * ================================================================================
+     * DIRECT EXECUTION RESHARD TESTS
+     * ================================================================================
+     *
+     * These tests use direct command execution (without Writer) to verify
+     * reshard event sequences with explicit context copying. Useful for debugging
+     * individual reshard scenarios.
+     *
+     * ================================================================================
+     */
+
+    /**
+     * Helper: Execute commands and verify change stream events using ChangeStreamReader.
+     * Uses SingleChangeStreamMatcher for subsequence matching to handle per-shard duplicate events.
+     * @param {ShardingTest} st - The sharding test instance
+     * @param {string} dbName - Database name
+     * @param {string} collName - Collection name
+     * @param {Array} commands - Array of command objects to execute
+     * @param {Array} instanceNamesToCleanup - Array to register reader instances for cleanup
+     * @param {Set} databasesToCleanup - Set to register databases for cleanup
+     */
+    function executeAndVerifyEventsDirect(st, dbName, collName, commands, instanceNamesToCleanup, databasesToCleanup) {
+        Random.setRandomSeed(TEST_SEED);
+        cleanupTestDatabase(st.s, dbName);
+        databasesToCleanup.add(dbName);
+
+        const readerInstanceName = `reader_${dbName}_${Date.now()}`;
+        instanceNamesToCleanup.push(readerInstanceName);
+
+        // Collect expected events and create matchers.
+        const expectedEvents = [];
+        commands.forEach((cmd) => {
+            expectedEvents.push(...cmd.getChangeEvents(ChangeStreamWatchMode.kCollection));
+        });
+        // Use subset matching via static ChangeEventMatcher.eventModifier.
+        const eventMatchers = expectedEvents.map((e) => new ChangeEventMatcher(e));
+        const matcher = new SingleChangeStreamMatcher(eventMatchers);
+
+        // Get cluster time BEFORE executing commands.
+        const startTime = getCurrentClusterTime(st.s, dbName);
+
+        // Execute commands.
+        commands.forEach((cmd) => {
+            cmd.execute(st.s);
+        });
+
+        // Use ChangeStreamReader with kContinuous mode.
+        const readerConfig = {
+            instanceName: readerInstanceName,
+            watchMode: ChangeStreamWatchMode.kCollection,
+            dbName: dbName,
+            collName: collName,
+            readingMode: ChangeStreamReadingMode.kContinuous,
+            startAtClusterTime: startTime,
+            numberOfEventsToRead: expectedEvents.length,
+        };
+
+        ChangeStreamReader.run(st.s, readerConfig);
+
+        // Read captured events from Connector.
+        const capturedRecords = Connector.readAllChangeEvents(st.s, readerInstanceName);
+        const actualEvents = capturedRecords.map((r) => r.changeEvent);
+
+        // Use deferred matching to handle extra/out-of-order events from MongoDB.
+        for (const event of actualEvents) {
+            matcher.matches(event, false);
+        }
+
+        // Verify all expected events were matched (extra events are logged but allowed).
+        matcher.assertDone();
+    }
+
+    describe("Direct Execution Reshard", function () {
+        /**
+         * Test: Reshard with double reshard cycle.
+         * Sequence: Create → Shard(range) → Reshard(hashed) → DropOldIndex → Reshard(range) → DropOldIndex
+         *
+         * IMPORTANT: Each command must receive a COPY of ctx ({...ctx}) because ctx is mutated
+         * after command creation. Commands store a reference to collectionCtx, and getChangeEvents()
+         * uses that reference later during verification.
+         *
+         * TODO SERVER-114858: Skipped because hashed sharding has non-deterministic chunk
+         * distribution, causing unpredictable event counts in multi-shard clusters.
+         */
+        it.skip("double reshard cycle with index drops", function () {
+            const dbName = TEST_DB;
+            const collName = "test_coll_direct_double_reshard";
+
+            const commands = [];
+            let ctx = {
+                exists: false,
+                nonEmpty: false,
+                shardKeySpec: null,
+                isSharded: false,
+            };
+
+            // Step 1: Create collection.
+            commands.push(new CreateUntrackedCollectionCommand(dbName, collName, this.shards, {...ctx}));
+            ctx.exists = true;
+
+            // Step 2: Shard with range key {data: 1}.
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            commands.push(new ShardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            ctx.isSharded = true;
+            ctx.shardKeySpec = {data: 1};
+
+            // Step 3: Reshard to hashed key.
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            ctx.shardKeySpec = {data: "hashed"};
+            // Drop OLD range index.
+            commands.push(new DropIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+
+            // Step 4: Reshard back to range.
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            ctx.shardKeySpec = {data: 1};
+            // Drop OLD hashed index.
+            commands.push(new DropIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+
+            executeAndVerifyEventsDirect(
+                this.st,
+                dbName,
+                collName,
+                commands,
+                this.instanceNamesToCleanup,
+                this.databasesToCleanup,
+            );
+        });
+
+        /**
+         * Test: First reshard (no prior reshard) produces expected events.
+         * Sequence: Create → Shard(range) → Reshard(hashed) → DropOldIndex
+         *
+         * IMPORTANT: Each command must receive a COPY of ctx ({...ctx}) because ctx is mutated
+         * after command creation.
+         *
+         * TODO SERVER-114858: Skipped because hashed sharding has non-deterministic chunk
+         * distribution, causing unpredictable event counts in multi-shard clusters.
+         */
+        it.skip("first reshard with index drop", function () {
+            const dbName = TEST_DB;
+            const collName = "test_coll_direct_first_reshard";
+
+            const commands = [];
+            let ctx = {
+                exists: false,
+                nonEmpty: false,
+                shardKeySpec: null,
+                isSharded: false,
+            };
+
+            // Step 1: Create collection.
+            commands.push(new CreateUntrackedCollectionCommand(dbName, collName, this.shards, {...ctx}));
+            ctx.exists = true;
+
+            // Step 2: Shard with range key {data: 1}.
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            commands.push(new ShardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            ctx.isSharded = true;
+            ctx.shardKeySpec = {data: 1};
+
+            // Step 3: Reshard to hashed key.
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            ctx.shardKeySpec = {data: "hashed"};
+            // Drop OLD range index.
+            commands.push(new DropIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+
+            executeAndVerifyEventsDirect(
+                this.st,
+                dbName,
+                collName,
+                commands,
+                this.instanceNamesToCleanup,
+                this.databasesToCleanup,
+            );
+        });
+
+        /**
+         * Test: Full shard → reshard → unshard lifecycle.
+         * Sequence: Create → Shard(range) → Reshard(hashed) → DropOldIndex → Unshard → DropOldIndex
+         *
+         * IMPORTANT: Each command must receive a COPY of ctx ({...ctx}) because ctx is mutated
+         * after command creation.
+         *
+         * TODO SERVER-114858: Skipped because hashed sharding has non-deterministic chunk
+         * distribution, causing unpredictable event counts in multi-shard clusters.
+         */
+        it.skip("shard → reshard → unshard with index drop", function () {
+            const dbName = TEST_DB;
+            const collName = "test_coll_direct_reshard_unshard";
+
+            const commands = [];
+            let ctx = {
+                exists: false,
+                nonEmpty: false,
+                shardKeySpec: null,
+                isSharded: false,
+            };
+
+            // Step 1: Create collection.
+            commands.push(new CreateUntrackedCollectionCommand(dbName, collName, this.shards, {...ctx}));
+            ctx.exists = true;
+
+            // Step 2: Shard with range key {data: 1}.
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            commands.push(new ShardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: 1}));
+            ctx.isSharded = true;
+            ctx.shardKeySpec = {data: 1};
+
+            // Step 3: Reshard to hashed key.
+            commands.push(new CreateIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            commands.push(new ReshardCollectionCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+            ctx.shardKeySpec = {data: "hashed"};
+            // Drop hashed index.
+            commands.push(new DropIndexCommand(dbName, collName, this.shards, {...ctx}, {data: "hashed"}));
+
+            // Step 4: Unshard collection.
+            commands.push(new UnshardCollectionCommand(dbName, collName, this.shards, {...ctx}));
+            ctx.isSharded = false;
+            ctx.shardKeySpec = null;
+
+            executeAndVerifyEventsDirect(
+                this.st,
+                dbName,
+                collName,
+                commands,
+                this.instanceNamesToCleanup,
+                this.databasesToCleanup,
+            );
+        });
+    }); // end describe("Direct Execution Reshard")
 });

@@ -373,14 +373,25 @@ function isHashedShardKey(shardKeySpec) {
  * @param {string} collName - Collection name.
  * @param {boolean} isSharded - Whether the collection is sharded.
  * @param {Object} currentShardKeySpec - The current shard key specification.
+ * @param {Object} indexSpec - Optional index spec to use for event count (for drop index after unshard).
  * @param {Array} shardSet - Array of shards in the shard set.
  * @returns {Array} - Array of event objects.
  */
-function generatePerShardIndexEvents(operationType, dbName, collName, isSharded, currentShardKeySpec, shardSet) {
+function generatePerShardIndexEvents(
+    operationType,
+    dbName,
+    collName,
+    isSharded,
+    currentShardKeySpec,
+    indexSpec,
+    shardSet,
+) {
     // TODO SERVER-114858: This logic assumes hashed keys distribute to all shards and
     // range keys stay on one shard. Once move chunk is properly implemented, we may
     // need to track actual data distribution rather than inferring from shard key type.
-    const hasHashedShardKey = isHashedShardKey(currentShardKeySpec);
+    // Use indexSpec if provided (for drop index), otherwise use currentShardKeySpec.
+    const keySpecForEventCount = indexSpec || currentShardKeySpec;
+    const hasHashedShardKey = isHashedShardKey(keySpecForEventCount);
     const numEvents = isSharded && hasHashedShardKey ? shardSet.length : 1;
 
     const events = [];
@@ -496,6 +507,7 @@ class CreateIndexCommand extends Command {
             this.collName,
             this.collectionCtx.isSharded || false,
             this.collectionCtx.shardKeySpec || null,
+            null, // No special index spec for create
             this.shardSet,
         );
     }
@@ -550,12 +562,15 @@ class DropIndexCommand extends Command {
     }
 
     getChangeEvents(watchMode) {
+        // Event count is based on CURRENT shard key distribution, not the index being dropped.
+        // When the collection is hashed-sharded, all shards emit events for any index operation.
         return generatePerShardIndexEvents(
             "dropIndexes",
             this.dbName,
             this.collName,
             this.collectionCtx.isSharded || false,
             this.collectionCtx.shardKeySpec || null,
+            null, // Use current shard key for event count, like CreateIndexCommand
             this.shardSet,
         );
     }
