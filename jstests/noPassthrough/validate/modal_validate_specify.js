@@ -6,6 +6,9 @@
  *   requires_wiredtiger,
  * ]
  */
+
+import {parseValidateOutputsFromLogs} from "jstests/noPassthrough/validate/libs/validate_find_repl_set_divergence.js";
+
 function setupCollections(db) {
     assert.commandWorked(db.createCollection("ham"));
     assert.commandWorked(db["ham"].insert({a: 1}));
@@ -18,11 +21,7 @@ function setupCollections(db) {
 
 function generateResults(dbpath, opts) {
     MongoRunner.runMongod({dbpath: dbpath, validate: "", setParameter: opts, noCleanData: true});
-    let validateLogs = rawMongoProgramOutput("(9437301)")
-        .split("\n")
-        .filter((line) => line.trim() !== "")
-        .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
-    return validateLogs;
+    return parseValidateOutputsFromLogs();
 }
 
 function runDbTest() {

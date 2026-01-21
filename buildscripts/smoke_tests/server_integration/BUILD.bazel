@@ -111,6 +111,7 @@ resmoke_suite_test(
         "//jstests/disk/libs:wt_file_helper.js",
         "//jstests/libs:key1",
         "//jstests/multiVersion/libs:verify_versions.js",
+        "//jstests/noPassthrough/validate/libs:validate_find_repl_set_divergence.js",
         "//jstests/replsets/libs:dbcheck_utils.js",
     ],
     resmoke_args = ["--runAllFeatureFlagTests"],

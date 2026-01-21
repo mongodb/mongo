@@ -586,7 +586,8 @@ void validateHashes(const std::vector<std::string>& hashPrefixes, bool equalLeng
 
 ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                        NamespaceString nss,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj,
+                                       bool skipAtClusterTime) {
     const bool background = cmdObj["background"].trueValue();
     const bool logDiagnostics = cmdObj["logDiagnostics"].trueValue();
 
@@ -747,7 +748,7 @@ ValidationOptions parseValidateOptions(OperationContext* opCtx,
     }
 
     boost::optional<Timestamp> timestamp = boost::none;
-    if (cmdObj["atClusterTime"]) {
+    if (!skipAtClusterTime && cmdObj["atClusterTime"]) {
         if (background) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Running the validate command with { background: true } "

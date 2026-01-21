@@ -7,6 +7,8 @@
  * ]
  */
 
+import {parseValidateOutputsFromLogs} from "jstests/noPassthrough/validate/libs/validate_find_repl_set_divergence.js";
+
 const dbpath = MongoRunner.dataPath + jsTestName();
 const dbName = jsTestName();
 const collName = jsTestName();
@@ -23,10 +25,7 @@ function runValidate(opts) {
         },
         noCleanData: true,
     });
-    const validateResults = rawMongoProgramOutput("(9437301)")
-        .split("\n")
-        .filter((line) => line.trim() !== "")
-        .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
+    const validateResults = parseValidateOutputsFromLogs();
     assert.eq(validateResults.length, 1);
     jsTest.log.info(`Validate result with ${tojson(opts)}:\n${tojson(validateResults[0])}`);
     clearRawMongoProgramOutput();

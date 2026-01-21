@@ -8,7 +8,10 @@
  */
 
 import {reconnect} from "jstests/replsets/rslib.js";
-import {runValidateFindDivergenceTests} from "jstests/noPassthrough/validate/libs/validate_find_repl_set_divergence.js";
+import {
+    parseValidateOutputsFromLogs,
+    runValidateFindDivergenceTests,
+} from "jstests/noPassthrough/validate/libs/validate_find_repl_set_divergence.js";
 
 const dbpath0 = MongoRunner.dataPath + jsTestName() + "_0";
 const dbpath1 = MongoRunner.dataPath + jsTestName() + "_1";
@@ -56,10 +59,7 @@ function runValidate(dbpath, port, opts) {
         },
         noCleanData: true,
     });
-    const validateResults = rawMongoProgramOutput("(9437301)")
-        .split("\n")
-        .filter((line) => line.trim() !== "")
-        .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
+    const validateResults = parseValidateOutputsFromLogs();
     assert.eq(validateResults.length, 1);
     jsTest.log.info(`Validate result with ${tojson(opts)}:\n${tojson(validateResults[0])}`);
     clearRawMongoProgramOutput();

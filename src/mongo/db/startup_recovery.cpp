@@ -708,13 +708,15 @@ void startupRepair(OperationContext* opCtx,
 }
 
 // Perform collection validation for singular collection
-bool offlineValidateCollection(OperationContext* opCtx, NamespaceString nss) {
+bool offlineValidateCollection(OperationContext* opCtx,
+                               NamespaceString nss,
+                               bool skipAtClusterTime = false) {
     auto collectionValidateOptionsParam =
         ServerParameterSet::getNodeParameterSet()->get<CollectionValidateOptionsServerParameter>(
             "collectionValidateOptions");
     auto validateOptions = collectionValidateOptionsParam->_data.getOptions();
     auto parsedOptions = !validateOptions.isEmpty()
-        ? CollectionValidation::parseValidateOptions(opCtx, nss, validateOptions)
+        ? CollectionValidation::parseValidateOptions(opCtx, nss, validateOptions, skipAtClusterTime)
         : CollectionValidation::ValidationOptions(
               CollectionValidation::ValidateMode::kForegroundFull,
               CollectionValidation::RepairMode::kNone,
@@ -751,7 +753,7 @@ bool offlineValidateDb(OperationContext* opCtx, DatabaseName dbName) {
              CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName)) {
             opCtx->checkForInterrupt();
 
-            allResultsValid &= offlineValidateCollection(opCtx, nss);
+            allResultsValid &= offlineValidateCollection(opCtx, nss, !nss.isReplicated());
         }
     }
     return allResultsValid;

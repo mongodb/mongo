@@ -6,6 +6,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {parseValidateOutputsFromLogs} from "jstests/noPassthrough/validate/libs/validate_find_repl_set_divergence.js";
 
 // Skip DB hash check in stopSet() since we expect it to fail in this test along with fastcount.
 TestData.skipCheckDBHashes = true;
@@ -83,12 +84,9 @@ function runValidate(path, opts) {
         },
         noCleanData: true,
     });
-    const validateResults = rawMongoProgramOutput("(9437301)")
-        .split("\n")
-        .filter((line) => line.trim() !== "")
-        .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
+    const validateResults = parseValidateOutputsFromLogs();
     assert.eq(validateResults.length, 1);
-    // jsTest.log.info(`Validate result \n${tojson(validateResults[0])}`);
+    jsTest.log.info(`Validate result \n${tojson(validateResults[0])}`);
     clearRawMongoProgramOutput();
     return validateResults[0].attr.results;
 }

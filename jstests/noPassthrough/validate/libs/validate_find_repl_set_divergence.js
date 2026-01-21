@@ -299,3 +299,10 @@ export function runValidateFindDivergenceTests(colls, numDocs, getValidateResult
         clearCollections(colls);
     })();
 }
+
+export function parseValidateOutputsFromLogs() {
+    return rawMongoProgramOutput("(9437301)")
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .map((line) => JSON.parse(line.split("|").slice(1).join("|")));
+}

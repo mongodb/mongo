@@ -57,10 +57,13 @@ MONGO_MOD_FILE_PRIVATE void validateHashes(const std::vector<std::string>& hashP
 /**
  * Parses and checks the command object and returns a 'ValidationOptions' object used for collection
  * validation.
+ * Optionally skips parsing 'atClusterTime' for unreplicated collections, which is desired with
+ * modal validation usage.
  */
 ValidationOptions parseValidateOptions(OperationContext* opCtx,
                                        NamespaceString nss,
-                                       const BSONObj& cmdObj);
+                                       const BSONObj& cmdObj,
+                                       bool skipAtClusterTime = false);
 
 /**
  * Expects the caller to hold no locks.
