@@ -1350,6 +1350,8 @@ private:
                 ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
                 ->getValue(boost::none);
         fleCompactOpts.setCompactAnchorPaddingFactor(boost::none);
+        auto newOpts = fleCompactOpts.toBSON().removeField(
+            FLECompactionOptions::kMaxAnchorCompactionSizeFieldName);
 
         write_ops::UpdateCommandRequest updateOp(NamespaceString::kClusterParametersNamespace);
         updateOp.setUpdates(
@@ -1357,8 +1359,7 @@ private:
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(BSON("_id"
                                 << "fleCompactionOptions"));
-                entry.setU(
-                    write_ops::UpdateModification::parseFromClassicUpdate(fleCompactOpts.toBSON()));
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(newOpts));
                 return entry;
             }()});
 
