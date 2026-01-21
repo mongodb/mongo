@@ -10,7 +10,7 @@
  *
  * @param {function} fn the callback to execute
  * @param {function} shouldRetry a function to determine whether or not the execution should be
- *     retried. Receives the received exception as an input an is supposed to return true for
+ *     retried. Receives a caught exception as an input and is supposed to return true for
  *     another retry attempt, and false otherwise.
  * @param {number} maxRetries maximum number of attempts (including the first attempt).
  * @param {number} initialBackoffMs initial value for expoential backoff in milliseconds.
