@@ -62,7 +62,7 @@ filters:
       - 10gen/query-execution-write-exec
   - "extensions*":
     approvers:
-      - 10gen/query-integration-features
+      - 10gen/query-integration-extensions-api
   - "fle*":
     approvers:
       - 10gen/query-integration-features
