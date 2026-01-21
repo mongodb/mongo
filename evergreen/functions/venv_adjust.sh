@@ -38,10 +38,12 @@ else
             "$venv_dir/Scripts/activate"
     else
         # Update VIRTUAL_ENV paths in activate script
-        # Handle both double and single quotes for cross-version compatibility
-        sed -i -e "s:VIRTUAL_ENV=\".*\":VIRTUAL_ENV=\"$venv_dir\":" \
-            -e "s:VIRTUAL_ENV='.*':VIRTUAL_ENV='$venv_dir':" \
-            "$venv_dir/bin/activate"
+        # Python 3.10 format: VIRTUAL_ENV="/path" (double quoted)
+        # Python 3.13 format: export VIRTUAL_ENV=/path (unquoted with export)
+        sed -e "s:VIRTUAL_ENV=\".*\":VIRTUAL_ENV=\"$venv_dir\":" \
+            -e "s:export VIRTUAL_ENV=/.*:export VIRTUAL_ENV=$venv_dir:" \
+            "$venv_dir/bin/activate" >"$venv_dir/bin/activate.tmp"
+        mv "$venv_dir/bin/activate.tmp" "$venv_dir/bin/activate"
     fi
 
     # Add back python symlinks on linux platforms
