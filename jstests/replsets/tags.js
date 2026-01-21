@@ -1,3 +1,9 @@
+/**
+ * @tags: [
+ *  requires_mongobridge,
+ * ]
+ */
+
 import {TagsTest} from "jstests/replsets/libs/tags.js";
 
 let nodes = [{}, {}, {}, {}, {}];

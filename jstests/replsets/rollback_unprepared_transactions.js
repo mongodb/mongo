@@ -2,6 +2,7 @@
  * Tests that an unprepared transaction can be rolled back.
  * @tags: [
  *   requires_replication,
+ *   requires_mongobridge,
  * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";

@@ -18,7 +18,8 @@
  * check
  * 12. Release a stepdown fail point
  * @tags: [
- *     requires_fcv_82
+ *   requires_fcv_82,
+ *   requires_mongobridge,
  * ]
  */
 

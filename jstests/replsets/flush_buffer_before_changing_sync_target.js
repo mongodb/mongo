@@ -21,15 +21,11 @@ let waitForSameOplogPosition = function (db1, db2, errmsg) {
 // start set
 let replSet = new ReplSetTest({name: "testSet", nodes: 3});
 replSet.startSet();
-replSet.initiate({
-    _id: "testSet",
-    members: [
-        {_id: 0, host: getHostName() + ":" + replSet.ports[0]},
-        {_id: 1, host: getHostName() + ":" + replSet.ports[1], priority: 0},
-        {_id: 2, host: getHostName() + ":" + replSet.ports[2], priority: 0},
-    ],
-    settings: {chainingAllowed: false},
-});
+let initialConfig = replSet.getReplSetConfig();
+initialConfig.members[1].priority = 0;
+initialConfig.members[2].priority = 0;
+initialConfig.settings = {chainingAllowed: false};
+replSet.initiate(initialConfig);
 
 // set up common points of access
 let primary = replSet.getPrimary();

@@ -5,6 +5,7 @@
  *
  * @tags: [
  *     requires_replication,
+ *     requires_mongobridge,
  * ]
  */
 

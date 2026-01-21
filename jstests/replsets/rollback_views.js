@@ -13,6 +13,10 @@
  * 6. B rejoins the set and goes through the rollback/recovery process.
  * 7. The contents of A and B are compared to ensure the rollback results in consistent nodes,
  *    and have the expected collections and views..
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {awaitOpTime} from "jstests/replsets/rslib.js";

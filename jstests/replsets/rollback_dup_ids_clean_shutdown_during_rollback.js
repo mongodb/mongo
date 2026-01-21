@@ -4,7 +4,10 @@
 // In this test we also make sure that a clean shutdown during rollback does not overwrite the
 // unstable checkpoints taken during the rollback process.
 //
-// @tags: [requires_persistence]
+// @tags: [
+//   requires_persistence,
+//   requires_mongobridge,
+// ]
 //
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 

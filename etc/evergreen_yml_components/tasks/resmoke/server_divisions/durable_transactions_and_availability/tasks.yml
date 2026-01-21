@@ -1095,6 +1095,22 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: replica_sets_with_priority_ports_gen
+    # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "incompatible_debug_mode",
+        "replica_sets",
+        "san",
+        "large",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
     name: replica_sets_initsync_jscore_passthrough_gen
     # TODO(SERVER-69951) remove "incompatible_debug_mode" tag
     tags:

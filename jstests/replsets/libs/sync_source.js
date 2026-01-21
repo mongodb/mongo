@@ -117,7 +117,8 @@ export function assertSyncSourceChangesTo(rst, secondary, expectedSyncSource) {
         return timestampCmp(sourceMember.optime.ts, appliedTimestamp) > 0;
     });
     restartServerReplication(secondary);
-    assertSyncSourceMatchesSoon(secondary, expectedSyncSource.host);
+    let host = TestData.usePriorityPorts ? expectedSyncSource.priorityHost : expectedSyncSource.host;
+    assertSyncSourceMatchesSoon(secondary, host);
 }
 
 export const DataCenter = class {

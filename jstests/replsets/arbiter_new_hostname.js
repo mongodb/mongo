@@ -13,14 +13,8 @@ import {ReplSetTest} from "jstests/libs/replsettest.js";
 const replTest = new ReplSetTest({name: "test", nodes: 3});
 replTest.startSet();
 const nodes = replTest.nodeList();
-let config = {
-    "_id": "test",
-    "members": [
-        {"_id": 0, "host": nodes[0]},
-        {"_id": 1, "host": nodes[1]},
-        {"_id": 2, "host": nodes[2], arbiterOnly: true},
-    ],
-};
+let config = replTest.getReplSetConfig();
+config.members[2].arbiterOnly = true;
 replTest.initiate(config);
 
 let primary = replTest.getPrimary();
@@ -28,7 +22,7 @@ replTest.awaitReplication();
 replTest.awaitSecondaryNodes();
 
 const arbiterId = 2;
-const newPort = replTest.getPort(arbiterId) + 1;
+const newPort = allocatePort();
 jsTestLog("Restarting the arbiter node on a new port: " + newPort);
 replTest.stop(arbiterId);
 replTest.start(arbiterId, {port: newPort}, true);

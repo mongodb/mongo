@@ -1,5 +1,9 @@
 /**
  * Test of the RollbackTest helper library.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 

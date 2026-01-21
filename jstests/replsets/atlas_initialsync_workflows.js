@@ -1,5 +1,9 @@
 /**
  * This test simulates initial sync workflows which are performed by the Atlas automation agent.
+ *
+ * @tags: [
+ *   requires_mongobridge
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {disconnectSecondaries, reconnectSecondaries, waitForState} from "jstests/replsets/rslib.js";

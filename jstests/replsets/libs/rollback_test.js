@@ -36,6 +36,10 @@
  *
  * Please refer to the various `transition*` functions for more information on the behavior
  * of each stage.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";

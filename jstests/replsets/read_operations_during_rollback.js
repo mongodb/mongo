@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_majority_read_concern,
+ *   requires_mongobridge,
  * ]
  */
 

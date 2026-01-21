@@ -1,3 +1,7 @@
+// @tags: [
+//   requires_mongobridge,
+// ]
+
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {syncFrom} from "jstests/replsets/rslib.js";
 

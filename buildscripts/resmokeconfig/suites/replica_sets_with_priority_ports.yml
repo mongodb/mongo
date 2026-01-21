@@ -1,0 +1,29 @@
+test_kind: js_test
+
+selector:
+  roots:
+    - jstests/replsets/*.js
+    - jstests/replsets/**/*.js
+    - src/mongo/db/modules/enterprise/jstests/fcbis/*.js
+  exclude_files:
+    # TODO (SERVER-112863): Enable the following tests once priority ports are enabled on lastLTS
+    # FCV.
+    - jstests/replsets/all_commands_downgrading_to_upgraded.js
+    - jstests/replsets/read_committed_lookup.js
+    - jstests/replsets/noop_writes_wait_for_write_concern_fcv.js
+    - jstests/replsets/disallow_shardsvr_transactions_wcMajorityJournal_false.js
+    - jstests/replsets/stepdown_during_set_fcv.js
+    - src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_mixed_version_sync.js
+
+  exclude_with_any_tags:
+    # Mongobridge intercepts, blocks, and delays messages between nodes in a replica set. When a
+    # priority port is present, these operations are bypassed via the priority port.
+    - requires_mongobridge
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          usePriorityPorts: true
+      nodb: ""

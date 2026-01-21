@@ -95,7 +95,8 @@ export var ElectionHandoffTest = (function () {
                 kTimeoutMS,
             );
 
-            subStr = `{"term":${term + 1},"dryRun":false,"vote":"yes","from":"${primary.host}"`;
+            let primaryHost = TestData.usePriorityPorts ? primary.priorityHost : primary.host;
+            subStr = `{"term":${term + 1},"dryRun":false,"vote":"yes","from":"${primaryHost}"`;
             jsTestLog(subStr);
             assert.soon(
                 function () {

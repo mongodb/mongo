@@ -2,7 +2,10 @@
  * Tests that rollback fixes the transactions table and gets the correct fastcounts for
  * transactions.
  *
- * @tags: [uses_transactions]
+ * @tags: [
+ *   uses_transactions,
+ *   requires_mongobridge,
+ * ]
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 

@@ -2,7 +2,10 @@
  * Tests that collMod commands during every stage of rollback are tracked correctly.
  * This especially targets collection validators that begin partially or fully uninitialized.
  *
- * @tags: [requires_fcv_53]
+ * @tags: [
+ *   requires_fcv_53,
+ *   requires_mongobridge,
+ * ]
  */
 
 import {RollbackTestDeluxe} from "jstests/replsets/libs/rollback_test_deluxe.js";

@@ -3,6 +3,10 @@
  *
  * This test works by creating a collection and an index in that collection,
  * then renaming that collection and rolling back a drop on that index.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";

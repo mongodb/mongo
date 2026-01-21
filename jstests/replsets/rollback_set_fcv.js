@@ -6,7 +6,10 @@
  * - the FCV document is rolled back from fully downgraded to downgrading
  * - the FCV document is rolled back from downgrading to fully upgraded
  *
- *  @tags: [multiversion_incompatible]
+ *  @tags: [
+ *   multiversion_incompatible,
+ *   requires_mongobridge,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

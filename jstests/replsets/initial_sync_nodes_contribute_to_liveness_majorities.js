@@ -7,6 +7,10 @@
  * This is done by stepping down the primary, waiting for it to become a secondary, and allowing it
  * to run for primary again. Since the other secondary is disconnected, the primary must receive a
  * vote from the initial sync node to get elected again.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

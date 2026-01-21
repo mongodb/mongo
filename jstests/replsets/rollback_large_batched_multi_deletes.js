@@ -3,6 +3,7 @@
  * @tags: [
  *   requires_fcv_71,
  *   requires_replication,
+ *   requires_mongobridge,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

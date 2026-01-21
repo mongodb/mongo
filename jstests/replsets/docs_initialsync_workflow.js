@@ -1,5 +1,9 @@
 /**
  * This test simulates workflows for adding a new node and resyncing a node recommended by docs.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {disconnectSecondaries, reconnectSecondaries, waitForState} from "jstests/replsets/rslib.js";

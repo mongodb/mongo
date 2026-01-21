@@ -4,6 +4,7 @@
  * @tags: [
  *   # Primary driven index builds will abort when a new node steps up as primary.
  *   primary_driven_index_builds_incompatible_due_to_abort_on_step_up,
+ *   requires_mongobridge,
  * ]
  */
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_builds/index_build.js";

@@ -10,16 +10,13 @@ let name = "chaining_removal";
 let replTest = new ReplSetTest({name: name, nodes: numNodes});
 let nodes = replTest.startSet();
 let port = replTest.ports;
-replTest.initiate({
-    _id: name,
-    members: [
-        {_id: 0, host: nodes[0].host, priority: 3},
-        {_id: 1, host: nodes[1].host, priority: 0},
-        {_id: 2, host: nodes[2].host, priority: 0},
-        {_id: 3, host: nodes[3].host, priority: 0},
-        {_id: 4, host: nodes[4].host, priority: 0},
-    ],
+let initialConfig = replTest.getReplSetConfig();
+initialConfig.members.forEach((member) => {
+    member.priority = 0;
 });
+initialConfig.members[0].priority = 3;
+replTest.initiate(initialConfig);
+
 replTest.awaitNodesAgreeOnPrimary(replTest.timeoutMS, nodes, nodes[0]);
 let primary = replTest.getPrimary();
 // The default WC is majority and stopServerReplication could prevent satisfying any majority

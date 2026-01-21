@@ -16,6 +16,7 @@
  *
  * @tags: [
  *   multiversion_incompatible,
+ *   requires_mongobridge,
  * ]
  */
 

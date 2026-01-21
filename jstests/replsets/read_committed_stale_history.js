@@ -2,7 +2,10 @@
  * Tests that a node on a stale branch of history won't incorrectly mark its ops as committed even
  * when hearing about a commit point with a higher optime from a new primary.
  *
- * @tags: [requires_majority_read_concern]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

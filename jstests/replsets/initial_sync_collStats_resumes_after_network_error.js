@@ -1,6 +1,10 @@
 /**
  * Tests that initial sync restarts on the same collection if there is a network error during the
  * collStats command (rather than restarting initial sync).
+ *
+ * @tags: [
+ *   requires_mongobridge
+ * ]
  */
 
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";

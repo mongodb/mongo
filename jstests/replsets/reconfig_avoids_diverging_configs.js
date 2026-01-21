@@ -12,6 +12,10 @@
  * 5. Issue a reconfig to node1 that removes node2. We now have diverging configs
  *   from two different primaries.
  * 6. Reconnect node0 to the rest of the set and verify that its reconfig fails.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";

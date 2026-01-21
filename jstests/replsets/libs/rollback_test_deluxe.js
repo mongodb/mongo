@@ -33,6 +33,10 @@
  *
  * The default role cycle mode is kCyclical, though it is not guaranteed to be respected in the face
  * of restarts.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";

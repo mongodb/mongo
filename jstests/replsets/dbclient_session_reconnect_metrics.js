@@ -2,7 +2,10 @@
  * Test that reconnect metrics for DBClientSession exist and are appropriately incremented.
  *
  * This test cannot be run on older binaries because the metrics do not exist yet.
- * * @tags: [multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   requires_mongobridge
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

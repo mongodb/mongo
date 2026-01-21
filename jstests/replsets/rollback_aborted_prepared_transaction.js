@@ -5,7 +5,11 @@
  * by the transaction coordinator because transaction coordinator should always call
  * prepareTransaction with {w : "majority"}.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   uses_transactions,
+ *   uses_prepare_transaction,
+ *   requires_mongobridge,
+ * ]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";

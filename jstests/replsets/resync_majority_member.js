@@ -8,6 +8,7 @@
  * @tags: [
  *   multiversion_incompatible,
  *   incompatible_with_windows_tls,
+ *   requires_mongobridge,
  * ]
  */
 

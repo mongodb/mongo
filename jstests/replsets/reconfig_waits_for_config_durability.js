@@ -8,6 +8,7 @@
  *
  * @tags: [
  *   requires_persistence,
+ *   requires_mongobridge,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

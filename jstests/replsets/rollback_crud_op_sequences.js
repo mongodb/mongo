@@ -1,5 +1,9 @@
 /*
  * Basic test of a succesful replica set rollback for CRUD operations.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 

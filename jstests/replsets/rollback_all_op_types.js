@@ -8,7 +8,10 @@
  * true system behavior i.e. mocking an oplog entry with an incorrect format. So, this integration
  * test provides an additional verification of rollback's correctness within a real replica set.
  *
- * @tags: [requires_fcv_53]
+ * @tags: [
+ *  requires_fcv_53,
+ *  requires_mongobridge,
+ * ]
  */
 
 import {RollbackTestDeluxe} from "jstests/replsets/libs/rollback_test_deluxe.js";

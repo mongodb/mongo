@@ -5,7 +5,11 @@
  * transactions on rollback, such prepare conflicts would be unnecessary. This test therefore
  * verifies that they do not happen.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   uses_transactions,
+ *   uses_prepare_transaction,
+ *   requires_mongobridge,
+ * ]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";

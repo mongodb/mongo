@@ -1,6 +1,10 @@
 /**
  * Test that replSetReconfig does not consider non-voting nodes towards the config commitment
  * majority.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

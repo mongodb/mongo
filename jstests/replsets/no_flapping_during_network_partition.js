@@ -8,6 +8,10 @@
  * 4.  Verify the primary and secondary did not change.
  * 5.  Heal the partition.
  * 6.  Verify the primary and secondary did not change and are in the initial term.
+ *
+ * @tags: [
+ *   requires_mongobridge
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

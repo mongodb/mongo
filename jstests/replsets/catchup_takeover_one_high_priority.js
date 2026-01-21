@@ -1,6 +1,10 @@
 // Test to ensure that catchup takeover runs even if it isn't the highest
 // priority node and that once the high priority node is caught up,
 // it becomes primary again.
+//
+// @tags: [
+//   requires_mongobridge,
+// ]
 
 // 3-node replica set with one high priority node.
 // Start replica set. Make node 0 primary and stop the replication

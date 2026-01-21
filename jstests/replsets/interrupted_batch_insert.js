@@ -9,6 +9,10 @@
 //    that were inserted locally but did not get majority committed before the insert in step 4.
 // 6. Unpause the thread performing the insert from step 1. If it continues to insert batches even
 //    though there was a rollback, those inserts will violate the {ordered: true} option.
+//
+// @tags: [
+//   requires_mongobridge,
+// ]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";

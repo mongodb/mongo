@@ -4,6 +4,7 @@
  * and are expected to retry until success.
  *
  * @tags: [
+ *   requires_mongobridge,
  * ]
  */
 

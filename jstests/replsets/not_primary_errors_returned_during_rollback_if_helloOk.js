@@ -5,7 +5,10 @@
  *
  * In practice, drivers will send "helloOk: true" in the initial handshake when
  * opening a connection to the database.
- * @tags: [requires_majority_read_concern]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";

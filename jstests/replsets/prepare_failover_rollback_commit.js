@@ -9,6 +9,7 @@
  * @tags: [
  *   uses_prepare_transaction,
  *   uses_transactions,
+ *   requires_mongobridge,
  * ]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";

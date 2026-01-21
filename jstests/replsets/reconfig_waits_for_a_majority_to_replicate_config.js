@@ -1,6 +1,10 @@
 /**
  * Test that replSetReconfig waits for a majority of nodes to replicate the config
  * before starting another reconfig.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

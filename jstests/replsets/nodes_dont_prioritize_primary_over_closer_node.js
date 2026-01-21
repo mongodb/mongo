@@ -6,6 +6,10 @@
  * targetS is in the data center closest to the test node.
  * Finally, we verify that the test node will decide to sync from targetS, since it is in the
  * closest data center.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

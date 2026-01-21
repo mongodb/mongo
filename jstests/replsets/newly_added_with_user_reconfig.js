@@ -3,6 +3,7 @@
  * reconfigs.
  *
  * @tags: [
+ *   requires_mongobridge,
  * ]
  */
 

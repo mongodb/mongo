@@ -96,7 +96,7 @@ Status AllDatabaseCloner::ensurePrimaryOrSecondary(
     auto memberData = ReplicationCoordinator::get(getGlobalServiceContext())->getMemberData();
     auto syncSourceIter = std::find_if(
         memberData.begin(), memberData.end(), [source = getSource()](const MemberData& member) {
-            return member.getHostAndPort() == source;
+            return member.getHostAndPortPriority() == source;
         });
     if (syncSourceIter == memberData.end()) {
         Status status(ErrorCodes::NotPrimaryOrSecondary,

@@ -12,6 +12,7 @@
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   requires_mongobridge,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

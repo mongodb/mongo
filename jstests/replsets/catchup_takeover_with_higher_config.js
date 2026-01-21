@@ -99,7 +99,8 @@ waitForNodeState(nodes, 2, ReplSetTest.State.PRIMARY, 30 * 1000);
 // candidate to catchup takeover node2.
 assert.soon(() => {
     const status = assert.commandWorked(nodes[0].adminCommand({replSetGetStatus: 1}));
-    return status.syncSourceHost === nodes[2].host;
+    let syncHost = TestData.usePriorityPorts ? nodes[2].priorityHost : nodes[2].host;
+    return status.syncSourceHost === syncHost;
 });
 
 // Lift the failpoint on node1 to let it finish reconfig and bump the config term.

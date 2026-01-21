@@ -5,7 +5,10 @@
  * node would be "stuck" with state=ROLLBACK while it was doing steady-state replication, with no
  * way to reach SECONDARY without restarting the process.
  *
- * @tags: [requires_fcv_53]
+ * @tags: [
+ *   requires_fcv_53,
+ *   requires_mongobridge,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

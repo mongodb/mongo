@@ -1,5 +1,9 @@
 /**
  * Tests that capped collections get the correct fastcounts after rollback.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 

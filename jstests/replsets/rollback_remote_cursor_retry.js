@@ -3,6 +3,10 @@
  * oplog, which may fail due to transient network errors. It uses the 'failCommand' failpoint
  * to simulate exactly two network failures, so that common point resolution can succeed on the
  * third attempt.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

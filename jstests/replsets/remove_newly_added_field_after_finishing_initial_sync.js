@@ -5,6 +5,7 @@
  * field.
  *
  * @tags: [
+ *   requires_mongobridge,
  * ]
  */
 

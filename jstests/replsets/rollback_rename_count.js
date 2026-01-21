@@ -1,5 +1,9 @@
 /**
  * Tests that rollback corrects fastcounts even when collections are renamed.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 

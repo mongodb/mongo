@@ -1,6 +1,10 @@
 /*
  * Test that a node in rollback state can safely be removed from the replica set
  * config via reconfig. See SERVER-48179.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

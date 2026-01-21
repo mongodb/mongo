@@ -18,7 +18,7 @@ replTest.getPrimary();
  * Prepare to restart the sole node on a new port, it no longer finds itself in the old config.
  */
 const config = replTest.getReplSetConfigFromNode(0);
-const newPort = replTest.getPort(0) + 1;
+const newPort = allocatePort();
 const hostname = config.members[0].host.split(":")[0];
 const newHostAndPort = `${hostname}:${newPort}`;
 

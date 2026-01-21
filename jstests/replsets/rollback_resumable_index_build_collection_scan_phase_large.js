@@ -11,6 +11,7 @@
  *   incompatible_with_gcov,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   requires_mongobridge,
  * ]
  */
 import {RollbackResumableIndexBuildTest} from "jstests/replsets/libs/rollback_resumable_index_build.js";

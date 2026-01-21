@@ -50,7 +50,8 @@ assert.soon(
     function () {
         primary.getDB("foo").bar.insert({a: 2});
         let res = secondaries[1].getDB("admin").runCommand({"replSetGetStatus": 1});
-        return res.syncSourceHost === primary.name;
+        let primaryHost = TestData.usePriorityPorts ? primary.priorityHost : primary.name;
+        return res.syncSourceHost === primaryHost;
     },
     "sync target not changed back to primary",
     100 * 1000,

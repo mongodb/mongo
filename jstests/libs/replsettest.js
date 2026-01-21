@@ -598,7 +598,8 @@ export class ReplSetTest {
      * Blocks until the specified node says it's syncing from the given upstream node.
      */
     awaitSyncSource(node, upstreamNode, timeout) {
-        jsTest.log.info("Waiting for node " + node.name + " to start syncing from " + upstreamNode.name);
+        let upstreamSyncSource = TestData.usePriorityPorts ? upstreamNode.priorityHost : upstreamNode.host;
+        jsTest.log.info("Waiting for node " + node.name + " to start syncing from " + upstreamSyncSource);
         let status = null;
         assert(this !== undefined);
         assert.soonNoExcept(
@@ -607,12 +608,12 @@ export class ReplSetTest {
 
                 for (let j = 0; j < status.members.length; j++) {
                     if (status.members[j].self) {
-                        return status.members[j].syncSourceHost === upstreamNode.host;
+                        return status.members[j].syncSourceHost === upstreamSyncSource;
                     }
                 }
                 return false;
             },
-            "Awaiting node " + node + " syncing from " + upstreamNode + ": " + tojson(status),
+            "Awaiting node " + node + " syncing from " + upstreamSyncSource + ": " + tojson(status),
             timeout,
         );
     }
@@ -3576,7 +3577,7 @@ function _constructStartNewInstances(rst, opts) {
 
     rst._bridgeOptions = opts.bridgeOptions || {};
 
-    rst._usePriorityPorts = opts.usePriorityPorts ?? false;
+    rst._usePriorityPorts = TestData.usePriorityPorts || (opts.usePriorityPorts ?? false);
     if (rst._usePriorityPorts) {
         assert(!rst._useBridge, "usePriorityPorts is not supported when using MongoBridge.");
     }

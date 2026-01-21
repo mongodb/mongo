@@ -2,7 +2,11 @@
  * Tests that step-up to become a primary during rollback won't crash the server with
  * OplogOutOfOrder error after becoming a secondary again.
  * Exercises the fix for SERVER-61977.
- * @tags: [uses_transactions]
+ *
+ * @tags: [
+ *   uses_transactions,
+ *   requires_mongobridge,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

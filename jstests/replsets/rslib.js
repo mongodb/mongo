@@ -41,7 +41,8 @@ let w = 0;
  * source will be a valid sync source for the syncing node.
  */
 syncFrom = function (syncingNode, desiredSyncSource, rst) {
-    jsTestLog("Forcing " + syncingNode.name + " to sync from " + desiredSyncSource.name);
+    let syncFromHost = TestData.usePriorityPorts ? desiredSyncSource.priorityHost : desiredSyncSource.name;
+    jsTestLog("Forcing " + syncingNode.name + " to sync from " + syncFromHost);
 
     // Ensure that 'desiredSyncSource' doesn't already have the dummy write sitting around from
     // a previous syncFrom attempt.
@@ -60,7 +61,7 @@ syncFrom = function (syncingNode, desiredSyncSource, rst) {
         return desiredSyncSource.getDB(dummyName).getCollection(dummyName).findOne({a: 1});
     });
 
-    assert.commandWorked(syncingNode.adminCommand({replSetSyncFrom: desiredSyncSource.name}));
+    assert.commandWorked(syncingNode.adminCommand({replSetSyncFrom: syncFromHost}));
     restartServerReplication(syncingNode);
     rst.awaitSyncSource(syncingNode, desiredSyncSource);
     rst.awaitReplication();

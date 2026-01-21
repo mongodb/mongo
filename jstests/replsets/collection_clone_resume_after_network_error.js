@@ -5,6 +5,10 @@
  *  - failure in first batch
  *  - failure in subsequent batches
  *  - multiple resumable failures during the same clone
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

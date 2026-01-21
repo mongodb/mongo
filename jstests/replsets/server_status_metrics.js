@@ -4,6 +4,10 @@
  * The test for metrics.repl.network.oplogGetMoresProcessed requires a storage engine that supports
  * document-level locking because it uses the planExecutorHangBeforeShouldWaitForInserts failpoint
  * to block oplog fetching getMores while trying to do oplog writes.
+ *
+ *  @tags: [
+ *   requires_mongobridge
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

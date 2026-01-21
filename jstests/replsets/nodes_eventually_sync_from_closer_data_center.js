@@ -6,6 +6,7 @@
  * to sync from S1, since S1's data center is closer.
  *
  * @tags: [
+ *   requires_mongobridge,
  * ]
  */
 

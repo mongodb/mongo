@@ -1,6 +1,10 @@
 /**
  * Tests that initial sync will abort an attempt if the sync source enters and completes initial
  * sync during cloning (i.e. the source is resynced during an outage).
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

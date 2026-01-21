@@ -4,6 +4,7 @@
 // to the disconnected node via the delayed secondary.
 //
 // @tags: [
+//   requires_mongobridge,
 // ]
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {syncFrom, waitForAllMembers} from "jstests/replsets/rslib.js";

@@ -10,6 +10,10 @@
  * 5. A receives many new operations, which B will replicate after rollback.
  * 6. B rejoins the set and goes through the rollback process.
  * 7. The contents of A and B are compare to ensure the rollback results in consistent nodes.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {awaitOpTime} from "jstests/replsets/rslib.js";

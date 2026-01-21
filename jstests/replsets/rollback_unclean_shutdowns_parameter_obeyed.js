@@ -3,7 +3,10 @@
  * We test that nodes can only be shut down with the SIGTERM signal (15), not SIGKILL (9), when
  * allowUncleanShutdowns=false.
  *
- * @tags: [requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_mongobridge,
+ * ]
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 

@@ -3,7 +3,11 @@
  * snapshots be dropped during rollback, therefore committed reads will block until a new committed
  * snapshot is available.
  *
- * @tags: [requires_majority_read_concern, requires_fcv_53]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_fcv_53,
+ *   requires_mongobridge,
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

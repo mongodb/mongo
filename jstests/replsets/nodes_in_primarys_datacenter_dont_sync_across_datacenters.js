@@ -6,6 +6,7 @@
  * has a lower ping time.
  *
  * @tags: [
+ *   requires_mongobridge,
  * ]
  */
 

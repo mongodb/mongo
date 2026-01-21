@@ -36,7 +36,8 @@ jsTestLog("Node 1 is syncing from Node 0");
 let failfirstOplogEntryFetcherCallback = configureFailPoint(newNode, "failfirstOplogEntryFetcherCallback");
 
 jsTestLog("Calling replSetSyncFrom while failfirstOplogEntryFetcherCallback is enabled");
-assert.commandWorked(newNode.adminCommand({replSetSyncFrom: primary.name}));
+let primaryHost = TestData.usePriorityPorts ? primary.priorityHost : primary.host;
+assert.commandWorked(newNode.adminCommand({replSetSyncFrom: primaryHost}));
 
 failfirstOplogEntryFetcherCallback.wait();
 

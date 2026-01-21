@@ -50,7 +50,8 @@ assert.soon(function () {
 assert.commandWorked(initialSyncNode.adminCommand({configureFailPoint: "forceSyncSourceCandidate", mode: "off"}));
 
 jsTestLog("Setting the initial sync source from secondary to primary.");
-assert.commandWorked(initialSyncNode.adminCommand({replSetSyncFrom: secondary.name}));
+let syncHost = TestData.usePriorityPorts ? secondary.priorityHost : secondary.host;
+assert.commandWorked(initialSyncNode.adminCommand({replSetSyncFrom: syncHost}));
 
 // Turning off the 'initialSyncHangBeforeSplittingControlFlow' failpoint should cause initial sync
 // to restart with the secondary as the sync source.
@@ -60,7 +61,7 @@ assert.commandWorked(
 );
 hangBeforeFinishInitialSync.wait();
 let res = assert.commandWorked(initialSyncNode.adminCommand({"replSetGetStatus": 1}));
-assert.eq(secondary.name, res.syncSourceHost, res);
+assert.eq(syncHost, res.syncSourceHost, res);
 assert.eq(failedInitialSyncAttempts + 1, res.initialSyncStatus.failedInitialSyncAttempts);
 assert.eq(2, res.initialSyncStatus.initialSyncAttempts.length);
 hangBeforeFinishInitialSync.off();

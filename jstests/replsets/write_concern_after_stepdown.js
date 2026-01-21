@@ -1,6 +1,10 @@
 /*
  * Tests that heartbeats containing writes from a different branch of history can't cause a stale
  * primary to incorrectly acknowledge a w:majority write that's about to be rolled back.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

@@ -1,5 +1,9 @@
 /**
  * Fixture to test rollback permutations with index builds.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

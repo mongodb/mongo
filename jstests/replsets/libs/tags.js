@@ -2,6 +2,10 @@
  * Sets up a test for replica set tags sets.
  *
  * https://docs.mongodb.com/v3.0/tutorial/configure-replica-set-tag-sets/
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig} from "jstests/replsets/rslib.js";

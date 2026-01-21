@@ -2,6 +2,10 @@
  * Test to ensure that a 'renameCollection' operation that occurs on the sync source past the
  * rollback common point for a collection that also exists on the rollback node will not cause data
  * corruption on the rollback node.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ *  ]
  */
 
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";

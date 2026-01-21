@@ -2,6 +2,7 @@
  * Tests that currentOp displays information about in-progress automatic reconfigs.
  *
  * @tags: [
+ *   requires_mongobridge,
  * ]
  */
 

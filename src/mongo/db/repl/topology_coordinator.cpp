@@ -3384,8 +3384,10 @@ TopologyCoordinator::_shouldChangeSyncSourceInitialChecks(const HostAndPort& cur
     // While we can allow data replication across config versions, we still do not allow syncing
     // from a node that is not in our config. Using the strict version of
     // findMemberIndexByHostAndPort will cause us to choose a new sync source if a priority port
-    // has been added.
-    const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(currentSource, true);
+    // has been added but we relax these constraints if the 'forceSyncSource' failpoint is set to
+    // aid in testing.
+    const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(
+        currentSource, !forceSyncSourceCandidate.shouldFail() /* strict */);
     if (currentSourceIndex == -1) {
         LOGV2(21831,
               "Choosing new sync source because current sync source is not in our config",

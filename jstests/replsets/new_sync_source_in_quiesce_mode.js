@@ -49,7 +49,8 @@ quiesceModeFailPoint.wait();
 
 jsTestLog("Ensure syncingNode tries to sync from syncSource.");
 // Use the replSetSyncFrom command to try and connect to the syncSource in quiesce mode.
-assert.commandWorked(syncingNode.adminCommand({replSetSyncFrom: syncSource.name}));
+let syncFromNode = TestData.usePriorityPorts ? syncSource.priorityHost : syncSource.host;
+assert.commandWorked(syncingNode.adminCommand({replSetSyncFrom: syncFromNode}));
 restartServerReplication(syncingNode);
 // We will have denylisted syncSource since it is shutting down, so we should re-enter
 // sync source selection and eventually choose the primary as our sync source.

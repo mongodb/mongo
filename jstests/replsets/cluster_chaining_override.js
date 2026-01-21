@@ -1,6 +1,10 @@
 /**
  * Tests that if chaining is disabled, enabling the server parameter
  * 'enableOverrideClusterChainingSetting' will allow the node to chain anyway.
+ *
+ * @tags: [
+ *   requires_mongobridge
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

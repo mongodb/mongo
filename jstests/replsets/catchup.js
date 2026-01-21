@@ -1,4 +1,10 @@
-// Test the catch-up behavior of new primaries.
+/**
+ * Test the catch-up behavior of new primaries.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
+ */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication} from "jstests/libs/write_concern_util.js";

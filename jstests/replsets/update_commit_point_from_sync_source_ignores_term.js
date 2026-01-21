@@ -1,7 +1,10 @@
 /**
  * Tests that even if the sync source's lastOpCommitted is in a higher term than the node's
  * lastApplied, the node can update its own lastOpCommitted to its lastApplied.
- * @tags: [requires_majority_read_concern]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_mongobridge,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";

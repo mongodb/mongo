@@ -15,6 +15,10 @@
  *  - The txnNumber for the first session id is the original value.
  *  - There is no record for the second session id.
  *  - A record for the third session id was created during oplog replay.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 // This test drops a collection in the config database, which is not allowed under a session. It
 // also manually simulates a session, which is not compatible with implicit sessions.

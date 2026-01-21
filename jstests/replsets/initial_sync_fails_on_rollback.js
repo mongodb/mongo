@@ -2,7 +2,10 @@
  * Test that initial sync fails if a rollback occurs while querying collection data.
  *
  * This test depends on 4.4 features.
- * @tags: [multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

@@ -2,7 +2,10 @@
  * Tests that secondaries do not advance their commit point to have a greater term than their
  * lastApplied. This prevents incorrectly prefix-committing operations that are not majority
  * committed.
- * @tags: [requires_majority_read_concern]
+ * @tags: [
+ *   requires_majority_read_concern,
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

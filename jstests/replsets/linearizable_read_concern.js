@@ -11,6 +11,10 @@
  * partitioned primary and then making the primary step down in the main
  * thread after finding the issued noop. The secondary thread should throw
  * an exception and exit.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getLatestOp} from "jstests/replsets/rslib.js";

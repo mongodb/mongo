@@ -18,7 +18,7 @@ const rst = new ReplSetTest({
 const nodes = rst.startSet();
 
 function getDataObj(syncSource) {
-    return {hostAndPort: syncSource.host};
+    return {hostAndPort: TestData.usePriorityPorts ? syncSource.priorityHost : syncSource.host};
 }
 
 configureFailPoint(nodes[1], failpointName, getDataObj(nodes[0]));

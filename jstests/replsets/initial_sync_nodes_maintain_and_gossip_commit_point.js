@@ -7,6 +7,10 @@
  * commit point, and verify that the commit point on the initial syncing node is updated. Finally,
  * we ensure that the disconnected secondary is able to update its commit point from the initial
  * syncing node via heartbeats.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";

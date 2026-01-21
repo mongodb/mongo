@@ -2,7 +2,11 @@
  * Tests that a rollback directory is created for oplog entries during replica set rollback, and
  * verifies that the rolled back oplogs are written to that directory.
  *
- * @tags: [requires_persistence, requires_fcv_81]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_fcv_81,
+ *   requires_mongobridge,
+ * ]
  */
 
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";

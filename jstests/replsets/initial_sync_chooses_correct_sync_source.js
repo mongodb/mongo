@@ -3,6 +3,7 @@
  * initialSyncReadPreference.
  *
  * @tags: [
+ *  requires_mongobridge,
  * ]
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";

@@ -4,6 +4,7 @@
  * @tags: [
  *  requires_persistence,
  *  multiversion_incompatible,
+ *  requires_mongobridge,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

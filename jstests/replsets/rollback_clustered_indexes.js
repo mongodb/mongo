@@ -2,6 +2,7 @@
  * Tests that writes on collections clustered by _id can be rolled back.
  * @tags: [
  *   requires_replication,
+ *   requires_mongobridge,
  * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";

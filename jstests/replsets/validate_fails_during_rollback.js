@@ -1,5 +1,9 @@
 /*
  * This test makes sure the 'validate' command fails correctly during rollback.
+ *
+ * @tags: [
+ *   requires_mongobridge,
+ *  ]
  */
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
