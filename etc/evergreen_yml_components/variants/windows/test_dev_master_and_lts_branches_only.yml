@@ -12,6 +12,8 @@ buildvariants:
     run_on:
       - windows-2022-small
     expansions:
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug

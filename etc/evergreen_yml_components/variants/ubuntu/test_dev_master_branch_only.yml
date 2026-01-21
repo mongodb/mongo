@@ -13,6 +13,8 @@ buildvariants:
       - ubuntu2204-arm64-m8g-4xlarge
     stepback: false
     expansions:
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       compile_variant: *workstation_bazel_cache_hydration_arm64
       evergreen_remote_exec: on
     tasks:
@@ -28,6 +30,8 @@ buildvariants:
       - ubuntu2204-large
     stepback: false
     expansions:
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       compile_variant: *workstation_bazel_cache_hydration_x86_64
       evergreen_remote_exec: on
     tasks:
@@ -43,6 +47,8 @@ buildvariants:
       - rhel93-xxlarge
     stepback: false
     expansions:
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       compile_variant: *upload_source_graph_index
       evergreen_remote_exec: on
     tasks:

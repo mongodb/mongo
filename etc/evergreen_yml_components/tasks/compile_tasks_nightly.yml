@@ -98,8 +98,8 @@ tasks:
           local_file: msi-files-signed.tgz
           remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-msi-files-signed.tgz
           bucket: mciuploads
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: application/tar
           display_name: MSI Files
 
@@ -199,8 +199,8 @@ tasks:
           local_file: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           skip_existing: ${is_release}
@@ -211,8 +211,8 @@ tasks:
           local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           skip_existing: ${is_release}
@@ -223,8 +223,8 @@ tasks:
           local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           skip_existing: ${is_release}
@@ -236,8 +236,8 @@ tasks:
         params:
           aws_secret: ${aws_secret}
           aws_key: ${aws_key}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
           bucket: ${push_bucket}
           content_type: ${content_type|application/gzip}
@@ -252,8 +252,8 @@ tasks:
           local_file: src/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongodb-dist-test-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           skip_existing: ${is_release}
@@ -264,8 +264,8 @@ tasks:
           local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           skip_existing: ${is_release}
@@ -277,8 +277,8 @@ tasks:
           local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           skip_existing: ${is_release}
@@ -289,8 +289,8 @@ tasks:
         params:
           aws_secret: ${aws_secret}
           aws_key: ${aws_key}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
           bucket: ${push_bucket}
           content_type: ${content_type|application/gzip}
@@ -303,8 +303,8 @@ tasks:
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           build_variants: ["enterprise-windows", "windows"]
           local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi
           bucket: ${push_bucket}
@@ -318,8 +318,8 @@ tasks:
           aws_secret: ${aws_secret}
           local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
           aws_key: ${aws_key}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           bucket: ${push_bucket}
           content_type: text/plain
           remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
@@ -331,8 +331,8 @@ tasks:
           aws_secret: ${aws_secret}
           local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
           aws_key: ${aws_key}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           bucket: ${push_bucket}
           content_type: text/plain
           remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
@@ -344,8 +344,8 @@ tasks:
         params:
           aws_secret: ${aws_secret}
           aws_key: ${aws_key}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
           bucket: ${push_bucket}
           content_type: text/plain
@@ -358,8 +358,8 @@ tasks:
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           build_variants: ["enterprise-windows", "windows"]
           local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha1
           bucket: ${push_bucket}
@@ -372,8 +372,8 @@ tasks:
         params:
           aws_secret: ${aws_secret}
           local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           aws_key: ${aws_key}
           bucket: ${push_bucket}
           content_type: text/plain
@@ -385,8 +385,8 @@ tasks:
         params:
           aws_secret: ${aws_secret}
           local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           aws_key: ${aws_key}
           bucket: ${push_bucket}
           content_type: text/plain
@@ -401,8 +401,8 @@ tasks:
           local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: text/plain
           remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
           skip_existing: ${is_release}
@@ -416,8 +416,8 @@ tasks:
           build_variants: ["enterprise-windows", "windows"]
           local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha256
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256
           skip_existing: ${is_release}
           content_type: text/plain
@@ -429,8 +429,8 @@ tasks:
           local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: text/plain
           remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           skip_existing: ${is_release}
@@ -442,8 +442,8 @@ tasks:
           local_file: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: text/plain
           remote_file: ${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           skip_existing: ${is_release}
@@ -457,8 +457,8 @@ tasks:
           local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
           bucket: ${push_bucket}
           content_type: text/plain
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
           skip_existing: ${is_release}
           optional: true
@@ -471,8 +471,8 @@ tasks:
           build_variants: ["enterprise-windows", "windows"]
           local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.md5
           bucket: ${push_bucket}
-          permissions: ${mciuploads_binary_permissions_push|public-read}
-          visibility: ${mciuploads_binary_visibility_push|public}
+          permissions: ${mciuploads_binary_permissions_push|private}
+          visibility: ${mciuploads_binary_visibility_push|signed}
           content_type: text/plain
           remote_file: ${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5
           skip_existing: ${is_release}

@@ -26,6 +26,8 @@ variables:
   # - etc/evergreen_yml_components/variants/windows/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &windows_expansions
+    mciuploads_binary_permissions: public-read
+    mciuploads_binary_visibility: public
     compile_variant: *windows_compile_variant_name
     burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
@@ -57,6 +59,8 @@ buildvariants:
       - windows-2022-xxlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     expansions: &windows_compile_expansions
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       exe: ".exe"
       ext: zip
       additional_package_targets: >-

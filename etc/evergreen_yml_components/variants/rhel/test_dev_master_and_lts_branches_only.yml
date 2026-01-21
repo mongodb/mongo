@@ -39,6 +39,8 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
+    mciuploads_binary_permissions: public-read
+    mciuploads_binary_visibility: public
     multiversion_platform: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
@@ -54,6 +56,8 @@ buildvariants:
     run_on:
       - rhel8.8-small
     expansions:
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug

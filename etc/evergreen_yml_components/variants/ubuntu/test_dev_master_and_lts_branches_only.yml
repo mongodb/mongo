@@ -14,8 +14,6 @@ variables:
       multiversion_edition: enterprise
       repo_edition: enterprise
       large_distro_name: ubuntu2204-large
-      mciuploads_binary_permissions: private
-      mciuploads_binary_visibility: signed
       antithesis_bazel_compile_flags: >-
         --//bazel/config:antithesis=True
         --copt=-fsanitize-coverage=trace-pc-guard

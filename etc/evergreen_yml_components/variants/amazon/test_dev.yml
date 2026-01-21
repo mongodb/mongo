@@ -16,6 +16,8 @@ variables:
     stepback: false
 
   - &linux-arm64-static-enterprise-compile-expansions
+    mciuploads_binary_permissions: public-read
+    mciuploads_binary_visibility: public
     has_packages: false
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=amazon2023
@@ -30,6 +32,8 @@ variables:
   # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_arm64_generic_expansions
+    mciuploads_binary_permissions: public-read
+    mciuploads_binary_visibility: public
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: aarch64
@@ -95,8 +99,6 @@ buildvariants:
       compile_variant: *amazon-linux2023-arm64-static-compile
       evergreen_remote_exec: on
       skip_debug_link: true
-      mciuploads_binary_permissions: private
-      mciuploads_binary_visibility: signed
       remote_link: true
       resmoke_tests_tag_filter: ci-development-critical-single-variant
       # Boost the priority on remote execution since this is the longest running task chain in
@@ -176,8 +178,6 @@ buildvariants:
       evergreen_remote_exec: on
       skip_debug_link: true
       remote_link: true
-      mciuploads_binary_permissions: private
-      mciuploads_binary_visibility: signed
       resmoke_tests_tag_filter: ci-development-critical-single-variant
     tasks:
       - name: run_unit_tests_TG
@@ -272,8 +272,6 @@ buildvariants:
       has_packages: false
       skip_symbolization: true
       evergreen_remote_exec: on
-      mciuploads_binary_permissions: private
-      mciuploads_binary_visibility: signed
       build_timeout_seconds: 1440
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
@@ -497,8 +495,6 @@ buildvariants:
         --remote_execution_priority=1
       evergreen_remote_exec: on
       skip_debug_link: true
-      mciuploads_binary_permissions: private
-      mciuploads_binary_visibility: signed
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:

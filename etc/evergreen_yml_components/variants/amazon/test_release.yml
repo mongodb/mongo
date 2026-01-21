@@ -409,8 +409,6 @@ buildvariants:
     run_on:
       - amazon2023.3-arm64-m8g-xlarge
     expansions: &enterprise-amazon2023-arm64-dynamic-expansions
-      mciuploads_binary_permissions: private
-      mciuploads_binary_visibility: signed
       mciuploads_binary_permissions_push: public-read
       mciuploads_binary_visibility_push: public
       additional_package_targets: archive-mongocryptd-stripped archive-mongocryptd-debug

@@ -10,6 +10,8 @@ buildvariants:
     run_on:
       - amazon2023.3-small
     expansions: &amazon-linux-2023-x86-mongot-integration-expansions
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
@@ -79,6 +81,8 @@ buildvariants:
     run_on:
       - amazon2023.3-arm64-m8g-xlarge
     expansions: &amazon2023-arm64-mongot-integration-expansions
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
@@ -150,6 +154,8 @@ buildvariants:
       - amazon2-arm64-latest-m8g-xlarge
     stepback: true
     expansions: &amazon-linux2-arm64-mongot-integration-expansions
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
@@ -213,6 +219,8 @@ buildvariants:
     run_on:
       - amazon2-latest-large
     expansions: &amazon2-x86-mongot-integration-expansions
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2
@@ -268,6 +276,8 @@ buildvariants:
       - rhel8.8-medium
     tags: []
     expansions:
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       compile_variant: *enterprise-rhel-8-64-mongot-integration
       has_packages: false
       build_mongot: true

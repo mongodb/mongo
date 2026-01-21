@@ -11,6 +11,8 @@ buildvariants:
     run_on:
       - macos-14-arm64
     expansions:
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
       compile_variant: *enterprise-macos-arm64
       test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,slow_on_macos
       resmoke_jobs_max: 6

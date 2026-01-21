@@ -11,6 +11,9 @@ buildvariants:
     activate: true
     run_on:
       - rhel8.8-medium
+    expansions:
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
     tasks:
       - name: version_gen
       - name: version_burn_in_gen

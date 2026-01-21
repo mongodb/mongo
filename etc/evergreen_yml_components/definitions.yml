@@ -641,8 +641,8 @@ functions:
       local_file: src/bazel-bin/dist-test-debug.${ext|tgz}
       remote_file: ${mongo_debugsymbols}
       bucket: mciuploads
-      permissions: ${mciuploads_binary_permissions|public-read}
-      visibility: ${mciuploads_binary_visibility|public}
+      permissions: ${mciuploads_binary_permissions|private}
+      visibility: ${mciuploads_binary_visibility|signed}
       content_type: ${content_type|application/gzip}
       display_name: mongo-debugsymbols.${ext|tgz}
 
@@ -2959,8 +2959,8 @@ functions:
       local_file: mongo-tests.tgz
       remote_file: ${project}/${build_variant}/${revision}/tests/mongo-tests-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
-      permissions: ${mciuploads_binary_permissions|public-read}
-      visibility: ${mciuploads_binary_visibility|public}
+      permissions: ${mciuploads_binary_permissions|private}
+      visibility: ${mciuploads_binary_visibility|signed}
       content_type: application/gzip
       display_name: Test binaries and libraries - Execution ${execution}
       optional: true
@@ -3073,8 +3073,8 @@ functions:
       local_file: src/mongo-hanganalyzer.tgz
       remote_file: ${project}/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
-      permissions: ${mciuploads_binary_permissions|public-read}
-      visibility: ${mciuploads_binary_visibility|public}
+      permissions: ${mciuploads_binary_permissions|private}
+      visibility: ${mciuploads_binary_visibility|signed}
       content_type: application/gzip
       display_name: Hang Analyzer Output - Execution ${execution}
       optional: true

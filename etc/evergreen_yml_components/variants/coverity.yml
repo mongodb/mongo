@@ -7,6 +7,9 @@ buildvariants:
     # Run at 4 am UTC everyday
     cron: "30 4 * * *"
     run_on: ubuntu2404-xlarge
+    expansions:
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
     modules:
       - devprod_coverity
     tasks:
