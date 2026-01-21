@@ -92,4 +92,14 @@ LogicalAggStageHandle LogicalAggStageAPI::clone() const {
     return LogicalAggStageHandle(logicalAggStage);
 }
 
+bool LogicalAggStageAPI::isSortedByVectorSearchScore() const {
+    bool outIsSortedByVectorSearchScore{false};
+    invokeCAndConvertStatusToException([&]() {
+        return vtable().is_stage_sorted_by_vector_search_score(get(),
+                                                               &outIsSortedByVectorSearchScore);
+    });
+
+    return outIsSortedByVectorSearchScore;
+}
+
 }  // namespace mongo::extension

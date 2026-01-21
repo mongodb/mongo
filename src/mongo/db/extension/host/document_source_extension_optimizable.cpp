@@ -33,9 +33,10 @@
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/search_helper.h"
-#include "mongo/util/namespace_string_util.h"
-#include "mongo/util/serialization_context.h"
+#include "mongo/db/pipeline/search/vector_search_helper.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::extension::host {
 
@@ -460,4 +461,23 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceExtensionOptimizable::clone(
     return create(newExpCtx, _logicalStage->clone(), _properties);
 }
 
+DocumentSourceContainer::iterator DocumentSourceExtensionOptimizable::optimizeAt(
+    DocumentSourceContainer::iterator itr, DocumentSourceContainer* container) {
+    // Attempt to remove a $sort on metadata if the extension stage is sorted by vector search
+    // score.
+    if (_logicalStage->isSortedByVectorSearchScore()) {
+        if (auto result = search_helpers::applyVectorSearchSortOptimization(itr, container)) {
+            return *result;
+        }
+    }
+    return std::next(itr);
+}
 }  // namespace mongo::extension::host
+
+namespace mongo::rule_based_rewrites::pipeline {
+using DocumentSourceExtensionOptimizable =
+    mongo::extension::host::DocumentSourceExtensionOptimizable;
+REGISTER_RULES(DocumentSourceExtensionOptimizable,
+               OPTIMIZE_AT_RULE(DocumentSourceExtensionOptimizable));
+
+}  // namespace mongo::rule_based_rewrites::pipeline

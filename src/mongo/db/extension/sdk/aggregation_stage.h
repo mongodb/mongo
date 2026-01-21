@@ -76,6 +76,11 @@ public:
     virtual std::unique_ptr<ExecAggStageBase> compile() const = 0;
     virtual boost::optional<DistributedPlanLogic> getDistributedPlanLogic() const = 0;
     virtual std::unique_ptr<LogicalAggStage> clone() const = 0;
+    // Extension stages (like $vectorSearch) that do sort by vector search score should override
+    // this and return true.
+    virtual bool isSortedByVectorSearchScore() const {
+        return false;
+    }
 
 protected:
     LogicalAggStage() = delete;  // No default constructor.
@@ -182,6 +187,16 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extIsStageSortedByVectorSearchScore(
+        const ::MongoExtensionLogicalAggStage* extLogicalStage,
+        bool* outIsSortedByVectorSearchScore) {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            const auto& impl =
+                static_cast<const ExtensionLogicalAggStage*>(extLogicalStage)->getImpl();
+            *outIsSortedByVectorSearchScore = impl.isSortedByVectorSearchScore();
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
@@ -189,7 +204,8 @@ private:
         .explain = &_extExplain,
         .compile = &_extCompile,
         .get_distributed_plan_logic = &_extGetDistributedPlanLogic,
-        .clone = &_extClone};
+        .clone = &_extClone,
+        .is_stage_sorted_by_vector_search_score = &_extIsStageSortedByVectorSearchScore};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

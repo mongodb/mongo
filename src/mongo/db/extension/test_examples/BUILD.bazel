@@ -52,6 +52,7 @@ extensions_with_config(
         ":metrics_mongo_extension_signed_lib",
         ":other_metrics_mongo_extension_signed_lib",
         ":sleep_mongo_extension_signed_lib",
+        ":vector_search_optimization_mongo_extension_signed_lib",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
@@ -95,6 +96,7 @@ pkg_name = "//" + package_name() + "/"
         "limit",
         "match_topN",
         "native_vector_search",
+        "vector_search_optimization",
     ]
 ]
 
