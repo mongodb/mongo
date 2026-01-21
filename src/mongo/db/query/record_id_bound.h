@@ -39,7 +39,6 @@
 #include <ostream>
 
 #include <boost/optional.hpp>
-#include <fmt/format.h>
 
 namespace mongo {
 
@@ -61,7 +60,7 @@ public:
     }
 
     /**
-     * Appends a BSON respresentation of the bound to a BSONObjBuilder. If one is not explicitily
+     * Appends a BSON respresentation of the bound to a BSONObjBuilder. If one is not explicitly
      * provided it reconstructs it from the RecordId.
      */
     void appendToBSONAs(BSONObjBuilder* builder, StringData fieldName) const {
