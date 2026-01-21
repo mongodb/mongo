@@ -53,6 +53,7 @@ executor:
     mixed_bin_versions: new_old_old_old_old_new
     mongod_options:
       set_parameters:
+        defaultFindReplicaSetHostTimeoutMS: 120000
         enableElectionHandoff: 0
         enableTestCommands: 1
       syncdelay: 5

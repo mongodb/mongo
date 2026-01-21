@@ -353,6 +353,7 @@
           set_parameters:
             enableElectionHandoff: 0
             enableTestCommands: 1
+            defaultFindReplicaSetHostTimeoutMS: 120000
         configsvr_options:
           all_nodes_electable: true
           replset_config_options:
