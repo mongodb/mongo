@@ -100,6 +100,9 @@ filters:
   - "pcre2":
     approvers:
       - 10gen/query-execution
+  - "private/.placeholder":
+    approvers:
+      - 10gen/devprod-build
   - "protobuf":
     approvers:
       - 10gen/server-networking-and-observability

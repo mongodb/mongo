@@ -3394,6 +3394,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/opentelemetry-cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/opentelemetry-proto @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/pcre2 @10gen/query-execution @svc-auto-approve-bot
+/src/third_party/private/.placeholder @10gen/devprod-build @svc-auto-approve-bot
 /src/third_party/**/protobuf @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/third_party/**/re2 @10gen/server-programmability @svc-auto-approve-bot
 /src/third_party/**/s2 @10gen/query-integration @svc-auto-approve-bot

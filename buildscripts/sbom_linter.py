@@ -315,6 +315,8 @@ def main() -> int:
     third_party_libs.remove("sasl")
     # This is not a real third party, its just the local ssl pretending to be boringssl
     third_party_libs.remove("boringssl_replacement")
+    # Nothing in this directory is included in Community/EA
+    third_party_libs.remove("private")
     error_manager = lint_sbom(input_file, output_file, third_party_libs, should_format)
     error_manager.print_errors()
 
