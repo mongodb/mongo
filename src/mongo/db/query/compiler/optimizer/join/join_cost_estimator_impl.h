@@ -49,6 +49,7 @@ public:
     JoinCostEstimatorImpl& operator=(JoinCostEstimatorImpl&&) = delete;
 
     JoinCostEstimate costCollScanFragment(NodeId nodeId) override;
+    JoinCostEstimate costIndexScanFragment(NodeId nodeId) override;
 
 private:
     const JoinReorderingContext& _jCtx;

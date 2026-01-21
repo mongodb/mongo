@@ -56,4 +56,20 @@ JoinCostEstimate JoinCostEstimatorImpl::costCollScanFragment(NodeId nodeId) {
     return JoinCostEstimate(numDocsProcessed, numDocsOutput, numSeqIOs, numRandIOs);
 }
 
+JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId) {
+    // For simplicity we assume there are no non-sargable filters applied after the index scan. This
+    // means that we assume the number of documents processed and output are both equal to the
+    // cardinality estimate of that node.
+    CardinalityEstimate numDocsProcessed =
+        _cardinalityEstimator.getOrEstimateSubsetCardinality(makeNodeSet(nodeId));
+    CardinalityEstimate numDocsOutput = numDocsProcessed;
+    // Assume that the sequential IO performed by scanning the index itself is negilible.
+    CardinalityEstimate numSeqIOs = zeroCE;
+    // Model the random IO performed by fetching documents from the collection. For simplicity,
+    // assume that every index entry causes us to read a new page from the collection.
+    CardinalityEstimate numRandIOs = numDocsOutput;
+    return JoinCostEstimate(numDocsProcessed, numDocsOutput, numSeqIOs, numRandIOs);
+}
+
+
 }  // namespace mongo::join_ordering

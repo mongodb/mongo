@@ -27,37 +27,82 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
+#include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::join_ordering {
 
-class JoinCostEstimatorTest : public JoinOrderingTestFixture {};
+class JoinCostEstimatorTest : public JoinOrderingTestFixture {
+public:
+    void setUp() override {
+        JoinOrderingTestFixture::setUp();
+        smallNss = NamespaceString::createNamespaceString_forTest("foo");
+        largeNss = NamespaceString::createNamespaceString_forTest("bar");
+        smallNodeId = *graph.addNode(smallNss, makeCanonicalQuery(smallNss), boost::none);
+        largeNodeId = *graph.addNode(largeNss, makeCanonicalQuery(largeNss), boost::none);
+        unselectiveNodeId = *graph.addNode(largeNss, makeCanonicalQuery(largeNss), boost::none);
+        jCtx.emplace(makeContext());
+
+        SubsetCardinalities subsetCards{
+            {makeNodeSet(smallNodeId), makeCard(100)},
+            {makeNodeSet(largeNodeId), makeCard(10'000)},
+            {makeNodeSet(unselectiveNodeId), makeCard(100'000)},
+        };
+        NodeCardinalities collCards{makeCard(100'000), makeCard(200'000), makeCard(200'000)};
+
+        cardEstimator =
+            std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, collCards);
+
+        constexpr double docSizeBytes = 500;
+        catalogStats = {.collStats = {
+                            {smallNss,
+                             CollectionStats{.allocatedDataPageBytes =
+                                                 collCards[smallNodeId].toDouble() * docSizeBytes}},
+                            {largeNss,
+                             CollectionStats{.allocatedDataPageBytes =
+                                                 collCards[largeNodeId].toDouble() * docSizeBytes}},
+                        }};
+
+        costEstimator =
+            std::make_unique<JoinCostEstimatorImpl>(*jCtx, *cardEstimator, catalogStats);
+    }
+
+    NamespaceString smallNss;
+    NamespaceString largeNss;
+    NodeId smallNodeId;
+    NodeId largeNodeId;
+    NodeId unselectiveNodeId;
+    boost::optional<JoinReorderingContext> jCtx;
+    std::unique_ptr<JoinCardinalityEstimator> cardEstimator;
+    CatalogStats catalogStats;
+    std::unique_ptr<JoinCostEstimator> costEstimator;
+};
 
 TEST_F(JoinCostEstimatorTest, LargerCollectionHasHigherCost) {
-    auto smallNss = NamespaceString::createNamespaceString_forTest("foo");
-    auto largeNss = NamespaceString::createNamespaceString_forTest("bar");
-    auto smallNodeId = graph.addNode(smallNss, makeCanonicalQuery(smallNss), boost::none);
-    auto largeNodeId = graph.addNode(largeNss, makeCanonicalQuery(largeNss), boost::none);
+    auto smallCost = costEstimator->costCollScanFragment(smallNodeId);
+    auto largeCost = costEstimator->costCollScanFragment(largeNodeId);
+    ASSERT_GT(largeCost, smallCost);
+}
 
-    auto jCtx = makeContext();
+TEST_F(JoinCostEstimatorTest, LargerIndexScanHasHigherCost) {
+    auto smallCost = costEstimator->costIndexScanFragment(smallNodeId);
+    auto largeCost = costEstimator->costIndexScanFragment(largeNodeId);
+    ASSERT_GT(largeCost, smallCost);
+}
 
-    std::unique_ptr<JoinCardinalityEstimator> cardEstimator =
-        std::make_unique<FakeJoinCardinalityEstimator>(jCtx);
-    CatalogStats catalogStats{.collStats = {
-                                  {smallNss, CollectionStats{.allocatedDataPageBytes = 32 * 1024}},
-                                  {largeNss, CollectionStats{.allocatedDataPageBytes = 64 * 1024}},
-                              }};
+TEST_F(JoinCostEstimatorTest, SelectiveIndexScanHasSmallerCostThanCollScan) {
+    auto collScanCost = costEstimator->costCollScanFragment(smallNodeId);
+    auto indexScanCost = costEstimator->costIndexScanFragment(smallNodeId);
+    ASSERT_GT(collScanCost, indexScanCost);
+}
 
-    std::unique_ptr<JoinCostEstimator> joinCostEstimator =
-        std::make_unique<JoinCostEstimatorImpl>(jCtx, *cardEstimator, catalogStats);
-
-    auto smallCost = joinCostEstimator->costCollScanFragment(*smallNodeId);
-    auto largeCost = joinCostEstimator->costCollScanFragment(*largeNodeId);
-    std::cout << smallCost.getTotalCost().toDouble() << " " << largeCost.getTotalCost().toDouble()
-              << std::endl;
-    ASSERT_GT(largeCost.getTotalCost(), smallCost.getTotalCost());
+TEST_F(JoinCostEstimatorTest, UnselectiveIndexScanHasLargerCostThanCollScan) {
+    auto collScanCost = costEstimator->costCollScanFragment(unselectiveNodeId);
+    auto indexScanCost = costEstimator->costIndexScanFragment(unselectiveNodeId);
+    ASSERT_GT(indexScanCost, collScanCost);
 }
 
 }  // namespace mongo::join_ordering

@@ -51,6 +51,16 @@ public:
      * collection scan; it is the caller's responsibility to ensure this is the case.
      */
     virtual JoinCostEstimate costCollScanFragment(NodeId) = 0;
+
+    /**
+     * Estimate the cost of a single table index scan plan fragment. This function assumes that the
+     * given 'NodeId' corresponds to a node in the JoinGraph whose single table access path is an
+     * index scan followed by a fetch; it is caller's responsibility to ensure this is the case.
+     *
+     * TODO SERVER-117506: Once we support projections and start producing covered plans, we will
+     * need to modify this function.
+     */
+    virtual JoinCostEstimate costIndexScanFragment(NodeId) = 0;
 };
 
 }  // namespace mongo::join_ordering

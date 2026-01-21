@@ -78,6 +78,7 @@ mongo_cc_unit_test(
         ":unit_test_helpers",
         "//src/mongo/db:query_exec",
         "//src/mongo/db/exec/document_value:document_value_test_util",
+        "//src/mongo/db/query/compiler/optimizer/cost_based_ranker:cbr_test_utils",
     ],
 )
 
