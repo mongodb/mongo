@@ -39,6 +39,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
+#include "mongo/util/observable_mutex_registry.h"
 
 #include <algorithm>
 #include <mutex>
@@ -61,6 +62,7 @@ OplogApplier::OplogApplier(executor::TaskExecutor* executor,
                            Observer* observer,
                            const Options& options)
     : _executor(executor), _oplogBuffer(oplogBuffer), _observer(observer), _options(options) {
+    ObservableMutexRegistry::get().add("OplogApplier::_mutex", _mutex);
     _oplogBatcher = std::make_unique<OplogApplierBatcher>(this, oplogBuffer);
 }
 
@@ -88,12 +90,12 @@ void OplogApplier::shutdown() {
         LOGV2_FATAL_NOTRACE(40304, "Turn off rsSyncApplyStop before attempting clean shutdown");
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     _inShutdown = true;
 }
 
 bool OplogApplier::inShutdown() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     return _inShutdown;
 }
 

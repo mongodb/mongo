@@ -51,6 +51,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/observable_mutex.h"
 
 #include <functional>
 #include <memory>
@@ -248,7 +249,7 @@ private:
 
     // Protects member data of BackgroundSync.
     // Never hold the BackgroundSync mutex when trying to acquire the ReplicationCoordinator mutex.
-    mutable stdx::mutex _mutex;  // (S)
+    mutable ObservableMutex<stdx::mutex> _mutex;  // (S)
 
     OpTime _lastOpTimeFetched;  // (M)
 

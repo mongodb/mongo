@@ -29,6 +29,8 @@
 
 #include "mongo/db/repl/oplog_writer.h"
 
+#include "mongo/util/observable_mutex_registry.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 namespace mongo {
@@ -37,7 +39,9 @@ namespace repl {
 OplogWriter::OplogWriter(executor::TaskExecutor* executor,
                          OplogBuffer* writeBuffer,
                          const Options& options)
-    : _batcher(writeBuffer), _executor(executor), _writeBuffer(writeBuffer), _options(options) {}
+    : _batcher(writeBuffer), _executor(executor), _writeBuffer(writeBuffer), _options(options) {
+    ObservableMutexRegistry::get().add("OplogWriter::_mutex", _mutex);
+}
 
 OplogBuffer* OplogWriter::getBuffer() const {
     return _writeBuffer;
@@ -68,12 +72,12 @@ Future<void> OplogWriter::startup() {
 }
 
 void OplogWriter::shutdown() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     _inShutdown = true;
 }
 
 bool OplogWriter::inShutdown() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    stdx::lock_guard lock(_mutex);
     return _inShutdown;
 }
 

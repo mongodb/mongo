@@ -41,6 +41,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/observable_mutex.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -168,7 +169,7 @@ private:
     OplogApplier* _oplogApplier;
     OplogBuffer* const _oplogBuffer;
 
-    stdx::mutex _mutex;
+    ObservableMutex<stdx::mutex> _mutex;
     stdx::condition_variable _cv;
 
     /**
