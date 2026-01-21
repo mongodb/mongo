@@ -565,6 +565,111 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:github/Azure/azure-sdk-for-cpp@azure-storage-blobs_12.13.0",
+      "supplier": {
+        "name": "Microsoft Corporation",
+        "url": [
+          "https://azure.microsoft.com"
+        ]
+      },
+      "author": "Microsoft Corporation",
+      "group": "azure",
+      "name": "Azure SDK for C++ - Storage Blobs",
+      "version": "12.13.0",
+      "description": "Azure Storage Blobs client library for C++. This library provides functionality for uploading, downloading, and managing blobs in Azure Storage.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (c) Microsoft Corporation. All rights reserved.",
+      "purl": "pkg:github/Azure/azure-sdk-for-cpp@azure-storage-blobs_12.13.0",
+      "externalReferences": [
+        {
+          "url": "https://github.com/Azure/azure-sdk-for-cpp.git",
+          "type": "distribution"
+        }
+      ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Atlas Streams"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/azure-sdk/scripts/import.sh"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/azure-sdk"
+          }
+        ]
+      },
+      "scope": "optional"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:generic/gnome/libxml2@2.15.1",
+      "supplier": {
+        "name": "GNOME Project",
+        "url": [
+          "https://gitlab.gnome.org/GNOME/libxml2"
+        ]
+      },
+      "author": "Daniel Veillard",
+      "group": "gnome",
+      "name": "libxml2",
+      "version": "2.15.1",
+      "description": "libxml2 is an XML toolkit implemented in C, originally developed for the GNOME project. It provides a set of interfaces for parsing, modifying, and validating XML documents.",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "copyright": "Copyright (C) 1998-2024 Daniel Veillard. All Rights Reserved.",
+      "cpe": "cpe:2.3:a:xmlsoft:libxml2:2.15.1:*:*:*:*:*:*:*",
+      "purl": "pkg:generic/gnome/libxml2@2.15.1",
+      "externalReferences": [
+        {
+          "url": "https://gitlab.gnome.org/GNOME/libxml2.git",
+          "type": "distribution"
+        }
+      ],
+      "properties": [
+        {
+          "name": "internal:team_responsible",
+          "value": "Atlas Streams"
+        },
+        {
+          "name": "emits_persisted_data",
+          "value": "false"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/libxml2/scripts/import.sh"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/third_party/libxml2"
+          }
+        ]
+      },
+      "scope": "optional"
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:github/boostorg/boost@boost-1.88.0",
       "supplier": {
         "name": "The Boost Foundation",
@@ -2640,6 +2745,7 @@
         "pkg:github/json-schema-org/json-schema-test-suite@728066f9c5c258ba3b1804a22a5b998f2ec77ec0",
         "pkg:github/mongodb/libmongocrypt@1.15.0",
         "pkg:github/confluentinc/librdkafka@v2.6.0",
+        "pkg:generic/gnome/libxml2@2.15.1",
         "pkg:github/libtom/libtomcrypt@v1.18.2",
         "pkg:github/libunwind/libunwind@v1.8.1",
         "pkg:github/antirez/linenoise@6cdc775807e57b2c3fd64bd207814f8ee1fe35f3",
@@ -2801,6 +2907,10 @@
     },
     {
       "ref": "pkg:github/libunwind/libunwind@v1.8.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:generic/gnome/libxml2@2.15.1",
       "dependsOn": []
     },
     {

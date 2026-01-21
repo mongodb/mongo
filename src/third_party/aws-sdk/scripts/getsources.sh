@@ -48,7 +48,7 @@ cd build
 
 # Configure and create the final Makefile
 # If making platform files use "cmake .." instead of "cmake ."
-cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_STANDARD=17 -DBUILD_ONLY="s3;lambda;kinesis" -DENABLE_UNITY_BUILD=OFF -DENABLE_TESTING=OFF -DAUTORUN_UNIT_TESTS=OFF -DENABLE_HTTP_CLIENT_TESTING=OFF -DCMAKE_INSTALL_PREFIX=..
+cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_STANDARD=20 -DBUILD_ONLY="s3;lambda;kinesis" -DENABLE_UNITY_BUILD=OFF -DENABLE_TESTING=OFF -DAUTORUN_UNIT_TESTS=OFF -DENABLE_HTTP_CLIENT_TESTING=OFF -DCMAKE_INSTALL_PREFIX=..
 cmake --build . --config=Debug
 cmake --install . --config=Debug
 
@@ -80,6 +80,7 @@ find . -type d \( -name "build" -o -name "aws-lc" -o -name "bin" -o -name "tests
 # sub folders in source folders that are not needed
 find . -type d \( -name "darwin" -o -name "windows" -o -name "android" -o -name "msvc" -o -name "msvc" -o -name "platform_fallback_stubs" -o -name "huffman_generator" -o -name "bsd" \) -exec rm -rf {} \; || true
 
+find . -type f -name ".clang-tidy" -exec rm -f {} \; 2>/dev/null || true
 cd $DIST_DIR/aws-sdk/src
 find . -maxdepth 1 -type d -not \( -name "aws-cpp-sdk-core" -o -name "aws-cpp-sdk-access-management" \) -exec rm -rf {} \; || true
 cd $DIST_DIR/aws-sdk/generated/src

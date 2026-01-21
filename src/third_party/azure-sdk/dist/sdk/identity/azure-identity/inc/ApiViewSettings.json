@@ -1,0 +1,16 @@
+{
+  "sourceFilesToProcess": null,
+  "additionalIncludeDirectories": [
+    "../../../core/azure-core/inc"
+  ],
+  "additionalCompilerSwitches": [
+    "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+  ],
+  "allowInternal": false,
+  "includeDetail": false,
+  "includePrivate": false,
+  "filterNamespace": "Azure::Identity",
+  "reviewName": "Azure Identity",
+  "serviceName": "Azure Identity",
+  "packageName": "azure-identity-cpp"
+}

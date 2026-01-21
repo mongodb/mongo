@@ -1,0 +1,185 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# Target compatibility - Linux only for now
+TARGET_COMPATIBILITY = select({
+    "//bazel/config:linux_aarch64": [],
+    "//bazel/config:linux_x86_64": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+# Platform-specific include paths for generated headers
+AZURE_PLATFORM_INCLUDE = select({
+    "@platforms//cpu:x86_64": ["-Isrc/third_party/azure-sdk/platform/linux_x86_64/include"],
+    "@platforms//cpu:aarch64": ["-Isrc/third_party/azure-sdk/platform/linux_aarch64/include"],
+    "//conditions:default": [],
+})
+
+# Common compiler options for Azure SDK
+AZURE_COMMON_COPTS = [
+    "-Wno-error",
+    "-Wno-unused-parameter",
+    "-Wno-missing-field-initializers",
+]
+
+# Common defines for Azure SDK
+AZURE_COMMON_DEFINES = [
+    "AZ_PLATFORM_POSIX",
+    "_azure_BUILDING_SDK",
+]
+
+# Azure Core library - provides HTTP client, credentials, logging, etc.
+mongo_cc_library(
+    name = "azure-core",
+    srcs = glob(
+        [
+            "dist/sdk/core/azure-core/src/**/*.cpp",
+        ],
+        exclude = [
+            "dist/sdk/core/azure-core/src/**/win*.cpp",
+            "dist/sdk/core/azure-core/src/**/windows/**/*.cpp",
+            "dist/sdk/core/azure-core/src/http/winhttp/**/*.cpp",
+        ],
+    ),
+    hdrs = glob([
+        "dist/sdk/core/azure-core/inc/**/*.hpp",
+        "dist/sdk/core/azure-core/inc/**/*.h",
+        "dist/sdk/core/azure-core/src/**/*.hpp",
+        "dist/sdk/core/azure-core/src/**/*.h",
+    ]) + select({
+        "@platforms//cpu:x86_64": glob(["platform/linux_x86_64/include/*.h"]),
+        "@platforms//cpu:aarch64": glob(["platform/linux_aarch64/include/*.h"]),
+        "//conditions:default": [],
+    }),
+    copts = AZURE_COMMON_COPTS + AZURE_PLATFORM_INCLUDE + [
+        "-Isrc/third_party/azure-sdk/dist/sdk/core/azure-core/inc",
+    ],
+    includes = [
+        "dist/sdk/core/azure-core/inc",
+    ],
+    linkopts = [
+        "-lcurl",
+        "-lssl",
+        "-lcrypto",
+        "-lpthread",
+    ],
+    local_defines = AZURE_COMMON_DEFINES + [
+        "BUILD_CURL_HTTP_TRANSPORT_ADAPTER",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+)
+
+# Azure Identity library - provides credential types for Azure authentication
+# Supports managed identity, service principal, environment credentials, etc.
+mongo_cc_library(
+    name = "azure-identity",
+    srcs = glob(
+        [
+            "dist/sdk/identity/azure-identity/src/**/*.cpp",
+        ],
+        exclude = [
+            "dist/sdk/identity/azure-identity/src/**/win*.cpp",
+            "dist/sdk/identity/azure-identity/src/**/windows/**/*.cpp",
+        ],
+    ),
+    hdrs = glob([
+        "dist/sdk/identity/azure-identity/inc/**/*.hpp",
+        "dist/sdk/identity/azure-identity/inc/**/*.h",
+        "dist/sdk/identity/azure-identity/src/**/*.hpp",
+        "dist/sdk/identity/azure-identity/src/**/*.h",
+    ]),
+    copts = AZURE_COMMON_COPTS + AZURE_PLATFORM_INCLUDE + [
+        "-Isrc/third_party/azure-sdk/dist/sdk/core/azure-core/inc",
+        "-Isrc/third_party/azure-sdk/dist/sdk/identity/azure-identity/inc",
+    ],
+    includes = [
+        "dist/sdk/identity/azure-identity/inc",
+    ],
+    local_defines = AZURE_COMMON_DEFINES,
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        ":azure-core",
+    ],
+)
+
+# Azure Storage Common library - shared storage utilities
+mongo_cc_library(
+    name = "azure-storage-common",
+    srcs = glob([
+        "dist/sdk/storage/azure-storage-common/src/**/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/sdk/storage/azure-storage-common/inc/**/*.hpp",
+        "dist/sdk/storage/azure-storage-common/inc/**/*.h",
+    ]),
+    copts = AZURE_COMMON_COPTS + AZURE_PLATFORM_INCLUDE + [
+        "-Isrc/third_party/azure-sdk/dist/sdk/core/azure-core/inc",
+        "-Isrc/third_party/azure-sdk/dist/sdk/storage/azure-storage-common/inc",
+    ],
+    includes = [
+        "dist/sdk/storage/azure-storage-common/inc",
+    ],
+    local_defines = AZURE_COMMON_DEFINES,
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        ":azure-core",
+        "@libxml2",
+    ],
+)
+
+# Azure Storage Blobs library - blob storage operations
+mongo_cc_library(
+    name = "azure-storage-blobs",
+    srcs = glob([
+        "dist/sdk/storage/azure-storage-blobs/src/**/*.cpp",
+    ]),
+    hdrs = glob([
+        "dist/sdk/storage/azure-storage-blobs/inc/**/*.hpp",
+        "dist/sdk/storage/azure-storage-blobs/inc/**/*.h",
+        "dist/sdk/storage/azure-storage-blobs/src/**/*.hpp",
+        "dist/sdk/storage/azure-storage-blobs/src/**/*.h",
+    ]),
+    copts = AZURE_COMMON_COPTS + AZURE_PLATFORM_INCLUDE + [
+        "-Isrc/third_party/azure-sdk/dist/sdk/core/azure-core/inc",
+        "-Isrc/third_party/azure-sdk/dist/sdk/storage/azure-storage-common/inc",
+        "-Isrc/third_party/azure-sdk/dist/sdk/storage/azure-storage-blobs/inc",
+    ],
+    includes = [
+        "dist/sdk/storage/azure-storage-blobs/inc",
+    ],
+    local_defines = AZURE_COMMON_DEFINES,
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        ":azure-core",
+        ":azure-storage-common",
+    ],
+)
+
+# Main Azure SDK library target that exposes all needed functionality
+mongo_cc_library(
+    name = "azure-sdk",
+    hdrs = glob([
+        "dist/sdk/core/azure-core/inc/**/*.hpp",
+        "dist/sdk/core/azure-core/inc/**/*.h",
+        "dist/sdk/identity/azure-identity/inc/**/*.hpp",
+        "dist/sdk/identity/azure-identity/inc/**/*.h",
+        "dist/sdk/storage/azure-storage-common/inc/**/*.hpp",
+        "dist/sdk/storage/azure-storage-common/inc/**/*.h",
+        "dist/sdk/storage/azure-storage-blobs/inc/**/*.hpp",
+        "dist/sdk/storage/azure-storage-blobs/inc/**/*.h",
+    ]),
+    includes = [
+        "dist/sdk/core/azure-core/inc",
+        "dist/sdk/identity/azure-identity/inc",
+        "dist/sdk/storage/azure-storage-blobs/inc",
+        "dist/sdk/storage/azure-storage-common/inc",
+    ],
+    target_compatible_with = TARGET_COMPATIBILITY,
+    deps = [
+        ":azure-core",
+        ":azure-identity",
+        ":azure-storage-blobs",
+        ":azure-storage-common",
+    ],
+)

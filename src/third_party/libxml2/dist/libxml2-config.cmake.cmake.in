@@ -1,0 +1,155 @@
+# libxml2-config.cmake
+# --------------------
+#
+# Libxml2 cmake module.
+# This module sets the following variables:
+#
+# ::
+#
+#   LIBXML2_INCLUDE_DIR        - Directory where LibXml2 headers are located.
+#   LIBXML2_INCLUDE_DIRS       - list of the include directories needed to use LibXml2.
+#   LIBXML2_LIBRARY            - path to the LibXml2 library.
+#   LIBXML2_LIBRARIES          - xml2 libraries to link against.
+#   LIBXML2_DEFINITIONS        - the compiler switches required for using LibXml2.
+#   LIBXML2_VERSION_MAJOR      - The major version of libxml2.
+#   LIBXML2_VERSION_MINOR      - The minor version of libxml2.
+#   LIBXML2_VERSION_PATCH      - The patch version of libxml2.
+#   LIBXML2_VERSION_STRING     - version number as a string (ex: "2.3.4")
+#   LIBXML2_MODULES            - whether libxml2 has dso support
+#   LIBXML2_XMLLINT_EXECUTABLE - path to the XML checking tool xmllint coming with LibXml2
+
+include("${CMAKE_CURRENT_LIST_DIR}/libxml2-export.cmake")
+
+@PACKAGE_INIT@
+
+set(LIBXML2_VERSION_MAJOR  @LIBXML_MAJOR_VERSION@)
+set(LIBXML2_VERSION_MINOR  @LIBXML_MINOR_VERSION@)
+set(LIBXML2_VERSION_PATCH  @LIBXML_MICRO_VERSION@)
+set(LIBXML2_VERSION_STRING "@VERSION@")
+set(LIBXML2_INSTALL_PREFIX ${PACKAGE_PREFIX_DIR})
+set(LIBXML2_INCLUDE_DIR    ${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@/libxml2)
+set(LIBXML2_LIBRARY_DIR    ${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@)
+
+macro(select_library_location target basename)
+    if(TARGET ${target})
+        foreach(property IN ITEMS IMPORTED_LOCATION IMPORTED_IMPLIB)
+            get_target_property(${basename}_${property}_DEBUG ${target} ${property}_DEBUG)
+            get_target_property(${basename}_${property}_MINSIZEREL ${target} ${property}_MINSIZEREL)
+            get_target_property(${basename}_${property}_NOCONFIG ${target} ${property}_NOCONFIG)
+            get_target_property(${basename}_${property}_RELEASE ${target} ${property}_RELEASE)
+            get_target_property(${basename}_${property}_RELWITHDEBINFO ${target} ${property}_RELWITHDEBINFO)
+
+            if(${basename}_${property}_DEBUG AND ${basename}_${property}_RELEASE)
+                set(${basename}_LIBRARY debug ${${basename}_${property}_DEBUG} optimized ${${basename}_${property}_RELEASE})
+            elseif(${basename}_${property}_DEBUG AND ${basename}_${property}_RELWITHDEBINFO)
+                set(${basename}_LIBRARY debug ${${basename}_${property}_DEBUG} optimized ${${basename}_${property}_RELWITHDEBINFO})
+            elseif(${basename}_${property}_DEBUG AND ${basename}_${property}_MINSIZEREL)
+                set(${basename}_LIBRARY debug ${${basename}_${property}_DEBUG} optimized ${${basename}_${property}_MINSIZEREL})
+            elseif(${basename}_${property}_RELEASE)
+                set(${basename}_LIBRARY ${${basename}_${property}_RELEASE})
+            elseif(${basename}_${property}_RELWITHDEBINFO)
+                set(${basename}_LIBRARY ${${basename}_${property}_RELWITHDEBINFO})
+            elseif(${basename}_${property}_MINSIZEREL)
+                set(${basename}_LIBRARY ${${basename}_${property}_MINSIZEREL})
+            elseif(${basename}_${property}_DEBUG)
+                set(${basename}_LIBRARY ${${basename}_${property}_DEBUG})
+            elseif(${basename}_${property}_NOCONFIG)
+                set(${basename}_LIBRARY ${${basename}_${property}_NOCONFIG})
+            endif()
+        endforeach()
+    endif()
+endmacro()
+
+macro(select_executable_location target basename)
+    if(TARGET ${target})
+        get_target_property(${basename}_IMPORTED_LOCATION_DEBUG ${target} IMPORTED_LOCATION_DEBUG)
+        get_target_property(${basename}_IMPORTED_LOCATION_MINSIZEREL ${target} IMPORTED_LOCATION_MINSIZEREL)
+        get_target_property(${basename}_IMPORTED_LOCATION_NOCONFIG ${target} IMPORTED_LOCATION_NOCONFIG)
+        get_target_property(${basename}_IMPORTED_LOCATION_RELEASE ${target} IMPORTED_LOCATION_RELEASE)
+        get_target_property(${basename}_IMPORTED_LOCATION_RELWITHDEBINFO ${target} IMPORTED_LOCATION_RELWITHDEBINFO)
+
+        if(${basename}_IMPORTED_LOCATION_RELEASE)
+            set(${basename}_EXECUTABLE ${${basename}_IMPORTED_LOCATION_RELEASE})
+        elseif(${basename}_IMPORTED_LOCATION_RELWITHDEBINFO)
+            set(${basename}_EXECUTABLE ${${basename}_IMPORTED_LOCATION_RELWITHDEBINFO})
+        elseif(${basename}_IMPORTED_LOCATION_MINSIZEREL)
+            set(${basename}_EXECUTABLE ${${basename}_IMPORTED_LOCATION_MINSIZEREL})
+        elseif(${basename}_IMPORTED_LOCATION_DEBUG)
+            set(${basename}_EXECUTABLE ${${basename}_IMPORTED_LOCATION_DEBUG})
+        elseif(${basename}_IMPORTED_LOCATION_NOCONFIG)
+            set(${basename}_EXECUTABLE ${${basename}_IMPORTED_LOCATION_NOCONFIG})
+        endif()
+    endif()
+endmacro()
+
+select_library_location(LibXml2::LibXml2 LIBXML2)
+select_executable_location(LibXml2::xmlcatalog LIBXML2_XMLCATALOG)
+select_executable_location(LibXml2::xmllint LIBXML2_XMLLINT)
+
+set(LIBXML2_LIBRARIES ${LIBXML2_LIBRARY})
+set(LIBXML2_INCLUDE_DIRS ${LIBXML2_INCLUDE_DIR})
+
+include(CMakeFindDependencyMacro)
+
+set(LIBXML2_SHARED @BUILD_SHARED_LIBS@)
+set(LIBXML2_WITH_ICONV @LIBXML2_WITH_ICONV@)
+set(LIBXML2_WITH_THREADS @LIBXML2_WITH_THREADS@)
+set(LIBXML2_WITH_ICU @LIBXML2_WITH_ICU@)
+set(LIBXML2_WITH_ZLIB @LIBXML2_WITH_ZLIB@)
+
+if(NOT LIBXML2_SHARED)
+    set(LIBXML2_DEFINITIONS -DLIBXML_STATIC)
+
+    if(LIBXML2_WITH_ICONV)
+        find_dependency(Iconv)
+        list(APPEND LIBXML2_LIBRARIES    ${Iconv_LIBRARIES})
+        if(NOT Iconv_FOUND)
+            set(${CMAKE_FIND_PACKAGE_NAME}_FOUND FALSE)
+            set(${CMAKE_FIND_PACKAGE_NAME}_NOT_FOUND_MESSAGE "Iconv dependency was not found")
+            return()
+        endif()
+    endif()
+
+    if(LIBXML2_WITH_THREADS)
+        find_dependency(Threads)
+        list(APPEND LIBXML2_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
+        if(NOT Threads_FOUND)
+            set(${CMAKE_FIND_PACKAGE_NAME}_FOUND FALSE)
+            set(${CMAKE_FIND_PACKAGE_NAME}_NOT_FOUND_MESSAGE "Threads dependency was not found")
+            return()
+        endif()
+    endif()
+
+    if(LIBXML2_WITH_ICU)
+        find_dependency(ICU COMPONENTS data i18n uc)
+        list(APPEND LIBXML2_LIBRARIES    ${ICU_LIBRARIES})
+        if(NOT ICU_FOUND)
+            set(${CMAKE_FIND_PACKAGE_NAME}_FOUND FALSE)
+            set(${CMAKE_FIND_PACKAGE_NAME}_NOT_FOUND_MESSAGE "ICU dependency was not found")
+            return()
+        endif()
+    endif()
+
+    if(LIBXML2_WITH_ZLIB)
+        find_dependency(ZLIB)
+        list(APPEND LIBXML2_LIBRARIES    ${ZLIB_LIBRARIES})
+        if(NOT ZLIB_FOUND)
+            set(${CMAKE_FIND_PACKAGE_NAME}_FOUND FALSE)
+            set(${CMAKE_FIND_PACKAGE_NAME}_NOT_FOUND_MESSAGE "ZLIB dependency was not found")
+            return()
+        endif()
+    endif()
+
+    if(UNIX)
+        list(APPEND LIBXML2_LIBRARIES m)
+    endif()
+
+    if(WIN32)
+        list(APPEND LIBXML2_LIBRARIES Bcrypt)
+    endif()
+endif()
+
+# whether libxml2 has dso support
+set(LIBXML2_MODULES @LIBXML2_WITH_MODULES@)
+
+mark_as_advanced(LIBXML2_LIBRARY LIBXML2_XMLCATALOG_EXECUTABLE LIBXML2_XMLLINT_EXECUTABLE)

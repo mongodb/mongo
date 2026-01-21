@@ -1,0 +1,22 @@
+{
+  "sourceFilesToProcess": null,
+  "sourceFilesToSkip": [
+    "azure/core/internal/json/json.hpp",
+    "azure/core/internal/json/json_optional.hpp"
+  ],
+  "additionalIncludeDirectories": [
+  ],
+  "additionalCompilerSwitches": [
+    "-DBUILD_CURL_HTTP_TRANSPORT_ADAPTER",
+    "-DBUILD_TRANSPORT_WINHTTP_ADAPTER",
+    "-DCURL_STATICLIB",
+    "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+  ],
+  "allowInternal": true,
+  "includeDetail": false,
+  "includePrivate": false,
+  "filterNamespace": "Azure::",
+  "reviewName": "Azure Core API Review",
+  "serviceName": null,
+  "packageName": "azure-core-cpp"
+}

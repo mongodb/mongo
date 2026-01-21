@@ -1,0 +1,35 @@
+/* Define to 1 if you have the declaration of 'getentropy', and to 0 if you
+   don't. */
+#cmakedefine01 HAVE_DECL_GETENTROPY
+
+/* Define to 1 if you have the declaration of 'glob', and to 0 if you don't.
+   */
+#cmakedefine01 HAVE_DECL_GLOB
+
+/* Define to 1 if you have the declaration of 'mmap', and to 0 if you don't.
+   */
+#cmakedefine01 HAVE_DECL_MMAP
+
+/* Define if __attribute__((destructor)) is accepted */
+#cmakedefine HAVE_FUNC_ATTRIBUTE_DESTRUCTOR 1
+
+/* Have dlopen based dso */
+#cmakedefine HAVE_DLOPEN 1
+
+/* Define if history library is there (-lhistory) */
+#cmakedefine HAVE_LIBHISTORY 1
+
+/* Define if readline library is there (-lreadline) */
+#cmakedefine HAVE_LIBREADLINE 1
+
+/* Have shl_load based dso */
+#cmakedefine HAVE_SHLLOAD 1
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#cmakedefine HAVE_STDINT_H 1
+
+/* System configuration directory (/etc) */
+#cmakedefine XML_SYSCONFDIR "@XML_SYSCONFDIR@"
+
+/* TLS specifier */
+#cmakedefine XML_THREAD_LOCAL @XML_THREAD_LOCAL@
