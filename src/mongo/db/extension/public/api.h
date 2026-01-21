@@ -1136,6 +1136,15 @@ typedef struct MongoExtensionVTable {
  *
  * NOTE: You must define this symbol in your extension shared library and avoid name mangling (for
  * example, with 'extern "C"') so that the MongoDB server can find it at loadtime.
+ *
+ * IMPORTANT: We require that extensions throw exceptions using the HostServices' user_asserted()
+ * and tripwire_asserted() functions instead of throwing C++ exceptions across the API boundary.
+ * However, the HostServices is only initialized after this function is called (during the call
+ * to MongoExtension::initialize). Attempting to use HostServices in the body of
+ * get_mongodb_extension would result in a crash. Therefore, if your extension needs to report
+ * errors during get_mongodb_extension, you must build a "hand-crafted" MongoExtensionStatus object
+ * and return it directly from this function.
+ * TODO SERVER-115700: Fix this design limitation.
  */
 #define GET_MONGODB_EXTENSION_SYMBOL "get_mongodb_extension"
 typedef MongoExtensionStatus* (*get_mongo_extension_t)(
