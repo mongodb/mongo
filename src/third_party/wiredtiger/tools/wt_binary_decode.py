@@ -32,7 +32,7 @@
 # see "wt dump" for that.  But this is standalone (doesn't require linkage with any WT
 # libraries), and may be useful as 1) a learning tool 2) quick way to hack/extend dumping.
 
-import codecs, io, logging, os, re, sys, traceback, json, shutil, tempfile, subprocess, base64
+import codecs, io, logging, os, re, sys, traceback
 from py_common import binary_data, btree_format, page_service
 from py_common.printer import Printer
 from py_common.stats import PageStats
@@ -131,140 +131,6 @@ def wtdecode_file_object(b, opts, nbytes):
         pagecount += 1
     p.rint('')
 
-def decrypt_page(page, opts):
-    """
-    Call the pagedecryptor tool from the mongo repo.
-    """
-    
-    if not shutil.which('pagedecryptor'):
-        raise FileNotFoundError(
-            "pagedecryptor not found: Decryption requires the 'pagedecryptor' tool from the MongoDB "
-            "encryption module. Please install the tool and ensure the 'pagedecryptor' binary is on your "
-            "PATH.\n"
-            "Hint - compile from the mongo repo with:\n"
-            "bazel build //src/mongo/db/modules/atlas/src/disagg_storage/encryption:pagedecryptor"
-        )
-        
-    if not opts.keyfile or not os.path.exists(opts.keyfile):
-        raise FileNotFoundError(
-            "keyfile not found: Decryption requires the test_keyfile for the KEK."
-        )
-        
-    # Mandatory fields for decryption
-    metadata = page.get('metadata', {})
-    page_id = metadata.get('page_id', {}).get('val', {}).get('LongVal')
-    if page_id is None:
-        raise ValueError(f"Missing 'page_id' in page: {page}")
-    lsn = page.get('lsn', {}).get('lsn')
-    if lsn is None:
-        raise ValueError(f"Missing 'lsn' in page: {page_id}")
-    table_id = metadata.get('table_id', {}).get('val', {}).get('IntVal')
-    if table_id is None:
-        raise ValueError(f"Missing 'table_id' in page: {page_id}")
-    
-    # Optional fields depending on the page type.
-    base_lsn = metadata.get('base_lsn', {}).get('val', {}).get('LongVal')
-    backlink_lsn = metadata.get('backlink_lsn', {}).get('val', {}).get('LongVal')
-    
-    with tempfile.NamedTemporaryFile(mode='w', delete=True, suffix='.in') as temp_input, \
-         tempfile.NamedTemporaryFile(mode='rb', delete=True, suffix='.out') as temp_output:
-    
-        # Write the page bytes to the temporary input file. The decrypt tool expects a file containing a
-        # base64 encoded byte string.
-        entry_bytes = page.get('entry', [])
-        raw_bytes = bytes(entry_bytes)
-        base64_encoded = base64.b64encode(raw_bytes)
-        temp_input.write(base64_encoded.decode('ascii'))
-        temp_input.flush()
-        
-        cmd = [
-            'pagedecryptor',
-            '--inputPath', temp_input.name,
-            '--outputPath', temp_output.name,
-            '--keyFile', opts.keyfile,
-            '--lsn', str(lsn),
-            '--tableId', str(table_id),
-            '--pageId', str(page_id),
-        ]
-        
-        if base_lsn is not None:
-            cmd.extend(['--baseLsn', str(base_lsn)])
-        if backlink_lsn is not None:
-            cmd.extend(['--backlinkLsn', str(backlink_lsn)])
-            
-        if metadata.get('flags', {}).get("val", {}).get("IntVal", {}) == page_service.UpdateTypeFlags.UPDATE_TYPE_DELTA:
-            cmd.extend(['--isDelta'])
-        
-        try:
-            decrypt_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            if (opts.debug):
-                print(f'pagedecryptor stdout: {decrypt_result.stdout}')
-                print(f'pagedecryptor stderr: {decrypt_result.stderr}')
-        except subprocess.CalledProcessError as e:
-            print(f"Error decrypting page {page_id}: {e}", file=sys.stderr)
-            print(f"pagedecryptor stderr: {e.stderr}", file=sys.stderr)
-            raise
-        
-        decrypted_bytes = temp_output.read()
-    
-    return decrypted_bytes
-
-def disagg_metadata_string(page):
-    metadata = page.get('metadata', {})
-    meta_string = (
-        f"Disagg Page Metadata:\n"
-        f"  page_id: {metadata.get('page_id', {}).get('val', {}).get('LongVal', 'None')}\n"
-        f"  table_id: {metadata.get('table_id', {}).get('val', {}).get('IntVal', 'None')}\n"
-        f"  lsn: {page.get('lsn', {}).get('lsn', 'None')}\n"
-        f"  base_lsn: {metadata.get('base_lsn', {}).get('val', {}).get('LongVal', 'None')}\n"
-        f"  backlink_lsn: {metadata.get('backlink_lsn', {}).get('val', {}).get('LongVal', 'None')}"
-    )
-    
-    return meta_string
-    
-def extract_disagg_pages(disagg_table, opts):
-    for line in disagg_table:
-        # Parse each line as a separate json object containing the page entries associated with a 
-        # page id.
-        pages = json.loads(line.strip())
-        page_entries = pages.get('entries', [])
-
-        # Each page_id can have a number of entries associated with it. 
-        for page in page_entries:
-            print(disagg_metadata_string(page))
-            
-            # If the page entry is empty do not try and decrypt/decode it. SLS sometimes stores
-            # empty pages.
-            if not page['entry']:
-                print('empty page')
-                print('')
-                continue
-            
-            decrypted_page_bytes = decrypt_page(page, opts)
-            
-            # The disagg metadata page is plaintext, print it as such.
-            if page['metadata']['table_id']['val']['IntVal'] == 1:
-                print('Disagg Metadata File:')
-                page_string = decrypted_page_bytes.decode('ascii')
-                print(f'  {page_string}')
-                
-                # The metadata table root page address cookie is stored as plaintext hex in the addr 
-                # field of the checkpoint string. Extract it and decode it to print the disagg
-                # page metadata.
-                print('Metadata Table Root Page:')
-                addr_string = page_string.split('addr="')[1].split('"')[0]
-                addr = btree_format.DisaggAddr.parse(bytes.fromhex(addr_string))
-                print(addr)
-                print('')
-                continue
-                
-            b = binary_data.BinaryFile(io.BytesIO(decrypted_page_bytes))
-            p = Printer(b, opts)
-            page = btree_format.WTPage()
-            page = page.parse(b, len(decrypted_page_bytes), opts)
-            page.print_page(opts)
-            p.rint('')
-
 def extract_mongodb_log_hex(f, opts):
     """
     Extract hex dump from MongoDB log file containing checksum mismatch errors.
@@ -350,10 +216,10 @@ def wtdecode(opts):
         opts.disagg = True
         opts.fragment = True
         if opts.filename == '-':
-            extract_disagg_pages(sys.stdin, opts)
+            page_service.extract_disagg_pages(sys.stdin, opts)
         else:
             with open(opts.filename, "r") as infile:
-                extract_disagg_pages(infile, opts)
+                page_service.extract_disagg_pages(infile, opts)
         
     elif opts.filename == '-':
         nbytes = 0      # unknown length
