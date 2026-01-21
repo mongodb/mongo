@@ -92,14 +92,14 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(
     awaitResult();
 
     if (expectAbortDecisionWithCode) {
-        jsTest.log("Expect abort decision, so wait for recipient to clean up the orphans.");
+        jsTest.log("Expect abort decision, so wait for recipient range deletion to complete.");
         assert.soon(() => {
-            return 0 === st.rs1.getPrimary().getDB(dbName).getCollection(collName).count();
+            return 0 === st.rs1.getPrimary().getDB("config").getCollection("rangeDeletions").count();
         });
     } else {
-        jsTest.log("Expect commit decision, so wait for donor to clean up the orphans.");
+        jsTest.log("Expect commit decision, so wait for donor range deletion to complete.");
         assert.soon(() => {
-            return 0 === st.rs0.getPrimary().getDB(dbName).getCollection(collName).count();
+            return 0 === st.rs0.getPrimary().getDB("config").getCollection("rangeDeletions").count();
         });
     }
 
