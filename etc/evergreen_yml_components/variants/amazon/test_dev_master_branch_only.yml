@@ -429,7 +429,7 @@ buildvariants:
     # This set of tasks is not able to be reused on the all-feature-flags variant. Any changes
     # here should be duplicated to
     # enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only.
-    tasks: &query-alias-task-list
+    tasks:
       - name: .assigned_to_jira_team_server_query_execution !.requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags !.uwe
       - name: .assigned_to_jira_team_server_query_execution .requires_large_host !.aggfuzzer !.query_fuzzer !.updatefuzzer !.jstestfuzz !.benchmarks !.blocked_in_query_alias !.requires_all_feature_flags !.uwe
         distros:
@@ -502,7 +502,9 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: trySbeEngine}"
         --excludeWithAnyTags=resource_intensive
-    tasks: *query-alias-task-list
+    tasks:
+      - name: product_limits
+        cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
 
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only

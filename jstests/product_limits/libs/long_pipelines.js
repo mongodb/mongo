@@ -69,6 +69,40 @@ export class WorkloadManyCollectionsInLookupBushy extends LongPipelineWorkload {
         return [result];
     }
 }
+
+export class WorkloadManyCollectionsInLookupUnwind extends LongPipelineWorkload {
+    // Many $lookup-$unwind-s where each new collection is joined to the same column.
+    // Unwind each lookup result immediately after.
+    scale() {
+        return Math.min(500, super.scale());
+    }
+
+    pipeline() {
+        let pipeline = [];
+        let unsetList = ["_id"];
+        for (let i = 1; i < this.scale(); i++) {
+            pipeline.push({
+                $lookup: {from: `coll${i}`, localField: "f0", foreignField: "f0", as: `asField_${i}`},
+            });
+            pipeline.push({$unwind: `$asField_${i}`});
+            // Remove all _id fields
+            unsetList.push(`asField_${i}._id`);
+        }
+
+        pipeline.push({$unset: unsetList});
+
+        return pipeline;
+    }
+
+    result() {
+        let result = {f0: 1};
+        for (let i = 1; i < this.scale(); i++) {
+            result[`asField_${i}`] = {f0: 1};
+        }
+        return [result];
+    }
+}
+
 export class WorkloadManyMatchStages extends LongPipelineWorkload {
     /** Many $match stages. */
     pipeline() {

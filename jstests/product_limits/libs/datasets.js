@@ -183,6 +183,7 @@ export class DatasetManyCollections extends Dataset {
         return [
             LongPipelineWorkloads.WorkloadManyCollectionsInLookupBushy,
             LongPipelineWorkloads.WorkloadManyCollectionsInUnionWith,
+            LongPipelineWorkloads.WorkloadManyCollectionsInLookupUnwind,
         ];
     }
 
