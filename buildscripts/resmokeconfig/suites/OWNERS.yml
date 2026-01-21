@@ -201,3 +201,6 @@ filters:
   - "replica_sets_with_priority_ports.yml":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "sharding_jscore_passthrough_priority_ports.yml":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology

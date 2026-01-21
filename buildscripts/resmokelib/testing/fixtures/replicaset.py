@@ -250,6 +250,13 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             self.nodes[0].await_ready()
 
         # Initiate the replica set.
+        # TODO (SERVER-112863): Skip priority ports during initial initiation for shard servers
+        # because shard servers start up with FCV lastLTS in which the priority port is not allowed.
+        # We will reinitiate with priority ports after the cluster is set up. This is not needed for
+        # config servers since only pure shard servers are started with lastLTS FCV.
+        is_shard_server = "shardsvr" in self.mongod_options
+        skip_priority_ports_during_init = is_shard_server and self.use_priority_ports
+
         members = []
         for i, node in enumerate(self.nodes):
             member_info = {"_id": i, "host": node.get_internal_connection_string()}
@@ -260,6 +267,12 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                     # Only 7 nodes in a replica set can vote, so the other members must still be
                     # non-voting when this fixture is configured to have voting secondaries.
                     member_info["votes"] = 0
+            if (
+                not skip_priority_ports_during_init
+                and self.use_priority_ports
+                and hasattr(node, "priority_port")
+            ):
+                member_info["priorityPort"] = node.priority_port
             members.append(member_info)
         if self.initial_sync_node:
             member_config = {
@@ -270,6 +283,12 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 member_config["hidden"] = 1
                 member_config["votes"] = 0
                 member_config["priority"] = 0
+            if (
+                not skip_priority_ports_during_init
+                and self.use_priority_ports
+                and hasattr(self.initial_sync_node, "priority_port")
+            ):
+                member_config["priorityPort"] = self.initial_sync_node.priority_port
 
             members.append(member_config)
 
@@ -446,6 +465,36 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                     self.logger.error(msg + ".")
                     raise self.fixturelib.ServerFailure(msg)
                 time.sleep(5)  # Wait a little bit before trying again.
+
+    def reinitiate_with_priority_ports(self):
+        """Reinitiate the replica set with priority ports included in the configuration.
+
+        This is used for shard servers in sharded clusters where priority ports cannot be included
+        during initial initiation due to FCV constraints, but can be added via reconfig afterwards.
+        """
+        if not self.use_priority_ports:
+            return
+
+        primary = self.get_primary()
+        client = primary.mongo_client()
+
+        # Get the current configuration
+        config = client.admin.command({"replSetGetConfig": 1})["config"]
+
+        # Add priority ports by mapping config members to node fixtures
+        for member in config["members"]:
+            member_id = member["_id"]
+            # Check if this is the initial sync node
+            if self.initial_sync_node and member_id == self.initial_sync_node_idx:
+                if hasattr(self.initial_sync_node, "priority_port"):
+                    member["priorityPort"] = self.initial_sync_node.priority_port
+            # Otherwise it's a regular node
+            elif hasattr(self.nodes[member_id], "priority_port"):
+                member["priorityPort"] = self.nodes[member_id].priority_port
+        config["version"] = config["version"] + 1
+
+        self.logger.info("Reinitiating replica set with priority ports: %s", config)
+        self._reconfig_repl_set(client, config)
 
     def await_last_op_committed(self, timeout_secs=None):
         """Wait for the last majority committed op to be visible."""

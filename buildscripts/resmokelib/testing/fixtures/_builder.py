@@ -464,12 +464,15 @@ class ShardedClusterBuilder(FixtureBuilder):
             logger, job_num, fixturelib, *args, **kwargs
         )
 
+        use_priority_ports = kwargs.get("use_priority_ports", False)
         config_shard = kwargs["config_shard"]
         config_svr = None
         # Since config servers do not currently hold collection data, a mongot enabled shared
         # cluster doesn't couple/launch the config server with an accompanying mongot
         if config_shard is None:
-            config_svr = self._new_configsvr(sharded_cluster, is_multiversion, old_bin_version)
+            config_svr = self._new_configsvr(
+                sharded_cluster, is_multiversion, old_bin_version, use_priority_ports
+            )
         else:
             config_svr = self._new_rs_shard(
                 sharded_cluster,
@@ -478,6 +481,7 @@ class ShardedClusterBuilder(FixtureBuilder):
                 config_shard,
                 kwargs["num_rs_nodes_per_shard"],
                 launch_mongot=False,
+                use_priority_ports=use_priority_ports,
             )
         sharded_cluster.install_configsvr(config_svr)
 
@@ -495,6 +499,7 @@ class ShardedClusterBuilder(FixtureBuilder):
                     rs_shard_index,
                     kwargs["num_rs_nodes_per_shard"],
                     launch_mongot,
+                    use_priority_ports=use_priority_ports,
                 )
                 sharded_cluster.install_rs_shard(rs_shard)
                 # Extend the list of nodes to be sure configsvr nodes are placed at first places.
@@ -512,6 +517,7 @@ class ShardedClusterBuilder(FixtureBuilder):
                 mongos_index,
                 num_routers,
                 is_multiversion,
+                use_priority_ports=use_priority_ports,
             )
             sharded_cluster.install_mongos(mongos)
 
@@ -631,17 +637,20 @@ class ShardedClusterBuilder(FixtureBuilder):
         sharded_cluster: ShardedClusterFixture,
         is_multiversion: bool,
         old_bin_version: Optional[str],
+        use_priority_ports: bool = False,
     ) -> ReplicaSetFixture:
         """Return a replica set fixture configured as the config server.
 
         :param sharded_cluster: sharded cluster fixture we are configuring config server for
         :param is_multiversion: whether we are in multiversion mode
         :param old_bin_version: old bin version
+        :param use_priority_ports: whether to use priority ports for replica set nodes
         :return: replica set fixture configured as the config server
         """
 
         configsvr_logger = sharded_cluster.get_configsvr_logger()
         configsvr_kwargs = sharded_cluster.get_configsvr_kwargs()
+        configsvr_kwargs["use_priority_ports"] = use_priority_ports
 
         mixed_bin_versions = None
         if is_multiversion:
@@ -666,6 +675,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         rs_shard_index: int,
         num_rs_nodes_per_shard: int,
         launch_mongot: bool,
+        use_priority_ports: bool = False,
     ) -> ReplicaSetFixture:
         """Return a replica set fixture configured as a shard in a sharded cluster.
 
@@ -675,12 +685,14 @@ class ShardedClusterBuilder(FixtureBuilder):
         :param rs_shard_index: replica set shard index
         :param num_rs_nodes_per_shard: the number of nodes in a replica set per shard
         :param launch_mongot: bool indicating if each shard needs to startup a mongot
+        :param use_priority_ports: whether to use priority ports for replica set nodes
         :return: replica set fixture configured as a shard in a sharded cluster
         """
 
         rs_shard_logger = sharded_cluster.get_rs_shard_logger(rs_shard_index)
         rs_shard_kwargs = sharded_cluster.get_rs_shard_kwargs(rs_shard_index)
         rs_shard_kwargs["launch_mongot"] = launch_mongot
+        rs_shard_kwargs["use_priority_ports"] = use_priority_ports
 
         if mixed_bin_versions is not None:
             start_index = rs_shard_index * num_rs_nodes_per_shard
@@ -706,6 +718,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         mongos_index: int,
         total: int,
         is_multiversion: bool,
+        use_priority_ports: bool = False,
     ) -> FixtureContainer:
         """Make a fixture container with configured mongos fixture(s) in it.
 
@@ -718,11 +731,13 @@ class ShardedClusterBuilder(FixtureBuilder):
         :param mongos_index: the index of mongos
         :param total: total number of mongos
         :param is_multiversion: whether we are in multiversion mode
+        :param use_priority_ports: whether to use priority ports for mongos
         :return: fixture container with configured mongos fixture(s) in it
         """
 
         mongos_logger = sharded_cluster.get_mongos_logger(mongos_index, total)
         mongos_kwargs = sharded_cluster.get_mongos_kwargs()
+        mongos_kwargs["use_priority_port"] = use_priority_ports
 
         old_fixture = None
 
@@ -739,6 +754,7 @@ class ShardedClusterBuilder(FixtureBuilder):
 
         # We can't restart mongos since explicit ports are not supported.
         new_fixture_mongos_kwargs = sharded_cluster.get_mongos_kwargs()
+        new_fixture_mongos_kwargs["use_priority_port"] = use_priority_ports
 
         new_fixture = make_fixture(
             _class,

@@ -53,6 +53,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         inject_catalog_metadata=None,
         shard_replset_name_prefix="shard-rs",
         configsvr_replset_name="config-rs",
+        use_priority_ports=False,
     ):
         """
         Initialize ShardedClusterFixture with different options for the cluster processes.
@@ -110,6 +111,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.inject_catalog_metadata = inject_catalog_metadata
         self.configsvr_replset_name = configsvr_replset_name
         self.shard_replset_name_prefix = shard_replset_name_prefix
+        self.use_priority_ports = use_priority_ports
 
         # Options for roles - shardsvr, configsvr.
         self.configsvr_options = self.fixturelib.make_historic(
@@ -317,6 +319,15 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # the secondary mongoses risk reading from a stale config server and seeing an empty config
         # database.
         self.configsvr.await_last_op_committed()
+
+        # TODO (SERVER-112863): Reinitiate shard servers with priority ports after adding shards.
+        # Shard servers start up with FCV lastLTS in which the priority port is not allowed during
+        # initial initiation, but can be added via reconfig afterwards. This is not needed for config
+        # servers since only pure shard servers are started with lastLTS FCV.
+        if self.use_priority_ports:
+            for shard in self.shards:
+                if shard is not self.configsvr:
+                    shard.reinitiate_with_priority_ports()
 
         # Ensure that the sessions collection gets auto-sharded by the config server
         if self.configsvr is not None:
@@ -763,6 +774,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         mongos_executable=None,
         mongos_options=None,
         add_feature_flags=False,
+        use_priority_port=False,
     ):
         """Initialize _MongoSFixture."""
 
@@ -791,6 +803,11 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS:
             self.grpcPort = fixturelib.get_next_port(job_num)
             self.mongos_options["grpcPort"] = self.grpcPort
+
+        self.use_priority_port = use_priority_port
+        if self.use_priority_port:
+            self.priority_port = fixturelib.get_next_port(job_num)
+            self.mongos_options["priorityPort"] = self.priority_port
 
         self._dbpath_prefix = dbpath_prefix
 

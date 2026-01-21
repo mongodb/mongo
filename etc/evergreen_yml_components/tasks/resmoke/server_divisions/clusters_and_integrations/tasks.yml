@@ -1864,6 +1864,21 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: sharding_jscore_passthrough_priority_ports_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "incompatible_mac",
+        "sharding",
+        "jscore",
+        "common",
+        "requires_all_feature_flags",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
     name: sharding_kill_stepdown_terminate_jscore_passthrough_gen
     tags:
       [
