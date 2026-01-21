@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/util/bitset_util.h"
@@ -114,6 +115,9 @@ struct BaseNode {
     // Corresponds to node in the graph this represents a base table access to.
     const NodeId node;
 
+    // Cost of base collection access.
+    JoinCostEstimate cost;
+
     std::string toString(size_t numNodesToPrint = kHardMaxNodesInJoin,
                          std::string indentStr = "") const;
 };
@@ -146,6 +150,9 @@ struct JoiningNode {
     // Keeps a copy of the bitset representing the subgraph this originated from.
     const NodeSet bitset;
 
+    // Cost of join.
+    JoinCostEstimate cost;
+
     std::string toString(size_t numNodesToPrint = kHardMaxNodesInJoin,
                          std::string indentStr = "") const;
 };
@@ -171,10 +178,12 @@ public:
     JoinPlanNodeId registerJoinNode(const JoinSubset& subset,
                                     JoinMethod method,
                                     JoinPlanNodeId left,
-                                    JoinPlanNodeId right);
+                                    JoinPlanNodeId right,
+                                    JoinCostEstimate cost);
     JoinPlanNodeId registerBaseNode(NodeId node,
                                     const QuerySolution* soln,
-                                    const NamespaceString& nss);
+                                    const NamespaceString& nss,
+                                    JoinCostEstimate cost);
     JoinPlanNodeId registerINLJRHSNode(NodeId node,
                                        std::shared_ptr<const IndexCatalogEntry> entry,
                                        const NamespaceString& nss);
@@ -184,6 +193,8 @@ public:
     }
 
     NodeSet getBitset(JoinPlanNodeId id) const;
+    // Note: not all node types have an associated cost.
+    JoinCostEstimate getCost(JoinPlanNodeId id) const;
 
     template <typename T>
     const T& getAs(JoinPlanNodeId id) const {

@@ -17,21 +17,21 @@ Level 7:
 11111111
 
 Output plans (best plan 0):
-0.[11111111] INLJ
+0.(0)[11111111] INLJ
  -> left:
-    [01111111] INLJ
+    (0)[01111111] INLJ
      -> left:
-        [00111111] INLJ
+        (0)[00111111] INLJ
          -> left:
-            [00011111] INLJ
+            (0)[00011111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -47,21 +47,21 @@ Output plans (best plan 0):
  -> right:
     [10000000][test.nss7] INDEX_PROBE { a7: 1 }
 
-1.[11111111] HJ
+1.(0)[11111111] HJ
  -> left:
-    [01111111] INLJ
+    (0)[01111111] INLJ
      -> left:
-        [00111111] INLJ
+        (0)[00111111] INLJ
          -> left:
-            [00011111] INLJ
+            (0)[00011111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -75,23 +75,23 @@ Output plans (best plan 0):
      -> right:
         [01000000][test.nss6] INDEX_PROBE { a6: -1 }
  -> right:
-    [10000000][test.nss7] COLLSCAN
+    (0)[10000000][test.nss7] COLLSCAN
 
-2.[11111111] NLJ
+2.(0)[11111111] NLJ
  -> left:
-    [01111111] INLJ
+    (0)[01111111] INLJ
      -> left:
-        [00111111] INLJ
+        (0)[00111111] INLJ
          -> left:
-            [00011111] INLJ
+            (0)[00011111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -105,23 +105,23 @@ Output plans (best plan 0):
      -> right:
         [01000000][test.nss6] INDEX_PROBE { a6: -1 }
  -> right:
-    [10000000][test.nss7] COLLSCAN
+    (0)[10000000][test.nss7] COLLSCAN
 
-3.[11111111] INLJ
+3.(0)[11111111] INLJ
  -> left:
-    [10111111] INLJ
+    (0)[10111111] INLJ
      -> left:
-        [00111111] INLJ
+        (0)[00111111] INLJ
          -> left:
-            [00011111] INLJ
+            (0)[00011111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -137,21 +137,21 @@ Output plans (best plan 0):
  -> right:
     [01000000][test.nss6] INDEX_PROBE { a6: -1 }
 
-4.[11111111] HJ
+4.(0)[11111111] HJ
  -> left:
-    [10111111] INLJ
+    (0)[10111111] INLJ
      -> left:
-        [00111111] INLJ
+        (0)[00111111] INLJ
          -> left:
-            [00011111] INLJ
+            (0)[00011111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -165,23 +165,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [01000000][test.nss6] COLLSCAN
+    (0)[01000000][test.nss6] COLLSCAN
 
-5.[11111111] NLJ
+5.(0)[11111111] NLJ
  -> left:
-    [10111111] INLJ
+    (0)[10111111] INLJ
      -> left:
-        [00111111] INLJ
+        (0)[00111111] INLJ
          -> left:
-            [00011111] INLJ
+            (0)[00011111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -195,23 +195,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [01000000][test.nss6] COLLSCAN
+    (0)[01000000][test.nss6] COLLSCAN
 
-6.[11111111] INLJ
+6.(0)[11111111] INLJ
  -> left:
-    [11011111] INLJ
+    (0)[11011111] INLJ
      -> left:
-        [01011111] INLJ
+        (0)[01011111] INLJ
          -> left:
-            [00011111] INLJ
+            (0)[00011111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -227,21 +227,21 @@ Output plans (best plan 0):
  -> right:
     [00100000][test.nss5] INDEX_PROBE { a5: 1 }
 
-7.[11111111] HJ
+7.(0)[11111111] HJ
  -> left:
-    [11011111] INLJ
+    (0)[11011111] INLJ
      -> left:
-        [01011111] INLJ
+        (0)[01011111] INLJ
          -> left:
-            [00011111] INLJ
+            (0)[00011111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -255,23 +255,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00100000][test.nss5] COLLSCAN
+    (0)[00100000][test.nss5] COLLSCAN
 
-8.[11111111] NLJ
+8.(0)[11111111] NLJ
  -> left:
-    [11011111] INLJ
+    (0)[11011111] INLJ
      -> left:
-        [01011111] INLJ
+        (0)[01011111] INLJ
          -> left:
-            [00011111] INLJ
+            (0)[00011111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -285,23 +285,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00100000][test.nss5] COLLSCAN
+    (0)[00100000][test.nss5] COLLSCAN
 
-9.[11111111] INLJ
+9.(0)[11111111] INLJ
  -> left:
-    [11101111] INLJ
+    (0)[11101111] INLJ
      -> left:
-        [01101111] INLJ
+        (0)[01101111] INLJ
          -> left:
-            [00101111] INLJ
+            (0)[00101111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -317,21 +317,21 @@ Output plans (best plan 0):
  -> right:
     [00010000][test.nss4] INDEX_PROBE { a4: -1 }
 
-10.[11111111] HJ
+10.(0)[11111111] HJ
  -> left:
-    [11101111] INLJ
+    (0)[11101111] INLJ
      -> left:
-        [01101111] INLJ
+        (0)[01101111] INLJ
          -> left:
-            [00101111] INLJ
+            (0)[00101111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -345,23 +345,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00010000][test.nss4] COLLSCAN
+    (0)[00010000][test.nss4] COLLSCAN
 
-11.[11111111] NLJ
+11.(0)[11111111] NLJ
  -> left:
-    [11101111] INLJ
+    (0)[11101111] INLJ
      -> left:
-        [01101111] INLJ
+        (0)[01101111] INLJ
          -> left:
-            [00101111] INLJ
+            (0)[00101111] INLJ
              -> left:
-                [00001111] INLJ
+                (0)[00001111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -375,23 +375,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00010000][test.nss4] COLLSCAN
+    (0)[00010000][test.nss4] COLLSCAN
 
-12.[11111111] INLJ
+12.(0)[11111111] INLJ
  -> left:
-    [11110111] INLJ
+    (0)[11110111] INLJ
      -> left:
-        [01110111] INLJ
+        (0)[01110111] INLJ
          -> left:
-            [00110111] INLJ
+            (0)[00110111] INLJ
              -> left:
-                [00010111] INLJ
+                (0)[00010111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -407,21 +407,21 @@ Output plans (best plan 0):
  -> right:
     [00001000][test.nss3] INDEX_PROBE { a3: 1 }
 
-13.[11111111] HJ
+13.(0)[11111111] HJ
  -> left:
-    [11110111] INLJ
+    (0)[11110111] INLJ
      -> left:
-        [01110111] INLJ
+        (0)[01110111] INLJ
          -> left:
-            [00110111] INLJ
+            (0)[00110111] INLJ
              -> left:
-                [00010111] INLJ
+                (0)[00010111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -435,23 +435,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00001000][test.nss3] COLLSCAN
+    (0)[00001000][test.nss3] COLLSCAN
 
-14.[11111111] NLJ
+14.(0)[11111111] NLJ
  -> left:
-    [11110111] INLJ
+    (0)[11110111] INLJ
      -> left:
-        [01110111] INLJ
+        (0)[01110111] INLJ
          -> left:
-            [00110111] INLJ
+            (0)[00110111] INLJ
              -> left:
-                [00010111] INLJ
+                (0)[00010111] INLJ
                  -> left:
-                    [00000111] INLJ
+                    (0)[00000111] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -465,23 +465,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00001000][test.nss3] COLLSCAN
+    (0)[00001000][test.nss3] COLLSCAN
 
-15.[11111111] INLJ
+15.(0)[11111111] INLJ
  -> left:
-    [11111011] INLJ
+    (0)[11111011] INLJ
      -> left:
-        [01111011] INLJ
+        (0)[01111011] INLJ
          -> left:
-            [00111011] INLJ
+            (0)[00111011] INLJ
              -> left:
-                [00011011] INLJ
+                (0)[00011011] INLJ
                  -> left:
-                    [00001011] INLJ
+                    (0)[00001011] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -497,21 +497,21 @@ Output plans (best plan 0):
  -> right:
     [00000100][test.nss2] INDEX_PROBE { a2: -1 }
 
-16.[11111111] HJ
+16.(0)[11111111] HJ
  -> left:
-    [11111011] INLJ
+    (0)[11111011] INLJ
      -> left:
-        [01111011] INLJ
+        (0)[01111011] INLJ
          -> left:
-            [00111011] INLJ
+            (0)[00111011] INLJ
              -> left:
-                [00011011] INLJ
+                (0)[00011011] INLJ
                  -> left:
-                    [00001011] INLJ
+                    (0)[00001011] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -525,23 +525,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00000100][test.nss2] COLLSCAN
+    (0)[00000100][test.nss2] COLLSCAN
 
-17.[11111111] NLJ
+17.(0)[11111111] NLJ
  -> left:
-    [11111011] INLJ
+    (0)[11111011] INLJ
      -> left:
-        [01111011] INLJ
+        (0)[01111011] INLJ
          -> left:
-            [00111011] INLJ
+            (0)[00111011] INLJ
              -> left:
-                [00011011] INLJ
+                (0)[00011011] INLJ
                  -> left:
-                    [00001011] INLJ
+                    (0)[00001011] INLJ
                      -> left:
-                        [00000011] INLJ
+                        (0)[00000011] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000010][test.nss1] INDEX_PROBE { a1: 1 }
                      -> right:
@@ -555,23 +555,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00000100][test.nss2] COLLSCAN
+    (0)[00000100][test.nss2] COLLSCAN
 
-18.[11111111] INLJ
+18.(0)[11111111] INLJ
  -> left:
-    [11111101] INLJ
+    (0)[11111101] INLJ
      -> left:
-        [01111101] INLJ
+        (0)[01111101] INLJ
          -> left:
-            [00111101] INLJ
+            (0)[00111101] INLJ
              -> left:
-                [00011101] INLJ
+                (0)[00011101] INLJ
                  -> left:
-                    [00001101] INLJ
+                    (0)[00001101] INLJ
                      -> left:
-                        [00000101] INLJ
+                        (0)[00000101] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000100][test.nss2] INDEX_PROBE { a2: -1 }
                      -> right:
@@ -587,21 +587,21 @@ Output plans (best plan 0):
  -> right:
     [00000010][test.nss1] INDEX_PROBE { a1: 1 }
 
-19.[11111111] HJ
+19.(0)[11111111] HJ
  -> left:
-    [11111101] INLJ
+    (0)[11111101] INLJ
      -> left:
-        [01111101] INLJ
+        (0)[01111101] INLJ
          -> left:
-            [00111101] INLJ
+            (0)[00111101] INLJ
              -> left:
-                [00011101] INLJ
+                (0)[00011101] INLJ
                  -> left:
-                    [00001101] INLJ
+                    (0)[00001101] INLJ
                      -> left:
-                        [00000101] INLJ
+                        (0)[00000101] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000100][test.nss2] INDEX_PROBE { a2: -1 }
                      -> right:
@@ -615,23 +615,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00000010][test.nss1] COLLSCAN
+    (0)[00000010][test.nss1] COLLSCAN
 
-20.[11111111] NLJ
+20.(0)[11111111] NLJ
  -> left:
-    [11111101] INLJ
+    (0)[11111101] INLJ
      -> left:
-        [01111101] INLJ
+        (0)[01111101] INLJ
          -> left:
-            [00111101] INLJ
+            (0)[00111101] INLJ
              -> left:
-                [00011101] INLJ
+                (0)[00011101] INLJ
                  -> left:
-                    [00001101] INLJ
+                    (0)[00001101] INLJ
                      -> left:
-                        [00000101] INLJ
+                        (0)[00000101] INLJ
                          -> left:
-                            [00000001][test.nss0] COLLSCAN
+                            (0)[00000001][test.nss0] COLLSCAN
                          -> right:
                             [00000100][test.nss2] INDEX_PROBE { a2: -1 }
                      -> right:
@@ -645,23 +645,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00000010][test.nss1] COLLSCAN
+    (0)[00000010][test.nss1] COLLSCAN
 
-21.[11111111] INLJ
+21.(0)[11111111] INLJ
  -> left:
-    [11111110] INLJ
+    (0)[11111110] INLJ
      -> left:
-        [01111110] INLJ
+        (0)[01111110] INLJ
          -> left:
-            [00111110] INLJ
+            (0)[00111110] INLJ
              -> left:
-                [00011110] INLJ
+                (0)[00011110] INLJ
                  -> left:
-                    [00001110] INLJ
+                    (0)[00001110] INLJ
                      -> left:
-                        [00000110] INLJ
+                        (0)[00000110] INLJ
                          -> left:
-                            [00000010][test.nss1] COLLSCAN
+                            (0)[00000010][test.nss1] COLLSCAN
                          -> right:
                             [00000100][test.nss2] INDEX_PROBE { a2: -1 }
                      -> right:
@@ -677,21 +677,21 @@ Output plans (best plan 0):
  -> right:
     [00000001][test.nss0] INDEX_PROBE { a0: -1 }
 
-22.[11111111] HJ
+22.(0)[11111111] HJ
  -> left:
-    [11111110] INLJ
+    (0)[11111110] INLJ
      -> left:
-        [01111110] INLJ
+        (0)[01111110] INLJ
          -> left:
-            [00111110] INLJ
+            (0)[00111110] INLJ
              -> left:
-                [00011110] INLJ
+                (0)[00011110] INLJ
                  -> left:
-                    [00001110] INLJ
+                    (0)[00001110] INLJ
                      -> left:
-                        [00000110] INLJ
+                        (0)[00000110] INLJ
                          -> left:
-                            [00000010][test.nss1] COLLSCAN
+                            (0)[00000010][test.nss1] COLLSCAN
                          -> right:
                             [00000100][test.nss2] INDEX_PROBE { a2: -1 }
                      -> right:
@@ -705,23 +705,23 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00000001][test.nss0] COLLSCAN
+    (0)[00000001][test.nss0] COLLSCAN
 
-23.[11111111] NLJ
+23.(0)[11111111] NLJ
  -> left:
-    [11111110] INLJ
+    (0)[11111110] INLJ
      -> left:
-        [01111110] INLJ
+        (0)[01111110] INLJ
          -> left:
-            [00111110] INLJ
+            (0)[00111110] INLJ
              -> left:
-                [00011110] INLJ
+                (0)[00011110] INLJ
                  -> left:
-                    [00001110] INLJ
+                    (0)[00001110] INLJ
                      -> left:
-                        [00000110] INLJ
+                        (0)[00000110] INLJ
                          -> left:
-                            [00000010][test.nss1] COLLSCAN
+                            (0)[00000010][test.nss1] COLLSCAN
                          -> right:
                             [00000100][test.nss2] INDEX_PROBE { a2: -1 }
                      -> right:
@@ -735,5 +735,5 @@ Output plans (best plan 0):
      -> right:
         [10000000][test.nss7] INDEX_PROBE { a7: 1 }
  -> right:
-    [00000001][test.nss0] COLLSCAN
+    (0)[00000001][test.nss0] COLLSCAN
 

@@ -8,65 +8,65 @@ Level 2:
 111
 
 Output plans (best plan 0):
-0.[111] HJ
+0.(0)[111] HJ
  -> left:
-    [011] HJ
+    (0)[011] HJ
      -> left:
-        [001][test.nss0] COLLSCAN
+        (0)[001][test.nss0] COLLSCAN
      -> right:
-        [010][test.nss1] COLLSCAN
+        (0)[010][test.nss1] COLLSCAN
  -> right:
-    [100][test.nss2] COLLSCAN
+    (0)[100][test.nss2] COLLSCAN
 
-1.[111] NLJ
+1.(0)[111] NLJ
  -> left:
-    [011] HJ
+    (0)[011] HJ
      -> left:
-        [001][test.nss0] COLLSCAN
+        (0)[001][test.nss0] COLLSCAN
      -> right:
-        [010][test.nss1] COLLSCAN
+        (0)[010][test.nss1] COLLSCAN
  -> right:
-    [100][test.nss2] COLLSCAN
+    (0)[100][test.nss2] COLLSCAN
 
-2.[111] HJ
+2.(0)[111] HJ
  -> left:
-    [101] HJ
+    (0)[101] HJ
      -> left:
-        [001][test.nss0] COLLSCAN
+        (0)[001][test.nss0] COLLSCAN
      -> right:
-        [100][test.nss2] COLLSCAN
+        (0)[100][test.nss2] COLLSCAN
  -> right:
-    [010][test.nss1] COLLSCAN
+    (0)[010][test.nss1] COLLSCAN
 
-3.[111] NLJ
+3.(0)[111] NLJ
  -> left:
-    [101] HJ
+    (0)[101] HJ
      -> left:
-        [001][test.nss0] COLLSCAN
+        (0)[001][test.nss0] COLLSCAN
      -> right:
-        [100][test.nss2] COLLSCAN
+        (0)[100][test.nss2] COLLSCAN
  -> right:
-    [010][test.nss1] COLLSCAN
+    (0)[010][test.nss1] COLLSCAN
 
-4.[111] HJ
+4.(0)[111] HJ
  -> left:
-    [110] HJ
+    (0)[110] HJ
      -> left:
-        [010][test.nss1] COLLSCAN
+        (0)[010][test.nss1] COLLSCAN
      -> right:
-        [100][test.nss2] COLLSCAN
+        (0)[100][test.nss2] COLLSCAN
  -> right:
-    [001][test.nss0] COLLSCAN
+    (0)[001][test.nss0] COLLSCAN
 
-5.[111] NLJ
+5.(0)[111] NLJ
  -> left:
-    [110] HJ
+    (0)[110] HJ
      -> left:
-        [010][test.nss1] COLLSCAN
+        (0)[010][test.nss1] COLLSCAN
      -> right:
-        [100][test.nss2] COLLSCAN
+        (0)[100][test.nss2] COLLSCAN
  -> right:
-    [001][test.nss0] COLLSCAN
+    (0)[001][test.nss0] COLLSCAN
 
 RIGHT DEEP, 3 Nodes
 HJ order pruning enabled: 0
@@ -78,33 +78,33 @@ Level 2:
 111
 
 Output plans (best plan 0):
-0.[111] HJ
+0.(0)[111] HJ
  -> left:
-    [100][test.nss2] COLLSCAN
+    (0)[100][test.nss2] COLLSCAN
  -> right:
-    [011] HJ
+    (0)[011] HJ
      -> left:
-        [001][test.nss0] COLLSCAN
+        (0)[001][test.nss0] COLLSCAN
      -> right:
-        [010][test.nss1] COLLSCAN
+        (0)[010][test.nss1] COLLSCAN
 
-1.[111] HJ
+1.(0)[111] HJ
  -> left:
-    [010][test.nss1] COLLSCAN
+    (0)[010][test.nss1] COLLSCAN
  -> right:
-    [101] HJ
+    (0)[101] HJ
      -> left:
-        [001][test.nss0] COLLSCAN
+        (0)[001][test.nss0] COLLSCAN
      -> right:
-        [100][test.nss2] COLLSCAN
+        (0)[100][test.nss2] COLLSCAN
 
-2.[111] HJ
+2.(0)[111] HJ
  -> left:
-    [001][test.nss0] COLLSCAN
+    (0)[001][test.nss0] COLLSCAN
  -> right:
-    [110] HJ
+    (0)[110] HJ
      -> left:
-        [010][test.nss1] COLLSCAN
+        (0)[010][test.nss1] COLLSCAN
      -> right:
-        [100][test.nss2] COLLSCAN
+        (0)[100][test.nss2] COLLSCAN
 

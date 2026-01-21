@@ -10,59 +10,59 @@ Level 3:
 1111
 
 Output plans (best plan 0):
-0.[1111] HJ
+0.(0)[1111] HJ
  -> left:
-    [0111] HJ
+    (0)[0111] HJ
      -> left:
-        [0011] HJ
+        (0)[0011] HJ
          -> left:
-            [0001][test.nss0] COLLSCAN
+            (0)[0001][test.nss0] COLLSCAN
          -> right:
-            [0010][test.nss1] COLLSCAN
+            (0)[0010][test.nss1] COLLSCAN
      -> right:
-        [0100][test.nss2] COLLSCAN
+        (0)[0100][test.nss2] COLLSCAN
  -> right:
-    [1000][test.nss3] COLLSCAN
+    (0)[1000][test.nss3] COLLSCAN
 
-1.[1111] NLJ
+1.(0)[1111] NLJ
  -> left:
-    [0111] HJ
+    (0)[0111] HJ
      -> left:
-        [0011] HJ
+        (0)[0011] HJ
          -> left:
-            [0001][test.nss0] COLLSCAN
+            (0)[0001][test.nss0] COLLSCAN
          -> right:
-            [0010][test.nss1] COLLSCAN
+            (0)[0010][test.nss1] COLLSCAN
      -> right:
-        [0100][test.nss2] COLLSCAN
+        (0)[0100][test.nss2] COLLSCAN
  -> right:
-    [1000][test.nss3] COLLSCAN
+    (0)[1000][test.nss3] COLLSCAN
 
-2.[1111] NLJ
+2.(0)[1111] NLJ
  -> left:
-    [1101] HJ
+    (0)[1101] HJ
      -> left:
-        [0101] HJ
+        (0)[0101] HJ
          -> left:
-            [0001][test.nss0] COLLSCAN
+            (0)[0001][test.nss0] COLLSCAN
          -> right:
-            [0100][test.nss2] COLLSCAN
+            (0)[0100][test.nss2] COLLSCAN
      -> right:
-        [1000][test.nss3] COLLSCAN
+        (0)[1000][test.nss3] COLLSCAN
  -> right:
-    [0010][test.nss1] COLLSCAN
+    (0)[0010][test.nss1] COLLSCAN
 
-3.[1111] HJ
+3.(0)[1111] HJ
  -> left:
-    [0010][test.nss1] COLLSCAN
+    (0)[0010][test.nss1] COLLSCAN
  -> right:
-    [1101] HJ
+    (0)[1101] HJ
      -> left:
-        [0101] HJ
+        (0)[0101] HJ
          -> left:
-            [0001][test.nss0] COLLSCAN
+            (0)[0001][test.nss0] COLLSCAN
          -> right:
-            [0100][test.nss2] COLLSCAN
+            (0)[0100][test.nss2] COLLSCAN
      -> right:
-        [1000][test.nss3] COLLSCAN
+        (0)[1000][test.nss3] COLLSCAN
 

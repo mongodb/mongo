@@ -39,7 +39,11 @@
 namespace mongo::join_ordering {
 namespace {
 static constexpr size_t kBaseLevel = 0;
+// TODO SERVER-117480: remove this/ replace with actual calls to the costing module.
+JoinCostEstimate getZeroCE() {
+    return JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE);
 }
+}  // namespace
 
 const std::vector<JoinSubset>& PlanEnumeratorContext::getSubsets(int level) {
     return _joinSubsets[level];
@@ -109,13 +113,13 @@ void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
             const auto& nss = _ctx.joinGraph.accessPathAt(nodeId)->nss();
             auto rhs = _registry.registerINLJRHSNode(nodeId, ie, nss);
             subset.plans.push_back(
-                _registry.registerJoinNode(subset, method, left.bestPlan(), rhs));
+                _registry.registerJoinNode(subset, method, left.bestPlan(), rhs, getZeroCE()));
         } else {
             return;
         }
     } else {
-        subset.plans.push_back(
-            _registry.registerJoinNode(subset, method, left.bestPlan(), right.bestPlan()));
+        subset.plans.push_back(_registry.registerJoinNode(
+            subset, method, left.bestPlan(), right.bestPlan(), getZeroCE()));
     }
 
     LOGV2_DEBUG(11336912,
@@ -166,7 +170,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
         const auto* qsn = _ctx.cbrCqQsns.at(cq).get();
         _joinSubsets[kBaseLevel].push_back(JoinSubset(NodeSet{}.set(i)));
         _joinSubsets[kBaseLevel].back().plans = {
-            _registry.registerBaseNode((NodeId)i, qsn, cq->nss())};
+            _registry.registerBaseNode((NodeId)i, qsn, cq->nss(), getZeroCE())};
     }
 
     // Initialize the rest of the joinSubsets.

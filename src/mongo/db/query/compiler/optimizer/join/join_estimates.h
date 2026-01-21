@@ -71,6 +71,9 @@ public:
         return _totalCost;
     }
 
+    std::string toString() const;
+    BSONObj toBSON() const;
+
     auto operator<=>(const JoinCostEstimate& other) const {
         return _totalCost <=> other._totalCost;
     }
@@ -96,7 +99,7 @@ private:
 };
 
 inline std::ostream& operator<<(std::ostream& os, const JoinCostEstimate& cost) {
-    return os << cost.getTotalCost().toString();
+    return os << cost.toString();
 }
 
 }  // namespace mongo::join_ordering

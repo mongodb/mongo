@@ -55,4 +55,15 @@ JoinCostEstimate::JoinCostEstimate(CardinalityEstimate numDocsProcessed,
         _ioSeqNumPages * ioSeqIncremental + _ioRandNumPages * ioRandIncremental;
 }
 
+std::string JoinCostEstimate::toString() const {
+    return str::stream() << _totalCost.cost().v();
+}
+
+BSONObj JoinCostEstimate::toBSON() const {
+    return BSON("totalCost" << _totalCost.toBSON() << "numDocsProcessed"
+                            << _numDocsProcessed.toBSON() << "numDocsOutput"
+                            << _numDocsOutput.toBSON() << "ioSeqNumPages" << _ioSeqNumPages.toBSON()
+                            << "ioRandNumPages" << _ioRandNumPages.toBSON());
+}
+
 }  // namespace mongo::join_ordering

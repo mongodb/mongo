@@ -36,7 +36,20 @@
 
 namespace mongo::join_ordering {
 namespace {
-NodeSet getBitset(const JoinPlanNode& node) {
+JoinCostEstimate getNodeCost(const JoinPlanNode& node) {
+    return std::visit(OverloadedVisitor{[](const JoiningNode& join) { return join.cost; },
+                                        [](const INLJRHSNode& ip) {
+                                            // These nodes don't have their own cost.
+                                            MONGO_UNREACHABLE_TASSERT(11727800);
+                                            return JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE);
+                                        },
+                                        [](const BaseNode& base) {
+                                            return base.cost;
+                                        }},
+                      node);
+}
+
+NodeSet getNodeBitset(const JoinPlanNode& node) {
     return std::visit(
         OverloadedVisitor{[](const JoiningNode& join) { return join.bitset; },
                           [](const INLJRHSNode& ip) { return NodeSet().set(ip.node); },
@@ -65,8 +78,14 @@ std::string joinMethodToString(JoinMethod method) {
 std::string joinNodeStringPrefix(const JoinPlanNode& node,
                                  size_t numNodesToPrint,
                                  std::string indentStr) {
-    return str::stream() << indentStr << "[" << nodeSetToString(getBitset(node), numNodesToPrint)
-                         << "]";
+    std::stringstream ss;
+    ss << indentStr;
+    if (!std::holds_alternative<INLJRHSNode>(node)) {
+        // INLJRHSNodes don't have their own associated cost.
+        ss << "(" << getNodeCost(node).toString() << ")";
+    }
+    ss << "[" << nodeSetToString(getNodeBitset(node), numNodesToPrint) << "]";
+    return ss.str();
 }
 }  // namespace
 
@@ -98,18 +117,20 @@ std::ostream& operator<<(std::ostream& os, const JoinSubset& subset) {
 JoinPlanNodeId JoinPlanNodeRegistry::registerJoinNode(const JoinSubset& subset,
                                                       JoinMethod method,
                                                       JoinPlanNodeId left,
-                                                      JoinPlanNodeId right) {
+                                                      JoinPlanNodeId right,
+                                                      JoinCostEstimate cost) {
     JoinPlanNodeId id = _allJoinPlans.size();
-    _allJoinPlans.emplace_back(JoiningNode{method, left, right, subset.subset});
+    _allJoinPlans.emplace_back(JoiningNode{method, left, right, subset.subset, std::move(cost)});
     return id;
 }
 
 JoinPlanNodeId JoinPlanNodeRegistry::registerBaseNode(NodeId node,
                                                       const QuerySolution* soln,
-                                                      const NamespaceString& nss) {
+                                                      const NamespaceString& nss,
+                                                      JoinCostEstimate cost) {
     tassert(11371702, "Expected an initialized qsn", soln);
     JoinPlanNodeId id = _allJoinPlans.size();
-    _allJoinPlans.emplace_back(BaseNode{soln, nss, node});
+    _allJoinPlans.emplace_back(BaseNode{soln, nss, node, std::move(cost)});
     return id;
 }
 
@@ -159,36 +180,37 @@ std::string JoinPlanNodeRegistry::joinPlansToString(const JoinPlans& plans,
 }
 
 NodeSet JoinPlanNodeRegistry::getBitset(JoinPlanNodeId id) const {
-    return std::visit(
-        OverloadedVisitor{[](const JoiningNode& join) { return join.bitset; },
-                          [](const INLJRHSNode& ip) { return NodeSet().set(ip.node); },
-                          [](const BaseNode& base) {
-                              return NodeSet().set(base.node);
-                          }},
-        get(id));
+    return getNodeBitset(get(id));
+}
+
+JoinCostEstimate JoinPlanNodeRegistry::getCost(JoinPlanNodeId nodeId) const {
+    return getNodeCost(get(nodeId));
 }
 
 BSONObj JoinPlanNodeRegistry::joinPlanNodeToBSON(JoinPlanNodeId nodeId,
                                                  size_t numNodesToPrint) const {
-    return std::visit(
-        OverloadedVisitor{
-            [this, numNodesToPrint](const JoiningNode& join) {
-                return BSON("subset" << nodeSetToString(join.bitset, numNodesToPrint) << "method"
-                                     << joinMethodToString(join.method) << "left"
-                                     << joinPlanNodeToBSON(join.left, numNodesToPrint) << "right"
-                                     << joinPlanNodeToBSON(join.right, numNodesToPrint));
-            },
-            [numNodesToPrint](const INLJRHSNode& ip) {
-                return BSON("subset" << nodeSetToString(NodeSet().set(ip.node), numNodesToPrint)
-                                     << "accessPath"
-                                     << (str::stream() << "INDEX_PROBE "
-                                                       << ip.entry->descriptor()->keyPattern()));
-            },
-            [numNodesToPrint](const BaseNode& base) {
-                return BSON("subset" << nodeSetToString(NodeSet().set(base.node), numNodesToPrint)
-                                     << "accessPath" << base.soln->summaryString());
-            }},
+    BSONObjBuilder bob;
+    bob << "subset" << nodeSetToString(getBitset(nodeId), numNodesToPrint);
+    if (!isOfType<INLJRHSNode>(nodeId)) {
+        // INLJRHSNodes don't have their own associated cost.
+        bob << "cost" << getCost(nodeId).toBSON();
+    }
+    std::visit(
+        OverloadedVisitor{[this, numNodesToPrint, &bob](const JoiningNode& join) {
+                              bob << "method" << joinMethodToString(join.method);
+                              bob << "left" << joinPlanNodeToBSON(join.left, numNodesToPrint);
+                              bob << "right" << joinPlanNodeToBSON(join.right, numNodesToPrint);
+                          },
+                          [&bob](const INLJRHSNode& ip) {
+                              bob << "accessPath"
+                                  << (str::stream()
+                                      << "INDEX_PROBE " << ip.entry->descriptor()->keyPattern());
+                          },
+                          [&bob](const BaseNode& base) {
+                              bob << "accessPath" << base.soln->summaryString();
+                          }},
         get(nodeId));
+    return bob.obj();
 }
 
 }  // namespace mongo::join_ordering
