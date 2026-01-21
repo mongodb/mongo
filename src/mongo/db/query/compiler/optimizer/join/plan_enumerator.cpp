@@ -108,18 +108,35 @@ void PlanEnumeratorContext::addJoinPlan(PlanTreeShape type,
         auto edge = edges[0];
         auto ie = bestIndexSatisfyingJoinPredicates(
             _ctx, (NodeId)*begin(right.subset), _ctx.joinGraph.getEdge(edge));
-        if (ie) {
-            const auto nodeId = right.getNodeId();
-            const auto& nss = _ctx.joinGraph.accessPathAt(nodeId)->nss();
-            auto rhs = _registry.registerINLJRHSNode(nodeId, ie, nss);
-            subset.plans.push_back(
-                _registry.registerJoinNode(subset, method, left.bestPlan(), rhs, getZeroCE()));
-        } else {
+        if (!ie) {
+            // No such index.
             return;
         }
+
+        const auto nodeId = right.getNodeId();
+        const auto& nss = _ctx.joinGraph.accessPathAt(nodeId)->nss();
+
+        // TODO SERVER-117480: actually get cost.
+        auto joinCost = getZeroCE();
+        if (subset.hasPlans() && joinCost >= _registry.getCost(subset.bestPlan())) {
+            // Only build this plan if it is better than what we already have.
+            return;
+        }
+
+        auto rhs = _registry.registerINLJRHSNode(nodeId, ie, nss);
+        subset.plans.push_back(
+            _registry.registerJoinNode(subset, method, left.bestPlan(), rhs, std::move(joinCost)));
+
     } else {
+        // TODO SERVER-117480: actually get cost.
+        auto joinCost = getZeroCE();
+        if (subset.hasPlans() && joinCost >= _registry.getCost(subset.bestPlan())) {
+            // Only build this plan if it is better than what we already have.
+            return;
+        }
+
         subset.plans.push_back(_registry.registerJoinNode(
-            subset, method, left.bestPlan(), right.bestPlan(), getZeroCE()));
+            subset, method, left.bestPlan(), right.bestPlan(), std::move(joinCost)));
     }
 
     LOGV2_DEBUG(11336912,
@@ -169,6 +186,7 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
         const auto* cq = _ctx.joinGraph.getNode((NodeId)i).accessPath.get();
         const auto* qsn = _ctx.cbrCqQsns.at(cq).get();
         _joinSubsets[kBaseLevel].push_back(JoinSubset(NodeSet{}.set(i)));
+        // TODO SERVER-117291: actually get cost.
         _joinSubsets[kBaseLevel].back().plans = {
             _registry.registerBaseNode((NodeId)i, qsn, cq->nss(), getZeroCE())};
     }

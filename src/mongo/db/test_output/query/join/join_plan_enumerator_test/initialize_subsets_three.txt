@@ -18,56 +18,6 @@ Output plans (best plan 0):
  -> right:
     (0)[100][test.nss2] COLLSCAN
 
-1.(0)[111] NLJ
- -> left:
-    (0)[011] HJ
-     -> left:
-        (0)[001][test.nss0] COLLSCAN
-     -> right:
-        (0)[010][test.nss1] COLLSCAN
- -> right:
-    (0)[100][test.nss2] COLLSCAN
-
-2.(0)[111] HJ
- -> left:
-    (0)[101] HJ
-     -> left:
-        (0)[001][test.nss0] COLLSCAN
-     -> right:
-        (0)[100][test.nss2] COLLSCAN
- -> right:
-    (0)[010][test.nss1] COLLSCAN
-
-3.(0)[111] NLJ
- -> left:
-    (0)[101] HJ
-     -> left:
-        (0)[001][test.nss0] COLLSCAN
-     -> right:
-        (0)[100][test.nss2] COLLSCAN
- -> right:
-    (0)[010][test.nss1] COLLSCAN
-
-4.(0)[111] HJ
- -> left:
-    (0)[110] HJ
-     -> left:
-        (0)[010][test.nss1] COLLSCAN
-     -> right:
-        (0)[100][test.nss2] COLLSCAN
- -> right:
-    (0)[001][test.nss0] COLLSCAN
-
-5.(0)[111] NLJ
- -> left:
-    (0)[110] HJ
-     -> left:
-        (0)[010][test.nss1] COLLSCAN
-     -> right:
-        (0)[100][test.nss2] COLLSCAN
- -> right:
-    (0)[001][test.nss0] COLLSCAN
-
 RIGHT DEEP, 3 Nodes
 HJ order pruning enabled: 0
 Level 0:
@@ -87,24 +37,4 @@ Output plans (best plan 0):
         (0)[001][test.nss0] COLLSCAN
      -> right:
         (0)[010][test.nss1] COLLSCAN
-
-1.(0)[111] HJ
- -> left:
-    (0)[010][test.nss1] COLLSCAN
- -> right:
-    (0)[101] HJ
-     -> left:
-        (0)[001][test.nss0] COLLSCAN
-     -> right:
-        (0)[100][test.nss2] COLLSCAN
-
-2.(0)[111] HJ
- -> left:
-    (0)[001][test.nss0] COLLSCAN
- -> right:
-    (0)[110] HJ
-     -> left:
-        (0)[010][test.nss1] COLLSCAN
-     -> right:
-        (0)[100][test.nss2] COLLSCAN
 
