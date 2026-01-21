@@ -735,15 +735,15 @@ TEST_F(ShardRoleTest, AcquireShardedCollWhenCriticalSectionIsActiveThrows) {
         AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
         const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
             operationContext(), nssShardedCollection1);
-        csr->enterCriticalSectionCatchUpPhase(criticalSectionReason);
-        csr->enterCriticalSectionCommitPhase(criticalSectionReason);
+        csr->enterCriticalSectionCatchUpPhase(operationContext(), criticalSectionReason);
+        csr->enterCriticalSectionCommitPhase(operationContext(), criticalSectionReason);
     }
 
     ON_BLOCK_EXIT([&] {
         AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
         const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
             operationContext(), nssShardedCollection1);
-        csr->exitCriticalSection(criticalSectionReason);
+        csr->exitCriticalSection(operationContext(), criticalSectionReason);
     });
 
     PlacementConcern placementConcern{{}, shardVersionShardedCollection1};
@@ -1835,8 +1835,8 @@ TEST_F(ShardRoleTest, RestoreForWriteJoinsCriticalSectionWhenNotRetryableWrite) 
             AutoGetCollection coll(newOpCtx, nssShardedCollection1, MODE_X);
             const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
                 newOpCtx, nssShardedCollection1);
-            csr->enterCriticalSectionCatchUpPhase(criticalSectionReason);
-            csr->enterCriticalSectionCommitPhase(criticalSectionReason);
+            csr->enterCriticalSectionCatchUpPhase(operationContext(), criticalSectionReason);
+            csr->enterCriticalSectionCommitPhase(operationContext(), criticalSectionReason);
         }
 
         barrier.countDownAndWait();
@@ -1862,7 +1862,7 @@ TEST_F(ShardRoleTest, RestoreForWriteJoinsCriticalSectionWhenNotRetryableWrite) 
         AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
         const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
             operationContext(), nssShardedCollection1);
-        csr->exitCriticalSection(criticalSectionReason);
+        csr->exitCriticalSection(operationContext(), criticalSectionReason);
     }
 
     // Now parallel thread should be able to restore and finish.
@@ -1896,15 +1896,15 @@ TEST_F(ShardRoleTest, RestoreForWriteDoesNotJoinCriticalSectionWhenRetryableWrit
         AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
         const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
             operationContext(), nssShardedCollection1);
-        csr->enterCriticalSectionCatchUpPhase(criticalSectionReason);
-        csr->enterCriticalSectionCommitPhase(criticalSectionReason);
+        csr->enterCriticalSectionCatchUpPhase(operationContext(), criticalSectionReason);
+        csr->enterCriticalSectionCommitPhase(operationContext(), criticalSectionReason);
     }
 
     ON_BLOCK_EXIT([&] {
         AutoGetCollection coll(operationContext(), nssShardedCollection1, MODE_X);
         const auto& csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
             operationContext(), nssShardedCollection1);
-        csr->exitCriticalSection(criticalSectionReason);
+        csr->exitCriticalSection(operationContext(), criticalSectionReason);
     });
 
     // Restore the resources

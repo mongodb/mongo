@@ -89,15 +89,19 @@ void DatabaseShardingStateMock::clearExpectedFailureDbVersionCheck() {
 
 void DatabaseShardingStateMock::setDbMetadata(OperationContext* opCtx,
                                               const DatabaseType& dbMetadata) {
-    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    _dbMetadataAccessor.setAccessType(opCtx,
+                                      DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
     _dbMetadataAccessor.setDbMetadata(opCtx, dbMetadata.getPrimary(), dbMetadata.getVersion());
-    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
+    _dbMetadataAccessor.setAccessType(opCtx,
+                                      DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
 }
 
 void DatabaseShardingStateMock::clearDbMetadata(OperationContext* opCtx) {
-    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    _dbMetadataAccessor.setAccessType(opCtx,
+                                      DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
     _dbMetadataAccessor.clearDbMetadata(opCtx);
-    _dbMetadataAccessor.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
+    _dbMetadataAccessor.setAccessType(opCtx,
+                                      DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
 }
 
 }  // namespace mongo

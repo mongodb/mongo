@@ -205,7 +205,7 @@ public:
                           "refresh model.");
             }
 
-            boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
+            boost::optional<CriticalSectionSignal> criticalSectionSignal;
 
             {
                 // If the primary is in the critical section, secondaries must wait for the commit

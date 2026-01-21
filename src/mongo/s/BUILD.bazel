@@ -350,6 +350,7 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/ddl:coll_mod_command_idl",
         "//src/mongo/db/shard_role/ddl:index_commands_idl",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
+        "//src/mongo/db/shard_role/shard_catalog:critical_section_signal",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/topology:remove_shard_exception",

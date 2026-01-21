@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2024-present MongoDB, Inc.
+ *    Copyright (C) 2026-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,36 +27,39 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/shard_role/shard_catalog/critical_section_signal.h"
 
-#include "mongo/db/operation_context.h"
-#include "mongo/util/modules.h"
+#include "mongo/db/sharding_environment/sharding_statistics.h"
 
 namespace mongo {
 
-namespace refresh_util {
-
-/**
- * This method implements a best-effort attempt to wait for a refresh to complete, throwing an
- * exception if it fails or times out.
- *
- * All waits on refreshes in a shard should go through this code path, because it also accounts for
- * transactions and locking.
- */
-MONGO_MOD_PRIVATE void waitForRefreshToComplete(OperationContext* opCtx,
-                                                const SharedSemiFuture<void>& refresh);
-
-/**
- * This method implements a best-effort attempt to wait for the critical section to complete
- * before returning to the router at the previous step in order to prevent it from busy spinning
- * while the critical section is in progress.
- *
- * All waits for migration critical section should go through this code path, because it also
- * accounts for transactions and locking.
- */
-MONGO_MOD_NEEDS_REPLACEMENT Status waitForCriticalSectionToComplete(
-    OperationContext* opCtx, const CriticalSectionSignal& critSecSignal) noexcept;
-
-}  // namespace refresh_util
-
+void CriticalSectionSignal::get(OperationContext* opCtx) const {
+    auto token = [&] {
+        switch (_type) {
+            case CriticalSectionType::Database:
+                return ShardingStatistics::get(opCtx->getServiceContext())
+                    .databaseCriticalSectionStatistics.startWaiter();
+            case CriticalSectionType::Collection:
+                return ShardingStatistics::get(opCtx->getServiceContext())
+                    .collectionCriticalSectionStatistics.startWaiter();
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }();
+    ON_BLOCK_EXIT([&] {
+        switch (_type) {
+            case CriticalSectionType::Database:
+                ShardingStatistics::get(opCtx->getServiceContext())
+                    .databaseCriticalSectionStatistics.finishWaiter(token);
+                break;
+            case CriticalSectionType::Collection:
+                ShardingStatistics::get(opCtx->getServiceContext())
+                    .collectionCriticalSectionStatistics.finishWaiter(token);
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    });
+    _signal.get(opCtx);
+}
 }  // namespace mongo

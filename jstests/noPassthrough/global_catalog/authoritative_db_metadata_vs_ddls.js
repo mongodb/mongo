@@ -33,10 +33,25 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
     }
 }
 
+function getStatistics(shardPrimaryNode) {
+    return assert.commandWorked(shardPrimaryNode.adminCommand({serverStatus: 1})).shardingStatistics
+        .databaseVersionUpdateCounters;
+}
+
+let statistics;
 {
     jsTest.log("Validating shard database metadata consistency for createDatabase DDL");
 
+    statistics = getStatistics(st.rs0.getPrimary());
+    // We start at 0 durable and 2 in memory because we store the config and admin databases in memory exclusively.
+    assert.eq(statistics.durableChanges, 0);
+    assert.eq(statistics.inMemoryClears, 2);
+
     assert.commandWorked(db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+
+    statistics = getStatistics(st.rs0.getPrimary());
+    assert.eq(statistics.durableChanges, 1);
+    assert.eq(statistics.inMemorySets, 1);
 
     st.awaitReplicationOnShards();
 
@@ -53,7 +68,20 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
 {
     jsTest.log("Validating shard database metadata consistency for movePrimary DDL");
 
+    statistics = getStatistics(st.rs1.getPrimary());
+    assert.eq(statistics.durableChanges, 0);
+    assert.eq(statistics.inMemoryClears, 2);
+
     assert.commandWorked(db.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}));
+
+    statistics = getStatistics(st.rs0.getPrimary());
+    assert.eq(statistics.durableChanges, 2);
+    assert.eq(statistics.inMemorySets, 1, statistics);
+    assert.eq(statistics.inMemoryClears, 3, statistics);
+    statistics = getStatistics(st.rs1.getPrimary());
+    assert.eq(statistics.durableChanges, 1);
+    assert.eq(statistics.inMemorySets, 1, statistics);
+    assert.eq(statistics.inMemoryClears, 2, statistics);
 
     st.awaitReplicationOnShards();
 
@@ -76,6 +104,11 @@ function validateShardCatalogCache(dbName, shard, expectedDbMetadata) {
     jsTest.log("Validating shard database metadata consistency for dropDatabase DDL");
 
     assert.commandWorked(db.dropDatabase());
+
+    statistics = getStatistics(st.rs1.getPrimary());
+    assert.eq(statistics.durableChanges, 2);
+    assert.eq(statistics.inMemoryClears, 3, statistics);
+    assert.eq(statistics.inMemorySets, 1, statistics);
 
     st.awaitReplicationOnShards();
 

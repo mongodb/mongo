@@ -44,6 +44,7 @@
 #include "mongo/db/shard_role/shard_catalog/metadata_manager.h"
 #include "mongo/db/shard_role/shard_catalog/scoped_collection_metadata.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
+#include "mongo/db/versioning_protocol/stale_exception.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
@@ -211,31 +212,32 @@ public:
      *
      * Entering into the Critical Section interrupts any ongoing filtering metadata refresh.
      */
-    void enterCriticalSectionCatchUpPhase(const BSONObj& reason);
-    void enterCriticalSectionCommitPhase(const BSONObj& reason);
+    void enterCriticalSectionCatchUpPhase(OperationContext* opCtx, const BSONObj& reason);
+    void enterCriticalSectionCommitPhase(OperationContext* opCtx, const BSONObj& reason);
 
     /**
      * It transitions the critical section back to the catch up phase.
      */
-    void rollbackCriticalSectionCommitPhaseToCatchUpPhase(const BSONObj& reason);
+    void rollbackCriticalSectionCommitPhaseToCatchUpPhase(OperationContext* opCtx,
+                                                          const BSONObj& reason);
 
     /**
      * Method to control the collection's critical section. Methods listed below must be called with
      * both the collection lock and CSR acquired in exclusive mode.
      */
-    void exitCriticalSection(const BSONObj& reason);
+    void exitCriticalSection(OperationContext* opCtx, const BSONObj& reason);
 
     /**
      * Same semantics than 'exitCriticalSection' but without doing error-checking. Only meant to be
      * used when recovering the critical sections in the RecoverableCriticalSectionService.
      */
-    void exitCriticalSectionNoChecks();
+    void exitCriticalSectionNoChecks(OperationContext* opCtx);
 
     /**
      * If the collection is currently in a critical section, returns the critical section signal to
      * be waited on. Otherwise, returns nullptr.
      */
-    boost::optional<SharedSemiFuture<void>> getCriticalSectionSignal(
+    boost::optional<CriticalSectionSignal> getCriticalSectionSignal(
         ShardingMigrationCriticalSection::Operation op) const;
 
     /**

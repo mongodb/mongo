@@ -65,16 +65,16 @@ TEST_F(DatabaseShardingMetadataAccessorTest, MetadataRoundTrip) {
     auto opCtx = cc().makeOperationContext();
     DatabaseShardingMetadataAccessor cache{makeTestDbName()};
 
-    cache.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    cache.setAccessType(opCtx.get(), DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
 
     ShardId primaryShard("shardA");
     DatabaseVersion version{UUID::gen(), Timestamp(1, 0)};
 
     cache.setDbMetadata(opCtx.get(), primaryShard, version);
-    cache.setMovePrimaryInProgress();
+    cache.setMovePrimaryInProgress(opCtx.get());
 
     // Return to reader mode and verify the values.
-    cache.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
+    cache.setAccessType(opCtx.get(), DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
 
     ASSERT_TRUE(cache.getDbPrimaryShard(opCtx.get()));
     ASSERT_EQ(*cache.getDbPrimaryShard(opCtx.get()), primaryShard);
@@ -85,11 +85,11 @@ TEST_F(DatabaseShardingMetadataAccessorTest, MetadataRoundTrip) {
     ASSERT_TRUE(cache.isMovePrimaryInProgress());
 
     // Clear everything again.
-    cache.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    cache.setAccessType(opCtx.get(), DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
     cache.clearDbMetadata(opCtx.get());
-    cache.unsetMovePrimaryInProgress();
+    cache.unsetMovePrimaryInProgress(opCtx.get());
 
-    cache.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
+    cache.setAccessType(opCtx.get(), DatabaseShardingMetadataAccessor::AccessType::kReadAccess);
     ASSERT_FALSE(cache.getDbPrimaryShard(opCtx.get()));
     ASSERT_FALSE(cache.getDbVersion(opCtx.get()));
     ASSERT_FALSE(cache.isMovePrimaryInProgress());
@@ -101,7 +101,7 @@ TEST_F(DatabaseShardingMetadataAccessorTest, UnsafeSetterBypassesAccessControl) 
 
     ShardId primaryShard("shardB");
     DatabaseVersion version{UUID::gen(), Timestamp(2, 0)};
-    cache.setDbMetadata_UNSAFE(primaryShard, version);
+    cache.setDbMetadata_UNSAFE(opCtx.get(), primaryShard, version);
 
     // Even in default (read) access mode, reading is allowed
     ASSERT_TRUE(cache.getDbPrimaryShard(opCtx.get()));
@@ -129,7 +129,7 @@ DEATH_TEST_F(DatabaseShardingMetadataAccessorTestDeathTest,
              "Tripwire assertion") {
     auto opCtx = cc().makeOperationContext();
     DatabaseShardingMetadataAccessor cache{makeTestDbName()};
-    cache.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    cache.setAccessType(opCtx.get(), DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
 
     // Should tassert due to write-only access
     cache.getDbVersion(opCtx.get());
@@ -149,7 +149,7 @@ TEST_F(DatabaseShardingMetadataAccessorTest, BypassWriteAccessCheck) {
 TEST_F(DatabaseShardingMetadataAccessorTest, BypassReadAccessCheck) {
     auto opCtx = cc().makeOperationContext();
     DatabaseShardingMetadataAccessor cache{makeTestDbName()};
-    cache.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    cache.setAccessType(opCtx.get(), DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
     BypassDatabaseMetadataAccess bypass{opCtx.get(),
                                         BypassDatabaseMetadataAccess::Type::kReadOnly};  // NOLINT
     // Should be allowed with the bypass object.
@@ -174,7 +174,7 @@ DEATH_TEST_F(DatabaseShardingMetadataAccessorTestDeathTest,
              "Tripwire assertion") {
     auto opCtx = cc().makeOperationContext();
     DatabaseShardingMetadataAccessor cache{makeTestDbName()};
-    cache.setAccessType(DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
+    cache.setAccessType(opCtx.get(), DatabaseShardingMetadataAccessor::AccessType::kWriteAccess);
     BypassDatabaseMetadataAccess bypass{opCtx.get(),
                                         BypassDatabaseMetadataAccess::Type::kWriteOnly};  // NOLINT
     // Should be allowed with the bypass object.

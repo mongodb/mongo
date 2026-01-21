@@ -35,7 +35,9 @@ namespace mongo {
 
 namespace refresh_util {
 
-void waitForRefreshToComplete(OperationContext* opCtx, SharedSemiFuture<void> future) {
+namespace {
+template <typename SignalT>
+void waitForSignalToComplete(OperationContext* opCtx, const SignalT& future) {
     // Must not block while holding a lock
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
@@ -52,11 +54,16 @@ void waitForRefreshToComplete(OperationContext* opCtx, SharedSemiFuture<void> fu
         future.get(opCtx);
     }
 }
+}  // namespace
+
+void waitForRefreshToComplete(OperationContext* opCtx, const SharedSemiFuture<void>& future) {
+    waitForSignalToComplete(opCtx, future);
+}
 
 Status waitForCriticalSectionToComplete(OperationContext* opCtx,
-                                        SharedSemiFuture<void> critSecSignal) noexcept {
+                                        const CriticalSectionSignal& critSecSignal) noexcept {
     try {
-        waitForRefreshToComplete(opCtx, critSecSignal);
+        waitForSignalToComplete(opCtx, critSecSignal);
     } catch (const DBException& ex) {
         // This is a best-effort attempt to wait for the critical section to complete, so no
         // need to handle any exceptions

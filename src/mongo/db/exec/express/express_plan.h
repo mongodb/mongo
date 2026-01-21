@@ -125,16 +125,16 @@ public:
  */
 class WaitingForCondition {
 public:
-    WaitingForCondition(SharedSemiFuture<void> waitSignal) : _waitSignal(std::move(waitSignal)) {}
+    WaitingForCondition(CriticalSectionSignal waitSignal) : _waitSignal(std::move(waitSignal)) {}
 
-    const SharedSemiFuture<void>& waitSignal() const {
+    const CriticalSectionSignal& waitSignal() const {
         return _waitSignal;
     }
 
     static constexpr bool indicatesSuccessfulProgress = false;
 
 private:
-    SharedSemiFuture<void> _waitSignal;
+    CriticalSectionSignal _waitSignal;
 };
 
 /**
@@ -837,7 +837,7 @@ PlanProgress applyShardFilter(write_stage_common::PreWriteFilter& preWriteFilter
                               const NamespaceString& nss,
                               StringData operationName,
                               Continuation continuation) {
-    boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
+    boost::optional<CriticalSectionSignal> criticalSectionSignal;
     auto [filterStatus, shouldWriteToOrphan] =
         preWriteFilter.checkIfNotWritable(Document(obj.value()),
                                           operationName,
