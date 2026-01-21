@@ -51,6 +51,7 @@ extensions_with_config(
         ":native_vector_search_mongo_extension_signed_lib",
         ":metrics_mongo_extension_signed_lib",
         ":other_metrics_mongo_extension_signed_lib",
+        ":sleep_mongo_extension_signed_lib",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
@@ -188,6 +189,7 @@ filegroup(
         "metrics",
         "other_metrics",
         "interrupt",
+        "sleep",
     ]
 ]
 

@@ -124,6 +124,7 @@ mongo_cc_unit_test(
         "jparse_util_test.cpp",
         "memory_util_test.cpp",
         "retry_test.cpp",
+        "scoped_timer_metric_test.cpp",
         "stop_token_test.cpp",
         "string_util_test.cpp",
         "throughput_gauge_test.cpp",
