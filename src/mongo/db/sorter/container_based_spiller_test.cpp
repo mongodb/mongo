@@ -72,6 +72,11 @@ public:
         const std::vector<ViewableIntegerKeyedContainer::Entry>& _entries;
     };
 
+    ViewableIntegerKeyedContainer() = default;
+
+    explicit ViewableIntegerKeyedContainer(std::shared_ptr<Ident> ident)
+        : _ident(std::move(ident)) {}
+
     std::shared_ptr<Ident> ident() const override {
         return _ident;
     }
@@ -572,6 +577,50 @@ TEST_F(SortedContainerWriterTest, ContainerWriterAllowsNullValueWithNonNullKey) 
     ASSERT_EQ(container.entries()[0].second, std::string(expected.buf(), expected.len()));
 
     exhaustIterators<IntWrapper, NullValue>(writer);
+}
+
+class ContainerBasedSpillerTest : public ServiceContextMongoDTest {};
+
+TEST_F(ContainerBasedSpillerTest, Spill) {
+    auto opCtx = makeOperationContext();
+
+    auto replCoord = dynamic_cast<repl::ReplicationCoordinatorMock*>(
+        repl::ReplicationCoordinator::get(opCtx.get()));
+    ASSERT(replCoord);
+    replCoord->alwaysAllowWrites(true);
+
+    auto ns = NamespaceString::createNamespaceString_forTest("test", "container_based_spiller");
+    CollectionMock coll{ns};
+    CollectionPtr collPtr{&coll};
+    ViewableIntegerKeyedContainer container{std::make_shared<Ident>("ident")};
+    SorterContainerStats stats{nullptr};
+
+    ContainerBasedSpiller<IntWrapper, NullValue> spiller{
+        *opCtx,
+        *shard_role_details::getRecoveryUnit(opCtx.get()),
+        collPtr,
+        container,
+        stats,
+        ns.dbName(),
+        SorterChecksumVersion::v2};
+
+    std::vector<std::pair<IntWrapper, NullValue>> data{{50, {}}, {100, {}}, {75, {}}, {125, {}}};
+    std::span span{data};
+
+    auto it1 = spiller.spill(
+        SortOptions{}, SorterSpiller<IntWrapper, NullValue>::Settings{}, span.subspan(0, 2), 0);
+    auto it2 = spiller.spill(
+        SortOptions{}, SorterSpiller<IntWrapper, NullValue>::Settings{}, span.subspan(2, 2), 0);
+
+    ASSERT_TRUE(it1->more());
+    EXPECT_EQ(it1->next().first, 50);
+    ASSERT_TRUE(it1->more());
+    EXPECT_EQ(it1->next().first, 100);
+
+    ASSERT_TRUE(it2->more());
+    EXPECT_EQ(it2->next().first, 75);
+    ASSERT_TRUE(it2->more());
+    EXPECT_EQ(it2->next().first, 125);
 }
 
 }  // namespace

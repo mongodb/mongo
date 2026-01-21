@@ -254,6 +254,7 @@ public:
                                 RecoveryUnit& ru,
                                 const CollectionPtr& collection,
                                 IntegerKeyedContainer& container,
+                                SorterContainerStats& stats,
                                 int64_t currKey,
                                 boost::optional<DatabaseName> dbName = boost::none,
                                 SorterChecksumVersion checksumVersion = SorterChecksumVersion::v2)
@@ -262,21 +263,24 @@ public:
           _ru(ru),
           _collection(collection),
           _container(container),
+          _stats(stats),
           _currKey(currKey) {}
 
     std::unique_ptr<SortedStorageWriter<Key, Value>> makeWriter(const SortOptions& opts,
                                                                 const Settings& settings) override {
         return std::make_unique<sorter::SortedContainerWriter<Key, Value>>(
-            _opCtx, _ru, _collection, _container, opts, _currKey, settings);
+            _opCtx, _ru, _collection, _container, _stats, opts, _currKey, settings);
     };
 
     std::shared_ptr<sorter::Iterator<Key, Value>> makeIterator(
         std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override {
-        return writer->doneUnique();
+        return writer->done();
     }
 
     std::unique_ptr<sorter::Iterator<Key, Value>> makeIteratorUnique(
-        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override;
+        std::unique_ptr<SortedStorageWriter<Key, Value>> writer) override {
+        return writer->doneUnique();
+    }
 
     size_t getIteratorSize() override {
         return sizeof(sorter::ContainerIterator<Key, Value>);
@@ -296,7 +300,8 @@ public:
     };
 
     boost::optional<boost::filesystem::path> getSpillDirPath() override {
-        return boost::filesystem::path(ident::getDirectory(_container.ident()->getIdent()));
+        return boost::filesystem::path(
+            std::string{ident::getDirectory(_container.ident()->getIdent())});
     };
 
     /**
@@ -311,7 +316,52 @@ private:
     RecoveryUnit& _ru;
     const CollectionPtr& _collection;
     IntegerKeyedContainer& _container;
+    SorterContainerStats& _stats;
     int64_t _currKey;
+};
+
+template <typename Key, typename Value>
+class ContainerBasedSpiller : public SorterSpillerBase<Key, Value> {
+public:
+    ContainerBasedSpiller(OperationContext& opCtx,
+                          RecoveryUnit& ru,
+                          const CollectionPtr& collection,
+                          IntegerKeyedContainer& container,
+                          SorterContainerStats& stats,
+                          boost::optional<DatabaseName> dbName,
+                          SorterChecksumVersion checksumVersion)
+        : SorterSpillerBase<Key, Value>(std::make_unique<ContainerBasedSorterStorage<Key, Value>>(
+              opCtx, ru, collection, container, stats, 1, std::move(dbName), checksumVersion)) {}
+
+    std::unique_ptr<SorterStorage<Key, Value>> mergeSpills(
+        const SortOptions& opts,
+        const SorterSpillerBase<Key, Value>::Settings& settings,
+        SorterStats& stats,
+        std::vector<std::shared_ptr<sorter::Iterator<Key, Value>>>& iters,
+        SorterSpillerBase<Key, Value>::Comparator comp,
+        std::size_t numTargetedSpills,
+        std::size_t numParallelSpills) override {
+        // TODO (SERVER-117220): Implement merging spills.
+        return std::move(this->_storage);
+    }
+
+private:
+    std::unique_ptr<SortedStorageWriter<Key, Value>> _spill(
+        const SortOptions& opts,
+        const SorterSpillerBase<Key, Value>::Settings& settings,
+        std::span<std::pair<Key, Value>> data,
+        uint32_t idx) {
+        auto writer = this->_storage->makeWriter(opts, settings);
+        for (auto&& [key, value] : data.subspan(idx)) {
+            writer->addAlreadySorted(key, value);
+            ++_current;
+        }
+        static_cast<ContainerBasedSorterStorage<Key, Value>*>(this->_storage.get())
+            ->updateCurrKey(_current);
+        return std::move(writer);
+    }
+
+    int64_t _current = 1;
 };
 
 }  // namespace mongo::sorter
