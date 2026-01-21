@@ -33,6 +33,7 @@ export function shouldSkipCommand(_commandName, commandObj) {
         // Ignore fsync to avoid locking the initial sync node without unlocking.
         "fsync": true,
         "fsyncUnlock": true,
+        "flushRouterConfig": true,
     };
 
     if (_commandName in skippedCommands) {
