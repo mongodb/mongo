@@ -2,7 +2,7 @@
  * Tests metrics and logging for the priority port.
  *
  * @tags: [
- *   featureFlagDedicatedPortForPriorityOperations,
+ *   requires_fcv_83,
  * ]
  */
 import {describe, before, after, it} from "jstests/libs/mochalite.js";
