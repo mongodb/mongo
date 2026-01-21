@@ -273,6 +273,7 @@ private:
 
     // Performs any waiting that's needed after locks and resources are released during yield.
     void doWaitDuringYield();
+    void logWriteConflictAndBackoff(size_t numAttempts);
 
     std::unique_ptr<insert_listener::Notifier> makeNotifier();
 

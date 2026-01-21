@@ -940,6 +940,16 @@ server_parameters:
         validator:
             gte: 0
         redact: false
+
+    internalQueryEnableWriteConflictBackoffWithoutTicket:
+        description: >-
+            Enables behavior where the query engine will release resources before sleeping for write
+            conflicts.
+        set_at: [startup]
+        cpp_varname: internalQueryEnableWriteConflictBackoffWithoutTicket
+        cpp_vartype: AtomicWord<bool>
+        default: false
+        redact: false
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

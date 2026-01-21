@@ -286,7 +286,18 @@ void hangBeforeShouldWaitForInsertsIfFailpointEnabled(PlanExecutorImpl* exec) {
 
 
 /**
- *
+ * Logs and sleeps, if necessary, after a write conflict.
+ */
+void PlanExecutorImpl::logWriteConflictAndBackoff(size_t numAttempts) {
+    if (MONGO_unlikely(planExecutorHangBeforeLogAndBackoff.shouldFail())) {
+        planExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
+    }
+    logAndRecordWriteConflictAndBackoff(
+        _opCtx, numAttempts, "plan execution", ""_sd, NamespaceStringOrUUID(_nss));
+}
+
+/**
+ * Does all waiting during yield if needed.
  */
 void PlanExecutorImpl::doWaitDuringYield() {
     // If we yielded because we encountered a sharding critical section, wait for the critical
@@ -301,14 +312,7 @@ void PlanExecutorImpl::doWaitDuringYield() {
     }
 
     if (_writeConflictsInARowToLog) {
-        if (MONGO_unlikely(planExecutorHangBeforeLogAndBackoff.shouldFail())) {
-            planExecutorHangBeforeLogAndBackoff.pauseWhileSet(_opCtx);
-        }
-        logAndRecordWriteConflictAndBackoff(_opCtx,
-                                            *_writeConflictsInARowToLog,
-                                            "plan execution",
-                                            ""_sd,
-                                            NamespaceStringOrUUID(_nss));
+        logWriteConflictAndBackoff(*_writeConflictsInARowToLog);
         _writeConflictsInARowToLog = boost::none;
     }
 }
@@ -528,7 +532,13 @@ void PlanExecutorImpl::_handleNeedYield(size_t& writeConflictsInARow,
 
         // Set this member variable to indicate that when we yield, after resources are
         // relinquished, we should log and backoff.
-        _writeConflictsInARowToLog = writeConflictsInARow;
+        if (internalQueryEnableWriteConflictBackoffWithoutTicket.load()) {
+            // Defer the logAndBackoff() call to the yield handler.
+            _writeConflictsInARowToLog = writeConflictsInARow;
+        } else {
+            // Do the log and backoff immediately, while we're holding the ticket.
+            logWriteConflictAndBackoff(writeConflictsInARow);
+        }
     }
 
     // Yield next time through the loop.

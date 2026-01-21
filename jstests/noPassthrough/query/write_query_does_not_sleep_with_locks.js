@@ -16,6 +16,8 @@ const rst = new ReplSetTest({
             // Use a fixed number of execution control tickets so that we can easily force
             // operations to compete for tickets.
             executionControlConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
+            // The fix for this is gated behind a flag since it's still experimental.
+            internalQueryEnableWriteConflictBackoffWithoutTicket: true,
         },
     },
 });
