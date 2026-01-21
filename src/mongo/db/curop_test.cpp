@@ -361,6 +361,10 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
                                 1 /* nModified */,
                                 0 /* nDeleted */,
                                 0 /* nInserted */);
+    CardinalityEstimationMethods ceMethods1;
+    ceMethods1.setHistogram(1);
+    ceMethods1.setSampling(1);
+    cursorMetrics.setCardinalityEstimationMethods(ceMethods1);
     cursorMetrics.setDelinquentAcquisitions(3);
     cursorMetrics.setTotalAcquisitionDelinquencyMillis(400);
     cursorMetrics.setMaxAcquisitionDelinquencyMillis(200);
@@ -395,6 +399,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateCursorMetrics) {
     ASSERT_EQ(*additiveMetrics.wasLoadShed, true);
     ASSERT_EQ(*additiveMetrics.wasDeprioritized, true);
     ASSERT_EQ(*additiveMetrics.planningTime, Microseconds(250));
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHistogram().value_or(0), 1);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getSampling().value_or(0), 1);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHeuristics().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
 }
 
@@ -483,6 +493,7 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     additiveMetrics.numInterruptChecks = 2;
     additiveMetrics.overdueInterruptApproxMax = Milliseconds(100);
     additiveMetrics.planningTime = Microseconds(100);
+    additiveMetrics.cardinalityEstimationMethods.setHeuristics(2);
     additiveMetrics.nDocsSampled = 10;
 
     query_stats::DataBearingNodeMetrics remoteMetrics;
@@ -502,6 +513,9 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     remoteMetrics.numInterruptChecks = 1;
     remoteMetrics.overdueInterruptApproxMax = Milliseconds(300);
     remoteMetrics.planningTime = Microseconds(150);
+    remoteMetrics.cardinalityEstimationMethods.setHeuristics(1);
+    remoteMetrics.cardinalityEstimationMethods.setHistogram(1);
+    remoteMetrics.cardinalityEstimationMethods.setSampling(1);
     remoteMetrics.nDocsSampled = 15;
 
     additiveMetrics.aggregateDataBearingNodeMetrics(remoteMetrics);
@@ -522,6 +536,12 @@ TEST(CurOpTest, AdditiveMetricsShouldAggregateDataBearingNodeMetrics) {
     ASSERT_EQ(*additiveMetrics.numInterruptChecks, 3);
     ASSERT_EQ(*additiveMetrics.overdueInterruptApproxMax, Milliseconds(300));
     ASSERT_EQ(*additiveMetrics.planningTime, Microseconds(250));
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHeuristics().value_or(0), 3);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getHistogram().value_or(0), 1);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getSampling().value_or(0), 1);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
+    ASSERT_EQ(additiveMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
     ASSERT_EQ(*additiveMetrics.nDocsSampled, 25);
 }
 

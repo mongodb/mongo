@@ -1543,8 +1543,7 @@ struct QueryStatsBSONParams {
     BSONObj nMatched = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj nModified = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
     BSONObj planningTimeMicros = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
-
-    // CBR-specific metrics.
+    CardinalityEstimationMethods cardinalityEstimationMethods;
     BSONObj nDocsSampled = intMetricBson(0, std::numeric_limits<int64_t>::max(), 0, 0);
 };
 
@@ -1600,8 +1599,22 @@ void verifyQueryStatsBSON(QueryStatsEntry& qse, const QueryStatsBSONParams& para
     if (params.includeCBRMetrics) {
         subsectionBuilder->append("planningTimeMicros", params.planningTimeMicros);
 
-        BSONObjBuilder cbrStatsBuilder = subsectionBuilder->subobjStart("costBasedRanker");
-        cbrStatsBuilder.append("nDocsSampled", params.nDocsSampled);
+        // Always add costBasedRanker section when CBR metrics are requested.
+        BSONObjBuilder cbrBuilder(subsectionBuilder->subobjStart("costBasedRanker"));
+        BSONObjBuilder methodsBuilder(cbrBuilder.subobjStart("cardinalityEstimationMethods"));
+
+        CardinalityEstimationMethods ceMethods;
+        ceMethods.setHistogram(params.cardinalityEstimationMethods.getHistogram().value_or(0));
+        ceMethods.setSampling(params.cardinalityEstimationMethods.getSampling().value_or(0));
+        ceMethods.setHeuristics(params.cardinalityEstimationMethods.getHeuristics().value_or(0));
+        ceMethods.setMixed(params.cardinalityEstimationMethods.getMixed().value_or(0));
+        ceMethods.setMetadata(params.cardinalityEstimationMethods.getMetadata().value_or(0));
+        ceMethods.setCode(params.cardinalityEstimationMethods.getCode().value_or(0));
+        ceMethods.serialize(&methodsBuilder);
+        methodsBuilder.done();
+
+        cbrBuilder.append("nDocsSampled", params.nDocsSampled);
+        cbrBuilder.done();
     }
 
     if (params.useSubsections) {
@@ -1700,32 +1713,94 @@ TEST_F(QueryStatsStoreTest, BasicDiskUsage) {
                                      .nModified = intMetricBson(1, 1, 1, 1),
                                  });
         }
+    }
+}
 
-        // Collect some metrics again but with CBR metrics.
+TEST_F(QueryStatsStoreTest, BasicDiskUsageWithCBRMetrics) {
+    // TODO SERVER-112150 Remove useSubsections.
+    for (bool useSubsections : {false, true}) {
+        QueryStatsStore queryStatsStore{5000000, 1000};
+
+        auto getMetrics = [&](BSONObj query) {
+            auto key = makeFindKeyFromQuery(query);
+            auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
+            ASSERT_OK(lookupResult);
+            return *lookupResult.getValue();
+        };
+
+        auto collectMetricsBase = [&](BSONObj query) {
+            auto key = makeFindKeyFromQuery(query);
+            auto lookupHash = absl::HashOf(key);
+            auto lookupResult = queryStatsStore.lookup(lookupHash);
+            if (!lookupResult.isOK()) {
+                queryStatsStore.put(lookupHash, QueryStatsEntry{std::move(key)});
+                lookupResult = queryStatsStore.lookup(lookupHash);
+            }
+            return lookupResult.getValue();
+        };
+
+        BSONObj query = BSON("query" << BSON("b" << 5));
+
+        // Collect some metrics with planningTime and CE methods.
         {
-            auto metrics = collectMetricsBase(query1);
+            auto metrics = collectMetricsBase(query);
             metrics->execCount += 1;
             metrics->lastExecutionMicros += 100;
             metrics->queryPlannerStats.planningTimeMicros.aggregate(500);
+            CardinalityEstimationMethods ceCounts;
+            ceCounts.setHistogram(2);
+            ceCounts.setSampling(1);
+            metrics->queryPlannerStats.costBasedRankerStats.cardinalityEstimationMethods.aggregate(
+                ceCounts);
             metrics->queryPlannerStats.costBasedRankerStats.nDocsSampled.aggregate(15);
         }
 
-        // With CBR metrics.
-        // TODO SERVER-115606 Add case for CE method.
         {
-            auto qse3 = getMetrics(query1);
-            verifyQueryStatsBSON(qse3,
+            auto qse = getMetrics(query);
+            CardinalityEstimationMethods expectedCE;
+            expectedCE.setHistogram(2);
+            expectedCE.setSampling(1);
+            verifyQueryStatsBSON(qse,
                                  {
                                      .useSubsections = useSubsections,
-                                     .includeWriteMetrics = true,
+                                     .includeWriteMetrics = false,
                                      .includeCBRMetrics = true,
-                                     .lastExecutionMicros = 247012LL,
-                                     .execCount = 3LL,
-                                     .hasSortStage = boolMetricBson(0, 1),
-                                     .usedDisk = boolMetricBson(1, 0),
-                                     .nMatched = intMetricBson(1, 1, 1, 1),
-                                     .nModified = intMetricBson(1, 1, 1, 1),
+                                     .lastExecutionMicros = 100LL,
+                                     .execCount = 1LL,
                                      .planningTimeMicros = intMetricBson(500, 500, 500, 250000),
+                                     .cardinalityEstimationMethods = expectedCE,
+                                     .nDocsSampled = intMetricBson(15, 15, 15, 225),
+                                 });
+        }
+
+        // Add more CE methods.
+        {
+            auto metrics = collectMetricsBase(query);
+            metrics->execCount += 1;
+            metrics->lastExecutionMicros += 200;
+            metrics->queryPlannerStats.planningTimeMicros.aggregate(300);
+            CardinalityEstimationMethods ceCounts;
+            ceCounts.setHeuristics(1);
+            ceCounts.setHistogram(1);
+            metrics->queryPlannerStats.costBasedRankerStats.cardinalityEstimationMethods.aggregate(
+                ceCounts);
+        }
+
+        {
+            auto qse = getMetrics(query);
+            CardinalityEstimationMethods expectedCE;
+            expectedCE.setHistogram(3);
+            expectedCE.setSampling(1);
+            expectedCE.setHeuristics(1);
+            verifyQueryStatsBSON(qse,
+                                 {
+                                     .useSubsections = useSubsections,
+                                     .includeWriteMetrics = false,
+                                     .includeCBRMetrics = true,
+                                     .lastExecutionMicros = 300LL,  // 100 + 200
+                                     .execCount = 2LL,
+                                     .planningTimeMicros = intMetricBson(800, 300, 500, 340000),
+                                     .cardinalityEstimationMethods = expectedCE,
                                      .nDocsSampled = intMetricBson(15, 15, 15, 225),
                                  });
         }

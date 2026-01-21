@@ -110,6 +110,7 @@ void QueryExecEntry::toBSON(BSONObjBuilder& queryStatsBuilder, bool buildAsSubse
 
 void CostBasedRankerEntry::toBSON(BSONObjBuilder& queryStatsBuilder) const {
     BSONObjBuilder cbrBuilder{sizeof(CostBasedRankerEntry) + kBSONOverhead};
+    cardinalityEstimationMethods.appendTo(cbrBuilder, "cardinalityEstimationMethods");
     nDocsSampled.appendTo(cbrBuilder, "nDocsSampled");
     queryStatsBuilder.append("costBasedRanker", cbrBuilder.obj());
 }
@@ -130,7 +131,6 @@ void QueryPlannerEntry::toBSON(BSONObjBuilder& queryStatsBuilder,
 
     if (includeCBRMetrics) {
         planningTimeMicros.appendTo(*builder, "planningTimeMicros");
-
         costBasedRankerStats.toBSON(*builder);
     }
 

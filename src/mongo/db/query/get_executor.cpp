@@ -69,6 +69,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/index_bounds_builder.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
@@ -587,6 +588,44 @@ protected:
         return boost::none;
     }
 
+    /**
+     * Captures the cardinality estimation method (if it exists) from the winning plan's root node
+     * and stores it in CurOp for query stats collection.
+     */
+    void captureCardinalityEstimationMethodForQueryStats(
+        const boost::optional<PlanExplainerData>& maybeExplainData, const QuerySolution* solution) {
+        if (maybeExplainData && !maybeExplainData->estimates.empty() && solution) {
+            auto it = maybeExplainData->estimates.find(solution->root());
+            if (it != maybeExplainData->estimates.end()) {
+                auto& ceMethods =
+                    CurOp::get(_opCtx)->debug().getAdditiveMetrics().cardinalityEstimationMethods;
+                switch (it->second.outCE.source()) {
+                    case cost_based_ranker::EstimationSource::Histogram:
+                        ceMethods.setHistogram(ceMethods.getHistogram().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Sampling:
+                        ceMethods.setSampling(ceMethods.getSampling().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Heuristics:
+                        ceMethods.setHeuristics(ceMethods.getHeuristics().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Mixed:
+                        ceMethods.setMixed(ceMethods.getMixed().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Metadata:
+                        ceMethods.setMetadata(ceMethods.getMetadata().value_or(0) + 1);
+                        break;
+                    case cost_based_ranker::EstimationSource::Code:
+                        ceMethods.setCode(ceMethods.getCode().value_or(0) + 1);
+                        break;
+                    default:
+                        MONGO_UNREACHABLE_TASSERT(11560600);
+                        break;
+                }
+            }
+        }
+    }
+
     OperationContext* _opCtx;
     const MultipleCollectionAccessor& _collections;
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
@@ -663,6 +702,8 @@ private:
     std::unique_ptr<ClassicRuntimePlannerResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
         boost::optional<PlanExplainerData> maybeExplainData) final {
+        captureCardinalityEstimationMethodForQueryStats(maybeExplainData, solution.get());
+
         auto result = releaseResult();
         result->runtimePlanner = std::make_unique<crp_classic::SingleSolutionPassthroughPlanner>(
             makePlannerData(),
@@ -821,6 +862,8 @@ protected:
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
         boost::optional<PlanExplainerData> maybeExplainData) final {
+        this->captureCardinalityEstimationMethodForQueryStats(maybeExplainData, solution.get());
+
         // TODO SERVER-92589: Support CBR with SBE plans
         auto result = this->releaseResult();
         result->runtimePlanner = std::make_unique<crp_sbe::SingleSolutionPassthroughPlanner>(

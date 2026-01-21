@@ -3702,6 +3702,9 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                               1 /* nModified */,
                               0 /* nDeleted */,
                               0 /* nInserted */);
+        CardinalityEstimationMethods ceMethods1;
+        ceMethods1.setHistogram(2);
+        metrics.setCardinalityEstimationMethods(ceMethods1);
         metrics.setDelinquentAcquisitions(3);
         metrics.setTotalAcquisitionDelinquencyMillis(100);
         metrics.setMaxAcquisitionDelinquencyMillis(80);
@@ -3747,6 +3750,12 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.nDeleted, 0);
         ASSERT_EQ(remoteMetrics.nInserted, 0);
         ASSERT_EQ(remoteMetrics.planningTime, Microseconds(100));
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getHistogram().value_or(0), 2);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getSampling().value_or(0), 0);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getHeuristics().value_or(0), 0);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
         ASSERT_EQ(remoteMetrics.nDocsSampled, 15);
     }
 
@@ -3770,6 +3779,10 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
                               2 /* nModified */,
                               1 /* nDeleted */,
                               1 /* nInserted */);
+        CardinalityEstimationMethods ceMethods2;
+        ceMethods2.setHistogram(1);
+        ceMethods2.setSampling(1);
+        metrics.setCardinalityEstimationMethods(ceMethods2);
         metrics.setDelinquentAcquisitions(2);
         metrics.setTotalAcquisitionDelinquencyMillis(150);
         metrics.setMaxAcquisitionDelinquencyMillis(120);
@@ -3813,6 +3826,12 @@ TEST_F(AsyncResultsMergerTest, RemoteMetricsAggregatedLocally) {
         ASSERT_EQ(remoteMetrics.nDeleted, 1);
         ASSERT_EQ(remoteMetrics.nInserted, 1);
         ASSERT_EQ(remoteMetrics.planningTime, Microseconds(250));
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getHistogram().value_or(0), 3);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getSampling().value_or(0), 1);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getHeuristics().value_or(0), 0);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getMixed().value_or(0), 0);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getMetadata().value_or(0), 0);
+        ASSERT_EQ(remoteMetrics.cardinalityEstimationMethods.getCode().value_or(0), 0);
         ASSERT_EQ(remoteMetrics.nDocsSampled, 31);
     }
 

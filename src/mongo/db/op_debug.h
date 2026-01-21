@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_shape/query_shape_hash.h"
@@ -46,9 +47,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/modules.h"
 
-#include <map>
-#include <set>
-#include <string>
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
@@ -246,7 +244,9 @@ public:
         // after optimizations. This metric is expected to be positive regardless of whether the
         // plan came from (e.g. multi-planner, cost-based ranker, plan cache).
         boost::optional<Microseconds> planningTime;
-
+        // Counts of cardinality estimation methods used by the winning plan's root node.
+        // On mongos, this aggregates counts across shards. All zeros if CBR was not used.
+        CardinalityEstimationMethods cardinalityEstimationMethods;
         // Number of documents sampled by cost-based ranker (CBR) when using sampling method to pick
         // the best plan.
         boost::optional<long long> nDocsSampled;

@@ -75,6 +75,7 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
     bool wasDeprioritized = false;
 
     Microseconds planningTime{0};
+    CardinalityEstimationMethods cardinalityEstimationMethods;
     uint64_t nDocsSampled{0};
 
     /**
@@ -109,6 +110,24 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         wasLoadShed = wasLoadShed || other.wasLoadShed;
         wasDeprioritized = wasDeprioritized || other.wasDeprioritized;
         planningTime += other.planningTime;
+        cardinalityEstimationMethods.setHistogram(
+            cardinalityEstimationMethods.getHistogram().value_or(0) +
+            other.cardinalityEstimationMethods.getHistogram().value_or(0));
+        cardinalityEstimationMethods.setSampling(
+            cardinalityEstimationMethods.getSampling().value_or(0) +
+            other.cardinalityEstimationMethods.getSampling().value_or(0));
+        cardinalityEstimationMethods.setHeuristics(
+            cardinalityEstimationMethods.getHeuristics().value_or(0) +
+            other.cardinalityEstimationMethods.getHeuristics().value_or(0));
+        cardinalityEstimationMethods.setMixed(
+            cardinalityEstimationMethods.getMixed().value_or(0) +
+            other.cardinalityEstimationMethods.getMixed().value_or(0));
+        cardinalityEstimationMethods.setMetadata(
+            cardinalityEstimationMethods.getMetadata().value_or(0) +
+            other.cardinalityEstimationMethods.getMetadata().value_or(0));
+        cardinalityEstimationMethods.setCode(
+            cardinalityEstimationMethods.getCode().value_or(0) +
+            other.cardinalityEstimationMethods.getCode().value_or(0));
         nDocsSampled += other.nDocsSampled;
     }
 
@@ -150,6 +169,21 @@ struct MONGO_MOD_PUB DataBearingNodeMetrics {
         wasLoadShed = wasLoadShed || metrics.getWasLoadShed();
         wasDeprioritized = wasDeprioritized || metrics.getWasDeprioritized();
         planningTime += Microseconds(metrics.getPlanningTimeMicros());
+        const auto& ce = metrics.getCardinalityEstimationMethods();
+        cardinalityEstimationMethods.setHistogram(
+            cardinalityEstimationMethods.getHistogram().value_or(0) +
+            ce.getHistogram().value_or(0));
+        cardinalityEstimationMethods.setSampling(
+            cardinalityEstimationMethods.getSampling().value_or(0) + ce.getSampling().value_or(0));
+        cardinalityEstimationMethods.setHeuristics(
+            cardinalityEstimationMethods.getHeuristics().value_or(0) +
+            ce.getHeuristics().value_or(0));
+        cardinalityEstimationMethods.setMixed(cardinalityEstimationMethods.getMixed().value_or(0) +
+                                              ce.getMixed().value_or(0));
+        cardinalityEstimationMethods.setMetadata(
+            cardinalityEstimationMethods.getMetadata().value_or(0) + ce.getMetadata().value_or(0));
+        cardinalityEstimationMethods.setCode(cardinalityEstimationMethods.getCode().value_or(0) +
+                                             ce.getCode().value_or(0));
         nDocsSampled += metrics.getNDocsSampled();
     }
 };

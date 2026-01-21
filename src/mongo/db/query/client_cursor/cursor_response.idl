@@ -47,6 +47,41 @@ enums:
             DocumentResult: "results"
 
 structs:
+    CardinalityEstimationMethods:
+        description: "Counts of cardinality estimation methods used by the cost-based ranker."
+        strict: false
+        fields:
+            Histogram:
+                description: "Count of estimates computed via histogram CE."
+                type: long
+                optional: true
+                stability: unstable
+            Sampling:
+                description: "Count of estimates computed via sampling CE."
+                type: long
+                optional: true
+                stability: unstable
+            Heuristics:
+                description: "Count of estimates computed via heuristic CE."
+                type: long
+                optional: true
+                stability: unstable
+            Mixed:
+                description: "Count of estimates from computations mixing different estimation types."
+                type: long
+                optional: true
+                stability: unstable
+            Metadata:
+                description: "Count of estimates from database metadata like collection cardinality."
+                type: long
+                optional: true
+                stability: unstable
+            Code:
+                description: "Count of estimates computed directly in C++, e.g. constants or exactCE."
+                type: long
+                optional: true
+                stability: unstable
+
     CursorMetrics:
         description: "A struct representing all of the metrics a cursor response can return."
         strict: false
@@ -91,8 +126,13 @@ structs:
                 description: "Time from the moment a planning request is received to the moment the winning plan is finalized"
                 type: long
                 stability: unstable
+            cardinalityEstimationMethods:
+                description: "Counts of cardinality estimation methods used by the cost-based ranker."
+                type: CardinalityEstimationMethods
+                default: true
+                stability: unstable
             nDocsSampled:
-                description: "Number of documents sampled by the query with CBR."
+                description: "Number of documents sampled by the query by the cost-based ranker."
                 type: long
                 stability: unstable
             cpuNanos:

@@ -59,6 +59,14 @@ static const BSONObj basicMetricsObj = fromjson(R"({
     fromMultiPlanner: true,
     fromPlanCache: true,
     planningTimeMicros: {"$numberLong": "0"},
+    cardinalityEstimationMethods: {
+        "Histogram": {"$numberLong": "2"},
+        "Sampling": {"$numberLong": "1"},
+        "Heuristics": {"$numberLong": "0"},
+        "Mixed": {"$numberLong": "0"},
+        "Metadata": {"$numberLong": "0"},
+        "Code": {"$numberLong": "0"}
+    },
     nDocsSampled: {"$numberLong": "4"},
     cpuNanos: {"$numberLong": "18"},
     delinquentAcquisitions: {"$numberLong": "0"},
@@ -325,6 +333,13 @@ TEST(CursorResponseTest, parseFromBSONCursorMetrics) {
     ASSERT_TRUE(metrics.getFromMultiPlanner());
     ASSERT_TRUE(metrics.getFromPlanCache());
     ASSERT_EQ(metrics.getPlanningTimeMicros(), 0);
+    const auto& ceMethods = metrics.getCardinalityEstimationMethods();
+    ASSERT_EQ(ceMethods.getHistogram().value_or(0), 2);
+    ASSERT_EQ(ceMethods.getSampling().value_or(0), 1);
+    ASSERT_EQ(ceMethods.getHeuristics().value_or(0), 0);
+    ASSERT_EQ(ceMethods.getMixed().value_or(0), 0);
+    ASSERT_EQ(ceMethods.getMetadata().value_or(0), 0);
+    ASSERT_EQ(ceMethods.getCode().value_or(0), 0);
     ASSERT_EQ(metrics.getNDocsSampled(), 4);
     ASSERT_EQ(metrics.getCpuNanos(), 18);
     ASSERT_EQ(metrics.getDelinquentAcquisitions(), 0);
@@ -974,6 +989,10 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
                           1 /* nModified */,
                           0 /* nDeleted */,
                           0 /* nInserted */);
+    CardinalityEstimationMethods ceMethods;
+    ceMethods.setHistogram(2);
+    ceMethods.setSampling(1);
+    metrics.setCardinalityEstimationMethods(ceMethods);
 
     auto pbrToken = BSON("n" << 1);
     builder.setPostBatchResumeToken(pbrToken);
@@ -1019,6 +1038,14 @@ TEST_F(CursorResponseBuilderTest, buildResponseWithAllKnownFields) {
     ASSERT_EQ(parsedMetrics->getNModified(), 1);
     ASSERT_EQ(parsedMetrics->getNDeleted(), 0);
     ASSERT_EQ(parsedMetrics->getNInserted(), 0);
+
+    const auto& parsedCeMethods = parsedMetrics->getCardinalityEstimationMethods();
+    ASSERT_EQ(parsedCeMethods.getHistogram().value_or(0), 2);
+    ASSERT_EQ(parsedCeMethods.getSampling().value_or(0), 1);
+    ASSERT_EQ(parsedCeMethods.getHeuristics().value_or(0), 0);
+    ASSERT_EQ(parsedCeMethods.getMixed().value_or(0), 0);
+    ASSERT_EQ(parsedCeMethods.getMetadata().value_or(0), 0);
+    ASSERT_EQ(parsedCeMethods.getCode().value_or(0), 0);
 
     ASSERT_TRUE(response.getPartialResultsReturned());
     ASSERT_TRUE(response.getInvalidated());

@@ -43,4 +43,15 @@ void AggregatedBool::appendTo(BSONObjBuilder& builder, StringData fieldName) con
         .append("true"_sd, static_cast<long long>(trueCount))
         .append("false"_sd, static_cast<long long>(falseCount));
 }
+
+void AggregatedCardinalityEstimationMethods::appendTo(BSONObjBuilder& builder,
+                                                      StringData fieldName) const {
+    BSONObjBuilder{builder.subobjStart(fieldName)}
+        .append("Histogram", static_cast<long long>(counts.getHistogram().value_or(0)))
+        .append("Sampling", static_cast<long long>(counts.getSampling().value_or(0)))
+        .append("Heuristics", static_cast<long long>(counts.getHeuristics().value_or(0)))
+        .append("Mixed", static_cast<long long>(counts.getMixed().value_or(0)))
+        .append("Metadata", static_cast<long long>(counts.getMetadata().value_or(0)))
+        .append("Code", static_cast<long long>(counts.getCode().value_or(0)));
+}
 }  // namespace mongo::query_stats

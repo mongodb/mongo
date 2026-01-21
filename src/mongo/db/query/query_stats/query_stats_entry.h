@@ -104,6 +104,12 @@ struct CostBasedRankerEntry {
     void toBSON(BSONObjBuilder& queryStatsBuilder) const;
 
     /**
+     * Aggregates the cardinality estimation methods used across all executions.
+     * Each method maps to a count of how many times it was used.
+     */
+    AggregatedCardinalityEstimationMethods cardinalityEstimationMethods;
+
+    /**
      * Aggregates the number of documents sampled by the cost-based ranker.
      */
     AggregatedMetric<uint64_t> nDocsSampled;
