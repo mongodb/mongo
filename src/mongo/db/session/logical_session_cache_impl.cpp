@@ -364,11 +364,11 @@ Status LogicalSessionCacheImpl::_refresh(Client* client) {
     if (refreshRes.hasErrors()) {
         const auto numFailed = refreshRes.failedSessions.size();
         for (const auto& error : refreshRes.errors) {
-            LOGV2_ERROR(94001000,
-                        "Failed to refresh some active sessions, continuing without these",
-                        "numFailed"_attr = numFailed,
-                        "totalAttempted"_attr = activeSessionRecords.size(),
-                        "error"_attr = redact(error));
+            LOGV2_WARNING(94001000,
+                          "Failed to refresh some active sessions, continuing without these",
+                          "numFailed"_attr = numFailed,
+                          "totalAttempted"_attr = activeSessionRecords.size(),
+                          "error"_attr = redact(error));
         }
         // Return the first error to the caller after logging them all.
         refreshStatus = refreshRes.errors[0];
