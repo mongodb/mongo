@@ -14,6 +14,17 @@ selector:
     - jstests/replsets/disallow_shardsvr_transactions_wcMajorityJournal_false.js
     - jstests/replsets/stepdown_during_set_fcv.js
     - src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_mixed_version_sync.js
+    - jstests/replsets/initial_sync_fcv.js
+    - jstests/replsets/awaitable_hello_fcv_change.js
+    - jstests/replsets/fcv_retryable_write_concern.js
+    - jstests/replsets/writes_wait_for_write_concern.js
+    - jstests/replsets/replicate_record_ids_fcv_downgrade.js
+
+    # TODO (SERVER-112863): Enable the following tests once priority ports can be added via force
+    # reconfig.
+    - jstests/replsets/unconditional_step_down.js
+    - jstests/replsets/force_reconfig_skips_oplog_commitment.js
+    - jstests/replsets/reconfig_waits_for_oplog_commitment_condition_when_leaving_force.js
 
   exclude_with_any_tags:
     # Mongobridge intercepts, blocks, and delays messages between nodes in a replica set. When a

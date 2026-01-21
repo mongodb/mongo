@@ -335,8 +335,15 @@ Status validatePriorityPortSettings(const VersionContext& vCtx,
             if (!priorityPortFeatureEnabled) {
                 return {ErrorCodes::InvalidOptions,
                         "Priority port is not supported on the current FCV"};
-            } else if (force && !oldConfig->getMemberAt(i).getPriorityPort().has_value()) {
-                return {ErrorCodes::InvalidOptions, "Cannot add priority ports via force reconfig"};
+            } else if (force) {
+                // If the priority port is new (either from a new member or adding to an existing
+                // member), we disallow it. If the port already existed in the old config, we allow
+                // it.
+                const auto& oldMember = oldConfig->findMemberByID(newMember.getId().getData());
+                if (oldMember == nullptr || !oldMember->getPriorityPort().has_value()) {
+                    return {ErrorCodes::InvalidOptions,
+                            "Cannot add priority ports via force reconfig"};
+                }
             }
         }
     }
