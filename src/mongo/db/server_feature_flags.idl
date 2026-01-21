@@ -242,3 +242,9 @@ feature_flags:
         default: false
         fcv_gated: true
         check_against_fcv: operation_fcv_only
+    featureFlagCreateSupportsStorageTierOptions:
+        description: "Enables the catalog support for creating cold/hot collections and indexes for disaggregated storage"
+        cpp_varname: gFeatureFlagCreateSupportsStorageTierOptions
+        default: false
+        fcv_gated: true
+        check_against_fcv: operation_fcv_only

@@ -55,6 +55,13 @@ enums:
             warn: warn
             errorAndLog: errorAndLog
 
+    StorageTierLevel:
+        description: "Disaggregated storage 'hotness' level for a collection or index"
+        type: string
+        values:
+            hot: hot
+            cold: cold
+
 structs:
     IndexOptionDefaults:
         description: "The default configuration for indexes per storage engine."
@@ -67,3 +74,27 @@ structs:
                 stability: stable
                 validator:
                     callback: collection_options_validation::validateStorageEngineOptions
+
+    DefaultIndexesTier:
+        description: "Disaggregated storage default 'hotness' level for indexes belonging to a collection"
+        strict: true
+        fields:
+            defaultTier:
+                description: "Disaggregated storage default 'hotness' for indexes"
+                type: StorageTierLevel
+                stability: unstable
+
+    CollectionStorageTier:
+        description: "The disaggregated storage configuration for hot/cold collections"
+        strict: true
+        fields:
+            collection:
+                description: "Specifies the collection storage tier"
+                type: StorageTierLevel
+                stability: unstable
+                default: "hot"
+            indexes:
+                description: "Specifies the indexes storage tier"
+                type: DefaultIndexesTier
+                optional: true
+                stability: unstable

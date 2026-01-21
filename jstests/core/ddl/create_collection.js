@@ -7,6 +7,7 @@
 import {ClusteredCollectionUtil} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // "create" command rejects invalid options.
 assert.commandWorked(db.runCommand({drop: "create_collection"}));
@@ -194,3 +195,35 @@ assert.commandFailedWithCode(
     db.createCollection("create_collection", {collation: {locale: "uk"}}),
     ErrorCodes.NamespaceExists,
 );
+
+// Testing storage tier create parameter
+if (FeatureFlagUtil.isPresentAndEnabled(db, "CreateSupportsStorageTierOptions")) {
+    let i = 0;
+    function getCollectionName() {
+        return "with_storage_tier" + i++;
+    }
+
+    // Valid values for storageTier.collection and/or storageTier.indexes
+    assert.commandWorked(db.createCollection(getCollectionName(), {storageTier: {collection: "hot"}}));
+    assert.commandWorked(db.createCollection(getCollectionName(), {storageTier: {collection: "cold"}}));
+    assert.commandWorked(db.createCollection(getCollectionName(), {storageTier: {indexes: {defaultTier: "cold"}}}));
+    assert.commandWorked(db.createCollection(getCollectionName(), {storageTier: {indexes: {defaultTier: "hot"}}}));
+    assert.commandWorked(
+        db.createCollection(getCollectionName(), {storageTier: {collection: "cold", indexes: {defaultTier: "hot"}}}),
+    );
+
+    // Invalid values for storageTier, storageTier.collection and/or storageTier.indexes
+    assert.commandFailed(db.createCollection(getCollectionName(), {storageTier: 100}));
+    assert.commandFailed(db.createCollection(getCollectionName(), {storageTier: {collection: "foo"}}));
+    assert.commandFailed(db.createCollection(getCollectionName(), {storageTier: {indexes: "bar"}}));
+    assert.commandFailed(db.createCollection(getCollectionName(), {storageTier: {indexes: {defaultTier: "bar"}}}));
+    assert.commandFailed(
+        db.createCollection(getCollectionName(), {storageTier: {ccccollection: "hot", indexes: {defaultTier: "cold"}}}),
+    );
+    assert.commandFailed(
+        db.createCollection(getCollectionName(), {storageTier: {collection: "hot", indexes: {defaultTierrrr: "lol"}}}),
+    );
+    assert.commandFailed(
+        db.createCollection(getCollectionName(), {storageTier: {collection: "hot", indexes: {defaultTier: "lol"}}}),
+    );
+}

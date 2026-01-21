@@ -182,6 +182,11 @@ structs:
                 type: EncryptedFieldConfig
                 optional: true
                 stability: stable
+            storageTier:
+                description: "Specific to disaggregated storage to set hot/cold options."
+                type: CollectionStorageTier
+                optional: true
+                stability: unstable
             temp:
                 description: "Internal field that can be used in the $out aggregation code."
                 type: safeBool
