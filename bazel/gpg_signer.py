@@ -20,9 +20,12 @@ import sys
 import tempfile
 from typing import List, Optional
 
+debug = False  # manually change to enable verbose output
+
 
 def _debug(msg: str) -> None:
-    print(msg, file=sys.stderr)
+    if debug:
+        print(msg, file=sys.stderr)
 
 
 def _run(argv: List[str], *, capture_stdout: bool = False) -> subprocess.CompletedProcess:
@@ -30,7 +33,11 @@ def _run(argv: List[str], *, capture_stdout: bool = False) -> subprocess.Complet
         return subprocess.run(
             argv, check=True, text=True, stdout=subprocess.PIPE, stderr=sys.stderr
         )
-    return subprocess.run(argv, check=True)
+    if not debug:
+        with open(os.devnull, "wb") as null:
+            return subprocess.run(argv, check=True, stdout=null, stderr=null)
+    else:
+        return subprocess.run(argv, check=True)
 
 
 def _extract_fingerprint(colons_output: str) -> Optional[str]:
