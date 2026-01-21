@@ -76,7 +76,7 @@ hs_cursor(void *arg)
             if (ret == WT_NOTFOUND)
                 break;
             testutil_check(
-              __wt_curhs_open_ext((WT_SESSION_IMPL *)session, hs_id, 0, NULL, &cursor));
+              __wt_curhs_open_ext((WT_SESSION_IMPL *)session, hs_id, 0, NULL, NULL, &cursor));
             F_SET(cursor, WT_CURSTD_HS_READ_COMMITTED);
 
             /*

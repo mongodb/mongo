@@ -162,6 +162,13 @@ connection_disaggregated_config = [
         type='category', subconfig=connection_disaggregated_config_common +\
               disaggregated_config_common),
 ]
+table_disaggregated_config = [
+    Config('storage_tier', 'none', r'''
+        A hint to the storage service about the expected storage
+        characteristics of this table. Currently the default (empty) value indicates a hot
+        collection, and it can be configured to 'cold' to indicate a cold collection.''',
+        choices=['cold', 'none'], undoc=True),
+]
 connection_page_delta_config = [
     Config('page_delta', '', r'''
         configure page delta settings for this connection''',
@@ -170,7 +177,7 @@ connection_page_delta_config = [
 file_disaggregated_config = [
     Config('disaggregated', '', r'''
         configure disaggregated storage for this file''',
-        type='category', subconfig=disaggregated_config_common
+        type='category', subconfig=disaggregated_config_common + table_disaggregated_config
     ),
 ]
 wiredtiger_open_disaggregated_storage_configuration = connection_disaggregated_config

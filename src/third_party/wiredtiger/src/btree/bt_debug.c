@@ -272,7 +272,7 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile, uint32_t
     if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && !WT_IS_HS(session->dhandle) &&
       !(WT_READING_CHECKPOINT(session) && session->hs_checkpoint == NULL)) {
         WT_ASSERT(session, session->dhandle != NULL);
-        WT_ERR(__wt_curhs_open(session, S2BT(session)->id, NULL, &ds->hs_cursor));
+        WT_ERR(__wt_curhs_open(session, S2BT(session)->id, NULL, NULL, &ds->hs_cursor));
     }
 
     if (ds->hs_cursor != NULL) {
@@ -1056,7 +1056,7 @@ __wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
         if (ret == WT_NOTFOUND)
             return (0);
 
-        WT_RET(__wt_curhs_open_ext(session, hs_id, 0, NULL, &hs_cursor));
+        WT_RET(__wt_curhs_open_ext(session, hs_id, 0, NULL, NULL, &hs_cursor));
         hs_btree = __wt_curhs_get_btree(hs_cursor);
         WT_WITH_BTREE(session, hs_btree, ret = __wt_debug_tree_all(session, NULL, NULL, ofile));
         WT_TRET(hs_cursor->close(hs_cursor));

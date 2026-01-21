@@ -168,7 +168,7 @@ __rec_hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor
              * case, we'll never get here.
              */
             if (hs_insert_cursor == NULL)
-                WT_ERR(__wt_curhs_open(session, btree_id, NULL, &hs_insert_cursor));
+                WT_ERR(__wt_curhs_open(session, btree_id, NULL, NULL, &hs_insert_cursor));
 
             /*
              * If these history store records are resolved prepared updates, their durable
@@ -679,7 +679,7 @@ __wti_rec_hs_insert_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_MULTI
     cache_hs_insert_full_update = cache_hs_insert_reverse_modify = cache_hs_write_squash = 0;
     cache_hs_key_processed = cache_hs_update_processed = 0;
 
-    WT_RET(__wt_curhs_open(session, btree->id, NULL, &hs_cursor));
+    WT_RET(__wt_curhs_open(session, btree->id, NULL, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
 
     __wt_update_vector_init(session, &updates);
@@ -1268,13 +1268,13 @@ __rec_hs_delete_record(
      * matches the current btree and attempt to reuse it if it does not.
      */
     if (r->hs_cursor == NULL)
-        WT_RET(__wt_curhs_open(session, btree->id, NULL, &r->hs_cursor));
+        WT_RET(__wt_curhs_open(session, btree->id, NULL, NULL, &r->hs_cursor));
     else if (__wt_curhs_get_btree_id(session, r->hs_cursor) != btree->id) {
         WT_RET_ERROR_OK(ret = __wt_curhs_set_btree_id(session, r->hs_cursor, btree->id), EINVAL);
         if (ret == EINVAL) {
             WT_RET(r->hs_cursor->close(r->hs_cursor));
             r->hs_cursor = NULL;
-            WT_RET(__wt_curhs_open(session, btree->id, NULL, &r->hs_cursor));
+            WT_RET(__wt_curhs_open(session, btree->id, NULL, NULL, &r->hs_cursor));
         }
     }
 

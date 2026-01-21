@@ -116,6 +116,8 @@ struct __wt_btree {
     WT_CKPT *ckpt;               /* Checkpoint information */
     size_t ckpt_bytes_allocated; /* Checkpoint information array allocation size */
 
+    const char *hs_checkpoint_name; /* History store checkpoint name. */
+
     WT_BTREE_TYPE type; /* Type */
 
     const char *key_format;   /* Key format */
@@ -146,7 +148,7 @@ struct __wt_btree {
     bool prefix_compression;      /* Prefix compression */
     u_int prefix_compression_min; /* Prefix compression min */
 
-    /* FIXME-WT-15633: Combine `prune_timestamp` and `ckpt_timestamp` into one variable */
+    /* FIXME-WT-15633: Combine `prune_timestamp` and `checkpoint_timestamp` into one variable */
     wt_shared wt_timestamp_t prune_timestamp; /* Ingest table GC collection timestamp */
     wt_timestamp_t checkpoint_timestamp;      /* Stable table checkpoint timestamp */
 
@@ -293,6 +295,7 @@ struct __wt_btree {
 
     /* The next page ID available for allocation in disaggregated storage for this tree. */
     wt_shared uint64_t next_page_id;
+    WT_BTREE_STORAGE_TIER storage_tier; /* Disaggregated storage tier type */
 
 /*
  * Flag values up to 0xfff are reserved for WT_DHANDLE_XXX. See comment with dhandle flags for an

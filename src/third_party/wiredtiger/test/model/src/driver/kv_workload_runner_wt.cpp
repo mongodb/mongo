@@ -37,6 +37,10 @@
 #include "model/driver/kv_workload_runner_wt.h"
 #include "model/util.h"
 
+extern "C" {
+#include "wt_internal.h"
+}
+
 #if defined(__unix__) || defined(__APPLE__)
 #include <dirent.h>
 #endif
@@ -704,10 +708,23 @@ kv_workload_runner_wt::wiredtiger_open_nolock()
                 throw wiredtiger_exception("Cannot reconfigure WiredTiger", ret);
         }
 
-        /* Set the stable timestamp. */
+        /* Set the stable and oldest timestamps. */
         if (picked_up) {
             std::ostringstream stable_config;
             stable_config << "stable_timestamp=" << std::hex << checkpoint_timestamp;
+
+            /*
+             * FIXME-WT-16475: WiredTiger may set the oldest timestamp internally when picking up
+             * the first checkpoint. If this is the case, we don't have to set the oldest timestamp
+             * here inside test/model.
+             */
+            model::timestamp_t oldest_timestamp =
+              model::timestamp_t(((WT_CONNECTION_IMPL *)_connection)
+                                   ->disaggregated_storage.last_checkpoint_oldest_timestamp);
+            /* The oldest timestamp may not be set, in that case, ignore it. */
+            if (oldest_timestamp != k_timestamp_none)
+                stable_config << ",oldest_timestamp=" << std::hex << oldest_timestamp;
+
             std::string stable_config_str = stable_config.str();
             ret = _connection->set_timestamp(_connection, stable_config_str.c_str());
             if (ret != 0)

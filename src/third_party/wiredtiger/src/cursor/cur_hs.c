@@ -9,7 +9,8 @@
 #include "wt_internal.h"
 
 static int __curhs_file_cursor_next(WT_SESSION_IMPL *, WT_CURSOR *);
-static int __curhs_file_cursor_open(WT_SESSION_IMPL *, const char *, WT_CURSOR *, WT_CURSOR **);
+static int __curhs_file_cursor_open(
+  WT_SESSION_IMPL *, const char *, const char *, WT_CURSOR *, WT_CURSOR **);
 static int __curhs_file_cursor_prev(WT_SESSION_IMPL *, WT_CURSOR *);
 static int __curhs_file_cursor_search_near(WT_SESSION_IMPL *, WT_CURSOR *, int *);
 static int __curhs_prev_visible(WT_SESSION_IMPL *, WT_CURSOR_HS *);
@@ -21,16 +22,18 @@ static int __curhs_search_near_helper(WT_SESSION_IMPL *, WT_CURSOR *, bool);
  *     Open a new history store table cursor, internal function.
  */
 static int
-__curhs_file_cursor_open(
-  WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, WT_CURSOR **cursorp)
+__curhs_file_cursor_open(WT_SESSION_IMPL *session, const char *uri, const char *checkpoint_name,
+  WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
     WT_CURSOR *cursor;
+    WT_DECL_ITEM(stable_uri_buf);
     WT_DECL_RET;
     size_t len;
     char *tmp;
 
     const char *open_cursor_cfg[] = {
       WT_CONFIG_BASE(session, WT_SESSION_open_cursor), "", NULL, NULL};
+    tmp = NULL;
 
     if (WT_READING_CHECKPOINT(session)) {
         /*
@@ -43,8 +46,17 @@ __curhs_file_cursor_open(
         WT_RET(__wt_malloc(session, len, &tmp));
         WT_ERR(__wt_snprintf(tmp, len, "checkpoint=%s", session->hs_checkpoint));
         open_cursor_cfg[2] = tmp;
-    } else
-        tmp = NULL;
+    } else if (checkpoint_name != NULL) {
+        WT_ASSERT(
+          session, __wt_conn_is_disagg(session) && !S2C(session)->layered_table_manager.leader);
+        WT_ERR(__wt_scr_alloc(session, 0, &stable_uri_buf));
+        /*
+         * Use a URI with a "/<checkpoint name> suffix. This is interpreted as reading from the
+         * stable checkpoint, but without it being a traditional checkpoint cursor.
+         */
+        WT_ERR(__wt_buf_fmt(session, stable_uri_buf, "%s/%s", uri, checkpoint_name));
+        uri = stable_uri_buf->data;
+    }
 
     WT_WITHOUT_DHANDLE(
       session, ret = __wt_open_cursor(session, uri, owner, open_cursor_cfg, &cursor));
@@ -57,6 +69,7 @@ __curhs_file_cursor_open(
 
 err:
     __wt_free(session, tmp);
+    __wt_scr_free(session, &stable_uri_buf);
     return (ret);
 }
 
@@ -138,11 +151,11 @@ __wt_curhs_cache(WT_SESSION_IMPL *session)
      * while still in use. However, history store dhandles are an exception as they are not subject
      * to sweeping.
      */
-    WT_RET(__curhs_file_cursor_open(session, WT_HS_URI, NULL, &cursor));
+    WT_RET(__curhs_file_cursor_open(session, WT_HS_URI, NULL, NULL, &cursor));
     WT_RET(cursor->close(cursor));
 
     if (__wt_conn_is_disagg(session)) {
-        WT_RET(__curhs_file_cursor_open(session, WT_HS_URI_SHARED, NULL, &cursor));
+        WT_RET(__curhs_file_cursor_open(session, WT_HS_URI_SHARED, NULL, NULL, &cursor));
         WT_RET(cursor->close(cursor));
     }
     return (0);
@@ -1394,12 +1407,13 @@ __wt_curhs_set_btree_id(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t bt
  *     Initialize a history store cursor.
  */
 int
-__wt_curhs_open(WT_SESSION_IMPL *session, uint32_t btree_id, WT_CURSOR *owner, WT_CURSOR **cursorp)
+__wt_curhs_open(WT_SESSION_IMPL *session, uint32_t btree_id, const char *checkpoint_name,
+  WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
     uint32_t hs_id;
 
     hs_id = __curhs_btree_id_to_hs_id(session, btree_id);
-    return (__wt_curhs_open_ext(session, hs_id, btree_id, owner, cursorp));
+    return (__wt_curhs_open_ext(session, hs_id, btree_id, checkpoint_name, owner, cursorp));
 }
 
 /*
@@ -1409,8 +1423,8 @@ __wt_curhs_open(WT_SESSION_IMPL *session, uint32_t btree_id, WT_CURSOR *owner, W
  *     the it.
  */
 int
-__wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id, WT_CURSOR *owner,
-  WT_CURSOR **cursorp)
+__wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id,
+  const char *checkpoint_name, WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
@@ -1457,7 +1471,7 @@ __wt_curhs_open_ext(WT_SESSION_IMPL *session, uint32_t hs_id, uint32_t btree_id,
     WT_ERR(__wt_strdup(session, uri, &cursor->uri));
 
     /* Open the file cursor for operations on the regular history store .*/
-    WT_ERR(__curhs_file_cursor_open(session, uri, owner, &hs_cursor->file_cursor));
+    WT_ERR(__curhs_file_cursor_open(session, uri, checkpoint_name, owner, &hs_cursor->file_cursor));
 
     WT_WITH_BTREE(session, CUR2BT(hs_cursor->file_cursor),
       ret = __wt_cursor_init(cursor, uri, owner, NULL, cursorp));

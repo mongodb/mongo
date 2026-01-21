@@ -1251,7 +1251,7 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
          * Open a history store table cursor and scan the history store for the given btree and key
          * with maximum start timestamp to let the search point to the last version of the key.
          */
-        WT_ERR(__wt_curhs_open(session, btree->id, NULL, &hs_cursor));
+        WT_ERR(__wt_curhs_open(session, btree->id, NULL, NULL, &hs_cursor));
         F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
         if (btree->type == BTREE_ROW)
             hs_cursor->set_key(hs_cursor, 4, btree->id, &cbt->iface.key, WT_TS_MAX, UINT64_MAX);

@@ -1072,7 +1072,7 @@ __verify_key_hs(
 
     btree = S2BT(session);
     hs_btree_id = btree->id;
-    WT_RET(__wt_curhs_open(session, hs_btree_id, NULL, &hs_cursor));
+    WT_RET(__wt_curhs_open(session, hs_btree_id, NULL, NULL, &hs_cursor));
     F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
 
     /*

@@ -1460,7 +1460,7 @@ __schema_create_config_check(
   WT_SESSION_IMPL *session, const char *uri, const char *config, bool import)
 {
     WT_CONFIG_ITEM cval;
-    bool file_metadata, is_tiered, tiered_name_set;
+    bool file_metadata, is_tiered, tiered_name_set, storage_tier_set;
 
     file_metadata =
       __wt_config_getones(session, config, "import.file_metadata", &cval) == 0 && cval.val != 0;
@@ -1501,6 +1501,15 @@ __schema_create_config_check(
     if (__wt_conn_is_disagg(session) && write_ts_never)
         WT_RET_SUB(session, EINVAL, WT_CONFLICT_DISAGG,
           "write_timestamp_usage cannot be set to never when disaggregated storage is enabled");
+
+    /* We only support storage tier of cold in disagg mode. */
+    storage_tier_set =
+      __wt_config_getones(session, config, "disaggregated.storage_tier", &cval) == 0 &&
+      cval.len != 0;
+    if (!__wt_conn_is_disagg(session) && storage_tier_set)
+        if (strncmp("none", cval.str, cval.len) != 0)
+            WT_RET_SUB(session, EINVAL, WT_CONFLICT_DISAGG,
+              "Cold collections only supported when disaggregated storage is enabled");
 
     return (0);
 }

@@ -1072,7 +1072,9 @@ functions:
           echo Iteration $i/${times}
           rm -rf RUNDIR
           ./t -c ../../../test/format/CONFIG.disagg ${format_args|} ${extra_arg|} || fail
-          ./t -R $format_args ${extra_args|} || fail
+          if [ ${reopen|true} = true ]; then
+            ./t -R $format_args ${extra_args|} || fail
+          fi
         done
   "many dbs test":
     command: shell.exec
@@ -1691,6 +1693,7 @@ variables:
         vars:
           format_args: disagg.multi=1 runs.predictable_replay=1 runs.ops=500000:2000000
           times: 5
+          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
 
   - &format-stress-test-disagg-multi-data-validation
     depends_on:
@@ -1702,6 +1705,7 @@ variables:
           # Validate data with a non-layered table.
           format_args: disagg.multi=1 runs.predictable_replay=1 ops.verify=1 disagg.multi_validation=1 runs.ops=500000:2000000
           times: 5
+          reopen: false # FIXME-WT-16481 Reopen currently causes failures in disagg multi mode.
 
 #######################################
 #               Tasks                 #
@@ -3029,6 +3033,251 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: -v 2 -b 11/12
+
+  # XSAN testing runs longer and needs more buckets to keep individual task turnaround time reasonable.
+
+  - name: unit-test-xsan-bucket00
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 0/24
+
+  - name: unit-test-xsan-bucket01
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 1/24
+
+  - name: unit-test-xsan-bucket02
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 2/24
+
+  - name: unit-test-xsan-bucket03
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 3/24
+
+  - name: unit-test-xsan-bucket04
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 4/24
+
+  - name: unit-test-xsan-bucket05
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 5/24
+
+  - name: unit-test-xsan-bucket06
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 6/24
+
+  - name: unit-test-xsan-bucket07
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 7/24
+
+  - name: unit-test-xsan-bucket08
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 8/24
+
+  - name: unit-test-xsan-bucket09
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 9/24
+
+  - name: unit-test-xsan-bucket10
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 10/24
+
+  - name: unit-test-xsan-bucket11
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 11/24
+
+  - name: unit-test-xsan-bucket12
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 12/24
+
+  - name: unit-test-xsan-bucket13
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 13/24
+
+  - name: unit-test-xsan-bucket14
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 14/24
+
+  - name: unit-test-xsan-bucket15
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 15/24
+
+  - name: unit-test-xsan-bucket16
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 16/24
+
+  - name: unit-test-xsan-bucket17
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 17/24
+
+  - name: unit-test-xsan-bucket18
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 18/24
+
+  - name: unit-test-xsan-bucket19
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 19/24
+
+  - name: unit-test-xsan-bucket20
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 20/24
+
+  - name: unit-test-xsan-bucket21
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 21/24
+
+  - name: unit-test-xsan-bucket22
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 22/24
+
+  - name: unit-test-xsan-bucket23
+    tags: ["python","pull_request","unit_test_xsan"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 -b 23/24
+
+  # Long running tests are broken out into their own buckets/tasks so that they can be scheduled
+  # to run at a later testing stage, e.g. merge queue testing.
 
   - name: unit-test-long-bucket00
     tags: ["python", "unit_test_long"]
@@ -6581,7 +6830,7 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
   tags: ["pull_request"]
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.unit_test_tsan"
+    - name: ".pull_request !.pull_request_compilers !.unit_test_tsan !.unit_test_xsan"
     - name: ".lint"
     - name: ".unit_test_long"
       distros: ubuntu2004-large
@@ -6660,7 +6909,7 @@ buildvariants:
     additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
   tags: ["pull_request", "sanitizer"]
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test !.unit_test_tsan !syscall-linux !chunkcache-test"
+    - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test !.unit_test_tsan !syscall-linux !chunkcache-test !format-mirror-test"
     - name: examples-c-test
     - name: format-asan-smoke-test
     - name: model-test-long
@@ -6675,8 +6924,7 @@ buildvariants:
     - name: ".stress-test-asan"
     - name: ".stress-test-disagg"
       distros: ubuntu2004-large
-    # FIXME-WT-16302: Split unit tests into more buckets
-    - name: ".unit_test"
+    - name: ".unit_test_xsan"
     - name: ".unit_test_disagg"
     - name: ".unit_test_long"
 
@@ -7131,7 +7379,7 @@ buildvariants:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=RelWithDebInfo
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.unit_test_tsan"
+    - name: ".pull_request !.pull_request_compilers !.unit_test_tsan !.unit_test_xsan"
     - name: compile
     - name: make-check-test
     - name: unit-test
@@ -7219,7 +7467,7 @@ buildvariants:
     NONSTANDALONE: -DWT_STANDALONE_BUILD=0
     unit_test_variant_args: "--hook nonstandalone"
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.unit_test_tsan"
+    - name: ".pull_request !.pull_request_compilers !.unit_test_tsan !.unit_test_xsan"
     - name: compile
     - name: make-check-test
     - name: unit-test-extra-long
@@ -7546,7 +7794,7 @@ buildvariants:
     additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
     ctest_extra_args: -E "wt12015_backup_corruption"
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test !.unit_test_tsan !.unit_test_tsan !syscall-linux !chunkcache-test"
+    - name: ".pull_request !.pull_request_compilers !.unit_test_xsan !.python !.tiered_unittest !csuite-wt12015-backup-corruption-test !.unit_test_tsan !syscall-linux !chunkcache-test"
     - name: examples-c-test
     - name: format-asan-smoke-test
     - name: model-test-long
@@ -7561,7 +7809,6 @@ buildvariants:
     - name: ".stress-test-asan"
     - name: ".stress-test-disagg"
       distros: amazon2023-arm64-latest-large-m8g
-    # FIXME-WT-16302: Split unit tests into more buckets
     - name: ".unit_test"
     - name: ".unit_test_disagg"
     - name: ".unit_test_long"

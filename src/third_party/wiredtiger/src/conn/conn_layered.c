@@ -514,9 +514,10 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
     WT_DECL_ITEM(metadata_buf);
     WT_DECL_RET;
     WT_DISAGGREGATED_STORAGE *disagg;
+    wt_timestamp_t oldest_timestamp;
     uint64_t lsn;
     uint32_t checksum;
-    char *checkpoint_root_copy, ts_string[WT_TS_INT_STRING_SIZE];
+    char *checkpoint_root_copy, ts_string[2][WT_TS_INT_STRING_SIZE];
 
     checkpoint_root_copy = NULL;
     conn = S2C(session);
@@ -535,11 +536,19 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
     WT_ERR(__wt_strndup(session, checkpoint_root, checkpoint_root_size, &checkpoint_root_copy));
     WT_ERR(__wt_scr_alloc(session, 0, &metadata_buf));
 
+    /*
+     * Get the oldest timestamp from the metadata, don't use the one from the global transaction
+     * structure as we need the timestamp associated with the checkpoint.
+     */
+    WT_ERR(__wt_meta_read_checkpoint_oldest(session, NULL, &oldest_timestamp, NULL));
+
     /* Format metadata settings. */
-    WT_ERR(__wt_buf_fmt(session, metadata_buf,
-      "checkpoint=%s,\n"
-      "timestamp=%" PRIx64,
-      checkpoint_root_copy, checkpoint_timestamp));
+    WT_ERR(
+      __wt_buf_fmt(session, metadata_buf,
+        "checkpoint=%s,\n"
+        "timestamp=%" PRIx64 ",\n"
+        "oldest_timestamp=%" PRIx64,
+        checkpoint_root_copy, checkpoint_timestamp, oldest_timestamp));
 
     /* Append key provider metadata, if available. */
     if (conn->key_provider != NULL) {
@@ -574,13 +583,15 @@ __wt_disagg_put_checkpoint_meta(WT_SESSION_IMPL *session, const char *checkpoint
      */
     __wt_atomic_store_uint64_release(&disagg->last_checkpoint_meta_lsn, lsn);
     __wt_atomic_store_uint64_release(&disagg->last_checkpoint_timestamp, checkpoint_timestamp);
+    __wt_atomic_store_uint64_release(&disagg->last_checkpoint_oldest_timestamp, oldest_timestamp);
     disagg->last_checkpoint_meta_checksum = checksum; /* Protected by the checkpoint lock. */
 
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Wrote disaggregated checkpoint metadata: lsn=%" PRIu64 ", timestamp=%" PRIu64
-      " %s, checksum=%" PRIx32 ", root=\"%s\"",
-      lsn, checkpoint_timestamp, __wt_timestamp_to_string(checkpoint_timestamp, ts_string),
-      checksum, checkpoint_root_copy);
+      " %s, oldest_timestamp=%" PRIu64 " %s, checksum=%" PRIx32 ", root=\"%s\"",
+      lsn, checkpoint_timestamp, __wt_timestamp_to_string(checkpoint_timestamp, ts_string[0]),
+      oldest_timestamp, __wt_timestamp_to_string(oldest_timestamp, ts_string[1]), checksum,
+      checkpoint_root_copy);
 
     __wt_free(session, disagg->last_checkpoint_root);
     disagg->last_checkpoint_root = checkpoint_root_copy;
@@ -852,6 +863,17 @@ __disagg_parse_meta(WT_SESSION_IMPL *session, const WT_ITEM *meta_buf, WT_DISAGG
             else
                 WT_ERR(__wt_txn_parse_timestamp(
                   session, "checkpoint timestamp", &metadata->checkpoint_timestamp, &cfg_value));
+        } else if (WT_CONFIG_LIT_MATCH("oldest_timestamp", cfg_key)) {
+            WT_ASSERT_ALWAYS(session, metadata->oldest_timestamp == WT_TS_NONE,
+              "Duplicate timestamp entry in disaggregated storage metadata: "
+              "metadata->oldest_timestamp=%" PRIu64,
+              metadata->oldest_timestamp);
+
+            if (cfg_value.len > 0 && cfg_value.val == 0)
+                metadata->oldest_timestamp = WT_TS_NONE;
+            else
+                WT_ERR(__wt_txn_parse_timestamp(
+                  session, "oldest timestamp", &metadata->oldest_timestamp, &cfg_value));
         } else if (WT_CONFIG_LIT_MATCH("key_provider", cfg_key)) {
             WT_ASSERT_ALWAYS(session, metadata->key_provider == NULL,
               "Duplicate key_provider entry in disaggregated storage metadata");
@@ -1111,9 +1133,11 @@ __disagg_update_checkpoint_meta(WT_SESSION_IMPL *session, WT_SESSION_IMPL *inter
     __wt_atomic_store_uint64_release(
       &conn->disaggregated_storage.last_checkpoint_meta_lsn, ckpt_meta->metadata_lsn);
 
-    /* Update the checkpoint timestamp. */
+    /* Update the timestamps. */
     __wt_atomic_store_uint64_release(
       &conn->disaggregated_storage.last_checkpoint_timestamp, metadata->checkpoint_timestamp);
+    __wt_atomic_store_uint64_release(
+      &conn->disaggregated_storage.last_checkpoint_oldest_timestamp, metadata->oldest_timestamp);
 
     /* Remember the root config of the last checkpoint. */
     __wt_free(session, conn->disaggregated_storage.last_checkpoint_root);
@@ -1144,7 +1168,7 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     WT_ITEM metadata_buf;
     WT_SESSION_IMPL *internal_session;
     uint64_t current_meta_lsn;
-    char ts_string[WT_TS_INT_STRING_SIZE];
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
 
     conn = S2C(session);
 
@@ -1189,9 +1213,10 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, const WT_DISAGG_CHECKPOINT
     __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE,
       "Picking up disaggregated storage checkpoint: metadata_lsn=%" PRIu64 ", timestamp=%" PRIu64
       " %s"
-      ", root=\"%.*s\"",
+      ", oldest_timestamp=%" PRIu64 " %s, root=\"%.*s\"",
       ckpt_meta->metadata_lsn, metadata.checkpoint_timestamp,
-      __wt_timestamp_to_string(metadata.checkpoint_timestamp, ts_string),
+      __wt_timestamp_to_string(metadata.checkpoint_timestamp, ts_string[0]),
+      metadata.oldest_timestamp, __wt_timestamp_to_string(metadata.oldest_timestamp, ts_string[1]),
       (int)metadata.checkpoint_len, metadata.checkpoint);
 
     /* Load crypt key data with the key provider extension, if any. */

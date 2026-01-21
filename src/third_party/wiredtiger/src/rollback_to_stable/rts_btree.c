@@ -380,7 +380,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
     __wt_txn_pinned_timestamp(session, &pinned_ts);
 
     /* Open a history store table cursor. */
-    WT_ERR(__wt_curhs_open(session, hs_btree_id, NULL, &hs_cursor));
+    WT_ERR(__wt_curhs_open(session, hs_btree_id, NULL, NULL, &hs_cursor));
     /*
      * Rollback-to-stable operates exclusively (i.e., it is the only active operation in the system)
      * outside the constraints of transactions. Therefore, there is no need for snapshot based
