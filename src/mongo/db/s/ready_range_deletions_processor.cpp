@@ -215,7 +215,10 @@ void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
             continue;
         }
 
-        auto task = _queue.front();
+        auto task = [&] {
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            return _queue.front();
+        }();
         const auto dbName = task.getNss().dbName();
         const auto collectionUuid = task.getCollectionUuid();
         const auto range = task.getRange();
