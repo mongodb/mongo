@@ -35,7 +35,6 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
@@ -45,13 +44,12 @@ class CBRForNoMPResultsStrategy {
 public:
     ~CBRForNoMPResultsStrategy() = default;
 
-    StatusWith<QueryPlanner::PlanRankingResult> rankPlans(
-        CanonicalQuery& query,
-        QueryPlannerParams& plannerParams,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        const MultipleCollectionAccessor& collections,
-        OperationContext* opCtx,
-        PlannerData plannerData);
+    StatusWith<PlanRankingResult> rankPlans(CanonicalQuery& query,
+                                            QueryPlannerParams& plannerParams,
+                                            PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                            const MultipleCollectionAccessor& collections,
+                                            OperationContext* opCtx,
+                                            PlannerData plannerData);
 
     std::unique_ptr<WorkingSet> extractWorkingSet();
 

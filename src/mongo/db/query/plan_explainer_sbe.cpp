@@ -644,7 +644,7 @@ void PlanExplainerSBEBase::getSummaryStats(PlanSummaryStats* statsOut) const {
 
     auto common = _root->getCommonStats();
     statsOut->nReturned = common->advances;
-    statsOut->fromMultiPlanner = isMultiPlan();
+    statsOut->fromMultiPlanner = areThereRejectedPlansToExplain();
     statsOut->fromPlanCache = isFromCache();
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;

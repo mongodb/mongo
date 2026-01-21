@@ -1119,5 +1119,278 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
     ASSERT_THROWS_CODE(mpsPtr->runTrials(planYieldPolicy.get()), DBException, 11521900);
 }
 
+TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansSimple) {
+    const int N = 100;
+    for (int i = 0; i < N; ++i) {
+        insert(BSON("foo" << (i % 10)));
+    }
+
+    addIndex(BSON("foo" << 1));
+
+    auto coll = getCollection();
+
+    // Plan 0: IXScan over foo == 7. Winner.
+    unique_ptr<WorkingSet> sharedWs(new WorkingSet());
+    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(expCtx.get(), coll, sharedWs.get(), 7);
+
+    // Plan 1: CollScan. Loser.
+    BSONObj filterObj = BSON("foo" << 7);
+    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(expCtx.get(), filterObj);
+    unique_ptr<PlanStage> collScanRoot =
+        getCollScanPlan(expCtx.get(), coll, sharedWs.get(), filter.get());
+
+    auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
+
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(),
+        coll,
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+
+    mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
+    mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
+
+    auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
+                                                  nss,
+                                                  static_cast<PlanStage*>(mps.get()),
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+    ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
+    ASSERT_OK(mps->pickBestPlan());
+    ASSERT_TRUE(mps->bestPlanChosen());
+
+    auto rejected = mps->extractRejectedPlansAndStages();
+    ASSERT_EQ(rejected.size(), 1);
+    ASSERT_TRUE(rejected[0].solution);
+    ASSERT_TRUE(rejected[0].planStage);
+    ASSERT_EQ(rejected[0].planStage->stageType(), STAGE_COLLSCAN);
+}
+
+TEST_F(QueryStageMultiPlanTest, NoRejectedPlansExtractedWhenBackupPlanIsLast) {
+    const int N = 100;
+    for (int i = 0; i < N; ++i) {
+        insert(BSON("b" << (i % 10) << "a" << 0));
+    }
+
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+
+    auto coll = getCollection();
+
+    // Query for 'a'. Sort on 'b'.
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setFilter(BSON("a" << 1));
+    findCommand->setSort(BSON("b" << 1));
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
+
+    // Plan.
+    auto plannerParams = makePlannerParams(coll, *cq);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);
+    ASSERT_OK(statusWithMultiPlanSolns.getStatus());
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
+
+    // We expect a plan using index {a: 1} + sort and and plan using index {b: 1} to satisfy the
+    // sorting.
+    // The winner will be the plan using index {a: 1} + sort since it will EOF on the
+    // IXSCAN stage.
+    ASSERT_EQUALS(solutions.size(), 2U);
+
+    // Fill out the MultiPlanStage.
+    auto mps = std::make_unique<MultiPlanStage>(expCtx.get(),
+                                                coll,
+                                                cq.get(),
+                                                plan_cache_util::ClassicPlanCacheWriter{
+                                                    opCtx.get(), coll, false /* executeInSbe */
+                                                });
+    unique_ptr<WorkingSet> ws(new WorkingSet());
+    // Put each solution from the planner into the MPS.
+    for (size_t i = 0; i < solutions.size(); ++i) {
+        auto&& root = stage_builder::buildClassicExecutableTree(
+            opCtx.get(), coll, *cq, *solutions[i], ws.get());
+        mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
+    }
+
+    NoopYieldPolicy yieldPolicy(expCtx->getOperationContext(), &opCtx.get()->fastClockSource());
+    ASSERT_OK(mps->runTrials(&yieldPolicy));
+    ASSERT_OK(mps->pickBestPlan());
+    ASSERT(mps->bestPlanChosen());
+    // A backup plan will be set since the the winner plan includes a blocking SORT stage.
+    ASSERT(mps->hasBackupPlan());
+
+    auto rejected = mps->extractRejectedPlansAndStages();
+    // We expect no rejected plan as the backup plan is not considered rejected.
+    ASSERT_EQ(rejected.size(), 0);
+}
+
+TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansWhenBackupPlanIsNotLast) {
+    const int N = 100;
+    for (int i = 0; i < N; ++i) {
+        insert(BSON("b" << (i % 10) << "a" << 0 << "c" << i));
+    }
+
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("c" << 1));
+
+    auto coll = getCollection();
+
+    // Query for both 'a' and 'b' and sort on 'b'.
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setFilter(BSON("a" << 1 << "c" << BSON("$gte" << 0)));
+    findCommand->setSort(BSON("b" << 1));
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = ExpressionContextBuilder{}.fromRequest(opCtx.get(), *findCommand).build(),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, coll);
+
+    // Plan.
+    auto plannerParams = makePlannerParams(coll, *cq);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);
+    ASSERT_OK(statusWithMultiPlanSolns.getStatus());
+    auto solutions = std::move(statusWithMultiPlanSolns.getValue());
+
+    // We expect the following plans:
+    // 1. One using index {a: 1} + sort
+    // 2. Another using index {b: 1} to satisfy the sorting
+    // 3. A plan using index {c: 1} to filter on 'c' + sort.
+    // The winner will be the plan using index {a: 1} + sort since it will EOF on the
+    // IXSCAN stage.
+    ASSERT_EQUALS(solutions.size(), 3U);
+
+    // Fill out the MultiPlanStage.
+    auto mps = std::make_unique<MultiPlanStage>(expCtx.get(),
+                                                coll,
+                                                cq.get(),
+                                                plan_cache_util::ClassicPlanCacheWriter{
+                                                    opCtx.get(), coll, false /* executeInSbe */
+                                                });
+    unique_ptr<WorkingSet> ws(new WorkingSet());
+    // Put each solution from the planner into the MPS.
+    for (size_t i = 0; i < solutions.size(); ++i) {
+        auto&& root = stage_builder::buildClassicExecutableTree(
+            opCtx.get(), coll, *cq, *solutions[i], ws.get());
+        mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
+    }
+
+    // This sets a backup plan.
+    NoopYieldPolicy yieldPolicy(expCtx->getOperationContext(), &opCtx.get()->fastClockSource());
+    ASSERT_OK(mps->runTrials(&yieldPolicy));
+    ASSERT_OK(mps->pickBestPlan());
+    ASSERT(mps->bestPlanChosen());
+    // A backup plan will be set since the winner plan includes a blocking SORT stage.
+    ASSERT(mps->hasBackupPlan());
+
+    auto rejected = mps->extractRejectedPlansAndStages();
+    ASSERT_EQ(rejected.size(), 1);
+    ASSERT_TRUE(rejected[0].solution);
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(
+        ""
+        "{sort:{"
+        "  pattern: {b: 1}, limit: 0, node:{fetch:{ "
+        "    filter: {a:1}, node:{ixscan: {"
+        "      pattern: {c:1}, bounds: {c: [[0, Infinity, true, true]]}"
+        "    }}"
+        "  }}"
+        "}}",
+        rejected[0].solution->root()));
+    ASSERT_TRUE(rejected[0].planStage);
+    ASSERT_EQ(rejected[0].planStage->stageType(), STAGE_SORT_SIMPLE);
+}
+
+TEST_F(QueryStageMultiPlanTest, ExtractRejectedPlansAfterAbandonTrials) {
+    const int N = 100;
+    for (int i = 0; i < N; ++i) {
+        insert(BSON("foo" << (i % 10)));
+    }
+
+    addIndex(BSON("foo" << 1));
+
+    auto coll = getCollection();
+
+    // Plan 0: IXScan over foo == 7
+    unique_ptr<WorkingSet> sharedWs(new WorkingSet());
+    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(expCtx.get(), coll, sharedWs.get(), 7);
+
+    // Plan 1: CollScan.
+    BSONObj filterObj = BSON("foo" << 7);
+    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(expCtx.get(), filterObj);
+    unique_ptr<PlanStage> collScanRoot =
+        getCollScanPlan(expCtx.get(), coll, sharedWs.get(), filter.get());
+
+    auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
+
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(),
+        coll,
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+
+    mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
+    mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
+
+    auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
+                                                  nss,
+                                                  static_cast<PlanStage*>(mps.get()),
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+
+    ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
+    mps->abandonTrials();
+    ASSERT_FALSE(mps->bestPlanChosen());
+
+    auto rejected = mps->extractRejectedPlansAndStages();
+
+    // Both plans should be returned as rejected.
+    ASSERT_EQ(rejected.size(), 2UL);
+    ASSERT_TRUE(rejected[0].solution);
+    ASSERT_TRUE(rejected[0].planStage);
+    ASSERT_TRUE(rejected[1].solution);
+    ASSERT_TRUE(rejected[1].planStage);
+}
+
+DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
+                   ExtractRejectedPlansWithoutDecisionThrows,
+                   "Tripwire assertion.*11540200") {
+    const int N = 100;
+    for (int i = 0; i < N; ++i) {
+        insert(BSON("foo" << (i % 10)));
+    }
+
+    addIndex(BSON("foo" << 1));
+
+    auto coll = getCollection();
+
+    // Plan 0: IXScan over foo == 7
+    unique_ptr<WorkingSet> sharedWs(new WorkingSet());
+    unique_ptr<PlanStage> ixScanRoot = getIxScanPlan(expCtx.get(), coll, sharedWs.get(), 7);
+
+    // Plan 1: CollScan.
+    BSONObj filterObj = BSON("foo" << 7);
+    unique_ptr<MatchExpression> filter = makeMatchExpressionFromFilter(expCtx.get(), filterObj);
+    unique_ptr<PlanStage> collScanRoot =
+        getCollScanPlan(expCtx.get(), coll, sharedWs.get(), filter.get());
+
+    auto cq = makeCanonicalQuery(opCtx.get(), nss, filterObj);
+
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(),
+        coll,
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+
+    mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
+    mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
+
+    auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
+                                                  nss,
+                                                  static_cast<PlanStage*>(mps.get()),
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+
+    ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
+    // Verify calling extraction before picking best plan or abandoning triggers assertion.
+    auto rejected = mps->extractRejectedPlansAndStages();
+}
+
 }  // namespace
 }  // namespace mongo

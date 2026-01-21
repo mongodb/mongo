@@ -41,7 +41,7 @@ namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.collection");
 
-class CBRForNoMPResultsStrategyMock : public plan_ranking::CBRForNoMPResultsStrategy {
+class CBRForNoMPResultsStrategySpy : public plan_ranking::CBRForNoMPResultsStrategy {
 public:
     boost::optional<classic_runtime_planner::MultiPlanner>& getMultiPlanner() {
         return _multiPlanner;
@@ -61,7 +61,7 @@ TEST_F(CBRForNoMPResultsTest, SingleSolutionDoesNotUseMultiPlanner) {
 
     auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.indexes = indices;
-    CBRForNoMPResultsStrategyMock strategy;
+    CBRForNoMPResultsStrategySpy strategy;
     auto status = strategy.rankPlans(*cq,
                                      params,
                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
@@ -70,10 +70,33 @@ TEST_F(CBRForNoMPResultsTest, SingleSolutionDoesNotUseMultiPlanner) {
                                      std::move(plannerData));
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
-    ASSERT_EQ(status.getValue().rejectedPlans.size(), 0);
-    ASSERT_EQ(status.getValue().estimates.size(), 0);
+    ASSERT_FALSE(status.getValue().maybeExplainData.has_value());
     ASSERT_EQ(strategy.getMultiPlanner(), boost::none);
     ASSERT_EQ(status.getValue().needsWorksMeasured, false);
+}
+
+TEST_F(CBRForNoMPResultsTest, QueryPlannerFailsReturnsError) {
+    auto colls = getCollsAccessor();
+    // Create a query that won't have any index plans since we haven't created any indexes.
+    auto [cq, plannerData] = createCQAndPlannerData(colls, BSON("a" << 42));
+
+    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
+
+    // Set options to forbid table scan. Since there are no available indexes, planning will fail.
+    params.mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    CBRForNoMPResultsStrategySpy strategy;
+    auto status = strategy.rankPlans(*cq,
+                                     params,
+                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                     colls,
+                                     operationContext(),
+                                     std::move(plannerData));
+
+    ASSERT_NOT_OK(status.getStatus());
+    ASSERT_EQ(status.getStatus().code(), ErrorCodes::NoQueryExecutionPlans);
+
+    ASSERT_TRUE(strategy.extractWorkingSet());
 }
 
 TEST_F(CBRForNoMPResultsTest, EOFMultiPlannerMakesADecisionWithoutCBR) {
@@ -86,7 +109,7 @@ TEST_F(CBRForNoMPResultsTest, EOFMultiPlannerMakesADecisionWithoutCBR) {
 
     auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.indexes = indices;
-    CBRForNoMPResultsStrategyMock strategy;
+    CBRForNoMPResultsStrategySpy strategy;
     auto status = strategy.rankPlans(*cq,
                                      params,
                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
@@ -95,9 +118,14 @@ TEST_F(CBRForNoMPResultsTest, EOFMultiPlannerMakesADecisionWithoutCBR) {
                                      std::move(plannerData));
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
-    // TODO SERVER-115402. Fix this to include rejected plans.
-    ASSERT_EQ(status.getValue().rejectedPlans.size(), 0);
-    ASSERT_EQ(status.getValue().estimates.size(), 0);
+    ASSERT_TRUE(status.getValue().maybeExplainData.has_value());
+    auto& explainData = status.getValue().maybeExplainData.value();
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 1);
+    ASSERT_EQ(explainData.estimates.size(), 0);
+    ASSERT_FALSE(explainData.rejectedPlansWithStages[0].solution == nullptr);
+    auto rejectedPlanStats = explainData.rejectedPlansWithStages[0].planStage->getStats();
+    ASSERT_EQ(rejectedPlanStats->common.works, 2);
+    ASSERT_EQ(rejectedPlanStats->common.advanced, 1);
     ASSERT_TRUE(strategy.getMultiPlanner().has_value());
     auto stats = strategy.getMultiPlanner()->getSpecificStats();
     ASSERT_TRUE(stats->earlyExit);
@@ -118,7 +146,7 @@ TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
 
     auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.indexes = indices;
-    CBRForNoMPResultsStrategyMock strategy;
+    CBRForNoMPResultsStrategySpy strategy;
     auto status = strategy.rankPlans(*cq,
                                      params,
                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
@@ -127,15 +155,20 @@ TEST_F(CBRForNoMPResultsTest, BatchFilledMultiPlannerMakesADecisionWithoutCBR) {
                                      std::move(plannerData));
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
-    // TODO SERVER-115402. Fix this to include rejected plans.
-    ASSERT_EQ(status.getValue().rejectedPlans.size(), 0);
-    ASSERT_EQ(status.getValue().estimates.size(), 0);
+    auto& explainData = status.getValue().maybeExplainData.value();
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 1);
+    ASSERT_EQ(explainData.estimates.size(), 0);
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 1);
+    ASSERT_FALSE(explainData.rejectedPlansWithStages[0].solution == nullptr);
+    auto rejectedPlanStats = explainData.rejectedPlansWithStages[0].planStage->getStats();
+    ASSERT_EQ(rejectedPlanStats->common.works, 101);
+    ASSERT_EQ(rejectedPlanStats->common.advanced, 99);
     ASSERT_TRUE(strategy.getMultiPlanner().has_value());
     auto stats = strategy.getMultiPlanner()->getSpecificStats();
     ASSERT_TRUE(stats->earlyExit);
     ASSERT_EQ(stats->numResultsFound, 200);  // Batch filled during trials
     ASSERT_EQ(stats->numCandidatePlans, 2);
-    ASSERT_EQ(stats->totalWorks, 202);  // 1 work to seek + 200 advances per plan
+    ASSERT_EQ(stats->totalWorks, 202);  // 2 * 101 works in each plan
     ASSERT_EQ(status.getValue().needsWorksMeasured, false);
 }
 
@@ -150,7 +183,7 @@ TEST_F(CBRForNoMPResultsTest, LittleResultsMultiPlannerMakesADecisionWithoutCBR)
 
     auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
     params.mainCollectionInfo.indexes = indices;
-    CBRForNoMPResultsStrategyMock strategy;
+    CBRForNoMPResultsStrategySpy strategy;
     auto status = strategy.rankPlans(*cq,
                                      params,
                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
@@ -159,9 +192,13 @@ TEST_F(CBRForNoMPResultsTest, LittleResultsMultiPlannerMakesADecisionWithoutCBR)
                                      std::move(plannerData));
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
-    // TODO SERVER-115402. Fix this to include rejected plans.
-    ASSERT_EQ(status.getValue().rejectedPlans.size(), 0);
-    ASSERT_EQ(status.getValue().estimates.size(), 0);
+    auto& explainData = status.getValue().maybeExplainData.value();
+    ASSERT_EQ(explainData.estimates.size(), 0);
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 1);
+    ASSERT_FALSE(explainData.rejectedPlansWithStages[0].solution == nullptr);
+    auto rejectedPlanStats = explainData.rejectedPlansWithStages[0].planStage->getStats();
+    ASSERT_EQ(rejectedPlanStats->common.works, 10000);
+    ASSERT_EQ(rejectedPlanStats->common.advanced, 1);
     ASSERT_TRUE(strategy.getMultiPlanner().has_value());
     auto stats = strategy.getMultiPlanner()->getSpecificStats();
     ASSERT_FALSE(stats->earlyExit);
@@ -184,7 +221,7 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     params.mainCollectionInfo.indexes = indices;
     params.mainCollectionInfo.collStats =
         std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(5001), kNss);
-    CBRForNoMPResultsStrategyMock strategy;
+    CBRForNoMPResultsStrategySpy strategy;
     auto status = strategy.rankPlans(*cq,
                                      params,
                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
@@ -193,8 +230,20 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
                                      std::move(plannerData));
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
-    ASSERT_EQ(status.getValue().rejectedPlans.size(), 1);
-    ASSERT_EQ(status.getValue().estimates.size(), 4);  // 2 x (IXSCAN + FETCH)
+    auto& explainData = status.getValue().maybeExplainData.value();
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 3);  // 2 from MP + 1 from CBR
+    ASSERT_EQ(explainData.estimates.size(), 4);                // 2 x (IXSCAN + FETCH)
+    int numCBRRejectedPlans = 0;
+    for (const auto& rejectedPlan : explainData.rejectedPlansWithStages) {
+        ASSERT_FALSE(rejectedPlan.solution == nullptr);
+        if (rejectedPlan.planStage) {  // It is rejected by multi-planner
+            ASSERT_EQ(rejectedPlan.planStage->getStats()->common.works, 5000);
+            ASSERT_EQ(rejectedPlan.planStage->getStats()->common.advanced, 0);
+        } else {
+            numCBRRejectedPlans++;
+        }
+    }
+    ASSERT_EQ(numCBRRejectedPlans, 1);
     ASSERT_TRUE(strategy.getMultiPlanner().has_value());
     auto stats = strategy.getMultiPlanner()->getSpecificStats();
     ASSERT_FALSE(stats->earlyExit);
@@ -202,6 +251,82 @@ TEST_F(CBRForNoMPResultsTest, NoResultsMultiPlannerUsesCBR) {
     ASSERT_EQ(stats->numCandidatePlans, 2);
     ASSERT_EQ(stats->totalWorks, 10000);
     ASSERT_EQ(status.getValue().needsWorksMeasured, true);
+}
+
+TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
+    createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
+    createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
+    insertNDocuments(10001);
+    auto colls = getCollsAccessor();
+
+    auto [cq, plannerData] =
+        createCQAndPlannerData(colls,
+                               BSON("a" << GT << 0 << "b" << GT << 0 << "c" << -1),
+                               [](FindCommandRequest& findCmd) { findCmd.setReturnKey(true); });
+
+    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
+    params.mainCollectionInfo.indexes = indices;
+    params.mainCollectionInfo.collStats =
+        std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(5001), kNss);
+    CBRForNoMPResultsStrategySpy strategy;
+    auto status = strategy.rankPlans(*cq,
+                                     params,
+                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                     colls,
+                                     operationContext(),
+                                     std::move(plannerData));
+    ASSERT_OK(status.getStatus());
+    ASSERT_EQ(status.getValue().solutions.size(), 1);
+    auto& explainData = status.getValue().maybeExplainData.value();
+    // TODO SERVER-117370. Populate the CBR plans as rejected plans.
+    // ASSERT_EQ(explainData.cbrRejectedPlans.size(), 2);
+    // ASSERT_EQ(explainData.estimates.size(), 4);  // 2 x (IXSCAN + FETCH)
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 1);
+    ASSERT_FALSE(explainData.rejectedPlansWithStages[0].solution == nullptr);
+    auto rejectedPlanStats = explainData.rejectedPlansWithStages[0].planStage->getStats();
+    ASSERT_EQ(rejectedPlanStats->common.works, 10000);
+    ASSERT_EQ(rejectedPlanStats->common.advanced, 0);
+    ASSERT_TRUE(strategy.getMultiPlanner().has_value());
+    auto stats = strategy.getMultiPlanner()->getSpecificStats();
+    ASSERT_FALSE(stats->earlyExit);
+    ASSERT_EQ(stats->numResultsFound, 0);
+    ASSERT_EQ(stats->numCandidatePlans, 2);
+    ASSERT_EQ(stats->totalWorks, 20000);
+}
+
+TEST_F(CBRForNoMPResultsTest, MPPicksBlockingSortAndEOFs) {
+    createIndexOnEmptyCollection(operationContext(), BSON("a" << 1), "a_1");
+    createIndexOnEmptyCollection(operationContext(), BSON("b" << 1), "b_1");
+    insertNDocuments(10);
+    auto colls = getCollsAccessor();
+
+    auto [cq, plannerData] =
+        createCQAndPlannerData(colls, BSON("b" << LT << 0), [](FindCommandRequest& findCmd) {
+            findCmd.setSort(BSON("a" << 1));
+        });
+
+    auto params = QueryPlannerParams{QueryPlannerParams::ArgsForTest{}};
+    params.mainCollectionInfo.indexes = indices;
+    params.mainCollectionInfo.collStats =
+        std::make_unique<stats::CollectionStatisticsImpl>(static_cast<double>(5001), kNss);
+    CBRForNoMPResultsStrategySpy strategy;
+    auto status = strategy.rankPlans(*cq,
+                                     params,
+                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                     colls,
+                                     operationContext(),
+                                     std::move(plannerData));
+    ASSERT_OK(status.getStatus());
+    ASSERT_EQ(status.getValue().solutions.size(), 1);
+    auto& explainData = status.getValue().maybeExplainData.value();
+    // No rejected plans since the winner includes a blocking sort hence the other is backup.
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 0);
+    ASSERT_TRUE(strategy.getMultiPlanner().has_value());
+    auto stats = strategy.getMultiPlanner()->getSpecificStats();
+    ASSERT_TRUE(stats->earlyExit);
+    ASSERT_EQ(stats->numResultsFound, 0);
+    ASSERT_EQ(stats->numCandidatePlans, 2);
+    ASSERT_EQ(stats->totalWorks, 4);
 }
 }  // namespace
 }  // namespace mongo

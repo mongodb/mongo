@@ -69,7 +69,7 @@ public:
                          RemoteExplainVector* remoteExplains,
                          bool usedJoinOpt = false);
 
-    bool isMultiPlan() const final {
+    bool areThereRejectedPlansToExplain() const final {
         return _isMultiPlan;
     }
     bool isFromCache() const {

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/runtime_planners/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/exec/runtime_planners/planner_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -56,13 +57,12 @@ public:
      *
      * Returns the best plan or error.
      */
-    StatusWith<QueryPlanner::PlanRankingResult> rankPlans(
-        OperationContext* opCtx,
-        CanonicalQuery& query,
-        QueryPlannerParams& plannerParams,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        const MultipleCollectionAccessor& collections,
-        PlannerData plannerData);
+    StatusWith<PlanRankingResult> rankPlans(OperationContext* opCtx,
+                                            CanonicalQuery& query,
+                                            QueryPlannerParams& plannerParams,
+                                            PlanYieldPolicy::YieldPolicy yieldPolicy,
+                                            const MultipleCollectionAccessor& collections,
+                                            PlannerData plannerData);
 
     /**
      * Transfer ownership of the working set _ws to the caller.

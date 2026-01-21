@@ -101,7 +101,7 @@ public:
         return version;
     }
 
-    bool isMultiPlan() const override {
+    bool areThereRejectedPlansToExplain() const override {
         return false;  // Assuming no multi-planning by default
     }
 

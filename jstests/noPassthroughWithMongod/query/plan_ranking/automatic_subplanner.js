@@ -39,12 +39,12 @@ const pipeline = [
     {"$limit": 400},
 ];
 
-function testAutomaticUsesNoSubplanner(nRejected) {
+function testAutomaticUsesNoSubplanner(maxEnumeratedPlans) {
     jsTest.log.info("Running testAutomaticUsesNoSubplanner");
     const explain = coll.explain("executionStats").aggregate(pipeline);
     const winningPlan = getWinningPlanFromExplain(explain);
     assertPlanCosted(winningPlan);
-    assert.eq(explain.queryPlanner.rejectedPlans.length, nRejected, toJsonForLog(explain));
+    assert.eq(explain.queryPlanner.rejectedPlans.length, maxEnumeratedPlans - 1, toJsonForLog(explain)); // -1 for the winning plan
     const subplan = getPlanStage(explain, "SUBPLAN");
     assert.eq(null, subplan, toJsonForLog(explain));
     assert.eq(explain.executionStats.nReturned, 400, toJsonForLog(explain));
@@ -80,7 +80,12 @@ try {
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutionsLow}),
         );
-        testAutomaticUsesNoSubplanner(maxOrSolutionsLow);
+        if (autoStrategy === "CBRCostBasedRankerChoice") {
+            // TODO SERVER-117372. Explain multiplanner plans when cost based choice is active.
+            testAutomaticUsesNoSubplanner(maxOrSolutionsLow + 1);
+        } else {
+            testAutomaticUsesNoSubplanner(2 * (maxOrSolutionsLow + 1)); // Every strategy (MP + CBR) generates maxOrSolutionsLow plans plus one since there's an index that could be used to satisfy the sorting.
+        }
 
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutionsHigh}),

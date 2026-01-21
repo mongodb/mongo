@@ -33,13 +33,23 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/util/modules.h"
 
 
 namespace mongo {
 namespace plan_ranking {
+
+
+struct PlanRankingResult {
+    std::vector<std::unique_ptr<QuerySolution>> solutions;
+    boost::optional<PlanExplainerData> maybeExplainData;
+    // True if these plans were chosen without a pre-execution trial run that measured the
+    // 'work' metric (for example, selected by a non-multiplanner). Such plans must be
+    // run in a pre-execution phase to measure the amount of work done to produce the
+    // first batch, so they can be considered for insertion into the classic plan cache.
+    bool needsWorksMeasured{false};
+};
 
 /**
  * Maximum number of plans of $or queries for which the automatic ranking strategy uses whole query
@@ -64,14 +74,14 @@ bool delayOrSkipSubplanner(CanonicalQuery& query, QueryPlanRankerModeEnum planRa
  */
 class PlanRanker {
 public:
-    StatusWith<QueryPlanner::PlanRankingResult> rankPlans(
+    StatusWith<PlanRankingResult> rankPlans(
         OperationContext* opCtx,
         CanonicalQuery& query,
         QueryPlannerParams& plannerParams,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         const MultipleCollectionAccessor& collections,
-        // PlannerData for classic multiplanner. We only need the classic one since multiplanning
-        // only runs with classic, even if SBE is enabled.
+        // PlannerData for classic multiplanner. We only need the classic one since
+        // multiplanning only runs with classic, even if SBE is enabled.
         PlannerData multiPlannerData);
 
     std::unique_ptr<WorkingSet> extractWorkingSet();
