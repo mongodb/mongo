@@ -425,6 +425,18 @@ tasks:
     commands:
       - func: "streams build and push"
 
+  # This task is intended for use when building QA builds.
+  - name: streams_skip_tests_build_and_push_gen
+    tags: ["assigned_to_jira_team_streams", "auxiliary"]
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+    commands:
+      - func: "streams skip tests build and push"
+
   - name: bazel_result_tasks_gen
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     depends_on:

@@ -19,14 +19,19 @@ from buildscripts.util.read_config import read_config_file
 # Streams currently depends on multiple generated test suite tasks, which is why this task must also be generated.
 
 
-def make_task(compile_variant: str, additional_dependencies: set[str], push: str) -> Task:
+def make_task(
+    compile_variant: str, additional_dependencies: set[str], push: str, skip_tests: str
+) -> Task:
     taskPrefix = "streams_build_"
     scriptArgs = ["./src/evergreen/streams_image_build_and_push.sh"]
     dependencies = {
         TaskDependency("archive_dist_test", compile_variant),
     }
-    # Only depend on tests if pushing image
-    if push == "true":
+    if skip_tests == "true" and push == "true":
+        taskPrefix += "and_push_"
+        scriptArgs.append("--push")
+        scriptArgs.append("--skip-tests")
+    elif skip_tests == "false" and push == "true":
         taskPrefix += "and_push_"
         scriptArgs.append("--push")
         dependencies.add(TaskDependency("aggregation", compile_variant))
@@ -72,6 +77,7 @@ def main(
     expansions_file: Annotated[str, typer.Argument()] = "expansions.yml",
     output_file: Annotated[str, typer.Option("--output-file")] = "streams_build_and_push.json",
     push: Annotated[str, typer.Option("--push")] = "false",
+    skip_tests: Annotated[str, typer.Option("--skip-tests")] = "false",
 ):
     evg_api = evergreen_conn.get_evergreen_api()
     expansions = read_config_file(expansions_file)
@@ -81,7 +87,7 @@ def main(
     evg_version = evg_api.version_by_id(version_id)
     variant = evg_version.build_by_variant(build_variant_name)
     task_deps = []
-    if push == "true":
+    if skip_tests == "false" and push == "true":
         for task in variant.get_tasks():
             if task.display_name not in required_tasks:
                 continue
@@ -108,7 +114,14 @@ def main(
     build_variant = BuildVariant(name=build_variant_name)
     build_variant.display_task(
         current_task_name.replace("_gen", ""),
-        [make_task(compile_variant_name, additional_dependencies=task_deps, push=push)],
+        [
+            make_task(
+                compile_variant_name,
+                additional_dependencies=task_deps,
+                push=push,
+                skip_tests=skip_tests,
+            )
+        ],
         distros=[distro],
     )
     shrub_project = ShrubProject.empty()
