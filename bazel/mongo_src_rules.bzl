@@ -1493,8 +1493,6 @@ def mongo_cc_extension_shared_library(
             "//conditions:default": [],
         }),
         # linkshared produces a shared library as the output.
-        # TODO SERVER-109255 Make sure the test extensions are statically linked, as we expect
-        # all extensions to be.
         linkshared = True,
         non_transitive_dyn_linkopts = select({
             "@platforms//os:linux": [

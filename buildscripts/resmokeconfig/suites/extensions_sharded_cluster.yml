@@ -20,6 +20,7 @@ executor:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
+      - VerifyExtensionsVisibility
   config:
     shell_options:
       eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
@@ -27,6 +28,7 @@ executor:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
     - class: ValidateCollections
+    - class: VerifyExtensionsVisibility
   fixture:
     class: ShardedClusterFixture
     num_shards: 2

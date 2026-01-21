@@ -92,10 +92,48 @@ ldd_libs_basename() {
         sort -u
 }
 
+# Extract DT_NEEDED entries (direct dependencies) from readelf output
+dt_needed_libs() {
+    local bin="$1"
+    readelf -d "$bin" |
+        awk '/\(NEEDED\)/ {gsub(/\[|\]/, "", $5); print $5}' |
+        sort -u
+}
+
 srv_ldd="$(ldd_libs_basename "$SERVER_BIN")"
 ext_ldd="$(ldd_libs_basename "$EXT_SO")"
 
-# 2) Compare version conflicts.
+# Base regex for allowed dependencies (common to both direct and transitive)
+# NOTE: This is still a shared object (dlopen), so libc + loader will be dynamic.
+# Policy exceptions: OpenSSL (libcrypto/libssl) may be dynamic. libgcc_s is allowed because the server dynamically links it.
+ALLOWED_DEPS_BASE='ld-linux.*\.so\.[0-9]+|libc\.so\.[0-9]+|libm\.so\.[0-9]+|libresolv\.so\.[0-9]+|libdl\.so\.[0-9]+|libpthread\.so\.[0-9]+|librt\.so\.[0-9]+|libcrypto\.so\.[0-9]+|libssl\.so\.[0-9]+|libgcc_s\.so\.[0-9]+|linux-vdso\.so\.[0-9]+'
+
+# 2a) Check direct dependencies (DT_NEEDED) - stricter control
+# Direct dependencies are what the extension explicitly links against.
+ALLOWED_DIRECT_DEPS_REGEX="^(${ALLOWED_DEPS_BASE})$"
+
+ext_dt_needed="$(dt_needed_libs "$EXT_SO")"
+unexpected_direct_deps="$(echo "$ext_dt_needed" | grep -Ev "${ALLOWED_DIRECT_DEPS_REGEX}" || true)"
+if [[ -n "$unexpected_direct_deps" ]]; then
+    echo "Unexpected direct dynamic dependencies in extension (DT_NEEDED):"
+    echo "$unexpected_direct_deps"
+    die "Extension has unexpected direct dynamic library dependencies. Prefer static linking."
+fi
+
+# 2b) Check transitive dependencies (from ldd) - more lenient
+# Transitive deps come from libraries that the extension links against.
+# For example, if extension links OpenSSL, OpenSSL might pull in libz.
+# libz is allowed transitively (via OpenSSL) but not as a direct dependency.
+ALLOWED_TRANSITIVE_DEPS_REGEX="^(${ALLOWED_DEPS_BASE}|libz\.so\.[0-9]+)$"
+
+unexpected_transitive_deps="$(echo "$ext_ldd" | grep -Ev "${ALLOWED_TRANSITIVE_DEPS_REGEX}" || true)"
+if [[ -n "$unexpected_transitive_deps" ]]; then
+    echo "Unexpected transitive dynamic dependencies in extension (from ldd):"
+    echo "$unexpected_transitive_deps"
+    die "Extension has unexpected transitive dynamic library dependencies."
+fi
+
+# 2c) Compare version conflicts.
 # Normalize foo.so.3.1.2 -> foo.so.3 (works for lib* and ld-linux*, etc).
 normalize_version() {
     sed -E 's/^(.+\.so\.[0-9]+)\..*$/\1/' | sort -u

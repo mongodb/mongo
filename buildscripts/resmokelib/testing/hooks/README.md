@@ -64,6 +64,7 @@ Specify any of the following as the `hooks` in your [Suite](../../../../buildscr
   - This will run on all collections in all databases on every stand-alone node, primary replica-set node, or primary shard node.
 - [`ValidateDirectSecondaryReads`](./validate_direct_secondary_reads.py) - Only supported in suites that use `ReplicaSetFixture`.
   - To be used with `set_read_preference_secondary.js` and `implicit_enable_profiler.js` in suites that read directly from secondaries in a replica set. Check the profiler collections of all databases at the end of the suite to verify that each secondary only ran the read commands it got directly from the shell.
+- [`VerifyExtensionsVisibility`](./verify_extensions_visibility.py) - Verify at the beginning of the suite that all extension .so files are safe to dlopen (symbol visibility, dependency, and symbol override checks).
 - [`WaitForReplication`](./wait_for_replication.py) - Wait for replication to complete.
 
 ## Interfaces
