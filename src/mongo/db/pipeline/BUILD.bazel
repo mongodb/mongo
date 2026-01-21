@@ -1347,6 +1347,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/query/search:mongot_options",
         "//src/mongo/db/repl:image_collection_entry",
         "//src/mongo/db/repl:oplog_entry",
+        "//src/mongo/db/repl:oplog_entry_test_helpers",
         "//src/mongo/db/repl:replmocks",
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/shard_role/shard_catalog:catalog_test_fixture",

@@ -3485,7 +3485,7 @@ TEST_F(ChangeStreamStageTest,
 
 DEATH_TEST_REGEX_F(ChangeStreamStageTestDeathTest,
                    DocumentSourceChangeStreamTransformTransformUnknownSupportedEvent,
-                   "Tripwire assertion.*5052201") {
+                   "Tripwire assertion.*11352601") {
     getExpCtx()->setForPerShardCursor(true);
 
     BSONObj spec = BSON(DocumentSourceChangeStreamTransform::kStageName

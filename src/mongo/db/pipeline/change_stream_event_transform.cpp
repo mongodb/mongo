@@ -519,7 +519,12 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                              {"indexOptions", o2Field.getField("indexOptions_old"_sd)}});
             } else {
                 // We should never see an unknown command.
-                MONGO_UNREACHABLE_TASSERT(6654400);
+                LOGV2_WARNING(11352604,
+                              "Unsupported command type found in command oplog entry",
+                              "oField"_attr = oField);
+                tasserted(11352605,
+                          str::stream() << "Unsupported command type found in command oplog entry "
+                                        << oField.toString());
             }
 
             // Make sure the result doesn't have a document key.
@@ -556,10 +561,17 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             }
 
             // We should never see an unknown noop entry.
-            MONGO_UNREACHABLE_TASSERT(5052201);
+            LOGV2_WARNING(11352600, "Invalid noop entry", "o2Field"_attr = o2Field);
+            tasserted(11352601, str::stream() << "Invalid noop entry" << o2Field.toString());
         }
         default: {
-            MONGO_UNREACHABLE_TASSERT(6330501);
+            LOGV2_WARNING(11352602,
+                          "Unsupported oplog entry type",
+                          "opType"_attr = static_cast<int>(opType),
+                          "input"_attr = input);
+
+            tasserted(11352603,
+                      str::stream() << "Unsupported oplog entry type " << static_cast<int>(opType));
         }
     }
 

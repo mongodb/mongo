@@ -44,7 +44,10 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/time_support.h"
@@ -88,6 +91,15 @@ Document applyTransformation(const repl::OplogEntry& oplogEntry,
 
     ChangeStreamEventTransformer transformer(make_intrusive<ExpressionContextForTest>(ns), spec);
     return transformer.applyTransformation(oplogDoc);
+}
+
+repl::OplogEntry makeContainerOplogEntry() {
+    const repl::OpTime entryOpTime{Timestamp(3, 4), 5};
+    StringData containerIdent = "container_ident";
+    auto key = BSONBinData("k", 1, BinDataType::BinDataGeneral);
+    auto value = BSONBinData("v", 1, BinDataType::BinDataGeneral);
+
+    return makeContainerInsertOplogEntry(entryOpTime, nss, containerIdent, key, value);
 }
 
 TEST(ChangeStreamEventTransformTest, TestDefaultUpdateTransform) {
@@ -423,6 +435,56 @@ TEST(
 
     repl::OplogEntry immutableEntry(oplogEntry.toBSON());
     ASSERT_DOCUMENT_EQ(applyTransformation(immutableEntry, nss, {"movePrimary"}), expectedDoc);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
+                 TestInvalidCommand,
+                 "Tripwire assertion.*11352605.*Unsupported command type") {
+
+    // "applyOps" command type not supported by the event transformer
+    Document unsupportedCommandType{
+        {"applyOps", Value{std::vector<Document>{}}},
+        {"prepare", true},
+    };
+
+    auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kCommand,
+                                     nss.getCommandNS(),
+                                     unsupportedCommandType.toBson(),
+                                     testUuid(),
+                                     boost::none,  // fromMigrate
+                                     boost::none   // o2 field
+    );
+
+    applyTransformation(oplogEntry);
+}
+
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
+                 TestInvalidNoop,
+                 "Tripwire assertion.*11352601") {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+
+    auto o2Field = Document{{"unsupported_event", nss.toString_forTest()}};
+    auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kNoop,
+                                     nss,
+                                     BSONObj(),
+                                     testUuid(),
+                                     boost::none,  // fromMigrate
+                                     o2Field.toBson());
+
+    // Applying the transform on invalid Noop should throw a TAssert.
+    applyTransformation(oplogEntry);
+}
+
+DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
+                 TestUnsupportedOplogEntryType,
+                 "Tripwire assertion.*11352603.*Unsupported oplog entry type") {
+
+    auto oplogEntry = makeContainerOplogEntry();
+
+    // Applying the transform on unsupported container insert should throw a TAssert.
+    applyTransformation(oplogEntry);
 }
 
 }  // namespace
