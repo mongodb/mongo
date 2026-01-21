@@ -112,7 +112,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return BSONObj();
     }
 
@@ -558,7 +558,7 @@ public:
         return {};
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctx) const override {
         return BSON(kStageName << kStageSpec);
     }
 
@@ -601,8 +601,7 @@ public:
         return {};
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        sdk::QueryShapeOptsHandle ctxHandle(ctx);
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctxHandle) const override {
         BSONObjBuilder builder;
 
         builder.append(kIndexFieldName, ctxHandle->serializeIdentifier(std::string(kIndexValue)));
@@ -698,8 +697,7 @@ public:
         return {};
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        sdk::QueryShapeOptsHandle ctxHandle(ctx);
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctxHandle) const override {
         BSONObjBuilder builder;
 
         builder.append(kSingleFieldPath,
@@ -789,8 +787,7 @@ public:
         return {};
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        sdk::QueryShapeOptsHandle ctxHandle(ctx);
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctxHandle) const override {
 
         // Build a BSON object for the spec and keep the memory in scope across the calls to
         // serialize literal.
@@ -1444,7 +1441,7 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return _spec;
     }
 
@@ -1510,8 +1507,10 @@ TEST(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodePreservesQueryShape
     // Clone the parse node.
     auto clonedHandle = handle->clone();
 
+    SerializationOptions opts{};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
     // Verify query shape is preserved (CloneableExtensionParseNode returns _spec as query shape).
-    ASSERT_BSONOBJ_EQ(handle->getQueryShape({}), clonedHandle->getQueryShape({}));
+    ASSERT_BSONOBJ_EQ(handle->getQueryShape(adapter), clonedHandle->getQueryShape(adapter));
 }
 
 // Test fixture for extension parse nodes that implement both clone() and expand().
@@ -1533,7 +1532,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return _spec;
     }
 
@@ -1560,9 +1559,11 @@ TEST(HostParseNodeCloneTest, ClonedParseNodeQueryShapeUnaffectedByExpandOnOther)
     // Clone the parse node.
     auto clonedHandle = handle->clone();
 
+    SerializationOptions opts{};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
     // Get query shape before expand.
-    auto originalQueryShape = handle->getQueryShape({});
-    auto clonedQueryShape = clonedHandle->getQueryShape({});
+    auto originalQueryShape = handle->getQueryShape(adapter);
+    auto clonedQueryShape = clonedHandle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(originalQueryShape, clonedQueryShape);
 
     // Expand the original handle (not the clone).
@@ -1570,7 +1571,7 @@ TEST(HostParseNodeCloneTest, ClonedParseNodeQueryShapeUnaffectedByExpandOnOther)
     ASSERT_EQ(expanded.size(), 1);
 
     // Verify the cloned handle still returns the same query shape after the original was expanded.
-    ASSERT_BSONOBJ_EQ(clonedQueryShape, clonedHandle->getQueryShape({}));
+    ASSERT_BSONOBJ_EQ(clonedQueryShape, clonedHandle->getQueryShape(adapter));
 }
 
 // Test fixture for extension AST nodes that implement clone().

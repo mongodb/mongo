@@ -73,7 +73,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return BSON(kMatchTopNName << _input);
     }
 

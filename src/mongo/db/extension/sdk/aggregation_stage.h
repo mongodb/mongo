@@ -33,6 +33,7 @@
 #include "mongo/db/extension/sdk/distributed_plan_logic.h"
 #include "mongo/db/extension/sdk/operation_metrics_adapter.h"
 #include "mongo/db/extension/sdk/query_execution_context_handle.h"
+#include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/raii_vector_to_abi_array.h"
 #include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/extension_status.h"
@@ -364,7 +365,7 @@ public:
         return _name;
     }
 
-    virtual BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const = 0;
+    virtual BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const = 0;
 
     virtual size_t getExpandedSize() const = 0;
 

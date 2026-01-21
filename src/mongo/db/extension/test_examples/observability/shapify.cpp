@@ -56,8 +56,7 @@ public:
     ShapifyParseNode(std::string_view stageName, const BSONObj& input)
         : sdk::TestParseNode<sdk::shared_test_stages::TransformAggStageAstNode>(stageName, input) {}
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
-        sdk::QueryShapeOptsHandle ctxHandle(ctx);
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctxHandle) const override {
         BSONObjBuilder builder;
 
         buildQueryShape(ctxHandle, _arguments, builder);
@@ -70,7 +69,7 @@ public:
     }
 
 private:
-    void buildQueryShape(sdk::QueryShapeOptsHandle ctxHandle,
+    void buildQueryShape(const sdk::QueryShapeOptsHandle& ctxHandle,
                          BSONObj input,
                          BSONObjBuilder& builder) const {
         for (const auto& elt : input) {

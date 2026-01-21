@@ -29,6 +29,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/sdk/extension_factory.h"
+#include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/test_extension_util.h"
 #include "mongo/util/modules.h"
 
@@ -122,7 +123,7 @@ public:
             std::make_unique<AstNodeType>(getName(), _arguments))});
         return expanded;
     }
-    mongo::BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    mongo::BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const override {
         return BSON(_name << _arguments);
     }
 

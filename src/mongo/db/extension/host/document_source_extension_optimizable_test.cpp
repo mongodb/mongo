@@ -39,6 +39,7 @@
 #include "mongo/db/extension/host_connector/adapter/host_services_adapter.h"
 #include "mongo/db/extension/sdk/aggregation_stage.h"
 #include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/shared_test_stages.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -267,7 +268,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return BSONObj();
     }
 
@@ -396,7 +397,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return {};
     }
 
@@ -425,7 +426,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return {};
     }
 
@@ -445,7 +446,7 @@ public:
 
     std::vector<VariantNodeHandle> expand() const override;
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return {};
     }
 
@@ -464,7 +465,7 @@ public:
 
     std::vector<VariantNodeHandle> expand() const override;
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return {};
     }
 
@@ -507,7 +508,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return {};
     }
 
@@ -647,7 +648,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -681,7 +682,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -712,7 +713,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -839,7 +840,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -2306,7 +2307,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return BSON(std::string(kStageName) << BSONObj());
     }
 

@@ -35,6 +35,7 @@
 #include "mongo/db/extension/sdk/distributed_plan_logic.h"
 #include "mongo/db/extension/sdk/dpl_array_container.h"
 #include "mongo/db/extension/sdk/host_services.h"
+#include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/extension/sdk/tests/fruits_test_stage.h"
 #include "mongo/db/extension/sdk/tests/transform_test_stages.h"
 #include "mongo/db/extension/shared/get_next_result.h"
@@ -163,7 +164,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -209,7 +210,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle&) const override {
         return BSONObj();
     }
 
@@ -257,7 +258,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle&) const override {
         return BSONObj();
     }
 
@@ -296,7 +297,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle&) const override {
         return BSONObj();
     }
 
@@ -347,7 +348,7 @@ public:
         return out;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle&) const override {
         return BSONObj();
     }
 
@@ -438,7 +439,7 @@ public:
         out.emplace_back(new sdk::ExtensionAggStageAstNode(std::make_unique<LeafBAstNode>()));
         return out;
     }
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle&) const override {
         return {};
     }
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {
@@ -472,7 +473,7 @@ public:
         out.emplace_back(new sdk::ExtensionAggStageAstNode(std::make_unique<LeafDAstNode>()));
         return out;
     }
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle&) const override {
         return {};
     }
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {
@@ -506,7 +507,7 @@ public:
         out.emplace_back(new sdk::ExtensionAggStageParseNode(std::make_unique<MidBParseNode>()));
         return out;
     }
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle&) const override {
         return {};
     }
     std::unique_ptr<sdk::AggStageParseNode> clone() const override {
@@ -659,7 +660,7 @@ public:
         return {};
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -722,7 +723,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -774,7 +775,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -806,7 +807,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -838,7 +839,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -869,7 +870,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -899,7 +900,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 

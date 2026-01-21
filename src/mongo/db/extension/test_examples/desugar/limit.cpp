@@ -126,7 +126,7 @@ public:
         sdk_uassert(11484702, "the limit must be a positive number  ", limit.getValue() > 0);
     }
 
-    mongo::BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    mongo::BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         // Need to override otherwise the default implementation would return an inaccurate object
         // like so: {$extensionLimit: {$extensionLimit: 3}}.
         return _stageBson;

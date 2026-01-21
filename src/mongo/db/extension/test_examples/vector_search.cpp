@@ -59,7 +59,7 @@ public:
         return expanded;
     }
 
-    mongo::BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    mongo::BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         return mongo::BSONObj();
     }
 

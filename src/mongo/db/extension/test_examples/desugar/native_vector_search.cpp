@@ -211,7 +211,7 @@ public:
         return expanded;
     }
 
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts* ctx) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle& ctx) const override {
         return BSONObj();
     }
 
@@ -302,7 +302,7 @@ public:
     /**
      * Emit the canonical query shape used for plan-cache hashing.
      */
-    BSONObj getQueryShape(const ::MongoExtensionHostQueryShapeOpts*) const override {
+    BSONObj getQueryShape(const sdk::QueryShapeOptsHandle&) const override {
         BSONObjBuilder bob;
         bob.append("path", _path);
         {
