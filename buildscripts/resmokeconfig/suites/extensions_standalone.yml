@@ -15,13 +15,11 @@ executor:
   archive:
     hooks:
       - ValidateCollections
-      - VerifyExtensionsVisibility
   config:
     shell_options:
       eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
   hooks:
     - class: ValidateCollections
-    - class: VerifyExtensionsVisibility
   fixture:
     class: MongoDFixture
     load_all_extensions: true

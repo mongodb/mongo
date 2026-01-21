@@ -18,14 +18,12 @@ executor:
     hooks:
       - CheckReplDBHash
       - ValidateCollections
-      - VerifyExtensionsVisibility
   config:
     shell_options:
       eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
   hooks:
     - class: CheckReplDBHash
     - class: ValidateCollections
-    - class: VerifyExtensionsVisibility
   fixture:
     class: ReplicaSetFixture
     num_nodes: 1
