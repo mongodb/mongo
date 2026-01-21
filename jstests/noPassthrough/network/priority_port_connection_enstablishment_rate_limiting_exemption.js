@@ -21,7 +21,6 @@ describe("Tests for priority port exemption from connection (session) establishm
     this.exemptIP = "127.0.0.1";
 
     this.kParamsConnectionEstablishmentRateLimiter = {
-        ingressConnectionEstablishmentRateLimiterEnabled: true,
         ingressConnectionEstablishmentRatePerSec: 1,
         ingressConnectionEstablishmentBurstCapacitySecs: 1,
         ingressConnectionEstablishmentMaxQueueDepth: 0,
@@ -35,6 +34,20 @@ describe("Tests for priority port exemption from connection (session) establishm
     };
 
     this.testConnectionEstablishmentRateLimiter = (conn, rs) => {
+        const exemptConn = new Mongo(`mongodb://${this.exemptIP}:${conn.port}`);
+        // Enable connection (session) establishment request rate limiter. We enable the rate limiter
+        // here rather than during test setup to ensure the test setup does not interfere with the
+        // metrics being validated below, specifically the rejected connection count. If enabled earlier,
+        // the _isSelf commands executed during test setup would trigger connection rejections,
+        // incrementing the establishmentRateLimit counter. As a result, the rejected counter would
+        // already be non-zero at this point, invalidating our test assumptions.
+        assert.commandWorked(
+            exemptConn
+                .getDB("admin")
+                .adminCommand({setParameter: 1, ingressConnectionEstablishmentRateLimiterEnabled: true}),
+        );
+        jsTest.log.info("Enabled connection (session) establishment rate limiter");
+
         // Make one non exempt connection on the main port (the only available token is consumed).
         const connToMainPort = new Mongo(`mongodb://${this.nonExemptIP}:${conn.port}`);
         assert.commandWorked(connToMainPort.getDB("admin").runCommand({ping: 1}));
@@ -78,18 +91,17 @@ describe("Tests for priority port exemption from connection (session) establishm
         assert(this.getEstablishmentRateLimitStats(conn)["exempted"] >= 1);
 
         // Disable connection (session) establishment request rate limiter
-        const exemptConn = new Mongo(`mongodb://${this.exemptIP}:${conn.port}`);
         assert.commandWorked(
             exemptConn
                 .getDB("admin")
                 .adminCommand({setParameter: 1, ingressConnectionEstablishmentRateLimiterEnabled: false}),
         );
+        jsTest.log.info("Disabled connection (session) establishment rate limiter");
     };
 
     it("Starting up a replica set with priority port enabled on all nodes", () => {
         const rs = new ReplSetTest({
-            // TODO (SERVER-115960): Increase the number of nodes
-            nodes: 1,
+            nodes: 3,
             usePriorityPorts: true,
             nodeOptions: {
                 setParameter: {
@@ -105,10 +117,10 @@ describe("Tests for priority port exemption from connection (session) establishm
         // Wait for replica set to be fully initialized
         rs.awaitReplication();
 
-        // TODO (SERVER-115960): After increasing the number of nodes, test connection establishment rate
-        // limiter on all nodes in the set
-        jsTest.log.info("Testing primary node: " + rs.getPrimary().host);
-        this.testConnectionEstablishmentRateLimiter(rs.getPrimary(), rs);
+        rs.nodes.forEach((conn) => {
+            jsTest.log.info("Testing replica set node: " + conn.host);
+            this.testConnectionEstablishmentRateLimiter(conn, rs);
+        });
 
         rs.stopSet();
     });
