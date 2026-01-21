@@ -146,5 +146,6 @@ feature_flags:
             transactions helps prevent the donor from not being to acquire the critical section
             within the critical section timeout when there are long-running transactions.
         cpp_varname: gFeatureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true

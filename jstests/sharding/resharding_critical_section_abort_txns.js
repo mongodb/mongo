@@ -5,8 +5,7 @@
  * - The response has RetryableWriteError label if the in-progress command is commitTransaction or
  *   abortTransaction. Otherwise, it has TransientTransactionError label.
  * @tags: [
- *   requires_fcv_82,
- *   featureFlagReshardingAbortUnpreparedTransactionsUponPreparingToBlockWrites,
+ *   requires_fcv_83
  * ]
  */
 
