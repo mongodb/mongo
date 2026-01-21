@@ -399,6 +399,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/OWNERS.yml
 /etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/**/* @10gen/query @svc-auto-approve-bot
 
+# The following patterns are parsed from ./etc/evergreen_yml_components/variants/amazon/streams/OWNERS.yml
+/etc/evergreen_yml_components/variants/amazon/streams/**/* @10gen/streams-engine @svc-auto-approve-bot
+
 # The following patterns are parsed from ./etc/evergreen_yml_components/variants/codecoverage/OWNERS.yml
 /etc/evergreen_yml_components/variants/codecoverage/**/* @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 
