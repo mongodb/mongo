@@ -7,8 +7,8 @@
  */
 import {linebreak, section, subSection} from "jstests/libs/query/pretty_md.js";
 import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/query/sbe_util.js";
 import {prettyPrintWinningPlan, getWinningJoinOrderOneLine} from "jstests/query_golden/libs/pretty_plan.js";
+import {joinTestWrapper} from "jstests/query_golden/libs/join_opt.js";
 
 const coll = db[jsTestName() + "_base"];
 coll.drop();
@@ -45,16 +45,6 @@ assert.commandWorked(
     ]),
 );
 
-const origParams = assert.commandWorked(
-    db.adminCommand({
-        getParameter: 1,
-        internalEnableJoinOptimization: 1,
-        internalRandomJoinReorderDefaultToHashJoin: 1,
-        internalJoinReorderMode: 1,
-    }),
-);
-delete origParams.ok;
-
 function runSingleTest(subtitle, pipeline, seen = undefined) {
     let joinOrder = undefined;
     const explain = coll.explain().aggregate(pipeline);
@@ -75,127 +65,127 @@ function runSingleTest(subtitle, pipeline, seen = undefined) {
 }
 
 function runRandomReorderTests(pipeline) {
-    try {
-        const baseRes = runSingleTest("No join opt", pipeline, false);
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: false}));
+    const baseRes = runSingleTest("No join opt", pipeline, false);
 
-        const params = {
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
             internalJoinReorderMode: "random",
             internalEnableJoinOptimization: true,
             internalRandomJoinReorderDefaultToHashJoin: true,
-        };
-        assert.commandWorked(db.adminCommand({setParameter: 1, ...params}));
-        let seed = 0;
-        const seen = new Set();
-        while (seed < 12) {
-            assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: seed}));
-            const res = runSingleTest(`Random reordering with seed ${seed}`, pipeline, seen);
-            if (res !== undefined) {
-                // Skip seed if we've seen this order before.
-                assert(_resultSetsEqualUnordered(baseRes, res), `Results differ between no join opt and seed ${seed}`);
-            }
-            seed++;
+        }),
+    );
+    let seed = 0;
+    const seen = new Set();
+    while (seed < 12) {
+        assert.commandWorked(db.adminCommand({setParameter: 1, internalRandomJoinOrderSeed: seed}));
+        const res = runSingleTest(`Random reordering with seed ${seed}`, pipeline, seen);
+        if (res !== undefined) {
+            // Skip seed if we've seen this order before.
+            assert(_resultSetsEqualUnordered(baseRes, res), `Results differ between no join opt and seed ${seed}`);
         }
-        linebreak();
-    } finally {
-        // Reset flags.
-        assert.commandWorked(db.adminCommand({setParameter: 1, ...origParams}));
+        seed++;
     }
+    linebreak();
 }
 
-// A - BASE - B
-section("3-Node graph, base node fully connected");
-runRandomReorderTests([
-    {$lookup: {from: a.getName(), as: "x", localField: "a", foreignField: "a"}},
-    {$unwind: "$x"},
-    {$lookup: {from: b.getName(), as: "y", localField: "b", foreignField: "b"}},
-    {$unwind: "$y"},
-    {$project: {_id: 0, "x._id": 0, "y._id": 0}},
-]);
+joinTestWrapper(() => {
+    // A - BASE - B
+    section("3-Node graph, base node fully connected");
+    runRandomReorderTests([
+        {$lookup: {from: a.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$lookup: {from: b.getName(), as: "y", localField: "b", foreignField: "b"}},
+        {$unwind: "$y"},
+        {$project: {_id: 0, "x._id": 0, "y._id": 0}},
+    ]);
 
-// BASE - A - B
-section("3-Node graph, base node connected to one node");
-runRandomReorderTests([
-    {$lookup: {from: a.getName(), as: "x", localField: "a", foreignField: "a"}},
-    {$unwind: "$x"},
-    {$lookup: {from: b.getName(), as: "y", localField: "x.b", foreignField: "b"}},
-    {$unwind: "$y"},
-    {$project: {_id: 0, "x._id": 0, "y._id": 0}},
-]);
+    // BASE - A - B
+    section("3-Node graph, base node connected to one node");
+    runRandomReorderTests([
+        {$lookup: {from: a.getName(), as: "x", localField: "a", foreignField: "a"}},
+        {$unwind: "$x"},
+        {$lookup: {from: b.getName(), as: "y", localField: "x.b", foreignField: "b"}},
+        {$unwind: "$y"},
+        {$project: {_id: 0, "x._id": 0, "y._id": 0}},
+    ]);
 
-//   BASE
-//  /    \
-// A ---- B (could be inferred...)
-section("3-Node graph + potentially inferred edge");
-runRandomReorderTests([
-    {$lookup: {from: a.getName(), as: "x", localField: "base", foreignField: "base"}},
-    {$unwind: "$x"},
-    {$lookup: {from: b.getName(), as: "y", localField: "base", foreignField: "base"}},
-    {$unwind: "$y"},
-    {$project: {_id: 0, "x._id": 0, "y._id": 0}},
-]);
+    //   BASE
+    //  /    \
+    // A ---- B (could be inferred...)
+    section("3-Node graph + potentially inferred edge");
+    runRandomReorderTests([
+        {$lookup: {from: a.getName(), as: "x", localField: "base", foreignField: "base"}},
+        {$unwind: "$x"},
+        {$lookup: {from: b.getName(), as: "y", localField: "base", foreignField: "base"}},
+        {$unwind: "$y"},
+        {$project: {_id: 0, "x._id": 0, "y._id": 0}},
+    ]);
 
-section("4-Node graph + potentially inferred edges & filters");
-runRandomReorderTests([
-    {$match: {b: {$eq: 3}}},
-    {$lookup: {from: a.getName(), as: "x", localField: "base", foreignField: "base"}},
-    {$unwind: "$x"},
-    {$lookup: {from: b.getName(), as: "y", localField: "base", foreignField: "base"}},
-    {$unwind: "$y"},
-    {
-        $lookup: {
-            from: coll.getName(),
-            as: "z",
-            localField: "y.base",
-            foreignField: "base",
-            pipeline: [{$match: {base: {$gt: 3}}}],
+    section("4-Node graph + potentially inferred edges & filters");
+    runRandomReorderTests([
+        {$match: {b: {$eq: 3}}},
+        {$lookup: {from: a.getName(), as: "x", localField: "base", foreignField: "base"}},
+        {$unwind: "$x"},
+        {$lookup: {from: b.getName(), as: "y", localField: "base", foreignField: "base"}},
+        {$unwind: "$y"},
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "z",
+                localField: "y.base",
+                foreignField: "base",
+                pipeline: [{$match: {base: {$gt: 3}}}],
+            },
         },
-    },
-    {$unwind: "$z"},
-    {$project: {_id: 0, "x._id": 0, "y._id": 0, "z._id": 0}},
-]);
+        {$unwind: "$z"},
+        {$project: {_id: 0, "x._id": 0, "y._id": 0, "z._id": 0}},
+    ]);
 
-section("5-Node graph + filters");
-runRandomReorderTests([
-    {$match: {b: {$eq: 3}}},
-    {
-        $lookup: {
-            from: a.getName(),
-            as: "aaa",
-            localField: "a",
-            foreignField: "a",
-            pipeline: [{$match: {base: {$in: [22, 33]}}}],
+    section("5-Node graph + filters");
+    runRandomReorderTests([
+        {$match: {b: {$eq: 3}}},
+        {
+            $lookup: {
+                from: a.getName(),
+                as: "aaa",
+                localField: "a",
+                foreignField: "a",
+                pipeline: [{$match: {base: {$in: [22, 33]}}}],
+            },
         },
-    },
-    {$unwind: "$aaa"},
-    {
-        $lookup: {
-            from: b.getName(),
-            as: "bbb",
-            localField: "b",
-            foreignField: "b",
-            pipeline: [{$match: {base: {$gt: 20}}}],
+        {$unwind: "$aaa"},
+        {
+            $lookup: {
+                from: b.getName(),
+                as: "bbb",
+                localField: "b",
+                foreignField: "b",
+                pipeline: [{$match: {base: {$gt: 20}}}],
+            },
         },
-    },
-    {$unwind: "$bbb"},
-    {
-        $lookup: {
-            from: coll.getName(),
-            as: "ccc",
-            localField: "aaa.base",
-            foreignField: "base",
-            pipeline: [{$match: {b: {$lt: 0}}}],
+        {$unwind: "$bbb"},
+        {
+            $lookup: {
+                from: coll.getName(),
+                as: "ccc",
+                localField: "aaa.base",
+                foreignField: "base",
+                pipeline: [{$match: {b: {$lt: 0}}}],
+            },
         },
-    },
-    {$unwind: "$ccc"},
-    {
-        $lookup: {
-            from: b.getName(),
-            as: "ddd",
-            localField: "base",
-            foreignField: "base",
-            pipeline: [{$match: {b: {$gt: 0}}}],
+        {$unwind: "$ccc"},
+        {
+            $lookup: {
+                from: b.getName(),
+                as: "ddd",
+                localField: "base",
+                foreignField: "base",
+                pipeline: [{$match: {b: {$gt: 0}}}],
+            },
         },
-    },
-    {$unwind: "$ddd"},
-    {$project: {_id: 0, "aaa._id": 0, "bbb._id": 0, "ccc._id": 0, "ddd._id": 0}},
-]);
+        {$unwind: "$ddd"},
+        {$project: {_id: 0, "aaa._id": 0, "bbb._id": 0, "ccc._id": 0, "ddd._id": 0}},
+    ]);
+}); // joinTestWrapper();
