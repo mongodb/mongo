@@ -1311,7 +1311,7 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     // Retry if IFRFlagRetry is thrown. On retry, disable the flag in the ifrContext.
     auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
                           RetryOnViewState& state) {
-        vector_search_metrics::onViewKickbackRetryCount.increment(1);
+        sVectorSearchMetrics.onViewKickbackRetryCount.addAndFetch(1);
         state.ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
             ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
     };

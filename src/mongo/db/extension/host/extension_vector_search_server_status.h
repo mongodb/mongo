@@ -29,16 +29,40 @@
 
 #pragma once
 
+#include "mongo/platform/atomic.h"
 
-#include "mongo/base/counter.h"
-namespace mongo::vector_search_metrics {
+namespace mongo {
 
-extern Counter64& legacyVectorSearchQueryCount;
+/**
+ * Metrics for tracking vector search usage.
+ */
+struct VectorSearchServerStatusMetrics {
+    /**
+     * Counter for tracking the number of queries run with legacy $vectorSearch.
+     */
+    Atomic<int64_t> legacyVectorSearchQueryCount{0};
 
-extern Counter64& extensionVectorSearchQueryCount;
+    /**
+     * Counter for tracking the number of queries run with extension $vectorSearch.
+     */
+    Atomic<int64_t> extensionVectorSearchQueryCount{0};
 
-extern Counter64& onViewKickbackRetryCount;
+    /**
+     * Counter for tracking the number of queries that went through the
+     * $vectorSearch-on-a-view retry kickback.
+     */
+    Atomic<int64_t> onViewKickbackRetryCount{0};
 
-// TODO SERVER-116049: add metric for inSubpipelineKickbackRetries.
+    /**
+     * Counter for tracking the number of queries that went through the
+     * $vectorSearch-in-a-subpipeline retry kickback.
+     */
+    Atomic<int64_t> inSubpipelineKickbackCount{0};
+};
 
-}  // namespace mongo::vector_search_metrics
+/**
+ * Global instance of vector search metrics.
+ */
+extern VectorSearchServerStatusMetrics sVectorSearchMetrics;
+
+}  // namespace mongo

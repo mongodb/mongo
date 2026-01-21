@@ -48,7 +48,7 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceExtensionToStageFn(
 
     // Increment extensionVectorSearchQueryCount if this is a $vectorSearch extension stage.
     if (documentSource->getSourceName() == search_helpers::kExtensionVectorSearchStageName) {
-        vector_search_metrics::extensionVectorSearchQueryCount.increment(1);
+        sVectorSearchMetrics.extensionVectorSearchQueryCount.addAndFetch(1);
     }
 
     auto execAggStageHandle = documentSource->compile();

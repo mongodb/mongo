@@ -29,17 +29,43 @@
 
 #include "mongo/db/extension/host/extension_vector_search_server_status.h"
 
-#include "mongo/db/commands/server_status/server_status_metric.h"
+#include "mongo/db/commands/server_status/server_status.h"
 
-namespace mongo::vector_search_metrics {
+namespace mongo {
 
-auto& legacyVectorSearchQueryCount =
-    *MetricBuilder<Counter64>("extension.vectorSearch.legacyVectorSearchUsed");
+VectorSearchServerStatusMetrics sVectorSearchMetrics{};
 
-auto& extensionVectorSearchQueryCount =
-    *MetricBuilder<Counter64>("extension.vectorSearch.extensionVectorSearchUsed");
+namespace {
+class VectorSearchServerStatusSection : public ServerStatusSection {
+public:
+    using ServerStatusSection::ServerStatusSection;
 
-auto& onViewKickbackRetryCount =
-    *MetricBuilder<Counter64>("extension.vectorSearch.onViewKickbackRetries");
+    bool includeByDefault() const override {
+        return true;
+    }
 
-}  // namespace mongo::vector_search_metrics
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        BSONObjBuilder builder;
+        builder.append(
+            "legacyVectorSearchUsed",
+            static_cast<long long>(sVectorSearchMetrics.legacyVectorSearchQueryCount.load()));
+        builder.append(
+            "extensionVectorSearchUsed",
+            static_cast<long long>(sVectorSearchMetrics.extensionVectorSearchQueryCount.load()));
+        builder.append(
+            "onViewKickbackRetries",
+            static_cast<long long>(sVectorSearchMetrics.onViewKickbackRetryCount.load()));
+        builder.append(
+            "inSubpipelineKickbackRetries",
+            static_cast<long long>(sVectorSearchMetrics.inSubpipelineKickbackCount.load()));
+        return builder.obj();
+    }
+};
+
+auto& extensionVectorSearchSection =
+    *ServerStatusSectionBuilder<VectorSearchServerStatusSection>("extension.vectorSearch")
+         .forShard()
+         .forRouter();
+}  // namespace
+}  // namespace mongo
