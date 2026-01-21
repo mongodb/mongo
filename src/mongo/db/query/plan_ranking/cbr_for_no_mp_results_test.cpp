@@ -278,14 +278,20 @@ TEST_F(CBRForNoMPResultsTest, CBRCannotDecideUsesMultiPlanner) {
     ASSERT_OK(status.getStatus());
     ASSERT_EQ(status.getValue().solutions.size(), 1);
     auto& explainData = status.getValue().maybeExplainData.value();
-    // TODO SERVER-117370. Populate the CBR plans as rejected plans.
-    // ASSERT_EQ(explainData.cbrRejectedPlans.size(), 2);
-    // ASSERT_EQ(explainData.estimates.size(), 4);  // 2 x (IXSCAN + FETCH)
-    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 1);
+    ASSERT_EQ(explainData.rejectedPlansWithStages.size(), 3);  // 1 from multiplanner + 2 from CBR
     ASSERT_FALSE(explainData.rejectedPlansWithStages[0].solution == nullptr);
-    auto rejectedPlanStats = explainData.rejectedPlansWithStages[0].planStage->getStats();
-    ASSERT_EQ(rejectedPlanStats->common.works, 10000);
-    ASSERT_EQ(rejectedPlanStats->common.advanced, 0);
+    auto multiPlannerRejectedPlanStats =
+        explainData.rejectedPlansWithStages[0].planStage->getStats();
+    ASSERT_EQ(multiPlannerRejectedPlanStats->common.works, 10000);
+    ASSERT_EQ(multiPlannerRejectedPlanStats->common.advanced, 0);
+    ASSERT_EQ(explainData.estimates.size(),
+              0);  // Empty estimates map as setReturnKey cannot be estimated
+    ASSERT_FALSE(explainData.rejectedPlansWithStages[1].solution == nullptr);
+    ASSERT_TRUE(explainData.rejectedPlansWithStages[1].planStage ==
+                nullptr);  // No plan stage as CBR rejected
+    ASSERT_FALSE(explainData.rejectedPlansWithStages[2].solution == nullptr);
+    ASSERT_TRUE(explainData.rejectedPlansWithStages[2].planStage ==
+                nullptr);  // No plan stage as CBR rejected
     ASSERT_TRUE(strategy.getMultiPlanner().has_value());
     auto stats = strategy.getMultiPlanner()->getSpecificStats();
     ASSERT_FALSE(stats->earlyExit);

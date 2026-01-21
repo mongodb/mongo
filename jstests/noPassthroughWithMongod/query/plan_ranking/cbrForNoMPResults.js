@@ -122,8 +122,16 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
     const explain = coll.find(query).returnKey().explain("executionStats");
     const winningPlan = getWinningPlanFromExplain(explain);
     assertPlanNotCosted(winningPlan);
-
     assert.eq(getExecutionStats(explain)[0].nReturned, 0, toJsonForLog(explain));
+
+    if (getEngine(explain) === "classic") {
+        const rejectedPlans = getRejectedPlans(explain);
+        assert.eq(rejectedPlans.length, 3, toJsonForLog(explain));
+        assertPlanNotCosted(rejectedPlans[0]);
+        // CBR plans are not costed since the returnKey stage is not costable.
+        assertPlanNotCosted(rejectedPlans[1]);
+        assertPlanNotCosted(rejectedPlans[2]);
+    }
 
     // Now verify that without the ReturnKey stage, the query is planned with CBR.
     const cbrExplain = coll.find(query).explain("executionStats");
@@ -132,9 +140,11 @@ function testReturnKeyIsPlannedWithMultiPlanner() {
     if (getEngine(cbrExplain) === "classic") {
         assertPlanCosted(cbrWinningPlan);
 
-        const rejectedPlans = getRejectedPlans(explain);
-        // TODO SERVER-117370. Populate the CBR plans as rejected plans.
-        assert.eq(rejectedPlans.length, 1, toJsonForLog(explain));
+        const rejectedPlans = getRejectedPlans(cbrExplain);
+        assert.eq(rejectedPlans.length, 3, toJsonForLog(cbrExplain));
+        assertPlanCosted(rejectedPlans[0]);
+        assertPlanNotCosted(rejectedPlans[1]);
+        assertPlanNotCosted(rejectedPlans[2]);
     }
     assert.eq(getExecutionStats(cbrExplain)[0].nReturned, 0, toJsonForLog(cbrExplain));
 }

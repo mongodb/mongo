@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/explain_diagnostic_printer.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
@@ -560,6 +561,69 @@ TEST_F(PlanExplainerTest, INLJEmbeddingTest) {
             ]
         })",
         outerBob.obj());
+}
+
+TEST_F(PlanExplainerTest, PlanExplainerDataMergeEmpty) {
+    PlanExplainerData data1;
+    data1.rejectedPlansWithStages.push_back({nullptr, nullptr});
+
+    PlanExplainerData data2;
+    data2.planStageQsnMap.emplace(nullptr, nullptr);
+
+    data1 << std::move(data2);
+
+    ASSERT_EQ(data1.rejectedPlansWithStages.size(), 1);
+    ASSERT_EQ(data1.planStageQsnMap.size(), 1);
+}
+
+TEST_F(PlanExplainerTest, OptionalPlanExplainerDataMerge) {
+    boost::optional<PlanExplainerData> data1;
+    boost::optional<PlanExplainerData> data2;
+
+    // Both empty - stays empty
+    data1 << std::move(data2);
+    ASSERT_FALSE(data1);
+
+    // LHS empty, RHS has value - merged has value
+    data2.emplace();
+    data2->rejectedPlansWithStages.push_back({nullptr, nullptr});
+    data1 << std::move(data2);
+    ASSERT_TRUE(data1);
+    ASSERT_EQ(data1->rejectedPlansWithStages.size(), 1);
+
+    // Both have values - merges content
+    boost::optional<PlanExplainerData> data3;
+    data3.emplace();
+    data3->planStageQsnMap.emplace(nullptr, nullptr);
+
+    data1 << std::move(data3);
+    ASSERT_EQ(data1->rejectedPlansWithStages.size(), 1);
+    ASSERT_EQ(data1->planStageQsnMap.size(), 1);
+}
+
+TEST_F(PlanExplainerTest, PlanExplainerDataMergeFull) {
+    PlanExplainerData data1;
+    auto qsn1 = std::make_unique<QuerySolution>();
+    data1.rejectedPlansWithStages.push_back({std::move(qsn1), nullptr});
+    // Use distinct pointer values to avoid key collision
+    data1.planStageQsnMap.emplace(reinterpret_cast<const PlanStage*>(0x1), nullptr);
+    data1.estimates.emplace(reinterpret_cast<const QuerySolutionNode*>(0x1),
+                            cost_based_ranker::QSNEstimate{});
+
+    PlanExplainerData data2;
+    auto qsn2 = std::make_unique<QuerySolution>();
+    data2.rejectedPlansWithStages.push_back({std::move(qsn2), nullptr});
+    data2.planStageQsnMap.emplace(reinterpret_cast<const PlanStage*>(0x2), nullptr);
+    data2.estimates.emplace(reinterpret_cast<const QuerySolutionNode*>(0x2),
+                            cost_based_ranker::QSNEstimate{});
+
+    data1 << std::move(data2);
+
+    ASSERT_EQ(data1.rejectedPlansWithStages.size(), 2);
+    ASSERT(data1.rejectedPlansWithStages[0].solution != nullptr);
+    ASSERT(data1.rejectedPlansWithStages[1].solution != nullptr);
+    ASSERT_EQ(data1.planStageQsnMap.size(), 2);
+    ASSERT_EQ(data1.estimates.size(), 2);
 }
 
 }  // namespace

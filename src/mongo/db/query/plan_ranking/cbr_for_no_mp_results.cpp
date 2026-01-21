@@ -88,36 +88,79 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
         return mpTrialsStatus;
     }
     auto stats = _multiPlanner->getSpecificStats();
-    // If no plan has produced any results (absolutely zero productivity) during the trials phase
-    // and also multiplanner didn't exit early (EOF), use CBR to rank the plans.
-    if (!stats->earlyExit && stats->numResultsFound == 0) {
-        CBRPlanRankingStrategy cbrStrategy;
-        plannerParams.planRankerMode = QueryPlanRankerModeEnum::kSamplingCE;
-        auto result = cbrStrategy.rankPlans(opCtx, query, plannerParams, yieldPolicy, collections);
-        plannerParams.planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
-        if (!result.isOK()) {
-            return result.getStatus();
-        }
+    // We're using CBR to pick a plan only if multiplanner did not produce any results during the
+    // trials phase and did not exit early either.
+    //
+    // Specifically applied as follows:
+    // 1. Try multiplanner first: If it produced any results during trials phase or exited early,
+    //    pick best plan from it.
+    // 2. Otherwise, try CBR: If CBR picks a single best plan, return that.
+    // 3. Otherwise, resume multiplanner to completion and pick best plan from it.
+    if (stats->earlyExit || stats->numResultsFound > 0) {
+        auto remainingMultiPlannerWorksPerPlan =
+            trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
+        return resumeMultiPlannerAndPickBestPlan(
+            {.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
+             .targetNumResults = trialsConfig.targetNumResults});
+    }
+    tassert(11737001,
+            "Expected multi-planner to have produced zero results during trials phase",
+            stats->numResultsFound == 0);
 
-        // Having onlny a single solution means that CBR was able to pick a best plan.
-        if (result.getValue().solutions.size() == 1) {
-            _multiPlanner->abandonTrials();
+    // No plan produced any results during the trials phase.
+    CBRPlanRankingStrategy cbrStrategy;
+    plannerParams.planRankerMode = QueryPlanRankerModeEnum::kSamplingCE;
+    auto cbrResult = cbrStrategy.rankPlans(opCtx, query, plannerParams, yieldPolicy, collections);
+    plannerParams.planRankerMode = QueryPlanRankerModeEnum::kAutomaticCE;
+    if (!cbrResult.isOK()) {
+        return cbrResult.getStatus();
+    }
+
+    if (cbrResult.getValue().solutions.size() == 1) {
+        _multiPlanner->abandonTrials();
+        // TODO SERVER-117373. Only if explain is needed.
+        auto resultValue = std::move(cbrResult.getValue());
+        resultValue.maybeExplainData << _multiPlanner->extractExplainData();
+
+        return std::move(resultValue);
+    } else {
+        // move solutions from cbrResult into maybeExplainData.rejectedPlansWithStages
+        for (size_t i = 0; i < cbrResult.getValue().solutions.size(); i++) {
             // TODO SERVER-117373. Only if explain is needed.
-            auto resultValue = std::move(result.getValue());
-            resultValue.maybeExplainData << _multiPlanner->extractExplainData();
-
-            return std::move(resultValue);
-        } else {
-            // TODO SERVER-117370. Populate the CBR plans as rejected plans.
+            cbrResult.getValue().maybeExplainData->rejectedPlansWithStages.push_back(
+                {std::move(cbrResult.getValue().solutions[i]), nullptr});
         }
     }
+
+    // Previous multi-planning phase didn't exit early.
+    // Resume it since CBR couldn't pick a single best plan either.
+    // TODO SERVER-117488. Only resume the plan that CBR considered best and the not estimable ones.
+    auto remainingMultiPlannerWorksPerPlan =
+        trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
+    auto result =
+        resumeMultiPlannerAndPickBestPlan({.maxNumWorksPerPlan = remainingMultiPlannerWorksPerPlan,
+                                           .targetNumResults = trialsConfig.targetNumResults});
+    if (!result.isOK()) {
+        return result;
+    }
+    // TODO SERVER-117373. Only if explain is needed.
+    result.getValue().maybeExplainData << std::move(cbrResult.getValue().maybeExplainData);
+    return std::move(result.getValue());
+}
+
+std::unique_ptr<WorkingSet> CBRForNoMPResultsStrategy::extractWorkingSet() {
+    tassert(11451400, "WorkingSet is not initialized", _ws);
+    auto result = std::move(_ws);
+    _ws = nullptr;
+    return result;
+}
+
+StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::resumeMultiPlannerAndPickBestPlan(
+    const trial_period::TrialPhaseConfig& trialsConfig) {
+    auto stats = _multiPlanner->getSpecificStats();
+
     if (!stats->earlyExit) {
-        // Previous multi-planning phase didn't exit early.
-        // Resume it.
-        auto remainingWorksPerPlan =
-            trialsConfig.maxNumWorksPerPlan - cappedTrialsConfig.maxNumWorksPerPlan;
-        auto status = _multiPlanner->runTrials({.maxNumWorksPerPlan = remainingWorksPerPlan,
-                                                .targetNumResults = trialsConfig.targetNumResults});
+        auto status = _multiPlanner->runTrials(trialsConfig);
         if (!status.isOK()) {
             return status;
         }
@@ -135,13 +178,6 @@ StatusWith<PlanRankingResult> CBRForNoMPResultsStrategy::rankPlans(
     // TODO SERVER-117373. Only if explain is needed.
     result.maybeExplainData.emplace(_multiPlanner->extractExplainData());
     return std::move(result);
-}
-
-std::unique_ptr<WorkingSet> CBRForNoMPResultsStrategy::extractWorkingSet() {
-    tassert(11451400, "WorkingSet is not initialized", _ws);
-    auto result = std::move(_ws);
-    _ws = nullptr;
-    return result;
 }
 }  // namespace plan_ranking
 }  // namespace mongo
