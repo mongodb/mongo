@@ -267,9 +267,9 @@ StageConstraints DocumentSourceExtensionOptimizable::constraints(
                                         PositionRequirement::kNone,
                                         HostTypeRequirement::kNone,
                                         DiskUseRequirement::kNoDiskUse,
-                                        FacetRequirement::kAllowed,
+                                        FacetRequirement::kNotAllowed,
                                         TransactionRequirement::kNotAllowed,
-                                        LookupRequirement::kAllowed,
+                                        LookupRequirement::kNotAllowed,
                                         UnionRequirement::kAllowed,
                                         ChangeStreamRequirement::kDenylist);
     constraints.canRunOnTimeseries = false;
@@ -287,12 +287,15 @@ StageConstraints DocumentSourceExtensionOptimizable::constraints(
     if (!_properties.getAllowedInUnionWith()) {
         constraints.unionRequirement = StageConstraints::UnionRequirement::kNotAllowed;
     }
-    if (!_properties.getAllowedInLookup()) {
-        constraints.lookupRequirement = StageConstraints::LookupRequirement::kNotAllowed;
-    }
-    if (!_properties.getAllowedInFacet()) {
-        constraints.facetRequirement = StageConstraints::FacetRequirement::kNotAllowed;
-    }
+    // TODO SERVER-117259 Enable extension stages in $lookup; change the default back to 'kAllowed'.
+    // if (!_properties.getAllowedInLookup()) {
+    //     constraints.lookupRequirement = StageConstraints::LookupRequirement::kNotAllowed;
+    // }
+
+    // TODO SERVER-117260 Enable extension stages in $facet; change the default back to 'kAllowed'.
+    // if (!_properties.getAllowedInFacet()) {
+    //     constraints.facetRequirement = StageConstraints::FacetRequirement::kNotAllowed;
+    // }
 
     return constraints;
 }

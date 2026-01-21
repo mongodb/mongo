@@ -53,13 +53,16 @@ StageConstraints DocumentSourceExtensionForQueryShape::constraints(
     // lenient as possible to avoid prematurely rejecting a valid pipeline. If new callers begin
     // relying on constraints() before desugaring for correctness, we may need to surface
     // constraint metadata on the ParseNode or delay constraint checks until after desugar.
+    //
+    // TODO SERVER-117259 Change LookupRequirement.
+    // TODO SERVER-117260 Change FacetRequirement.
     auto constraints = StageConstraints(StreamType::kStreaming,
                                         PositionRequirement::kNone,
                                         HostTypeRequirement::kNone,
                                         DiskUseRequirement::kNoDiskUse,
-                                        FacetRequirement::kAllowed,
+                                        FacetRequirement::kNotAllowed,
                                         TransactionRequirement::kNotAllowed,
-                                        LookupRequirement::kAllowed,
+                                        LookupRequirement::kNotAllowed,
                                         UnionRequirement::kAllowed,
                                         ChangeStreamRequirement::kDenylist);
     constraints.canRunOnTimeseries = false;

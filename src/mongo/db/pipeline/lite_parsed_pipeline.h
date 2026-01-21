@@ -88,7 +88,14 @@ public:
         : _isRunningAgainstView_ForHybridSearch(isRunningAgainstView_ForHybridSearch) {
         _stageSpecs.reserve(pipelineStages.size());
         for (auto&& rawStage : pipelineStages) {
-            _stageSpecs.push_back(LiteParsedDocumentSource::parse(nss, rawStage, options));
+            auto stageCopy = rawStage;
+            if (options.makeSubpipelineOwned) {
+                stageCopy.makeOwned();
+            }
+            _stageSpecs.push_back(LiteParsedDocumentSource::parse(nss, stageCopy, options));
+            if (options.makeSubpipelineOwned) {
+                _stageSpecs.back()->setOwnedBson(stageCopy);
+            }
         }
     }
 

@@ -19,8 +19,6 @@ const kNotAllowedInLookupErrorCode = 51047;
 const kNotAllowedInUnionWithErrorCode = 31441;
 const kNotAllowedInFacetErrorCode = 40600;
 
-/*
-TODO SERVER-117179 Enable this test.
 // Test that a $lookup pipeline can reject an extension stage.
 {
     const lookupPipeline = [{$lookup: {from: other.getName(), as: "joined", pipeline: [{$testFoo: {}}]}}];
@@ -57,7 +55,6 @@ TODO SERVER-117179 Enable this test.
         kNotAllowedInLookupErrorCode,
     );
 }
-*/
 
 // Test that a $unionWith pipeline can reject an extension stage.
 {
@@ -95,8 +92,7 @@ TODO SERVER-117179 Enable this test.
         kNotAllowedInUnionWithErrorCode,
     );
 }
-/*
-TODO SERVER-117179 Enable this test.
+
 // Test that a $facet pipeline can reject an extension stage.
 {
     const facetPipeline = [{$facet: {facetPipe: [{$testFoo: {}}]}}];
@@ -133,4 +129,3 @@ TODO SERVER-117179 Enable this test.
         kNotAllowedInFacetErrorCode,
     );
 }
-*/

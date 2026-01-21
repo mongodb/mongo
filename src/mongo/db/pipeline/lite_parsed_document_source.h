@@ -83,6 +83,14 @@ struct LiteParserOptions {
     // Optional tracker to note when extensions are used in a given aggregate, and track whether
     // that command succeeds. Should be owned by the command invocation, not here.
     ExtensionMetrics* extensionMetrics = nullptr;
+
+    // Indicates whether the LiteParsedPipeline constructor for a stage's subpipeline should take
+    // ownership of the BSON *during* parsing, not after. This is needed for extension stages that
+    // execute inside of subpipelines, since they will call 'getOriginalBson()' and so need the
+    // underlying BSON to be preserved.
+    //
+    // TODO SERVER-117525 Delete this option once the subpipeline has an owned wrapper.
+    bool makeSubpipelineOwned = false;
 };
 
 namespace exec::agg {
@@ -589,6 +597,12 @@ public:
         }
 
         _ownedBson = _originalBson.wrap();
+        _originalBson = _ownedBson->firstElement();
+    }
+
+    // TODO SERVER-117525 Delete this function.
+    void setOwnedBson(BSONObj obj) {
+        _ownedBson = obj;
         _originalBson = _ownedBson->firstElement();
     }
 
