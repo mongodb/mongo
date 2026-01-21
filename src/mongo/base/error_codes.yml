@@ -866,7 +866,7 @@ error_codes:
 
   - {code: 400, name: CannotUpgrade}
 
-  - {code: 401, name: ResumeTenantChangeStream}
+  # - {code: 401, name: ResumeTenantChangeStream} # Removed in v8.3
 
   - {code: 402, name: ResourceExhausted, categories: [RetriableError]}
 

@@ -591,7 +591,7 @@ TEST_F(ErrorLabelBuilderTest, ResumableChangeStreamErrorAppliesToChangeStreamAgg
 
     for (auto&& errorCode : {ErrorCodes::NetworkTimeout,
                              ErrorCodes::QueryPlanKilled,
-                             ErrorCodes::ResumeTenantChangeStream,
+                             ErrorCodes::RetryChangeStream,
                              ErrorCodes::FailedToSatisfyReadPreference}) {
         // The label applies to a $changeStream "aggregate" command.
         std::string commandName = "aggregate";

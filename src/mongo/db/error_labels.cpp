@@ -155,8 +155,7 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
          ErrorCodes::isNeedRetargettingError(*_code) || _code == ErrorCodes::RetryChangeStream ||
          _code == ErrorCodes::FailedToSatisfyReadPreference ||
          _code == ErrorCodes::QueryPlanKilled /* the change stream cursor gets killed upon node
-                                                 rollback */
-         || _code == ErrorCodes::ResumeTenantChangeStream);
+                                                 rollback */);
 
     // If the command or exception is not relevant, bail out early.
     if (!mayNeedResumableChangeStreamErrorLabel) {
@@ -317,7 +316,6 @@ bool isTransientTransactionError(ErrorCodes::Error code,
         return false;
     }
 
-    bool isTransient;
     switch (code) {
         case ErrorCodes::WriteConflict:
         case ErrorCodes::LockTimeout:
@@ -326,11 +324,11 @@ bool isTransientTransactionError(ErrorCodes::Error code,
         case ErrorCodes::StaleDbVersion:
             return true;
         default:
-            isTransient = false;
             break;
     }
 
-    isTransient |= ErrorCodes::isSnapshotError(code) || ErrorCodes::isNeedRetargettingError(code);
+    bool isTransient =
+        ErrorCodes::isSnapshotError(code) || ErrorCodes::isNeedRetargettingError(code);
 
     if (isCommitOrAbort) {
         // On NoSuchTransaction it's safe to retry the whole transaction only if the data cannot be
