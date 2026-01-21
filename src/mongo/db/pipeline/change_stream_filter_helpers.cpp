@@ -261,7 +261,7 @@ std::unique_ptr<MatchExpression> buildInvalidationFilter(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MatchExpression* userMatch,
     std::vector<BSONObj>& backingBsonObjs) {
-    auto nss = expCtx->getNamespaceString();
+    const auto& nss = expCtx->getNamespaceString();
     auto streamType = ChangeStream::getChangeStreamType(nss);
 
     // A whole-cluster change stream is not invalidated by anything.
