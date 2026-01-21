@@ -495,6 +495,7 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
         // collection was dropped a long time ago. Because of this, we are okay with piggy-backing
         // off another thread's request to refresh the cache, simply waiting for that request to
         // return instead of forcing another refresh.
+        catalogCache->onStaleDatabaseVersion(outputNs.dbName(), boost::none);
         catalogCache->onStaleCollectionVersion(outputNs, boost::none);
 
         routingCtx = uassertStatusOK(getRoutingContext(expCtx->getOperationContext(), {outputNs}));
