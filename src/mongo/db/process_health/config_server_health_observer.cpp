@@ -212,10 +212,9 @@ Future<ConfigServerHealthObserver::CheckResult> ConfigServerHealthObserver::_che
     checkCtx->taskExecutor = periodicCheckContext.taskExecutor;
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-    checkCtx->client = _svcCtx->getService(ClusterRole::RouterServer)
-                           ->makeClient("ConfigServerHealthObserver",
-                                        Client::noSession(),
-                                        ClientOperationKillableByStepdown{false});
+    checkCtx->client = _svcCtx->getService()->makeClient("ConfigServerHealthObserver",
+                                                         Client::noSession(),
+                                                         ClientOperationKillableByStepdown{false});
     checkCtx->opCtx = checkCtx->client->makeOperationContext();
     checkCtx->opCtx->setDeadlineAfterNowBy(kObserverTimeout, ErrorCodes::ExceededTimeLimit);
 

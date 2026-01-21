@@ -461,7 +461,7 @@ void FSyncLockThread::_waitUntilLastAppliedCatchupLastWritten() {
 }
 
 void FSyncLockThread::run() {
-    ThreadClient tc("fsyncLockWorker", _serviceContext->getService(ClusterRole::ShardServer));
+    ThreadClient tc("fsyncLockWorker", _serviceContext->getService());
     // We first lock to stop oplogWriter then wait oplogApplier to apply everything in its buffer.
     // This can make sure we have applied all oplogs that have been written when we fsync lock the
     // server.

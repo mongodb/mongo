@@ -115,7 +115,7 @@ void AutoGetRstlForStepUpStepDown::_startKillOpThread() {
 
 void AutoGetRstlForStepUpStepDown::_killOpThreadFn() {
     Client::initThread("RstlKillOpThread",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                       getGlobalServiceContext()->getService(),
                        Client::noSession(),
                        ClientOperationKillableByStepdown{false});
 

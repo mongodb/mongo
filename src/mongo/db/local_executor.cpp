@@ -65,7 +65,7 @@ std::shared_ptr<executor::TaskExecutor> createLocalExecutor(ServiceContext* serv
     tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
     tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
         Client::initThread(threadName,
-                           serviceContext->getService(ClusterRole::ShardServer),
+                           serviceContext->getService(),
                            Client::noSession(),
                            ClientOperationKillableByStepdown{false});
     };

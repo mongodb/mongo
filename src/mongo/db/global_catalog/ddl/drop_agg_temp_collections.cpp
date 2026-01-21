@@ -88,8 +88,7 @@ void dropAggTempCollections(OperationContext* opCtx) {
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     ExecutorFuture<void>(executor)
         .then([serviceContext, tempCollectionsToDrop] {
-            ThreadClient tc{"dropAggTempCollections",
-                            serviceContext->getService(ClusterRole::ShardServer)};
+            ThreadClient tc{"dropAggTempCollections", serviceContext->getService()};
             const auto opCtx = tc->makeOperationContext();
 
             // Wait for the node to become a writable primary before processing the list

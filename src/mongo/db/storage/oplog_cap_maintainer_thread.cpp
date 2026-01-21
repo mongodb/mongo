@@ -284,7 +284,7 @@ void OplogCapMaintainerThread::_reclaimOplog(OperationContext* opCtx,
 void OplogCapMaintainerThread::run() {
     LOGV2(5295000, "Oplog cap maintainer thread started", "threadName"_attr = name());
     ThreadClient tc(name(),
-                    getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                    getGlobalServiceContext()->getService(),
                     Client::noSession(),
                     ClientOperationKillableByStepdown{false});
 

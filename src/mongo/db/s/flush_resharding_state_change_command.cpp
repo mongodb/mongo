@@ -157,8 +157,7 @@ public:
             // executor in sharded clusters and that executor is one that executes networking
             // operations.
             AsyncTry([svcCtx = opCtx->getServiceContext(), nss = ns(), numTries = 0]() mutable {
-                ThreadClient tc("FlushReshardingStateChange",
-                                svcCtx->getService(ClusterRole::ShardServer));
+                ThreadClient tc("FlushReshardingStateChange", svcCtx->getService());
                 auto opCtx = tc->makeOperationContext();
 
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());

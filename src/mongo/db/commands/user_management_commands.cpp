@@ -692,9 +692,7 @@ private:
 
         explicit UMCTransactionClientStandalone(OperationContext* opCtx, StringData cmdName)
             : UMCTransactionClient(cmdName),
-              _client(opCtx->getServiceContext()
-                          ->getService(ClusterRole::ShardServer)
-                          ->makeClient(std::string{cmdName})),
+              _client(opCtx->getServiceContext()->getService()->makeClient(std::string{cmdName})),
               _writeConcern(opCtx->getWriteConcern().toBSON().removeField(
                   ReadWriteConcernProvenanceBase::kSourceFieldName)) {
             _vts = auth::ValidatedTenancyScope::get(opCtx);
@@ -728,8 +726,7 @@ private:
                     .serialize();
 
             auto* serviceContext = _client->getServiceContext();
-            auto* serviceEntryPoint =
-                serviceContext->getService(ClusterRole::ShardServer)->getServiceEntryPoint();
+            auto* serviceEntryPoint = serviceContext->getService()->getServiceEntryPoint();
 
             AlternativeClientRegion altClientRegion(_client);
             auto subOpCtx = serviceContext->makeOperationContext(Client::getCurrent());

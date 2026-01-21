@@ -194,9 +194,8 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                       gFeatureFlagIntentRegistration.isEnabled());
             while (true) {
                 try {
-                    auto newClient = opCtx->getServiceContext()
-                                         ->getService(ClusterRole::ShardServer)
-                                         ->makeClient("StepdownCleaner");
+                    auto newClient =
+                        opCtx->getServiceContext()->getService()->makeClient("StepdownCleaner");
                     AlternativeClientRegion acr(newClient);
                     auto newOpCtx = cc().makeOperationContext();
                     // We wait RSTL at no timeout because we have to get it to update WriteAbility

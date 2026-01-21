@@ -237,7 +237,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
 void FilteringMetadataCache::init(ServiceContext* serviceCtx,
                                   std::shared_ptr<ShardServerCatalogCacheLoader> loader,
                                   bool isPrimary) {
-    invariant(serviceCtx->getService(ClusterRole::ShardServer) != nullptr);
+    invariant(serviceCtx->getService() != nullptr);
 
     loader->initializeReplicaSetRole(isPrimary);
 
@@ -254,7 +254,7 @@ void FilteringMetadataCache::init(ServiceContext* serviceCtx,
 
 void FilteringMetadataCache::initForTesting(ServiceContext* serviceCtx,
                                             std::shared_ptr<ShardServerCatalogCacheLoader> loader) {
-    invariant(serviceCtx->getService(ClusterRole::ShardServer) != nullptr);
+    invariant(serviceCtx->getService() != nullptr);
 
     auto decoration = FilteringMetadataCache::get(serviceCtx);
     invariant(decoration->_loader == nullptr);
@@ -698,8 +698,7 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshDbVersion(
                this,
                serviceCtx = opCtx->getServiceContext(),
                forwardableOpMetadata = ForwardableOperationMetadata(opCtx)] {
-            ThreadClient tc("DbMetadataRefreshThread",
-                            serviceCtx->getService(ClusterRole::ShardServer));
+            ThreadClient tc("DbMetadataRefreshThread", serviceCtx->getService());
             const auto opCtxHolder =
                 CancelableOperationContext(tc->makeOperationContext(), cancellationToken, executor);
             auto opCtx = opCtxHolder.get();
@@ -923,8 +922,7 @@ SharedSemiFuture<void> FilteringMetadataCache::_recoverRefreshCollectionPlacemen
     auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
     return ExecutorFuture<void>(executor)
         .then([=, this] {
-            ThreadClient tc("RecoverRefreshThread",
-                            serviceContext->getService(ClusterRole::ShardServer));
+            ThreadClient tc("RecoverRefreshThread", serviceContext->getService());
 
             if (MONGO_unlikely(hangInRecoverRefreshThread.shouldFail())) {
                 hangInRecoverRefreshThread.pauseWhileSet();

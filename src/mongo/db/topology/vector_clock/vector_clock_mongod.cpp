@@ -261,9 +261,8 @@ ExecutorFuture<void> VectorClockMongoD::_createPersisterTask() {
                                     ->getFixedExecutor())
         .then([this]() {
             while (true) {
-                ThreadClient tc(
-                    "VectorClockStateOperation",
-                    vectorClockMongoDDecoration.owner(this)->getService(ClusterRole::ShardServer));
+                ThreadClient tc("VectorClockStateOperation",
+                                vectorClockMongoDDecoration.owner(this)->getService());
                 const auto opCtxHolder = tc->makeOperationContext();
                 auto* const opCtx = opCtxHolder.get();
 

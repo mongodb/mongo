@@ -89,7 +89,7 @@ void setupReplication(ServiceContext* svcCtx, ClusterRole role) {
         ThreadPool::Options options;
         options.onCreateThread = [svcCtx](const std::string& threadName) {
             Client::initThread(threadName,
-                               svcCtx->getService(ClusterRole::ShardServer),
+                               svcCtx->getService(),
                                Client::noSession(),
                                ClientOperationKillableByStepdown{false});
         };
@@ -141,13 +141,13 @@ void setupOpObservers(ServiceContext* svcCtx) {
 }
 
 // Sets up storage engine with a clean slate.
-void setupStorage(ServiceContext* svcCtx, ClusterRole role) {
+void setupStorage(ServiceContext* svcCtx) {
     constexpr auto kDBPrefix = "/tmp/bench";
     storageGlobalParams.dbpath = fmt::format("{}-{}", kDBPrefix, ProcessId::getCurrent().asInt64());
     boost::filesystem::remove_all(storageGlobalParams.dbpath);
     boost::filesystem::create_directory(storageGlobalParams.dbpath);
 
-    auto service = svcCtx->getService(role);
+    auto service = svcCtx->getService();
     auto strand = ClientStrand::make(service->makeClient("storage-initializer", nullptr));
     strand->run([&] {
         BSONObjBuilder bob;
@@ -163,14 +163,14 @@ public:
     static constexpr auto kDatabase = "test"_sd;
 
     void setUpServiceContext(ServiceContext* svcCtx) override {
-        auto service = svcCtx->getService(getClusterRole());
+        auto service = svcCtx->getService();
         service->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
 
         setupReplication(svcCtx, getClusterRole());
         setupCatalog(svcCtx);
         setupShardingState(svcCtx);
         setupOpObservers(svcCtx);
-        setupStorage(svcCtx, getClusterRole());
+        setupStorage(svcCtx);
     }
 
     void tearDownServiceContext(ServiceContext* svcCtx) override {
@@ -184,7 +184,7 @@ public:
 
 protected:
     void _populateTestData(ServiceContext* svcCtx) {
-        auto service = svcCtx->getService(getClusterRole());
+        auto service = svcCtx->getService();
         auto strand = ClientStrand::make(service->makeClient("db-initializer", nullptr));
         strand->run([&] {
             OpMsgRequest request;

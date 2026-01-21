@@ -92,10 +92,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
     invariant(!_running);
     _running = true;
     _oplogVisibilityThread =
-        stdx::thread([this,
-                      service = opCtx->getServiceContext()->getService(ClusterRole::ShardServer),
-                      &engine,
-                      &oplog] {
+        stdx::thread([this, service = opCtx->getServiceContext()->getService(), &engine, &oplog] {
             Client::initThread("OplogVisibilityThread", service);
 
             stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);

@@ -209,8 +209,7 @@ void TopologyVersionObserver::_handleTopologyUpdate(
 
 void TopologyVersionObserver::_workerThreadBody() noexcept try {
     invariant(_serviceContext);
-    ThreadClient tc(kTopologyVersionObserverName,
-                    _serviceContext->getService(ClusterRole::ShardServer));
+    ThreadClient tc(kTopologyVersionObserverName, _serviceContext->getService());
 
     // This thread may be interrupted by replication state changes and this is safe because
     // _handleTopologyUpdate is the only place where an opCtx is used and already has logic for

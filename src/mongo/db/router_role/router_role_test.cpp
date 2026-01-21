@@ -185,8 +185,7 @@ public:
 
         // The service needs to be set to the RouterServer service so that the "insert" command can
         // be found when attaching txn request fields for the tests in this file.
-        auto targetService =
-            operationContext()->getServiceContext()->getService(ClusterRole::RouterServer);
+        auto targetService = operationContext()->getServiceContext()->getService();
         operationContext()->getClient()->setService(targetService);
     }
 

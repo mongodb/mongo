@@ -387,7 +387,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
     // The OplogApplierBatcher's thread has its own shutdown sequence triggered by the
     // OplogApplier, so we don't want it to be killed in other ways.
     Client::initThread("ReplBatcher",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                       getGlobalServiceContext()->getService(),
                        Client::noSession(),
                        ClientOperationKillableByStepdown{false});
 

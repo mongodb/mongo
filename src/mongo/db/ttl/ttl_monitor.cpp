@@ -280,7 +280,7 @@ void TTLMonitor::updateSleepSeconds(Seconds newSeconds) {
 }
 
 void TTLMonitor::run() {
-    ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+    ThreadClient tc(name(), getGlobalServiceContext()->getService());
     AuthorizationSession::get(cc())->grantInternalAuthorization();
 
     while (true) {
@@ -510,8 +510,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
             ExecutorFuture<void>(executor)
                 .then(
                     [serviceContext = opCtx->getServiceContext(), nss, staleError = ex.toStatus()] {
-                        ThreadClient tc("TTLShardVersionRecovery",
-                                        serviceContext->getService(ClusterRole::ShardServer));
+                        ThreadClient tc("TTLShardVersionRecovery", serviceContext->getService());
                         auto uniqueOpCtx = tc->makeOperationContext();
                         auto opCtx = uniqueOpCtx.get();
                         shard_role_loop::RetryContext shardRoleRetryCtx;

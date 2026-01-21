@@ -158,7 +158,7 @@ void WatchdogPeriodicThread::setPeriod(Milliseconds period) {
 void WatchdogPeriodicThread::doLoop() {
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
     Client::initThread(_threadName,
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                       getGlobalServiceContext()->getService(),
                        Client::noSession(),
                        ClientOperationKillableByStepdown{false});
 

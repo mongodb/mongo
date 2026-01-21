@@ -72,11 +72,11 @@ public:
 };
 
 MONGO_MOD_PUBLIC inline void ResourceYielderFactory::initialize(ServiceContext* svcCtx) {
-    if (auto svc = svcCtx->getService(ClusterRole::ShardServer)) {
+    if (auto svc = svcCtx->getService(); svc && svc->role().has(ClusterRole::ShardServer)) {
         ResourceYielderFactory::set(*svc, std::make_unique<ShardResourceYielderFactory>());
     }
 
-    if (auto svc = svcCtx->getService(ClusterRole::RouterServer)) {
+    if (auto svc = svcCtx->getService(); svc && svc->role().has(ClusterRole::RouterServer)) {
         ResourceYielderFactory::set(*svc, std::make_unique<RouterResourceYielderFactory>());
     }
 };

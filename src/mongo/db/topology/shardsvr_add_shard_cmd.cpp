@@ -138,9 +138,8 @@ public:
             // a session checked out.
             // TODO (SERVER - 97816): remove non - OSI path once 9.0 becomes last LTS.
             if (txnParticipant) {
-                auto newClient = getGlobalServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("ShardsvrAddShard");
+                auto newClient =
+                    getGlobalServiceContext()->getService()->makeClient("ShardsvrAddShard");
                 AlternativeClientRegion acr(newClient);
                 auto cancelableOperationContext = CancelableOperationContext(
                     cc().makeOperationContext(),

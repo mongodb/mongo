@@ -54,7 +54,7 @@ std::string ClusterCursorCleanupJob::name() const {
 }
 
 void ClusterCursorCleanupJob::run() {
-    ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::RouterServer));
+    ThreadClient tc(name(), getGlobalServiceContext()->getService());
     auto* const client = Client::getCurrent();
     auto* const manager = Grid::get(client->getServiceContext())->getCursorManager();
     invariant(manager);

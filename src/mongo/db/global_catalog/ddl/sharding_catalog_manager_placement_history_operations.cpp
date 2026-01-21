@@ -1174,9 +1174,8 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx,
     // Create an alternative opCtx to perform the needed snapshot reads without polluting the state
     // of object passed in by the caller; Internal auth credentials will be also applied to ensure
     // that the $merge stage included in the first step is able to write into the config db.
-    auto altClient = opCtx->getServiceContext()
-                         ->getService(ClusterRole::ShardServer)
-                         ->makeClient("initializePlacementHistory");
+    auto altClient =
+        opCtx->getServiceContext()->getService()->makeClient("initializePlacementHistory");
 
     AuthorizationSession::get(altClient.get())->grantInternalAuthorization();
     AlternativeClientRegion acr(altClient);

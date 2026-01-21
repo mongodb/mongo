@@ -44,7 +44,7 @@ class ServiceEntryPointRouterRoleTest : public virtual service_context_test::Rou
 public:
     void setUp() override {
         ServiceEntryPointTestFixture::setUp();
-        auto routerService = getGlobalServiceContext()->getService(ClusterRole::RouterServer);
+        auto routerService = getGlobalServiceContext()->getService();
         ReadWriteConcernDefaults::create(routerService, _lookupMock.getFetchDefaultsFn());
         _lookupMock.setLookupCallReturnValue({});
 

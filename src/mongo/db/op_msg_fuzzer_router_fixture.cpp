@@ -79,13 +79,13 @@ OpMsgFuzzerRouterFixture::OpMsgFuzzerRouterFixture(bool skipGlobalInitializers) 
 
     _serviceContext = getGlobalServiceContext();
     _setAuthorizationManager();
-    _serviceContext->getService(ClusterRole::RouterServer)
-        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointRouterRole>());
+    _serviceContext->getService()->setServiceEntryPoint(
+        std::make_unique<ServiceEntryPointRouterRole>());
 
     _serviceContext->setPeriodicRunner(makePeriodicRunner(_serviceContext));
 
-    _routerStrand = ClientStrand::make(
-        _serviceContext->getService(ClusterRole::RouterServer)->makeClient("routerTest", _session));
+    _routerStrand =
+        ClientStrand::make(_serviceContext->getService()->makeClient("routerTest", _session));
 }
 
 int OpMsgFuzzerRouterFixture::testOneInput(const char* Data, size_t Size) {

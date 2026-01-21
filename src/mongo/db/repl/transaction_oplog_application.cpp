@@ -872,9 +872,8 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
             {
                 // Make a new opCtx so that we can set the lsid when applying the prepare
                 // transaction oplog entry.
-                auto newClient = opCtx->getServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("reconstruct-prepared-transactions");
+                auto newClient = opCtx->getServiceContext()->getService()->makeClient(
+                    "reconstruct-prepared-transactions");
 
                 AlternativeClientRegion acr(newClient);
                 const auto newOpCtx = cc().makeOperationContext();
@@ -999,9 +998,8 @@ void recoverPreparedTransactionsFromPreciseCheckpoint(OperationContext* opCtx) t
 
         // Make a new opCtx so it can use the corresponding logical session id and transaction
         // number when recovering the prepared transaction.
-        auto newClient = opCtx->getServiceContext()
-                             ->getService(ClusterRole::ShardServer)
-                             ->makeClient("recover-prepared-transactions-precise-checkpoint");
+        auto newClient = opCtx->getServiceContext()->getService()->makeClient(
+            "recover-prepared-transactions-precise-checkpoint");
         AlternativeClientRegion acr(newClient);
         const auto newOpCtxHolder = cc().makeOperationContext();
 

@@ -105,16 +105,16 @@ OpMsgFuzzerShardFixture::OpMsgFuzzerShardFixture(bool skipGlobalInitializers)
 
     _serviceContext = getGlobalServiceContext();
     _setAuthorizationManager();
-    _serviceContext->getService(ClusterRole::ShardServer)
-        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+    _serviceContext->getService()->setServiceEntryPoint(
+        std::make_unique<ServiceEntryPointShardRole>());
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
     _serviceContext->setOpObserver(std::move(observerRegistry));
 
     _serviceContext->setPeriodicRunner(makePeriodicRunner(_serviceContext));
 
-    _shardStrand = ClientStrand::make(
-        _serviceContext->getService(ClusterRole::ShardServer)->makeClient("shardTest", _session));
+    _shardStrand =
+        ClientStrand::make(_serviceContext->getService()->makeClient("shardTest", _session));
 
     auto clientGuard = _shardStrand->bind();
 

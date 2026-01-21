@@ -590,7 +590,7 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
     AsyncTry([] {
         // TODO(SERVER-111753): Please revisit if this thread could be made killable.
         ThreadClient tc("UpdateReplicaSetOnConfigServer",
-                        getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                        getGlobalServiceContext()->getService(),
                         ClientOperationKillableByStepdown{false});
         auto opCtxHolder = cc().makeOperationContext();
         auto opCtx = opCtxHolder.get();

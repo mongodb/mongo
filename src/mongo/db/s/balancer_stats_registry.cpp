@@ -119,7 +119,7 @@ void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
     ExecutorFuture<void>(_threadPool)
         .then([this] {
             ThreadClient tc("BalancerStatsRegistry::asynchronousInitialization",
-                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+                            getGlobalServiceContext()->getService());
 
             OperationContext* opCtx;
             {

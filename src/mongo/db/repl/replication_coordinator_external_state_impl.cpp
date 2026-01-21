@@ -176,7 +176,7 @@ auto makeThreadPool(const std::string& poolName, const std::string& threadName) 
     threadPoolOptions.poolName = poolName;
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName,
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                           getGlobalServiceContext()->getService(),
                            Client::noSession(),
                            ClientOperationKillableByStepdown{false});
 

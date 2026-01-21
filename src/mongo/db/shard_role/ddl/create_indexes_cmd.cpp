@@ -759,9 +759,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(
             {
                 // The current OperationContext may be interrupted, which would prevent us from
                 // taking locks. Use a new OperationContext to abort the index build.
-                auto newClient = opCtx->getServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("abort-index-build");
+                auto newClient =
+                    opCtx->getServiceContext()->getService()->makeClient("abort-index-build");
                 AlternativeClientRegion acr(newClient);
                 const auto abortCtx = cc().makeOperationContext();
 

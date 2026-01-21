@@ -109,9 +109,8 @@ public:
                 // a transaction.
                 // To ensure this operation is properly recorded in the oplog, we will perform a
                 // dummy write later using the original opCtx.
-                auto alternativeClient = opCtx->getServiceContext()
-                                             ->getService(ClusterRole::ShardServer)
-                                             ->makeClient("DropIndexesParticipant");
+                auto alternativeClient =
+                    opCtx->getServiceContext()->getService()->makeClient("DropIndexesParticipant");
                 AlternativeClientRegion acr(alternativeClient);
 
                 auto alternativeOpCtx = CancelableOperationContext(

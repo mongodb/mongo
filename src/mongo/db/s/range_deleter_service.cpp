@@ -187,8 +187,7 @@ void RangeDeleterService::_launchRangeDeletionRecoveryTask(OperationContext* opC
                                                            long long term) {
     ExecutorFuture<void>(_executor)
         .then([serviceContext = opCtx->getServiceContext(), this, term] {
-            ThreadClient tc("ResubmitRangeDeletionsOnStepUp",
-                            serviceContext->getService(ClusterRole::ShardServer));
+            ThreadClient tc("ResubmitRangeDeletionsOnStepUp", serviceContext->getService());
 
             {
                 auto lock = _acquireMutexUnconditionally();

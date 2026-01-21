@@ -176,8 +176,7 @@ void ReadyRangeDeletionsProcessor::_completedRangeDeletion() {
 }
 
 void ReadyRangeDeletionsProcessor::_runRangeDeletions() {
-    ThreadClient threadClient(kRangeDeletionThreadName,
-                              _service->getService(ClusterRole::ShardServer));
+    ThreadClient threadClient(kRangeDeletionThreadName, _service->getService());
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);

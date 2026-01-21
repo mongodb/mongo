@@ -60,7 +60,7 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
     tpOptions.maxThreads = 50;
     tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
         Client::initThread(threadName,
-                           serviceContext->getService(ClusterRole::ShardServer),
+                           serviceContext->getService(),
                            Client::noSession(),
                            ClientOperationKillableByStepdown{false});
     };

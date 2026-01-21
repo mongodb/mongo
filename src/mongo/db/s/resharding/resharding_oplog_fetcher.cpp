@@ -362,7 +362,7 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                    ThreadClient client(fmt::format("OplogFetcher-{}-{}",
                                                    _reshardingUUID.toString(),
                                                    _donorShard.toString()),
-                                       _service()->getService(ClusterRole::ShardServer));
+                                       _service()->getService());
 
                    boost::optional<CancelableOperationContextFactory> aggOpCtxFactory;
                    {
@@ -641,7 +641,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
-                                _service()->getService(ClusterRole::ShardServer));
+                                _service()->getService());
             auto opCtxRaii = factory.makeOperationContext(client.get());
             auto opCtx = opCtxRaii.get();
 

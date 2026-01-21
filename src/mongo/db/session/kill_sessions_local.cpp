@@ -306,11 +306,8 @@ void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
     // When checking out sessions below, the opCtx can hold the global lock acquired by the
     // prepared transaction, making it a target by the repl killOp thread. The input opCtx is
     // already unkillable so we just mark this one also unkillable to avoid crash.
-    auto newClient = opCtx->getServiceContext()
-                         ->getService(ClusterRole::ShardServer)
-                         ->makeClient("prepared-txns-yield-locks",
-                                      Client::noSession(),
-                                      ClientOperationKillableByStepdown{false});
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient(
+        "prepared-txns-yield-locks", Client::noSession(), ClientOperationKillableByStepdown{false});
 
 
     AlternativeClientRegion acr(newClient);

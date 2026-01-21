@@ -203,8 +203,7 @@ void doProfile(auto opCtx,
                std::variant<Milliseconds, NoTimeoutTag> lockTimeout) {
     // We create a new opCtx so that we aren't interrupted by having the original operation
     // killed or timed out. Those are the case we want to have profiling data.
-    auto newClient =
-        opCtx->getServiceContext()->getService(ClusterRole::ShardServer)->makeClient("profiling");
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient("profiling");
     auto newCtx = newClient->makeOperationContext();
 
     // We swap the lockers as that way we preserve locks held in transactions and any other

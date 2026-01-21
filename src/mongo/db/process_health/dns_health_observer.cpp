@@ -95,10 +95,8 @@ Future<HealthCheckStatus> DnsHealthObserver::periodicCheckImpl(
 
     if (!isFailPointActive) {
         // TODO(SERVER-74659): Please revisit if this thread could be made killable.
-        auto client = _svcCtx->getService(ClusterRole::RouterServer)
-                          ->makeClient("DNSHealthObserver",
-                                       Client::noSession(),
-                                       ClientOperationKillableByStepdown{false});
+        auto client = _svcCtx->getService()->makeClient(
+            "DNSHealthObserver", Client::noSession(), ClientOperationKillableByStepdown{false});
 
         auto opCtx = client->makeOperationContext();
         auto const shardRegistry = Grid::get(_svcCtx)->shardRegistry();

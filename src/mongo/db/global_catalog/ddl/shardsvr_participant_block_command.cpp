@@ -158,9 +158,8 @@ public:
                 // Use an AlternativeClientRegion because releasing a RecoverableCriticalSection
                 // triggers an update with `multi: true`, which cannot be executed inside a
                 // transaction.
-                auto newClient = getGlobalServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("ShardSvrParticipantBlockCmdClient");
+                auto newClient = getGlobalServiceContext()->getService()->makeClient(
+                    "ShardSvrParticipantBlockCmdClient");
                 AlternativeClientRegion acr(newClient);
                 auto cancelableOperationContext = CancelableOperationContext(
                     cc().makeOperationContext(),

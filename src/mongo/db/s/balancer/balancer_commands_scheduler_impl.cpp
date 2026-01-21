@@ -398,8 +398,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         _stateUpdatedCV.notify_all();
     });
 
-    Client::initThread("BalancerCommandsScheduler",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+    Client::initThread("BalancerCommandsScheduler", getGlobalServiceContext()->getService());
 
     // This worker thread may perform remote request, so that its operation context must be
     // interruptible. Marking it so here is safe, since the replica set changes are also notified by

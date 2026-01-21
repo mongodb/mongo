@@ -145,9 +145,8 @@ public:
             OperationContext* opCtx,
             const NamespaceString& nss,
             const std::pair<CollectionType, std::vector<ChunkType>>& collAndChunks) {
-            auto newClient = opCtx->getServiceContext()
-                                 ->getService(ClusterRole::ShardServer)
-                                 ->makeClient("ShardsvrFetchCollMetadata");
+            auto newClient =
+                opCtx->getServiceContext()->getService()->makeClient("ShardsvrFetchCollMetadata");
             AlternativeClientRegion acr(newClient);
             auto newOpCtx =
                 CancelableOperationContext(cc().makeOperationContext(),

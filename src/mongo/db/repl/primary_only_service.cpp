@@ -357,8 +357,7 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
     threadPoolOptions.threadNamePrefix = getServiceName() + "-";
     threadPoolOptions.poolName = getServiceName() + "ThreadPool";
     threadPoolOptions.onCreateThread = [this](const std::string& threadName) {
-        Client::initThread(threadName,
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+        Client::initThread(threadName, getGlobalServiceContext()->getService());
         auto client = Client::getCurrent();
         AuthorizationSession::get(*client)->grantInternalAuthorization();
 

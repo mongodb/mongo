@@ -192,9 +192,7 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     // Swap out the clients in order to get a fresh opCtx. Previous operations in this transaction
     // that have been run on this opCtx would have set the timeout in the locker on the opCtx, but
     // commit should not have a lock timeout.
-    auto newClient = getGlobalServiceContext()
-                         ->getService(ClusterRole::ShardServer)
-                         ->makeClient("ShardingCatalogManager");
+    auto newClient = getGlobalServiceContext()->getService()->makeClient("ShardingCatalogManager");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
     newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

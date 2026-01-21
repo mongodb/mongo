@@ -67,9 +67,7 @@ public:
     }
 
     auto makeClient(std::shared_ptr<transport::Session> session) {
-        return getServiceContext()
-            ->getService(ClusterRole::ShardServer)
-            ->makeClient("HelloMetricsTest", session);
+        return getServiceContext()->getService()->makeClient("HelloMetricsTest", session);
     }
 
     struct ExhaustMetrics {

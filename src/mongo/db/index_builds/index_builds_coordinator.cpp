@@ -1901,7 +1901,7 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
 
     _stepUpThread = stdx::thread([this] {
         Client::initThread("IndexBuildsCoordinator-StepUp",
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+                           getGlobalServiceContext()->getService());
         auto threadCtx = Client::getCurrent()->makeOperationContext();
         _onStepUpAsyncTaskFn(threadCtx.get());
     });
@@ -3010,10 +3010,8 @@ template <typename Func>
 void runOnAlternateContext(OperationContext* opCtx, std::string name, Func func) {
     // The cleanup doesn't involve WT operations, and notifies the primary with a networking
     // message, it's safe and better to keep it unkillable.
-    auto newClient =
-        opCtx->getServiceContext()
-            ->getService(ClusterRole::ShardServer)
-            ->makeClient(name, Client::noSession(), ClientOperationKillableByStepdown{false});
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient(
+        name, Client::noSession(), ClientOperationKillableByStepdown{false});
     AlternativeClientRegion acr(newClient);
     const auto newCtx = cc().makeOperationContext();
     func(newCtx.get());

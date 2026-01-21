@@ -120,8 +120,7 @@ public:
                             uassertStatusOK(args.status);
                         }
 
-                        ThreadClient tc("TransactionCoordinator",
-                                        _serviceContext->getService(ClusterRole::ShardServer));
+                        ThreadClient tc("TransactionCoordinator", _serviceContext->getService());
 
                         auto uniqueOpCtxIter = [&] {
                             stdx::lock_guard lk(_mutex);

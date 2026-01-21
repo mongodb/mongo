@@ -276,7 +276,7 @@ public:
     }
 
     void run() override {
-        ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+        ThreadClient tc(name(), getGlobalServiceContext()->getService());
 
         LOGV2_DEBUG(22303, 1, "starting {name} thread", "name"_attr = name());
 

@@ -44,8 +44,7 @@ public:
         // Transition to primary so that the server can accept writes.
         invariant(replCoordMock->setFollowerMode(repl::MemberState::RS_PRIMARY));
         repl::ReplicationCoordinator::set(sc, std::move(replCoordMock));
-        sc->getService(getClusterRole())
-            ->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+        sc->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
 
         auto persistenceProvider = std::make_unique<rss::AttachedPersistenceProvider>();
         rss::ReplicatedStorageService::get(getGlobalServiceContext())

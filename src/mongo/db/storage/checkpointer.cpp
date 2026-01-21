@@ -81,9 +81,8 @@ void Checkpointer::set(ServiceContext* serviceCtx, std::unique_ptr<Checkpointer>
 }
 
 void Checkpointer::run() {
-    ThreadClient tc(name(),
-                    getGlobalServiceContext()->getService(ClusterRole::ShardServer),
-                    ClientOperationKillableByStepdown{false});
+    ThreadClient tc(
+        name(), getGlobalServiceContext()->getService(), ClientOperationKillableByStepdown{false});
     LOGV2_DEBUG(22307, 1, "Starting thread", "threadName"_attr = name());
 
     while (true) {

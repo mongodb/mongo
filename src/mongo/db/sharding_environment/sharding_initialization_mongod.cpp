@@ -280,7 +280,7 @@ private:
 
             // TODO(SERVER-111753): Please revisit if this thread could be made killable.
             ThreadClient tc("updateShardIdentityConfigString",
-                            _serviceContext->getService(ClusterRole::ShardServer),
+                            _serviceContext->getService(),
                             ClientOperationKillableByStepdown{false});
             auto opCtx = tc->makeOperationContext();
             ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(), update);

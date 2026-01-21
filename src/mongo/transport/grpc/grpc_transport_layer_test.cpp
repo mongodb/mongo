@@ -84,7 +84,7 @@ public:
             MONGO_UNIMPLEMENTED;
         };
         serviceEntryPoint = sep.get();
-        svcCtx->getService(ClusterRole::ShardServer)->setServiceEntryPoint(std::move(sep));
+        svcCtx->getService()->setServiceEntryPoint(std::move(sep));
         svcCtx->setPeriodicRunner(newPeriodicRunner());
         ServiceExecutor::startupAll(svcCtx);
 

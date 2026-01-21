@@ -185,7 +185,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                     auth::ValidatedTenancyScope::kNotRequired, DatabaseName::kAdmin, commandObj)
                     .serialize();
             const auto replyOpMsg =
-                OpMsg::parseOwned(service->getService(ClusterRole::ShardServer)
+                OpMsg::parseOwned(service->getService()
                                       ->getServiceEntryPoint()
                                       ->handleRequest(opCtx, requestOpMsg, start)
                                       .get()

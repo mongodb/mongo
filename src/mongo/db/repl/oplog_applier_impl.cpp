@@ -443,7 +443,7 @@ void ApplyBatchFinalizerForJournal::record(const OpTimeAndWallTime& newOpTimeAnd
 
 void ApplyBatchFinalizerForJournal::_run() {
     Client::initThread("ApplyBatchFinalizerForJournal",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                       getGlobalServiceContext()->getService(),
                        Client::noSession(),
                        ClientOperationKillableByStepdown{false});
 

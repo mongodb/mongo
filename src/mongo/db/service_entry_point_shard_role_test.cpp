@@ -56,7 +56,7 @@ class ServiceEntryPointShardRoleTest : public ServiceEntryPointTestFixture {
 public:
     void setUp() override {
         ServiceEntryPointTestFixture::setUp();
-        auto shardService = getGlobalServiceContext()->getService(ClusterRole::ShardServer);
+        auto shardService = getGlobalServiceContext()->getService();
         ReadWriteConcernDefaults::create(shardService, _lookupMock.getFetchDefaultsFn());
         _lookupMock.setLookupCallReturnValue({});
 

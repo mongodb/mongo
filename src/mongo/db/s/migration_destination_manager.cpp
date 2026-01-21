@@ -1240,8 +1240,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
                                                  bool skipToCritSecTaken) {
     invariant(_sessionId);
 
-    Client::initThread("migrateThread",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+    Client::initThread("migrateThread", getGlobalServiceContext()->getService());
     auto client = Client::getCurrent();
     bool recovering = false;
     while (true) {
@@ -1441,9 +1440,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         // currently supported in retryable writes.
         outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         {
-            auto newClient = outerOpCtx->getServiceContext()
-                                 ->getService(ClusterRole::ShardServer)
-                                 ->makeClient("MigrationCoordinator");
+            auto newClient =
+                outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
             AlternativeClientRegion acr(newClient);
             auto executor =
                 Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
@@ -1538,9 +1536,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             migrateThreadHangAtStep3.pauseWhileSet();
         }
 
-        auto newClient = outerOpCtx->getServiceContext()
-                             ->getService(ClusterRole::ShardServer)
-                             ->makeClient("MigrationCoordinator");
+        auto newClient =
+            outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
         AlternativeClientRegion acr(newClient);
         auto executor =
             Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
@@ -1826,9 +1823,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         }
     } else {
         outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-        auto newClient = outerOpCtx->getServiceContext()
-                             ->getService(ClusterRole::ShardServer)
-                             ->makeClient("MigrationCoordinator");
+        auto newClient =
+            outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
         AlternativeClientRegion acr(newClient);
         auto executor =
             Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
@@ -1858,9 +1854,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     }
 
     outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-    auto newClient = outerOpCtx->getServiceContext()
-                         ->getService(ClusterRole::ShardServer)
-                         ->makeClient("MigrationCoordinator");
+    auto newClient =
+        outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
     AlternativeClientRegion acr(newClient);
     auto executor =
         Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();

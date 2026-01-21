@@ -66,9 +66,7 @@ public:
     }
 
     auto makeClient(std::shared_ptr<transport::Session> session = nullptr) {
-        return getServiceContext()
-            ->getService(ClusterRole::ShardServer)
-            ->makeClient("SessionManagerTest", session);
+        return getServiceContext()->getService()->makeClient("SessionManagerTest", session);
     }
 
     std::size_t getActiveOperations() const {

@@ -168,7 +168,7 @@ std::unique_ptr<ThreadPool> makeReplWorkerPool(size_t threadCount,
     options.maxThreads = threadCount;
     options.onCreateThread = [isKillableByStepdown](const std::string&) {
         Client::initThread(getThreadName(),
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                           getGlobalServiceContext()->getService(),
                            Client::noSession(),
                            ClientOperationKillableByStepdown{isKillableByStepdown});
         auto client = Client::getCurrent();

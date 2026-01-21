@@ -182,9 +182,8 @@ public:
         if (TransactionParticipant::get(opCtx)) {
             {
                 // Use ACR to have a thread holding the session while we do the cloning.
-                auto newClient = opCtx->getServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("SetAllowMigrations");
+                auto newClient =
+                    opCtx->getServiceContext()->getService()->makeClient("SetAllowMigrations");
                 AlternativeClientRegion acr(newClient);
                 auto executor =
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();

@@ -155,9 +155,8 @@ public:
                 // applying the WriteUnitOfWork as a transaction (kGroupForTransaction). A tactical
                 // solution is to use an alternative client as well as a new operation context.
 
-                auto newClient = getGlobalServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("ShardsvrCommitDropDatabaseMetadata");
+                auto newClient = getGlobalServiceContext()->getService()->makeClient(
+                    "ShardsvrCommitDropDatabaseMetadata");
                 AlternativeClientRegion acr(newClient);
                 auto newOpCtx = CancelableOperationContext(
                     cc().makeOperationContext(),

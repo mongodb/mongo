@@ -339,8 +339,7 @@ public:
     }
 
     void run() override {
-        ThreadClient tc("clientcursormon",
-                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+        ThreadClient tc("clientcursormon", getGlobalServiceContext()->getService());
 
         while (!globalInShutdownDeprecated()) {
             {

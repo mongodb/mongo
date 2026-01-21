@@ -99,9 +99,8 @@ public:
                 // solution is to use an alternative client as well as a new operation context.
 
                 // For the authoritative shards use the replay protection
-                auto newClient = getGlobalServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("ShardsvrDropDatabaseParticipant");
+                auto newClient = getGlobalServiceContext()->getService()->makeClient(
+                    "ShardsvrDropDatabaseParticipant");
 
                 AlternativeClientRegion acr(newClient);
                 auto cancelableOperationContext = CancelableOperationContext(

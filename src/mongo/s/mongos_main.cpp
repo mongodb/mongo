@@ -311,11 +311,10 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
     });
 
     // TODO(SERVER-111754): Please revisit if this thread could be made killable.
-    auto newClient = opCtx->getServiceContext()
-                         ->getService(ClusterRole::RouterServer)
-                         ->makeClient("ImplicitlyAbortTxnAtShutdown",
-                                      Client::noSession(),
-                                      ClientOperationKillableByStepdown{false});
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient(
+        "ImplicitlyAbortTxnAtShutdown",
+        Client::noSession(),
+        ClientOperationKillableByStepdown{false});
     AlternativeClientRegion acr(newClient);
 
     Status shutDownStatus(ErrorCodes::InterruptedAtShutdown,
@@ -368,7 +367,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         if (!haveClient()) {
             // TODO(SERVER-111755): Please revisit if this thread could be made killable.
             Client::initThread(getThreadName(),
-                               serviceContext->getService(ClusterRole::RouterServer),
+                               serviceContext->getService(),
                                Client::noSession(),
                                ClientOperationKillableByStepdown{false});
         }
@@ -743,9 +742,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     });
 
     // TODO(SERVER-111755): Please revisit if this thread could be made killable.
-    ThreadClient tc("mongosMain",
-                    serviceContext->getService(ClusterRole::RouterServer),
-                    ClientOperationKillableByStepdown{false});
+    ThreadClient tc(
+        "mongosMain", serviceContext->getService(), ClientOperationKillableByStepdown{false});
 
     logMongosVersionInfo(nullptr);
 
@@ -770,8 +768,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     ProfileFilterImpl::initializeDefaults(serviceContext);
 
-    serviceContext->getService(ClusterRole::RouterServer)
-        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointRouterRole>());
+    serviceContext->getService()->setServiceEntryPoint(
+        std::make_unique<ServiceEntryPointRouterRole>());
 
     {
         SectionScopedTimer scopedTimer(serviceContext->getFastClockSource(),
@@ -800,7 +798,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         quickExit(ExitCode::badOptions);
     }
 
-    ReadWriteConcernDefaults::create(serviceContext->getService(ClusterRole::RouterServer),
+    ReadWriteConcernDefaults::create(serviceContext->getService(),
                                      readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
 
@@ -811,7 +809,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     std::shared_ptr<ReplicaSetChangeNotifier::Listener> replicaSetChangeListener;
 
     // Only initialize Router ResourceYielder Factory since we do not have a Shard role.
-    ResourceYielderFactory::set(*serviceContext->getService(ClusterRole::RouterServer),
+    ResourceYielderFactory::set(*serviceContext->getService(),
                                 std::make_unique<RouterResourceYielderFactory>());
 
     // Since extensions modify the global parserMap, which is not thread-safe, they must be loaded
@@ -915,9 +913,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&opCtx))));  // NOLINT
 
     SessionKiller::set(
-        serviceContext->getService(ClusterRole::RouterServer),
-        std::make_shared<SessionKiller>(serviceContext->getService(ClusterRole::RouterServer),
-                                        killSessionsRemote));
+        serviceContext->getService(),
+        std::make_shared<SessionKiller>(serviceContext->getService(), killSessionsRemote));
 
     LogicalSessionCache::set(
         serviceContext,

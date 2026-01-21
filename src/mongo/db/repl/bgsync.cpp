@@ -241,7 +241,7 @@ bool BackgroundSync::_inShutdown_inlock() const {
 
 void BackgroundSync::_run() {
     Client::initThread("BackgroundSync",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                       getGlobalServiceContext()->getService(),
                        Client::noSession(),
                        ClientOperationKillableByStepdown{false});
     AuthorizationSession::get(cc())->grantInternalAuthorization();

@@ -85,9 +85,8 @@ void releaseCriticalSectionInEmptySession(OperationContext* opCtx,
         // Use an AlternativeClientRegion because releasing a RecoverableCriticalSection
         // triggers an update with `multi: true`, which cannot be executed inside a
         // transaction.
-        auto newClient = getGlobalServiceContext()
-                             ->getService(ClusterRole::ShardServer)
-                             ->makeClient("ShardsvrMovePrimaryExitCriticalSection");
+        auto newClient = getGlobalServiceContext()->getService()->makeClient(
+            "ShardsvrMovePrimaryExitCriticalSection");
         AlternativeClientRegion acr(newClient);
         auto newOpCtx = CancelableOperationContext(
             cc().makeOperationContext(),

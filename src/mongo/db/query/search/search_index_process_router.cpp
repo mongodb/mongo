@@ -44,7 +44,8 @@ ServiceContext::ConstructorActionRegisterer SearchIndexProcessRouterImplementati
     "SearchIndexProcessRouter-registration", [](ServiceContext* serviceContext) {
         invariant(serviceContext);
         // Only register the router implementation if this server has a router service.
-        if (auto service = serviceContext->getService(ClusterRole::RouterServer); service) {
+        if (auto service = serviceContext->getService();
+            service && service->role().hasExclusively(ClusterRole::RouterServer)) {
             SearchIndexProcessInterface::set(service, std::make_unique<SearchIndexProcessRouter>());
         }
     }};

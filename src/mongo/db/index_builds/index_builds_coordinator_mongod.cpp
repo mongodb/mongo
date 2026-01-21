@@ -122,7 +122,7 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     // Ensure all threads have a client.
     options.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName,
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                           getGlobalServiceContext()->getService(),
                            Client::noSession(),
                            ClientOperationKillableByStepdown{false});
     };

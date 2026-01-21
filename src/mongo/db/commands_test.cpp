@@ -622,7 +622,7 @@ public:
     }
 
     TypeInfoSet getCommandsForRole(const CommandConstructionPlan& plan, ClusterRole role) {
-        Service* service = getServiceContext()->getService(role);
+        Service* service = getServiceContext()->getService();
         if (!service)
             return {};
         invariant(service->role().hasExclusively(role));

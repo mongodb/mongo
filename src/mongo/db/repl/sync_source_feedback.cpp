@@ -160,8 +160,7 @@ void SyncSourceFeedback::shutdown() {
 void SyncSourceFeedback::run(executor::TaskExecutor* executor,
                              BackgroundSync* bgsync,
                              ReplicationCoordinator* replCoord) {
-    Client::initThread("SyncSourceFeedback",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+    Client::initThread("SyncSourceFeedback", getGlobalServiceContext()->getService());
 
     HostAndPort syncTarget;
 

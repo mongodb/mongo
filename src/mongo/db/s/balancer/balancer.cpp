@@ -843,8 +843,7 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 }
 
 void Balancer::_consumeActionStreamLoop() {
-    Client::initThread("BalancerSecondary",
-                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+    Client::initThread("BalancerSecondary", getGlobalServiceContext()->getService());
 
     auto opCtx = cc().makeOperationContext();
     executor::ScopedTaskExecutor executor(
@@ -1035,8 +1034,7 @@ void Balancer::_mainThread() {
         _joinCond.notify_all();
     });
 
-    ThreadClient threadClient("Balancer",
-                              getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+    ThreadClient threadClient("Balancer", getGlobalServiceContext()->getService());
 
     auto opCtx = threadClient->makeOperationContext();
     auto shardingContext = Grid::get(opCtx.get());
@@ -1267,7 +1265,7 @@ void Balancer::_applyStreamingActionResponseToPolicy(const BalancerStreamAction&
                                                      ActionsStreamPolicy* policy) {
     tassert(8245242, "No action in progress", _outstandingStreamingOps.addAndFetch(-1) >= 0);
     ThreadClient tc("BalancerSecondaryThread::applyActionResponse",
-                    getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+                    getGlobalServiceContext()->getService());
 
     auto opCtx = tc->makeOperationContext();
     policy->applyActionResult(opCtx.get(), action, response);

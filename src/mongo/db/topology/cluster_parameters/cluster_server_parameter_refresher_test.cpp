@@ -53,8 +53,7 @@ protected:
         _refresher = std::make_unique<ClusterServerParameterRefresher>();
 
         // RouterServer role is required to run the refresher.
-        auto targetService =
-            operationContext()->getServiceContext()->getService(ClusterRole::RouterServer);
+        auto targetService = operationContext()->getServiceContext()->getService();
         operationContext()->getClient()->setService(targetService);
 
         const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);

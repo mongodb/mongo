@@ -99,8 +99,7 @@ public:
 
 private:
     void run(Seconds waitTime, NoopWriteFn&& noopWrite) {
-        Client::initThread("NoopWriter",
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+        Client::initThread("NoopWriter", getGlobalServiceContext()->getService());
 
         while (true) {
             try {

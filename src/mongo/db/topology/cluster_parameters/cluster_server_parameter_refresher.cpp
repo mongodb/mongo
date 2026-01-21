@@ -108,9 +108,8 @@ getFCVAndClusterParametersFromConfigServer() {
     // refresher process and from getClusterParameter.
     // Allow this client to be killable. If interrupted, the exception will be caught and handled in
     // refreshParameters.
-    auto altClient = getGlobalServiceContext()
-                         ->getService(ClusterRole::RouterServer)
-                         ->makeClient("clusterParameterRefreshTransaction");
+    auto altClient =
+        getGlobalServiceContext()->getService()->makeClient("clusterParameterRefreshTransaction");
 
     AlternativeClientRegion clientRegion(altClient);
     auto opCtx = cc().makeOperationContext();

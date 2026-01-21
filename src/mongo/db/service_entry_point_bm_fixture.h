@@ -59,7 +59,7 @@ public:
 
         // Minimal set up necessary for ServiceEntryPoint.
         auto sc = getGlobalServiceContext();
-        auto service = sc->getService(getClusterRole());
+        auto service = sc->getService();
 
         ReadWriteConcernDefaults::create(service, _lookupMock.getFetchDefaultsFn());
         _lookupMock.setLookupCallReturnValue({});
@@ -87,10 +87,8 @@ public:
     template <typename F>
     requires(std::is_invocable_r_v<BSONObj, F>)
     void runBenchmark(benchmark::State& state, F makeRequestBody) {
-        auto strand = ClientStrand::make(
-            getGlobalServiceContext()
-                ->getService(getClusterRole())
-                ->makeClient(fmt::format("conn{}", _nextClientId.fetchAndAdd(1)), nullptr));
+        auto strand = ClientStrand::make(getGlobalServiceContext()->getService()->makeClient(
+            fmt::format("conn{}", _nextClientId.fetchAndAdd(1)), nullptr));
         strand->run([&] {
             auto client = strand->getClientPointer();
             auto sep = client->getService()->getServiceEntryPoint();

@@ -562,7 +562,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoaderImpl::getChu
         .then([=, this]() {
             // TODO(SERVER-111753): Please revisit if this thread could be made killable.
             ThreadClient tc("ShardServerCatalogCacheLoader::getChunksSince",
-                            getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                            getGlobalServiceContext()->getService(),
                             ClientOperationKillableByStepdown{false});
             auto context = _contexts.makeOperationContext(*tc);
 
@@ -601,7 +601,7 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoaderImpl::getDatabase(
         .then([this, dbName, isPrimary = isPrimary, term = term]() {
             // TODO(SERVER-111753): Please revisit if this thread could be made killable.
             ThreadClient tc("ShardServerCatalogCacheLoader::getDatabase",
-                            getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                            getGlobalServiceContext()->getService(),
                             ClientOperationKillableByStepdown{false});
             auto context = _contexts.makeOperationContext(*tc);
 
@@ -1143,7 +1143,7 @@ void ShardServerCatalogCacheLoaderImpl::_ensureMajorityPrimaryAndScheduleDbTask(
 void ShardServerCatalogCacheLoaderImpl::_runCollAndChunksTasks(const NamespaceString& nss) {
     // TODO(SERVER-111753): Please revisit if this thread could be made killable.
     ThreadClient tc("ShardServerCatalogCacheLoader::runCollAndChunksTasks",
-                    getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                    getGlobalServiceContext()->getService(),
                     ClientOperationKillableByStepdown{false});
 
     auto context = _contexts.makeOperationContext(*tc);
@@ -1220,7 +1220,7 @@ void ShardServerCatalogCacheLoaderImpl::_runCollAndChunksTasks(const NamespaceSt
 void ShardServerCatalogCacheLoaderImpl::_runDbTasks(const DatabaseName& dbName) {
     // TODO(SERVER-111753): Please revisit if this thread could be made killable.
     ThreadClient tc("ShardServerCatalogCacheLoader::runDbTasks",
-                    getGlobalServiceContext()->getService(ClusterRole::ShardServer),
+                    getGlobalServiceContext()->getService(),
                     ClientOperationKillableByStepdown{false});
     auto context = _contexts.makeOperationContext(*tc);
 

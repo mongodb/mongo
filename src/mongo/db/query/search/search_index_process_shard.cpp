@@ -42,7 +42,8 @@ ServiceContext::ConstructorActionRegisterer SearchIndexProcessShardImplementatio
     "SearchIndexProcessShard-registration", [](ServiceContext* serviceContext) {
         invariant(serviceContext);
         // Only register the router implementation if this server has a shard service.
-        if (auto service = serviceContext->getService(ClusterRole::ShardServer); service) {
+        if (auto service = serviceContext->getService();
+            service->role().has(ClusterRole::ShardServer)) {
             SearchIndexProcessInterface::set(service, std::make_unique<SearchIndexProcessShard>());
         }
     }};

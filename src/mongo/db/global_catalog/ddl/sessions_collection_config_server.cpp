@@ -113,7 +113,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 
         // TODO SERVER-83917: Make a more general API to switch the service used by the client.
         auto originalService = opCtx->getService();
-        auto shardService = opCtx->getServiceContext()->getService(ClusterRole::ShardServer);
+        auto shardService = opCtx->getServiceContext()->getService();
         {
             ClientLock lk(opCtx->getClient());
             opCtx->getClient()->setService(shardService);

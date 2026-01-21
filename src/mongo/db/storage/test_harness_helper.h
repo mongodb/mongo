@@ -45,8 +45,7 @@ namespace mongo {
  */
 class MONGO_MOD_OPEN HarnessHelper : public ScopedGlobalServiceContextForTest {
 public:
-    explicit HarnessHelper()
-        : _threadClient(getGlobalServiceContext()->getService(ClusterRole::ShardServer)) {}
+    explicit HarnessHelper() : _threadClient(getGlobalServiceContext()->getService()) {}
 
     virtual ServiceContext::UniqueOperationContext newOperationContext(Client* const client) {
         auto opCtx = client->makeOperationContext();

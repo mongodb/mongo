@@ -213,8 +213,7 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeCollecti
     threadPoolOptions.threadNamePrefix = prefix + "-";
     threadPoolOptions.poolName = prefix + "ThreadPool";
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName,
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+        Client::initThread(threadName, getGlobalServiceContext()->getService());
         auto* client = Client::getCurrent();
         AuthorizationSession::get(*client)->grantInternalAuthorization();
     };

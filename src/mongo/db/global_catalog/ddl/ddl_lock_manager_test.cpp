@@ -123,10 +123,8 @@ TEST_F(DDLLockManagerTest, TryLockDatabase) {
     DDLLockManager::ScopedDatabaseDDLLock ddlLock(operationContext(), _dbName, "ddlLock", MODE_S);
 
     const auto tryLock = [&](LockMode mode, bool shouldSuccess) {
-        auto newClient = operationContext()
-                             ->getServiceContext()
-                             ->getService(ClusterRole::ShardServer)
-                             ->makeClient("newClient");
+        auto newClient =
+            operationContext()->getServiceContext()->getService()->makeClient("newClient");
         const AlternativeClientRegion acr(newClient);
         const auto newCtx = cc().makeOperationContext();
         newCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -157,10 +155,8 @@ TEST_F(DDLLockManagerTest, TryLockCollection) {
     DDLLockManager::ScopedCollectionDDLLock ddlLock(operationContext(), nss, StringData{}, MODE_S);
 
     const auto tryLock = [&](LockMode mode, bool shouldSuccess) {
-        auto newClient = operationContext()
-                             ->getServiceContext()
-                             ->getService(ClusterRole::ShardServer)
-                             ->makeClient("newClient");
+        auto newClient =
+            operationContext()->getServiceContext()->getService()->makeClient("newClient");
         const AlternativeClientRegion acr(newClient);
         const auto newCtx = cc().makeOperationContext();
         newCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

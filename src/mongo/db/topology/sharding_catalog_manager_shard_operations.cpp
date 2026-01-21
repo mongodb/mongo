@@ -1147,8 +1147,7 @@ void ShardingCatalogManager::scheduleAsyncUnblockDDLCoordinators(OperationContex
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     const auto serviceContext = opCtx->getServiceContext();
     AsyncTry([this, serviceContext] {
-        ThreadClient tc{"resetDDLBlockingForTopologyChange",
-                        serviceContext->getService(ClusterRole::ShardServer)};
+        ThreadClient tc{"resetDDLBlockingForTopologyChange", serviceContext->getService()};
         auto uniqueOpCtx{tc->makeOperationContext()};
         auto opCtx{uniqueOpCtx.get()};
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
