@@ -85,7 +85,7 @@ function testSampleTimeout() {
     let logMatcher = /Collection timed out on collector/;
     assert(logMatcher.test(mongoOutput));
 
-    setParameter("diagnosticDataCollectionSampleTimeoutMillis", 250);
+    setParameter("diagnosticDataCollectionSampleTimeoutMillis", 100);
 
     clearRawMongoProgramOutput();
     getNextSample();
