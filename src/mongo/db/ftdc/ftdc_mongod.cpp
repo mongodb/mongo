@@ -42,6 +42,7 @@
 #include "mongo/db/ftdc/ftdc_mongod_gen.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/ftdc/ftdc_server.h"
+#include "mongo/db/ftdc/networking_collectors.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -176,6 +177,7 @@ std::unique_ptr<FTDCCollectorInterface> makeFilteredCollector(
 
 void registerShardCollectors(FTDCController* controller) {
     registerServerCollectors(controller);
+    registerNetworkingCollectors(controller);
 
     if (auto rc = getGlobalRC(); rc && isRepl(*rc)) {
         // CmdReplSetGetStatus

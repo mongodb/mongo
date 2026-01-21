@@ -76,6 +76,7 @@ mongo_cc_library(
     srcs = [
         "ftdc_server.cpp",
         "ftdc_system_stats.cpp",
+        "networking_collectors.cpp",
         ":ftdc_server_gen",
     ],
     srcs_select = [{
