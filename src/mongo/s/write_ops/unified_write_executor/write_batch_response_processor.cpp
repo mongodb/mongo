@@ -264,7 +264,7 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
 
     std::set<WriteOp> toRetry;
     CollectionsToCreate collsToCreate;
-    std::map<WriteOpId, std::set<ShardId>> successfulShardSet;
+    absl::flat_hash_map<WriteOpId, std::set<ShardId>> successfulShardSet;
 
     // Process the results for each op that was part of this batch.
     for (auto& [op, items] : itemsByOp) {

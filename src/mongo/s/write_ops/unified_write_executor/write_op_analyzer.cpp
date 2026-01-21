@@ -64,7 +64,12 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
 
     // TODO SERVER-106874 remove the namespace translation check entirely once 9.0 becomes last
     // LTS. By then we will only have viewless timeseries that do not require nss translation.
-    auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+    auto [it, inserted] = _timeseriesBucketsNSSCache.try_emplace(nss);
+    if (inserted) {
+        it->second = nss.makeTimeseriesBucketsNamespace();
+    }
+    const NamespaceString& bucketsNss = it->second;
+
     if (routingCtx.hasNss(bucketsNss)) {
         nss = bucketsNss;
         isViewfulTimeseries = true;

@@ -41,7 +41,7 @@ boost::optional<WriteOp> WriteOpProducer::peekNext() {
 
 void WriteOpProducer::advance() {
     if (!_activeIndices.empty()) {
-        _activeIndices.erase(*_activeIndices.begin());
+        _activeIndices.erase(_activeIndices.begin());
     }
 }
 

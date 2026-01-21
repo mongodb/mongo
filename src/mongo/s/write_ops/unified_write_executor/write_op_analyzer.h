@@ -65,7 +65,6 @@ struct Analysis {
     bool isViewfulTimeseries;
     boost::optional<analyze_shard_key::TargetedSampleId> targetedSampleId;
 };
-
 class WriteOpAnalyzer {
 public:
     /**
@@ -100,6 +99,11 @@ private:
 
     Stats& _stats;
     PauseMigrationsDuringMultiUpdatesEnablement _pauseMigrationsDuringMultiUpdatesParameter;
+
+    // Stores the result of 'makeTimeseriesBucketsNamespace()' to avoid re-making it.
+    // TODO SERVER-106874 remove this once 9.0 becomes last LTS. By then we will only have viewless
+    // timeseries that do not require nss translation.
+    absl::flat_hash_map<NamespaceString, NamespaceString> _timeseriesBucketsNSSCache;
 };
 
 }  // namespace unified_write_executor

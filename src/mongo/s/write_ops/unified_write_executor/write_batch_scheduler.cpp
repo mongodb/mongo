@@ -145,7 +145,7 @@ bool WriteBatchScheduler::executeRound(OperationContext* opCtx) {
         _batcher.markOpReprocess(result.opsToRetry);
     }
 
-    _batcher.noteSuccessfulShards(result.successfulShardSet);
+    _batcher.noteSuccessfulShards(std::move(result.successfulShardSet));
 
     // Create a collection for each namespace in 'collsToCreate', and set 'madeProgress' to true
     // if the call to createCollections() successfully created one or more collections.

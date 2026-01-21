@@ -56,7 +56,7 @@ struct ProcessorResult {
     // Shards where each op succeeded. This is used to track the shards that we don't need to retry
     // on because of retryable(staleness/collection doesn't exist errors) because the operation was
     // already executed.
-    std::map<WriteOpId, std::set<ShardId>> successfulShardSet;
+    absl::flat_hash_map<WriteOpId, std::set<ShardId>> successfulShardSet;
 };
 
 /**

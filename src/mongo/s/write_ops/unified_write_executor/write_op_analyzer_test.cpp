@@ -911,11 +911,20 @@ TEST_F(WriteOpAnalyzerTestImpl, ViewfulTimeSeriesSimple) {
             BulkWriteUpdateOp(0,
                               BSON("x" << -1),
                               write_ops::UpdateModification(BSON("$set" << BSON("x" << -10)))),
+            BulkWriteUpdateOp(0,
+                              BSON("x" << -2),
+                              write_ops::UpdateModification(BSON("$set" << BSON("x" << -11)))),
         },
         {NamespaceInfoEntry(nss)});
 
     WriteOp op1(request, 0);
     auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
+    ASSERT_EQ(AnalysisType::kSingleShard, analysis.type);
+    ASSERT_TRUE(analysis.isViewfulTimeseries);
+
+    // Checking against the same namespace to exercise buckets namespace caching.
+    WriteOp op2(request, 1);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(AnalysisType::kSingleShard, analysis.type);
     ASSERT_TRUE(analysis.isViewfulTimeseries);
 

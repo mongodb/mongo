@@ -776,7 +776,7 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherSkipsDoneBatches) {
     auto batcher = OrderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
 
     // Note a few operations to have all shards already successfully written to.
-    const std::map<WriteOpId, std::set<ShardId>> successfulShardsToAdd{
+    const absl::flat_hash_map<WriteOpId, std::set<ShardId>> successfulShardsToAdd{
         {WriteOpId(0), std::set<ShardId>{nss1Shard0.shardName}},
         {WriteOpId(4), std::set<ShardId>{nss0Shard0.shardName, nss0Shard1.shardName}},
         {WriteOpId(6), std::set<ShardId>{nss0Shard0.shardName, nss0Shard1.shardName}},
@@ -1699,7 +1699,7 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherSkipsDoneBatche
     auto batcher = UnorderedWriteOpBatcher(producer, analyzer, WriteCommandRef{request});
 
     // Note a few operations to have all shards already successfully written to.
-    const std::map<WriteOpId, std::set<ShardId>> successfulShardsToAdd{
+    const absl::flat_hash_map<WriteOpId, std::set<ShardId>> successfulShardsToAdd{
         {WriteOpId(0), std::set<ShardId>{nss1Shard0.shardName}},
         {WriteOpId(2), std::set<ShardId>{nss0Shard0.shardName, nss0Shard1.shardName}},
         {WriteOpId(5), std::set<ShardId>{nss0Shard0.shardName, nss0Shard1.shardName}},

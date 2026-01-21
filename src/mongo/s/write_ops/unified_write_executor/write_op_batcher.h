@@ -252,7 +252,8 @@ public:
      * Marks the shards that ops already succeeded in case we only need to retry parts
      * of any ops.
      */
-    void noteSuccessfulShards(std::map<WriteOpId, std::set<ShardId>> successfulShardsToAdd) {
+    void noteSuccessfulShards(
+        absl::flat_hash_map<WriteOpId, std::set<ShardId>> successfulShardsToAdd) {
         for (auto& [opId, successfulShards] : successfulShardsToAdd) {
             auto it = _successfulShardMap.find(opId);
             if (it == _successfulShardMap.cend()) {
@@ -294,7 +295,7 @@ protected:
     bool _retryOnTargetError = true;
 
     // Tracks which shards operations already succeeded on.
-    std::map<WriteOpId, std::set<ShardId>> _successfulShardMap;
+    absl::flat_hash_map<WriteOpId, std::set<ShardId>> _successfulShardMap;
 
     const WriteCommandRef _cmdRef;
 };

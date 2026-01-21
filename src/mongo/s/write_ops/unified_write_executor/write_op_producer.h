@@ -87,8 +87,10 @@ public:
 
 protected:
     void populateActiveIndices(size_t numOps) {
+        auto hint = _activeIndices.end();
+
         for (size_t i = 0; i < numOps; ++i) {
-            _activeIndices.insert(i);
+            hint = _activeIndices.insert(hint, i);
         }
     }
 
