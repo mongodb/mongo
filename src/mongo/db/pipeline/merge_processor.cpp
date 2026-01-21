@@ -117,12 +117,17 @@ MergeStrategy makeUpdateStrategy() {
               auto&& batch,
               auto&& bcr,
               UpsertType upsert,
-              InsertStrategyStatistics& _) {
+              MergeStatistics* mergeStats) {
+        const size_t batchSize = batch.size();
         constexpr auto multi = false;
         auto updateCommand = bcr.extractUpdateRequest();
         updateCommand->setUpdates(constructUpdateEntries(expCtx, std::move(batch), upsert, multi));
-        uassertStatusOK(expCtx->getMongoProcessInterface()->update(
+        auto updateResult = uassertStatusOK(expCtx->getMongoProcessInterface()->update(
             expCtx, ns, std::move(updateCommand), wc, upsert, multi, epoch));
+        if (mergeStats) {
+            mergeStats->totalDocsProcessed += batchSize;
+            mergeStats->docsMatched += updateResult.nMatched;
+        }
     };
 }
 
@@ -142,13 +147,17 @@ MergeStrategy makeStrictUpdateStrategy() {
               auto&& batch,
               auto&& bcr,
               UpsertType upsert,
-              InsertStrategyStatistics& _) {
+              MergeStatistics* mergeStats) {
         const int64_t batchSize = batch.size();
         constexpr auto multi = false;
         auto updateCommand = bcr.extractUpdateRequest();
         updateCommand->setUpdates(constructUpdateEntries(expCtx, std::move(batch), upsert, multi));
         auto updateResult = uassertStatusOK(expCtx->getMongoProcessInterface()->update(
             expCtx, ns, std::move(updateCommand), wc, upsert, multi, epoch));
+        if (mergeStats) {
+            mergeStats->totalDocsProcessed += batchSize;
+            mergeStats->docsMatched += updateResult.nMatched;
+        }
         uassert(ErrorCodes::MergeStageNoMatchingDocument,
                 "$merge could not find a matching document in the target collection "
                 "for at least one document in the source collection",
@@ -227,7 +236,7 @@ MergeStrategy makeInsertStrategy() {
               auto&& batch,
               auto&& bcr,
               UpsertType upsertType,
-              InsertStrategyStatistics& _) {
+              MergeStatistics* mergeStats) {
         std::vector<BSONObj> objectsToInsert(batch.size());
         // The batch stores replacement style updates, but for this "insert" style of $merge we'd
         // like to just insert the new document without attempting any sort of replacement.
@@ -238,16 +247,20 @@ MergeStrategy makeInsertStrategy() {
         insertCommand->setDocuments(std::move(objectsToInsert));
         auto insertResult = expCtx->getMongoProcessInterface()->insert(
             expCtx, ns, std::move(insertCommand), wc, epoch);
+        if (mergeStats) {
+            mergeStats->totalDocsProcessed += batch.size();
+            mergeStats->docsMatched += insertResult.size();
+        }
         for (const write_ops::WriteError& writeError : insertResult) {
             uassertStatusOK(writeError.getStatus());
         }
     };
 }
 
-bool shouldAttemptInsert(const InsertStrategyStatistics& insertStats) {
-    return insertStats.insertDocAttempts <
+bool shouldAttemptInsert(const MergeStatistics& mergeStats) {
+    return mergeStats.totalDocsProcessed <
         static_cast<size_t>(internalQueryMergeMinInsertAttempts.loadRelaxed()) ||
-        static_cast<double>(insertStats.insertErrors) / insertStats.insertDocAttempts <=
+        static_cast<double>(mergeStats.docsMatched) / mergeStats.totalDocsProcessed <=
         internalQueryMergeMaxInsertErrorRate.loadRelaxed();
 }
 
@@ -261,7 +274,7 @@ void runBackupStrategy(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        UpsertType upsertType,
                        const MergeStrategy& backupStrategy,
                        const BatchTransform& backupTransform,
-                       InsertStrategyStatistics& insertStats) {
+                       MergeStatistics* mergeStats) {
     if (batch.empty()) {
         return;
     }
@@ -279,7 +292,7 @@ void runBackupStrategy(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                    std::move(batch),
                    std::move(bcr),
                    upsertType,
-                   insertStats);
+                   mergeStats);
 }
 
 template <AllowDuplicateKeyErrorsFromMergeIndex allowDuplicateKeyErrorsFromMergeIndex>
@@ -297,8 +310,8 @@ MergeStrategy makeInsertStrategyWithBackup(BatchTransform backupTransform,
                                               MongoProcessInterface::BatchedObjects&& batch,
                                               auto&& bcr,
                                               UpsertType upsertType,
-                                              InsertStrategyStatistics& insertStats) {
-        if (!shouldAttemptInsert(insertStats)) {
+                                              MergeStatistics* mergeStats) {
+        if (mergeStats && !shouldAttemptInsert(*mergeStats)) {
             return runBackupStrategy(expCtx,
                                      ns,
                                      mergeOnFields,
@@ -309,7 +322,7 @@ MergeStrategy makeInsertStrategyWithBackup(BatchTransform backupTransform,
                                      backupUpsertType,
                                      backupStrategy,
                                      backupTransform,
-                                     insertStats);
+                                     mergeStats);
         }
 
         std::vector<BSONObj> objectsToInsert(batch.size());
@@ -323,8 +336,10 @@ MergeStrategy makeInsertStrategyWithBackup(BatchTransform backupTransform,
 
         auto insertResult = expCtx->getMongoProcessInterface()->insert(
             expCtx, ns, std::move(insertCommand), wc, epoch);
-        insertStats.insertDocAttempts += batch.size();
-        insertStats.insertErrors += insertResult.size();
+        if (mergeStats) {
+            mergeStats->totalDocsProcessed += batch.size();
+            mergeStats->docsMatched += insertResult.size();
+        }
         if (insertResult.empty()) {
             return;
         }
@@ -355,7 +370,8 @@ MergeStrategy makeInsertStrategyWithBackup(BatchTransform backupTransform,
                           backupUpsertType,
                           backupStrategy,
                           backupTransform,
-                          insertStats);
+                          // Stats are already updated, so passing nullptr to backup strategy
+                          nullptr /* mergeStats */);
     };
 }
 
@@ -604,7 +620,7 @@ void MergeProcessor::flush(const NamespaceString& outputNs,
                          std::move(batch),
                          std::move(bcr),
                          _descriptor.upsertType,
-                         _insertStats);
+                         &_mergeStats);
 }
 
 BSONObj MergeProcessor::_extractMergeOnFieldsFromDoc(
@@ -639,8 +655,8 @@ BSONObj MergeProcessor::_extractMergeOnFieldsFromDoc(
 
 bool MergeProcessor::shouldFlush(size_t currentBatchSize) {
     return _descriptor.isInsertWithUpdateBackupStrategy &&
-        _insertStats.insertDocAttempts < _insertStats.minInsertAttempts &&
-        _insertStats.insertDocAttempts + currentBatchSize >= _insertStats.minInsertAttempts;
+        _mergeStats.totalDocsProcessed < _mergeStats.minInsertAttempts &&
+        _mergeStats.totalDocsProcessed + currentBatchSize >= _mergeStats.minInsertAttempts;
 }
 
 }  // namespace mongo

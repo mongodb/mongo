@@ -45,9 +45,9 @@
 
 namespace MONGO_MOD_PUBLIC mongo {
 
-struct MONGO_MOD_PRIVATE InsertStrategyStatistics {
-    size_t insertDocAttempts = 0;
-    size_t insertErrors = 0;
+struct MONGO_MOD_PRIVATE MergeStatistics {
+    size_t totalDocsProcessed = 0;
+    size_t docsMatched = 0;
     const size_t minInsertAttempts =
         static_cast<size_t>(internalQueryMergeMinInsertAttempts.loadRelaxed());
     const double maxInsertErrorRate = internalQueryMergeMaxInsertErrorRate.loadRelaxed();
@@ -74,7 +74,7 @@ struct MergeStrategyDescriptor {
                                              MongoProcessInterface::BatchedObjects&&,
                                              BatchedCommandRequest&&,
                                              UpsertType upsert,
-                                             InsertStrategyStatistics&)>;
+                                             MergeStatistics*)>;
 
     // A function object that will be invoked to generate a BatchedCommandRequest.
     using BatchedCommandGenerator = std::function<BatchedCommandRequest(
@@ -228,7 +228,7 @@ private:
     boost::optional<ChunkVersion> _collectionPlacementVersion;
     bool _allowMergeOnNullishValues;
 
-    InsertStrategyStatistics _insertStats;
+    MergeStatistics _mergeStats;
 };
 
 const std::map<const MergeStrategyDescriptor::MergeMode, const MergeStrategyDescriptor>&
