@@ -43,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
@@ -93,7 +94,8 @@ public:
                     std::unique_ptr<RemoteExplainVector> remoteExplains,
                     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage,
                     const MultipleCollectionAccessor& mca,
-                    bool usedJoinOpt = false);
+                    bool usedJoinOpt = false,
+                    cost_based_ranker::EstimateMap estimates = {});
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();

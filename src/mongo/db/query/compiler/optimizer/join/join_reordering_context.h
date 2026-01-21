@@ -53,6 +53,10 @@ struct JoinReorderingContext {
     const std::vector<ResolvedPath>& resolvedPaths;
     QuerySolutionMap cbrCqQsns;
     AvailableIndexes perCollIdxs;
+
+    // Whether or not we are explaining the query. Based on this flag we may, for example, keep
+    // around costing/CE information to display in the explain output.
+    bool explain = false;
 };
 
 }  // namespace mongo::join_ordering

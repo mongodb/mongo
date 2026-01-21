@@ -39,6 +39,8 @@ struct ReorderedJoinSolution {
     std::unique_ptr<QuerySolution> soln;
     // Base node of new join order.
     NodeId baseNode;
+    // Estimate information for QuerySolutionNodes in 'soln'.
+    cost_based_ranker::EstimateMap estimates;
 };
 
 /**

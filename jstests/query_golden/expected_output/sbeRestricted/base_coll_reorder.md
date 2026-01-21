@@ -54,7 +54,6 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"isCached" : false,
 					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}
@@ -232,7 +231,6 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"isCached" : false,
 					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}
@@ -405,7 +403,6 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"isCached" : false,
 					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}
@@ -649,7 +646,6 @@ Execution Engine: classic
 							"$eq" : 3
 						}
 					},
-					"isCached" : false,
 					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}
@@ -1156,7 +1152,6 @@ Execution Engine: classic
 							"$eq" : 3
 						}
 					},
-					"isCached" : false,
 					"nss" : "test.base_coll_reorder_md_base",
 					"stage" : "COLLSCAN"
 				}

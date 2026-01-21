@@ -195,10 +195,11 @@ export function normalizePlan(plan, flatten = true) {
     }
 
     // Expand this array if you find new fields which are inconsistent across different test runs.
-    const ignoreFields = ["isCached", "indexVersion", "planNodeId"];
+    const ignoreFields = ["isCached", "indexVersion", "planNodeId", "cardinalityEstimate", "estimatesMetadata"];
 
     // Iterates over the plan while ignoring the `ignoreFields`, to create flattened stages whenever
     // `kExplainChildFieldNames` are encountered.
+    ignoreFields.forEach((field) => delete plan[field]);
     const stack = [["root", {...plan}]];
     while (stack.length > 0) {
         const [name, next] = stack.pop();

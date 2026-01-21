@@ -210,12 +210,11 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
 
     // Pre-process indexes per collection to facilitate INLJ enumeration.
     auto indexesPerColl = extractINLJEligibleIndexes(solns, mca);
-    JoinReorderingContext ctx{
-        .joinGraph = model.graph,
-        .resolvedPaths = model.resolvedPaths,
-        .cbrCqQsns = std::move(solns),
-        .perCollIdxs = std::move(indexesPerColl),
-    };
+    JoinReorderingContext ctx{.joinGraph = model.graph,
+                              .resolvedPaths = model.resolvedPaths,
+                              .cbrCqQsns = std::move(solns),
+                              .perCollIdxs = std::move(indexesPerColl),
+                              .explain = expCtx->getExplain().has_value()};
 
     ReorderedJoinSolution reordered;
     switch (qkc.getJoinReorderMode()) {
@@ -270,6 +269,9 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
         plannerOptions |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 
+    // TODO SERVER-111913: Once we are no-longer cloning QSN for single-table plans, the estimate
+    // map from join-reordering 'reordered.estimates' can be combined with the estimate map from
+    // CBR 'swAccessPlans.getValue().estimate' before creating the executor below.
     // We actually have several canonical queries, so we don't try to pass one in.
     auto exec = uassertStatusOK(plan_executor_factory::make(opCtx,
                                                             nullptr /* cq */,
@@ -281,7 +283,8 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                                                             std::move(sbeYieldPolicy),
                                                             false /* isFromPlanCache */,
                                                             false /* cachedPlanHash */,
-                                                            true /*usedJoinOpt*/));
+                                                            true /*usedJoinOpt*/,
+                                                            std::move(reordered.estimates)));
 
     return JoinReorderedExecutorResult{.executor = std::move(exec), .model = std::move(model)};
 }

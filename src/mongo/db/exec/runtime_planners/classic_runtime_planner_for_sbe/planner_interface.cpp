@@ -75,6 +75,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                                        isFromPlanCache,
                                                        cachedPlanHash,
                                                        false /*usedJoinOpt*/,
+                                                       {} /* estimates */,
                                                        std::move(remoteCursors),
                                                        std::move(remoteExplains),
                                                        std::move(classicRuntimePlannerStage)));

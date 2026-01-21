@@ -64,7 +64,6 @@ Execution Engine: sbe
 			"strategy" : "HashJoin"
 		},
 		"localField" : "b",
-		"planNodeId" : 3,
 		"scanDirection" : "forward",
 		"stage" : "EQ_LOOKUP_UNWIND",
 		"strategy" : "HashJoin"
@@ -366,7 +365,6 @@ Execution Engine: sbe
 			"stage" : "GROUP"
 		},
 		"memLimit" : 104857600,
-		"planNodeId" : 6,
 		"sortPattern" : {
 			"count" : -1
 		},
@@ -689,7 +687,6 @@ Execution Engine: sbe
 						"nss" : "test.basic_joins_md",
 						"stage" : "COLLSCAN"
 					},
-					"planNodeId" : 2,
 					"stage" : "PROJECTION_SIMPLE",
 					"transformBy" : {
 						"_id" : false,
@@ -1101,7 +1098,6 @@ Execution Engine: sbe
 						
 					},
 					"nss" : "test.basic_joins_md",
-					"planNodeId" : 1,
 					"stage" : "COLLSCAN"
 				}
 			}
@@ -1475,7 +1471,6 @@ Execution Engine: sbe
 						"nss" : "test.basic_joins_md",
 						"stage" : "COLLSCAN"
 					},
-					"planNodeId" : 2,
 					"stage" : "PROJECTION_SIMPLE",
 					"transformBy" : {
 						"_id" : false,
@@ -1903,7 +1898,6 @@ Execution Engine: sbe
 						}
 					},
 					"nss" : "test.basic_joins_md",
-					"planNodeId" : 1,
 					"stage" : "COLLSCAN"
 				}
 			}
@@ -2269,7 +2263,6 @@ Execution Engine: sbe
 			"strategy" : "HashJoin"
 		},
 		"localField" : "x.c",
-		"planNodeId" : 3,
 		"scanDirection" : "forward",
 		"stage" : "EQ_LOOKUP_UNWIND",
 		"strategy" : "HashJoin"
@@ -2560,7 +2553,6 @@ Execution Engine: sbe
 			"strategy" : "HashJoin"
 		},
 		"localField" : "x.c",
-		"planNodeId" : 4,
 		"scanDirection" : "forward",
 		"stage" : "EQ_LOOKUP_UNWIND",
 		"strategy" : "HashJoin"
@@ -2925,7 +2917,6 @@ Execution Engine: sbe
 			"strategy" : "HashJoin"
 		},
 		"localField" : "w.y.d",
-		"planNodeId" : 4,
 		"scanDirection" : "forward",
 		"stage" : "EQ_LOOKUP_UNWIND",
 		"strategy" : "HashJoin"
@@ -3270,7 +3261,6 @@ Execution Engine: sbe
 			"strategy" : "HashJoin"
 		},
 		"localField" : "b",
-		"planNodeId" : 4,
 		"scanDirection" : "forward",
 		"stage" : "EQ_LOOKUP_UNWIND",
 		"strategy" : "HashJoin"
@@ -3594,7 +3584,6 @@ Execution Engine: sbe
 			"strategy" : "HashJoin"
 		},
 		"localField" : "x.c",
-		"planNodeId" : 4,
 		"scanDirection" : "forward",
 		"stage" : "EQ_LOOKUP_UNWIND",
 		"strategy" : "HashJoin"
@@ -3904,7 +3893,6 @@ Execution Engine: sbe
 			"strategy" : "HashJoin"
 		},
 		"localField" : "x.c",
-		"planNodeId" : 4,
 		"scanDirection" : "forward",
 		"stage" : "EQ_LOOKUP_UNWIND",
 		"strategy" : "HashJoin"
@@ -4232,7 +4220,6 @@ Execution Engine: sbe
 			"strategy" : "IndexedLoopJoin"
 		},
 		"localField" : "a",
-		"planNodeId" : 4,
 		"scanDirection" : "forward",
 		"stage" : "EQ_LOOKUP_UNWIND",
 		"strategy" : "IndexedLoopJoin"

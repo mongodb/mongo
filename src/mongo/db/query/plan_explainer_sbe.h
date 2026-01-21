@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates_storage.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
@@ -67,7 +68,8 @@ public:
                          boost::optional<size_t> cachedPlanHash,
                          std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
                          RemoteExplainVector* remoteExplains,
-                         bool usedJoinOpt = false);
+                         bool usedJoinOpt = false,
+                         cost_based_ranker::EstimateMap estimates = {});
 
     bool areThereRejectedPlansToExplain() const final {
         return _isMultiPlan;
@@ -119,6 +121,9 @@ protected:
     const sbe::PlanStage* _root{nullptr};
     const stage_builder::PlanStageData* _rootData{nullptr};
 
+    // This field is owned here and has keys corresponding to nodes in PlanExplainer::_solution.
+    cost_based_ranker::EstimateMap _estimates;
+
     const bool _isMultiPlan{false};
     const bool _isFromPlanCache{false};
     const bool _usedJoinOpt{false};
@@ -140,7 +145,8 @@ public:
         std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
         std::unique_ptr<PlanStage> classicRuntimePlannerStage,
         RemoteExplainVector* remoteExplains,
-        bool usedJoinOpt = false);
+        bool usedJoinOpt = false,
+        cost_based_ranker::EstimateMap estimates = {});
 
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(
@@ -157,5 +163,6 @@ private:
 // Exposed only for testing purposes.
 void statsToBSON(const QuerySolutionNode* node,
                  BSONObjBuilder* bob,
-                 const BSONObjBuilder* topLevelBob);
+                 const BSONObjBuilder* topLevelBob,
+                 const cost_based_ranker::EstimateMap& estimates = {});
 }  // namespace mongo

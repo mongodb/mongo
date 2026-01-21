@@ -155,27 +155,47 @@ std::vector<QSNJoinPredicate> makeJoinPreds(const JoinReorderingContext& ctx,
     return preds;
 }
 
+void addEstimateIfExplain(const JoinReorderingContext& ctx,
+                          const PlanEnumeratorContext& peCtx,
+                          QuerySolutionNode* node,
+                          NodeSet set,
+                          cost_based_ranker::EstimateMap& estimates) {
+    if (!ctx.explain) {
+        return;
+    }
+
+    // TODO SERVER-116505: Populate estimates map with cost information when available.
+    auto ce = peCtx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(set);
+    estimates.emplace(node, cost_based_ranker::QSNEstimate{.outCE = ce});
+}
+
 // Forward-declare because of mutual recursion.
-std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(const JoinReorderingContext& ctx,
-                                                           const JoiningNode& join,
-                                                           const JoinPlanNodeRegistry& registry);
+std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
+    const JoinReorderingContext& ctx,
+    const PlanEnumeratorContext& peCtx,
+    const JoiningNode& join,
+    cost_based_ranker::EstimateMap& estimates);
 
 std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(const JoinReorderingContext& ctx,
+                                                        const PlanEnumeratorContext& peCtx,
                                                         JoinPlanNodeId nodeId,
-                                                        const JoinPlanNodeRegistry& registry) {
+                                                        cost_based_ranker::EstimateMap& estimates) {
     std::unique_ptr<QuerySolutionNode> qsn;
-    std::visit(OverloadedVisitor{[&ctx, &qsn, &registry](const JoiningNode& join) {
-                                     qsn = buildQSNFromJoiningNode(ctx, join, registry);
-                                 },
-                                 [&qsn](const BaseNode& base) {
-                                     // TODO SERVER-111913: Avoid this clone
-                                     qsn = base.soln->root()->clone();
-                                 },
-                                 [&ctx, &qsn, &registry](const INLJRHSNode& ip) {
-                                     qsn = createIndexProbeQSN(ctx.joinGraph.getNode(ip.node),
-                                                               ip.entry);
-                                 }},
-               registry.get(nodeId));
+    std::visit(
+        OverloadedVisitor{[&](const JoiningNode& join) {
+                              qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates);
+                              addEstimateIfExplain(ctx, peCtx, qsn.get(), join.bitset, estimates);
+                          },
+                          [&](const BaseNode& base) {
+                              // TODO SERVER-111913: Avoid this clone
+                              qsn = base.soln->root()->clone();
+                              addEstimateIfExplain(
+                                  ctx, peCtx, qsn.get(), NodeSet().set(base.node), estimates);
+                          },
+                          [&](const INLJRHSNode& ip) {
+                              qsn = createIndexProbeQSN(ctx.joinGraph.getNode(ip.node), ip.entry);
+                          }},
+        peCtx.registry().get(nodeId));
     return qsn;
 }
 
@@ -239,14 +259,16 @@ const JoinNode& findFirstNode(const JoinGraph& joinGraph, NodeSet set) {
     MONGO_UNREACHABLE_TASSERT(11336910);
 }
 
-std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(const JoinReorderingContext& ctx,
-                                                           const JoiningNode& join,
-                                                           const JoinPlanNodeRegistry& registry) {
-    auto leftChild = buildQSNFromJoinPlan(ctx, join.left, registry);
-    auto rightChild = buildQSNFromJoinPlan(ctx, join.right, registry);
+std::unique_ptr<QuerySolutionNode> buildQSNFromJoiningNode(
+    const JoinReorderingContext& ctx,
+    const PlanEnumeratorContext& peCtx,
+    const JoiningNode& join,
+    cost_based_ranker::EstimateMap& estimates) {
+    auto leftChild = buildQSNFromJoinPlan(ctx, peCtx, join.left, estimates);
+    auto rightChild = buildQSNFromJoinPlan(ctx, peCtx, join.right, estimates);
 
-    const auto& leftSubset = registry.getBitset(join.left);
-    const auto& rightSubset = registry.getBitset(join.right);
+    const auto& leftSubset = peCtx.registry().getBitset(join.left);
+    const auto& rightSubset = peCtx.registry().getBitset(join.right);
 
     const bool isLeftBaseNode = leftSubset.count() == 1;
     const bool isRightBaseNode = rightSubset.count() == 1;
@@ -413,10 +435,10 @@ ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx
     // Build QSN based on best plan.
     auto ret = std::make_unique<QuerySolution>();
     auto baseNodeId = getLeftmostNodeIdOfJoinPlan(ctx, bestPlanNodeId, registry);
-    ret->setRoot(buildQSNFromJoinPlan(ctx, bestPlanNodeId, registry));
 
+    cost_based_ranker::EstimateMap estimates;
+    ret->setRoot(buildQSNFromJoinPlan(ctx, peCtx, bestPlanNodeId, estimates));
     LOGV2_DEBUG(11179803, 5, "QSN for winning plan", "qsn"_attr = ret->toString());
-    return {.soln = std::move(ret), .baseNode = baseNodeId};
+    return {.soln = std::move(ret), .baseNode = baseNodeId, .estimates = std::move(estimates)};
 }
-
 }  // namespace mongo::join_ordering

@@ -76,7 +76,6 @@ Execution Engine: sbe
 			"stage" : "EQ_LOOKUP_UNWIND",
 			"strategy" : "HashJoin"
 		},
-		"planNodeId" : 4,
 		"stage" : "PROJECTION_DEFAULT",
 		"transformBy" : {
 			"_id" : false,
@@ -248,7 +247,6 @@ Execution Engine: sbe
 			"stage" : "EQ_LOOKUP_UNWIND",
 			"strategy" : "HashJoin"
 		},
-		"planNodeId" : 4,
 		"stage" : "PROJECTION_DEFAULT",
 		"transformBy" : {
 			"_id" : false,
@@ -415,7 +413,6 @@ Execution Engine: sbe
 			"stage" : "EQ_LOOKUP_UNWIND",
 			"strategy" : "HashJoin"
 		},
-		"planNodeId" : 4,
 		"stage" : "PROJECTION_DEFAULT",
 		"transformBy" : {
 			"_id" : false,

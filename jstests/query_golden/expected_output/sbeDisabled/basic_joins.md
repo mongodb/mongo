@@ -47,7 +47,6 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"isCached" : false,
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}
@@ -343,7 +342,6 @@ Execution Engine: classic
 						"nss" : "test.basic_joins_md",
 						"stage" : "COLLSCAN"
 					},
-					"isCached" : false,
 					"stage" : "PROJECTION_SIMPLE",
 					"transformBy" : {
 						"_id" : 0,
@@ -707,7 +705,6 @@ Execution Engine: classic
 						"nss" : "test.basic_joins_md",
 						"stage" : "COLLSCAN"
 					},
-					"isCached" : false,
 					"stage" : "PROJECTION_SIMPLE",
 					"transformBy" : {
 						"_id" : 0,
@@ -1115,7 +1112,6 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"isCached" : false,
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}
@@ -1490,7 +1486,6 @@ Execution Engine: classic
 						"nss" : "test.basic_joins_md",
 						"stage" : "COLLSCAN"
 					},
-					"isCached" : false,
 					"stage" : "PROJECTION_SIMPLE",
 					"transformBy" : {
 						"_id" : 0,
@@ -1917,7 +1912,6 @@ Execution Engine: classic
 							"$gt" : 1
 						}
 					},
-					"isCached" : false,
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}
@@ -2267,7 +2261,6 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"isCached" : false,
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}
@@ -2556,7 +2549,6 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"isCached" : false,
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}
@@ -2930,7 +2922,6 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"isCached" : false,
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}
@@ -3291,7 +3282,6 @@ Execution Engine: classic
 						"nss" : "test.basic_joins_md",
 						"stage" : "COLLSCAN"
 					},
-					"isCached" : false,
 					"stage" : "PROJECTION_SIMPLE",
 					"transformBy" : {
 						"_id" : false
@@ -3621,7 +3611,6 @@ Execution Engine: classic
 						"nss" : "test.basic_joins_md",
 						"stage" : "COLLSCAN"
 					},
-					"isCached" : false,
 					"stage" : "PROJECTION_SIMPLE",
 					"transformBy" : {
 						"_id" : true,
@@ -3937,7 +3926,6 @@ Execution Engine: classic
 						"nss" : "test.basic_joins_md",
 						"stage" : "COLLSCAN"
 					},
-					"isCached" : false,
 					"stage" : "PROJECTION_DEFAULT",
 					"transformBy" : {
 						"_id" : true,
@@ -4262,7 +4250,6 @@ Execution Engine: classic
 							"$eq" : "foo"
 						}
 					},
-					"isCached" : false,
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}

@@ -70,5 +70,6 @@ std::unique_ptr<PlanExplainer> make(
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
     std::unique_ptr<PlanStage> classicRuntimePlannerStage,
     RemoteExplainVector* remoteExplains = nullptr,
-    bool usedJoinOpt = false);
+    bool usedJoinOpt = false,
+    cost_based_ranker::EstimateMap estimates = {});
 }  // namespace mongo::plan_explainer_factory

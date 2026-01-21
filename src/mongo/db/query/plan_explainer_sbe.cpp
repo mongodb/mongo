@@ -210,7 +210,8 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     ExplainOptions::Verbosity verbosity,
     bool isCached,
     bool printBytecode,
-    bool usedJoinOpt = false) {
+    bool usedJoinOpt = false,
+    const cost_based_ranker::EstimateMap& _estimates = {}) {
     BSONObjBuilder bob;
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -232,7 +233,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     }
 
     if (solution != nullptr) {
-        statsToBSON(solution->root(), &bob, &bob);
+        statsToBSON(solution->root(), &bob, &bob, _estimates);
         if (internalQueryAllowForcedPlanByHash.load()) {
             bob.append("solutionHashUnstable", (long long)solution->hash());
         }
@@ -277,7 +278,8 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
 
 void statsToBSON(const QuerySolutionNode* node,
                  BSONObjBuilder* bob,
-                 const BSONObjBuilder* topLevelBob) {
+                 const BSONObjBuilder* topLevelBob,
+                 const cost_based_ranker::EstimateMap& estimates) {
     tassert(9378604, "encountered unexpected nullptr for BSONObjBuilder", bob);
     tassert(9378605, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
 
@@ -289,6 +291,17 @@ void statsToBSON(const QuerySolutionNode* node,
 
     bob->append("stage", nodeStageTypeToString(node));
     bob->appendNumber("planNodeId", static_cast<long long>(node->nodeId()));
+
+    // Cost and cardinality of the stage.
+    if (estimates.contains(node)) {
+        const auto& est = estimates.at(node);
+        // TODO SERVER-116505: Add cost here when available, possibly differentiating costs from the
+        // join module vs CBR.
+        bob->append("cardinalityEstimate", est.outCE.toDouble());
+        BSONObjBuilder metadataBob(bob->subobjStart("estimatesMetadata"));
+        metadataBob.append("ceSource", toStringData(est.outCE.source()));
+        metadataBob.done();
+    }
 
     // Display the BSON representation of the filter, if there is one.
     if (node->filter) {
@@ -583,7 +596,7 @@ void statsToBSON(const QuerySolutionNode* node,
     // rather than 'inputStages'.
     if (node->children.size() == 1) {
         BSONObjBuilder childBob(bob->subobjStart("inputStage"));
-        statsToBSON(node->children[0].get(), &childBob, topLevelBob);
+        statsToBSON(node->children[0].get(), &childBob, topLevelBob, estimates);
         return;
     }
 
@@ -592,7 +605,7 @@ void statsToBSON(const QuerySolutionNode* node,
     BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
     for (auto&& child : node->children) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(child.get(), &childBob, topLevelBob);
+        statsToBSON(child.get(), &childBob, topLevelBob, estimates);
     }
     childrenBob.doneFast();
 }
@@ -606,10 +619,12 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
     boost::optional<size_t> cachedPlanHash,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
     RemoteExplainVector* remoteExplains,
-    bool usedJoinOpt)
+    bool usedJoinOpt,
+    cost_based_ranker::EstimateMap estimates)
     : PlanExplainer{solution},
       _root{root},
       _rootData{data},
+      _estimates{std::move(estimates)},
       _isMultiPlan{isMultiPlan},
       _isFromPlanCache{isCachedPlan},
       _usedJoinOpt{usedJoinOpt},
@@ -713,7 +728,8 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStatsQueryPl
                                  ExplainOptions::Verbosity::kQueryPlanner,
                                  matchesCachedPlan(),
                                  printBytecode,
-                                 _usedJoinOpt);
+                                 _usedJoinOpt,
+                                 _estimates);
 }
 
 boost::optional<BSONArray> PlanExplainerSBEBase::buildRemotePlanInfo() const {
@@ -737,7 +753,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
     std::unique_ptr<PlanStage> classicRuntimePlannerStage,
     RemoteExplainVector* remoteExplains,
-    bool usedJoinOpt)
+    bool usedJoinOpt,
+    cost_based_ranker::EstimateMap estimates)
     : PlanExplainerSBEBase{root,
                            data,
                            solution,
@@ -746,7 +763,8 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                            cachedPlanHash,
                            std::move(debugInfo),
                            remoteExplains,
-                           usedJoinOpt},
+                           usedJoinOpt,
+                           std::move(estimates)},
       _classicRuntimePlannerStage{std::move(classicRuntimePlannerStage)},
       _classicRuntimePlannerExplainer{
           _classicRuntimePlannerStage  // If there were no multi-planning, this will be nullptr.

@@ -79,7 +79,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  std::unique_ptr<RemoteExplainVector> remoteExplains,
                                  std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage,
                                  const MultipleCollectionAccessor& mca,
-                                 bool usedJoinOpt)
+                                 bool usedJoinOpt,
+                                 cost_based_ranker::EstimateMap estimates)
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
@@ -154,7 +155,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   _rootData.debugInfo,
                                                   std::move(classicRuntimePlannerStage),
                                                   _remoteExplains.get(),
-                                                  usedJoinOpt);
+                                                  usedJoinOpt,
+                                                  std::move(estimates));
     _cursorType = _rootData.staticData->cursorType;
 
     if (_remoteCursors) {

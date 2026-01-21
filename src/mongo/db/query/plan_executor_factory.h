@@ -139,6 +139,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     bool isFromPlanCache,
     boost::optional<size_t> cachedPlanHash,
     bool usedJoinOpt = false,
+    cost_based_ranker::EstimateMap estimates = {},
     std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
     std::unique_ptr<RemoteExplainVector> remoteExplains = nullptr,
     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage = nullptr);
