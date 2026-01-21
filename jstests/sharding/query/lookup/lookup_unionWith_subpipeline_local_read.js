@@ -552,7 +552,7 @@ assertAggResultAndRouting(
     },
 );
 
-// TODO SERVER-101777 remove this test case.
+// TODO SERVER-98118 remove this test case.
 // For the authoritative shards, the secondaries will wait internally when they are yet to
 // catch up. This causes them to be always up to date.
 const isAuthoritativeShardEnabled = FeatureFlagUtil.isPresentAndEnabled(
