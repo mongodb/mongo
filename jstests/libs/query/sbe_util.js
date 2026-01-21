@@ -138,6 +138,26 @@ export function checkJoinOptimizationStatus(theDB) {
 }
 
 /**
+ * Check if featureFlagSbeNonLeadingMatch is enabled in the cluster.
+ *
+ * Quits test if there is no primary node and we are running in a mixed configuration.
+ */
+export function checkSbeNonLeadingMatchEnabled(theDB) {
+    if (theDB !== null) {
+        return discoverNodesAndCheck(theDB, (conn) => {
+            return FeatureFlagUtil.isPresentAndEnabled(conn, "SbeNonLeadingMatch");
+        });
+    } else {
+        // If we don't have a database available, we can only look at the TestData to see what
+        // parameters resmoke was given.
+        return (
+            TestData.setParameters.featureFlagSbeNonLeadingMatch &&
+            TestData.setParameters.featureFlagSbeNonLeadingMatch === "true"
+        );
+    }
+}
+
+/**
  * Check if featureFlagSbeFull is enabled in the cluster.
  *
  * Quits test if there is no primary node and we are running in a mixed configuration.

@@ -549,7 +549,11 @@ bool findSbeCompatibleStagesForPushdown(
         // stage must be pushed down for any later stages to also be pushed down.
         .transform = meetsRequirements(SbeCompatibility::requiresTrySbe) || isTimeseriesCollection,
 
-        .match = meetsRequirements(SbeCompatibility::requiresTrySbe) || isTimeseriesCollection,
+        .match = meetsRequirements(cq->getExpCtx()->getIfrContext()->getSavedFlagValue(
+                                       feature_flags::gFeatureFlagSbeNonLeadingMatch)
+                                       ? SbeCompatibility::noRequirements
+                                       : SbeCompatibility::requiresTrySbe) ||
+            isTimeseriesCollection,
 
         .unwind = meetsRequirements(SbeCompatibility::requiresSbeFull),
 

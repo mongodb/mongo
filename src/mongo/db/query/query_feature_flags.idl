@@ -367,3 +367,10 @@ feature_flags:
         cpp_varname: gFeatureFlagQueryStatsForInternalClients
         default: true
         fcv_gated: false
+
+    featureFlagSbeNonLeadingMatch:
+        description: "Feature flag to enable non-leading $match in SBE."
+        cpp_varname: gFeatureFlagSbeNonLeadingMatch
+        fcv_gated: false
+        default: false
+        incremental_rollout_phase: in_development

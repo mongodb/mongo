@@ -18,6 +18,7 @@
 // ]
 import {isWiredTiger} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     aggPlanHasStage,
     getAggPlanStage,
@@ -30,6 +31,7 @@ import {checkSbeFullyEnabled, checkSbeRestrictedOrFullyEnabled} from "jstests/li
 
 const sbeFullyEnabled = checkSbeFullyEnabled(db);
 const sbeRestricted = checkSbeRestrictedOrFullyEnabled(db);
+const sbeNonLeadingMatchEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeNonLeadingMatch");
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -371,6 +373,7 @@ assertPipelineIfSbeEnabled(
             optimizedAwayStages: ["$limit"],
         });
     },
+    sbeNonLeadingMatchEnabled /* hasEligibleRestrictedStage */,
 );
 
 // $match, $project, $limit can be optimized away when the projection is covered.

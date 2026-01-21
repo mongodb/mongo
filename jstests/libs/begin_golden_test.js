@@ -1,5 +1,9 @@
 import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
-import {checkSbeStatus, checkJoinOptimizationStatus} from "jstests/libs/query/sbe_util.js";
+import {
+    checkSbeStatus,
+    checkJoinOptimizationStatus,
+    checkSbeNonLeadingMatchEnabled,
+} from "jstests/libs/query/sbe_util.js";
 
 // Run any set-up necessary for a golden jstest. This function should be called from the suite
 // definition, so that individual tests don't need to remember to call it.
@@ -25,7 +29,11 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
     const sbeStatus = checkSbeStatus(typeof db === "undefined" ? null : db);
     const planRankerMode = getPlanRankerMode(typeof db === "undefined" ? null : db);
     const joinOptimizationStatus = checkJoinOptimizationStatus(typeof db === "undefined" ? null : db);
+    const sbeNonLeadingMatchEnabled = checkSbeNonLeadingMatchEnabled(typeof db === "undefined" ? null : db);
 
+    const sbeNonLeadingMatchExpectedExists = fileExists(
+        relativePathToExpectedOutput + "/featureFlagSbeNonLeadingMatch/" + outputName,
+    );
     const sbeExpectedExists = fileExists(relativePathToExpectedOutput + "/" + sbeStatus + "/" + outputName);
     const planRankerModeExpectedExists = fileExists(
         relativePathToExpectedOutput + "/" + planRankerMode + "/" + outputName,
@@ -34,7 +42,9 @@ export function beginGoldenTest(relativePathToExpectedOutput, fileExtension = ""
         relativePathToExpectedOutput + "/internalEnableJoinOptimization/" + outputName,
     );
 
-    if (joinOptimizationStatus && joinOptimizationExpectedExists) {
+    if (sbeNonLeadingMatchEnabled && sbeNonLeadingMatchExpectedExists) {
+        relativePathToExpectedOutput += "/featureFlagSbeNonLeadingMatch";
+    } else if (joinOptimizationStatus && joinOptimizationExpectedExists) {
         relativePathToExpectedOutput += "/internalEnableJoinOptimization";
     } else if (sbeExpectedExists && planRankerModeExpectedExists) {
         // Both SBE and CBR expected outputs exist, bail.

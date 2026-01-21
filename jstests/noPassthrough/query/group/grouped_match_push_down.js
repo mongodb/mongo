@@ -1,10 +1,13 @@
 // Tests classic planner rule to push-down $match with filters on renamed fields with dotted paths
 // over $group and $project in aggregation pipelines.
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getEngine, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
+
+const sbeNonLeadingMatchEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "SbeNonLeadingMatch");
 
 const MultiStageSBE = 0;
 const MultiStageClassic = 1;
@@ -157,7 +160,7 @@ assertPipelineOptimizationAndResult({
 assertPipelineOptimizationAndResult({
     pipeline: [{$group: {_id: "$d", c: {$sum: {$const: 1}}}}, {$addFields: {d: "$c"}}, {$match: {d: {$eq: 1}}}],
     expectedStageSequence: {
-        [MultiStageSBE]: ["$cursor", "$match", "$addFields"],
+        [MultiStageSBE]: sbeNonLeadingMatchEnabled ? ["$cursor", "$addFields"] : ["$cursor", "$match", "$addFields"],
         [MultiStageClassic]: ["$cursor", "$group", "$match", "$addFields"],
         [SingleStage]: ["PROJECTION_DEFAULT", "MATCH", "GROUP", "COLLSCAN"],
     },
