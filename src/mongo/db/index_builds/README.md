@@ -78,10 +78,11 @@ In addition to uniqueness constraints, indexes may have per-key constraints. For
 index may not be built on documents with parallel arrays. An index build on `{a: 1, b: 1}` will fail
 to generate a key for `{a: [1, 2, 3], b: [4, 5, 6]}`.
 
-On a primary under normal circumstances, we could fail an index build immediately after encountering
-a key generation error. Since secondaries apply oplog entries [out of
+On a primary under normal circumstances, index builds fail immediately after encountering a key
+generation error (as opposed to duplicate key errors), and the error is returned to the user. Since
+secondaries apply oplog entries [out of
 order](../repl/README.md#oplog-entry-application), however, spurious key generation errors may be
-encountered on otherwise consistent data. To solve this problem, we can relax key constraints and
+encountered on otherwise consistent data. To solve this problem, we relax key constraints and
 suppress key generation errors on secondaries.
 
 With the introduction of simultaneous index builds, an index build may be started on a secondary
@@ -89,14 +90,15 @@ node, but complete while it is a primary after a state transition. If we ignored
 in the secondary state, we would not be able to commit the index build and guarantee its consistency
 since we may have suppressed valid key generation errors.
 
-To solve this problem, on both primaries and secondaries, the records associated with key generation
-errors are skipped and recorded in a temporary table, the _skipped record table_. Like duplicate key
-constraints, but only on primaries at the conclusion of the index build, the keys for the [skipped
-records are
-re-generated](https://github.com/mongodb/mongo/blob/r4.4.0-rc9/src/mongo/db/index_builds_coordinator.cpp#L2294)
-and re-inserted under a collection X lock. If there are still constraint violations, an error is
-thrown. Secondaries rely on the primary's decision to commit as assurance that skipped records do
-not need to be checked.
+To solve this problem, on secondaries, the records associated with key generation errors are
+skipped and recorded in a temporary table, the _skipped record table_. If a secondary node becomes
+primary and then commits the index build, it re-generates and re-inserts keys for the [skipped
+records](https://github.com/mongodb/mongo/blob/r4.4.0-rc9/src/mongo/db/index_builds_coordinator.cpp#L2294)
+under a collection X lock. If there are still constraint violations, an error is thrown and the
+index build aborts. Primaries do not suppress key generation errors, so they do not use the skipped
+record table; they abort immediately when a key generation error occurs. Secondaries that remain
+secondary rely on the primary's decision to commit as assurance that skipped records do not need
+to be checked.
 
 See
 [SkippedRecordTracker](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/index/skipped_record_tracker.h#L45).
