@@ -26,7 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
+
+#include "mongo/db/change_stream_pre_images_truncate_markers.h"
 
 #include "mongo/db/admission/execution_control/execution_admission_context.h"
 #include "mongo/db/change_stream_pre_image_util.h"
@@ -469,16 +470,16 @@ void populateMarkersMap(
 }
 }  // namespace pre_image_marker_initialization_internal
 
-PreImagesTenantMarkers PreImagesTenantMarkers::createMarkers(
+PreImagesTruncateMarkers PreImagesTruncateMarkers::createMarkers(
     OperationContext* opCtx, const CollectionAcquisition& preImagesCollection) {
     invariant(preImagesCollection.exists());
-    PreImagesTenantMarkers preImagesTenantMarkers(preImagesCollection.uuid());
+    PreImagesTruncateMarkers preImagesTruncateMarkers(preImagesCollection.uuid());
     pre_image_marker_initialization_internal::populateMarkersMap(
-        opCtx, preImagesCollection, preImagesTenantMarkers._markersMap);
-    return preImagesTenantMarkers;
+        opCtx, preImagesCollection, preImagesTruncateMarkers._markersMap);
+    return preImagesTruncateMarkers;
 }
 
-void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx) {
+void PreImagesTruncateMarkers::refreshMarkers(OperationContext* opCtx) {
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Use writeConflictRetry since acquiring the collection can yield a WriteConflictException if
@@ -509,7 +510,7 @@ void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx) {
                        });
 }
 
-PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(OperationContext* opCtx) {
+PreImagesTruncateStats PreImagesTruncateMarkers::truncateExpiredPreImages(OperationContext* opCtx) {
     const auto markersMapSnapshot = _markersMap.getUnderlyingSnapshot();
 
     // Truncates are untimestamped. Allow multiple truncates to occur.
@@ -621,11 +622,11 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
     return stats;
 }
 
-void PreImagesTenantMarkers::updateOnInsert(const RecordId& recordId,
-                                            const UUID& nsUUID,
-                                            Date_t wallTime,
-                                            int64_t bytesInserted,
-                                            int64_t numRecords) {
+void PreImagesTruncateMarkers::updateOnInsert(const RecordId& recordId,
+                                              const UUID& nsUUID,
+                                              Date_t wallTime,
+                                              int64_t bytesInserted,
+                                              int64_t numRecords) {
     auto nsUUIDMarkers = _markersMap.find(nsUUID);
     if (!nsUUIDMarkers) {
         nsUUIDMarkers =

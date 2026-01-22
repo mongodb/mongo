@@ -29,18 +29,14 @@
 
 #pragma once
 
-#include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
-#include "mongo/db/storage/collection_truncate_markers.h"
-#include "mongo/util/concurrent_shared_values_map.h"
+#include "mongo/platform/rwmutex.h"
 #include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <memory>
-
-#include <absl/container/flat_hash_map.h>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 /**
@@ -54,17 +50,30 @@ public:
     PreImagesTruncateStats truncateExpiredPreImages(OperationContext* opCtx);
 
     /**
-     * Updates truncate markers to account for a newly inserted 'preImage' into the tenant's
-     * pre-images collection. If no truncate markers have been created for the 'tenantId's
-     * pre-images collection, this is a no-op.
+     * Updates truncate markers to account for a newly inserted 'preImage' into the pre-images
+     * collection. If no truncate markers have been created for the 'tenantId's pre-images
+     * collection, this is a no-op.
      */
     void updateMarkersOnInsert(OperationContext* opCtx,
                                const ChangeStreamPreImage& preImage,
                                int64_t bytesInserted);
 
-private:
-    friend class PreImagesTruncateManagerTest;
+    /**
+     * Returns true if the '_truncateMarkers' instance variable is populated, false otherwise.
+     */
+    bool areTruncateMarkersPopulated_forTest() const;
 
+    /**
+     * Test wrapper for calling '_getInitializedMarkersForPreImagesCollection()' from out of unit
+     * tests without making the method part of the public API. See that method's description for
+     * more details.
+     */
+    std::shared_ptr<PreImagesTruncateMarkers> getInitializedMarkersForPreImagesCollection_forTest(
+        OperationContext* opCtx) {
+        return _getInitializedMarkersForPreImagesCollection(opCtx);
+    }
+
+private:
     /**
      * Tries to retrieve truncate markers for the pre-images collection - or initialize the truncate
      * markers if they don't yet exist.
@@ -72,17 +81,42 @@ private:
      * Returns a shared_ptr to truncate markers for the pre-images collection. Returns a nullptr if
      * the pre-images collection doesn't exist yet.
      */
-    std::shared_ptr<PreImagesTenantMarkers> _getInitializedMarkersForPreImagesCollection(
+    std::shared_ptr<PreImagesTruncateMarkers> _getInitializedMarkersForPreImagesCollection(
         OperationContext* opCtx);
 
     /**
      * Returns a shared pointer to 'PreImagesTenantMarkers', provided the truncate markers were
      * successfully installed. Otherwise, returns a null pointer.
      */
-    std::shared_ptr<PreImagesTenantMarkers> _createAndInstallMarkers(OperationContext* opCtx);
+    std::shared_ptr<PreImagesTruncateMarkers> _createAndInstallMarkers(OperationContext* opCtx);
 
-    // TODO SERVER-109269: Remove map. Until then, only one entry should ever exist, for tenantId
-    // boost::none.
-    ConcurrentSharedValuesMap<boost::optional<TenantId>, PreImagesTenantMarkers> _tenantMap;
+    /**
+     * Returns a shared pointer to the currently installed 'PreImagesTenantMarkers' instance, if
+     * any. Can return a nullptr.
+     * The shared pointer is retrieved under the RWMutex in shared mode, so access to this function
+     * is thread-safe.
+     */
+    std::shared_ptr<PreImagesTruncateMarkers> _getTruncateMarkers() const;
+
+    /**
+     * Install a new value in the 'PreImagesTenantMarkers' instance. The new value can be a nullptr.
+     * any.
+     * The shared pointer is installed under the RWMutex in exclusive mode, so access to method is
+     * thread-safe.
+     */
+    void _setTruncateMarkers(std::shared_ptr<PreImagesTruncateMarkers> truncateMarkers);
+
+    /**
+     * Read-write mutex for accessing '_truncateMarkers'. All loads and stores of the
+     * '_truncateMarkers' instance in this class must acquire this mutex in the appropriate mode.
+     */
+    mutable RWMutex _mutex;
+
+    /**
+     * Truncate markers for the pre-images collection. The member is populated lazily and can
+     * contain a nullptr. This member is protected by '_mutex' and should never be accessed
+     * directly, but only via calls to ' _getTruncateMarkers()' and ' _setTruncateMarkers()'.
+     */
+    std::shared_ptr<PreImagesTruncateMarkers> _truncateMarkers;
 };
 }  // namespace mongo

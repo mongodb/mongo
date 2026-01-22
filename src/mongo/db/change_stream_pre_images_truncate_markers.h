@@ -33,9 +33,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_role/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrent_shared_values_map.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
+
+#include <cstdint>
 
 #include <boost/optional/optional.hpp>
 
@@ -105,7 +108,7 @@ void populateBySampling(
 }  // namespace pre_image_marker_initialization_internal
 
 /**
- * Statistics for a truncate pass over a given tenant's pre-images collection.
+ * Statistics for a truncate pass over the system's pre-images collection.
  */
 struct PreImagesTruncateStats {
     int64_t bytesDeleted{0};
@@ -123,13 +126,13 @@ struct PreImagesTruncateStats {
 };
 
 /**
- * Manages truncate markers specific to the tenant's pre-images collection.
+ * Manages truncate markers specific to the system's pre-images collection.
  */
-class PreImagesTenantMarkers {
+class PreImagesTruncateMarkers {
 public:
     /**
-     * Returns a 'PreImagesTenantMarkers' instance populated with truncate markers that span the
-     * tenant's pre-images collection. However, these markers are not safe to use until
+     * Returns a 'PreImagesTruncateMarkers' instance populated with truncate markers that span the
+     * system's pre-images collection. However, these markers are not safe to use until
      * 'refreshMarkers' is called to update the highest seen recordId and wall time for each
      * nsUUID. Otherwise, pre-images would not be truncated until new inserts come in for each
      * nsUUID.
@@ -137,8 +140,8 @@ public:
      * Note: Pre-images inserted concurrently with creation might not be covered by the resulting
      * truncate markers.
      */
-    static PreImagesTenantMarkers createMarkers(OperationContext* opCtx,
-                                                const CollectionAcquisition& preImagesCollection);
+    static PreImagesTruncateMarkers createMarkers(OperationContext* opCtx,
+                                                  const CollectionAcquisition& preImagesCollection);
 
     /**
      * Opens a fresh snapshot and ensures the all pre-images visible in the snapshot are
@@ -164,17 +167,17 @@ public:
                         int64_t bytesInserted,
                         int64_t numRecords = 1);
 
-    UUID getPreImagesCollectionUUID() {
+    UUID getPreImagesCollectionUUID() const {
         return _preImagesCollectionUUID;
     }
 
 private:
     friend class PreImagesTruncateManagerTest;
 
-    PreImagesTenantMarkers(const UUID& preImagesCollectionUUID)
+    PreImagesTruncateMarkers(const UUID& preImagesCollectionUUID)
         : _preImagesCollectionUUID{preImagesCollectionUUID} {}
 
-    UUID _preImagesCollectionUUID;
+    const UUID _preImagesCollectionUUID;
 
     /**
      * The pre-images collection spans pre-images generated across all pre-image enabled

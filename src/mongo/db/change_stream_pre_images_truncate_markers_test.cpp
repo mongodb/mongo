@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers.h"
 
 #include "mongo/db/change_stream_pre_image_test_helpers.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_test_fixture.h"

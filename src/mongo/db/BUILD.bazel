@@ -2076,8 +2076,8 @@ mongo_cc_library(
     name = "change_stream_pre_images_collection_manager",
     srcs = [
         "change_stream_pre_images_collection_manager.cpp",
-        "change_stream_pre_images_tenant_truncate_markers.cpp",
         "change_stream_pre_images_truncate_manager.cpp",
+        "change_stream_pre_images_truncate_markers.cpp",
         "change_stream_pre_images_truncate_markers_per_nsUUID.cpp",
     ],
     deps = [
@@ -2907,9 +2907,9 @@ mongo_cc_unit_test(
     name = "change_stream_pre_images_manager_test",
     srcs = [
         "change_stream_pre_images_remover_test.cpp",
-        "change_stream_pre_images_tenant_truncate_markers_test.cpp",
         "change_stream_pre_images_truncate_manager_test.cpp",
         "change_stream_pre_images_truncate_markers_per_nsUUID_test.cpp",
+        "change_stream_pre_images_truncate_markers_test.cpp",
     ],
     tags = ["mongo_unittest_eighth_group"],
     deps = [
