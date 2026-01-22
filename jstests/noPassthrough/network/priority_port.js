@@ -5,8 +5,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   requires_fcv_83,
- *   featureFlagReplicationUsageOfPriorityPort,
+ *   featureFlagDedicatedPortForPriorityOperations,
  * ]
  */
 
