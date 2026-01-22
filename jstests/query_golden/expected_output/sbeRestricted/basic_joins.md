@@ -4759,7 +4759,6 @@ Execution Engine: classic
 				"rejectedPlans" : [ ],
 				"winningPlan" : {
 					"direction" : "forward",
-					"isCached" : false,
 					"nss" : "test.basic_joins_md",
 					"stage" : "COLLSCAN"
 				}

@@ -645,7 +645,6 @@ Execution Engine: sbe
 						"strategy" : "HashJoin"
 					},
 					"localField" : "base",
-					"planNodeId" : 3,
 					"scanDirection" : "forward",
 					"stage" : "EQ_LOOKUP_UNWIND",
 					"strategy" : "HashJoin"
@@ -1132,7 +1131,6 @@ Execution Engine: sbe
 						}
 					},
 					"nss" : "test.base_coll_reorder_md_base",
-					"planNodeId" : 1,
 					"stage" : "COLLSCAN"
 				}
 			}

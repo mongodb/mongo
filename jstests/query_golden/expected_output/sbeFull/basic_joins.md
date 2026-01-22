@@ -4698,7 +4698,6 @@ Execution Engine: sbe
 						
 					},
 					"nss" : "test.basic_joins_md",
-					"planNodeId" : 1,
 					"stage" : "COLLSCAN"
 				}
 			}
