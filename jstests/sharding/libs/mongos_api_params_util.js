@@ -1738,6 +1738,7 @@ export let MongosAPIParametersUtil = (function () {
             commandName: "testVersions1And2",
             skip: "executes locally on mongos (not sent to any remote node)",
         },
+        {commandName: "upgradeDowngradeViewlessTimeseries", skip: "internal API"},
         {
             commandName: "update",
             run: {

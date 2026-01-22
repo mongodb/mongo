@@ -66,4 +66,7 @@ export const commandsAddedToMongodSinceLastLTS = [
     "testCommandFeatureFlaggedOnLatestFCV83",
     "_shardsvrRecreateRangeDeletionTasks",
     "_shardsvrRecreateRangeDeletionTasksParticipant",
+    "_shardsvrUpgradeDowngradeViewlessTimeseries",
+    "_shardsvrTimeseriesUpgradeDowngradePrepare",
+    "_shardsvrTimeseriesUpgradeDowngradeCommit",
 ];

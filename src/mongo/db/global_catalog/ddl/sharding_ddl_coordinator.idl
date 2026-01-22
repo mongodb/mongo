@@ -65,6 +65,8 @@ enums:
             kAddShard: "addShard"
             kCloneAuthoritativeMetadata: "cloneAuthoritativeMetadata"
             kInitializePlacementHistory: "initializePlacementHistory"
+            # TODO (SERVER-116499): Remove this coordinator type once 9.0 becomes last LTS.
+            kTimeseriesUpgradeDowngrade: "upgradeDowngradeViewlessTimeseries"
 
     # TODO (SERVER-98118): Remove this enum once v9.0 become last-lts.
     AuthoritativeMetadataAccessLevel:

@@ -795,6 +795,21 @@ const internalCommandsMap = {
             _shardsvrParticipantBlock: "x.y",
         },
     },
+    _shardsvrUpgradeDowngradeViewlessTimeseries: {
+        skip: true,
+        testname: "_shardsvrUpgradeDowngradeViewlessTimeseries",
+        command: {_shardsvrUpgradeDowngradeViewlessTimeseries: "x.y"},
+    },
+    _shardsvrTimeseriesUpgradeDowngradePrepare: {
+        skip: true,
+        testname: "_shardsvrTimeseriesUpgradeDowngradePrepare",
+        command: {_shardsvrTimeseriesUpgradeDowngradePrepare: "x.y"},
+    },
+    _shardsvrTimeseriesUpgradeDowngradeCommit: {
+        skip: true,
+        testname: "_shardsvrTimeseriesUpgradeDowngradeCommit",
+        command: {_shardsvrTimeseriesUpgradeDowngradeCommit: "x.y"},
+    },
     _shardsvrUntrackUnsplittableCollection: {
         testname: "_shardsvrUntrackUnsplittableCollection",
         command: {_shardsvrUntrackUnsplittableCollection: "x.y", writeConcern: {w: "majority"}},

@@ -56,6 +56,7 @@
 #include "mongo/db/global_catalog/ddl/rename_collection_coordinator.h"
 #include "mongo/db/global_catalog/ddl/set_allow_migrations_coordinator.h"
 #include "mongo/db/global_catalog/ddl/sharding_ddl_coordinator.h"
+#include "mongo/db/global_catalog/ddl/timeseries_upgrade_downgrade_coordinator.h"
 #include "mongo/db/global_catalog/ddl/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
@@ -142,6 +143,10 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
                                                                            std::move(initialState));
         case DDLCoordinatorTypeEnum::kInitializePlacementHistory:
             return std::make_shared<InitializePlacementHistoryCoordinator>(service,
+                                                                           std::move(initialState));
+        // TODO (SERVER-116499): Remove this once 9.0 becomes last LTS.
+        case DDLCoordinatorTypeEnum::kTimeseriesUpgradeDowngrade:
+            return std::make_shared<TimeseriesUpgradeDowngradeCoordinator>(service,
                                                                            std::move(initialState));
         default:
             uasserted(ErrorCodes::BadValue,

@@ -293,6 +293,7 @@ mongo_cc_library(
         "//src/mongo/db/global_catalog/ddl:shardsvr_join_ddl_coordinators_request_gen",
         "//src/mongo/db/global_catalog/ddl:shardsvr_join_migrations_request_gen",
         "//src/mongo/db/global_catalog/ddl:untrack_unsplittable_collection_gen",
+        "//src/mongo/db/global_catalog/ddl:upgrade_downgrade_viewless_timeseries_gen",
         "//src/mongo/db/global_catalog/metadata_consistency_validation:check_metadata_consistency_gen",
         "//src/mongo/db/router_role/routing_cache:shard_cannot_refresh_due_to_locks_held_exception.cpp",
         "//src/mongo/db/shard_role/ddl:clone_catalog_data_gen",

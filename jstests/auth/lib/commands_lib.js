@@ -345,6 +345,7 @@ const skippedAuthTestingCommands = [
     "testVersion2",
     "testVersions1And2",
     "timeseriesCatalogBucketParamsChanged",
+    "upgradeDowngradeViewlessTimeseries",
     "transitionToShardedCluster",
     "usersInfo",
     "voteAbortIndexBuild",
