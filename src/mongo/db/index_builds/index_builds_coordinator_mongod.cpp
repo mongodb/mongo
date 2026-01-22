@@ -231,6 +231,13 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext*) {
     // Stop new scheduling.
     _threadPool.shutdown();
 
+    // Join the step-up thread if it was started. The thread's opCtx should have been
+    // interrupted by the shutdown signal, causing it to exit promptly.
+    if (_stepUpThread.joinable()) {
+        LOGV2(11555800, "Waiting for IndexBuildsCoordinator step-up thread to exit");
+        _stepUpThread.join();
+    }
+
     // Wait for all active builds to stop.
     activeIndexBuilds.waitForAllIndexBuildsToStopForShutdown();
 
