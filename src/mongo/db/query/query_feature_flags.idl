@@ -374,3 +374,9 @@ feature_flags:
         fcv_gated: false
         default: false
         incremental_rollout_phase: in_development
+
+    featureFlagExtensionViewsAndUnionWith:
+        description: "Feature flag to enable extension stages on views and in $unionWith."
+        cpp_varname: gFeatureFlagExtensionViewsAndUnionWith
+        default: false
+        fcv_gated: false
