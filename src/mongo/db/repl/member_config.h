@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/member_config_gen.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/db/repl/split_horizon/split_horizon.h"
 #include "mongo/util/assert_util.h"
@@ -112,11 +113,11 @@ public:
      * use by internal replication systems.
      */
     HostAndPort getHostAndPortPriority() const {
-        if (getPriorityPort()) {
+        if (getPriorityPort() &&
+            !MONGO_unlikely(repl::disableReplicationUsageOfPriorityPort.load())) {
             return HostAndPort(getHostAndPort().host(), *getPriorityPort());
-        } else {
-            return getHostAndPort();
         }
+        return getHostAndPort();
     }
 
     bool isUsingPriorityPort(const HostAndPort& hap) const {

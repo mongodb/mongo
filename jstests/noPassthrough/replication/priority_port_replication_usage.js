@@ -123,6 +123,7 @@ describe("Tests for priority port usage within replication internals", function 
         let config = this.rs.getReplSetConfig();
         config.settings = {
             heartbeatTimeoutSecs: 1,
+            heartbeatIntervalMillis: 500,
             electionTimeoutMillis: 1000,
         };
         this.rs.initiate(config);

@@ -27,14 +27,6 @@
  *    it in the license file.
  */
 
-
-#define LOGV2_FOR_ELECTION(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                             \
-        ID, DLEVEL, {logv2::LogComponent::kReplicationElection}, MESSAGE, ##__VA_ARGS__)
-#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                               \
-        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
-
 #include "mongo/db/repl/topology_coordinator.h"
 
 #include "mongo/base/error_codes.h"
@@ -74,6 +66,13 @@
 #include <fmt/ostream.h>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
+#define LOGV2_FOR_ELECTION(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                             \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationElection}, MESSAGE, ##__VA_ARGS__)
+#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                               \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
 
 namespace mongo {
@@ -1236,6 +1235,9 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
                     "Could not find target in current config so ignoring",
                     "target"_attr = target,
                     "currentConfig"_attr = _rsConfig.toBSON());
+        if (MONGO_unlikely(_shouldRestartHeartbeatsForPriorityPortServerParameter(target))) {
+            return HeartbeatResponseAction::makeRestartHeartbeatsAction();
+        }
         return nextAction;
     }
 
@@ -1309,6 +1311,41 @@ OpTime TopologyCoordinator::_getMemberOpTimeForRecencyCheck(const MemberData& me
     }
 
     return memberOpTime;
+}
+
+bool TopologyCoordinator::_shouldRestartHeartbeatsForPriorityPortServerParameter(
+    const HostAndPort& member) {
+    bool serverParameterEnabled = repl::disableReplicationUsageOfPriorityPort.load();
+    // The parameter is and always has been false, so don't do anything special.
+    if (MONGO_likely(!serverParameterEnabled && !_priorityPortUsageEverDisabled)) {
+        return false;
+    }
+
+    if (serverParameterEnabled) {
+        _priorityPortUsageEverDisabled = true;
+        // Check whether we couldn't find the member in the config because the priority port was
+        // being used and is now disabled.
+        for (int i = 0; i < _rsConfig.getNumMembers(); i++) {
+            const auto& currMember = _rsConfig.getMemberAt(i);
+            if (currMember.getPriorityPort() &&
+                member ==
+                    HostAndPort(currMember.getHostAndPort().host(),
+                                *currMember.getPriorityPort())) {
+                return true;
+            }
+        }
+        return false;
+    } else {
+        // Check whether we couldn't find the member in the config because the main port was being
+        // used and the priority port is now enabled.
+        for (int i = 0; i < _rsConfig.getNumMembers(); i++) {
+            const auto& currMember = _rsConfig.getMemberAt(i);
+            if (currMember.getPriorityPort() && member == currMember.getHostAndPort()) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,

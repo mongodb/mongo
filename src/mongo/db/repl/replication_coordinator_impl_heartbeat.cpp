@@ -27,13 +27,6 @@
  *    it in the license file.
  */
 
-#define LOGV2_FOR_ELECTION(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                             \
-        ID, DLEVEL, {logv2::LogComponent::kReplicationElection}, MESSAGE, ##__VA_ARGS__)
-#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                               \
-        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -99,6 +92,12 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
+#define LOGV2_FOR_ELECTION(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                             \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationElection}, MESSAGE, ##__VA_ARGS__)
+#define LOGV2_FOR_HEARTBEATS(ID, DLEVEL, MESSAGE, ...) \
+    LOGV2_DEBUG_OPTIONS(                               \
+        ID, DLEVEL, {logv2::LogComponent::kReplicationHeartbeats}, MESSAGE, ##__VA_ARGS__)
 
 namespace mongo {
 namespace repl {
@@ -539,6 +538,14 @@ ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
                     });
             }
             break;
+        }
+        case HeartbeatResponseAction::RestartHeartbeats: {
+            LOGV2_FOR_HEARTBEATS(11426000,
+                                 0,
+                                 "Restarting heartbeats due to change in "
+                                 "'disableReplicationUsageOfPriorityPort'");
+            _cancelHeartbeats(lock);
+            _startHeartbeats(lock);
         }
     }
     if (action.getChangedSignificantly()) {

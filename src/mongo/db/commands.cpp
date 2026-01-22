@@ -683,6 +683,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     }
 
     auto isInternalThreadOrClient = !client->session() || client->isInternalClient();
+    bool isOnPriorityPort = client->session() && client->session()->isConnectedToPriorityPort();
 
     if (data.hasField("threadName") && (threadName != data.getStringField("threadName"))) {
         return false;  // only activate failpoint on thread from certain client
@@ -690,6 +691,12 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
 
     if (data.hasField("appName") && (appName != data.getStringField("appName"))) {
         return false;  // only activate failpoint on connection with a certain appName
+    }
+
+    if (!isOnPriorityPort) {
+        auto el = data.getField("priorityPortOnly");
+        if (el.isBoolean() && el.boolean())
+            return false;
     }
 
     if (data.hasField("namespace")) {
@@ -721,6 +728,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
               "appName"_attr = appName,
               logAttrs(nss),
               "isInternalClient"_attr = isInternalThreadOrClient,
+              "isOnPriorityPort"_attr = isOnPriorityPort,
               "command"_attr = cmd->getName());
         return true;
     }

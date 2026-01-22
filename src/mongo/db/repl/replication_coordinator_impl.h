@@ -1731,6 +1731,14 @@ private:
      */
     ReadPreference _getSyncSourceReadPreference(WithLock lk) const;
 
+    /**
+     * Checks whether we should restart heartbeats due to a change in the
+     * `disableReplicationUsageOfPriorityPort` server parameter.
+     */
+    bool _shouldRestartHeartbeatsForPriorityPortServerParameter(WithLock lk,
+                                                                bool serverParameterEnabled,
+                                                                const HostAndPort& oldMember);
+
     /*
      * Performs the replica set reconfig procedure.
      *
