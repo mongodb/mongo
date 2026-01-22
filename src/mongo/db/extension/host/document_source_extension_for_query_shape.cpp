@@ -76,7 +76,7 @@ Value DocumentSourceExtensionForQueryShape::serialize(const SerializationOptions
             "DocumentSourceExtensionForQueryShape",
             !opts.isKeepingLiteralsUnchanged());
 
-    host_connector::QueryShapeOptsAdapter adapter{&opts};
+    host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     return Value(_parseNode->getQueryShape(adapter));
 }
 

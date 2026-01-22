@@ -411,6 +411,15 @@ public:
                                   const SerializationOptions& opts = SerializationOptions{}) const;
 
     /**
+     * Create a Value that represents the document source.
+     *
+     * This is used by the default implementation of serializeToArray() to add this object
+     * to a pipeline being serialized. Returning a missing() Value results in no entry
+     * being added to the array for this stage (DocumentSource).
+     */
+    virtual Value serialize(const SerializationOptions& opts = SerializationOptions{}) const = 0;
+
+    /**
      * Shortcut method to get a BSONObj for debugging. Often useful in log messages, but is not
      * cheap so avoid doing so on a hot path at a low verbosity.
      */
@@ -707,15 +716,6 @@ protected:
     }};
 
 private:
-    /**
-     * Create a Value that represents the document source.
-     *
-     * This is used by the default implementation of serializeToArray() to add this object
-     * to a pipeline being serialized. Returning a missing() Value results in no entry
-     * being added to the array for this stage (DocumentSource).
-     */
-    virtual Value serialize(const SerializationOptions& opts = SerializationOptions{}) const = 0;
-
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 

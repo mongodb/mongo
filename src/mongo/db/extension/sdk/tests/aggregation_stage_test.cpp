@@ -92,7 +92,12 @@ public:
             std::make_unique<shared_test_stages::MockQueryExecutionContext>());
     }
 
+    auto getExpCtx() {
+        return _expCtx;
+    }
+
     std::unique_ptr<host_connector::QueryExecutionContextAdapter> _execCtx;
+    boost::intrusive_ptr<ExpressionContextForTest> _expCtx = new ExpressionContextForTest();
 };
 
 class ExpandToIdLookupNode : public extension::sdk::AggStageParseNode {
@@ -577,7 +582,7 @@ TEST_F(AggStageTest, SimpleComputeQueryShapeSucceeds) {
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(
         BSON(SimpleQueryShapeParseNode::kStageName << SimpleQueryShapeParseNode::kStageSpec),
@@ -628,7 +633,7 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(BSON(IdentifierQueryShapeParseNode::kStageName
                            << BSON(IdentifierQueryShapeParseNode::kIndexFieldName
@@ -644,7 +649,7 @@ TEST_F(AggStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) 
     opts.transformIdentifiers = true;
     opts.transformIdentifiersCallback = IdentifierQueryShapeParseNode::applyHmacForTest;
 
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(BSON(IdentifierQueryShapeParseNode::kStageName
                            << BSON(IdentifierQueryShapeParseNode::kIndexFieldName
@@ -726,7 +731,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithNoTransformation)
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
 
     ASSERT_BSONOBJ_EQ(BSON(FieldPathQueryShapeParseNode::kStageName
@@ -745,7 +750,7 @@ TEST_F(AggStageTest, SerializingFieldPathQueryShapeSucceedsWithTransformation) {
     opts.transformIdentifiers = true;
     opts.transformIdentifiersCallback = FieldPathQueryShapeParseNode::applyHmacForTest;
 
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
 
     auto transformedSingleField =
@@ -828,7 +833,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithNoTransformation) {
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
 
     BSONObjBuilder specBuilder;
@@ -850,7 +855,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithDebugShape) {
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
 
     BSONObjBuilder specBuilder;
@@ -868,7 +873,7 @@ TEST_F(AggStageTest, SerializingLiteralQueryShapeSucceedsWithRepresentativeValue
     auto handle = extension::AggStageParseNodeHandle{parseNode};
 
     SerializationOptions opts = SerializationOptions::kRepresentativeQueryShapeSerializeOptions;
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto queryShape = handle->getQueryShape(adapter);
 
     BSONObjBuilder specBuilder;
@@ -1461,7 +1466,9 @@ private:
     BSONObj _spec;
 };
 
-TEST(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodePreservesName) {
+using HostParseNodeCloneTest = AggStageTest;
+
+TEST_F(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodePreservesName) {
     auto spec = BSON("field" << "value");
 
     auto extensionParseNode =
@@ -1478,7 +1485,7 @@ TEST(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodePreservesName) {
     ASSERT_EQ(handle->getName(), clonedHandle->getName());
 }
 
-TEST(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodeIsIndependent) {
+TEST_F(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodeIsIndependent) {
     auto spec = BSON("data" << 42);
 
     auto extensionParseNode =
@@ -1496,7 +1503,7 @@ TEST(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodeIsIndependent) {
     ASSERT_TRUE(clonedHandle.isValid());
 }
 
-TEST(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodePreservesQueryShape) {
+TEST_F(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodePreservesQueryShape) {
     auto spec = BSON("field" << "value"
                              << "count" << 42);
 
@@ -1507,9 +1514,9 @@ TEST(HostParseNodeCloneTest, CloneExtensionAllocatedParseNodePreservesQueryShape
     // Clone the parse node.
     auto clonedHandle = handle->clone();
 
-    SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
     // Verify query shape is preserved (CloneableExtensionParseNode returns _spec as query shape).
+    SerializationOptions opts{};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     ASSERT_BSONOBJ_EQ(handle->getQueryShape(adapter), clonedHandle->getQueryShape(adapter));
 }
 
@@ -1548,7 +1555,7 @@ private:
     BSONObj _spec;
 };
 
-TEST(HostParseNodeCloneTest, ClonedParseNodeQueryShapeUnaffectedByExpandOnOther) {
+TEST_F(HostParseNodeCloneTest, ClonedParseNodeQueryShapeUnaffectedByExpandOnOther) {
     auto spec = BSON("field" << "value"
                              << "count" << 42);
 
@@ -1559,9 +1566,9 @@ TEST(HostParseNodeCloneTest, ClonedParseNodeQueryShapeUnaffectedByExpandOnOther)
     // Clone the parse node.
     auto clonedHandle = handle->clone();
 
-    SerializationOptions opts{};
-    extension::host_connector::QueryShapeOptsAdapter adapter{&opts};
     // Get query shape before expand.
+    SerializationOptions opts{};
+    extension::host_connector::QueryShapeOptsAdapter adapter{&opts, getExpCtx()};
     auto originalQueryShape = handle->getQueryShape(adapter);
     auto clonedQueryShape = clonedHandle->getQueryShape(adapter);
     ASSERT_BSONOBJ_EQ(originalQueryShape, clonedQueryShape);

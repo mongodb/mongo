@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/modules.h"
 
@@ -39,11 +40,22 @@ namespace mongo::extension::host_connector {
  */
 class QueryShapeOptsAdapter final : public ::MongoExtensionHostQueryShapeOpts {
 public:
-    QueryShapeOptsAdapter(const SerializationOptions* opts)
-        : ::MongoExtensionHostQueryShapeOpts{&VTABLE}, _opts(opts) {}
+    QueryShapeOptsAdapter(const SerializationOptions* opts,
+                          boost::intrusive_ptr<ExpressionContext> expCtx)
+        : ::MongoExtensionHostQueryShapeOpts{&VTABLE}, _opts(opts), _expCtx(std::move(expCtx)) {
+        uassert(11717605, "ExpressionContext pointer cannot be null", _expCtx != nullptr);
+    }
 
     const SerializationOptions* getOptsImpl() const {
         return _opts;
+    }
+
+    const boost::intrusive_ptr<ExpressionContext>& getExpCtx() const {
+        return _expCtx;
+    }
+
+    static inline bool isHostAllocated(const ::MongoExtensionHostQueryShapeOpts& opts) {
+        return opts.vtable == &VTABLE;
     }
 
 private:
@@ -65,5 +77,6 @@ private:
         &_extSerializeIdentifier, &_extSerializeFieldPath, &_extSerializeLiteral};
 
     const SerializationOptions* _opts;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 }  // namespace mongo::extension::host_connector

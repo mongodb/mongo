@@ -39,6 +39,7 @@ mongo_cc_library(
         "logger_adapter.cpp",
     ],
     deps = [
+        ":host_adapters",
         "//src/mongo:base",
         "//src/mongo/db/extension/public:api",
         "//src/mongo/db/extension/sdk:sdk_cpp",

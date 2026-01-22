@@ -29,9 +29,12 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/extension/host_connector/adapter/query_shape_opts_adapter.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/shared/byte_buf.h"
 #include "mongo/db/extension/shared/byte_buf_utils.h"
 #include "mongo/db/extension/shared/extension_status.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
@@ -140,10 +143,28 @@ private:
         const ::MongoExtensionAggStageParseNode* parseNode,
         const ::MongoExtensionHostQueryShapeOpts* ctx,
         ::MongoExtensionByteBuf** queryShape) noexcept {
-        return wrapCXXAndConvertExceptionToStatus([]() {
-            tasserted(10977800,
-                      "_hostGetQueryShape should not be called. Ensure that parseNode is "
-                      "extension-allocated, not host-allocated.");
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            uassert(11717600, "Received invalid query shape opts pointer", ctx != nullptr);
+            uassert(11717601,
+                    "A host parse node can only use host-generated query shape opts",
+                    host_connector::QueryShapeOptsAdapter::isHostAllocated(*ctx));
+
+            *queryShape = nullptr;
+            auto bsonSpec = static_cast<const HostAggStageParseNode*>(parseNode)->getBsonSpec();
+
+            // TODO SERVER-117619: Remove expression context from QueryShapeOptsAdapter once you can
+            // generate a query shape without going to DocumentSource.
+            const auto* optsAdapter =
+                static_cast<const host_connector::QueryShapeOptsAdapter*>(ctx);
+
+            auto parsedStage = DocumentSource::parse(optsAdapter->getExpCtx(), bsonSpec);
+            uassert(11717602,
+                    "It is not supported for a host parse node to generate query shape for a "
+                    "desugar stage",
+                    parsedStage.size() == 1);
+
+            Value serialized = parsedStage.front()->serialize(*optsAdapter->getOptsImpl());
+            *queryShape = new ByteBuf(serialized.getDocument().toBson());
         });
     };
 
