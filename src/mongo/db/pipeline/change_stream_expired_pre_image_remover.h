@@ -29,10 +29,14 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
+
+#include <string>
 
 namespace mongo {
 
@@ -73,7 +77,7 @@ public:
 
     void onShutdown() override;
 
-    inline std::string getServiceName() const final {
+    std::string getServiceName() const final {
         return "ChangeStreamExpiredPreImagesRemoverService";
     }
 

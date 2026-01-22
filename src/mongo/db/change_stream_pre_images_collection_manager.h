@@ -43,8 +43,6 @@
 #include <cstddef>
 #include <cstdint>
 
-#include <boost/optional/optional.hpp>
-
 namespace mongo {
 /**
  * Manages the lifecycle of the change stream pre-images collection(s). Also is responsible for
@@ -70,8 +68,9 @@ public:
         AtomicWord<int64_t> bytesDeleted;
 
         /**
-         * Cumulative number of pre-image collections scanned by the purging job. In single-tenant
-         * environments this is the same as totalPass as there is 1 pre-image collection per tenant.
+         * Cumulative number of pre-image collections scanned by the purging job. As
+         * system.preimages is the only collection that is scanned during purging, this counter will
+         * be incremented by one on every purge job invocation.
          */
         AtomicWord<int64_t> scannedCollections;
 
@@ -132,7 +131,7 @@ public:
      */
     void performExpiredChangeStreamPreImagesRemovalPass(Client* client);
 
-    const PurgingJobStats& getPurgingJobStats() {
+    const PurgingJobStats& getPurgingJobStats() const {
         return _purgingJobStats;
     }
 

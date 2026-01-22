@@ -144,7 +144,7 @@ void ChangeStreamPreImagesOpObserver::onUpdate(OperationContext* opCtx,
                               opTimeBundle.writeOpTime.toString()));
 
         ChangeStreamPreImageId id(uuid, opTimeBundle.writeOpTime.getTimestamp(), 0);
-        ChangeStreamPreImage preImage(id, opTimeBundle.wallClockTime, preImageDoc);
+        ChangeStreamPreImage preImage(std::move(id), opTimeBundle.wallClockTime, preImageDoc);
         invariant(args.coll->ns().tenantId() == boost::none);
         writeChangeStreamPreImageEntry(opCtx, preImage);
     }
@@ -188,7 +188,7 @@ void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
                         opTimeBundle.writeOpTime.toString()));
 
         ChangeStreamPreImageId id(uuid, opTimeBundle.writeOpTime.getTimestamp(), 0);
-        ChangeStreamPreImage preImage(id, opTimeBundle.wallClockTime, doc);
+        ChangeStreamPreImage preImage(std::move(id), opTimeBundle.wallClockTime, doc);
 
         invariant(nss.tenantId() == boost::none);
         writeChangeStreamPreImageEntry(opCtx, preImage);

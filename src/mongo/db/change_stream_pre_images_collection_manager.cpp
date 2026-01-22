@@ -55,6 +55,8 @@
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
+#include <boost/optional/optional.hpp>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
@@ -93,18 +95,19 @@ void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(Operation
     uassert(5868501,
             "Failpoint failPreimagesCollectionCreation enabled. Throwing exception",
             !MONGO_unlikely(failPreimagesCollectionCreation.shouldFail()));
-    const auto preImagesCollectionNamespace = NamespaceString::kChangeStreamPreImagesNamespace;
 
     CollectionOptions preImagesCollectionOptions;
 
     // Make the collection clustered by _id.
     preImagesCollectionOptions.clusteredIndex.emplace(
         clustered_util::makeCanonicalClusteredInfoForLegacyFormat());
-    const auto status = createCollection(
-        opCtx, preImagesCollectionNamespace, preImagesCollectionOptions, BSONObj());
+    const auto status = createCollection(opCtx,
+                                         NamespaceString::kChangeStreamPreImagesNamespace,
+                                         preImagesCollectionOptions,
+                                         BSONObj());
     uassert(status.code(),
             str::stream() << "Failed to create the pre-images collection: "
-                          << preImagesCollectionNamespace.toStringForErrorMsg()
+                          << NamespaceString::kChangeStreamPreImagesNamespace.toStringForErrorMsg()
                           << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
@@ -119,8 +122,6 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
                           << preImage.getId().getApplyOpsIndex(),
             preImage.getId().getApplyOpsIndex() >= 0);
 
-    const auto preImagesCollectionNamespace = NamespaceString::kChangeStreamPreImagesNamespace;
-
     // This lock acquisition can block on a stronger lock held by another operation modifying
     // the pre-images collection. There are no known cases where an operation holding an
     // exclusive lock on the pre-images collection also waits for oplog visibility.
@@ -128,7 +129,7 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
         shard_role_details::getLocker(opCtx));
     const auto changeStreamPreImagesCollection = acquireCollection(
         opCtx,
-        CollectionAcquisitionRequest(preImagesCollectionNamespace,
+        CollectionAcquisitionRequest(NamespaceString::kChangeStreamPreImagesNamespace,
                                      PlacementConcern{boost::none, ShardVersion::UNTRACKED()},
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kUnreplicatedWrite),
