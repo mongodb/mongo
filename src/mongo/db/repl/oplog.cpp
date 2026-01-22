@@ -1360,11 +1360,8 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
                                const CollectionPtr& collection,
                                const mongo::repl::OplogEntry& oplogEntry,
                                const BSONObj& preImage) {
-    Timestamp timestamp;
-    int64_t applyOpsIndex;
-
-    timestamp = oplogEntry.getTimestampForPreImage();
-    applyOpsIndex = oplogEntry.getApplyOpsIndex();
+    Timestamp timestamp = oplogEntry.getTimestampForPreImage();
+    int64_t applyOpsIndex = oplogEntry.getApplyOpsIndex();
 
     ChangeStreamPreImageId preImageId{collection->uuid(), timestamp, applyOpsIndex};
     ChangeStreamPreImage preImageDocument{
@@ -2425,7 +2422,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 Status applyContainerOperation_inlock(OperationContext* opCtx,
                                       const ApplierOperation& op,
                                       OplogApplication::Mode mode) {
-    const auto nss = op->getNss();
+    const auto& nss = op->getNss();
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX));
 
     auto ident = op->getContainer();
