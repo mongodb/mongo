@@ -485,17 +485,38 @@ public:
             }
         }
 
-        // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
-        // manually update the plan cache instead without multiplanning but this is simpler.
-        if (1 == solutions.size() && !_cq->getExpCtxRaw()->getForcePlanCache() &&
-            !_cq->getExpCtxRaw()
-                 ->getQueryKnobConfiguration()
-                 .getUseMultiplannerForSingleSolutions()) {
-            // Only one possible plan. Build the stages from the solution.
-            solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
-            return buildSingleSolutionPlan(std::move(solutions[0]),
-                                           std::move(rankerResult.getValue().maybeExplainData));
+        // TODO SERVER-117668: Move if-block logic into a helper function.
+        if (1 == solutions.size()) {
+            auto expCtx = _cq->getExpCtxRaw();
+            // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
+            // manually update the plan cache instead without multiplanning but this is simpler.
+            bool forceMultiPlanForSingleSolution = expCtx->getForcePlanCache() ||
+                expCtx->getQueryKnobConfiguration().getUseMultiplannerForSingleSolutions();
+
+            // TODO: SERVER-115226: Remove check for rejectedPlansWithStages once we no longer go
+            // through costing for single solution plans.
+            const bool hasRejectedPlans = rankerResult.getValue().maybeExplainData &&
+                !rankerResult.getValue().maybeExplainData->rejectedPlansWithStages.empty();
+
+            // If there is rejected plans in the  result from 'rankPlans()' and the
+            // 'needsWorksMeasured' flag is set, we run the single CBR picked solution through
+            // multiplanner to measure its number of works and add the plan to the plan cache. If
+            // 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
+            // 'needsWorksMeasured' and the number of rejected plans and instead only check whether
+            // we should force running the single solution plan through the multiplanner.
+            bool shouldMultiPlanForSingleSolution =
+                (!internalQueryDisablePlanCache.load() && hasRejectedPlans &&
+                 rankerResult.getValue().needsWorksMeasured) ||
+                forceMultiPlanForSingleSolution;
+
+            if (!shouldMultiPlanForSingleSolution) {
+                // Only one possible plan. Build the stages from the solution.
+                solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
+                return buildSingleSolutionPlan(std::move(solutions[0]),
+                                               std::move(rankerResult.getValue().maybeExplainData));
+            }
         }
+
         return buildMultiPlan(std::move(solutions),
                               std::move(rankerResult.getValue().maybeExplainData));
     }
