@@ -133,7 +133,11 @@ function reporter(propertyFn, namespaces) {
             jsTest.log.info(runDetails);
             const workload = runDetails.counterexample[0];
             jsTest.log.info(workload);
-            jsTest.log.info(runProperty(propertyFn, namespaces, workload));
+            try {
+                jsTest.log.info(runProperty(propertyFn, namespaces, workload));
+            } catch (e) {
+                jsTest.log.info(e);
+            }
             assert(false);
         }
     };
@@ -163,19 +167,36 @@ export function testProperty(propertyFn, namespaces, workloadModel, numRuns, exa
     let alwaysPassed = true;
     fc.assert(
         fc.property(workloadModel, (workload) => {
-            // Only return if the property passed or not. On failure,
-            // `runProperty` is called again and more details are exposed.
-            const result = runProperty(propertyFn, namespaces, workload);
+            let result;
+            let exception;
+            try {
+                result = runProperty(propertyFn, namespaces, workload);
+            } catch (e) {
+                exception = e;
+            }
+
+            const passed = !exception && result.passed;
+
             // If it failed for the first time, print that out so we have the first failure available
             // in case shrinking fails.
-            if (!result.passed && alwaysPassed) {
+            if (!passed && alwaysPassed) {
                 jsTest.log.info("The property " + propertyFn.name + " from " + jsTestName() + " failed");
                 jsTest.log.info("Initial inputs **before minimization**");
                 jsTest.log.info(workload);
                 jsTest.log.info("Initial failure details **before minimization**");
-                jsTest.log.info(result);
+                if (exception) {
+                    jsTest.log.info(exception);
+                } else {
+                    jsTest.log.info(result);
+                }
                 alwaysPassed = false;
             }
+            // Rethrow the caught exception if one occurred.
+            if (exception) {
+                throw exception;
+            }
+            // Only return if the property passed or not. On failure,
+            // `runProperty` is called again and more details are exposed.
             return result.passed;
         }),
         {seed, numRuns, reporter: reporter(propertyFn, namespaces), examples},
