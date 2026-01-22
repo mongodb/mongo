@@ -91,7 +91,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
-#include "mongo/util/safe_num.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 

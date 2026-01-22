@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <iosfwd>
@@ -73,7 +74,7 @@ class Value;
  *      newValue.toBSON(fieldName, &bsonObjBuilder);
  *
  */
-class SafeNum {
+class MONGO_MOD_PUBLIC SafeNum {
 public:
     SafeNum();
     ~SafeNum();
@@ -189,7 +190,7 @@ private:
     BSONType _type;
 
     // Value of the safe num. Indeterminate if _type is EOO.
-    union {
+    MONGO_MOD_NEEDS_REPLACEMENT union {
         int32_t int32Val;
         int64_t int64Val;
         double doubleVal;

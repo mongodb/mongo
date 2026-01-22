@@ -241,7 +241,6 @@ query:
     - src/mongo/s/query/shard_targeting_helpers*
     - src/mongo/db/namespace_spec.idl # only used by query
     - src/mongo/s/commands/*document_shard_key_*
-    - src/mongo/util/safe_num*
     - src/mongo/db/s/*analyze_shard_key*
     - src/mongo/s/*analyze_shard_key*
     - src/mongo/s/*query_analyze*
