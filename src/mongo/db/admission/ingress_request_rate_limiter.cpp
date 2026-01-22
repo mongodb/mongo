@@ -214,7 +214,8 @@ Status IngressRequestRateLimiter::admitRequest(Client* client) {
 
     auto rateLimitResult = _rateLimiter.tryAcquireToken();
     if (MONGO_unlikely(rateLimitResult == admission::RateLimiter::kRejectedErrorCode)) {
-        return Status{ErrorCodes::IngressRequestRateLimitExceeded, rateLimitResult.reason()};
+        return Status{ErrorCodes::IngressRequestRateLimitExceeded,
+                      "Request rejected: ingress request rate limit exceeded"};
     }
 
     return rateLimitResult;
