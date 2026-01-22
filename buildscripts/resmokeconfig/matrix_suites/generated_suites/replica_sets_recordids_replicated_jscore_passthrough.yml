@@ -23,7 +23,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
     num_nodes: 2
   hooks:
     - class: RunDBCheckInBackground

@@ -2,10 +2,8 @@
  * Tests that dbhash accounts for RecordIds only when 'recordIdsReplicated' is true.
  *
  * @tags: [
- *   featureFlagRecordIdsReplicated,
- *   # TODO (SERVER-89640): This test requires some collections to be created with
- *   # recordIdsReplicated:false.
- *   exclude_when_record_ids_replicated
+ *   # TODO (SERVER-117498): Decide how to test this.
+ *   __TEMPORARILY_DISABLED__,
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

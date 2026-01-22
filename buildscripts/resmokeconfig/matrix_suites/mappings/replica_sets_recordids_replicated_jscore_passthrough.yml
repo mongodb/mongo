@@ -1,3 +1,1 @@
 base_suite: replica_sets_jscore_passthrough
-overrides:
-  - "recordids_replicated.enable"

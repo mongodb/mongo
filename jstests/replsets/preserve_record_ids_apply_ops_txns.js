@@ -3,11 +3,8 @@
  * flag set even when inserting from within a transaction or when using the applyOps command.
  *
  * @tags: [
- *   featureFlagRecordIdsReplicated,
- *   # TODO (SERVER-89640): Remove tag.
- *   # Incompatible with the recordIdsReplicated:true builder, as it sets the option
- *   # on all collections.
- *   exclude_when_record_ids_replicated
+ *   # TODO (SERVER-117559): Decide what to do wit this test.
+ *   __TEMPORARILY_DISABLED__,
  * ]
  */
 import {validateShowRecordIdReplicatesAcrossNodes} from "jstests/libs/collection_write_path/replicated_record_ids_utils.js";

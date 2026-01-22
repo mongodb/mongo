@@ -123,9 +123,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(throwWCEDuringTxnCollCreate);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 MONGO_FAIL_POINT_DEFINE(hangAfterParsingValidator);
-MONGO_FAIL_POINT_DEFINE(overrideRecordIdsReplicatedDefault);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
 MONGO_FAIL_POINT_DEFINE(openCreateCollectionWindowFp);
+// TODO (SERVER-117265): Revisit to see if this can be removed.
+MONGO_FAIL_POINT_DEFINE(overrideRecordIdsReplicatedFalse);
 // Allows creating a buckets NS without timeseries options, as could ocurr on FCV 7.x and earlier,
 // for example due to SERVER-87678, or due to a drop concurrent to direct inserts on the buckets NS.
 MONGO_FAIL_POINT_DEFINE(skipCreateTimeseriesBucketsWithoutOptionsCheck);
@@ -163,6 +164,10 @@ bool shouldSetRecordIdsReplicated(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   const CollectionOptions& collectionOptions,
                                   bool isOriginalCollectionCreation) {
+    if (MONGO_unlikely(overrideRecordIdsReplicatedFalse.shouldFail())) {
+        return false;
+    }
+
     // The recordId is the '_id' for clustered collections - thus explicit recordId replication is
     // unnecessary. Additionally, replicated recordIds only apply to explicitly replicated
     // collections, since implicitly replicated collections don't guarantee CRUD ops are persisted
@@ -189,11 +194,6 @@ bool shouldSetRecordIdsReplicated(OperationContext* opCtx,
                     "oldValue"_attr = collectionOptions.recordIdsReplicated,
                     logAttrs(nss));
         return true;
-    }
-
-    // Do not use replicated record id if not explicitly enabled.
-    if (!overrideRecordIdsReplicatedDefault.shouldFail()) {
-        return false;
     }
 
     // To prevent issues with upgrade/downgrade when FCV is uninitialized, only enforce replicated

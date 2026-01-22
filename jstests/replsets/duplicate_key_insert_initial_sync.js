@@ -1,7 +1,7 @@
 /**
  * Tests insert generating duplicate key during initial sync are skipped.
  *
- * @tags: [requires_fcv_83]
+ * @tags: [featureFlagRecordIdsReplicated]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -17,8 +17,6 @@ const rst = new ReplSetTest({
         setParameter: {
             // On restart we will have no history to consult to figure out the highest leaf node.
             minSnapshotHistoryWindowInSeconds: 0,
-            "failpoint.overrideRecordIdsReplicatedDefault": "{mode: 'alwaysOn'}",
-            "failpoint.automaticallyCollmodToRecordIdsReplicatedFalse": "{mode: 'alwaysOn'}",
         },
     },
 });

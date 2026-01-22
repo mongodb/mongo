@@ -2401,14 +2401,8 @@ tasks:
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
-    # TODO (SERVER-88964): Remove exclude_when_record_ids_replicated.
     tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "jscore",
-        "exclude_when_record_ids_replicated",
-      ]
+      ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -2418,14 +2412,8 @@ tasks:
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_primary_step_down_passthrough_gen
-    # TODO (SERVER-88964): Remove exclude_when_record_ids_replicated.
     tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "jscore",
-        "exclude_when_record_ids_replicated",
-      ]
+      ["assigned_to_jira_team_server_catalog_and_routing", "default", "jscore"]
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -2681,13 +2669,11 @@ tasks:
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-    # TODO (SERVER-88964): Remove exclude_when_record_ids_replicated.
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "sharding",
-        "exclude_when_record_ids_replicated",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2699,13 +2685,11 @@ tasks:
 
   - <<: *gen_task_template
     name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
-    # TODO (SERVER-88964): Remove exclude_when_record_ids_replicated.
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "sharding",
-        "exclude_when_record_ids_replicated",
       ]
     commands:
       - func: "generate resmoke tasks"

@@ -6,7 +6,6 @@
           set_parameters:
             featureFlagPrimaryDrivenIndexBuilds: 1
             featureFlagRecordIdsReplicated: 1
-            failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
 - name: enable_primary_driven_index_builds_feature_flag_mongos
   value:
     executor:
@@ -25,7 +24,6 @@
               setParameters:
                 featureFlagPrimaryDrivenIndexBuilds: true
                 featureFlagRecordIdsReplicated: true
-                failpoint.overrideRecordIdsReplicatedDefault: "{mode: 'alwaysOn'}"
 - name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongos
   value:
     executor:
@@ -49,7 +47,6 @@
       # TODO SERVER-112247, TODO SERVER-112251: We may be able to enable this test if either we
       # emulate this restart behavior while testing, or when resumability is added.
       - primary_driven_index_builds_incompatible_due_to_abort_on_step_up
-      - exclude_when_record_ids_replicated
 - name: all_no_passthrough_index_builds_tests_selector
   value:
     selector:

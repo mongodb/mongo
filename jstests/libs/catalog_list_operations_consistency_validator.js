@@ -698,6 +698,17 @@ export function assertCatalogListOperationsConsistencyForDb(db, tenantId) {
                 collIndexes = collIndexes.filter((c) => !nsWithUnexpectedBucketsSet.has(c.name));
             }
         }
+        // TODO (SERVER-117265): Revisit if still needed.
+        if (TestData.isRunningFCVUpgradeDowngradeSuite) {
+            catalogInfo.forEach((doc) => {
+                if (doc.md) {
+                    delete doc.md.options.recordIdsReplicated;
+                }
+            });
+            collInfo.forEach((doc) => {
+                delete doc.options.recordIdsReplicated;
+            });
+        }
 
         // Check consistency between `listCollections`, `listIndexes` and `$listCatalog` results.
         // It is possible that the two commands return spuriously inconsistent results, for example
