@@ -94,11 +94,9 @@ std::unique_ptr<QuerySolution> MultiPlanner::extractQuerySolution() {
 }
 
 PlanExplainerData MultiPlanner::extractExplainData() {
-    PlanExplainerData out;
-    auto rejectedPlansWithStages = _multiplanStage->extractRejectedPlansAndStages();
-    out.rejectedPlansWithStages = std::move(rejectedPlansWithStages);
-    out.planStageQsnMap = std::move(_planStageQsnMap);
-    return out;
+    auto explainData = _multiplanStage->extractPlanExplainerData();
+    explainData.planStageQsnMap = std::move(_planStageQsnMap);
+    return explainData;
 }
 
 void MultiPlanner::abandonTrials() {

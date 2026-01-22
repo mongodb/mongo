@@ -206,8 +206,9 @@ public:
 
     /**
      * Extracts all rejected plans along with their PlanStages for explain purposes.
+     * Also extracts multiplanning stats of the winning plan, if any.
      */
-    [[nodiscard]] std::vector<SolutionWithPlanStage> extractRejectedPlansAndStages();
+    [[nodiscard]] PlanExplainerData extractPlanExplainerData();
 
     /**
      * Rejects all candidate plans without picking a best plan. Needed before extracting rejected

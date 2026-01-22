@@ -64,8 +64,15 @@ function testResultsQueryIsPlannedWithMultiPlanner() {
     assert.eq(execStats.nReturned, 1, toJsonForLog(explain));
     // TODO SERVER-115958: This test failes with featureFlagSbeFull.
     if (getEngine(explain) === "classic") {
+        assert.eq(execStats.executionStages.works, 2 /* seek + advance */, toJsonForLog(explain));
         assert.eq(execStats.allPlansExecution.length, 2, toJsonForLog(explain));
-        // TODO SERVER-117369. Fix the winning plan's stats being zero here.
+
+        // Winning plan trials' stats
+        assertPlanNotCosted(execStats.allPlansExecution[0].executionStages);
+        assert.eq(execStats.allPlansExecution[0].executionStages.advanced, 1, toJsonForLog(explain));
+        assert.eq(execStats.allPlansExecution[0].executionStages.works, 2, toJsonForLog(explain));
+
+        // Rejected plan trials' stats
         assertPlanNotCosted(execStats.allPlansExecution[1].executionStages);
         assert.eq(execStats.allPlansExecution[1].executionStages.advanced, 1, toJsonForLog(explain));
         assert.eq(execStats.allPlansExecution[1].executionStages.works, 2, toJsonForLog(explain));
@@ -103,7 +110,13 @@ function testEOFIsPlannedWithMultiPlanner() {
     if (getEngine(explain) === "classic") {
         assert.eq(executionStats.executionStages.works, 2 /* seek + advance */, toJsonForLog(explain));
         assert.eq(executionStats.allPlansExecution.length, 2, toJsonForLog(explain));
-        // TODO SERVER-117369. Fix the winning plan's stats being zero here.
+
+        // Winning plan trials' stats
+        assertPlanNotCosted(executionStats.allPlansExecution[0].executionStages);
+        assert.eq(executionStats.allPlansExecution[0].executionStages.advanced, 1, toJsonForLog(explain));
+        assert.eq(executionStats.allPlansExecution[0].executionStages.works, 2, toJsonForLog(explain));
+
+        // Rejected plan trials' stats
         assertPlanNotCosted(executionStats.allPlansExecution[1].executionStages);
         assert.eq(executionStats.allPlansExecution[1].executionStages.advanced, 1, toJsonForLog(explain));
         assert.eq(executionStats.allPlansExecution[1].executionStages.works, 2, toJsonForLog(explain));
