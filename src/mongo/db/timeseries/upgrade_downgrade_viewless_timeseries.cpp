@@ -372,7 +372,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
 
             // Only create the view on the primary shard.
             if (!skipViewCreation) {
-                CollectionOptions viewOptions;
+                CollectionOptions viewOptions{};
                 viewOptions.viewOn = std::string{bucketsNs.coll()};
                 viewOptions.collation = mainColl->getCollectionOptions().collation;
                 constexpr bool asArray = true;
