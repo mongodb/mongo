@@ -12,6 +12,8 @@
  *   cannot_run_during_upgrade_downgrade,
  *   # This test sets a failpoint on the primary so it is not compatible with stepdowns.
  *   does_not_support_stepdowns,
+ *   # resharding can't run during FCV transitions
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 

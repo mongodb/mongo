@@ -9,6 +9,8 @@
  *  assumes_unsharded_collection,
  *  # Creates chunks on specific shards
  *  assumes_stable_shard_list,
+ *  # resharding can't run during FCV transitions
+ *  cannot_run_during_upgrade_downgrade,
  * ]
  */
 

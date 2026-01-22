@@ -16,6 +16,8 @@
  *   requires_2_or_more_shards,
  *   # Requires a deterministic placement for the collection.
  *   assumes_balancer_off,
+ *   # moveCollection can't run during FCV transitions
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 

@@ -12,6 +12,8 @@
  *  # Stepdowns should be fine, but the only suites core_sharding tests run in randomize between
  *  # stepdowns, terminates, and kills. Failpoints and getLog cannot tolerate node restarts.
  *  does_not_support_stepdowns,
+ *  # resharding can't run during FCV transitions
+ *  cannot_run_during_upgrade_downgrade,
  * ]
  */
 

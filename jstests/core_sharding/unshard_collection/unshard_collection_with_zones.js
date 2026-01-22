@@ -2,7 +2,9 @@
  * Tests that a collection with zone definitions has its zones dropped when it is unsharded.
  * @tags: [
  * assumes_balancer_off,
- * does_not_support_stepdowns
+ * does_not_support_stepdowns,
+ * # unshardCollection can't run during FCV transitions
+ * cannot_run_during_upgrade_downgrade,
  * ]
  */
 

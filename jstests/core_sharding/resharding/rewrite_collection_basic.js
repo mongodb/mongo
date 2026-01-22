@@ -8,6 +8,8 @@
  *  does_not_support_stepdowns,
  *  # This test performs explicit calls to shardCollection
  *  assumes_unsharded_collection,
+ *  # resharding can't run during FCV transitions
+ *  cannot_run_during_upgrade_downgrade,
  * ]
  */
 

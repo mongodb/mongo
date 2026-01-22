@@ -9,6 +9,8 @@
  *   assumes_no_implicit_collection_creation_on_get_collection,
  *   # TODO SERVER-107141 re-enable this test in stepdown suites
  *   does_not_support_stepdowns,
+ *   # moveCollection can't run during FCV transitions
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {getRandomShardName} from "jstests/libs/sharded_cluster_fixture_helpers.js";
