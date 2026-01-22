@@ -270,7 +270,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         request.setFromOplogApplication(true);
         request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-        UpdateResult ur = update(opCtx, stashColl, request);
+        UpdateResult ur = doUpdate(opCtx, stashColl, request);
         invariant(ur.numMatched != 0);
 
         _applierMetrics->onWriteToStashCollections();
@@ -306,7 +306,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         request.setFromOplogApplication(true);
         request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-        UpdateResult ur = update(opCtx, outputColl, request);
+        UpdateResult ur = doUpdate(opCtx, outputColl, request);
         invariant(ur.numMatched != 0);
 
         return;
@@ -365,7 +365,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
         request.setUpsert(false);
         request.setFromOplogApplication(true);
         request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-        UpdateResult ur = update(opCtx, stashColl, request);
+        UpdateResult ur = doUpdate(opCtx, stashColl, request);
 
         invariant(ur.numMatched != 0);
 
@@ -400,7 +400,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
     request.setUpsert(false);
     request.setFromOplogApplication(true);
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-    UpdateResult ur = update(opCtx, outputColl, request);
+    UpdateResult ur = doUpdate(opCtx, outputColl, request);
 
     invariant(ur.numMatched != 0);
 }

@@ -378,7 +378,7 @@ int insertBatchTransactionally(OperationContext* opCtx,
                 updateRequest.setUpdateModification(updateModBuilder.obj());
                 updateRequest.setUpsert(true);
                 updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-                UpdateResult ur = update(opCtx, resumeDataColl, updateRequest);
+                UpdateResult ur = doUpdate(opCtx, resumeDataColl, updateRequest);
                 // When we have new data we always expect to make progress.  If we don't,
                 // we just inserted duplicate documents, so fail.
                 invariant(ur.numDocsModified == 1 || !ur.upsertedId.isEmpty() || numBytes == 0);

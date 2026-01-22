@@ -531,4 +531,3 @@ TEST_F(DeleteWithRecordIdAndPreImagesTest,
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
-

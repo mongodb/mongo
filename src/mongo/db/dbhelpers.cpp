@@ -304,7 +304,7 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
     }
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-    return ::mongo::update(opCtx, coll, request);
+    return ::mongo::doUpdate(opCtx, coll, request);
 }
 
 void Helpers::update(OperationContext* opCtx,
@@ -329,7 +329,7 @@ void Helpers::update(OperationContext* opCtx,
     }
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
-    ::mongo::update(opCtx, coll, request);
+    ::mongo::doUpdate(opCtx, coll, request);
 }
 
 Status Helpers::insert(OperationContext* opCtx, const CollectionPtr& coll, const BSONObj& doc) {
@@ -386,7 +386,7 @@ void Helpers::putSingleton(OperationContext* opCtx, CollectionAcquisition& coll,
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     request.setUpsert();
 
-    ::mongo::update(opCtx, coll, request);
+    ::mongo::doUpdate(opCtx, coll, request);
 
     CurOp::get(opCtx)->done();
 }

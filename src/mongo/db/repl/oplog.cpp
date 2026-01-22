@@ -456,7 +456,7 @@ void writeToImageCollection(OperationContext* opCtx,
     request.setFromOplogApplication(true);
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     // This code path can also be hit by things such as `applyOps.`
-    ::mongo::update(opCtx, collection, request);
+    ::mongo::doUpdate(opCtx, collection, request);
 }
 
 /* we write to local.oplog.rs:
@@ -1997,7 +1997,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                         timestamp));
                             }
 
-                            UpdateResult res = update(opCtx, collectionAcquisition, request);
+                            UpdateResult res = doUpdate(opCtx, collectionAcquisition, request);
                             if (res.numMatched == 0 && res.upsertedId.isEmpty()) {
                                 LOGV2_ERROR(
                                     21257,
@@ -2130,7 +2130,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         invariant(documentFound);
                     }
 
-                    UpdateResult ur = update(opCtx, collectionAcquisition, request);
+                    UpdateResult ur = doUpdate(opCtx, collectionAcquisition, request);
                     if (ur.numMatched == 0 && ur.upsertedId.isEmpty()) {
                         if (collection && collection->isCapped() &&
                             mode == OplogApplication::Mode::kSecondary) {

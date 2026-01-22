@@ -121,7 +121,6 @@ mongo_cc_library(
     name = "update_driver",
     srcs = [
         "update_driver.cpp",
-        "update_util.cpp",
     ],
     deps = [
         ":update",
