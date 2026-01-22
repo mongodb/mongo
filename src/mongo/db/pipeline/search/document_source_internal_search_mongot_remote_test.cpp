@@ -54,7 +54,7 @@ boost::intrusive_ptr<DocumentSource> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto specObj = elem.embeddedObject();
     auto serviceContext = expCtx->getOperationContext()->getServiceContext();
-    auto executor = executor::getMongotTaskExecutor(serviceContext);
+    auto executor = uassertStatusOK(executor::getMongotTaskExecutor(serviceContext));
     // The serialization for unsharded search does not contain a 'mongotQuery' field.
     InternalSearchMongotRemoteSpec spec = InternalSearchMongotRemoteSpec::parse(
         specObj, IDLParserContext(DocumentSourceInternalSearchMongotRemote::kStageName));

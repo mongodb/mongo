@@ -372,8 +372,8 @@ executor::RemoteCommandResponse runSearchCommandWithRetries(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const BSONObj& cmdObj,
     std::function<bool(Status)> retryPolicy) {
-    auto taskExecutor =
-        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    auto taskExecutor = uassertStatusOK(
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext()));
     executor::RemoteCommandResponse response = {
         getMongotAddress(),
         Status(ErrorCodes::InternalError, "Internal error running search command")};

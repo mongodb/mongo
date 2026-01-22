@@ -43,6 +43,19 @@
 namespace mongo {
 namespace {
 
+void appendDiagnosticInfo(BSONObjBuilder& builder,
+                          StringData subsectionName,
+                          const std::shared_ptr<executor::TaskExecutor>& taskExecutor) {
+
+    BSONObjBuilder subSectionBuilder = builder.subobjStart(subsectionName);
+    {
+        BSONObjBuilder substats = subSectionBuilder.subobjStart("diagnosticInfo");
+        taskExecutor->appendDiagnosticBSON(&substats);
+        substats.doneFast();
+    }
+    subSectionBuilder.doneFast();
+}
+
 class ConnPoolStatsCollector : public FTDCCollectorInterface {
 public:
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
@@ -71,6 +84,18 @@ public:
 
         // All replica sets being tracked.
         ReplicaSetMonitorManager::get()->report(&builder, true /* forFTDC */);
+
+        // Add Search diagnostics.
+        if (auto swExec = executor::getMongotTaskExecutor(opCtx->getServiceContext());
+            swExec.isOK()) {
+            appendDiagnosticInfo(builder, "mongot"_sd, swExec.getValue());
+        }
+
+        if (auto swExec =
+                executor::getSearchIndexManagementTaskExecutor(opCtx->getServiceContext());
+            swExec.isOK()) {
+            appendDiagnosticInfo(builder, "searchIndex"_sd, swExec.getValue());
+        }
     }
 
     std::string name() const override {

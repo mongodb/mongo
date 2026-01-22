@@ -128,8 +128,8 @@ BSONObj getSearchRemoteExplain(const ExpressionContext* expCtx,
                                size_t remoteCursorId,
                                boost::optional<BSONObj> sortSpec,
                                const mongot_cursor::OptimizationFlags& optimizationFlags) {
-    auto executor =
-        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    auto executor = uassertStatusOK(
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext()));
     auto explainObj = mongot_cursor::getSearchExplainResponse(
         expCtx, searchQuery, executor.get(), optimizationFlags);
     BSONObjBuilder builder;
@@ -482,8 +482,8 @@ void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
         return;
     }
     auto searchStage = dynamic_cast<mongo::DocumentSourceSearch*>(stage);
-    auto executor =
-        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    auto executor = uassertStatusOK(
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext()));
 
     auto cursors = mongot_cursor::establishCursorsForSearchStage(
         expCtx, searchStage->getMongotRemoteSpec(), executor, boost::none, std::move(yieldPolicy));
@@ -514,8 +514,8 @@ void establishSearchMetaCursorSBE(const boost::intrusive_ptr<ExpressionContext>&
     }
 
     auto searchStage = dynamic_cast<mongo::DocumentSourceSearchMeta*>(stage);
-    auto executor =
-        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext());
+    auto executor = uassertStatusOK(
+        executor::getMongotTaskExecutor(expCtx->getOperationContext()->getServiceContext()));
     auto cursors = mongot_cursor::establishCursorsForSearchMetaStage(
         expCtx,
         searchStage->getSearchQuery(),
