@@ -18,9 +18,6 @@ coll.insert([
     {_id: 3, x: 3},
 ]);
 
-const sortStageVectorSearchScore = {$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}}};
-const sortStageScore = {$sort: {score: {$meta: "score"}}};
-
 const buildTestVectorSearchOptStage = ({storedSource, ineligibleForSortOptimization}) => {
     return {
         $testVectorSearchOptimization: {
@@ -29,6 +26,14 @@ const buildTestVectorSearchOptStage = ({storedSource, ineligibleForSortOptimizat
         },
     };
 };
+
+const desugarFalseStage = {$testVectorSearchOptimization: {desugar: false}};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// vectorSearch $sort Optimization Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
+const sortStageVectorSearchScore = {$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}}};
+const sortStageScore = {$sort: {score: {$meta: "score"}}};
 
 const verifySortOptimizationApplied = (
     stage,
@@ -94,8 +99,6 @@ runTestWithDifferentStoredSourceVal({storedSource: true});
 // Test case where desugar is false - stage only expands to $testVectorSearch without idLookup/replaceRoot.
 // The sort optimization should still work directly after $testVectorSearch.
 const testDesugarFalse = () => {
-    const desugarFalseStage = {$testVectorSearchOptimization: {desugar: false}};
-
     // Valid sort on vectorSearchScore should be optimized away
     verifySortOptimizationApplied(desugarFalseStage, [sortStageVectorSearchScore], true);
 
@@ -104,3 +107,96 @@ const testDesugarFalse = () => {
 };
 
 testDesugarFalse();
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// vectorSearch $limit Optimization Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * Helper to get the extractedLimit value from $testVectorSearch stage in explain output
+ */
+const getExtractedLimit = (explainOutput) => {
+    // Check splitPipeline first (sharded case)
+    const vectorSearchInSplit = getStageFromSplitPipeline(explainOutput, "$testVectorSearch");
+    if (vectorSearchInSplit && vectorSearchInSplit.$testVectorSearch) {
+        return vectorSearchInSplit.$testVectorSearch.extractedLimit;
+    }
+
+    // Fall back to regular stages (non-sharded case)
+    const vectorSearchStages = getAggPlanStages(explainOutput, "$testVectorSearch");
+    if (vectorSearchStages.length > 0 && vectorSearchStages[0].$testVectorSearch) {
+        return vectorSearchStages[0].$testVectorSearch.extractedLimit;
+    }
+
+    return undefined;
+};
+
+/**
+ * Test limit extraction for vectorSearch optimization
+ */
+const testLimitExtraction = (stage) => {
+    const testCases = [
+        {
+            name: "Single limit",
+            stages: [{$limit: 10}],
+            expectedLimit: 10,
+        },
+        {
+            name: "Multiple limits (minimum extracted)",
+            stages: [{$limit: 20}, {$limit: 5}, {$limit: 15}],
+            expectedLimit: 5,
+        },
+        {
+            name: "No limit",
+            stages: [{$match: {x: 1}}],
+            expectedLimit: undefined,
+        },
+        {
+            name: "Skip and limit combined",
+            stages: [{$skip: 10}, {$limit: 5}],
+            expectedLimit: 15,
+        },
+        {
+            name: "Limit after $project (should extract)",
+            stages: [{$project: {x: 1}}, {$limit: 10}],
+            expectedLimit: 10,
+        },
+        {
+            name: "Limit after $unwind (blocking)",
+            stages: [{$unwind: "$arr"}, {$limit: 10}],
+            expectedLimit: undefined, // $unwind changes doc count
+        },
+        {
+            name: "Limit with sort on vectorSearchScore",
+            stages: [{$sort: {vectorSearchScore: {$meta: "vectorSearchScore"}}}, {$limit: 10}],
+            expectedLimit: 10,
+        },
+        {
+            name: "Limit in middle of pipeline",
+            stages: [{$project: {x: 1}}, {$limit: 15}, {$project: {x: 1}}],
+            expectedLimit: 15,
+        },
+        {
+            name: "Only skip, no limit",
+            stages: [{$skip: 10}],
+            expectedLimit: undefined,
+        },
+    ];
+
+    testCases.forEach(({name, stages, expectedLimit}) => {
+        const pipeline = [stage, ...stages];
+        const explainOutput = coll.explain("queryPlanner").aggregate(pipeline);
+        const extractedLimit = getExtractedLimit(explainOutput);
+        assert.eq(
+            extractedLimit,
+            expectedLimit,
+            `${name}: Expected limit ${expectedLimit}, got ${extractedLimit} for this pipeline: ${pipeline.map((stage) => stage.toString()).join(", ")}`,
+        );
+    });
+};
+
+// Run tests for both storedSource values
+testLimitExtraction(buildTestVectorSearchOptStage({storedSource: false}));
+testLimitExtraction(buildTestVectorSearchOptStage({storedSource: true}));
+
+// Test limit extraction when desugar is false - stage only expands to $testVectorSearch
+testLimitExtraction(desugarFalseStage);

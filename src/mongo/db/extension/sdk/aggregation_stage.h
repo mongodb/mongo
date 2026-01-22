@@ -82,11 +82,28 @@ public:
         return false;
     }
 
+    void setExtractedLimitVal(boost::optional<long long> extractedLimitVal) {
+        _limit = extractedLimitVal;
+    }
+
+    /**
+     * This is only intended to be used by the $vectorSearch extension stage for the following 2
+     * purposes:
+     * 1. The extension $vectorSearch should add a $limit to its DistributedPlanLogic’s merging
+     * pipeline.
+     * 2. The extension $vectorSearch can use the limit to compute the numCandidates:limit ratio
+     * metric.
+     */
+    boost::optional<long long> getExtractedLimitVal() const {
+        return _limit;
+    }
+
 protected:
     LogicalAggStage() = delete;  // No default constructor.
     explicit LogicalAggStage(std::string_view name) : _name(name) {}
 
     const std::string _name;
+    boost::optional<long long> _limit;
 };
 
 /**
@@ -115,7 +132,7 @@ public:
     ExtensionLogicalAggStage(ExtensionLogicalAggStage&&) = delete;
     ExtensionLogicalAggStage& operator=(ExtensionLogicalAggStage&&) = delete;
 
-    const LogicalAggStage& getImpl() const noexcept {
+    LogicalAggStage& getImpl() const noexcept {
         return *_stage;
     }
 
@@ -197,6 +214,15 @@ private:
         });
     }
 
+    static ::MongoExtensionStatus* _extSetVectorSearchLimitForOptimization(
+        ::MongoExtensionLogicalAggStage* extLogicalStage, long long* extractedLimitVal) {
+        return wrapCXXAndConvertExceptionToStatus([&]() {
+            auto& impl = static_cast<ExtensionLogicalAggStage*>(extLogicalStage)->getImpl();
+            impl.setExtractedLimitVal(
+                extractedLimitVal ? boost::optional<long long>(*extractedLimitVal) : boost::none);
+        });
+    }
+
     static constexpr ::MongoExtensionLogicalAggStageVTable VTABLE = {
         .destroy = &_extDestroy,
         .get_name = &_extGetName,
@@ -205,7 +231,8 @@ private:
         .compile = &_extCompile,
         .get_distributed_plan_logic = &_extGetDistributedPlanLogic,
         .clone = &_extClone,
-        .is_stage_sorted_by_vector_search_score = &_extIsStageSortedByVectorSearchScore};
+        .is_stage_sorted_by_vector_search_score = &_extIsStageSortedByVectorSearchScore,
+        .set_vector_search_limit_for_optimization = &_extSetVectorSearchLimitForOptimization};
     std::unique_ptr<LogicalAggStage> _stage;
 };
 

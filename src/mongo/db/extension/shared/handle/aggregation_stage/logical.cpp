@@ -102,4 +102,15 @@ bool LogicalAggStageAPI::isSortedByVectorSearchScore() const {
     return outIsSortedByVectorSearchScore;
 }
 
+void LogicalAggStageAPI::setExtractedLimitVal(boost::optional<long long> extractedLimitVal) {
+    invokeCAndConvertStatusToException([&]() {
+        if (extractedLimitVal.has_value()) {
+            return vtable().set_vector_search_limit_for_optimization(get(),
+                                                                     &extractedLimitVal.get());
+        } else {
+            return vtable().set_vector_search_limit_for_optimization(get(), nullptr);
+        }
+    });
+}
+
 }  // namespace mongo::extension

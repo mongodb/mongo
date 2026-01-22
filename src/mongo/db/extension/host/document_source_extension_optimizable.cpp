@@ -473,6 +473,8 @@ DocumentSourceContainer::iterator DocumentSourceExtensionOptimizable::optimizeAt
             return *result;
         }
     }
+    _limit = search_helpers::setVectorSearchLimitForOptimization(itr, container, _limit);
+    _logicalStage->setExtractedLimitVal(_limit);
     return std::next(itr);
 }
 }  // namespace mongo::extension::host

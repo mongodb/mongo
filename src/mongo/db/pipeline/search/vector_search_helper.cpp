@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/transaction/internal_transaction_metrics.h"
 
@@ -154,7 +155,7 @@ boost::optional<DocumentSourceContainer::iterator> applyVectorSearchSortOptimiza
     auto nextStageItr =
         std::next(itr);  // The iterator `itr` is pointed at the $vectorSearch extension stage so
     // when it is advanced, the returned iterator will point at the next
-    // stage (either an idLookup or replaceRoot stage).
+    // stage (most likely either an idLookup or replaceRoot stage).
 
     if (nextStageItr == container->end()) {
         return boost::none;
@@ -169,6 +170,32 @@ boost::optional<DocumentSourceContainer::iterator> applyVectorSearchSortOptimiza
     }
 
     return boost::none;
+}
+
+boost::optional<long long> setVectorSearchLimitForOptimization(
+    DocumentSourceContainer::iterator itr,
+    DocumentSourceContainer* container,
+    boost::optional<long long> currentLimit) {
+    auto nextStageItr =
+        std::next(itr);  // The iterator `itr` is pointed at the $vectorSearch extension stage
+                         // so when it is advanced, the returned iterator will point at the next
+                         // stage (most likely either an idLookup or replaceRoot stage).
+
+    // Only attempt to get the limit from the query if there are further stages in the pipeline.
+    if (nextStageItr == container->end()) {
+        return boost::none;
+    }
+
+    // Move past the $internalSearchIdLookup/$replaceRoot stage, if it is next.
+    if (findIdLookupOrReplaceRootStage(nextStageItr->get())) {
+        ++nextStageItr;
+    }
+
+    // Calculate the extracted limit without modifying the rest of the pipeline.
+    if (auto userLimit = getUserLimit(nextStageItr, container)) {
+        return currentLimit ? std::min(*currentLimit, *userLimit) : *userLimit;
+    }
+    return currentLimit;
 }
 }  // namespace search_helpers
 }  // namespace mongo

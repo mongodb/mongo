@@ -86,4 +86,17 @@ bool findIdLookupOrReplaceRootStage(DocumentSource* currStage);
  */
 boost::optional<DocumentSourceContainer::iterator> applyVectorSearchSortOptimization(
     DocumentSourceContainer::iterator itr, DocumentSourceContainer* container);
+
+/**
+ * Extracts and calculates the user limit for vector search optimizations.
+ *
+ * @param itr Iterator pointing to the vector search stage in the container
+ * @param container The document source container being optimized
+ * @param currentLimit The current limit value (if any) to be compared with the extracted limit
+ * @return the extracted limit if any, nothing otherwise
+ */
+boost::optional<long long> setVectorSearchLimitForOptimization(
+    DocumentSourceContainer::iterator itr,
+    DocumentSourceContainer* container,
+    boost::optional<long long> currentLimit);
 }  // namespace mongo::search_helpers

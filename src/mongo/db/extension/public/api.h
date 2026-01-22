@@ -417,6 +417,13 @@ typedef struct MongoExtensionLogicalAggStageVTable {
     MongoExtensionStatus* (*is_stage_sorted_by_vector_search_score)(
         const MongoExtensionLogicalAggStage* logicalStage, bool* outIsSortedByVectorSearchScore);
 
+    /**
+     * Populates extractedLimitVal with the extracted limit value for the $vectorSearch extension
+     * stage to use in its optimizations.
+     */
+    MongoExtensionStatus* (*set_vector_search_limit_for_optimization)(
+        MongoExtensionLogicalAggStage* logicalStage, long long* extractedLimitVal);
+
 } MongoExtensionLogicalAggStageVTable;
 
 /**
