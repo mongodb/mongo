@@ -151,7 +151,10 @@ mongo_cc_library(
         "//bazel/config:compiler_type_gcc": [
             "-Wno-maybe-uninitialized",
         ],
-        "//conditions:default": ["//conditions:incompatible"],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/platforms:rhel10": ["-DOPENSSL_NO_ENGINE"],
+        "//conditions:default": [],
     }),
     includes = [
         "dist/src",

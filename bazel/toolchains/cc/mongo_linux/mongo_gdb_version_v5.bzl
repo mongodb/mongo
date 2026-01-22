@@ -72,6 +72,16 @@ TOOLCHAIN_MAP_V5 = {
         "sha": "bedecdddd9a83d5b307bbb5d8aa48b3ec298234483c1a5edf407594b429ef7c0",
         "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_gdb-rhel90-a579bff08e941a4dae705e4708ec8da38805b6f1.tar.gz",
     },
+    "rhel10_x86_64": {
+        "platform_name": "rhel10",
+        "sha": "4f8bf9a3ce2454a6ce2636e45746dc2a25de139413fe2e60c28aac9b44b07df9",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_gdb-rhel10-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+    },
+    "rhel10_aarch64": {
+        "platform_name": "rhel10",
+        "sha": "52869b742dc8a3550d9656187a4c0e8f95fe8bea542949c25717557cbfbafd42",
+        "url": "https://s3.amazonaws.com/boxes.10gen.com/build/toolchain/bazel_v5_gdb-rhel10-arm64-e921fc32d5c23d7cdb5cf406b05bf16eb5ab8dbd.tar.gz",
+    },
     "suse15_x86_64": {
         "platform_name": "suse15",
         "sha": "14bcc17c41082207b9a033bd879ad66f2195a8581bb4fb0d8c03159d14ae30e1",

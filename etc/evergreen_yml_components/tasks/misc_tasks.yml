@@ -1819,6 +1819,42 @@ tasks:
           distro: rhel90-selinux
           test_list: jstests/selinux/*.js
 
+  - name: selinux_rhel10_enterprise
+    tags: ["assigned_to_jira_team_server_security", "auxiliary"]
+    depends_on:
+      - name: archive_dist_test
+      - name: package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "set up venv"
+      - func: "fetch packages"
+      - func: "fetch binaries"
+      - func: "extract binaries"
+      - func: "run selinux tests"
+        vars:
+          distro: rhel10-selinux
+          test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
+
+  - name: selinux_rhel10_org
+    tags: ["assigned_to_jira_team_server_security", "auxiliary"]
+    depends_on:
+      - name: archive_dist_test
+      - name: package
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "set up venv"
+      - func: "fetch packages"
+      - func: "fetch binaries"
+      - func: "extract binaries"
+      - func: "run selinux tests"
+        vars:
+          distro: rhel10-selinux
+          test_list: jstests/selinux/*.js
+
   - name: sync_repo_with_copybara
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     patchable: false

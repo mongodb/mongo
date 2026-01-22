@@ -27,8 +27,13 @@ URL: http://www.mongodb.org
 Group: Applications/Databases
 Requires: mongodb-enterprise-cryptd, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-database-tools-extra
 
-%if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
+%if 0%{?rhel} >= 10
+BuildRequires: python-rpm-macros, python3-devel
+%global pathfix /usr/lib/rpm/redhat/pathfix.py
+
+%elif 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 BuildRequires: /usr/bin/pathfix.py, python3-devel
+%global pathfix /usr/bin/pathfix.py
 %endif
 
 Source0: %{_name}-%{version}.tar.gz
@@ -256,7 +261,7 @@ This package provides the MongoDB static library and header files needed to deve
 %prep
 %setup -n %{_name}-%{version}
 %if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
-pathfix.py -pni "%{__python3} %{py3_shbang_opts}" bin/install_compass
+%{__python3} %{pathfix} -pni "%{__python3} %{py3_shbang_opts}" bin/install_compass
 %endif
 
 %build
