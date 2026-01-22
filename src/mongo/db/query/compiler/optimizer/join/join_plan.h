@@ -164,36 +164,6 @@ struct JoiningNode {
 std::ostream& operator<<(std::ostream& os, const JoinSubset& subset);
 
 /**
- * Get the cost estimate of the given 'JoinPlanNode'. This operation is only defined for 'BaseNode'
- * and 'JoiningNode'.
- */
-inline JoinCostEstimate getNodeCost(const JoinPlanNode& node) {
-    return std::visit(OverloadedVisitor{[](const JoiningNode& join) { return join.cost; },
-                                        [](const INLJRHSNode& ip) {
-                                            // These nodes don't have their own cost.
-                                            MONGO_UNREACHABLE_TASSERT(11727800);
-                                            return JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE);
-                                        },
-                                        [](const BaseNode& base) {
-                                            return base.cost;
-                                        }},
-                      node);
-}
-
-/**
- * Get the node subset which this given 'JoinPlanNode' contains the solution for.
- */
-inline NodeSet getNodeBitset(const JoinPlanNode& node) {
-    return std::visit(
-        OverloadedVisitor{[](const JoiningNode& join) { return join.bitset; },
-                          [](const INLJRHSNode& ip) { return NodeSet().set(ip.node); },
-                          [](const BaseNode& base) {
-                              return NodeSet().set(base.node);
-                          }},
-        node);
-}
-
-/**
  * We don't want to reallocate memory for every node we reuse for some other subtree. This means
  * that every node could have multiple parents. In order to make sure we manage memory sanely and
  * efficiently, we delegate responsibility for managing node pointers to this registry, which

@@ -47,13 +47,6 @@ public:
                      CardinalityEstimate numSeqIOs,
                      CardinalityEstimate numRandIOs);
 
-    JoinCostEstimate(CardinalityEstimate numDocsProcessed,
-                     CardinalityEstimate numDocsOutput,
-                     CardinalityEstimate numSeqIOs,
-                     CardinalityEstimate numRandIOs,
-                     JoinCostEstimate leftCost,
-                     JoinCostEstimate rightCost);
-
     CardinalityEstimate getNumDocsProcessed() const {
         return _numDocsProcessed;
     }
@@ -72,10 +65,6 @@ public:
 
     CardinalityEstimate getNumDocsTransmitted() const {
         return _numDocsTransmitted;
-    }
-
-    CostEstimate getLocalOpCost() const {
-        return _localOpCost;
     }
 
     CostEstimate getTotalCost() const {
@@ -104,11 +93,8 @@ private:
     // broadcast hash joins. Note this is currently 0 as we don't support broadcast joins.
     CardinalityEstimate _numDocsTransmitted{zeroCE};
 
-    // Final estimate for the cost of this operation, ignoring the cost of children.
-    CostEstimate _localOpCost;
-
-    // Cumulative estimate for the cost of this join including the cost of children. This value of
-    // derived from all the other components in this class.
+    // Final estimate for the cost of this join. This value of derived from all the other components
+    // in this class.
     CostEstimate _totalCost;
 };
 

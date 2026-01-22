@@ -36,6 +36,29 @@
 
 namespace mongo::join_ordering {
 namespace {
+JoinCostEstimate getNodeCost(const JoinPlanNode& node) {
+    return std::visit(OverloadedVisitor{[](const JoiningNode& join) { return join.cost; },
+                                        [](const INLJRHSNode& ip) {
+                                            // These nodes don't have their own cost.
+                                            MONGO_UNREACHABLE_TASSERT(11727800);
+                                            return JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE);
+                                        },
+                                        [](const BaseNode& base) {
+                                            return base.cost;
+                                        }},
+                      node);
+}
+
+NodeSet getNodeBitset(const JoinPlanNode& node) {
+    return std::visit(
+        OverloadedVisitor{[](const JoiningNode& join) { return join.bitset; },
+                          [](const INLJRHSNode& ip) { return NodeSet().set(ip.node); },
+                          [](const BaseNode& base) {
+                              return NodeSet().set(base.node);
+                          }},
+        node);
+}
+
 /**
  * Helper to pretty-print join method.
  */

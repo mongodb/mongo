@@ -43,28 +43,16 @@ const CostCoefficient ioRandIncremental{CostCoefficientType{ioSeqIncremental.toD
 
 JoinCostEstimate::JoinCostEstimate(CardinalityEstimate numDocsProcessed,
                                    CardinalityEstimate numDocsOutput,
-                                   CardinalityEstimate numSeqIOs,
-                                   CardinalityEstimate numRandIOs)
+                                   CardinalityEstimate ioSeqPages,
+                                   CardinalityEstimate ioRandPages)
     : _numDocsProcessed(numDocsProcessed),
       _numDocsOutput(numDocsOutput),
-      _ioSeqNumPages(numSeqIOs),
-      _ioRandNumPages(numRandIOs),
-      _localOpCost(zeroCost),
+      _ioSeqNumPages(ioSeqPages),
+      _ioRandNumPages(ioRandPages),
       _totalCost(zeroCost) {
-    _localOpCost =
+    _totalCost =
         docProcessCpuIncremental * (_numDocsProcessed + _numDocsOutput + _numDocsTransmitted) +
         _ioSeqNumPages * ioSeqIncremental + _ioRandNumPages * ioRandIncremental;
-    _totalCost = _localOpCost;
-}
-
-JoinCostEstimate::JoinCostEstimate(CardinalityEstimate numDocsProcessed,
-                                   CardinalityEstimate numDocsOutput,
-                                   CardinalityEstimate numSeqIOs,
-                                   CardinalityEstimate numRandIOs,
-                                   JoinCostEstimate leftCost,
-                                   JoinCostEstimate rightCost)
-    : JoinCostEstimate(numDocsProcessed, numDocsOutput, numSeqIOs, numRandIOs) {
-    _totalCost = _localOpCost + leftCost.getTotalCost() + rightCost.getTotalCost();
 }
 
 std::string JoinCostEstimate::toString() const {
