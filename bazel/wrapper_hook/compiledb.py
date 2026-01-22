@@ -48,25 +48,58 @@ def run_pty_command(cmd):
 def generate_compiledb(bazel_bin, persistent_compdb, enterprise, atlas):
     # compiledb ignores command line args so just make a version rc file in anycase
     write_wrapper_hook_bazelrc([])
+
+    def rewrite_args(args, out_root_str, external_root_str):
+        rewritten = []
+        for arg in args:
+            if out_root_str and arg.startswith("bazel-out/"):
+                arg = out_root_str + "/" + arg[len("bazel-out/") :]
+            elif external_root_str and arg.startswith("external/"):
+                arg = external_root_str + "/" + arg[len("external/") :]
+            else:
+                # Preserve compiler prefixes while rewriting paths.
+                m = re.match(r"^(/external:I)(bazel-out|external)/(.*)$", arg)
+                if m:
+                    prefix, root, rest = m.groups()
+                    if root == "bazel-out" and out_root_str:
+                        arg = f"{prefix}{out_root_str}/{rest}"
+                    elif root == "external" and external_root_str:
+                        arg = f"{prefix}{external_root_str}/{rest}"
+                else:
+                    m = re.match(r"^(-isystem)(bazel-out|external)/(.*)$", arg)
+                    if m:
+                        prefix, root, rest = m.groups()
+                        if root == "bazel-out" and out_root_str:
+                            arg = f"{prefix}{out_root_str}/{rest}"
+                        elif root == "external" and external_root_str:
+                            arg = f"{prefix}{external_root_str}/{rest}"
+                    else:
+                        # Generic: preserve any two-character prefix (e.g. "-I", "/I").
+                        m = re.match(r"^(.{2})(bazel-out|external)/(.*)$", arg)
+                        if m:
+                            prefix, root, rest = m.groups()
+                            if root == "bazel-out" and out_root_str:
+                                arg = f"{prefix}{out_root_str}/{rest}"
+                            elif root == "external" and external_root_str:
+                                arg = f"{prefix}{external_root_str}/{rest}"
+            rewritten.append(arg)
+        return rewritten
+
+    info_proc = subprocess.run([bazel_bin, "info", "output_base"], capture_output=True, text=True)
     if persistent_compdb:
-        info_proc = subprocess.run(
-            [bazel_bin, "info", "output_base"], capture_output=True, text=True
-        )
         output_base = pathlib.Path(info_proc.stdout.strip() + "_bazel_compiledb")
         os.makedirs(REPO_ROOT / ".compiledb", exist_ok=True)
         symlink_prefix = REPO_ROOT / ".compiledb" / "compiledb-"
-        # Prefer real paths in compile_commands.json (avoid symlink forest paths like
-        # ".compiledb/compiledb-out/..."). We resolve the symlink targets once and
-        # substitute those roots when rewriting args.
-        symlink_out_root = pathlib.Path(f"{symlink_prefix}out")
-        real_out_root = pathlib.Path(os.path.realpath(symlink_out_root))
-        # "external" sits alongside "bazel-out" under the execroot.
-        real_external_root = pathlib.Path(
-            os.path.realpath(real_out_root / ".." / ".." / ".." / "external")
-        )
-        # Use forward slashes consistently in compile_commands.json across platforms.
-        real_out_root_str = real_out_root.as_posix()
-        real_external_root_str = real_external_root.as_posix()
+    else:
+        output_base = pathlib.Path(info_proc.stdout.strip())
+
+    # Prefer real paths in compile_commands.json (avoid symlink forest paths like
+    # ".compiledb/compiledb-out/..."). Resolve via output_base to avoid symlink prefix.
+    real_out_root = pathlib.Path(os.path.realpath(output_base / "execroot" / "_main" / "bazel-out"))
+    real_external_root = pathlib.Path(os.path.realpath(output_base / "external"))
+    # Use forward slashes consistently in compile_commands.json across platforms.
+    real_out_root_str = real_out_root.as_posix()
+    real_external_root_str = real_external_root.as_posix()
 
     compiledb_bazelrc = []
     compiledb_config = []
@@ -142,39 +175,7 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise, atlas):
 
         if persistent_compdb:
             # We need to adjust the args so actions can be runnable locally
-            args = []
-            for arg in action["arguments"]:
-                if arg.startswith("bazel-out/"):
-                    arg = real_out_root_str + "/" + arg[len("bazel-out/") :]
-                elif arg.startswith("external/"):
-                    arg = real_external_root_str + "/" + arg[len("external/") :]
-                else:
-                    # Preserve compiler prefixes while rewriting paths.
-                    m = re.match(r"^(/external:I)(bazel-out|external)/(.*)$", arg)
-                    if m:
-                        prefix, root, rest = m.groups()
-                        if root == "bazel-out":
-                            arg = f"{prefix}{real_out_root_str}/{rest}"
-                        else:
-                            arg = f"{prefix}{real_external_root_str}/{rest}"
-                    else:
-                        m = re.match(r"^(-isystem)(bazel-out|external)/(.*)$", arg)
-                        if m:
-                            prefix, root, rest = m.groups()
-                            if root == "bazel-out":
-                                arg = f"{prefix}{real_out_root_str}/{rest}"
-                            else:
-                                arg = f"{prefix}{real_external_root_str}/{rest}"
-                        else:
-                            # Generic: preserve any two-character prefix (e.g. "-I", "/I").
-                            m = re.match(r"^(.{2})(bazel-out|external)/(.*)$", arg)
-                            if m:
-                                prefix, root, rest = m.groups()
-                                if root == "bazel-out":
-                                    arg = f"{prefix}{real_out_root_str}/{rest}"
-                                else:
-                                    arg = f"{prefix}{real_external_root_str}/{rest}"
-                args.append(arg)
+            args = rewrite_args(action["arguments"], real_out_root_str, real_external_root_str)
 
             output_json.append(
                 {
@@ -188,7 +189,9 @@ def generate_compiledb(bazel_bin, persistent_compdb, enterprise, atlas):
             output_json.append(
                 {
                     "file": input_file,
-                    "arguments": action["arguments"],
+                    "arguments": rewrite_args(
+                        action["arguments"], real_out_root_str, real_external_root_str
+                    ),
                     "directory": repo_root_resolved,
                     "output": output_file,
                 }

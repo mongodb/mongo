@@ -366,6 +366,13 @@ tasks:
       - func: bazel run
         vars:
           target: //evergreen:validate_compile_commands
+      - func: "bazel compile"
+        vars:
+          targets: compiledb
+          bazel_args: --intree_compdb
+      - func: bazel run
+        vars:
+          target: //evergreen:validate_compile_commands
 
   - name: compile_upload_benchmarks
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
