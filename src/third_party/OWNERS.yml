@@ -12,9 +12,6 @@ filters:
   - "aws-sdk":
     approvers:
       - 10gen/streams-engine
-  - "azure-sdk":
-    approvers:
-      - 10gen/streams-engine
   - "benchmark":
     approvers:
       - 10gen/server-programmability
@@ -72,9 +69,6 @@ filters:
   - "libstemmer_c":
     approvers:
       - 10gen/query-integration
-  - "libxml2":
-    approvers:
-      - 10gen/streams-engine
   - "mock_ocsp_responder":
     approvers:
       - 10gen/server-security

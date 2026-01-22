@@ -133,12 +133,6 @@ single_version_override(
 )
 
 bazel_dep(name = "rules_pkg", version = "1.2.0")
-bazel_dep(name = "libxml2", version = "2.15.1")
-local_path_override(
-    module_name = "libxml2",
-    path = "src/third_party/libxml2/dist",
-)
-
 bazel_dep(name = "abseil-cpp", version = "20250512.1", repo_name = "com_google_absl")
 local_path_override(
     module_name = "abseil-cpp",
