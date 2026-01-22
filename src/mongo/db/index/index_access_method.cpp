@@ -993,16 +993,13 @@ protected:
 
     bool isMultikey() const final;
 
-    void setIsMultikey(size_t numberOfKeys, const MultikeyPaths& multikeyPaths);
+    void setIsMultikey(size_t numberOfKeys,
+                       const KeyStringSet& multikeyMetadataKeys,
+                       const MultikeyPaths& multikeyPaths);
 
     int64_t _keysInserted = 0;
 
     SortedDataIndexAccessMethod* _iam;
-
-    // Caches the set of all multikey metadata keys generated during the bulk build process.
-    // These are inserted into the sorter after all normal data keys have been added, just
-    // before the bulk build is committed.
-    KeyStringSet _multikeyMetadataKeys;
 
 private:
     virtual std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
@@ -1038,6 +1035,8 @@ private:
 
     // Set to true if any document added to the BulkBuilder causes the index to become multikey.
     bool _isMultiKey = false;
+
+    bool _hasMultiKeyMetadataKeys = false;
 
     // Holds the path components that cause this index to be multikey. The '_indexMultikeyPaths'
     // vector remains empty if this index doesn't support path-level multikey tracking.
@@ -1082,18 +1081,18 @@ void BaseBulkBuilder::setMultikeyPath(const MultikeyPaths& multikeyPaths, size_t
                                     (multikeyPaths)[idx].end());
 }
 
-
-void BaseBulkBuilder::clearMultikeyMetadataKeys() {
-    _multikeyMetadataKeys.clear();
-}
-
 bool BaseBulkBuilder::isMultikey() const {
     return _isMultiKey;
 }
 
-void BaseBulkBuilder::setIsMultikey(size_t numberOfKeys, const MultikeyPaths& multikeyPaths) {
+void BaseBulkBuilder::setIsMultikey(size_t numberOfKeys,
+                                    const KeyStringSet& multikeyMetadataKeys,
+                                    const MultikeyPaths& multikeyPaths) {
     _isMultiKey = _isMultiKey ||
-        _iam->shouldMarkIndexAsMultikey(numberOfKeys, _multikeyMetadataKeys, multikeyPaths);
+        _iam->shouldMarkIndexAsMultikey(numberOfKeys, multikeyMetadataKeys, multikeyPaths);
+    if (!multikeyMetadataKeys.empty()) {
+        _hasMultiKeyMetadataKeys = true;
+    }
 }
 
 bool BaseBulkBuilder::_duplicateCheck(OperationContext* opCtx,
@@ -1160,6 +1159,7 @@ Status BaseBulkBuilder::insert(OperationContext* opCtx,
 
     auto keys = containerPool.keys();
     auto multikeyPaths = containerPool.multikeyPaths();
+    KeyStringSet multikeyMetadataKeys;
 
     try {
         _iam->getKeys(opCtx,
@@ -1170,7 +1170,7 @@ Status BaseBulkBuilder::insert(OperationContext* opCtx,
                       options.getKeysMode,
                       SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                       keys.get(),
-                      &_multikeyMetadataKeys,
+                      &multikeyMetadataKeys,
                       multikeyPaths.get(),
                       loc,
                       onSuppressedError,
@@ -1195,8 +1195,12 @@ Status BaseBulkBuilder::insert(OperationContext* opCtx,
         _insert(opCtx, *shard_role_details::getRecoveryUnit(opCtx), collection, *entry, keyString);
         ++_keysInserted;
     }
+    for (const auto& keyString : multikeyMetadataKeys) {
+        _insert(opCtx, *shard_role_details::getRecoveryUnit(opCtx), collection, *entry, keyString);
+        ++_keysInserted;
+    }
 
-    setIsMultikey(keys->size(), *multikeyPaths);
+    setIsMultikey(keys->size(), multikeyMetadataKeys, *multikeyPaths);
 
     return Status::OK();
 }
@@ -1223,6 +1227,10 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
                    lk, _progressMessage, _keysInserted, 3 /* secondsBetween */),
                opCtx);
     }
+
+    auto keyFormat = _iam->getSortedDataInterface()->rsKeyFormat();
+    RecordId wildcardMultikeyMetadataRecordId = record_id_helpers::reservedIdFor(
+        record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, keyFormat);
 
     int64_t iterations = 0;
     while (it && it->more()) {
@@ -1254,6 +1262,18 @@ Status BaseBulkBuilder::commit(OperationContext* opCtx,
         auto data = it->next();
         if (kDebugBuild) {
             _debugEnsureSorted(data);
+        }
+
+        // If any multikey metadata keys were created, there could be duplicates if two documents
+        // have the same shapes resulting in identical multikey paths. Compare the full KeyString
+        // because all these keys share the same dummy RecordId.
+        if (_hasMultiKeyMetadataKeys && data.first.compare(_previousKey) == 0) {
+            RecordId recordId = key_string::decodeRecordIdAtEnd(data.first.getView(), keyFormat);
+            tassert(11480600,
+                    str::stream() << "Duplicate key " << data.first.toString()
+                                  << " with unexpected RecordId " << recordId.toString(),
+                    recordId == wildcardMultikeyMetadataRecordId);
+            continue;
         }
 
         // Before attempting to insert, check if this key is a duplicate of the previous one
@@ -1360,8 +1380,6 @@ private:
 
     void _finishCommit() final;
 
-    void _insertMultikeyMetadataKeysIntoSorter();
-
     std::unique_ptr<Sorter> _makeSorter(
         std::shared_ptr<Spiller> spiller,
         const SortOptions& opts,
@@ -1407,7 +1425,6 @@ SharedBufferFragmentBuilder& HybridBulkBuilder::_getMemPool() {
 }
 
 IndexStateInfo HybridBulkBuilder::persistDataForShutdown() {
-    _insertMultikeyMetadataKeysIntoSorter();
     auto state = _sorter->persistDataForShutdown();
 
     IndexStateInfo stateInfo;
@@ -1450,17 +1467,6 @@ void HybridBulkBuilder::_finishCommit() {
     _builder.reset();
 }
 
-void HybridBulkBuilder::_insertMultikeyMetadataKeysIntoSorter() {
-    for (const auto& keyString : _multikeyMetadataKeys) {
-        _sorter->add(keyString, mongo::NullValue());
-        ++_keysInserted;
-    }
-
-    // We clear the multikey metadata keys to prevent them from being inserted into the Sorter
-    // twice in the case that done() is called and then persistDataForShutdown() is later called.
-    clearMultikeyMetadataKeys();
-}
-
 std::unique_ptr<HybridBulkBuilder::Sorter> HybridBulkBuilder::_makeSorter(
     std::shared_ptr<Spiller> spiller,
     const SortOptions& opts,
@@ -1492,7 +1498,6 @@ std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
 HybridBulkBuilder::_finalizeSort(OperationContext* opCtx,
                                  RecoveryUnit& ru,
                                  const CollectionPtr& coll) {
-    _insertMultikeyMetadataKeysIntoSorter();
     return _sorter->done();
 }
 }  // namespace
