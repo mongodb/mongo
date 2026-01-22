@@ -28,8 +28,10 @@
  */
 
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cbr_test_utils.h"
+#include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimation_types.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
+#include "mongo/db/query/compiler/optimizer/join/plan_enumerator.h"
 #include "mongo/db/query/compiler/optimizer/join/unit_test_helpers.h"
 #include "mongo/unittest/unittest.h"
 
@@ -66,8 +68,10 @@ public:
                                                  collCards[largeNodeId].toDouble() * docSizeBytes}},
                         }};
 
-        costEstimator =
-            std::make_unique<JoinCostEstimatorImpl>(*jCtx, *cardEstimator, catalogStats);
+        planEnumCtx =
+            std::make_unique<PlanEnumeratorContext>(*jCtx, std::move(cardEstimator), false);
+        costEstimator = std::make_unique<JoinCostEstimatorImpl>(
+            *jCtx, *planEnumCtx->getJoinCardinalityEstimator(), catalogStats);
     }
 
     NamespaceString smallNss;
@@ -76,6 +80,7 @@ public:
     NodeId largeNodeId;
     NodeId unselectiveNodeId;
     boost::optional<JoinReorderingContext> jCtx;
+    std::unique_ptr<PlanEnumeratorContext> planEnumCtx;
     std::unique_ptr<JoinCardinalityEstimator> cardEstimator;
     CatalogStats catalogStats;
     std::unique_ptr<JoinCostEstimator> costEstimator;
@@ -103,6 +108,35 @@ TEST_F(JoinCostEstimatorTest, UnselectiveIndexScanHasLargerCostThanCollScan) {
     auto collScanCost = costEstimator->costCollScanFragment(unselectiveNodeId);
     auto indexScanCost = costEstimator->costIndexScanFragment(unselectiveNodeId);
     ASSERT_GT(indexScanCost, collScanCost);
+}
+
+const JoinSubset& getJoinSubsetForNodeId(const std::vector<JoinSubset>& subsets, NodeId nodeId) {
+    return *std::find_if(subsets.cbegin(), subsets.cend(), [&](const JoinSubset& subset) {
+        return subset.getNodeId() == nodeId;
+    });
+}
+
+// Verify that HJ(largeNss, foo) > HJ(smallNss, foo)
+TEST_F(JoinCostEstimatorTest, HashJoinLargerBuildSideHasLargerCost) {
+    JoinCostEstimate zeroJoinCost(zeroCE, zeroCE, zeroCE, zeroCE);
+    BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
+    BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
+    BaseNode unselectiveBaseNode{.nss = largeNss, .node = unselectiveNodeId, .cost = zeroJoinCost};
+    auto smallHjCost = costEstimator->costHashJoinFragment(smallBaseNode, unselectiveBaseNode);
+    auto largeHjCost = costEstimator->costHashJoinFragment(largeBaseNode, unselectiveBaseNode);
+    ASSERT_GT(largeHjCost, smallHjCost);
+}
+
+TEST_F(JoinCostEstimatorTest, HashJoinChildCostTakenIntoAccount) {
+    JoinCostEstimate zeroJoinCost(zeroCE, zeroCE, zeroCE, zeroCE);
+    BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
+    BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
+    BaseNode smallBaseNodeNonZero{.nss = smallNss,
+                                  .node = smallNodeId,
+                                  .cost = JoinCostEstimate(makeCard(1), zeroCE, zeroCE, zeroCE)};
+    auto smallHjCost = costEstimator->costHashJoinFragment(smallBaseNode, largeBaseNode);
+    auto largeHjCost = costEstimator->costHashJoinFragment(smallBaseNodeNonZero, largeBaseNode);
+    ASSERT_GT(largeHjCost, smallHjCost);
 }
 
 }  // namespace mongo::join_ordering
