@@ -5,7 +5,10 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   featureFlagDedicatedPortForPriorityOperations,
+ *   requires_fcv_83,
+ *   featureFlagReplicationUsageOfPriorityPort,
+ *   # The priority port is based on ASIO, so gRPC testing is excluded
+ *   grpc_incompatible,
  * ]
  */
 

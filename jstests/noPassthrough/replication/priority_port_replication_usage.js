@@ -4,6 +4,8 @@
  *
  * @tags: [
  *  featureFlagReplicationUsageOfPriorityPort,
+ *  # The priority port is based on ASIO, so gRPC testing is excluded
+ *  grpc_incompatible,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
