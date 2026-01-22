@@ -7,7 +7,8 @@
  *      requires_sharding,
  *      state_functions_share_transaction,
  *      uses_curop_agg_stage,
- *      uses_transactions
+ *      uses_transactions,
+ *      requires_getmore,
  * ]
  */
 
