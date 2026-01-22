@@ -515,6 +515,9 @@ buildvariants:
         --remote_execution_priority=1
       evergreen_remote_exec: on
       skip_debug_link: true
+      # BOLT requires the binaries to be publicly accessible
+      mciuploads_binary_permissions: public-read
+      mciuploads_binary_visibility: public
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
