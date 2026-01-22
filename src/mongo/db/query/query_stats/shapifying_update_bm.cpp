@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_bm_constants.h"
@@ -107,6 +106,7 @@ void runBenchmark(BSONObj predicate,
     builder.multi = false;
     builder.collation = BSON("locale" << "fr");
     builder.let = BSON("z" << "abc");
+    builder.arrayFilters = updateSpec.arrayFilters;
 
     auto updateCommandRequest = write_ops::UpdateCommandRequest::parseOwned(builder.toBSON());
 
@@ -182,7 +182,34 @@ void BM_PipelineUpdate_ShapifyAndSHA256Hash(benchmark::State& state) {
                  state);
 }
 
-// TODO SERVER-110351: Evaluate the performance of using the query stats for modifier updates
+// Benchmark functions for modifier updates.
+void BM_ModifierUpdate_ShapifyAndGenerateKey(benchmark::State& state) {
+    auto queryComplexity = static_cast<query_benchmark_constants::QueryComplexity>(state.range(0));
+    auto modifierUpdateComplexity =
+        static_cast<query_benchmark_constants::ModifierUpdateComplexity>(state.range(1));
+    bool useArrayFilters = state.range(2) != 0;
+
+    auto updateSpec =
+        query_benchmark_constants::getUpdateSpec(modifierUpdateComplexity, useArrayFilters);
+    runBenchmark(query_benchmark_constants::queryComplexityToJSON(queryComplexity),
+                 updateSpec,
+                 ShapifyUpdateTestType::kGenerateUpdateKey,
+                 state);
+}
+
+void BM_ModifierUpdate_ShapifyAndSHA256Hash(benchmark::State& state) {
+    auto queryComplexity = static_cast<query_benchmark_constants::QueryComplexity>(state.range(0));
+    auto modifierUpdateComplexity =
+        static_cast<query_benchmark_constants::ModifierUpdateComplexity>(state.range(1));
+    bool useArrayFilters = state.range(2) != 0;
+
+    auto updateSpec =
+        query_benchmark_constants::getUpdateSpec(modifierUpdateComplexity, useArrayFilters);
+    runBenchmark(query_benchmark_constants::queryComplexityToJSON(queryComplexity),
+                 updateSpec,
+                 ShapifyUpdateTestType::kSHA256Hash,
+                 state);
+}
 
 // We do not add a complexity dimension for replacement updates because the 'u' statement will
 // always get shapified into '?object'. In other words, the shapification work done for the 'u'
@@ -209,11 +236,28 @@ void BM_PipelineUpdate_ShapifyAndSHA256Hash(benchmark::State& state) {
               static_cast<int>(query_benchmark_constants::PipelineComplexity::                 \
                                    kWithMultipleStagesAndExpressions)}})                       \
         ->Threads(1)
+#define MODIFIER_UPDATE_ARGS()                                                                 \
+    ArgNames({"queryComplexity", "modifierUpdateComplexity", "useArrayFilters"})               \
+        ->ArgsProduct(                                                                         \
+            {{static_cast<int>(query_benchmark_constants::QueryComplexity::kIDHack),           \
+              static_cast<int>(query_benchmark_constants::QueryComplexity::kMildlyComplex),    \
+              static_cast<int>(query_benchmark_constants::QueryComplexity::kMkComplex),        \
+              static_cast<int>(query_benchmark_constants::QueryComplexity::kVeryComplex)},     \
+             {static_cast<int>(query_benchmark_constants::ModifierUpdateComplexity::kSimple),  \
+              static_cast<int>(                                                                \
+                  query_benchmark_constants::ModifierUpdateComplexity::kMildlyComplex),        \
+              static_cast<int>(query_benchmark_constants::ModifierUpdateComplexity::kComplex), \
+              static_cast<int>(                                                                \
+                  query_benchmark_constants::ModifierUpdateComplexity::kVeryComplex)},         \
+             {false, true}})                                                                   \
+        ->Threads(1)
 
 BENCHMARK(BM_ReplacementUpdate_ShapifyAndGenerateKey)->REPLACEMENT_ARGS();
 BENCHMARK(BM_ReplacementUpdate_ShapifyAndSHA256Hash)->REPLACEMENT_ARGS();
 BENCHMARK(BM_PipelineUpdate_ShapifyAndGenerateKey)->PIPELINE_ARGS();
 BENCHMARK(BM_PipelineUpdate_ShapifyAndSHA256Hash)->PIPELINE_ARGS();
+BENCHMARK(BM_ModifierUpdate_ShapifyAndGenerateKey)->MODIFIER_UPDATE_ARGS();
+BENCHMARK(BM_ModifierUpdate_ShapifyAndSHA256Hash)->MODIFIER_UPDATE_ARGS();
 
 }  // namespace
 }  // namespace mongo

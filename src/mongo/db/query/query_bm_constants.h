@@ -52,6 +52,7 @@ extern const BSONObj kVeryComplexProjection;
 struct UpdateSpec {
     BSONObj u;
     boost::optional<BSONObj> c;
+    boost::optional<BSONObj> arrayFilters;
 };
 
 enum class PipelineComplexity : int {
@@ -61,12 +62,23 @@ enum class PipelineComplexity : int {
     kWithMultipleStagesAndExpressions,
 };
 
+enum class ModifierUpdateComplexity : int {
+    kSimple = 0,
+    kMildlyComplex,
+    kComplex,
+    kVeryComplex,
+};
+
 extern UpdateSpec getUpdateSpec(const PipelineComplexity& complexity);
+
+const UpdateSpec& getUpdateSpec(const ModifierUpdateComplexity& complexity,
+                                bool useArrayFilters = false);
 
 extern const UpdateSpec kReplacementUpdate;
 extern const UpdateSpec kPipelineUpdateSimple;
 extern const UpdateSpec kPipelineUpdateWithConstants;
 extern const UpdateSpec kPipelineUpdateWithMultipleStages;
 extern const UpdateSpec kPipelineUpdateWithMultipleStagesAndExpressions;
+
 }  // namespace query_benchmark_constants
 }  // namespace mongo
