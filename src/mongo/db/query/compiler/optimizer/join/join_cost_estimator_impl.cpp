@@ -71,5 +71,69 @@ JoinCostEstimate JoinCostEstimatorImpl::costIndexScanFragment(NodeId nodeId) {
     return JoinCostEstimate(numDocsProcessed, numDocsOutput, numSeqIOs, numRandIOs);
 }
 
+// Use catalog information to return an estimate of the size of a document from the "relation"
+// containing all fields from all nodes in 'NodeSet'.
+double JoinCostEstimatorImpl::estimateDocSize(NodeSet subset) const {
+    // Calculate average document size of each "relation" and sum them together.
+    double result = 0;
+    for (auto nodeId : iterable(subset)) {
+        auto& collStats =
+            _catalogStats.collStats.at(_jCtx.joinGraph.getNode(nodeId).collectionName);
+        auto avgDocSize = collStats.allocatedDataPageBytes /
+            _cardinalityEstimator.getCollCardinality(nodeId).toDouble();
+        result += avgDocSize;
+    }
+    return result;
+}
+
+JoinCostEstimate JoinCostEstimatorImpl::costHashJoinFragment(const JoinPlanNode& left,
+                                                             const JoinPlanNode& right) {
+    NodeSet leftSubset = getNodeBitset(left);
+    NodeSet rightSubset = getNodeBitset(right);
+    CardinalityEstimate buildDocs =
+        _cardinalityEstimator.getOrEstimateSubsetCardinality(leftSubset);
+    CardinalityEstimate probeDocs =
+        _cardinalityEstimator.getOrEstimateSubsetCardinality(rightSubset);
+    CardinalityEstimate numDocsOutput =
+        _cardinalityEstimator.getOrEstimateSubsetCardinality(leftSubset | rightSubset);
+
+    // Note: We currently don't support block/memory estimate types in our estimates algebra (the
+    // type safe library with CardinalityEstimate, CostEstimate and other related types), so we are
+    // forced to fallback to using doubles for estimation.
+
+    // Represents the fraction of the dataset that exceeds the available memory buffer. A value of 0
+    // means the join is fully in memory, while a value of 1 means the join behaves like a Grace
+    // Hash Join.
+    double overflowFactor = 0;
+    // Use catalog information to estimate of one build and probe entry in bytes.
+    const double buildDocSize = estimateDocSize(leftSubset);
+    const double probeDocSize = estimateDocSize(rightSubset);
+    // Assume that spilling for the hash table using 32Kib pages.
+    constexpr double blockSize = 32 * 1024;
+    // Assume the default spilling threshold is used 100MiB.
+    constexpr double spillingThreshold = 100 * 1024 * 1024;
+
+    double buildSideBytesEstimate = buildDocs.toDouble() * buildDocSize;
+
+    if (buildSideBytesEstimate > spillingThreshold) {
+        overflowFactor = 1 - (spillingThreshold / buildSideBytesEstimate);
+    }
+
+    CardinalityEstimate numDocsProcessed =
+        buildDocs + probeDocs + overflowFactor * (buildDocs + probeDocs);
+
+    double buildBlocks = buildDocs.toDouble() * buildDocSize / blockSize;
+    double probeBlocks = probeDocs.toDouble() * probeDocSize / blockSize;
+
+    // Writing and reading of overflow partitions, will be 0 if no overflow.
+    CardinalityEstimate ioSeq{CardinalityType{2 * overflowFactor * (buildBlocks + probeBlocks)},
+                              EstimationSource::Sampling};
+
+    JoinCostEstimate leftCost = getNodeCost(left);
+    JoinCostEstimate rightCost = getNodeCost(right);
+
+    return JoinCostEstimate(
+        numDocsProcessed, numDocsOutput, ioSeq, zeroCE /*numRandIOs*/, leftCost, rightCost);
+}
 
 }  // namespace mongo::join_ordering

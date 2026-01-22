@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
+#include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/logical_defs.h"
 
 namespace mongo::join_ordering {
@@ -61,6 +62,12 @@ public:
      * need to modify this function.
      */
     virtual JoinCostEstimate costIndexScanFragment(NodeId) = 0;
+
+    /**
+     * Estimate the cost of a hash join plan fragment.
+     */
+    virtual JoinCostEstimate costHashJoinFragment(const JoinPlanNode& left,
+                                                  const JoinPlanNode& right) = 0;
 };
 
 }  // namespace mongo::join_ordering
