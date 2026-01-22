@@ -60,6 +60,7 @@
 
 #pragma once
 
+#include "mongo/platform/atomic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 #include "mongo/util/static_immortal.h"
@@ -90,6 +91,8 @@ template <typename T>
 constexpr inline bool pretendTrivialInit<std::shared_ptr<T>> = true;
 template <typename T>
 constexpr inline bool pretendTrivialInit<boost::optional<T>> = true;
+template <typename T>
+constexpr inline bool pretendTrivialInit<Atomic<T>> = std::is_trivially_constructible_v<T>;
 
 struct LifecycleOperations {
     using CtorFn = void(void*);
