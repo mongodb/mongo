@@ -144,16 +144,30 @@ PlanState ExtractFieldPathsStage::getNext() {
     } else {
         // Important this is only for toplevel fields. For nested fields, we would need knowledge of
         // arrayness. We would also need to check for input accessors during the tree traversal.
-        for (const auto& child : _root->getChildren) {
-            const auto& childWalkNode = child.second;
-            if (childWalkNode->inputAccessor) {
-                auto [childTag, childVal] = childWalkNode->inputAccessor->getViewOfValue();
-                value::walkField<value::ScalarProjectionPositionInfoRecorder>(
-                    childWalkNode.get(),
-                    childTag,
-                    childVal,
-                    value::bitcastTo<const char*>(childVal),
-                    walk);
+        if (_root->getChildren) {
+            for (const auto& child : *(_root->getChildren)) {
+                const auto& childWalkNode = child.second;
+                if (childWalkNode->inputAccessor) {
+                    auto [childTag, childVal] = childWalkNode->inputAccessor->getViewOfValue();
+                    value::walkField<value::ScalarProjectionPositionInfoRecorder>(
+                        childWalkNode.get(),
+                        childTag,
+                        childVal,
+                        value::bitcastTo<const char*>(childVal),
+                        walk);
+                }
+            }
+        } else {
+            for (const auto& [_, childWalkNode] : _root->getChildrenVector) {
+                if (childWalkNode->inputAccessor) {
+                    auto [childTag, childVal] = childWalkNode->inputAccessor->getViewOfValue();
+                    value::walkField<value::ScalarProjectionPositionInfoRecorder>(
+                        childWalkNode.get(),
+                        childTag,
+                        childVal,
+                        value::bitcastTo<const char*>(childVal),
+                        walk);
+                }
             }
         }
     }
