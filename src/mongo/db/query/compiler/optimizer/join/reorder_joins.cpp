@@ -155,18 +155,19 @@ std::vector<QSNJoinPredicate> makeJoinPreds(const JoinReorderingContext& ctx,
     return preds;
 }
 
-void addEstimateIfExplain(const JoinReorderingContext& ctx,
-                          const PlanEnumeratorContext& peCtx,
-                          QuerySolutionNode* node,
-                          NodeSet set,
-                          cost_based_ranker::EstimateMap& estimates) {
+void addEstimatesIfExplain(const JoinReorderingContext& ctx,
+                           const PlanEnumeratorContext& peCtx,
+                           QuerySolutionNode* node,
+                           NodeSet set,
+                           const JoinCostEstimate& cost,
+                           cost_based_ranker::EstimateMap& estimates) {
     if (!ctx.explain) {
         return;
     }
 
-    // TODO SERVER-116505: Populate estimates map with cost information when available.
     auto ce = peCtx.getJoinCardinalityEstimator()->getOrEstimateSubsetCardinality(set);
-    estimates.emplace(node, cost_based_ranker::QSNEstimate{.outCE = ce});
+    estimates.emplace(node,
+                      cost_based_ranker::QSNEstimate{.outCE = ce, .cost = cost.getTotalCost()});
 }
 
 // Forward-declare because of mutual recursion.
@@ -181,21 +182,22 @@ std::unique_ptr<QuerySolutionNode> buildQSNFromJoinPlan(const JoinReorderingCont
                                                         JoinPlanNodeId nodeId,
                                                         cost_based_ranker::EstimateMap& estimates) {
     std::unique_ptr<QuerySolutionNode> qsn;
-    std::visit(
-        OverloadedVisitor{[&](const JoiningNode& join) {
-                              qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates);
-                              addEstimateIfExplain(ctx, peCtx, qsn.get(), join.bitset, estimates);
-                          },
-                          [&](const BaseNode& base) {
-                              // TODO SERVER-111913: Avoid this clone
-                              qsn = base.soln->root()->clone();
-                              addEstimateIfExplain(
-                                  ctx, peCtx, qsn.get(), NodeSet().set(base.node), estimates);
-                          },
-                          [&](const INLJRHSNode& ip) {
-                              qsn = createIndexProbeQSN(ctx.joinGraph.getNode(ip.node), ip.entry);
-                          }},
-        peCtx.registry().get(nodeId));
+    std::visit(OverloadedVisitor{
+                   [&](const JoiningNode& join) {
+                       qsn = buildQSNFromJoiningNode(ctx, peCtx, join, estimates);
+                       addEstimatesIfExplain(
+                           ctx, peCtx, qsn.get(), join.bitset, join.cost, estimates);
+                   },
+                   [&](const BaseNode& base) {
+                       // TODO SERVER-111913: Avoid this clone
+                       qsn = base.soln->root()->clone();
+                       addEstimatesIfExplain(
+                           ctx, peCtx, qsn.get(), NodeSet().set(base.node), base.cost, estimates);
+                   },
+                   [&](const INLJRHSNode& ip) {
+                       qsn = createIndexProbeQSN(ctx.joinGraph.getNode(ip.node), ip.entry);
+                   }},
+               peCtx.registry().get(nodeId));
     return qsn;
 }
 
