@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/s/sharding_task_executor.h"
+#include "mongo/db/sharding_environment/sharding_task_executor.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

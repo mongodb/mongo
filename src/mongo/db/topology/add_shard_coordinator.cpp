@@ -40,6 +40,7 @@
 #include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/sharding_initialization_mongod.h"
 #include "mongo/db/sharding_environment/sharding_logging.h"
+#include "mongo/db/sharding_environment/sharding_task_executor.h"
 #include "mongo/db/topology/add_shard_gen.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/topology/topology_change_helpers.h"
@@ -49,7 +50,6 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/s/sharding_task_executor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
 

@@ -130,6 +130,7 @@ mongo_cc_library(
         "//src/mongo/s:sharding_task_executor_pool_gen",
     ],
     deps = [
+        ":sharding_task_executor",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/global_catalog:sharding_catalog_client_impl",
@@ -143,7 +144,6 @@ mongo_cc_library(
         "//src/mongo/rpc:metadata_impersonated_user",
         "//src/mongo/s:grid",
         "//src/mongo/s:query_analysis_sampler",
-        "//src/mongo/s:sharding_task_executor",
         "//src/mongo/util:periodic_runner_factory",
     ],
 )
@@ -180,13 +180,13 @@ mongo_cc_library(
     ],
     deps = [
         ":sharding_initialization",
+        ":sharding_task_executor",
         ":sharding_test_fixture_common",
         "//src/mongo/db/global_catalog:sharding_catalog_client_impl",
         "//src/mongo/db/query/collation:collator_factory_mock",
         "//src/mongo/db/transaction",
         "//src/mongo/executor:task_executor_pool",
         "//src/mongo/s:sharding_router_api",
-        "//src/mongo/s:sharding_task_executor",
         "//src/mongo/transport:transport_layer_mock",
         "//src/mongo/util:clock_source_mock",
     ],
@@ -244,5 +244,19 @@ mongo_cc_library(
         "//src/mongo/db/op_observer",
         "//src/mongo/db/op_observer:op_observer_impl",
         "//src/mongo/db/op_observer:operation_logger_impl",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharding_task_executor",
+    srcs = [
+        "sharding_task_executor.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:operation_time_tracker",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/sharding_environment/client:sharding_client",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/s:sharding_router_api",
     ],
 )
