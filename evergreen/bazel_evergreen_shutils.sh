@@ -260,11 +260,11 @@ bazel_evergreen_shutils::retry_bazel_cmd() {
 
     # Once we detect an OOM/server-death, we enable the guard for subsequent attempts.
     local use_oom_guard=false
-    local -r OOM_GUARD_FLAG='--local_resources=HOST_CPUS*.5'
+    local -r OOM_GUARD_FLAG='--local_resources=cpu=HOST_CPUS*.5'
 
     # Helper: does the current command string already include a local_resources flag?
     _cmd_has_local_resources() {
-        [[ "$1" == *"--local_resources"* ]]
+        [[ "$1" == *"--local_cpu_resources"* ]] || [[ "$1" == *"--local_ram_resources"* ]] || [[ "$1" == *"--local_resources"* ]]
     }
 
     local RET=1
