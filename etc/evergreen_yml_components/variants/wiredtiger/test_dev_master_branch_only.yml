@@ -105,7 +105,7 @@ buildvariants:
       - name: .clustered_collections !.requires_extra_system_deps
       - name: .misc_js
       - name: disk_wiredtiger
-      - name: .jscore .common
+      - name: .jscore .common !.feature_flag_guarded
       - name: jsCore_txns_large_txns_format
       - name: json_schema
       - name: query_golden_classic
@@ -115,7 +115,7 @@ buildvariants:
       - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
       - name: .ocsp
       - name: .read_write_concern
-      - name: .replica_sets !.encrypt !.fcbis
+      - name: .replica_sets !.encrypt !.fcbis !.feature_flag_guarded
       - name: replica_sets_reconfig_jscore_passthrough_gen
       - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
       - name: .retry

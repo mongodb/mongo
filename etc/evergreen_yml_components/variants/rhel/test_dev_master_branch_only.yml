@@ -277,7 +277,7 @@ buildvariants:
       - name: generate_buildid_to_debug_symbols_mapping
       # sharding_uninitialized_fcv_jscore_passthrough_gen spawns too many connections
       # and processes to be used with TLS on a single host.
-      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !.auth !.txns
+      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !.auth !.txns !.feature_flag_guarded
       - name: sharded_jscore_txns
       - name: .aggregation !.auth !aggregation_read_concern_majority_passthrough !aggregation_secondary_reads_gen
       # concurrency suites that use a ReplicaSetFixture will fail on this build variant.
@@ -504,7 +504,7 @@ buildvariants:
         distros:
           - rhel8.8-large
       - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
-      - name: .jscore .common !.requires_large_host
+      - name: .jscore .common !.requires_large_host !.feature_flag_guarded
       - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded !.requires_large_host
       - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded .requires_large_host
         distros:
@@ -605,9 +605,9 @@ buildvariants:
         patch_only: true
       - name: .concurrency .common !.kill_terminate !.feature_flag_guarded
         patch_only: true
-      - name: .jscore .common !.requires_large_host
+      - name: .jscore .common !.requires_large_host !.feature_flag_guarded
         patch_only: true
-      - name: .jscore .common .requires_large_host
+      - name: .jscore .common .requires_large_host !.feature_flag_guarded
         patch_only: true
         distros:
           - rhel8.8-large

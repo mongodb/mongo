@@ -1106,6 +1106,7 @@ tasks:
         "san",
         "large",
         "requires_all_feature_flags",
+        "feature_flag_guarded",
       ]
     commands:
       - func: "generate resmoke tasks"

@@ -789,7 +789,7 @@ buildvariants:
       - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-      - name: .jscore .common !.sbe_only
+      - name: .jscore .common !.sbe_only !.feature_flag_guarded
       - name: jsCore_min_batch_repeat_queries_multiplan_single_solutions_ese_gsm
       - name: jsCore_txns_large_txns_format
       - name: json_schema
@@ -797,7 +797,7 @@ buildvariants:
       - name: .query_fuzzer
       - name: .read_write_concern
       - name: replica_sets_large_txns_format_jscore_passthrough
-      - name: .replica_sets !.multi_oplog !.uninitialized_fcv
+      - name: .replica_sets !.multi_oplog !.uninitialized_fcv !.feature_flag_guarded
       - name: .replica_sets .encrypt
       - name: .resharding_fuzzer
       - name: .retry
