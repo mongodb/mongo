@@ -164,6 +164,7 @@ shell:
   meta:
     slack: ask-devprod-correctness
     jira: DevProd Correctness
+    fully_marked: true
   files:
     - src/mongo/shell/
     - src/mongo/db/modules/enterprise/src/fle/shell

@@ -43,11 +43,13 @@ structs:
     # Options passed to Mongo() javascript constructor
     localKMS:
         description: "Local KMS config"
+        mod_visibility: private
         fields:
             key: bindata_generic
 
     kmsProviders:
         description: "Supported KMS Providers"
+        mod_visibility: private
         strict: true
         fields:
             local:
@@ -56,6 +58,7 @@ structs:
 
     clientSideFLEOptions:
         description: "FLE Options inputted through the Mongo constructor in the shell"
+        mod_visibility: private
         fields:
             keyVaultClient: #Parsed as a JSHandleValue, not through IDL
                 type: void
@@ -72,6 +75,7 @@ structs:
 
     localMasterKey:
         description: "Local KMS Key Store Description"
+        mod_visibility: private
         fields:
             provider:
                 type: string
@@ -79,6 +83,7 @@ structs:
 
     localMasterKeyAndMaterial:
         description: "Local KMS Key Material Description"
+        mod_visibility: private
         fields:
             keyMaterial:
                 type: bindata_generic
@@ -87,6 +92,7 @@ structs:
 
     keyStoreRecord:
         description: "A V0 Key Store Record"
+        mod_visibility: private
         fields:
             _id: uuid
             keyMaterial: bindata_generic
