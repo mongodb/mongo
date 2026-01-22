@@ -700,7 +700,7 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
         --runAllFeatureFlagTests
-        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
+        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull,requires_sbe
     tasks:
       - name: .aggfuzzer
       - name: .change_stream_fuzzer
@@ -720,7 +720,7 @@ buildvariants:
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
         --runAllFeatureFlagTests --disableUnreleasedIFRFlags
-        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
+        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull,requires_sbe
     tasks:
       - name: .aggfuzzer
       - name: .change_stream_fuzzer

@@ -2,6 +2,7 @@
  * Ensures that the join optimizer populates estimate information (e.g., CE) in the explain output.
  * @tags: [
  *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 

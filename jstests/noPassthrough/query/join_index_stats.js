@@ -3,15 +3,11 @@
  * for all involved collections. Regression test for SERVER-114567.
  * @tags: [
  *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 
-import {getWinningPlanFromExplain, getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
-
-function joinOptimizerUsed(explain) {
-    const stages = getAllPlanStages(getWinningPlanFromExplain(explain)).map((stage) => stage.stage);
-    return stages.some((stage) => stage.includes("JOIN_EMBEDDING"));
-}
+import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
 
 function getUsageCount(indexName, collection) {
     let res = collection.aggregate([{$indexStats: {}}, {$match: {name: indexName}}]).toArray();
@@ -20,7 +16,6 @@ function getUsageCount(indexName, collection) {
     }
     return res[0].accesses.ops;
 }
-
 let conn = MongoRunner.runMongod();
 
 const db = conn.getDB("test");
@@ -81,7 +76,7 @@ const pipeline = [
 assert.commandWorked(conn.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));
 dropAndRecreateColls();
 const explain = coll1.explain().aggregate(pipeline);
-assert(joinOptimizerUsed(explain), "Join optimizer was not used as expected: " + tojson(explain));
+assert(joinOptUsed(explain), "Join optimizer was not used as expected: " + tojson(explain));
 
 //
 // Test with random order.
@@ -142,7 +137,7 @@ const selfLookupPipe = [
 dropAndRecreateColls();
 coll1.aggregate(selfLookupPipe).toArray();
 const selfLookupExplain = coll1.explain().aggregate(pipeline);
-assert(joinOptimizerUsed(selfLookupExplain), "Join optimizer was not used as expected: " + tojson(selfLookupExplain));
+assert(joinOptUsed(selfLookupExplain), "Join optimizer was not used as expected: " + tojson(selfLookupExplain));
 
 assert.eq(getUsageCount("a_1", coll1), 1);
 assert.eq(db.runCommand({serverStatus: 1}).metrics.queryExecutor.collectionScans.total, 14); // 13 from before + 1 now

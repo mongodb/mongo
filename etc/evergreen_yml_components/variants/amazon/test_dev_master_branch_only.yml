@@ -439,7 +439,7 @@ buildvariants:
       exec_timeout_factor: 1.5
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-        --excludeWithAnyTags=resource_intensive
+        --excludeWithAnyTags=resource_intensive,requires_sbe
     # This set of tasks is not able to be reused on the all-feature-flags variant. Any changes
     # here should be duplicated to
     # enterprise-amazon-linux2023-arm64-all-feature-flags-required-query-patch-only.
@@ -491,10 +491,6 @@ buildvariants:
       - name: query_cbr_histogram_aggregation_passthrough
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
       - name: query_golden_cbr_histogram
-        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
-      - name: query_join_optimization_passthrough_gen
-        cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
-      - name: query_join_optimization_no_passthrough_with_mongod_gen
         cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
 
   - <<: *amazon_linux2023_arm64_static_compile_variant_dependency

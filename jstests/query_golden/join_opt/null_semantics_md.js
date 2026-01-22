@@ -2,12 +2,14 @@
  * Run basic tests that validate join reordering preserves null semantics.
  *
  * @tags: [
- *   requires_fcv_83
+ *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 import {normalizeArray} from "jstests/libs/golden_test.js";
 import {code, section, subSection} from "jstests/libs/query/pretty_md.js";
-import {verifyExplainOutput, runJoinTestAndCompare, joinTestWrapper} from "jstests/query_golden/libs/join_opt.js";
+import {runJoinTestAndCompare, joinTestWrapper} from "jstests/query_golden/libs/join_opt.js";
+import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
 
 const testDocs = [
     {_id: 0},
@@ -56,7 +58,7 @@ function runNullSemanticsTest(pipeline, assertResultsEqual, extraParams = {}) {
     code(normalizeArray(noJoinOptResults, true /* shouldSortArray */));
 
     const noJoinExplain = coll.explain().aggregate(pipeline);
-    verifyExplainOutput(noJoinExplain, false /* joinOptExpectedInExplainOutput */);
+    assert(!joinOptUsed(noJoinExplain), "Join optimizer was not used as expected: " + tojson(noJoinExplain));
 
     // Enable join opt & increase the max number of nodes for join edges.
     assert.commandWorked(db.adminCommand({setParameter: 1, internalEnableJoinOptimization: true}));

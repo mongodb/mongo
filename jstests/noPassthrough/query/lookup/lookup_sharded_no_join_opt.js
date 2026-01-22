@@ -3,9 +3,10 @@
 //
 // @tags: [
 //   requires_fcv_83,
+//   requires_sbe
 // ]
 //
-import {getPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function joinOptimizationRuns(db, baseColl, coll1, coll2) {
@@ -19,10 +20,7 @@ function joinOptimizationRuns(db, baseColl, coll1, coll2) {
 
     const explain = db[baseColl].explain().aggregate(pipeline);
     jsTest.log.info({context: "Explain for pipeline", explain, output: db[baseColl].aggregate(pipeline).toArray()});
-    return (
-        getPlanStages(explain, "NESTED_LOOP_JOIN_EMBEDDING").length > 0 ||
-        getPlanStages(explain, "HASH_JOIN_EMBEDDING").length > 0
-    );
+    return joinOptUsed(explain);
 }
 
 // Set up a sharded cluster.

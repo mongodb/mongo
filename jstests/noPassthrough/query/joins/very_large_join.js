@@ -2,6 +2,7 @@
  * Tests that the join optimizer can handle a number of joins larger then the join graph can store.
  * @tags: [
  *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 

@@ -659,6 +659,29 @@ export function getShardQueryPlans(root) {
 }
 
 /**
+ * Returns a boolean that indicates if the explain showed that join optimization was used.
+ */
+export function joinOptUsed(explain) {
+    const winningPlanStats = getQueryPlanner(explain).winningPlan;
+
+    if (winningPlanStats.usedJoinOptimization === false) {
+        return false;
+    }
+    /**
+     * TODO SERVER-116227 remove stage checking logic once usedJoinOptimization flag is present in express-eligible queries
+     */
+    const stages = getAllPlanStages(getWinningPlanFromExplain(explain)).map((stage) => stage.stage);
+    const joinOptimzierStages = [
+        "NESTED_LOOP_JOIN_EMBEDDING",
+        "HASH_JOIN_EMBEDDING",
+        "INDEXED_NESTED_LOOP_JOIN_EMBEDDING",
+    ];
+    return (
+        winningPlanStats.usedJoinOptimization === true && stages.some((stage) => joinOptimzierStages.includes(stage))
+    );
+}
+
+/**
  * Returns an array of strings representing the "planSummary" values found in the input explain.
  * Assumes the given input is the root of an explain.
  *

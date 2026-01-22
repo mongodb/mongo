@@ -445,7 +445,10 @@ class GoldenTestApp(object):
                 "Only query_golden_classic passthrough found, will run with various settings for internalQueryFrameworkControl"
             )
             for flag in [
-                ["--mongodSetParameters={internalQueryFrameworkControl: forceClassicEngine}"],
+                [
+                    "--mongodSetParameters={internalQueryFrameworkControl: forceClassicEngine}",
+                    "--excludeWithAnyTags=requires_sbe",
+                ],
                 ["--mongodSetParameters={internalQueryFrameworkControl: trySbeEngine}"],
                 ["--mongodSetParameters={internalQueryFrameworkControl: trySbeRestricted}"],
                 ["--additionalFeatureFlags=featureFlagSbeFull"],

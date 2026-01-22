@@ -233,7 +233,7 @@ buildvariants:
       max_sub_suites: 5
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-        --excludeWithAnyTags=featureFlagSbeFull
+        --excludeWithAnyTags=featureFlagSbeFull,requires_sbe
       large_distro_name: rhel8.8-medium
     depends_on:
       - name: archive_dist_test

@@ -2,25 +2,10 @@
  * Tests that join optimization falls back gracefully in cases when it is not supported.
  * @tags: [
  *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
-import {getWinningPlanFromExplain, getQueryPlanner, getAllPlanStages} from "jstests/libs/query/analyze_plan.js";
-
-function joinOptimizedUsed(explain, expectedJoinOptimizer) {
-    const stages = getAllPlanStages(getWinningPlanFromExplain(explain)).map((stage) => stage.stage);
-    const joinOptimzierStages = [
-        "NESTED_LOOP_JOIN_EMBEDDING",
-        "HASH_JOIN_EMBEDDING",
-        "INDEXED_NESTED_LOOP_JOIN_EMBEDDING",
-    ];
-    const winningPlanStats = getQueryPlanner(explain).winningPlan;
-    assert(
-        winningPlanStats.hasOwnProperty("usedJoinOptimization") &&
-            winningPlanStats.usedJoinOptimization == expectedJoinOptimizer,
-        winningPlanStats,
-    );
-    return stages.some((stage) => joinOptimzierStages.includes(stage));
-}
+import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
 
 let conn = MongoRunner.runMongod();
 
@@ -55,7 +40,7 @@ function runTestCase({pipeline, expectedCount, expectedJoinOptimizer}) {
     const explain = coll1.explain().aggregate(pipeline);
     assert.eq(
         expectedJoinOptimizer,
-        joinOptimizedUsed(explain, expectedJoinOptimizer),
+        joinOptUsed(explain),
         "Expected join optimizer and actual usage differ: " + tojson(explain),
     );
 }

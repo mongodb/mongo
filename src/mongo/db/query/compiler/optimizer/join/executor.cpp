@@ -74,7 +74,13 @@ bool anySecondaryNamespacesDontExist(const MultipleCollectionAccessor& mca) {
 
 bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
                                     const Pipeline& pipeline) {
-    if (!pipeline.getContext()->getQueryKnobConfiguration().isJoinOrderingEnabled()) {
+    const auto& queryKnob = pipeline.getContext()->getQueryKnobConfiguration();
+
+    if (!queryKnob.isJoinOrderingEnabled()) {
+        return false;
+    }
+
+    if (queryKnob.isForceClassicEngineEnabled()) {
         return false;
     }
 

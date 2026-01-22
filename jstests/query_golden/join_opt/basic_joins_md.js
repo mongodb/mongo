@@ -2,12 +2,14 @@
  * Run basic tests that validate we enter join ordering logic.
  *
  * @tags: [
- *   requires_fcv_83
+ *   requires_fcv_83,
+ *   requires_sbe
  * ]
  */
 import {section, subSection} from "jstests/libs/query/pretty_md.js";
 import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
-import {verifyExplainOutput, runJoinTestAndCompare, joinTestWrapper} from "jstests/query_golden/libs/join_opt.js";
+import {runJoinTestAndCompare, joinTestWrapper} from "jstests/query_golden/libs/join_opt.js";
+import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -21,6 +23,7 @@ assert.commandWorked(
 
 const foreignColl1 = db[jsTestName() + "_foreign1"];
 foreignColl1.drop();
+
 assert.commandWorked(
     foreignColl1.insertMany([
         {_id: 0, a: 1, c: "zoo", d: 1},
@@ -44,7 +47,7 @@ function runBasicJoinTest(pipeline) {
     outputAggregationPlanAndResults(coll, pipeline, {}, true, false, false /* noLineBreak*/);
     const noJoinExplain = coll.explain().aggregate(pipeline);
     const noJoinOptResults = coll.aggregate(pipeline).toArray();
-    verifyExplainOutput(noJoinExplain, false /* joinOptExpectedInExplainOutput */);
+    assert(!joinOptUsed(noJoinExplain), "Join optimizer was not used as expected: " + tojson(noJoinExplain));
 
     runJoinTestAndCompare(
         "With bottom-up plan enumeration (left-deep)",
