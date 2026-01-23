@@ -29,6 +29,18 @@ declare function _replMonitorStats()
  * @returns True if the result sets compare equal and false otherwise.
  */
 declare function _resultSetsEqualNormalized(a: object[], b: object[]): boolean
+/**
+ * Compares two result sets after sorting arrays.
+ *
+ * @param a First result set.
+ * @param b Second result set.
+ *
+ * @throws {Error} If the size of the BSON representation of 'a' and 'b' exceeds the BSON size limit
+ *                 (~16mb).
+ *
+ * @returns True if the result sets compare equal after sorting arrays and false otherwise.
+ */
+declare function _resultSetsEqualUnorderedWithUnorderedArrays(a: object[], b: object[]): boolean
 declare function _resultSetsEqualUnordered()
 declare function _setShellFailPoint()
 declare function _srand()

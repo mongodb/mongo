@@ -83,7 +83,7 @@ const okIndexCreationErrorCodes = [
  * TODO SERVER-98132 redesign getQuery to be more opaque about how many query shapes and constants
  * there are.
  */
-function runProperty(propertyFn, namespaces, workload) {
+function runProperty(propertyFn, namespaces, workload, sortArrays) {
     let {collSpec, queries, extraParams} = workload;
     const {controlColl, experimentColl} = namespaces;
 
@@ -106,7 +106,7 @@ function runProperty(propertyFn, namespaces, workload) {
     });
 
     const testHelpers = {
-        comp: _resultSetsEqualUnordered,
+        comp: sortArrays === true ? _resultSetsEqualUnorderedWithUnorderedArrays : _resultSetsEqualUnordered,
         numQueryShapes: queries.length,
         leafParametersPerFamily,
     };
@@ -149,7 +149,7 @@ function reporter(propertyFn, namespaces) {
  * failure, `runProperty` is called again in the reporter, and prints out more details about the
  * failed property.
  */
-export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples) {
+export function testProperty(propertyFn, namespaces, workloadModel, numRuns, examples, sortArrays) {
     assert.eq(typeof propertyFn, "function");
     assert(Object.keys(namespaces).every((collName) => collName === "controlColl" || collName === "experimentColl"));
     assert.eq(typeof numRuns, "number");
