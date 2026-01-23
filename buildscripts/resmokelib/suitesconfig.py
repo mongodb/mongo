@@ -11,8 +11,8 @@ from typing import Any, Optional
 import yaml
 
 import buildscripts.resmokelib.utils.filesystem as fs
+from buildscripts.resmokelib import bazel_suite_parser, errors, suite_hierarchy, utils
 from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import errors, suite_hierarchy, utils
 from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
@@ -244,6 +244,59 @@ class SuiteConfigInterface:
         pass
 
 
+def expand_from_target_selector(config):
+    from_target = config.get("selector", {}).get("from_target", {})
+    if from_target:
+        if len(config["selector"].keys()) > 1:
+            # from_target is mutually exclusive with all other selector fields
+            raise ValueError(
+                f"'from_target' cannot be used with other selector fields. "
+                f"Selector is: {config['selector']}"
+            )
+
+        # Parse the bazel target to extract selector configuration
+        try:
+            target_config = bazel_suite_parser.parse_resmoke_suite_test(from_target)
+        except bazel_suite_parser.BazelParseError as err:
+            raise ValueError(f"Failed to parse bazel target '{from_target}': {err}")
+
+        # Resolve srcs to file paths
+        resolved_roots = []
+        for src_target in target_config["srcs"]:
+            try:
+                resolved_roots.append(bazel_suite_parser.resolve_target_to_files(src_target))
+            except bazel_suite_parser.BazelParseError as err:
+                raise ValueError(
+                    f"Failed to resolve target '{src_target}' from '{from_target}': {err}"
+                )
+
+        # Resolve exclude_files to file paths
+        resolved_exclude_files = []
+        for exclude_target in target_config["exclude_files"]:
+            try:
+                resolved_exclude_files.append(
+                    bazel_suite_parser.resolve_target_to_files(exclude_target)
+                )
+            except bazel_suite_parser.BazelParseError as err:
+                raise ValueError(
+                    f"Failed to resolve exclude target '{exclude_target}' from '{from_target}': {err}"
+                )
+
+        selector = {}
+        if resolved_roots:
+            selector["roots"] = resolved_roots
+        if resolved_exclude_files:
+            selector["exclude_files"] = resolved_exclude_files
+        if target_config["include_with_any_tags"]:
+            selector["include_with_any_tags"] = target_config["include_with_any_tags"]
+        if target_config["exclude_with_any_tags"]:
+            selector["exclude_with_any_tags"] = target_config["exclude_with_any_tags"]
+
+        config["selector"] = selector
+
+    return config
+
+
 class ExplicitSuiteConfig(SuiteConfigInterface):
     """Class for storing the resmoke.py suite YAML configuration."""
 
@@ -266,7 +319,9 @@ class ExplicitSuiteConfig(SuiteConfigInterface):
             # Not an explicit suite, return None.
             return None
 
-        return utils.load_yaml_file(suite_path)
+        config = utils.load_yaml_file(suite_path)
+        config = expand_from_target_selector(config)
+        return config
 
     @classmethod
     def get_named_suites(cls) -> dict[str, str]:
@@ -379,6 +434,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
                     + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites && bazel run //:format`"
                 )
 
+        config = expand_from_target_selector(config)
         return config
 
     @classmethod
@@ -392,7 +448,9 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             return None
         all_overrides = cls.parse_override_file(suites_dirs)
 
-        return cls.process_overrides(matrix_suite, all_overrides, suite_name)
+        config = cls.process_overrides(matrix_suite, all_overrides, suite_name)
+        config = expand_from_target_selector(config)
+        return config
 
     @classmethod
     def process_overrides(cls, suite, overrides, suite_name):

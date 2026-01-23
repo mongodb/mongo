@@ -22,8 +22,7 @@ def main(
                 base_config_content["selector"].pop(x, None)
 
     content = base_config_content
-    if "selector" not in content:
-        content["selector"] = {}
+    content["selector"] = {}
     content["selector"]["roots"] = tests
 
     if exclude_with_any_tags != "":
