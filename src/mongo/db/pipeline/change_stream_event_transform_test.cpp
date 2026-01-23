@@ -80,6 +80,23 @@ repl::MutableOplogEntry buildMovePrimaryOplogEntry(OperationContext* opCtx,
     return oplogEntry;
 }
 
+repl::OplogEntry buildUpgradeDowngradeViewlessTimeseriesOplogEntry(const NamespaceString& collNss,
+                                                                   bool isUpgrade) {
+    repl::MutableOplogEntry oplogEntry;
+
+    const auto commandNss = NamespaceString::makeCommandNamespace(collNss.dbName());
+
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(commandNss);
+    oplogEntry.setUuid(testUuid());
+    oplogEntry.setObject(BSON("upgradeDowngradeViewlessTimeseries" << collNss.coll() << "isUpgrade"
+                                                                   << isUpgrade));  // o
+    oplogEntry.setOpTime(repl::OpTime(kDefaultTs, 0));
+    oplogEntry.setWallClockTime(Date_t());
+
+    return repl::OplogEntry(oplogEntry.toBSON());
+}
+
 Document applyTransformation(const repl::OplogEntry& oplogEntry,
                              NamespaceString ns = nss,
                              const std::vector<std::string>& supportedEvents = {}) {
@@ -458,7 +475,6 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
     applyTransformation(oplogEntry);
 }
 
-
 DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
                  TestInvalidNoop,
                  "Tripwire assertion.*11352601") {
@@ -485,6 +501,65 @@ DEATH_TEST_REGEX(ChangeStreamEventTransformDeathTest,
 
     // Applying the transform on unsupported container insert should throw a TAssert.
     applyTransformation(oplogEntry);
+}
+
+TEST(
+    ChangeStreamEventTransformTest,
+    Given_UpgradeDowngradeViewlessTimeseriesOplogEntry_When_Transforming_Then_RenameCollectionEventWithRegularCollectionNameIsProduced) {
+    const NamespaceString collNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "timeseriesDB.tsColl");
+    const NamespaceString bucketsNss = collNss.makeTimeseriesBucketsNamespace();
+
+    auto opDescription = Document{
+        {"to", BSON("db" << collNss.db_forTest() << "coll" << collNss.coll())},
+    };
+    auto immutableEntry = buildUpgradeDowngradeViewlessTimeseriesOplogEntry(collNss, true);
+
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kRenameTargetNssField,
+         Document{{"db", collNss.db_forTest()}, {"coll", collNss.coll()}}},
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDescription, "rename")},
+        {DocumentSourceChangeStream::kOperationTypeField, "rename"_sd},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kCollectionUuidField, testUuid()},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", bucketsNss.db_forTest()}, {"coll", bucketsNss.coll()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField,
+         Document{BSON("to" << BSON("db" << collNss.db_forTest() << "coll" << collNss.coll()))}},
+    };
+    ASSERT_DOCUMENT_EQ(applyTransformation(immutableEntry, collNss), expectedDoc);
+}
+
+TEST(
+    ChangeStreamEventTransformTest,
+    Given_UpgradeDowngradeViewlessTimeseriesOplogEntry_When_Transforming_Then_RenameCollectionEventWithBucketsCollectionNameIsProduced) {
+    const NamespaceString collNss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "timeseriesDB.tsColl");
+    const NamespaceString bucketsNss = collNss.makeTimeseriesBucketsNamespace();
+
+    auto opDescription = Document{
+        {"to", BSON("db" << bucketsNss.db_forTest() << "coll" << bucketsNss.coll())},
+    };
+    auto immutableEntry = buildUpgradeDowngradeViewlessTimeseriesOplogEntry(collNss, false);
+
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kRenameTargetNssField,
+         Document{{"db", bucketsNss.db_forTest()}, {"coll", bucketsNss.coll()}}},
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(kDefaultTs, testUuid(), opDescription, "rename")},
+        {DocumentSourceChangeStream::kOperationTypeField, "rename"_sd},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kCollectionUuidField, testUuid()},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", collNss.db_forTest()}, {"coll", collNss.coll()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField,
+         Document{
+             BSON("to" << BSON("db" << bucketsNss.db_forTest() << "coll" << bucketsNss.coll()))}},
+    };
+    ASSERT_DOCUMENT_EQ(applyTransformation(immutableEntry, collNss), expectedDoc);
 }
 
 }  // namespace

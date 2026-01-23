@@ -291,6 +291,7 @@ public:
     void onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const UUID& uuid,
+                                              bool isUpgrade,
                                               bool skipViewCreation = false) override {}
 };
 

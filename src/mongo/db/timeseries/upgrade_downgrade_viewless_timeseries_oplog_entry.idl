@@ -39,12 +39,6 @@ structs:
 
             Transforms a timeseries collection from viewful (`myts` view + `system.buckets.myts`
             collection) to viewless format (unified `myts` timeseries collection) or viceversa.
-
-            The resulting format is that consistent with the FCV, i.e.:
-            - The resulting format is viewless timeseries if the
-              featureFlagCreateViewlessTimeseriesCollections is enabled.
-            - The resulting format is viewful timeseries if the
-              featureFlagCreateViewlessTimeseriesCollections is disabled.
         strict: false
         mod_visibility: public
         fields:
@@ -60,3 +54,8 @@ structs:
                     should have the view.
                 type: bool
                 optional: true
+            isUpgrade:
+                description: >
+                    True if the operation is an upgrade from viewful to viewless timeseries.
+                    False if the operation is a downgrade from viewless to viewful timeseries.
+                type: bool

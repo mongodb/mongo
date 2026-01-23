@@ -1286,9 +1286,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                  "upgradeDowngradeViewlessTimeseries oplog entries must have an UUID",
                  entry.getUuid().has_value());
 
-         auto isUpgrade = gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
-             VersionContext::getDecoration(opCtx));
-         if (isUpgrade) {
+         if (cmd.getIsUpgrade()) {
              timeseries::upgradeToViewlessTimeseries(opCtx, ns, entry.getUuid());
          } else {
              // Use skipViewCreation from oplog entry if present, otherwise default to false.

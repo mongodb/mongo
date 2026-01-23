@@ -302,7 +302,7 @@ void upgradeToViewlessTimeseries(OperationContext* opCtx,
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.
         opCtx->getServiceContext()->getOpObserver()->onUpgradeDowngradeViewlessTimeseries(
-            opCtx, mainNs, bucketsColl->uuid());
+            opCtx, mainNs, bucketsColl->uuid(), true /* isUpgrade */);
 
         wuow.commit();
     });
@@ -396,7 +396,7 @@ void downgradeFromViewlessTimeseries(OperationContext* opCtx,
 
         // Log a oplog entry giving a single, atomic timestamp to all operations done above.
         opCtx->getServiceContext()->getOpObserver()->onUpgradeDowngradeViewlessTimeseries(
-            opCtx, mainNs, mainColl->uuid(), skipViewCreation);
+            opCtx, mainNs, mainColl->uuid(), false /* isUpgrade */, skipViewCreation);
 
         wuow.commit();
     });

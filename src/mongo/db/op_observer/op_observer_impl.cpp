@@ -2422,6 +2422,7 @@ void OpObserverImpl::onTruncateRange(OperationContext* opCtx,
 void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCtx,
                                                           const NamespaceString& nss,
                                                           const UUID& uuid,
+                                                          bool isUpgrade,
                                                           bool skipViewCreation) {
     tassert(11450500,
             "Expecting the main namespace for timeseries upgrade/downgrade ops",
@@ -2434,7 +2435,7 @@ void OpObserverImpl::onUpgradeDowngradeViewlessTimeseries(OperationContext* opCt
         return;
     }
 
-    UpgradeDowngradeViewlessTimeseriesOplogEntry objectEntry(std::string{nss.coll()});
+    UpgradeDowngradeViewlessTimeseriesOplogEntry objectEntry(std::string{nss.coll()}, isUpgrade);
     if (skipViewCreation) {
         objectEntry.setSkipViewCreation(true);
     }
