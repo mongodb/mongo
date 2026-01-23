@@ -40,9 +40,7 @@ function testNoResultsQueryIsPlannedWithCBR() {
         assert.eq(execStats.allPlansExecution.length, 4, toJsonForLog(explain));
         assertPlanCosted(execStats.allPlansExecution[0].executionStages);
         assert.eq(execStats.allPlansExecution[0].executionStages.advanced, 0, toJsonForLog(explain));
-        // TODO SERVER-117670: Revisit how we display the works collected when caching CBR chosen plan.
-        // The winning plan chosen by CBR (IXSCAN on "b") will need a total of 9999k works to hit EOF.
-        assert.eq(execStats.allPlansExecution[0].executionStages.works, 9999, toJsonForLog(explain));
+        assert.eq(execStats.allPlansExecution[0].executionStages.works, 0, toJsonForLog(explain));
         assertPlanCosted(execStats.allPlansExecution[1].executionStages);
         assert.eq(execStats.allPlansExecution[1].executionStages.advanced, 0, toJsonForLog(explain));
         assert.eq(execStats.allPlansExecution[1].executionStages.works, 0, toJsonForLog(explain));
@@ -168,11 +166,6 @@ const prevPlanRankerMode = assert.commandWorked(db.adminCommand({setParameter: 1
 const prevAutoPlanRankingStrategy = assert.commandWorked(
     db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults"}),
 ).was;
-
-// Deterministic sample generation to ensure plan selection stability.
-const prevSequentialSamplingScan = assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: true}),
-).was;
 try {
     testNoResultsQueryIsPlannedWithCBR();
     testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking();
@@ -183,8 +176,5 @@ try {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
     assert.commandWorked(
         db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: prevAutoPlanRankingStrategy}),
-    );
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQuerySamplingBySequentialScan: prevSequentialSamplingScan}),
     );
 }

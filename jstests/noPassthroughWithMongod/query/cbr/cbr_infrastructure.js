@@ -224,28 +224,6 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     }
     r1.map((e) => assertCbrExplain(e));
 
-    // The CBR-chosen winning plan is wrapped in a MultiPlanStage (with a single candidate,
-    // namely the CBR winner) so we can reuse the classic multiplanner’s code to:
-    //
-    //   1. Measure how many works() the CBR plan needs to reach a multiplanner exit
-    //      condition (results limit / EOF / works limit), and
-    //   2. Cache that plan together with the measured works value.
-    //
-    // This wrapping can introduce a small off‑by‑one difference in the "works" metric for
-    // the winning plan in the specific case where the MultiPlan trial hits EOF:
-    //
-    //   * During the trial, the child plan reaches EOF once.
-    //   * Later, when we call doWork() on the MultiPlanStage in normal execution, it first
-    //     drains any buffered results and then calls work() on the child again, observing
-    //     EOF a second time.
-    //   * Both EOF probes increment the child plan’s works counter, even though no extra
-    //     keys or documents are examined.
-    //
-    // As a result, the CBR path can have exactly one more work() call than the pure plan without the
-    // MultiPlan stage at its root. 'cbrWorksEpsilon' captures this off‑by‑one.
-    // TODO SERVER-117425: Remove 'cbrWorksEpsilon' once we no longer do a second EOF probe.
-    const cbrWorksEpsilon = 1;
-
     // Uncomment to enable more detailed logging to determine which query caused a failure
     // jsTestLog(`Query ${tojson(query)}, project ${tojson(project)}, order ${tojson(order)}`);
     // if (e1.executionStats.totalKeysExamined > e0.executionStats.totalKeysExamined) {
@@ -256,7 +234,7 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     //     jsTestLog(`e0 ${tojson(e0)})`);
     //     jsTestLog(`e1 ${tojson(e1)})`);
     // }
-    // if (e1.executionStats.executionStages.works > e0.executionStats.executionStages.works + cbrWorksEpsilon) {
+    // if (e1.executionStats.executionStages.works > e0.executionStats.executionStages.works) {
     //     jsTestLog(`e0 ${tojson(e0)})`);
     //     jsTestLog(`e1 ${tojson(e1)})`);
     // }
@@ -268,10 +246,7 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     // works because of e.g. a sort. Sort is usually an in-memory operation thus much faster than
     // I/O. "Works" do not reflect that, but is apparent from measurements.
     const worksFactor = getPlanStage(e1, "SORT") ? 1.1 : 1.0;
-    assert(
-        e1.executionStats.executionStages.works <=
-            (e0.executionStats.executionStages.works + cbrWorksEpsilon) * worksFactor,
-    );
+    assert(e1.executionStats.executionStages.works <= e0.executionStats.executionStages.works * worksFactor);
 }
 
 function verifyCollectionCardinalityEstimate() {
