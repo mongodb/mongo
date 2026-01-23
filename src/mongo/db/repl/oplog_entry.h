@@ -84,6 +84,12 @@ constexpr StringData kNewPrimaryMsgField = "msg"_sd;
  */
 constexpr StringData kNewPrimaryMsg = "new primary"_sd;
 
+/**
+ * The field name for the commit timestamp for an oplog entry if the operation was executed in a
+ * multi-document transaction that has been committed. This field is in-memory only.
+ */
+constexpr StringData kExtractedCommitTransactionTimestampField = "commitTransactionTimestamp"_sd;
+
 inline void setVersionContextIfHasOperationFCV(DurableReplOperation& op,
                                                const VersionContext& vCtx) {
     if (vCtx.hasOperationFCV() &&
@@ -924,6 +930,21 @@ public:
     void setApplyOpsWallClockTime(boost::optional<mongo::Date_t> value);
 
     /**
+     * If this operation was executed in a multi-document transaction that has been committed,
+     * returns the commit timestamp if it has been set.
+     */
+    const boost::optional<mongo::Timestamp>& getCommitTransactionTimestamp() const;
+
+    void setCommitTransactionTimestamp(boost::optional<mongo::Timestamp> value);
+
+    /**
+     * If this is a terminal applyOps oplog entry for an unprepared transaction or a
+     * commitTransaction oplog entry for a prepared transaction, returns the commit timestamp for
+     * the transaction. Otherwise, returns an error.
+     */
+    StatusWith<Timestamp> extractCommitTransactionTimestamp() const;
+
+    /**
      * Returns a timestamp to use for recording of a change stream pre-image in the change stream
      * pre-images collection. Returns a timestamp of the "applyOps" entry, if this operation is
      * packed in the "applyOps" entry. Otherwise returns a timestamp of this oplog entry.
@@ -948,7 +969,6 @@ public:
      * has been suppressed
      */
     boost::optional<RetryImageEnum> getNeedsRetryImage() const;
-
 
     bool isCrudOpType() const;
     bool isContainerOpType() const;
@@ -976,6 +996,10 @@ private:
     // Wall clock time of the associated "applyOps" oplog entry when this oplog entry is extracted
     // from an "applyOps" oplog entry.
     boost::optional<Date_t> _applyOpsWallClockTime{boost::none};
+
+    // If this operation was executed in a multi-document transaction that has been committed,
+    // stores the commit timestamp for the transaction if it has been set.
+    boost::optional<Timestamp> _commitTransactionTimestamp{boost::none};
 
     bool _isForCappedCollection = false;
 

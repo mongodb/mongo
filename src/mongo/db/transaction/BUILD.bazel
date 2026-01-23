@@ -142,6 +142,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/op_observer:operation_logger_impl",
         "//src/mongo/db/repl:image_collection_entry",
         "//src/mongo/db/repl:mock_repl_coord_server_fixture",
+        "//src/mongo/db/repl:oplog_entry_test_helpers",
         "//src/mongo/db/repl:replica_set_aware_service",
         "//src/mongo/db/repl:storage_interface_impl",
         "//src/mongo/db/session:session_catalog_mongod",

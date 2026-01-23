@@ -30,6 +30,7 @@
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/index_builds/index_builds_common.h"
 
 #include <boost/optional.hpp>
@@ -256,5 +257,131 @@ OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
                                                       .statementIds = stmtIds,
                                                       .prevWriteOpTimeInTransaction = prevOpTime}}};
 }
+
+repl::MutableOplogEntry makeNoopMutableOplogEntry(const NamespaceString& nss,
+                                                  UUID uuid,
+                                                  const LogicalSessionId& lsid,
+                                                  TxnNumber txnNumber,
+                                                  const std::vector<StmtId>& stmtIds,
+                                                  repl::OpTime prevOpTime) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(nss);
+    oplogEntry.setUuid(uuid);
+    oplogEntry.setObject(BSON("TestValue" << 0));
+    oplogEntry.setWallClockTime(Date_t::now());
+    oplogEntry.setSessionId(lsid);
+    oplogEntry.setTxnNumber(txnNumber);
+    oplogEntry.setStatementIds(stmtIds);
+    oplogEntry.setPrevWriteOpTimeInTransaction(prevOpTime);
+    return oplogEntry;
+}
+
+repl::OplogEntry makeNoopOplogEntry(repl::OpTime opTime,
+                                    const NamespaceString& nss,
+                                    UUID uuid,
+                                    const LogicalSessionId& lsid,
+                                    TxnNumber txnNumber,
+                                    const std::vector<StmtId>& stmtIds,
+                                    repl::OpTime prevOpTime) {
+    auto mutableOplogEntry =
+        makeNoopMutableOplogEntry(nss, uuid, lsid, txnNumber, stmtIds, prevOpTime);
+    mutableOplogEntry.setOpTime(opTime);
+    return uassertStatusOK(repl::OplogEntry::parse(mutableOplogEntry.toBSON()));
+}
+
+repl::MutableOplogEntry makeApplyOpsMutableOplogEntry(
+    std::vector<repl::ReplOperation> ops,
+    OperationSessionInfo sessionInfo,
+    Date_t wallClockTime,
+    const std::vector<StmtId>& stmtIds,
+    boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+    boost::optional<repl::MultiOplogEntryType> multiOpType,
+    boost::optional<ApplyOpsType> applyOpsType) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
+    oplogEntry.setOperationSessionInfo(sessionInfo);
+    oplogEntry.setWallClockTime(wallClockTime);
+    oplogEntry.setStatementIds(stmtIds);
+    oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
+    oplogEntry.setMultiOpType(multiOpType);
+
+    BSONObjBuilder applyOpsBuilder;
+    BSONArrayBuilder opsArrayBuilder = applyOpsBuilder.subarrayStart("applyOps");
+    for (const auto& op : ops) {
+        opsArrayBuilder.append(op.toBSON());
+    }
+    opsArrayBuilder.done();
+    if (applyOpsType == ApplyOpsType::kPrepare) {
+        applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPrepareFieldName, true);
+    } else if (applyOpsType == ApplyOpsType::kPartial) {
+        applyOpsBuilder.append(repl::ApplyOpsCommandInfoBase::kPartialTxnFieldName, true);
+    }
+    applyOpsBuilder.doneFast();
+    oplogEntry.setObject(applyOpsBuilder.obj());
+
+    return oplogEntry;
+}
+
+repl::OplogEntry makeApplyOpsOplogEntry(repl::OpTime opTime,
+                                        std::vector<repl::ReplOperation> ops,
+                                        OperationSessionInfo sessionInfo,
+                                        Date_t wallClockTime,
+                                        const std::vector<StmtId>& stmtIds,
+                                        boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+                                        boost::optional<repl::MultiOplogEntryType> multiOpType,
+                                        boost::optional<ApplyOpsType> applyOpsType) {
+    auto mutableOplogEntry = makeApplyOpsMutableOplogEntry(ops,
+                                                           sessionInfo,
+                                                           wallClockTime,
+                                                           stmtIds,
+                                                           prevWriteOpTimeInTransaction,
+                                                           multiOpType,
+                                                           applyOpsType);
+    mutableOplogEntry.setOpTime(opTime);
+    return uassertStatusOK(repl::OplogEntry::parse(mutableOplogEntry.toBSON()));
+}
+
+repl::OplogEntry makeCommitTransactionOplogEntry(
+    repl::OpTime opTime,
+    OperationSessionInfo sessionInfo,
+    Timestamp commitTimestamp,
+    boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
+    CommitTransactionOplogObject commitObject;
+    commitObject.setCommitTimestamp(commitTimestamp);
+
+    repl::MutableOplogEntry op;
+    op.setOpType(repl::OpTypeEnum::kCommand);
+    op.setObject(commitObject.toBSON());
+    op.setSessionId(sessionInfo.getSessionId());
+    op.setTxnNumber(sessionInfo.getTxnNumber());
+    op.setOpTime(opTime);
+    op.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
+    op.setWallClockTime({});
+    op.setNss({});
+
+    return {op.toBSON()};
+}
+
+repl::OplogEntry makeAbortTransactionOplogEntry(
+    repl::OpTime opTime,
+    OperationSessionInfo sessionInfo,
+    boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
+    AbortTransactionOplogObject abortObject;
+
+    repl::MutableOplogEntry op;
+    op.setOpType(repl::OpTypeEnum::kCommand);
+    op.setObject(abortObject.toBSON());
+    op.setSessionId(sessionInfo.getSessionId());
+    op.setTxnNumber(sessionInfo.getTxnNumber());
+    op.setOpTime(opTime);
+    op.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
+    op.setWallClockTime({});
+    op.setNss({});
+
+    return {op.toBSON()};
+}
+
 }  // namespace repl
 }  // namespace mongo

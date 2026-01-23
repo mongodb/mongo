@@ -514,13 +514,16 @@ public:
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
-        OpStateAccumulator opStateAccumulator;
+        OpStateAccumulator fallbackOpStateAccumulator;
+        if (!opAccumulator) {
+            opAccumulator = &fallbackOpStateAccumulator;
+        }
         for (auto& o : _observers)
             o->onUnpreparedTransactionCommit(opCtx,
                                              reservedSlots,
                                              transactionOperations,
                                              applyOpsOperationAssignment,
-                                             &opStateAccumulator);
+                                             opAccumulator);
     }
 
     void onPreparedTransactionCommit(OperationContext* opCtx,

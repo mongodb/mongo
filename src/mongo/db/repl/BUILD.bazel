@@ -119,6 +119,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
         "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/shard_role/shard_catalog:collection_options",
     ],
@@ -1445,6 +1446,7 @@ mongo_cc_library(
         "optime",
         "//src/mongo/db:common",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:txn_cmd_request",
         "//src/mongo/db/index_builds:index_builds_common",
     ],
 )

@@ -254,6 +254,7 @@ struct ActiveTransactionHistory {
     boost::optional<SessionTxnRecord> lastTxnRecord;
     TransactionParticipant::CommittedStatementTimestampMap committedStatements;
     absl::flat_hash_set<NamespaceString> affectedNamespaces;
+    Timestamp commitTimestamp;
     bool hasIncompleteHistory{false};
 };
 
@@ -344,11 +345,18 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
     ON_BLOCK_EXIT([&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
 
     auto it = TransactionHistoryIterator(result.lastTxnRecord->getLastWriteOpTime());
+
     while (it.hasNext()) {
         try {
             const auto entry = it.next(opCtx);
 
             const auto& stmtIds = entry.getStatementIds();
+
+            if (result.lastTxnRecord->getState() == DurableTxnStateEnum::kCommitted &&
+                entry.getTimestamp() == result.lastTxnRecord->getLastWriteOpTime().getTimestamp()) {
+                // This is the last oplog entry in the oplog chain for a commited transaction.
+                result.commitTimestamp = uassertStatusOK(entry.extractCommitTransactionTimestamp());
+            }
 
             if (isInternalSessionForRetryableWrite(lsid) ||
                 entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
@@ -2218,8 +2226,9 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
             opCtx, applyOpsOplogSlotAndOperationAssignment.numberOfOplogSlotsRequired);
     }
 
+    OpStateAccumulator opAccumulator;
     opObserver->onUnpreparedTransactionCommit(
-        opCtx, reservedSlots, *txnOps, applyOpsOplogSlotAndOperationAssignment);
+        opCtx, reservedSlots, *txnOps, applyOpsOplogSlotAndOperationAssignment, &opAccumulator);
 
     // Read-only transactions with all read concerns must wait for any data they read to be majority
     // committed. For local read concern this is to match majority read concern. For both local and
@@ -2239,7 +2248,10 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
     // the caller, since the transaction can still be safely aborted at this point.
     _commitStorageTransaction(opCtx);
 
-    _finishCommitTransaction(opCtx, operationCount, oplogOperationBytes);
+    _finishCommitTransaction(opCtx,
+                             operationCount,
+                             oplogOperationBytes,
+                             opAccumulator.opTime.writeOpTime.getTimestamp());
 
     if (needsNoopWrite) {
         performNoopWrite(
@@ -2385,7 +2397,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         auto oplogOperationBytes = p().transactionOperations.getTotalOperationBytes();
         clearOperationsInMemory(opCtx);
 
-        _finishCommitTransaction(opCtx, operationCount, oplogOperationBytes);
+        _finishCommitTransaction(opCtx, operationCount, oplogOperationBytes, commitTimestamp);
     } catch (...) {
         // It is illegal for committing a prepared transaction to fail for any reason, other than an
         // invalid command, so we crash instead.
@@ -2502,7 +2514,7 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
             newTxnParticipant.clearOperationsInMemory(splitOpCtx.get());
 
             newTxnParticipant._finishCommitTransaction(
-                splitOpCtx.get(), operationCount, oplogOperationBytes);
+                splitOpCtx.get(), operationCount, oplogOperationBytes, commitTimestamp);
         }
 
         checkedOutSession->checkIn(splitOpCtx.get(), OperationContextSession::CheckInReason::kDone);
@@ -2512,11 +2524,15 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
 }
 
 void TransactionParticipant::Participant::_finishCommitTransaction(
-    OperationContext* opCtx, size_t operationCount, size_t oplogOperationBytes) noexcept {
+    OperationContext* opCtx,
+    size_t operationCount,
+    size_t oplogOperationBytes,
+    Timestamp commitTimestamp) noexcept {
     {
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).txnState.transitionTo(TransactionState::kCommitted);
+        o(lk).commitTimestamp = commitTimestamp;
         // Features such as the "split prepared transaction" optimization will not attribute
         // transaction metrics to the internal sessions.
         o(lk).transactionMetricsObserver.onCommit(opCtx,
@@ -3442,6 +3458,7 @@ void TransactionParticipant::Participant::_refreshSelfFromStorageIfNeeded(Operat
         o(lg).lastWriteOpTime = lastTxnRecord->getLastWriteOpTime();
         o(lg).affectedNamespaces = std::move(activeTxnHistory.affectedNamespaces);
         p().activeTxnCommittedStatements = std::move(activeTxnHistory.committedStatements);
+        o(lg).commitTimestamp = activeTxnHistory.commitTimestamp;
         o(lg).hasIncompleteHistory = activeTxnHistory.hasIncompleteHistory;
 
         if (!lastTxnRecord->getState()) {
@@ -3585,12 +3602,12 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
 
     // Sanity check that we don't double-execute statements
     for (const auto stmtId : stmtIdsWritten) {
-        const auto stmtOpTime = _checkStatementExecutedSelf(stmtId);
-        if (stmtOpTime) {
+        const auto stmtInfo = _checkStatementExecutedSelf(stmtId);
+        if (stmtInfo) {
             fassertOnRepeatedExecution(_sessionId(),
                                        sessionTxnRecord.getTxnNum(),
                                        stmtId,
-                                       *stmtOpTime,
+                                       stmtInfo->oplogEntryOpTime,
                                        sessionTxnRecord.getLastWriteOpTime());
         }
     }
@@ -3660,6 +3677,7 @@ void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
     o(*lk).affectedNamespaces.clear();
     o(*lk).prepareOpTime = repl::OpTime();
     o(*lk).recoveryPrepareOpTime = repl::OpTime();
+    o(*lk).commitTimestamp = Timestamp();
     o(*lk).transactionRuntimeContext = boost::none;
     p().autoCommit = boost::none;
     p().needToWriteAbortEntry = false;
@@ -3712,9 +3730,9 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
 boost::optional<repl::OplogEntry>
 TransactionParticipant::Participant::checkStatementExecutedAndFetchOplogEntry(
     OperationContext* opCtx, StmtId stmtId) const {
-    const auto stmtOpTime = _checkStatementExecuted(opCtx, stmtId);
+    const auto stmtInfo = _checkStatementExecuted(opCtx, stmtId);
 
-    if (!stmtOpTime) {
+    if (!stmtInfo) {
         return boost::none;
     }
 
@@ -3728,18 +3746,21 @@ TransactionParticipant::Participant::checkStatementExecutedAndFetchOplogEntry(
     auto storageInterface = repl::StorageInterface::get(opCtx);
     storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 
-    TransactionHistoryIterator txnIter(*stmtOpTime);
+    TransactionHistoryIterator txnIter(stmtInfo->oplogEntryOpTime);
     while (txnIter.hasNext()) {
-        const auto entry = txnIter.next(opCtx);
+        auto entry = txnIter.next(opCtx);
 
         if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
             validateTransactionHistoryApplyOpsOplogEntry(entry);
 
             std::vector<repl::OplogEntry> innerEntries;
             repl::ApplyOps::extractOperationsTo(entry, entry.getEntry().toBSON(), &innerEntries);
-            for (const auto& innerEntry : innerEntries) {
+            for (auto& innerEntry : innerEntries) {
                 const auto& stmtIds = innerEntry.getStatementIds();
                 if (std::find(stmtIds.begin(), stmtIds.end(), stmtId) != stmtIds.end()) {
+                    if (auto commitTimestamp = stmtInfo->commitTimestamp) {
+                        innerEntry.setCommitTransactionTimestamp(commitTimestamp);
+                    }
                     return innerEntry;
                 }
             }
@@ -3747,6 +3768,9 @@ TransactionParticipant::Participant::checkStatementExecutedAndFetchOplogEntry(
             const auto& stmtIds = entry.getStatementIds();
             invariant(!stmtIds.empty());
             if (std::find(stmtIds.begin(), stmtIds.end(), stmtId) != stmtIds.end()) {
+                if (auto commitTimestamp = stmtInfo->commitTimestamp) {
+                    entry.setCommitTransactionTimestamp(commitTimestamp);
+                }
                 return entry;
             }
         }
@@ -3760,16 +3784,17 @@ bool TransactionParticipant::Participant::checkStatementExecuted(OperationContex
     return bool(_checkStatementExecuted(opCtx, stmtId));
 }
 
-boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStatementExecuted(
-    OperationContext* opCtx, StmtId stmtId) const {
+boost::optional<TransactionParticipant::Participant::StatementInfo>
+TransactionParticipant::Participant::_checkStatementExecuted(OperationContext* opCtx,
+                                                             StmtId stmtId) const {
     const auto& retryableWriteTxnParticipantCatalog =
         getRetryableWriteTransactionParticipantCatalog(opCtx);
     invariant(retryableWriteTxnParticipantCatalog.isValid());
     invariant(retryableWriteTxnParticipantCatalog.getActiveTxnNumber() ==
               _activeRetryableWriteTxnNumber());
 
-    if (auto opTime = _checkStatementExecutedSelf(stmtId)) {
-        return opTime;
+    if (auto stmtInfo = _checkStatementExecutedSelf(stmtId)) {
+        return stmtInfo;
     }
 
     for (const auto& [sessionId, txnParticipant] :
@@ -3777,15 +3802,25 @@ boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStateme
         if (_sessionId() == sessionId || txnParticipant.transactionIsAborted()) {
             continue;
         }
-        if (auto opTime = txnParticipant._checkStatementExecutedSelf(stmtId)) {
-            return opTime;
+        if (auto stmtInfo = txnParticipant._checkStatementExecutedSelf(stmtId)) {
+            return stmtInfo;
         }
     }
     return boost::none;
 }
 
-boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStatementExecutedSelf(
-    StmtId stmtId) const {
+boost::optional<Timestamp> TransactionParticipant::Participant::_getCommitTimestamp() const {
+    if (transactionIsCommitted()) {
+        tassert(11730802,
+                "Expected a committed transaction to have a commit timestamp",
+                !o().commitTimestamp.isNull());
+        return o().commitTimestamp;
+    }
+    return boost::none;
+}
+
+boost::optional<TransactionParticipant::Participant::StatementInfo>
+TransactionParticipant::Participant::_checkStatementExecutedSelf(StmtId stmtId) const {
     invariant(o().isValid);
     if (_isInternalSessionForRetryableWrite()) {
         invariant(!transactionIsAborted());
@@ -3802,7 +3837,9 @@ boost::optional<repl::OpTime> TransactionParticipant::Participant::_checkStateme
         return boost::none;
     }
 
-    return it->second;
+    StatementInfo statementInfo(it->second);
+    statementInfo.commitTimestamp = _getCommitTimestamp();
+    return statementInfo;
 }
 
 namespace {

@@ -176,5 +176,55 @@ OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
     boost::optional<OpTime> prevOpTime = boost::none);
 
 BSONObj makeInsertApplyOpsEntry(const NamespaceString& nss, const UUID& uuid, const BSONObj& doc);
+
+repl::MutableOplogEntry makeNoopMutableOplogEntry(const NamespaceString& nss,
+                                                  UUID uuid,
+                                                  const LogicalSessionId& lsid,
+                                                  TxnNumber txnNumber,
+                                                  const std::vector<StmtId>& stmtIds,
+                                                  repl::OpTime prevOpTime);
+
+repl::OplogEntry makeNoopOplogEntry(repl::OpTime opTime,
+                                    const NamespaceString& nss,
+                                    UUID uuid,
+                                    const LogicalSessionId& lsid,
+                                    TxnNumber txnNumber,
+                                    const std::vector<StmtId>& stmtIds,
+                                    repl::OpTime prevOpTime);
+
+enum class ApplyOpsType { kPartial, kPrepare, kTerminal };
+
+repl::MutableOplogEntry makeApplyOpsMutableOplogEntry(
+    std::vector<repl::ReplOperation> ops,
+    OperationSessionInfo sessionInfo,
+    Date_t wallClockTime,
+    const std::vector<StmtId>& stmtIds,
+    boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+    boost::optional<repl::MultiOplogEntryType> multiOpType = boost::none,
+    boost::optional<ApplyOpsType> applyOpsType = ApplyOpsType::kTerminal);
+
+
+repl::OplogEntry makeApplyOpsOplogEntry(
+    repl::OpTime opTime,
+    std::vector<repl::ReplOperation> ops,
+    OperationSessionInfo sessionInfo,
+    Date_t wallClockTime,
+    const std::vector<StmtId>& stmtIds,
+    boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+    boost::optional<repl::MultiOplogEntryType> multiOpType = boost::none,
+    boost::optional<ApplyOpsType> applyOpsType = ApplyOpsType::kTerminal);
+
+
+repl::OplogEntry makeCommitTransactionOplogEntry(
+    repl::OpTime opTime,
+    OperationSessionInfo sessionInfo,
+    Timestamp commitTimestamp,
+    boost::optional<repl::OpTime> prevWriteOpTimeInTransaction);
+
+repl::OplogEntry makeAbortTransactionOplogEntry(
+    repl::OpTime opTime,
+    OperationSessionInfo sessionInfo,
+    boost::optional<repl::OpTime> prevWriteOpTimeInTransaction);
+
 }  // namespace repl
 }  // namespace MONGO_MOD_PUB mongo
