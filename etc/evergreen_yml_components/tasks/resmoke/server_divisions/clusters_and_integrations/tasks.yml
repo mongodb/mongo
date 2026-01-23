@@ -1873,8 +1873,6 @@ tasks:
         "sharding",
         "jscore",
         "common",
-        "requires_all_feature_flags",
-        "feature_flag_guarded",
       ]
     commands:
       - func: "generate resmoke tasks"

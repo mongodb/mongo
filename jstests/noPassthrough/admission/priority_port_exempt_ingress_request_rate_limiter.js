@@ -6,7 +6,6 @@
  *   requires_replication,
  *   requires_sharding,
  *   requires_fcv_83,
- *   featureFlagReplicationUsageOfPriorityPort,
  *   # The priority port is based on ASIO, so gRPC testing is excluded
  *   grpc_incompatible,
  * ]
@@ -214,10 +213,14 @@ describe("Tests for priority port exemption from ingress request rate limiter wi
         jsTest.log.info("Creating users for config server");
         this.createAdminUser(st.configRS.getPrimary());
         this.createRegularUser(st.configRS.getPrimary());
+        // Wait for user replication to complete
+        st.configRS.awaitReplication();
 
         jsTest.log.info("Creating users for shard server");
         this.createAdminUser(st.rs0.getPrimary());
         this.createRegularUser(st.rs0.getPrimary());
+        // Wait for user replication to complete
+        st.rs0.awaitReplication();
 
         // Wait for the cluster to be fully initialized
         st.configRS.awaitSecondaryNodes();

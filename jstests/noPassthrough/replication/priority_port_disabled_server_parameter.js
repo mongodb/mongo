@@ -3,7 +3,9 @@
  * priority port is disabled via a server parameter.
  *
  * @tags: [
- *  featureFlagReplicationUsageOfPriorityPort,
+ *  requires_fcv_83,
+ *  # The priority port is based on ASIO, so gRPC testing is excluded
+ *  grpc_incompatible,
  * ]
  */
 import {after, afterEach, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";

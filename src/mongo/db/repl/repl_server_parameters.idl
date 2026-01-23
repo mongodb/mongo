@@ -779,5 +779,6 @@ feature_flags:
             When enabled, allows replica set configuration with and internal replication usage of
             the dedicated priority port.
         cpp_varname: feature_flags::gFeatureFlagReplicationUsageOfPriorityPort
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true

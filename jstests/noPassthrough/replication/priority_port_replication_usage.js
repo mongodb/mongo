@@ -3,9 +3,11 @@
  * priority port.
  *
  * @tags: [
- *  featureFlagReplicationUsageOfPriorityPort,
- *  # The priority port is based on ASIO, so gRPC testing is excluded
- *  grpc_incompatible,
+ *    # The priority port is based on ASIO, so gRPC testing is excluded
+ *    grpc_incompatible,
+ *    requires_fcv_83,
+ *    # This test restarts nodes in a replica set, so it requires persistence.
+ *    requires_persistence,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
