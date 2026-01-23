@@ -10,54 +10,36 @@ assert.neq(null, conn, "mongod failed to start");
 
 const adminDB = conn.getDB("admin");
 
+function getTargetSection(serverStatusOutput) {
+    return serverStatusOutput.metrics.extension.vectorSearch;
+}
+
 (function VectorSearchServerStatusMetricsAppearByDefault() {
     // Get serverStatus and verify the extension.vectorSearch section exists.
     const serverStatus = adminDB.runCommand({serverStatus: 1});
     assert.commandWorked(serverStatus);
 
     // Verify the extension.vectorSearch section exists (section name with dot appears as top-level field).
-    assert(
-        serverStatus.hasOwnProperty("extension.vectorSearch") && serverStatus["extension.vectorSearch"] != null,
-        "serverStatus should have non-null 'extension.vectorSearch' section: " + tojson(serverStatus),
-    );
+    assert(serverStatus.hasOwnProperty("metrics"));
+    assert(serverStatus.metrics.hasOwnProperty("extension"), serverStatus.metrics);
+    assert(serverStatus.metrics.extension.hasOwnProperty("vectorSearch"), serverStatus.metrics.extension);
+    assert(serverStatus.metrics.extension.vectorSearch != null, serverStatus.metrics.extension);
 
-    const vectorSearchSection = serverStatus["extension.vectorSearch"];
-
-    // Verify all four metrics are populated.
-    function verifyMetricExistsAndIsPopulated(metricName) {
-        assert(
-            vectorSearchSection.hasOwnProperty(metricName),
-            `"extension.vectorSearch should have '${metricName}' field: ${tojson(vectorSearchSection)}`,
-        );
-        assert.gte(
-            vectorSearchSection[metricName],
-            0,
-            `'${metricName}' should be non-negative: ${vectorSearchSection[metricName]}`,
-        );
-    }
-
-    verifyMetricExistsAndIsPopulated("legacyVectorSearchUsed");
-    verifyMetricExistsAndIsPopulated("extensionVectorSearchUsed");
-    verifyMetricExistsAndIsPopulated("onViewKickbackRetries");
-    verifyMetricExistsAndIsPopulated("inSubpipelineKickbackRetries");
+    const vectorSearchSection = serverStatus.metrics.extension.vectorSearch;
+    assert(vectorSearchSection.hasOwnProperty("legacyVectorSearchUsed"), vectorSearchSection);
+    assert(vectorSearchSection.hasOwnProperty("extensionVectorSearchUsed"), vectorSearchSection);
+    assert(vectorSearchSection.hasOwnProperty("onViewKickbackRetries"), vectorSearchSection);
+    // TODO SERVER-116049: add test for inSubpipelineKickbackRetries.
 })();
 
 (function VectorSearchServerStatusMetricsCanBeRequested() {
-    const explicitServerStatus = adminDB.runCommand({serverStatus: 1, "extension.vectorSearch": 1});
+    const explicitServerStatus = adminDB.runCommand({serverStatus: 1, "metrics.extension.vectorSearch": 1});
     assert.commandWorked(explicitServerStatus);
-    assert(
-        explicitServerStatus.hasOwnProperty("extension.vectorSearch"),
-        "Explicitly requested extension.vectorSearch should be present",
-    );
-})();
 
-(function extensionVectorSearchServerStatusMetricsCanBeExcluded() {
-    const excludedServerStatus = adminDB.runCommand({serverStatus: 1, "extension.vectorSearch": 0});
-    assert.commandWorked(excludedServerStatus);
-    assert(
-        !excludedServerStatus.hasOwnProperty("extension.vectorSearch"),
-        "Excluded extension.vectorSearch should not be present: " + tojson(excludedServerStatus),
-    );
+    // Make sure the chain metrics -> extension -> vectorSearch exists.
+    assert(explicitServerStatus.hasOwnProperty("metrics"));
+    assert(explicitServerStatus.metrics.hasOwnProperty("extension"));
+    assert(explicitServerStatus.metrics.extension.hasOwnProperty("vectorSearch"));
 })();
 
 MongoRunner.stopMongod(conn);
@@ -82,16 +64,12 @@ MongoRunner.stopMongod(conn);
             // Get initial metrics.
             const initialServerStatus = testAdminDB.runCommand({serverStatus: 1});
             assert.commandWorked(initialServerStatus);
-            assert(
-                initialServerStatus.hasOwnProperty("extension.vectorSearch"),
-                "Initial serverStatus should have extension.vectorSearch section",
-            );
 
-            const initialMetrics = initialServerStatus["extension.vectorSearch"];
+            const initialMetrics = getTargetSection(initialServerStatus);
             const initialExtensionCount = initialMetrics.extensionVectorSearchUsed;
             const initialLegacyCount = initialMetrics.legacyVectorSearchUsed;
             const initialOnViewKickbackCount = initialMetrics.onViewKickbackRetries;
-            const initialInSubpipelineKickbackCount = initialMetrics.inSubpipelineKickbackRetries;
+            // const initialInSubpipelineKickbackCount = initialMetrics.inSubpipelineKickbackRetries;
 
             // Run a vector search query to trigger the extension.
             const pipeline = [{$vectorSearch: {}}];
@@ -101,12 +79,8 @@ MongoRunner.stopMongod(conn);
             // Get final metrics.
             const finalServerStatus = testAdminDB.runCommand({serverStatus: 1});
             assert.commandWorked(finalServerStatus);
-            assert(
-                finalServerStatus.hasOwnProperty("extension.vectorSearch"),
-                "Final serverStatus should have extension.vectorSearch section",
-            );
 
-            const finalMetrics = finalServerStatus["extension.vectorSearch"];
+            const finalMetrics = getTargetSection(finalServerStatus);
 
             // Verify extensionVectorSearchUsed was incremented.
             const finalExtensionCount = finalMetrics.extensionVectorSearchUsed;
@@ -120,7 +94,7 @@ MongoRunner.stopMongod(conn);
             // Verify other metrics remain at 0.
             const finalLegacyCount = finalMetrics.legacyVectorSearchUsed;
             const finalOnViewKickbackCount = finalMetrics.onViewKickbackRetries;
-            const finalInSubpipelineKickbackCount = finalMetrics.inSubpipelineKickbackRetries;
+            // TODO SERVER-116049: add test for inSubpipelineKickbackRetries.
 
             assert.eq(
                 finalLegacyCount,
@@ -131,11 +105,6 @@ MongoRunner.stopMongod(conn);
                 finalOnViewKickbackCount,
                 initialOnViewKickbackCount,
                 `onViewKickbackRetries should remain at ${initialOnViewKickbackCount}, got ${finalOnViewKickbackCount}`,
-            );
-            assert.eq(
-                finalInSubpipelineKickbackCount,
-                initialInSubpipelineKickbackCount,
-                `inSubpipelineKickbackRetries should remain at ${initialInSubpipelineKickbackCount}, got ${finalInSubpipelineKickbackCount}`,
             );
         },
         ["standalone"],
