@@ -95,6 +95,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.ndeleted = 2;
     currentAdditiveMetrics.nUpserted = 7;
     additiveMetricsToAdd.nUpserted = 8;
+    currentAdditiveMetrics.nUpdateOps = 5;
+    additiveMetricsToAdd.nUpdateOps = 6;
     currentAdditiveMetrics.keysInserted = 6;
     additiveMetricsToAdd.keysInserted = 5;
     currentAdditiveMetrics.keysDeleted = 4;
@@ -152,6 +154,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.ndeleted + *additiveMetricsToAdd.ndeleted);
     ASSERT_EQ(*currentAdditiveMetrics.nUpserted,
               *additiveMetricsBeforeAdd.nUpserted + *additiveMetricsToAdd.nUpserted);
+    // For nUpdateOps, we keep the existing value as the value to return.
+    ASSERT_EQ(*currentAdditiveMetrics.nUpdateOps, additiveMetricsBeforeAdd.nUpdateOps);
     ASSERT_EQ(*currentAdditiveMetrics.keysInserted,
               *additiveMetricsBeforeAdd.keysInserted + *additiveMetricsToAdd.keysInserted);
     ASSERT_EQ(*currentAdditiveMetrics.keysDeleted,
@@ -221,6 +225,7 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     additiveMetricsToAdd.overdueInterruptApproxMax = Milliseconds(100);
     additiveMetricsToAdd.planningTime = Microseconds(100);
     additiveMetricsToAdd.nDocsSampled = 10;
+    additiveMetricsToAdd.nUpdateOps = 5;
 
     // Save the current AdditiveMetrics object before adding.
     OpDebug::AdditiveMetrics additiveMetricsBeforeAdd;
@@ -250,6 +255,10 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     // The 'nUpserted' field for both the current AdditiveMetrics object and the AdditiveMetrics
     // object to add were not initialized, so nUpserted should still be uninitialized after the add.
     ASSERT_EQ(currentAdditiveMetrics.nUpserted, boost::none);
+
+    // The 'nUpdateOps' field for the current AdditiveMetrics object was not initialized, so it
+    // should return the AdditiveMEtrics object to add value.
+    ASSERT_EQ(currentAdditiveMetrics.nUpdateOps, *additiveMetricsToAdd.nUpdateOps);
 
     // The 'executionTime' field for both the current AdditiveMetrics object and the AdditiveMetrics
     // object to add were not initialized, so executionTime should still be uninitialized after the

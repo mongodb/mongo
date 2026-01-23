@@ -179,6 +179,11 @@ struct WritesEntry {
      * Aggregates the number of documents inserted (excluding upserts).
      */
     AggregatedMetric<uint64_t> nInserted;
+
+    /**
+     * Aggregates the total number of update operations in the update request.
+     */
+    AggregatedMetric<uint64_t> nUpdateOps;
 };
 
 /**

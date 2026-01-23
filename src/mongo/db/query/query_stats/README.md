@@ -266,6 +266,7 @@ following way:
 - `metrics.writes.nModified`: The number of existing documents updated.
 - `metrics.writes.nDeleted`: The number of documents deleted.
 - `metrics.writes.nInserted`: The number of documents inserted (excluding upserts).
+- `metrics.writes.nUpdateOps`: The number of updates in the original update request.
 
 #### Permissions
 

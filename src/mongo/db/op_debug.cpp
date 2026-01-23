@@ -1515,6 +1515,7 @@ void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     ninserted = addOptionals(ninserted, otherMetrics.ninserted);
     ndeleted = addOptionals(ndeleted, otherMetrics.ndeleted);
     nUpserted = addOptionals(nUpserted, otherMetrics.nUpserted);
+    nUpdateOps = nUpdateOps.has_value() ? nUpdateOps : otherMetrics.nUpdateOps;
     keysInserted = addOptionals(keysInserted, otherMetrics.keysInserted);
     keysDeleted = addOptionals(keysDeleted, otherMetrics.keysDeleted);
     readingTime = addOptionals(readingTime, otherMetrics.readingTime);
@@ -1695,6 +1696,7 @@ void OpDebug::AdditiveMetrics::reset() {
     keysInserted = boost::none;
     keysDeleted = boost::none;
     executionTime = boost::none;
+    nUpdateOps = boost::none;
 }
 
 bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const {
@@ -1703,7 +1705,8 @@ bool OpDebug::AdditiveMetrics::equals(const AdditiveMetrics& otherMetrics) const
         nBatches == otherMetrics.nBatches && nModified == otherMetrics.nModified &&
         ninserted == otherMetrics.ninserted && ndeleted == otherMetrics.ndeleted &&
         nUpserted == otherMetrics.nUpserted && keysInserted == otherMetrics.keysInserted &&
-        keysDeleted == otherMetrics.keysDeleted && executionTime == otherMetrics.executionTime;
+        keysDeleted == otherMetrics.keysDeleted && executionTime == otherMetrics.executionTime &&
+        nUpdateOps == otherMetrics.nUpdateOps;
 }
 
 void OpDebug::AdditiveMetrics::incrementKeysInserted(long long n) {

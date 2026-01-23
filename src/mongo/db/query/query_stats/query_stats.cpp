@@ -305,6 +305,7 @@ void updateWriteStatistics(WritesEntry& writeEntryToUpdate, const QueryStatsSnap
     writeEntryToUpdate.nModified.aggregate(snapshot.nModified);
     writeEntryToUpdate.nDeleted.aggregate(snapshot.nDeleted);
     writeEntryToUpdate.nInserted.aggregate(snapshot.nInserted);
+    writeEntryToUpdate.nUpdateOps.aggregate(snapshot.nUpdateOps);
 }
 
 void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
@@ -522,6 +523,7 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
         static_cast<uint64_t>(metrics.nModified.value_or(0)),
         static_cast<uint64_t>(metrics.ndeleted.value_or(0)),
         static_cast<uint64_t>(metrics.ninserted.value_or(0)),
+        static_cast<uint64_t>(metrics.nUpdateOps.value_or(0)),
         metrics.totalTimeQueuedMicros.value_or(Microseconds(0)).count(),
         static_cast<uint64_t>(metrics.totalAdmissions.value_or(0)),
         metrics.wasLoadShed.value_or(false),

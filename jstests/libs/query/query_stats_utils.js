@@ -549,13 +549,14 @@ export function assertAggregatedMetricsSingleExec(
         assertAggregatedMetric(queryStatSection, "keysExamined", numericMetric(keysExamined));
 
         if (writes) {
-            const {nMatched, nUpserted, nModified, nDeleted, nInserted} = writes;
+            const {nMatched, nUpserted, nModified, nDeleted, nInserted, nUpdateOps} = writes;
             const writesSection = getWriteMetrics(results.metrics);
             assertAggregatedMetric(writesSection, "nMatched", numericMetric(nMatched));
             assertAggregatedMetric(writesSection, "nUpserted", numericMetric(nUpserted));
             assertAggregatedMetric(writesSection, "nModified", numericMetric(nModified));
             assertAggregatedMetric(writesSection, "nDeleted", numericMetric(nDeleted));
             assertAggregatedMetric(writesSection, "nInserted", numericMetric(nInserted));
+            assertAggregatedMetric(writesSection, "nUpdateOps", numericMetric(nUpdateOps));
         }
     }
 
