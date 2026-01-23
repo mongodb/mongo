@@ -539,8 +539,8 @@ buildvariants:
       - name: .development_critical .requires_large_host
         distros:
           - rhel10.0-large
-      - name: .release_critical !.requires_large_host !.publish
-      - name: .release_critical .requires_large_host !.publish
+      - name: .release_critical !.requires_large_host !.publish !.publish_crypt
+      - name: .release_critical .requires_large_host !.publish !.publish_crypt
         distros:
           - rhel10.0-large
 
@@ -639,7 +639,7 @@ buildvariants:
       - name: .development_critical .requires_large_host
         distros:
           - rhel10.0-arm64-large
-      - name: .release_critical !.requires_large_host !.publish
-      - name: .release_critical .requires_large_host !.publish
+      - name: .release_critical !.requires_large_host !.publish !.publish_crypt
+      - name: .release_critical .requires_large_host !.publish !.publish_crypt
         distros:
           - rhel10.0-arm64-large
