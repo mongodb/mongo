@@ -1874,7 +1874,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 //     steady-state replication and existing users of applyOps.
 
                 const bool inTxn = opCtx->inMultiDocumentTransaction();
-                bool needToDoUpsert = haveWrappingWriteUnitOfWork && !inTxn;
+                bool isApplyOpsCmd = haveWrappingWriteUnitOfWork && !inTxn;
+                bool needToDoUpsert = isApplyOpsCmd;
 
                 Timestamp timestamp;
                 if (assignOperationTimestamp) {
@@ -1955,8 +1956,21 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             // have received on the initial sync.
                             return Status::OK();
                         }
-                        // Continue to the next block to retry the operation as an upsert.
-                        needToDoUpsert = true;
+
+                        if (auto opRid = op.getDurableReplOperation().getRecordId();
+                            opRid.has_value()) {
+                            // For collections with replicated recordIds we are taking the hard
+                            // stance that getting a DuplicatedKey error while applying an insert
+                            // oplog entry is a constraint violation.
+                            LOGV2_FATAL_NOTRACE(8830900,
+                                                "Got DuplicateKey error while applying insert "
+                                                "oplog entry with recordId",
+                                                "oplogEntry"_attr = redact(op.toBSONForLogging()),
+                                                "opTime"_attr = op.getOpTime());
+                        } else {
+                            // Continue to the next block to retry the operation as an upsert.
+                            needToDoUpsert = true;
+                        }
                     } else {
                         return status;
                     }
@@ -1964,11 +1978,38 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 // Now see if we need to do an upsert.
                 if (needToDoUpsert) {
+                    auto oplogIdField = o.getField("_id");
+
+                    if (auto opRid = op.getDurableReplOperation().getRecordId();
+                        opRid.has_value() && isApplyOpsCmd) {
+                        Snapshotted<BSONObj> doc;
+                        // If it is an applyOps cmd with recordId, and a document exists at the
+                        // oplog recordId, the _id of that document must match the _id in the oplog.
+                        // We don't need to check for non-applyOps commands as it would have failed
+                        // above due to DuplicateKey error on the recordId.
+                        if (collection->findDoc(opCtx, *opRid, &doc) &&
+                            !oplogIdField.binaryEqual(doc.value()["_id"])) {
+                            const auto& opObj = redact(op.toBSONForLogging());
+                            uasserted(
+                                8830901,
+                                fmt::format("While applying an applyOps insert oplog entry : '{}' "
+                                            "with 'rid' {}, the "
+                                            "corresponding record '{}' "
+                                            "had a different _id than the oplog.",
+                                            opObj.toString(),
+                                            opRid->toStringHumanReadable(),
+                                            redact(doc.value()).toString()));
+                        }
+                        // Here we have the record Id, we could optimize the upsert based on that
+                        // however it is not worth the effort given that we are here only on
+                        // uncommon applyOps usages.
+                    }
+
                     // Do update on DuplicateKey errors.
                     // This will only be on the _id field in replication,
                     // since we disable non-_id unique constraint violations.
                     BSONObjBuilder b;
-                    b.append(o.getField("_id"));
+                    b.append(oplogIdField);
 
                     auto request = UpdateRequest();
                     request.setNamespaceString(requestNss);
