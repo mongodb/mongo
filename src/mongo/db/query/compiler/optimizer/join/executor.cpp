@@ -48,7 +48,6 @@
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::join_ordering {
@@ -92,6 +91,15 @@ bool isAggEligibleForJoinReordering(const MultipleCollectionAccessor& mca,
     if (mca.getMainCollectionAcquisition().getShardingDescription().isSharded()) {
         // We don't permit a sharded base collection.
         return false;
+    }
+
+    // Check that no foreign collection is sharded.
+    for (const auto& [_, collAcq] : mca.getSecondaryCollectionAcquisitions()) {
+        if (collAcq.collectionExists() &&
+            collAcq.getCollection().getShardingDescription().isSharded()) {
+            // We don't permit sharded foreign collections.
+            return false;
+        }
     }
 
     if (mca.isAnySecondaryNamespaceAViewOrNotFullyLocal() || anySecondaryNamespacesDontExist(mca)) {
