@@ -3,6 +3,9 @@ filters:
   - "*analyze_shard_key*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "initialize_tenant_to_shard_cache*":
+    approvers:
+      - 10gen/server-security
   - "*move*range*":
     approvers:
       - 10gen/server-cluster-scalability

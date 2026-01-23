@@ -253,6 +253,9 @@ filters:
   - "multi_key_path_tracker*":
     approvers:
       - 10gen/query-execution-write-exec
+  - "multitenancy*":
+    approvers:
+      - 10gen/server-security
   - "yieldable.h":
     approvers:
       - 10gen/query-execution-yielding

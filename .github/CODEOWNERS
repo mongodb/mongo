@@ -1940,6 +1940,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/dbcommands.idl @10gen/server-storage-engine-integration @svc-auto-approve-bot
 /src/mongo/db/**/bulk_write_shard_test.cpp @10gen/query-execution-write-exec @svc-auto-approve-bot
 /src/mongo/db/**/multi_key_path_tracker* @10gen/query-execution-write-exec @svc-auto-approve-bot
+/src/mongo/db/**/multitenancy* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/**/yieldable.h @10gen/query-execution-yielding @svc-auto-approve-bot
 /src/mongo/db/**/mirror* @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/db/**/wire_version* @10gen/server-networking-and-observability @svc-auto-approve-bot
@@ -3112,6 +3113,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/s/OWNERS.yml
 /src/mongo/s/**/*analyze_shard_key* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/src/mongo/s/**/initialize_tenant_to_shard_cache* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/s/**/*move*range* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/*query_analyzer* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /src/mongo/s/**/query_analysis* @10gen/server-cluster-scalability @svc-auto-approve-bot

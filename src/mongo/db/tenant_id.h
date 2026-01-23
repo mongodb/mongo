@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/modules_incompletely_marked_header.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/time_support.h"
@@ -46,7 +47,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUBLIC mongo {
 
 /**
  *  Representation of a tenant identifier.
@@ -169,4 +170,4 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& stream,
     return stream << tenantId.toString();
 }
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUBLIC mongo
