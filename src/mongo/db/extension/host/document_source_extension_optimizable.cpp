@@ -32,6 +32,7 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
+#include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 #include "mongo/db/pipeline/search/search_helper.h"
@@ -211,6 +212,20 @@ bool DocumentSourceExtensionOptimizable::LiteParsedExpanded::isExtensionVectorSe
 }
 
 ViewPolicy DocumentSourceExtensionOptimizable::LiteParsedExpanded::getViewPolicy() const {
+    if (!feature_flags::gFeatureFlagExtensionViewsAndUnionWith.isEnabled()) {
+        // If this is not a $vectorSearch stage, views are banned entirely with the feature flag
+        // disabled.
+        uassert(ErrorCodes::NotImplemented,
+                str::stream() << "Extension stages are not allowed to run on a view namespace.",
+                isExtensionVectorSearchStage());
+
+        // If this is a $vectorSearch stage, we perform the IFR flag retry kickback to use legacy
+        // $vectorSearch instead.
+        uassertStatusOK(
+            Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
+                   "$vectorSearch-as-an-extension is not allowed against views."));
+    }
+
     return ViewPolicy{.policy = view_util::toFirstStageApplicationPolicy(
                           _astNode->getFirstStageViewApplicationPolicy()),
                       .callback = [this](const ViewInfo& viewInfo, StringData stageName) {

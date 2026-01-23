@@ -1195,23 +1195,6 @@ Status executeResolvedAggregate(const AggExState& aggExState,
                   "Namespace changed from collection to view during aggregation planning");
     }
 
-    // TODO SERVER-116021 Remove this check when the extension itself can check and uassert
-    // in its ViewPolicy function, rather than doing it here in the runAggregate
-    // infrastructure. $vectorSearch-as-an-extension is not allowed to run against views, at
-    // least in v8.3. If we see that a $vectorSearch stage exists in the pipeline AND a view
-    // exists, then we throw the IFRFlagRetry to disable the vector search extension flag
-    // and use legacy vector search instead.
-    // TODO SERVER-116994 Remove this check either from here or SERVER-116021 when
-    // $vectorSearch-as-an-extension is allowed against views.
-    if (aggExState.isView() &&
-        aggExState.getIfrContext()->getSavedFlagValue(
-            feature_flags::gFeatureFlagVectorSearchExtension) &&
-        aggExState.getOriginalLiteParsedPipeline().hasExtensionVectorSearchStage()) {
-        uassertStatusOK(
-            Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
-                   "$vectorSearch-as-an-extension is not allowed against views."));
-    }
-
     // Create an RAII object that prints the collection's shard key in the case of a tassert
     // or crash.
     ScopedDebugInfo shardKeyDiagnostics(

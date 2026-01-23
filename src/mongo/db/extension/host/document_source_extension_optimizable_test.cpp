@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline_factory.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
+#include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/namespace_string_util.h"
@@ -2436,6 +2437,8 @@ void testViewPolicyHelper(const NamespaceString& nss,
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedGetViewPolicyWithDefaultPrependAndCallback) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     testViewPolicyHelper(
         _nss,
@@ -2446,6 +2449,8 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 
 TEST_F(DocumentSourceExtensionOptimizableTest,
        LiteParsedExpandedGetViewPolicyWithDoNothingAndCallback) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagExtensionViewsAndUnionWith", true};
+
     const auto viewNss = NamespaceString::createNamespaceString_forTest("test.view"_sd);
     testViewPolicyHelper(
         _nss,
