@@ -118,7 +118,7 @@ bool AttachedServiceLifecycle::initializedUsingDefaultSyncDelay() const {
     return _initializedUsingDefaultSyncDelay;
 }
 
-void AttachedServiceLifecycle::initializeStateRequiredForOfflineValidation(ServiceContext*) {}
+void AttachedServiceLifecycle::initializeStateRequiredForOfflineValidation(OperationContext*) {}
 
 bool AttachedServiceLifecycle::shouldKeepThreadAliveUntilStorageEngineHasShutDown(
     const StringData) const {

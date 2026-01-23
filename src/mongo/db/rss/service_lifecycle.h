@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/modules.h"
@@ -96,7 +97,7 @@ public:
      * This method is not called when the node is part of a replica set or handling user
      * requests as a standalone.
      */
-    virtual void initializeStateRequiredForOfflineValidation(ServiceContext*) = 0;
+    virtual void initializeStateRequiredForOfflineValidation(OperationContext*) = 0;
 
     /**
      * If true, the named thread must be kept alive until the storage engine has shut down.
