@@ -2816,6 +2816,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/repl/**/* @10gen/server-replication-reviewers @svc-auto-approve-bot
 /src/mongo/db/repl/**/dbcheck* @10gen/server-dbcheck @svc-auto-approve-bot
 /src/mongo/db/repl/**/*oplog* @10gen/server-oplog @svc-auto-approve-bot
+/src/mongo/db/repl/**/change_stream_oplog_notification* @10gen/query-execution-change-streams @10gen/server-oplog @svc-auto-approve-bot
 /src/mongo/db/repl/**/*noop_writer* @10gen/server-oplog @svc-auto-approve-bot
 /src/mongo/db/repl/**/*bgsync* @10gen/server-oplog @svc-auto-approve-bot
 /src/mongo/db/repl/**/*sync_source* @10gen/server-oplog @svc-auto-approve-bot

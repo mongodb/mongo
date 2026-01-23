@@ -9,6 +9,10 @@ filters:
   - "*oplog*":
     approvers:
       - 10gen/server-oplog
+  - "change_stream_oplog_notification*":
+    approvers:
+      - 10gen/query-execution-change-streams
+      - 10gen/server-oplog
   - "*noop_writer*":
     approvers:
       - 10gen/server-oplog
