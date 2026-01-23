@@ -101,7 +101,7 @@ public:
      * Returns the number of path elements in the field path.
      */
     size_t getPathLength() const {
-        return _fieldPathDotPosition.size() - 1;
+        return getPathLength(_fieldPathDotPosition);
     }
 
     /**
@@ -130,10 +130,7 @@ public:
      * Return the ith field name from this path using zero-based indexes.
      */
     StringData getFieldName(size_t i) const MONGO_COMPILER_LIFETIME_BOUND {
-        dassert(i < getPathLength());
-        const auto begin = _fieldPathDotPosition[i] + 1;
-        const auto end = _fieldPathDotPosition[i + 1];
-        return StringData(&_fieldPath[begin], end - begin);
+        return getFieldName(i, _fieldPathDotPosition, _fieldPath);
     }
 
     /**
@@ -218,7 +215,8 @@ private:
      * Given a vector of dot positions, returns the number of elements in the field path.
      * ONLY FOR USE IN FACTORY FUNCTION. Otherwise use non-static member function of same name.
      */
-    static size_t getPathLength(std::vector<size_t> dotPositions) {
+    static size_t getPathLength(const std::vector<size_t>& dotPositions) {
+        tassert(11631400, "The vector 'dotPositions' cannot be empty", !dotPositions.empty());
         return dotPositions.size() - 1;
     }
 
@@ -228,11 +226,16 @@ private:
      * ONLY FOR USE IN FACTORY FUNCTION. Otherwise use non-static member function of same name.
      */
     static StringData getFieldName(size_t i,
-                                   std::vector<size_t> dotPositions,
+                                   const std::vector<size_t>& dotPositions,
                                    const std::string& fieldPath) {
-        dassert(i < getPathLength(dotPositions));
+        tassert(11631401,
+                "Index i must not be greater than the path length",
+                i < getPathLength(dotPositions));
         const auto begin = dotPositions[i] + 1;
         const auto end = dotPositions[i + 1];
+        tassert(11631402,
+                "StringData cannot be taken from range past end of string fieldPath",
+                begin < fieldPath.length() && end <= fieldPath.length());
         return StringData(&fieldPath[begin], end - begin);
     }
 
