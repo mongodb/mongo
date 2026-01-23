@@ -239,7 +239,7 @@ std::pair<CollectionOrViewAcquisition, bool> acquireCollectionOrViewWithBucketsL
                 ? originNssOrUUID.nss().getTimeseriesViewNamespace()
                 : originNssOrUUID.nss().makeTimeseriesBucketsNamespace();
             if (timeseriesCollectionExistsInCatalog(opCtx, otherNss)) {
-                auto otherAcquisitionReq = CollectionAcquisitionRequest::fromOpCtx(
+                auto otherAcquisitionReq = CollectionOrViewAcquisitionRequest::fromOpCtx(
                     opCtx, otherNss, acquisitionReq.operationType);
 
                 if (!otherAcquisitionReq.placementConcern.getShardVersion().has_value()) {
