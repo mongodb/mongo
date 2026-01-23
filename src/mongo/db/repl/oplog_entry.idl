@@ -235,6 +235,14 @@ structs:
                 description: "Snapshot of the FCV used by the operation,
                     which ensures that feature flag checks are stable through its execution."
 
+    DropAndRenameOplogEntryO2:
+        description: "The 'o2' field of a 'drop' or 'rename' oplog entry."
+        strict: false
+        fields:
+            numRecords:
+                type: long
+                description: "The number of records in the dropped or renamed collection."
+
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.
         inline_chained_structs: true
