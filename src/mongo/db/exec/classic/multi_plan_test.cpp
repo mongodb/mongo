@@ -1415,5 +1415,62 @@ DEATH_TEST_REGEX_F(QueryStageMultiPlanDeathTest,
     auto rejected = mps->extractPlanExplainerData();
 }
 
+TEST_F(QueryStageMultiPlanTest, ManagesStateAroundAbandoningTrials) {
+    // Insert a dummy object, just so the collection exists.
+    insert(BSON("foo" << 0));
+    auto coll = getCollection();
+
+    auto cq = makeCanonicalQuery(opCtx.get(), nss, {});
+
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(),
+        coll,
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+
+    auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
+                                                  nss,
+                                                  static_cast<PlanStage*>(mps.get()),
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+
+    ASSERT_FALSE(mps->isStateSaved());
+    ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
+    ASSERT_TRUE(mps->isStateSaved());
+    mps->abandonTrials();
+    ASSERT_FALSE(mps->isStateSaved());
+}
+
+TEST_F(QueryStageMultiPlanTest, ManagesStateAroundPickingBestPlan) {
+    // Insert a dummy object, just so the collection exists.
+    insert(BSON("foo" << 0));
+    auto coll = getCollection();
+
+    auto cq = makeCanonicalQuery(opCtx.get(), nss, {});
+
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(
+        expCtx.get(),
+        coll,
+        cq.get(),
+        plan_cache_util::ClassicPlanCacheWriter{opCtx.get(), coll, false});
+
+    unique_ptr<WorkingSet> sharedWs(new WorkingSet());
+    mps->addPlan(createQuerySolution(),
+                 getCollScanPlan(expCtx.get(), coll, sharedWs.get(), {}),
+                 sharedWs.get());
+
+
+    auto planYieldPolicy = makeClassicYieldPolicy(opCtx.get(),
+                                                  nss,
+                                                  static_cast<PlanStage*>(mps.get()),
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+
+    ASSERT_FALSE(mps->isStateSaved());
+    ASSERT_OK(mps->runTrials(planYieldPolicy.get()));
+    ASSERT_TRUE(mps->isStateSaved());
+    ASSERT_OK(mps->pickBestPlan());
+    ASSERT(mps->bestPlanChosen());
+    ASSERT_FALSE(mps->isStateSaved());
+}
+
 }  // namespace
 }  // namespace mongo

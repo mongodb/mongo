@@ -217,10 +217,18 @@ public:
      */
     void abandonTrials();
 
-protected:
-    void doSaveStateRequiresCollection() final {}
+    bool isStateSaved() {
+        return _isStateSaved;
+    }
 
-    void doRestoreStateRequiresCollection() final {}
+protected:
+    void doSaveStateRequiresCollection() final {
+        _isStateSaved = true;
+    }
+
+    void doRestoreStateRequiresCollection() final {
+        _isStateSaved = false;
+    }
 
 private:
     //
@@ -305,6 +313,8 @@ private:
 
     // Stats
     MultiPlanStats _specificStats;
+
+    bool _isStateSaved = false;
 };
 
 }  // namespace mongo

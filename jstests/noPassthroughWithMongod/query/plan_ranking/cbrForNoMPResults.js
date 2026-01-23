@@ -166,15 +166,24 @@ const prevPlanRankerMode = assert.commandWorked(db.adminCommand({setParameter: 1
 const prevAutoPlanRankingStrategy = assert.commandWorked(
     db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: "CBRForNoMultiplanningResults"}),
 ).was;
+const execYieldIterations = db.adminCommand({
+    getParameter: 1,
+    internalQueryExecYieldIterations: 1,
+}).internalQueryExecYieldIterations;
 try {
     testNoResultsQueryIsPlannedWithCBR();
     testNoResultsQueryWithSinglePlanDoesNotNeedPlanRanking();
     testResultsQueryIsPlannedWithMultiPlanner();
     testEOFIsPlannedWithMultiPlanner();
+    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
     testReturnKeyIsPlannedWithMultiPlanner();
 } finally {
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: prevAutoPlanRankingStrategy}),
+        db.adminCommand({
+            setParameter: 1,
+            planRankerMode: prevPlanRankerMode,
+            automaticCEPlanRankingStrategy: prevAutoPlanRankingStrategy,
+            internalQueryExecYieldIterations: execYieldIterations,
+        }),
     );
 }

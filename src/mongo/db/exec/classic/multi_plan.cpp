@@ -37,7 +37,6 @@
 #include "mongo/db/exec/classic/multi_plan_rate_limiter.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/compiler/ce/ce_common.h"
 #include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/cost_estimator.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
@@ -48,9 +47,8 @@
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranker_util.h"
-#include "mongo/db/query/query_execution_knobs_gen.h"
-#include "mongo/db/query/query_integration_knobs_gen.h"
 #include "mongo/db/query/query_optimization_knobs_gen.h"
+#include "mongo/db/query/restore_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/exceptions.h"
 #include "mongo/logv2/log.h"
@@ -279,6 +277,10 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy) {
 
 Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
                                  trial_period::TrialPhaseConfig trialConfig) {
+    if (_isStateSaved) {
+        restoreState(&collectionPtr());
+    }
+
     tassert(11521900,
             "Running trials for multi-plan stage when we already have a solution.",
             !bestPlanChosen());
@@ -356,6 +358,11 @@ Status MultiPlanStage::runTrials(PlanYieldPolicy* yieldPolicy,
         tickSource->ticksTo<Microseconds>(tickSource->getTicks() - startTicks));
     classicMicrosHistogram.increment(durationMicros);
     classicMicrosTotal.increment(durationMicros);
+
+    // Save state after running trials so that we are safe to yield or do other things
+    // (like run CBR)
+    saveState();
+
     return Status::OK();
 }
 
@@ -371,6 +378,10 @@ trial_period::TrialPhaseConfig MultiPlanStage::getTrialPhaseConfig() const {
 }
 
 Status MultiPlanStage::pickBestPlan() {
+    if (_isStateSaved) {
+        restoreState(&collectionPtr());
+    }
+
     tassert(11484502, "Picking best plan without having run trials", _specificStats.totalWorks > 0);
 
     // After picking best plan, ranking will own plan stats from candidate solutions (winner and
@@ -583,6 +594,10 @@ bool MultiPlanStage::hasBackupPlan() const {
 }
 
 void MultiPlanStage::abandonTrials() {
+    if (_isStateSaved) {
+        restoreState(&collectionPtr());
+    }
+
     tassert(11542002, "cannot abandon trials after best plan has been chosen", !bestPlanChosen());
     for (size_t i = 0; i < _candidates.size(); ++i) {
         rejectPlan(i);
