@@ -161,13 +161,9 @@ ServiceContext::~ServiceContext() {
     invariant(_clients.empty());
 }
 
-Service* ServiceContext::getService(ClusterRole role) const {
-    return _serviceSet->getService(role);
-}
-
 Service* ServiceContext::getService() const {
     for (auto role : {ClusterRole::ShardServer, ClusterRole::RouterServer})
-        if (auto p = getService(role))
+        if (auto p = _serviceSet->getService(role))
             return p;
     MONGO_UNREACHABLE;
 }

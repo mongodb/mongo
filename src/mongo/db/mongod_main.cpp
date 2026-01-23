@@ -1023,15 +1023,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     PeriodicTask::startRunningPeriodicTasks();
 
-    auto shardService = serviceContext->getService();
-    SessionKiller::set(shardService,
-                       std::make_shared<SessionKiller>(shardService, killSessionsLocal));
-
-    if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-        auto routerService = serviceContext->getService(ClusterRole::RouterServer);
-        SessionKiller::set(routerService,
-                           std::make_shared<SessionKiller>(routerService, killSessionsRemote));
-    }
+    SessionKiller::set(
+        serviceContext->getService(),
+        std::make_shared<SessionKiller>(serviceContext->getService(), killSessionsLocal));
 
     // Start up a background task to periodically check for and kill expired transactions; and a
     // background task to periodically check for and decrease cache pressure by decreasing the
@@ -1942,9 +1936,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // SessionKiller relies on the network stack being cleanly shutdown which only occurs under
     // sanitizers
     SessionKiller::shutdown(serviceContext->getService());
-    if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-        SessionKiller::shutdown(serviceContext->getService(ClusterRole::RouterServer));
-    }
 #endif
 
     FlowControl::shutdown(serviceContext);

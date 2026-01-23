@@ -218,9 +218,8 @@ public:
                 // (like range deletion utilities) would fail since retryable writes cannot have
                 // limit=0. A tactical solution is to use an alternative client as well as a new
                 // operation context.
-                auto newClient = getGlobalServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("ShardsvrTimeseriesUpgradeDowngradeCommit");
+                auto newClient = getGlobalServiceContext()->getService()->makeClient(
+                    "ShardsvrTimeseriesUpgradeDowngradeCommit");
                 AlternativeClientRegion acr(newClient);
                 auto newOpCtx = CancelableOperationContext(
                     cc().makeOperationContext(),
