@@ -150,7 +150,7 @@ void QueryAnalysisSampler::onStartup() {
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    stdx::lock_guard<stdx::mutex> lk(_sampleRateLimitersMutex);
+    stdx::lock_guard<stdx::mutex> lk(_jobsMutex);
 
     // setting isKillableByStepdown to false as _freshQueryStats has no OperationContext.
     // Holds only _queryStatsMutex and no other resources, updates only in memory states and
@@ -197,6 +197,7 @@ void QueryAnalysisSampler::onStartup() {
 }
 
 void QueryAnalysisSampler::onShutdown() {
+    stdx::lock_guard<stdx::mutex> lk(_jobsMutex);
     if (_periodicQueryStatsRefresher.isValid()) {
         _periodicQueryStatsRefresher.stop();
     }

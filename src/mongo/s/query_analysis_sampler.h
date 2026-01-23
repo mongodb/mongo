@@ -258,6 +258,7 @@ private:
 
     mutable stdx::mutex _sampleRateLimitersMutex;
     mutable stdx::mutex _queryStatsMutex;
+    mutable stdx::mutex _jobsMutex;
 
     PeriodicJobAnchor _periodicQueryStatsRefresher;
     QueryStats _queryStats;
