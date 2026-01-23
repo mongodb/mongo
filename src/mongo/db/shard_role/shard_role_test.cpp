@@ -112,6 +112,10 @@ protected:
         std::vector<ChunkType> chunks,
         boost::optional<ReshardingFields> reshardingField = boost::none);
 
+    // Runs the given callback on a new Client and OperationContext. This is useful to run
+    // operations while resources are stashed/yielded on the main OperationContext of the test.
+    void withNewOpCtx(std::function<void(OperationContext*)> callback);
+
     const DatabaseName dbNameTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     const DatabaseVersion dbVersionTestDb{UUID::gen(), Timestamp(1, 0)};
     const NamespaceString nssUnshardedCollection1 =
@@ -238,6 +242,13 @@ void ShardRoleTest::installShardedCollectionMetadata(
     AutoGetCollection coll(opCtx, nss, MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
         ->setFilteringMetadata(opCtx, collectionMetadata);
+}
+
+void ShardRoleTest::withNewOpCtx(std::function<void(OperationContext*)> callback) {
+    auto newClient = getService()->makeClient("AlternativeClient");
+    AlternativeClientRegion acr(newClient);
+    auto newOpCtxHolder = cc().makeOperationContext();
+    callback(newOpCtxHolder.get());
 }
 
 TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFromOSS) {
@@ -900,14 +911,10 @@ TEST_F(ShardRoleTest, WritesOnMultiDocTransactionsUseLatestCatalog) {
     }
 
     // Drop a collection
-    {
-        auto newClient =
-            operationContext()->getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto newOpCtx = cc().makeOperationContext();
-        DBDirectClient directClient(newOpCtx.get());
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        DBDirectClient directClient(newOpCtx);
         directClient.dropCollection(nssUnshardedCollection1);
-    }
+    });
 
     const auto acquireForRead = acquireCollectionOrView(
         operationContext(),
@@ -932,14 +939,10 @@ TEST_F(ShardRoleTest, ConflictIsThrownWhenShardVersionUnshardedButStashedCatalog
     CollectionCatalog::stash(operationContext(), CollectionCatalog::get(operationContext()));
 
     // Drop a collection
-    {
-        auto newClient =
-            operationContext()->getServiceContext()->getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto newOpCtx = cc().makeOperationContext();
-        DBDirectClient directClient(newOpCtx.get());
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        DBDirectClient directClient(newOpCtx);
         ASSERT_TRUE(directClient.dropCollection(nssUnshardedCollection1));
-    }
+    });
 
     // Try to acquire the now-dropped collection, with declared placement concern
     // ShardVersion::UNTRACKED. Expect a conflict to be detected.
@@ -1543,14 +1546,14 @@ TEST_F(ShardRoleTest, YieldAndRestoreViewAcquisitionWithLocks) {
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Change the view definition
-    {
-        DBDirectClient client(opCtx);
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        DBDirectClient client(newOpCtx);
         client.dropCollection(nss);
-        createTestView(operationContext(),
+        createTestView(newOpCtx,
                        nssView,
                        nssUnshardedCollection1,
                        {BSON("$match" << BSON("somethingDifferent" << 1))});
-    }
+    });
 
     // Attempt to restore. It must fail.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
@@ -1596,14 +1599,14 @@ TEST_F(ShardRoleTest, YieldAndRestoreViewAcquisitionWithoutLocks) {
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
     // Change the view definition
-    {
-        DBDirectClient client(opCtx);
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        DBDirectClient client(newOpCtx);
         client.dropCollection(nss);
-        createTestView(operationContext(),
+        createTestView(newOpCtx,
                        nssView,
                        nssUnshardedCollection1,
                        {BSON("$match" << BSON("somethingDifferent" << 1))});
-    }
+    });
 
     // Attempt to restore. It must fail.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
@@ -1966,10 +1969,10 @@ void ShardRoleTest::testRestoreFailsIfCollectionNoLongerExists(
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
 
     // Drop the collection
-    {
-        DBDirectClient client(operationContext());
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        DBDirectClient client(newOpCtx);
         client.dropCollection(nss);
-    }
+    });
 
     // Try to restore the resources should fail because the collection no longer exists.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
@@ -2000,12 +2003,8 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
 
     // Rename the collection.
-    {
-        auto newClient = getService()->makeClient("AlternativeClient");
-        AlternativeClientRegion acr(newClient);
-        auto newOpCtxHolder = acr->makeOperationContext();
-
-        DBDirectClient client(newOpCtxHolder.get());
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        DBDirectClient client(newOpCtx);
         BSONObj info;
         ASSERT_TRUE(client.runCommand(
             DatabaseName::kAdmin,
@@ -2014,7 +2013,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
                  << NamespaceString::createNamespaceString_forTest(dbNameTestDb, "foo2")
                         .ns_forTest()),
             info));
-    }
+    });
 
     // Try to restore the resources should fail because the collection has been renamed.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
@@ -2045,11 +2044,11 @@ void ShardRoleTest::testRestoreFailsIfCollectionDroppedAndRecreated(
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
 
     // Drop the collection and create a new one with the same nss.
-    {
-        DBDirectClient client(operationContext());
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        DBDirectClient client(newOpCtx);
         client.dropCollection(nss);
-        createTestCollection(operationContext(), nss);
-    }
+        createTestCollection(newOpCtx, nss);
+    });
 
     // Try to restore the resources should fail because the collection no longer exists.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
@@ -2143,11 +2142,11 @@ void ShardRoleTest::testRestoreFailsIfCollectionIsNowAView(
     shard_role_details::getRecoveryUnit(operationContext())->abandonSnapshot();
 
     // Drop collection and create a view in its place.
-    {
-        DBDirectClient client(operationContext());
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        DBDirectClient client(newOpCtx);
         client.dropCollection(nssUnshardedCollection1);
-        createTestView(operationContext(), nssUnshardedCollection1, nssShardedCollection1, {});
-    }
+        createTestView(newOpCtx, nssUnshardedCollection1, nssShardedCollection1, {});
+    });
 
     // Restore should fail.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
@@ -2377,8 +2376,10 @@ TEST_F(ShardRoleTest,
         yieldTransactionResourcesFromOperationContext(operationContext());
 
     // Drop the collection
-    DBDirectClient client(operationContext());
-    client.dropCollection(nss);
+    withNewOpCtx([&](OperationContext* newOpCtx) {
+        DBDirectClient client(newOpCtx);
+        client.dropCollection(nss);
+    });
 
     // Restore should fail
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
