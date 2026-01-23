@@ -136,4 +136,34 @@ JoinCostEstimate JoinCostEstimatorImpl::costHashJoinFragment(const JoinPlanNode&
         numDocsProcessed, numDocsOutput, ioSeq, zeroCE /*numRandIOs*/, leftCost, rightCost);
 }
 
+// TODO SERVER-117583: Consider the number of components of the index in the cost. For now, the
+// given index pointer is unused and as a result we return the same cost for all INLJs regardless of
+// the index used.
+JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& left,
+                                                         NodeId right,
+                                                         std::shared_ptr<const IndexCatalogEntry>) {
+    NodeSet leftSubset = getNodeBitset(left);
+    NodeSet rightSubset = makeNodeSet(right);
+    CardinalityEstimate numDocsOutput =
+        _cardinalityEstimator.getOrEstimateSubsetCardinality(leftSubset | rightSubset);
+    CardinalityEstimate leftDocs = _cardinalityEstimator.getOrEstimateSubsetCardinality(leftSubset);
+
+    // The INLJ will produce the join key for each document. The index probe, across all
+    // invocations, will produce the number of documents this join outputs.
+    CardinalityEstimate numDocsProcessed = leftDocs * 2 + numDocsOutput;
+    // Assume that sequential IO done by the index scan is neglible.
+    CardinalityEstimate numSeqIOs = zeroCE;
+    // Model the random IO performed by doing the index probe and fetch. We perform a random IO for
+    // each document we fetch.
+    // TODO SERVER-117523: Integrate the height of the B-tree into the formula.
+    CardinalityEstimate numRandIOs = numDocsProcessed;
+
+    return JoinCostEstimate(numDocsProcessed,
+                            numDocsOutput,
+                            numSeqIOs,
+                            numRandIOs,
+                            getNodeCost(left),
+                            JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE));
+}
+
 }  // namespace mongo::join_ordering

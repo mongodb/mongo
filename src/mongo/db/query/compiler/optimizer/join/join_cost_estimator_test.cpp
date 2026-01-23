@@ -49,11 +49,13 @@ public:
         jCtx.emplace(makeContext());
 
         SubsetCardinalities subsetCards{
-            {makeNodeSet(smallNodeId), makeCard(100)},
-            {makeNodeSet(largeNodeId), makeCard(10'000)},
-            {makeNodeSet(unselectiveNodeId), makeCard(100'000)},
+            {makeNodeSet(smallNodeId), makeCard(10)},
+            {makeNodeSet(largeNodeId), makeCard(1'000'000)},
+            {makeNodeSet(unselectiveNodeId), makeCard(2'000'000)},
+            {makeNodeSet(smallNodeId, largeNodeId), makeCard(1)},
+            {makeNodeSet(smallNodeId, unselectiveNodeId), makeCard(100'000)},
         };
-        NodeCardinalities collCards{makeCard(100'000), makeCard(200'000), makeCard(200'000)};
+        NodeCardinalities collCards{makeCard(100'000), makeCard(2'000'000), makeCard(200'000)};
 
         cardEstimator =
             std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, collCards);
@@ -133,10 +135,46 @@ TEST_F(JoinCostEstimatorTest, HashJoinChildCostTakenIntoAccount) {
     BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
     BaseNode smallBaseNodeNonZero{.nss = smallNss,
                                   .node = smallNodeId,
-                                  .cost = JoinCostEstimate(makeCard(1), zeroCE, zeroCE, zeroCE)};
+                                  .cost =
+                                      JoinCostEstimate(makeCard(10), zeroCE, makeCard(10), zeroCE)};
     auto smallHjCost = costEstimator->costHashJoinFragment(smallBaseNode, largeBaseNode);
     auto largeHjCost = costEstimator->costHashJoinFragment(smallBaseNodeNonZero, largeBaseNode);
     ASSERT_GT(largeHjCost, smallHjCost);
+}
+
+TEST_F(JoinCostEstimatorTest, INLJLargerLeftSideHasLargerCost) {
+    JoinCostEstimate zeroJoinCost(zeroCE, zeroCE, zeroCE, zeroCE);
+    BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
+    BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
+    auto smallINLJCost = costEstimator->costINLJFragment(smallBaseNode, unselectiveNodeId, nullptr);
+    auto largeINLJCost = costEstimator->costINLJFragment(largeBaseNode, unselectiveNodeId, nullptr);
+    ASSERT_GT(largeINLJCost, smallINLJCost);
+}
+
+TEST_F(JoinCostEstimatorTest, INLJLowerCostThanHashJoin) {
+    JoinCostEstimate zeroJoinCost(zeroCE, zeroCE, zeroCE, zeroCE);
+    // When the left side is small and the index is selective, INLJ should be cheaper than hash join
+    // (little random IO).
+    BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
+    BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
+
+    auto inljCost = costEstimator->costINLJFragment(smallBaseNode, largeNodeId, nullptr);
+    auto hjCost = costEstimator->costHashJoinFragment(smallBaseNode, largeBaseNode);
+
+    ASSERT_LT(inljCost, hjCost);
+}
+
+TEST_F(JoinCostEstimatorTest, INLJHigherCostThanHashJoin) {
+    JoinCostEstimate zeroJoinCost(zeroCE, zeroCE, zeroCE, zeroCE);
+    // When the left side is large and the index is unselective, INLJ should be more expensive than
+    // hash join (lots of random IO).
+    BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
+    BaseNode unselectiveBaseNode{.nss = largeNss, .node = unselectiveNodeId, .cost = zeroJoinCost};
+
+    auto inljCost = costEstimator->costINLJFragment(smallBaseNode, unselectiveNodeId, nullptr);
+    auto hjCost = costEstimator->costHashJoinFragment(smallBaseNode, unselectiveBaseNode);
+
+    ASSERT_GT(inljCost, hjCost);
 }
 
 }  // namespace mongo::join_ordering

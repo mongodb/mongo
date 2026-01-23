@@ -53,6 +53,9 @@ public:
     JoinCostEstimate costIndexScanFragment(NodeId nodeId) override;
     JoinCostEstimate costHashJoinFragment(const JoinPlanNode& left,
                                           const JoinPlanNode& right) override;
+    JoinCostEstimate costINLJFragment(const JoinPlanNode& left,
+                                      NodeId right,
+                                      std::shared_ptr<const IndexCatalogEntry> indexProbe) override;
 
 private:
     double estimateDocSize(NodeSet subset) const;
