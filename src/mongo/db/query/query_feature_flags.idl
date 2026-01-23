@@ -307,7 +307,8 @@ feature_flags:
     featureFlagQueryStatsCBRMetrics:
         description: "Feature flag to enable cost-based ranker metrics in query stats."
         cpp_varname: gFeatureFlagQueryStatsCBRMetrics
-        default: false
+        default: true
+        version: 8.3
         fcv_gated: true
 
     featureFlagQueryStatsMetricsSubsections:

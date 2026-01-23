@@ -3,7 +3,7 @@
  * cardinalityEstimationMethods) are collected in query stats.
  *
  * @tags: [
- *   featureFlagQueryStatsCBRMetrics,
+ *   requires_fcv_83,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
@@ -51,7 +51,7 @@ function validatePlanningTimeMicros(metrics) {
  * Runs the test suite against a specific topology.
  */
 function runCBRMetricsTests(topologyName, setupFn, teardownFn) {
-    describe(`planningTimeMicros in query stats (${topologyName})`, function () {
+    describe(`CBR metrics in query stats (${topologyName})`, function () {
         let fixture;
         let conn;
         let testDB;
