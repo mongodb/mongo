@@ -6,14 +6,14 @@
 ```
 ### Results
 ```json
-{  "_id" : "sHaRd0_2" }
-{  "_id" : "shARD1_3" }
-{  "_id" : "shard0_1" }
-{  "_id" : "shard0_2" }
-{  "_id" : "shard0_3" }
-{  "_id" : "shard1_1" }
-{  "_id" : "shard1_2" }
-{  "_id" : "shard1_3" }
+{ "_id" : "sHaRd0_2" }
+{ "_id" : "shARD1_3" }
+{ "_id" : "shard0_1" }
+{ "_id" : "shard0_2" }
+{ "_id" : "shard0_3" }
+{ "_id" : "shard1_1" }
+{ "_id" : "shard1_2" }
+{ "_id" : "shard1_3" }
 ```
 ### Summarized explain
 ```json
@@ -166,12 +166,12 @@
 ```
 ### Results
 ```json
-{  "_id" : "sHaRd0_2",  "otherField" : "b" }
-{  "_id" : "shARD1_3",  "otherField" : "c" }
-{  "_id" : "shard0_1",  "otherField" : "a" }
-{  "_id" : "shard0_2",  "otherField" : "b" }
-{  "_id" : "shard0_3",  "otherField" : "c" }
-{  "_id" : "shard1_1",  "otherField" : "a" }
+{ "_id" : "sHaRd0_2", "otherField" : "b" }
+{ "_id" : "shARD1_3", "otherField" : "c" }
+{ "_id" : "shard0_1", "otherField" : "a" }
+{ "_id" : "shard0_2", "otherField" : "b" }
+{ "_id" : "shard0_3", "otherField" : "c" }
+{ "_id" : "shard1_1", "otherField" : "a" }
 ```
 ### Summarized explain
 ```json
@@ -352,14 +352,14 @@
 ```
 ### Results
 ```json
-{  "_id" : "sHaRd0_2",  "avg" : 2.5 }
-{  "_id" : "shARD1_3",  "avg" : 6.5 }
-{  "_id" : "shard0_1",  "avg" : 1.25 }
-{  "_id" : "shard0_2",  "avg" : 2 }
-{  "_id" : "shard0_3",  "avg" : 3.25 }
-{  "_id" : "shard1_1",  "avg" : 4.25 }
-{  "_id" : "shard1_2",  "avg" : 5 }
-{  "_id" : "shard1_3",  "avg" : 6 }
+{ "_id" : "sHaRd0_2", "avg" : 2.5 }
+{ "_id" : "shARD1_3", "avg" : 6.5 }
+{ "_id" : "shard0_1", "avg" : 1.25 }
+{ "_id" : "shard0_2", "avg" : 2 }
+{ "_id" : "shard0_3", "avg" : 3.25 }
+{ "_id" : "shard1_1", "avg" : 4.25 }
+{ "_id" : "shard1_2", "avg" : 5 }
+{ "_id" : "shard1_3", "avg" : 6 }
 ```
 ### Summarized explain
 ```json
@@ -448,14 +448,14 @@
 ```
 ### Results
 ```json
-{  "_id" : "sHaRd0_2" }
-{  "_id" : "shARD1_3" }
-{  "_id" : "shard0_1" }
-{  "_id" : "shard0_2" }
-{  "_id" : "shard0_3" }
-{  "_id" : "shard1_1" }
-{  "_id" : "shard1_2" }
-{  "_id" : "shard1_3" }
+{ "_id" : "sHaRd0_2" }
+{ "_id" : "shARD1_3" }
+{ "_id" : "shard0_1" }
+{ "_id" : "shard0_2" }
+{ "_id" : "shard0_3" }
+{ "_id" : "shard1_1" }
+{ "_id" : "shard1_2" }
+{ "_id" : "shard1_3" }
 ```
 ### Summarized explain
 ```json
@@ -550,17 +550,17 @@
 ```
 ### Results
 ```json
-{  "_id" : [ "sHaRd0_2", 2.5 ] }
-{  "_id" : [ "shARD1_3", 6.5 ] }
-{  "_id" : [ "shard0_1", 1 ] }
-{  "_id" : [ "shard0_1", 1.5 ] }
-{  "_id" : [ "shard0_2", 2 ] }
-{  "_id" : [ "shard0_3", 3 ] }
-{  "_id" : [ "shard0_3", 3.5 ] }
-{  "_id" : [ "shard1_1", 4 ] }
-{  "_id" : [ "shard1_1", 4.5 ] }
-{  "_id" : [ "shard1_2", 5 ] }
-{  "_id" : [ "shard1_3", 6 ] }
+{ "_id" : [ "sHaRd0_2", 2.5 ] }
+{ "_id" : [ "shARD1_3", 6.5 ] }
+{ "_id" : [ "shard0_1", 1 ] }
+{ "_id" : [ "shard0_1", 1.5 ] }
+{ "_id" : [ "shard0_2", 2 ] }
+{ "_id" : [ "shard0_3", 3 ] }
+{ "_id" : [ "shard0_3", 3.5 ] }
+{ "_id" : [ "shard1_1", 4 ] }
+{ "_id" : [ "shard1_1", 4.5 ] }
+{ "_id" : [ "shard1_2", 5 ] }
+{ "_id" : [ "shard1_3", 6 ] }
 ```
 ### Summarized explain
 ```json
@@ -667,15 +667,15 @@
 ```
 ### Results
 ```json
-{  "_id" : [ "sHaRd0_2", 2.5 ],  "otherField" : "b" }
-{  "_id" : [ "shARD1_3", 6.5 ],  "otherField" : "c" }
-{  "_id" : [ "shard0_1", 1 ],  "otherField" : "a" }
-{  "_id" : [ "shard0_1", 1.5 ],  "otherField" : "A" }
-{  "_id" : [ "shard0_2", 2 ],  "otherField" : "b" }
-{  "_id" : [ "shard0_3", 3 ],  "otherField" : "c" }
-{  "_id" : [ "shard0_3", 3.5 ],  "otherField" : "C" }
-{  "_id" : [ "shard1_1", 4 ],  "otherField" : "a" }
-{  "_id" : [ "shard1_1", 4.5 ],  "otherField" : "A" }
+{ "_id" : [ "sHaRd0_2", 2.5 ], "otherField" : "b" }
+{ "_id" : [ "shARD1_3", 6.5 ], "otherField" : "c" }
+{ "_id" : [ "shard0_1", 1 ], "otherField" : "a" }
+{ "_id" : [ "shard0_1", 1.5 ], "otherField" : "A" }
+{ "_id" : [ "shard0_2", 2 ], "otherField" : "b" }
+{ "_id" : [ "shard0_3", 3 ], "otherField" : "c" }
+{ "_id" : [ "shard0_3", 3.5 ], "otherField" : "C" }
+{ "_id" : [ "shard1_1", 4 ], "otherField" : "a" }
+{ "_id" : [ "shard1_1", 4.5 ], "otherField" : "A" }
 ```
 ### Summarized explain
 ```json
@@ -830,17 +830,17 @@
 ```
 ### Results
 ```json
-{  "_id" : {  "actualId" : 1,  "secretlyShardKey" : "shard0_1" } }
-{  "_id" : {  "actualId" : 1.5,  "secretlyShardKey" : "shard0_1" } }
-{  "_id" : {  "actualId" : 2,  "secretlyShardKey" : "shard0_2" } }
-{  "_id" : {  "actualId" : 2.5,  "secretlyShardKey" : "sHaRd0_2" } }
-{  "_id" : {  "actualId" : 3,  "secretlyShardKey" : "shard0_3" } }
-{  "_id" : {  "actualId" : 3.5,  "secretlyShardKey" : "shard0_3" } }
-{  "_id" : {  "actualId" : 4,  "secretlyShardKey" : "shard1_1" } }
-{  "_id" : {  "actualId" : 4.5,  "secretlyShardKey" : "shard1_1" } }
-{  "_id" : {  "actualId" : 5,  "secretlyShardKey" : "shard1_2" } }
-{  "_id" : {  "actualId" : 6,  "secretlyShardKey" : "shard1_3" } }
-{  "_id" : {  "actualId" : 6.5,  "secretlyShardKey" : "shARD1_3" } }
+{ "_id" : { "actualId" : 1, "secretlyShardKey" : "shard0_1" } }
+{ "_id" : { "actualId" : 1.5, "secretlyShardKey" : "shard0_1" } }
+{ "_id" : { "actualId" : 2, "secretlyShardKey" : "shard0_2" } }
+{ "_id" : { "actualId" : 2.5, "secretlyShardKey" : "sHaRd0_2" } }
+{ "_id" : { "actualId" : 3, "secretlyShardKey" : "shard0_3" } }
+{ "_id" : { "actualId" : 3.5, "secretlyShardKey" : "shard0_3" } }
+{ "_id" : { "actualId" : 4, "secretlyShardKey" : "shard1_1" } }
+{ "_id" : { "actualId" : 4.5, "secretlyShardKey" : "shard1_1" } }
+{ "_id" : { "actualId" : 5, "secretlyShardKey" : "shard1_2" } }
+{ "_id" : { "actualId" : 6, "secretlyShardKey" : "shard1_3" } }
+{ "_id" : { "actualId" : 6.5, "secretlyShardKey" : "shARD1_3" } }
 ```
 ### Summarized explain
 ```json
@@ -949,7 +949,7 @@
 ```
 ### Results
 ```json
-{  "_id" : 1 }
+{ "_id" : 1 }
 ```
 ### Summarized explain
 ```json
@@ -1281,17 +1281,17 @@
 ```
 ### Results
 ```json
-{  "_id" : 1 }
-{  "_id" : 1.5 }
-{  "_id" : 2 }
-{  "_id" : 2.5 }
-{  "_id" : 3 }
-{  "_id" : 3.5 }
-{  "_id" : 4 }
-{  "_id" : 4.5 }
-{  "_id" : 5 }
-{  "_id" : 6 }
-{  "_id" : 6.5 }
+{ "_id" : 1 }
+{ "_id" : 1.5 }
+{ "_id" : 2 }
+{ "_id" : 2.5 }
+{ "_id" : 3 }
+{ "_id" : 3.5 }
+{ "_id" : 4 }
+{ "_id" : 4.5 }
+{ "_id" : 5 }
+{ "_id" : 6 }
+{ "_id" : 6.5 }
 ```
 ### Summarized explain
 ```json
@@ -1420,11 +1420,11 @@
 ```
 ### Results
 ```json
-{  "_id" : "A" }
-{  "_id" : "C" }
-{  "_id" : "a" }
-{  "_id" : "b" }
-{  "_id" : "c" }
+{ "_id" : "A" }
+{ "_id" : "C" }
+{ "_id" : "a" }
+{ "_id" : "b" }
+{ "_id" : "c" }
 ```
 ### Summarized explain
 ```json
@@ -1533,17 +1533,17 @@
 ```
 ### Results
 ```json
-{  "_id" : {  "key" : "sHaRd0_2",  "other" : "b" } }
-{  "_id" : {  "key" : "shARD1_3",  "other" : "c" } }
-{  "_id" : {  "key" : "shard0_1",  "other" : "A" } }
-{  "_id" : {  "key" : "shard0_1",  "other" : "a" } }
-{  "_id" : {  "key" : "shard0_2",  "other" : "b" } }
-{  "_id" : {  "key" : "shard0_3",  "other" : "C" } }
-{  "_id" : {  "key" : "shard0_3",  "other" : "c" } }
-{  "_id" : {  "key" : "shard1_1",  "other" : "A" } }
-{  "_id" : {  "key" : "shard1_1",  "other" : "a" } }
-{  "_id" : {  "key" : "shard1_2",  "other" : "b" } }
-{  "_id" : {  "key" : "shard1_3",  "other" : "c" } }
+{ "_id" : { "key" : "sHaRd0_2", "other" : "b" } }
+{ "_id" : { "key" : "shARD1_3", "other" : "c" } }
+{ "_id" : { "key" : "shard0_1", "other" : "A" } }
+{ "_id" : { "key" : "shard0_1", "other" : "a" } }
+{ "_id" : { "key" : "shard0_2", "other" : "b" } }
+{ "_id" : { "key" : "shard0_3", "other" : "C" } }
+{ "_id" : { "key" : "shard0_3", "other" : "c" } }
+{ "_id" : { "key" : "shard1_1", "other" : "A" } }
+{ "_id" : { "key" : "shard1_1", "other" : "a" } }
+{ "_id" : { "key" : "shard1_2", "other" : "b" } }
+{ "_id" : { "key" : "shard1_3", "other" : "c" } }
 ```
 ### Summarized explain
 ```json
@@ -1657,14 +1657,14 @@
 ```
 ### Results
 ```json
-{  "_id" : 1.25,  "num" : 1 }
-{  "_id" : 2,  "num" : 1 }
-{  "_id" : 2.5,  "num" : 1 }
-{  "_id" : 3.25,  "num" : 1 }
-{  "_id" : 4.25,  "num" : 1 }
-{  "_id" : 5,  "num" : 1 }
-{  "_id" : 6,  "num" : 1 }
-{  "_id" : 6.5,  "num" : 1 }
+{ "_id" : 1.25, "num" : 1 }
+{ "_id" : 2, "num" : 1 }
+{ "_id" : 2.5, "num" : 1 }
+{ "_id" : 3.25, "num" : 1 }
+{ "_id" : 4.25, "num" : 1 }
+{ "_id" : 5, "num" : 1 }
+{ "_id" : 6, "num" : 1 }
+{ "_id" : 6.5, "num" : 1 }
 ```
 ### Summarized explain
 ```json
@@ -1767,11 +1767,11 @@
 ```
 ### Results
 ```json
-{  "_id" : "A" }
-{  "_id" : "C" }
-{  "_id" : "a" }
-{  "_id" : "b" }
-{  "_id" : "c" }
+{ "_id" : "A" }
+{ "_id" : "C" }
+{ "_id" : "a" }
+{ "_id" : "b" }
+{ "_id" : "c" }
 ```
 ### Summarized explain
 ```json
@@ -1861,11 +1861,11 @@
 ```
 ### Results
 ```json
-{  "_id" : "A" }
-{  "_id" : "C" }
-{  "_id" : "a" }
-{  "_id" : "b" }
-{  "_id" : "c" }
+{ "_id" : "A" }
+{ "_id" : "C" }
+{ "_id" : "a" }
+{ "_id" : "b" }
+{ "_id" : "c" }
 ```
 ### Summarized explain
 ```json
@@ -1976,7 +1976,7 @@
 ```
 ### Results
 ```json
-{  "_id" : null }
+{ "_id" : null }
 ```
 ### Summarized explain
 ```json
@@ -2087,11 +2087,11 @@
 ```
 ### Results
 ```json
-{  "_id" : "A" }
-{  "_id" : "C" }
-{  "_id" : "a" }
-{  "_id" : "b" }
-{  "_id" : "c" }
+{ "_id" : "A" }
+{ "_id" : "C" }
+{ "_id" : "a" }
+{ "_id" : "b" }
+{ "_id" : "c" }
 ```
 ### Summarized explain
 ```json
@@ -2206,17 +2206,17 @@
 ```
 ### Results
 ```json
-{  "_id" : {  "_id" : 1,  "otherField" : "a",  "shardKey" : "shard0_1" } }
-{  "_id" : {  "_id" : 1.5,  "otherField" : "A",  "shardKey" : "shard0_1" } }
-{  "_id" : {  "_id" : 2,  "otherField" : "b",  "shardKey" : "shard0_2" } }
-{  "_id" : {  "_id" : 2.5,  "otherField" : "b",  "shardKey" : "sHaRd0_2" } }
-{  "_id" : {  "_id" : 3,  "otherField" : "c",  "shardKey" : "shard0_3" } }
-{  "_id" : {  "_id" : 3.5,  "otherField" : "C",  "shardKey" : "shard0_3" } }
-{  "_id" : {  "_id" : 4,  "otherField" : "a",  "shardKey" : "shard1_1" } }
-{  "_id" : {  "_id" : 4.5,  "otherField" : "A",  "shardKey" : "shard1_1" } }
-{  "_id" : {  "_id" : 5,  "otherField" : "b",  "shardKey" : "shard1_2" } }
-{  "_id" : {  "_id" : 6,  "otherField" : "c",  "shardKey" : "shard1_3" } }
-{  "_id" : {  "_id" : 6.5,  "otherField" : "c",  "shardKey" : "shARD1_3" } }
+{ "_id" : { "_id" : 1, "otherField" : "a", "shardKey" : "shard0_1" } }
+{ "_id" : { "_id" : 1.5, "otherField" : "A", "shardKey" : "shard0_1" } }
+{ "_id" : { "_id" : 2, "otherField" : "b", "shardKey" : "shard0_2" } }
+{ "_id" : { "_id" : 2.5, "otherField" : "b", "shardKey" : "sHaRd0_2" } }
+{ "_id" : { "_id" : 3, "otherField" : "c", "shardKey" : "shard0_3" } }
+{ "_id" : { "_id" : 3.5, "otherField" : "C", "shardKey" : "shard0_3" } }
+{ "_id" : { "_id" : 4, "otherField" : "a", "shardKey" : "shard1_1" } }
+{ "_id" : { "_id" : 4.5, "otherField" : "A", "shardKey" : "shard1_1" } }
+{ "_id" : { "_id" : 5, "otherField" : "b", "shardKey" : "shard1_2" } }
+{ "_id" : { "_id" : 6, "otherField" : "c", "shardKey" : "shard1_3" } }
+{ "_id" : { "_id" : 6.5, "otherField" : "c", "shardKey" : "shARD1_3" } }
 ```
 ### Summarized explain
 ```json
@@ -2296,14 +2296,14 @@
 ```
 ### Results
 ```json
-{  "_id" : "sHaRd0_2" }
-{  "_id" : "shARD1_3" }
-{  "_id" : "shard0_1" }
-{  "_id" : "shard0_2" }
-{  "_id" : "shard0_3" }
-{  "_id" : "shard1_1" }
-{  "_id" : "shard1_2" }
-{  "_id" : "shard1_3" }
+{ "_id" : "sHaRd0_2" }
+{ "_id" : "shARD1_3" }
+{ "_id" : "shard0_1" }
+{ "_id" : "shard0_2" }
+{ "_id" : "shard0_3" }
+{ "_id" : "shard1_1" }
+{ "_id" : "shard1_2" }
+{ "_id" : "shard1_3" }
 ```
 ### Summarized explain
 ```json
@@ -2448,12 +2448,12 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : "shard0_1" }
-{  "_id" : "shard0_2" }
-{  "_id" : "shard0_3" }
-{  "_id" : "shard1_1" }
-{  "_id" : "shard1_2" }
-{  "_id" : "shard1_3" }
+{ "_id" : "shard0_1" }
+{ "_id" : "shard0_2" }
+{ "_id" : "shard0_3" }
+{ "_id" : "shard1_1" }
+{ "_id" : "shard1_2" }
+{ "_id" : "shard1_3" }
 ```
 ### Summarized explain
 ```json
@@ -2558,11 +2558,11 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : "A" }
-{  "_id" : "C" }
-{  "_id" : "a" }
-{  "_id" : "b" }
-{  "_id" : "c" }
+{ "_id" : "A" }
+{ "_id" : "C" }
+{ "_id" : "a" }
+{ "_id" : "b" }
+{ "_id" : "c" }
 ```
 ### Summarized explain
 ```json
@@ -2706,14 +2706,14 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : {  "sk0" : "s0",  "sk1" : 1,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0",  "sk1" : 2,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 1, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 2, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 3, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 5, "sk2" : "c" } }
 ```
 ### Summarized explain
 ```json
@@ -2808,14 +2808,14 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : {  "sk0" : "s0",  "sk1" : 1,  "sk2" : "a" },  "setSk2" : [ "a" ],  "sumSk1" : 2 }
-{  "_id" : {  "sk0" : "s0",  "sk1" : 2,  "sk2" : "a" },  "setSk2" : [ "a" ],  "sumSk1" : 2 }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "b" },  "setSk2" : [ "b" ],  "sumSk1" : 1 }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "z" },  "setSk2" : [ "z" ],  "sumSk1" : 1 }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" },  "setSk2" : [ "b" ],  "sumSk1" : 4 }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" },  "setSk2" : [ "z" ],  "sumSk1" : 2 }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" },  "setSk2" : [ "b" ],  "sumSk1" : 6 }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" },  "setSk2" : [ "c" ],  "sumSk1" : 5 }
+{ "_id" : { "sk0" : "s0", "sk1" : 1, "sk2" : "a" }, "setSk2" : [ "a" ], "sumSk1" : 2 }
+{ "_id" : { "sk0" : "s0", "sk1" : 2, "sk2" : "a" }, "setSk2" : [ "a" ], "sumSk1" : 2 }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "b" }, "setSk2" : [ "b" ], "sumSk1" : 1 }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "z" }, "setSk2" : [ "z" ], "sumSk1" : 1 }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" }, "setSk2" : [ "b" ], "sumSk1" : 4 }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "z" }, "setSk2" : [ "z" ], "sumSk1" : 2 }
+{ "_id" : { "sk0" : "s1", "sk1" : 3, "sk2" : "b" }, "setSk2" : [ "b" ], "sumSk1" : 6 }
+{ "_id" : { "sk0" : "s1", "sk1" : 5, "sk2" : "c" }, "setSk2" : [ "c" ], "sumSk1" : 5 }
 ```
 ### Summarized explain
 ```json
@@ -2920,14 +2920,14 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : {  "sk0" : "s0",  "sk1" : 1,  "sk2" : "a" },  "root" : {  "_id" : 1,  "otherField" : "abc",  "sk0" : "s0",  "sk1" : 1,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0",  "sk1" : 2,  "sk2" : "a" },  "root" : {  "_id" : 2,  "otherField" : "def",  "sk0" : "s0",  "sk1" : 2,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "b" },  "root" : {  "_id" : 5,  "otherField" : "def",  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "z" },  "root" : {  "_id" : 6,  "otherField" : "abc",  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" },  "root" : {  "_id" : 3,  "otherField" : "abc",  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" },  "root" : {  "_id" : 4,  "otherField" : "abc",  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" },  "root" : {  "_id" : 7,  "otherField" : "def",  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" },  "root" : {  "_id" : 8,  "otherField" : "ghi",  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 1, "sk2" : "a" }, "root" : { "_id" : 1, "otherField" : "abc", "sk0" : "s0", "sk1" : 1, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 2, "sk2" : "a" }, "root" : { "_id" : 2, "otherField" : "def", "sk0" : "s0", "sk1" : 2, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "b" }, "root" : { "_id" : 5, "otherField" : "def", "sk0" : "s0/1", "sk1" : 1, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "z" }, "root" : { "_id" : 6, "otherField" : "abc", "sk0" : "s0/1", "sk1" : 1, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" }, "root" : { "_id" : 3, "otherField" : "abc", "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "z" }, "root" : { "_id" : 4, "otherField" : "abc", "sk0" : "s0/1", "sk1" : 2, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 3, "sk2" : "b" }, "root" : { "_id" : 7, "otherField" : "def", "sk0" : "s1", "sk1" : 3, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 5, "sk2" : "c" }, "root" : { "_id" : 8, "otherField" : "ghi", "sk0" : "s1", "sk1" : 5, "sk2" : "c" } }
 ```
 ### Summarized explain
 ```json
@@ -3034,14 +3034,14 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : {  "sk0" : "s0",  "sk1" : 1,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0",  "sk1" : 2,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 1, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 2, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 3, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 5, "sk2" : "c" } }
 ```
 ### Summarized explain
 ```json
@@ -3169,14 +3169,14 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : {  "sk0" : "s0",  "sk1" : 2,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0",  "sk1" : 3,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 3,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 3,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 4,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 6,  "sk2" : "c" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 2, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 3, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 3, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 3, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 4, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 6, "sk2" : "c" } }
 ```
 ### Summarized explain
 ```json
@@ -3316,11 +3316,11 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : {  "sk0" : "s0",  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s1",  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s1",  "sk2" : "c" } }
+{ "_id" : { "sk0" : "s0", "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0/1", "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk2" : "z" } }
+{ "_id" : { "sk0" : "s1", "sk2" : "b" } }
+{ "_id" : { "sk0" : "s1", "sk2" : "c" } }
 ```
 ### Summarized explain
 ```json
@@ -3423,17 +3423,17 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : {  "otherField" : "ABC",  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" } }
-{  "_id" : {  "otherField" : "DEF",  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
-{  "_id" : {  "otherField" : "GEH",  "sk0" : "s0",  "sk1" : 1,  "sk2" : "a" } }
-{  "_id" : {  "otherField" : "abc",  "sk0" : "s0",  "sk1" : 1,  "sk2" : "a" } }
-{  "_id" : {  "otherField" : "abc",  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "z" } }
-{  "_id" : {  "otherField" : "abc",  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" } }
-{  "_id" : {  "otherField" : "abc",  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
-{  "_id" : {  "otherField" : "def",  "sk0" : "s0",  "sk1" : 2,  "sk2" : "a" } }
-{  "_id" : {  "otherField" : "def",  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "b" } }
-{  "_id" : {  "otherField" : "def",  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
-{  "_id" : {  "otherField" : "ghi",  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
+{ "_id" : { "otherField" : "ABC", "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" } }
+{ "_id" : { "otherField" : "DEF", "sk0" : "s1", "sk1" : 3, "sk2" : "b" } }
+{ "_id" : { "otherField" : "GEH", "sk0" : "s0", "sk1" : 1, "sk2" : "a" } }
+{ "_id" : { "otherField" : "abc", "sk0" : "s0", "sk1" : 1, "sk2" : "a" } }
+{ "_id" : { "otherField" : "abc", "sk0" : "s0/1", "sk1" : 1, "sk2" : "z" } }
+{ "_id" : { "otherField" : "abc", "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" } }
+{ "_id" : { "otherField" : "abc", "sk0" : "s0/1", "sk1" : 2, "sk2" : "z" } }
+{ "_id" : { "otherField" : "def", "sk0" : "s0", "sk1" : 2, "sk2" : "a" } }
+{ "_id" : { "otherField" : "def", "sk0" : "s0/1", "sk1" : 1, "sk2" : "b" } }
+{ "_id" : { "otherField" : "def", "sk0" : "s1", "sk1" : 3, "sk2" : "b" } }
+{ "_id" : { "otherField" : "ghi", "sk0" : "s1", "sk1" : 5, "sk2" : "c" } }
 ```
 ### Summarized explain
 ```json
@@ -3557,14 +3557,14 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : {  "sk0" : "s0",  "sk1" : 1,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0",  "sk1" : 2,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 1, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 2, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 3, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 5, "sk2" : "c" } }
 ```
 ### Summarized explain
 ```json
@@ -3689,14 +3689,14 @@ Note: If we have duplicate _ids in the output, that signals a bug here.
 ```
 ### Results
 ```json
-{  "_id" : {  "sk0" : "s0",  "sk1" : 1,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0",  "sk1" : 2,  "sk2" : "a" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 1,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s0/1",  "sk1" : 2,  "sk2" : "z" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 3,  "sk2" : "b" } }
-{  "_id" : {  "sk0" : "s1",  "sk1" : 5,  "sk2" : "c" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 1, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0", "sk1" : 2, "sk2" : "a" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 1, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s0/1", "sk1" : 2, "sk2" : "z" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 3, "sk2" : "b" } }
+{ "_id" : { "sk0" : "s1", "sk1" : 5, "sk2" : "c" } }
 ```
 ### Summarized explain
 ```json

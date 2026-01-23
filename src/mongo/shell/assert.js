@@ -285,7 +285,7 @@ assert.eq = function (a, b, msg, attr) {
 function patchDiff(a, b) {
     const header = colorize("+ expected\n- actual").replace("\n", " ");
 
-    const multilinestr = (x) => tojson(x, " ");
+    const multilinestr = (x) => tojson(x, "  ");
     const diff = colorize(stringdiff(multilinestr(a), multilinestr(b)));
 
     return `${header}\n\n${diff}`;
