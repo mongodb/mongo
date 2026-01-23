@@ -86,13 +86,17 @@ struct OpTimeBundle {
 struct OpStateAccumulator : Decorable<OpStateAccumulator> {
     OpStateAccumulator() = default;
 
-    // Use either 'opTime' for non-insert operations or 'insertOpTimes', but not both.
+    // Use either 'opTime' for single operations or 'batchOpTimes' for operations wrapped in
+    // applyOps.
     OpTimeBundle opTime;
-    std::vector<repl::OpTime> insertOpTimes;
+    std::vector<repl::OpTime> batchOpTimes;
 
     // Temporary pre/post image information for a retryable findAndModify operation to be written
     // to the image collection (config.image_collection).
     boost::optional<repl::ReplOperation::ImageBundle> retryableFindAndModifyImageToWrite;
+
+    // ApplyOpsEntries used for changestreams with batched writes.
+    std::vector<TransactionOperations::ApplyOpsInfo::ApplyOpsEntry> applyOpsEntries;
 
 private:
     OpStateAccumulator(const OpStateAccumulator&) = delete;

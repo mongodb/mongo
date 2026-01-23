@@ -16,6 +16,7 @@ mongo_cc_library(
         "op_observer_registry.cpp",
     ],
     deps = [
+        ":batched_write_context",
         "//src/mongo:base",
         "//src/mongo/db/storage:container",
         "//src/mongo/db/storage/key_string",

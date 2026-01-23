@@ -168,7 +168,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
     }
 
     int index = 0;
-    const auto& opTimeList = opAccumulator->insertOpTimes;
+    const auto& opTimeList = opAccumulator->batchOpTimes;
     for (auto it = first; it != last; it++, index++) {
         auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
 
@@ -335,7 +335,7 @@ void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
     }
 
     // Return early if this isn't a retryable batched write.
-    if (!opAccumulator || opAccumulator->insertOpTimes.empty() ||
+    if (!opAccumulator || opAccumulator->batchOpTimes.empty() ||
         oplogGroupingFormat != WriteUnitOfWork::kGroupForPossiblyRetryableOperations ||
         !opCtx->getTxnNumber() || !opCtx->getLogicalSessionId()) {
         return;
@@ -348,7 +348,7 @@ void MigrationChunkClonerSourceOpObserver::onBatchedWriteCommit(
 
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(
         std::make_unique<LogRetryableApplyOpsForShardingHandler>(std::move(namespaces),
-                                                                 opAccumulator->insertOpTimes));
+                                                                 opAccumulator->batchOpTimes));
 }
 
 }  // namespace mongo

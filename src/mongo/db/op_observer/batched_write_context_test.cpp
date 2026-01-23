@@ -123,27 +123,6 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
 }
 
 DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
-                   TestDoesNotSupportPreImagesInCollection,
-                   "Invariant "
-                   "failure.*getChangeStreamPreImageRecordingMode.*repl::ReplOperation::"
-                   "ChangeStreamPreImageRecordingMode::kOff") {
-    auto opCtxRaii = makeOperationContext();
-    auto opCtx = opCtxRaii.get();
-
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
-    auto& bwc = BatchedWriteContext::get(opCtx);
-    // Need to explicitly set writes are batched to simulate op observer starting batched write.
-    bwc.setWritesAreBatched(true);
-
-    const NamespaceString nss =
-        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
-    auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
-    op.setChangeStreamPreImageRecordingMode(
-        repl::ReplOperation::ChangeStreamPreImageRecordingMode::kPreImagesCollection);
-    bwc.addBatchedOperation(opCtx, op);
-}
-
-DEATH_TEST_REGEX_F(BatchedWriteContextTestDeathTest,
                    TestDoesNotSupportMultiDocTxn,
                    "Invariant failure.*!opCtx->inMultiDocumentTransaction()") {
     auto opCtxRaii = makeOperationContext();
@@ -189,6 +168,12 @@ TEST_F(BatchedWriteContextTest, TestAcceptedBatchOperationsSucceeds) {
         nss, UUID::gen(), BSON("a" << 1), BSON("_id" << 2));
     bwc.addBatchedOperation(opCtx, op);
     ASSERT_EQ(ops->numOperations(), 3U);
+
+    op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
+    op.setChangeStreamPreImageRecordingMode(
+        repl::ReplOperation::ChangeStreamPreImageRecordingMode::kPreImagesCollection);
+    bwc.addBatchedOperation(opCtx, op);
+    ASSERT_EQ(ops->numOperations(), 4U);
 
     // Batched write committing is handled outside of the batched write context and involves the
     // oplog so it is not necessary to commit the WriteUnitOfWork in this test.

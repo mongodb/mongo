@@ -30,6 +30,7 @@
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
 
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/shard_role/transaction_resources.h"
 
@@ -53,7 +54,7 @@ void writeChangeStreamPreImageEntry(OperationContext* opCtx, const ChangeStreamP
  * clock time, respectively, of the "applyOps" entry. A pre-image is recorded for an operation only
  * if pre-images are enabled for the collection the operation is issued on.
  */
-void writeChangeStreamPreImagesForApplyOpsEntries(
+void writeChangeStreamPreImagesForApplyOpsEntry(
     OperationContext* opCtx,
     std::vector<repl::ReplOperation>::const_iterator stmtBegin,
     std::vector<repl::ReplOperation>::const_iterator stmtEnd,
@@ -83,35 +84,58 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
  * contains a representation of "applyOps" entries to be written for the transaction. The
  * 'operationTime' is wall clock time of the operations used for the pre-image documents.
  */
-void writeChangeStreamPreImagesForTransaction(
+template <typename OplogSlotAccessorFn>
+void writeChangeStreamPreImagesForApplyOpsChain(
     OperationContext* opCtx,
-    const std::vector<OplogSlot>& reservedSlots,
+    const std::vector<OplogSlot>& oplogSlots,
+    OplogSlotAccessorFn&& getOplogSlot,
     const std::vector<repl::ReplOperation>& operations,
-    const OpObserver::ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
+    const std::vector<TransactionOperations::ApplyOpsInfo::ApplyOpsEntry>& applyOpsEntries,
     Date_t operationTime) {
     // This function must be called from an outer WriteUnitOfWork in order to be rolled back upon
     // reaching the exception.
     invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
-    auto applyOpsEntriesIt = applyOpsOperationAssignment.applyOpsEntries.begin();
-    for (auto operationIter = operations.begin(); operationIter != operations.end();) {
+    auto i = 0;
+    for (auto operationIter = operations.begin(); operationIter != operations.end(); i++) {
+        auto applyOpsEntryIt = applyOpsEntries.begin() + i;
         tassert(7831000,
                 "Unexpected end of applyOps entries vector",
-                applyOpsEntriesIt != applyOpsOperationAssignment.applyOpsEntries.end());
-        const auto& applyOpsEntry = *applyOpsEntriesIt++;
+                applyOpsEntryIt != applyOpsEntries.end());
+        const auto& applyOpsEntry = *applyOpsEntryIt;
         const auto operationSequenceEnd = operationIter + applyOpsEntry.operations.size();
-        const auto& oplogSlot = reservedSlots[applyOpsEntry.oplogSlotIndex];
-        writeChangeStreamPreImagesForApplyOpsEntries(
+        const auto& oplogSlot = getOplogSlot(oplogSlots, applyOpsEntry, i);
+        writeChangeStreamPreImagesForApplyOpsEntry(
             opCtx, operationIter, operationSequenceEnd, oplogSlot.getTimestamp(), operationTime);
         operationIter = operationSequenceEnd;
     }
 }
 
-}  // namespace
+void writeChangeStreamPreImagesForTransaction(
+    OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
+    const std::vector<repl::ReplOperation>& operations,
+    const std::vector<TransactionOperations::ApplyOpsInfo::ApplyOpsEntry>& applyOpsEntries,
+    Date_t operationTime) {
+    writeChangeStreamPreImagesForApplyOpsChain(
+        opCtx,
+        reservedSlots,
+        [&](const std::vector<OplogSlot>& reservedSlots,
+            const auto& applyOpsEntry,
+            int i) -> const OplogSlot& { return reservedSlots[applyOpsEntry.oplogSlotIndex]; },
+        operations,
+        applyOpsEntries,
+        operationTime);
+}
 
-void ChangeStreamPreImagesOpObserver::onUpdate(OperationContext* opCtx,
-                                               const OplogUpdateEntryArgs& args,
-                                               OpStateAccumulator* opAccumulator) {
+void writeChangeStreamPreImageEntryIfNecessary(
+    OperationContext* opCtx,
+    OpStateAccumulator* opAccumulator,
+    const NamespaceString& nss,
+    const BSONObj& preImageDoc,
+    UUID uuid,
+    bool changeStreamPreAndPostImagesEnabledForCollection,
+    bool fromMigrate) {
     if (!opAccumulator) {
         return;
     }
@@ -123,19 +147,14 @@ void ChangeStreamPreImagesOpObserver::onUpdate(OperationContext* opCtx,
     // 3. The request to write the pre-image does not come from chunk-migrate event, i.e. source
     //    of the request is not 'fromMigrate'. The 'fromMigrate' events are filtered out by
     //    change streams and storing them in pre-image collection is redundant.
-    // 4. a request to update is not on a temporary resharding collection. This update request
-    //    does not result in change streams events. Recording pre-images from temporary
+    // 4. a request to update/delete is not on a temporary resharding collection. This update/delete
+    //    request does not result in change streams events. Recording pre-images from temporary
     //    resharing collection could result in incorrect pre-image getting recorded due to the
     //    temporary resharding collection not being consistent until writes are blocked (initial
     //    sync mode application).
     const auto& opTimeBundle = opAccumulator->opTime;
-    const auto& nss = args.coll->ns();
-    if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection &&
-        !opTimeBundle.writeOpTime.isNull() &&
-        args.updateArgs->source != OperationSource::kFromMigrate &&
-        !nss.isTemporaryReshardingCollection()) {
-        const auto& preImageDoc = args.updateArgs->preImageDoc;
-        const auto uuid = args.coll->uuid();
+    if (changeStreamPreAndPostImagesEnabledForCollection && !opTimeBundle.writeOpTime.isNull() &&
+        !fromMigrate && !nss.isTemporaryReshardingCollection()) {
         invariant(!preImageDoc.isEmpty(),
                   fmt::format("PreImage must be set when writing to change streams pre-images "
                               "collection for update on collection {} (UUID: {}) with optime {}",
@@ -145,9 +164,24 @@ void ChangeStreamPreImagesOpObserver::onUpdate(OperationContext* opCtx,
 
         ChangeStreamPreImageId id(uuid, opTimeBundle.writeOpTime.getTimestamp(), 0);
         ChangeStreamPreImage preImage(std::move(id), opTimeBundle.wallClockTime, preImageDoc);
-        invariant(args.coll->ns().tenantId() == boost::none);
+        invariant(nss.tenantId() == boost::none);
         writeChangeStreamPreImageEntry(opCtx, preImage);
     }
+}
+
+}  // namespace
+
+void ChangeStreamPreImagesOpObserver::onUpdate(OperationContext* opCtx,
+                                               const OplogUpdateEntryArgs& args,
+                                               OpStateAccumulator* opAccumulator) {
+    writeChangeStreamPreImageEntryIfNecessary(
+        opCtx,
+        opAccumulator,
+        args.coll->ns(),
+        args.updateArgs->preImageDoc,
+        args.coll->uuid(),
+        args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection,
+        args.updateArgs->source == OperationSource::kFromMigrate);
 }
 
 void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
@@ -157,42 +191,13 @@ void ChangeStreamPreImagesOpObserver::onDelete(OperationContext* opCtx,
                                                const DocumentKey& documentKey,
                                                const OplogDeleteEntryArgs& args,
                                                OpStateAccumulator* opAccumulator) {
-    if (!opAccumulator) {
-        return;
-    }
-
-    // Write a pre-image to the change streams pre-images collection when following conditions
-    // are met:
-    // 1. The collection has 'changeStreamPreAndPostImages' enabled.
-    // 2. The node wrote the oplog entry for the corresponding operation.
-    // 3. The request to write the pre-image does not come from chunk-migrate event, i.e. source
-    //    of the request is not 'fromMigrate'. The 'fromMigrate' events are filtered out by
-    //    change streams and storing them in pre-image collection is redundant.
-    // 4. a request to delete is not on a temporary resharding collection. This delete request
-    //    does not result in change streams events. Recording pre-images from temporary
-    //    resharing collection could result in incorrect pre-image getting recorded due to the
-    //    temporary resharding collection not being consistent until writes are blocked (initial
-    //    sync mode application).
-    const auto& opTimeBundle = opAccumulator->opTime;
-    const auto& nss = coll->ns();
-    if (args.changeStreamPreAndPostImagesEnabledForCollection &&
-        !opTimeBundle.writeOpTime.isNull() && !args.fromMigrate &&
-        !nss.isTemporaryReshardingCollection()) {
-        const auto uuid = coll->uuid();
-        invariant(
-            !doc.isEmpty(),
-            fmt::format("Deleted document must be set when writing to change streams pre-images "
-                        "collection for update on collection {} (UUID: {}) with optime {}",
-                        nss.toStringForErrorMsg(),
-                        uuid.toString(),
-                        opTimeBundle.writeOpTime.toString()));
-
-        ChangeStreamPreImageId id(uuid, opTimeBundle.writeOpTime.getTimestamp(), 0);
-        ChangeStreamPreImage preImage(std::move(id), opTimeBundle.wallClockTime, doc);
-
-        invariant(nss.tenantId() == boost::none);
-        writeChangeStreamPreImageEntry(opCtx, preImage);
-    }
+    writeChangeStreamPreImageEntryIfNecessary(opCtx,
+                                              opAccumulator,
+                                              coll->ns(),
+                                              doc,
+                                              coll->uuid(),
+                                              args.changeStreamPreAndPostImagesEnabledForCollection,
+                                              args.fromMigrate);
 }
 
 void ChangeStreamPreImagesOpObserver::onUnpreparedTransactionCommit(
@@ -217,8 +222,11 @@ void ChangeStreamPreImagesOpObserver::onUnpreparedTransactionCommit(
     // transaction commit timestamp as driven (implicitly) by the last written "applyOps" oplog
     // entry.
     const auto& statements = transactionOperations.getOperationsForOpObserver();
-    writeChangeStreamPreImagesForTransaction(
-        opCtx, reservedSlots, statements, applyOpsOperationAssignment, opTimeBundle.wallClockTime);
+    writeChangeStreamPreImagesForTransaction(opCtx,
+                                             reservedSlots,
+                                             statements,
+                                             applyOpsOperationAssignment.applyOpsEntries,
+                                             opTimeBundle.wallClockTime);
 }
 
 void ChangeStreamPreImagesOpObserver::preTransactionPrepare(
@@ -228,8 +236,56 @@ void ChangeStreamPreImagesOpObserver::preTransactionPrepare(
     const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     Date_t wallClockTime) {
     const auto& statements = transactionOperations.getOperationsForOpObserver();
-    writeChangeStreamPreImagesForTransaction(
-        opCtx, reservedSlots, statements, applyOpsOperationAssignment, wallClockTime);
+    writeChangeStreamPreImagesForTransaction(opCtx,
+                                             reservedSlots,
+                                             statements,
+                                             applyOpsOperationAssignment.applyOpsEntries,
+                                             wallClockTime);
+}
+
+void ChangeStreamPreImagesOpObserver::onBatchedWriteCommit(
+    OperationContext* opCtx,
+    WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+    OpStateAccumulator* opStateAccumulator) {
+    if (!opStateAccumulator) {
+        return;
+    }
+
+    auto& batchedWriteContext = BatchedWriteContext::get(opCtx);
+    TransactionOperations* batchedOps = batchedWriteContext.getBatchedOperations(opCtx);
+    const std::vector<repl::ReplOperation>& oplogEntries = batchedOps->getOperationsForOpObserver();
+
+    if (batchedOps->isEmpty()) {
+        return;
+    } else if (batchedOps->numOperations() == 1) {
+        auto op = oplogEntries.front();
+        if (op.getOpType() == repl::OpTypeEnum::kUpdate ||
+            op.getOpType() == repl::OpTypeEnum::kDelete) {
+            writeChangeStreamPreImageEntryIfNecessary(
+                opCtx,
+                opStateAccumulator,
+                op.getNss(),
+                op.getPreImage(),
+                op.getUuid().value(),
+                op.isChangeStreamPreImageRecordedInPreImagesCollection(),
+                op.getFromMigrate().value_or(false));
+        }
+        return;
+    } else {
+        writeChangeStreamPreImagesForApplyOpsChain(
+            opCtx,
+            opStateAccumulator->batchOpTimes,
+            [&](const std::vector<OplogSlot>& batchOpTimes,
+                const auto& applyOpsEntry,
+                int i) -> const OplogSlot& {
+                // OpTimes are inserted into opStateAccumulator->batchOpTimes in the same order as
+                // opStateAccumulator->applyOpsEntries in OpObserverImpl::onBatchedWriteCommit
+                return batchOpTimes[i];
+            },
+            oplogEntries,
+            opStateAccumulator->applyOpsEntries,
+            opStateAccumulator->opTime.wallClockTime);
+    }
 }
 
 }  // namespace mongo

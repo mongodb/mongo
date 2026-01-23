@@ -106,7 +106,7 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
         }
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
         if (opAccumulator) {
-            auto& opTimeList = opAccumulator->insertOpTimes;
+            auto& opTimeList = opAccumulator->batchOpTimes;
             if (!opTimeList.empty() && !opTimeList.back().isNull()) {
                 for (auto it = first; it != last; it++) {
                     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);

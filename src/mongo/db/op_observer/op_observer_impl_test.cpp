@@ -305,10 +305,10 @@ protected:
 
     void resetOplogAndTransactions(OperationContext* opCtx) const {
         reset(opCtx, nss);
-        reset(opCtx, NamespaceString::kRsOplogNamespace);
         reset(opCtx, NamespaceString::kSessionTransactionsTableNamespace);
         reset(opCtx, NamespaceString::kConfigImagesNamespace);
         reset(opCtx, NamespaceString::kChangeStreamPreImagesNamespace);
+        reset(opCtx, NamespaceString::kRsOplogNamespace);
     }
 
     // Assert that the oplog has the expected number of entries, and return them
@@ -3043,12 +3043,17 @@ const auto kNotRetryable = RetryableFindAndModifyLocation::kNone;
 const auto kRecordInSideCollection = RetryableFindAndModifyLocation::kSideCollection;
 
 const std::vector<bool> kInMultiDocumentTransactionCases{false, true};
+
+const auto kDontGroup = WriteUnitOfWork::OplogEntryGroupType::kDontGroup;
+const auto kGroup = WriteUnitOfWork::OplogEntryGroupType::kGroupForPossiblyRetryableOperations;
+
 }  // namespace
 
 struct UpdateTestCase {
     StoreDocOption imageType;
     bool changeStreamImagesEnabled;
     RetryableFindAndModifyLocation retryableOptions;
+    WriteUnitOfWork::OplogEntryGroupType oplogGroupType;
 
     int numOutputOplogs;
 
@@ -3092,6 +3097,7 @@ protected:
               "ChangeStreamPreAndPostImagesEnabled"_attr = testCase.changeStreamImagesEnabled,
               "RetryableFindAndModifyLocation"_attr =
                   testCase.getRetryableFindAndModifyLocationStr(),
+              "OplogGrouping"_attr = testCase.oplogGroupType == kGroup,
               "ExpectedOplogEntries"_attr = testCase.numOutputOplogs);
     }
 
@@ -3188,19 +3194,26 @@ protected:
 
     std::vector<UpdateTestCase> _cases = {
         // Regular updates.
-        {kNonFaM, kChangeStreamImagesDisabled, kNotRetryable, 1},
-        {kNonFaM, kChangeStreamImagesEnabled, kNotRetryable, 1},
-        {kNonFaM, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
+        {kNonFaM, kChangeStreamImagesDisabled, kNotRetryable, kDontGroup, 1},
+        {kNonFaM, kChangeStreamImagesDisabled, kNotRetryable, kGroup, 1},
+        {kNonFaM, kChangeStreamImagesEnabled, kNotRetryable, kDontGroup, 1},
+        {kNonFaM, kChangeStreamImagesEnabled, kNotRetryable, kGroup, 1},
+        {kNonFaM, kChangeStreamImagesEnabled, kRecordInSideCollection, kDontGroup, 1},
+        {kNonFaM, kChangeStreamImagesEnabled, kRecordInSideCollection, kGroup, 1},
         // FindAndModify asking for a preImage.
-        {kFaMPre, kChangeStreamImagesDisabled, kNotRetryable, 1},
-        {kFaMPre, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
-        {kFaMPre, kChangeStreamImagesEnabled, kNotRetryable, 1},
-        {kFaMPre, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
+        {kFaMPre, kChangeStreamImagesDisabled, kNotRetryable, kDontGroup, 1},
+        {kFaMPre, kChangeStreamImagesDisabled, kNotRetryable, kGroup, 1},
+        {kFaMPre, kChangeStreamImagesDisabled, kRecordInSideCollection, kDontGroup, 1},
+        {kFaMPre, kChangeStreamImagesEnabled, kNotRetryable, kDontGroup, 1},
+        {kFaMPre, kChangeStreamImagesEnabled, kNotRetryable, kGroup, 1},
+        {kFaMPre, kChangeStreamImagesEnabled, kRecordInSideCollection, kDontGroup, 1},
         // FindAndModify asking for a postImage.
-        {kFaMPost, kChangeStreamImagesDisabled, kNotRetryable, 1},
-        {kFaMPost, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
-        {kFaMPost, kChangeStreamImagesEnabled, kNotRetryable, 1},
-        {kFaMPost, kChangeStreamImagesEnabled, kRecordInSideCollection, 1}};
+        {kFaMPost, kChangeStreamImagesDisabled, kNotRetryable, kDontGroup, 1},
+        {kFaMPost, kChangeStreamImagesDisabled, kNotRetryable, kGroup, 1},
+        {kFaMPost, kChangeStreamImagesDisabled, kRecordInSideCollection, kDontGroup, 1},
+        {kFaMPost, kChangeStreamImagesEnabled, kNotRetryable, kDontGroup, 1},
+        {kFaMPost, kChangeStreamImagesEnabled, kNotRetryable, kGroup, 1},
+        {kFaMPost, kChangeStreamImagesEnabled, kRecordInSideCollection, kDontGroup, 1}};
 
     const NamespaceString _nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
@@ -3214,17 +3227,17 @@ protected:
 };
 
 TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
-    // Create a registry that registers the OpObserverImpl, FindAndModifyImagesOpObserver, and
-    // ChangeStreamPreImagesOpObserver.
+    // Register the OpObserverImpl, FindAndModifyImagesOpObserver, and
+    // ChangeStreamPreImagesOpObserver to the registry.
     // These OpObservers work together to ensure that images for retryable findAndModify and
     // change streams are written correctly to the respective side collections.
     // It falls into cases where `ReservedTimes` is expected to be instantiated. Due to strong
     // encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
-    OpObserverRegistry opObserver;
-    opObserver.addObserver(
+    auto opObserver = opObserverRegistry();
+    opObserver->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-    opObserver.addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
-    opObserver.addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
+    opObserver->addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
+    opObserver->addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];
@@ -3245,11 +3258,11 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
         CollectionUpdateArgs updateArgs{kPreImageDoc};
         updateArgs.criteria = kCriteria;
 
-        WriteUnitOfWork wuow(opCtx);
+        WriteUnitOfWork wuow(opCtx, testCase.oplogGroupType);
         AutoGetCollection locks(opCtx, _nss, MODE_IX);
         OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *locks);
         initializeOplogUpdateEntryArgs(opCtx, testCase, &updateEntryArgs);
-        opObserver.onUpdate(opCtx, updateEntryArgs);
+        opObserver->onUpdate(opCtx, updateEntryArgs);
         wuow.commit();
 
         // Phase 3: Analyze the results:
@@ -3263,20 +3276,24 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
 }
 
 TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
-    // Create a registry that registers the OpObserverImpl, FindAndModifyImagesOpObserver, and
-    // ChangeStreamPreImagesOpObserver.
+    // Register the OpObserverImpl, FindAndModifyImagesOpObserver, and
+    // ChangeStreamPreImagesOpObserver to the registry.
     // These OpObservers work together to ensure that images for retryable findAndModify and
     // change streams are written correctly to the respective side collections.
     // It falls into cases where `ReservedTimes` is expected to be instantiated. Due to strong
     // encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
-    OpObserverRegistry opObserver;
-    opObserver.addObserver(
+    auto opObserver = opObserverRegistry();
+    opObserver->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-    opObserver.addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
-    opObserver.addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
+    opObserver->addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
+    opObserver->addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];
+        if (testCase.oplogGroupType == kGroup) {
+            // Transactions cannot use batched writes.
+            continue;
+        }
         logTestCase(testCase);
 
         auto opCtxRaii = cc().makeOperationContext();
@@ -3300,8 +3317,8 @@ TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
         OplogUpdateEntryArgs updateEntryArgs(&updateArgs, *locks);
         initializeOplogUpdateEntryArgs(opCtx, testCase, &updateEntryArgs);
 
-        opObserver.onUpdate(opCtx, updateEntryArgs);
-        commitUnpreparedTransaction<OpObserverRegistry>(opCtx, opObserver);
+        opObserver->onUpdate(opCtx, updateEntryArgs);
+        commitUnpreparedTransaction<OpObserverRegistry>(opCtx, *opObserver);
         wuow.commit();
 
         // Phase 3: Analyze the results:
@@ -3423,6 +3440,7 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
 struct DeleteTestCase {
     bool changeStreamImagesEnabled;
     RetryableFindAndModifyLocation retryableOptions;
+    WriteUnitOfWork::OplogEntryGroupType oplogGroupType;
 
     int numOutputOplogs;
 
@@ -4637,7 +4655,6 @@ TEST_F(BatchedWriteOutputsTest, TestSingleContainerDeleteIsNotInApplyOps) {
         },
         false /*isRetryable*/);
 }
-
 class OnDeleteOutputsTest : public OpObserverTest {
 
 protected:
@@ -4653,6 +4670,7 @@ protected:
               "ChangeStreamPreAndPostImagesEnabled"_attr = testCase.changeStreamImagesEnabled,
               "RetryableFindAndModifyLocation"_attr =
                   testCase.getRetryableFindAndModifyLocationStr(),
+              "OplogGrouping"_attr = testCase.oplogGroupType == kGroup,
               "ExpectedOplogEntries"_attr = testCase.numOutputOplogs);
     }
 
@@ -4721,10 +4739,18 @@ protected:
         }
     }
 
-    std::vector<DeleteTestCase> _cases{{kChangeStreamImagesDisabled, kNotRetryable, 1},
-                                       {kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
-                                       {kChangeStreamImagesEnabled, kNotRetryable, 1},
-                                       {kChangeStreamImagesEnabled, kRecordInSideCollection, 1}};
+    std::vector<DeleteTestCase> _cases{
+        {kChangeStreamImagesDisabled, kNotRetryable, kDontGroup, 1},
+        {kChangeStreamImagesDisabled, kNotRetryable, kGroup, 1},
+        {kChangeStreamImagesDisabled, kRecordInSideCollection, kDontGroup, 1},
+        // TODO (SERVER-116395): Test grouping with RetryableFindAndModify
+        // {kChangeStreamImagesDisabled, kRecordInSideCollection, kGroup, 1},
+        {kChangeStreamImagesEnabled, kNotRetryable, kDontGroup, 1},
+        {kChangeStreamImagesEnabled, kNotRetryable, kGroup, 1},
+        {kChangeStreamImagesEnabled, kRecordInSideCollection, kDontGroup, 1},
+        // TODO (SERVER-116395): Test grouping with RetryableFindAndModify
+        // {kChangeStreamImagesEnabled, kRecordInSideCollection, kGroup, 1}
+    };
 
     const NamespaceString _nss =
         NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
@@ -4734,17 +4760,17 @@ protected:
 };
 
 TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
-    // Create a registry that registers the OpObserverImpl, FindAndModifyImagesOpObserver, and
-    // ChangeStreamPreImagesOpObserver.
+    // Register the OpObserverImpl, FindAndModifyImagesOpObserver, and
+    // ChangeStreamPreImagesOpObserver to the registry.
     // These OpObservers work together to ensure that images for retryable findAndModify and
     // change streams are written correctly to the respective side collections.
     // It falls into cases where `ReservedTimes` is expected to be instantiated. Due to strong
     // encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
-    OpObserverRegistry opObserver;
-    opObserver.addObserver(
+    auto opObserver = opObserverRegistry();
+    opObserver->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-    opObserver.addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
-    opObserver.addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
+    opObserver->addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
+    opObserver->addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];
@@ -4765,15 +4791,15 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
         OplogDeleteEntryArgs deleteEntryArgs;
         initializeOplogDeleteEntryArgs(opCtx, testCase, &deleteEntryArgs);
 
-        WriteUnitOfWork wuow(opCtx);
+        WriteUnitOfWork wuow(opCtx, testCase.oplogGroupType);
         AutoGetCollection locks(opCtx, _nss, MODE_IX);
         const auto& documentKey = getDocumentKey(*locks, _deletedDoc);
-        opObserver.onDelete(opCtx,
-                            *locks,
-                            testCase.isRetryable() ? 1 : kUninitializedStmtId,
-                            _deletedDoc,
-                            documentKey,
-                            deleteEntryArgs);
+        opObserver->onDelete(opCtx,
+                             *locks,
+                             testCase.isRetryable() ? 1 : kUninitializedStmtId,
+                             _deletedDoc,
+                             documentKey,
+                             deleteEntryArgs);
         wuow.commit();
 
         // Phase 3: Analyze the results:
@@ -4788,20 +4814,24 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
 }
 
 TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
-    // Create a registry that registers the OpObserverImpl, FindAndModifyImagesOpObserver, and
-    // ChangeStreamPreImagesOpObserver.
+    // Register the OpObserverImpl, FindAndModifyImagesOpObserver, and
+    // ChangeStreamPreImagesOpObserver to registry.
     // These OpObservers work together to ensure that images for retryable findAndModify and
     // change streams are written correctly to the respective side collections.
     // It falls into cases where `ReservedTimes` is expected to be instantiated. Due to strong
     // encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
-    OpObserverRegistry opObserver;
-    opObserver.addObserver(
+    auto opObserver = opObserverRegistry();
+    opObserver->addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-    opObserver.addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
-    opObserver.addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
+    opObserver->addObserver(std::make_unique<FindAndModifyImagesOpObserver>());
+    opObserver->addObserver(std::make_unique<ChangeStreamPreImagesOpObserver>());
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];
+        if (testCase.oplogGroupType == kGroup) {
+            // Transactions cannot use batched writes.
+            continue;
+        }
         logTestCase(testCase);
 
         auto opCtxRaii = cc().makeOperationContext();
@@ -4822,11 +4852,11 @@ TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
         initializeOplogDeleteEntryArgs(opCtx, testCase, &deleteEntryArgs);
         const auto stmtId = testCase.isRetryable() ? 1 : kUninitializedStmtId;
 
-        WriteUnitOfWork wuow(opCtx);
+        WriteUnitOfWork wuow(opCtx, testCase.oplogGroupType);
         AutoGetCollection locks(opCtx, _nss, MODE_IX);
         const auto& documentKey = getDocumentKey(*locks, _deletedDoc);
-        opObserver.onDelete(opCtx, *locks, stmtId, _deletedDoc, documentKey, deleteEntryArgs);
-        commitUnpreparedTransaction<OpObserverRegistry>(opCtx, opObserver);
+        opObserver->onDelete(opCtx, *locks, stmtId, _deletedDoc, documentKey, deleteEntryArgs);
+        commitUnpreparedTransaction<OpObserverRegistry>(opCtx, *opObserver);
         wuow.commit();
 
         // Phase 3: Analyze the results:
