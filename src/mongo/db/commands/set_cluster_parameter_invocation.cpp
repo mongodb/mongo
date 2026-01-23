@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/fle_options_gen.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/db/vector_clock.h"
@@ -64,6 +66,27 @@
 
 
 namespace mongo {
+
+Status allowedToEnable(const BSONObj& command) {
+    auto name = command.firstElement().fieldNameStringData();
+    if (name == "fleCompactionOptions"_sd &&
+        !gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        auto params = command.firstElement().Obj();
+        for (auto&& elem : params) {
+            auto field = elem.fieldNameStringData();
+            if (field != FLECompactionOptions::kMaxCompactionSizeFieldName &&
+                field != FLECompactionOptions::kMaxESCEntriesPerCompactionDeleteFieldName) {
+                return Status{ErrorCodes::IllegalOperation,
+                              str::stream()
+                                  << "Cannot set fleCompactionOptions." << field
+                                  << " unless Queryable Encryption range version 2 is enabled"};
+            }
+        }
+    }
+    return Status::OK();
+}
+
 bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                                            const SetClusterParameter& cmd,
                                            boost::optional<Timestamp> clusterParameterTime,
@@ -75,6 +98,8 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     StringData parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = _sps->get(parameterName);
     auto tenantId = cmd.getDbName().tenantId();
+
+    uassertStatusOK(allowedToEnable(cmdParamObj));
 
     auto [query, update] =
         normalizeParameter(opCtx,

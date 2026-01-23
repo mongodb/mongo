@@ -41,6 +41,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/crypto/fle_options_gen.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -57,6 +58,7 @@
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator_document_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
@@ -87,6 +89,21 @@ Status allowedToEnable(const BSONObj& command) {
             ErrorCodes::IllegalOperation,
             "Unable to enable pauseMigrationsDuringMultiUpdates cluster parameter because "
             "pauseMigrationsDuringMultiUpdatesAvailable feature flag is not enabled."};
+    }
+    if (name == "fleCompactionOptions"_sd &&
+        !gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        auto params = command.firstElement().Obj();
+        for (auto&& elem : params) {
+            auto field = elem.fieldNameStringData();
+            if (field != FLECompactionOptions::kMaxCompactionSizeFieldName &&
+                field != FLECompactionOptions::kMaxESCEntriesPerCompactionDeleteFieldName) {
+                return Status{ErrorCodes::IllegalOperation,
+                              str::stream()
+                                  << "Cannot set fleCompactionOptions." << field
+                                  << " unless Queryable Encryption range version 2 is enabled"};
+            }
+        }
     }
     return Status::OK();
 }

@@ -178,10 +178,6 @@ struct EncryptedFieldMatchResult {
 boost::optional<EncryptedFieldMatchResult> findMatchingEncryptedField(
     const FieldRef& key, const std::vector<FieldRef>& encryptedFields);
 
-class FLECompactionOptions;
-Status checkForVersion70IncompatibleFields(const FLECompactionOptions& newVal,
-                                           const boost::optional<TenantId>& tenantId);
-
 /**
  * Function to evaluate a QueryTypeConfig that appears under an EncryptedField. Used as a
  * visitor function when iterating all QueryTypeConfig present in an EncryptedFieldConfig.

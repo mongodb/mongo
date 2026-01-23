@@ -81,7 +81,7 @@ server_parameters:
     cpp_varname: gUnsupportedDangerousTestingFLEDiagnosticsEnabledAtStartup
     default: false
     redact: false
-    
+
   fleCompactionOptions:
     description: "Options related to compaction or cleanup operations in Queryable Encryption
         protocol version 2"
@@ -90,5 +90,3 @@ server_parameters:
     cpp_vartype: FLECompactionOptions
     redact: false
     omit_in_ftdc: false
-    validator:
-      callback: "checkForVersion70IncompatibleFields"

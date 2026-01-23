@@ -53,19 +53,6 @@ boost::optional<EncryptedFieldMatchResult> findMatchingEncryptedField(
     return {{*itr, key.numParts() <= itr->numParts()}};
 }
 
-Status checkForVersion70IncompatibleFields(const FLECompactionOptions& newVal,
-                                           const boost::optional<TenantId>& tenantId) {
-    if (!gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        if (newVal.getCompactAnchorPaddingFactor().has_value()) {
-            return Status{ErrorCodes::BadValue,
-                          "Cannot set fleCompactionOptions.compactAnchorPaddingFactor unless "
-                          "Queryable Encryption range version 2 is enabled"};
-        }
-    }
-    return Status::OK();
-}
-
 bool visitQueryTypeConfigs(const EncryptedField& field,
                            const QueryTypeConfigVisitor& visitOne,
                            const UnindexedEncryptedFieldVisitor& onEmptyField) {
