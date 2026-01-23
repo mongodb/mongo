@@ -385,7 +385,9 @@ Status insertDocumentsImpl(OperationContext* opCtx,
         }
     }
 
-    if (!nss.isImplicitlyReplicated()) {
+    // We call the OpObserver on config.transaction even when it is implicitly replicated
+    // because we need to observe the direct writes to it to validate those writes.
+    if (!nss.isImplicitlyReplicated() || nss.isConfigTransactionsCollection()) {
         opCtx->getServiceContext()->getOpObserver()->onInserts(
             opCtx,
             collection,

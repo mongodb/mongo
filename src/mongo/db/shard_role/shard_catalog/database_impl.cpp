@@ -202,8 +202,7 @@ bool shouldSetRecordIdsReplicated(OperationContext* opCtx,
         gFeatureFlagRecordIdsReplicated.isEnabledUseLastLTSFCVWhenUninitialized(
             VersionContext::getDecoration(opCtx),
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    // TODO (SERVER-115758): Determine whether internal collections can set 'recordIdsReplicated'.
-    if (isOriginalCollectionCreation && !nss.isOnInternalDb() && replicatedRidsFeatureIsEnabled) {
+    if (isOriginalCollectionCreation && replicatedRidsFeatureIsEnabled) {
         LOGV2_DEBUG(8700501,
                     0,
                     "Collection will use recordIdsReplicated:true.",
