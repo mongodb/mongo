@@ -915,10 +915,13 @@ Status NetworkInterfaceTL::CommandStateBase::handleClientAcquisitionError(Status
     }
 
     if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
-        LOGV2(6496500,
-              "Operation timed out while waiting to acquire connection",
-              "requestId"_attr = request.id,
-              "duration"_attr = connTimeoutWaitTime);
+        static logv2::SeveritySuppressor logSeverity{
+            Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(1)};
+        LOGV2_DEBUG(6496500,
+                    logSeverity().toInt(),
+                    "Operation timed out while waiting to acquire connection",
+                    "requestId"_attr = request.id,
+                    "duration"_attr = connTimeoutWaitTime);
     }
 
     return status;
