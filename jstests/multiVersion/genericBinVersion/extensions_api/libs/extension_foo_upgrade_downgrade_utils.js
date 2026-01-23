@@ -34,6 +34,16 @@ export function extensionNodeOptions(extensionName) {
     };
 }
 
+export function wrapOptionsWithStubParserFeatureFlag(baseOptions) {
+    return {
+        ...baseOptions,
+        setParameter: {
+            ...baseOptions.setParameter,
+            featureFlagExtensionStubParsers: true,
+        },
+    };
+}
+
 export function setupCollection(primaryConn, shardingTest = null) {
     const coll = assertDropAndRecreateCollection(getDB(primaryConn), collName);
     if (shardingTest) {

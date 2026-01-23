@@ -45,6 +45,7 @@ import {
     setupCollection,
     generateMultiversionExtensionConfigs,
     deleteMultiversionExtensionConfigs,
+    wrapOptionsWithStubParserFeatureFlag,
 } from "jstests/multiVersion/genericBinVersion/extensions_api/libs/extension_foo_upgrade_downgrade_utils.js";
 import {testPerformReplSetRollingRestart} from "jstests/multiVersion/libs/mixed_version_fixture_test.js";
 import {testPerformShardedClusterRollingRestart} from "jstests/multiVersion/libs/mixed_version_sharded_fixture_test.js";
@@ -62,8 +63,8 @@ try {
 
     // Test upgrading foo extension in a replica set.
     testPerformReplSetRollingRestart({
-        startingNodeOptions: fooV1Options,
-        restartNodeOptions: fooV2Options,
+        startingNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV1Options),
+        restartNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV2Options),
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1Only,
         // TODO SERVER-115501 Add fine-grained validation.
@@ -73,8 +74,8 @@ try {
 
     // Test upgrading foo extension in a sharded cluster.
     testPerformShardedClusterRollingRestart({
-        startingNodeOptions: fooV1Options,
-        restartNodeOptions: fooV2Options,
+        startingNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV1Options),
+        restartNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV2Options),
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1Only,
         afterConfigHasRestarted: assertFooStageAcceptedV1Only,
@@ -85,8 +86,8 @@ try {
 
     // Test downgrading foo extension in a replica set.
     testPerformReplSetRollingRestart({
-        startingNodeOptions: fooV2Options,
-        restartNodeOptions: fooV1Options,
+        startingNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV2Options),
+        restartNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV1Options),
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1AndV2,
         // TODO SERVER-115501 Add fine-grained validation.
@@ -96,8 +97,8 @@ try {
 
     // Test downgrading foo extension in a sharded cluster.
     testPerformShardedClusterRollingRestart({
-        startingNodeOptions: fooV2Options,
-        restartNodeOptions: fooV1Options,
+        startingNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV2Options),
+        restartNodeOptions: wrapOptionsWithStubParserFeatureFlag(fooV1Options),
         setupFn: setupCollection,
         beforeRestart: assertFooStageAcceptedV1AndV2,
         afterConfigHasRestarted: assertFooStageAcceptedV1AndV2,
