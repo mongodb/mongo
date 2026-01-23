@@ -1,6 +1,6 @@
 """Repository rules for rules_py_simple"""
 
-load("//bazel:utils.bzl", "retry_download_and_extract")
+load("//bazel:utils.bzl", "retry_download_and_extract", "write_python_pyc_cache_prefix_customization")
 load("//bazel/platforms:normalize.bzl", "ARCH_TO_PLATFORM_MAP", "OS_TO_PLATFORM_MAP")
 
 URLS_MAP = {
@@ -169,15 +169,7 @@ toolchain(
 
         usercustomize_file = "dist/lib/python" + python_major_version + "." + python_minor_version + "/site-packages/usercustomize.py"
 
-    ctx.file(
-        usercustomize_file,
-        """
-import sys
-import os
-import tempfile
-sys.pycache_prefix = os.path.join(tempfile.gettempdir(), "bazel_pycache")
-""",
-    )
+    write_python_pyc_cache_prefix_customization(ctx, usercustomize_file)
 
     ctx.report_progress("generating build file")
     os_constraint = OS_TO_PLATFORM_MAP[os]

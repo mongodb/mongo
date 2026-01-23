@@ -1,5 +1,5 @@
 load("//bazel/toolchains/cc/mongo_linux:mongo_gdb_version_v5.bzl", "TOOLCHAIN_MAP_V5")
-load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract")
+load("//bazel:utils.bzl", "generate_noop_toolchain", "get_toolchain_subs", "retry_download_and_extract", "write_python_pyc_cache_prefix_customization")
 
 def _gdb_download(ctx):
     distro, arch, substitutions = get_toolchain_subs(ctx)
@@ -60,7 +60,18 @@ def _gdb_download(ctx):
         python_execute_env = {
             "PYTHONHOME": pythonhome,
             "LD_LIBRARY_PATH": python_lib_path,
+            "PYTHONDONTWRITEBYTECODE": "1",
         }
+
+        # Ensure the bundled Python does not write .pyc files into the toolchain/runfiles tree.
+        write_python_pyc_cache_prefix_customization(
+            ctx,
+            "stow/python3-{version}/lib/python{pyver}/site-packages/sitecustomize.py".format(
+                version = ctx.attr.version,
+                pyver = python3_version,
+            ),
+        )
+
         result = ctx.execute([
             pythonhome + "/bin/python3",
             "-m",
