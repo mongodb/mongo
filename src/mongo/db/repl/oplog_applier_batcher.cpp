@@ -414,7 +414,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
         int retryAttempts = 0;
         for (;;) {
             try {
-                auto opCtx = cc().makeOperationContext();
+                auto opCtx = cc().getServiceContext()->makeKillOpsExemptOperationContext(&cc());
                 ScopedAdmissionPriority<ExecutionAdmissionContext> admissionPriority(
                     opCtx.get(), AdmissionContext::Priority::kExempt);
 

@@ -343,6 +343,21 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     return UniqueOperationContext(opCtx.release());
 };
 
+ServiceContext::UniqueOperationContext ServiceContext::makeKillOpsExemptOperationContext(
+    Client* client) {
+    for (unsigned caught = 0;; ++caught) {
+        auto opCtx = makeOperationContext(client);
+        ClientLock clientLock(client);
+        try {
+            opCtx->setKillOpsExempt();
+            return opCtx;
+        } catch (const ExceptionFor<ErrorCodes::OpCtxKilledOnMarkKillOpsExempt>&) {
+            if (caught >= 100)
+                throw;
+        }
+    }
+}
+
 void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx) const {
     auto client = opCtx->getClient();
     invariant(client);

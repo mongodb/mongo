@@ -1149,5 +1149,11 @@ error_codes:
   # Planner errors
   - {code: 482, name: MaxNumberOfOrPlansExceeded}
 
+  - {
+      code: 483,
+      name: OpCtxKilledOnMarkKillOpsExempt,
+      categories: [CancellationError, InternalOnly],
+    }
+
   # ^^^^
   # Add new codes, sequentially numbered, above.

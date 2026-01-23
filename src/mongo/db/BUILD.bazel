@@ -3179,6 +3179,7 @@ mongo_cc_unit_test(
         ":commands",
         ":dbdirectclient",
         ":mirror_maestro",
+        ":operation_killer",
         ":operation_time_tracker",
         ":rw_concern_d",
         ":service_context",

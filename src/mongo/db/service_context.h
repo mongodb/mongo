@@ -534,6 +534,17 @@ public:
      */
     UniqueOperationContext makeOperationContext(Client* client);
 
+    /**
+     * Makes a new operation context representing an operation on "client", and mark this
+     * operation context killOps exempt.
+     * This should be used when creating a context for an internal operation that a killOp command
+     * should not be able to kill.
+     * Can throw ExceptionFor<ErrorCodes::OpCtxKilledOnMarkKillOpsExempt> if we weren't able to
+     * create an operation context without it being killed before marking it as killOps exempt (this
+     * should never happen).
+     */
+    UniqueOperationContext makeKillOpsExemptOperationContext(Client* client);
+
     //
     // Storage
     //

@@ -777,9 +777,15 @@ public:
      * Set to prevent killOps from killing this opCtx even when an LSID is set.
      * You may only call this method prior to setting an LSID on this opCtx.
      * Calls to resetMultiDocumentTransactionState will reset _killOpsExempt to false.
+     *
+     * May be called by any thread that has locked the Client owning this operation context, or
+     * without lock by the thread executing on behalf of this operation context.
      */
     void setKillOpsExempt() {
         invariant(!getLogicalSessionId());
+        iassert(ErrorCodes::OpCtxKilledOnMarkKillOpsExempt,
+                "Calling setKillOpsExempt() on a killed op",
+                !isKillPending());
         _killOpsExempt = true;
     }
 
@@ -1114,7 +1120,7 @@ private:
     // session and can thus be passed into a killSessions command to target that session and its
     // operations. However, there are some cases where we want the opCtx to have both an LSID and
     // kill-immunity. Current examples include checking out sessions on replica set step up in order
-    // to refresh locks for prepared tranasctions or abort in-progress transactions.
+    // to refresh locks for prepared transactions or abort in-progress transactions.
     bool _killOpsExempt = false;
 
     // The query sampling options for operations on this opCtx.
