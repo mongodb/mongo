@@ -25,11 +25,11 @@ const prevAutomaticCEPlanRankingStrategy = prevQueryKnobs.automaticCEPlanRanking
 
 try {
     // 1: Run with only MultiPlanning.
-    db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"});
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
     sbeEligibleGroupDistinctScanTest();
 
     // 2: Run with CBR fallback strategies.
-    db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"});
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}));
 
     const cbrFallbackStrategies = [
         "CBRForNoMultiplanningResults",
@@ -39,11 +39,12 @@ try {
 
     for (const cbrFallbackStrategy of cbrFallbackStrategies) {
         jsTest.log.info("Running tests with automaticCE.", {cbrFallbackStrategy});
+        assert.commandWorked(db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: cbrFallbackStrategy}));
         sbeEligibleGroupDistinctScanTest();
     }
 
     // 3: Run under pure sampling configuration.
-    db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"});
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "samplingCE"}));
     sbeEligibleGroupDistinctScanTest();
 } finally {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
