@@ -127,11 +127,12 @@ MONGO_MOD_PUBLIC_FOR_TECHNICAL_REASONS constexpr void invariantWithContextAndLoc
     MONGO_invariant_EXPAND( \
         MONGO_invariant_PICK(__VA_ARGS__, MONGO_invariant_2, MONGO_invariant_1)(__VA_ARGS__))
 
-// Behaves like invariant in debug builds and is compiled out in release. Use for checks, which can
-// potentially be slow or on a critical path.
-#define MONGO_dassert(...) \
-    if (kDebugBuild)       \
-    invariant(__VA_ARGS__)
+/** An `invariant` that's only active in debug builds. Use for slow checks. */
+#define MONGO_dassert(...)                  \
+    do {                                    \
+        if constexpr (::mongo::kDebugBuild) \
+            invariant(__VA_ARGS__);         \
+    } while (false)
 
 #define dassert MONGO_dassert
 
