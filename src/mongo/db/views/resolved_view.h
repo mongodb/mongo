@@ -31,16 +31,21 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/version_context.h"
 #include "mongo/util/modules.h"
 
+#include <memory>
+#include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
@@ -150,6 +155,16 @@ private:
     boost::optional<bool> _timeseriesMayContainMixedData;
     boost::optional<bool> _timeseriesUsesExtendedRange;
     boost::optional<bool> _timeseriesfixedBuckets;
+};
+
+class PipelineResolver {
+public:
+    /**
+     * Constructs a new aggregation request which targets the base collection of 'resolvedView'
+     * and applies the view pipeline to the original aggregation request pipeline.
+     */
+    static AggregateCommandRequest buildRequestWithResolvedPipeline(
+        const ResolvedView& resolvedView, const AggregateCommandRequest& request);
 };
 
 }  // namespace mongo

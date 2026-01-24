@@ -940,7 +940,6 @@ mongo_cc_library(
         "//src/mongo/db/transaction",
         "//src/mongo/db/transaction:transaction_operations",
         "//src/mongo/db/validate:collection_validation",
-        "//src/mongo/db/views:pipeline_resolver",
         "//src/mongo/db/views:view_catalog_helpers",
         "//src/mongo/executor:async_request_executor",
         "//src/mongo/rpc:rewrite_state_change_errors",

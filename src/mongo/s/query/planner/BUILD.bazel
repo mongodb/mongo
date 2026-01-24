@@ -31,7 +31,6 @@ mongo_cc_library(
         "//src/mongo/db/shard_role/shard_catalog:collection_uuid_mismatch_info",
         "//src/mongo/db/timeseries:timeseries_options",
         "//src/mongo/db/views",
-        "//src/mongo/db/views:pipeline_resolver",
         "//src/mongo/db/views:view_catalog_helpers",
         "//src/mongo/s/query/exec:async_results_merger",
         "//src/mongo/s/query/exec:router_exec_stage",

@@ -41,7 +41,6 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"

@@ -65,17 +65,13 @@ std::unique_ptr<DocumentSourceScoreFusion::LiteParsed> DocumentSourceScoreFusion
     auto parsedSpec = ScoreFusionSpec::parse(spec.embeddedObject(), IDLParserContext(kStageName));
     auto inputPipesObj = parsedSpec.getInput().getPipelines();
 
-    auto opts = options;
-    opts.makeSubpipelineOwned = true;
-
     // Parse each pipeline.
     std::vector<LiteParsedPipeline> liteParsedPipelines;
-    std::transform(inputPipesObj.begin(),
-                   inputPipesObj.end(),
-                   std::back_inserter(liteParsedPipelines),
-                   [nss, opts](const auto& elem) {
-                       return LiteParsedPipeline(nss, parsePipelineFromBSON(elem), false, opts);
-                   });
+    std::transform(
+        inputPipesObj.begin(),
+        inputPipesObj.end(),
+        std::back_inserter(liteParsedPipelines),
+        [nss](const auto& elem) { return LiteParsedPipeline(nss, parsePipelineFromBSON(elem)); });
 
     return std::make_unique<DocumentSourceScoreFusion::LiteParsed>(
         spec, nss, std::move(liteParsedPipelines));

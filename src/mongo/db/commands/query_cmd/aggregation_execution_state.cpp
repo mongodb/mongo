@@ -46,7 +46,6 @@
 #include "mongo/db/timeseries/timeseries_request_util.h"
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/db/version_context.h"
-#include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 
 #include <fmt/format.h>

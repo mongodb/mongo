@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -94,30 +93,26 @@ public:
      * It manages the collection routing, meaning that the aggregation may be implicitly retried by
      * `runAggregate` if the placement of the collection has changed.
      */
-    static Status runAggregate(
-        OperationContext* opCtx,
-        const Namespaces& namespaces,
-        AggregateCommandRequest& request,
-        const LiteParsedPipeline& liteParsedPipeline,
-        const PrivilegeVector& privileges,
-        boost::optional<ExplainOptions::Verbosity> verbosity,
-        BSONObjBuilder* result,
-        StringData comment = "ClusterAggregate::runAggregate"_sd,
-        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
+    static Status runAggregate(OperationContext* opCtx,
+                               const Namespaces& namespaces,
+                               AggregateCommandRequest& request,
+                               const LiteParsedPipeline& liteParsedPipeline,
+                               const PrivilegeVector& privileges,
+                               boost::optional<ExplainOptions::Verbosity> verbosity,
+                               BSONObjBuilder* result,
+                               StringData comment = "ClusterAggregate::runAggregate"_sd);
 
 
     /**
      * Convenience version that internally constructs the LiteParsedPipeline.
      */
-    static Status runAggregate(
-        OperationContext* opCtx,
-        const Namespaces& namespaces,
-        AggregateCommandRequest& request,
-        const PrivilegeVector& privileges,
-        boost::optional<ExplainOptions::Verbosity> verbosity,
-        BSONObjBuilder* result,
-        StringData comment = "ClusterAggregate::runAggregate"_sd,
-        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
+    static Status runAggregate(OperationContext* opCtx,
+                               const Namespaces& namespaces,
+                               AggregateCommandRequest& request,
+                               const PrivilegeVector& privileges,
+                               boost::optional<ExplainOptions::Verbosity> verbosity,
+                               BSONObjBuilder* result,
+                               StringData comment = "ClusterAggregate::runAggregate"_sd);
 
     /**
      * Convenience version to inject the routingCtx by the caller. This function skips the
@@ -136,8 +131,7 @@ public:
         boost::optional<AggregateCommandRequest> originalRequest,
         boost::optional<ExplainOptions::Verbosity> verbosity,
         BSONObjBuilder* result,
-        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr,
-        bool alreadyDesugared = false);
+        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
 
     /**
      * Retries a command that was previously run on a view by resolving the view as an aggregation
@@ -150,15 +144,13 @@ public:
      *
      * This function doesn't throw, it return a Status object instead.
      */
-    static Status retryOnViewError(
-        OperationContext* opCtx,
-        const AggregateCommandRequest& request,
-        const ResolvedView& resolvedView,
-        const NamespaceString& requestedNss,
-        const PrivilegeVector& privileges,
-        boost::optional<ExplainOptions::Verbosity> verbosity,
-        BSONObjBuilder* result,
-        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr);
+    static Status retryOnViewError(OperationContext* opCtx,
+                                   const AggregateCommandRequest& request,
+                                   const ResolvedView& resolvedView,
+                                   const NamespaceString& requestedNss,
+                                   const PrivilegeVector& privileges,
+                                   boost::optional<ExplainOptions::Verbosity> verbosity,
+                                   BSONObjBuilder* result);
 };
 
 }  // namespace mongo

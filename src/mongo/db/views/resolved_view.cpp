@@ -32,6 +32,7 @@
 #include "mongo/db/views/resolved_view.h"
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -40,10 +41,13 @@
 #include "mongo/db/pipeline/document_source_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 
 #include <boost/move/utility_core.hpp>
@@ -248,6 +252,63 @@ boost::optional<BSONObj> ResolvedView::rewriteIndexHintForTimeseries(
     }
 
     return boost::none;
+}
+
+
+AggregateCommandRequest PipelineResolver::buildRequestWithResolvedPipeline(
+    const ResolvedView& resolvedView, const AggregateCommandRequest& originalRequest) {
+    // Start with a copy of the original request and modify fields as needed. We assume that most
+    // fields should be unchanged from the original request; any fields that need to be changed will
+    // be modified below.
+    // TODO SERVER-110454: Avoid copying the original pipeline when possible.
+    AggregateCommandRequest expandedRequest = originalRequest;
+    expandedRequest.setNamespace(resolvedView.getNamespace());
+
+    // If both 'explain' and 'cursor' are set, we give precedence to 'explain' and drop 'cursor'.
+    if (originalRequest.getExplain()) {
+        expandedRequest.setCursor(SimpleCursorOptions());
+    }
+
+    std::vector<BSONObj> resolvedPipeline;
+    auto& viewPipeline = resolvedView.getPipeline();
+    // Mongot user pipelines are a unique case: $_internalSearchIdLookup applies the view pipeline.
+    // For this reason, we do not expand the aggregation request to include the view pipeline.
+    if (search_helper_bson_obj::isMongotPipeline(originalRequest.getPipeline())) {
+        resolvedPipeline.reserve(originalRequest.getPipeline().size());
+        resolvedPipeline.insert(resolvedPipeline.end(),
+                                originalRequest.getPipeline().begin(),
+                                originalRequest.getPipeline().end());
+    } else {
+        // The new pipeline consists of two parts: first, 'pipeline' in this ResolvedView; then, the
+        // pipeline in 'request'.
+        resolvedPipeline.reserve(viewPipeline.size() + originalRequest.getPipeline().size());
+        resolvedPipeline.insert(resolvedPipeline.end(), viewPipeline.begin(), viewPipeline.end());
+        resolvedPipeline.insert(resolvedPipeline.end(),
+                                originalRequest.getPipeline().begin(),
+                                originalRequest.getPipeline().end());
+    }
+
+    if (resolvedPipeline.size() >= 1 &&
+        resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageNameInternal]) {
+        resolvedView.applyTimeseriesRewrites(&resolvedPipeline);
+    }
+    expandedRequest.setPipeline(std::move(resolvedPipeline));
+
+    // If we have an index hint on a time-series view, we may need to rewrite the index spec to
+    // match the index on the underlying buckets collection.
+    if (originalRequest.getHint() && resolvedView.timeseries()) {
+        auto newHint = resolvedView.rewriteIndexHintForTimeseries(*originalRequest.getHint());
+        if (newHint.has_value()) {
+            expandedRequest.setHint(*newHint);
+        }
+    }
+
+    // Operations on a view must always use the default collation of the view. We must have already
+    // checked that if the user's request specifies a collation, it matches the collation of the
+    // view.
+    expandedRequest.setCollation(resolvedView.getDefaultCollation());
+
+    return expandedRequest;
 }
 
 }  // namespace mongo

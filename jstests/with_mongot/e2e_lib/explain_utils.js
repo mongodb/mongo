@@ -11,26 +11,6 @@ import {
 } from "jstests/with_mongot/common_utils.js";
 
 /**
- * Asserts that the actual pipeline stages contain the expected stages in the correct order.
- * This checks that each stage at position i has the same stage name/type as the expected stage
- * at position i, without requiring exact equality of the entire stage objects.
- *
- * @param {Array} actualStages The actual pipeline stages to check.
- * @param {Array} expectedStages The expected pipeline stages.
- * @param {string} contextMessage Optional context message to include in error messages.
- */
-function assertStagesInExpectedOrder(actualStages, expectedStages, contextMessage = "") {
-    assert.eq(actualStages.length, expectedStages.length);
-    for (let i = 0; i < expectedStages.length; i++) {
-        const stageName = Object.keys(expectedStages[i])[0];
-        const errorMsg = contextMessage
-            ? `${contextMessage} Expected stage ${stageName} at position ${i}, but found: ${tojson(actualStages[i])}`
-            : `Expected stage ${stageName} at position ${i}, but found: ${tojson(actualStages[i])}`;
-        assert(actualStages[i].hasOwnProperty(stageName), errorMsg);
-    }
-}
-
-/**
  * This function checks that the explain output contains the view pipeline $_internalSearchIdLookup.
  * This should only be the case when there is a $search stage on the top-level of the user
  * pipeline.
@@ -53,7 +33,11 @@ function assertIdLookupContainsViewPipeline(explainOutput, viewPipeline) {
         assert.eq(idLookupFullSubPipe[0], idLookupStage);
         // Make sure that idLookup subpipeline contains all of the view stages.
         const idLookupViewStages = idLookupFullSubPipe.length > 1 ? idLookupFullSubPipe.slice(1) : [];
-        assertStagesInExpectedOrder(idLookupViewStages, viewPipeline);
+        assert.eq(idLookupViewStages.length, viewPipeline.length);
+        for (let i = 0; i < idLookupViewStages.length; i++) {
+            const stageName = Object.keys(viewPipeline[i])[0];
+            assert(idLookupViewStages[i].hasOwnProperty(stageName));
+        }
     }
 }
 
@@ -82,9 +66,7 @@ export function assertViewAppliedCorrectly(explainOutput, userPipeline, viewPipe
         // ResolvedView::asExpandedViewAggregation() was called). This also makes it easier to keep
         // explain checks simpler/more consistent between variants that run with SBE turned on and
         // SBE turned off, as SBE greatly changes how the stages are portrayed.
-        // Check that view pipeline stages are present in the right order.
-        const commandPipelineStart = explainOutput.command.pipeline.slice(0, viewPipeline.length);
-        assertStagesInExpectedOrder(commandPipelineStart, viewPipeline);
+        assert.eq(explainOutput.command.pipeline.slice(0, viewPipeline.length), viewPipeline);
     }
 }
 

@@ -590,7 +590,7 @@ public:
      * If '_ownedBson' already has a value, this is a no-op since the BSON data is already
      * guaranteed to remain valid.
      */
-    virtual void makeOwned() {
+    void makeOwned() {
         if (_originalBson.eoo() || _ownedBson) {
             // Nothing to own, or already owned.
             return;

@@ -104,20 +104,6 @@ public:
     }
 
     /**
-     * Converts this LiteParsedDocumentSource and all its subpipelines to own the BSON they hold.
-     * This recursively makes all stages in subpipelines owned as well.
-     */
-    void makeOwned() override {
-        // First, make the stage's own BSON owned
-        LiteParsedDocumentSourceDefault<Derived>::makeOwned();
-
-        // Then, make all subpipelines owned
-        for (auto& pipeline : _pipelines) {
-            pipeline.makeOwned();
-        }
-    }
-
-    /**
      * Check the read concern constraints of all sub-pipelines. If the stage that owns the
      * sub-pipelines has its own constraints this should be overridden to take those into account.
      */
