@@ -23,6 +23,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/repl:local_oplog_info",
         "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/replicated_size_and_count_metadata_manager",
         "//src/mongo/db/shard_role/shard_catalog:document_validation",
         "//src/mongo/db/storage:index_entry_comparison",
         "//src/mongo/db/storage:record_store_base",

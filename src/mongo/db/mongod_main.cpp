@@ -135,6 +135,7 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/replicated_size_and_count_metadata_manager/replicated_size_and_count_metadata_manager.h"
 #include "mongo/db/replication_state_transition_lock_guard.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/router_role/routing_cache/catalog_cache.h"
@@ -1868,6 +1869,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         // Allow memory leak for faster shutdown.
         catalog::shutDownCollectionCatalogAndGlobalStorageEngineCleanly(serviceContext,
                                                                         true /* memLeakAllowed */);
+    }
+
+    // Shut down the thread managing fast size and count information.
+    if (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        ReplicatedSizeAndCountMetadataManager::get(serviceContext).shutdown();
     }
 
     // Depending on the underlying implementation, there may be some state that needs to be shut

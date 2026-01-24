@@ -77,6 +77,9 @@
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/replicated_size_and_count_metadata_manager/replicated_size_and_count_metadata_manager.h"
+#include "mongo/db/replicated_size_and_count_metadata_manager/uncommitted_changes.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
@@ -1094,11 +1097,23 @@ long long CollectionImpl::getCappedMaxSize() const {
 }
 
 long long CollectionImpl::numRecords(OperationContext* opCtx) const {
-    return _shared->_recordStore->numRecords();
+    return (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+               VersionContext::getDecoration(opCtx),
+               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
+        ? ReplicatedSizeAndCountMetadataManager::get(opCtx->getServiceContext())
+                .find(uuid())
+                .count +
+            UncommittedMetaChange::read(opCtx).find(uuid()).count
+        : _shared->_recordStore->numRecords();
 }
 
 long long CollectionImpl::dataSize(OperationContext* opCtx) const {
-    return _shared->_recordStore->dataSize();
+    return (gFeatureFlagReplicatedSizeAndCount.isEnabledUseLastLTSFCVWhenUninitialized(
+               VersionContext::getDecoration(opCtx),
+               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
+        ? ReplicatedSizeAndCountMetadataManager::get(opCtx->getServiceContext()).find(uuid()).size +
+            UncommittedMetaChange::read(opCtx).find(uuid()).size
+        : _shared->_recordStore->dataSize();
 }
 
 int64_t CollectionImpl::sizeOnDisk(OperationContext* opCtx,
