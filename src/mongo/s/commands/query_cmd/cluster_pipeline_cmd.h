@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/extension_metrics.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/router_role/collection_routing_info_targeter.h"
@@ -106,9 +107,15 @@ public:
               _aggregationRequest(std::move(aggregationRequest)),
               _extensionMetrics(static_cast<const ClusterPipelineCommandBase*>(cmd)
                                     ->getExtensionMetricsAllocation()),
-              _liteParsedPipeline(_aggregationRequest,
-                                  false /* isRunningAgainstView_ForHybridSearch */,
-                                  {.extensionMetrics = &_extensionMetrics}),
+              // Create IFRContext early to ensure consistent flag values throughout the operation,
+              // including retries on view errors. Unlike mongod, mongos receives requests directly
+              // from clients (which cannot include ifrFlags), so we always create an empty context
+              // here.
+              _ifrContext(std::make_shared<IncrementalFeatureRolloutContext>()),
+              _liteParsedPipeline(
+                  _aggregationRequest,
+                  false /* isRunningAgainstView_ForHybridSearch */,
+                  {.ifrContext = _ifrContext, .extensionMetrics = &_extensionMetrics}),
               _privileges(std::move(privileges)) {}
 
         const GenericArguments& getGenericArguments() const override {
@@ -149,7 +156,9 @@ public:
                                                    _liteParsedPipeline,
                                                    _privileges,
                                                    verbosity,
-                                                   result));
+                                                   result,
+                                                   "ClusterAggregate::runAggregate"_sd,
+                                                   _ifrContext));
 
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 if (!isRawDataOperation(opCtx) ||
@@ -163,7 +172,8 @@ public:
                                                            nss,
                                                            _privileges,
                                                            verbosity,
-                                                           result));
+                                                           result,
+                                                           _ifrContext));
                 } else {
                     // If the resolved view is on a time-series collection and the command request
                     // was for raw data, we want to run aggregate on the buckets namespace instead
@@ -177,7 +187,9 @@ public:
                         _liteParsedPipeline,
                         _privileges,
                         verbosity,
-                        result));
+                        result,
+                        "ClusterAggregate::runAggregate"_sd,
+                        _ifrContext));
                 }
             }
             _extensionMetrics.markSuccess();
@@ -220,6 +232,12 @@ public:
         const OpMsgRequest& _request;
         AggregateCommandRequest _aggregationRequest;
         ExtensionMetrics _extensionMetrics;
+        // Store the IFR context as a shared pointer. This object is mutable while running the
+        // command. It must be shared because commands with subpipelines pass the same IFR context
+        // in to child subpipeline expression contexts, rather than copying it. We want to ensure
+        // that a consistent and single IFR context is used across the entirety of query processing,
+        // including in child subpipelines and retries on view errors.
+        std::shared_ptr<IncrementalFeatureRolloutContext> _ifrContext;
         const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;
     };
