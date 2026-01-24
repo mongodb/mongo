@@ -53,6 +53,8 @@ extensions_with_config(
         ":other_metrics_mongo_extension_signed_lib",
         ":sleep_mongo_extension_signed_lib",
         ":vector_search_optimization_mongo_extension_signed_lib",
+        ":disallow_view_mongo_extension_signed_lib",
+        ":desugar_add_view_name_mongo_extension_signed_lib",
 
         #################### EXTENSIONS FOR NO-PASSTHROUGH TESTS ####################
         # Any extension that is just loaded in a no-passthrough test MUST NOT have the
@@ -83,6 +85,8 @@ pkg_name = "//" + package_name() + "/"
         "foo_v2",
         "bar",
         "read_n_documents",
+        "disallow_view",
+        "desugar_add_view_name",
     ]
 ]
 
