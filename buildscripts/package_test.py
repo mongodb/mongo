@@ -14,6 +14,7 @@ import uuid
 from concurrent import futures
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Set, Tuple
+from urllib.parse import urlparse
 
 import docker
 import docker.errors
@@ -24,6 +25,8 @@ from docker.models.images import Image
 from retry.api import retry_call
 from simple_report import Report, Result
 
+from buildscripts.resmokelib.utils import evergreen_conn
+
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
 
@@ -32,6 +35,66 @@ handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter("[%(asctime)s]%(levelname)s:%(message)s")
 handler.setFormatter(formatter)
 root.addHandler(handler)
+
+
+def download_packages_from_build(build_id: str, download_dir: Path) -> Path:
+    """
+    Download the packages artifact from the Evergreen API.
+
+    This is needed because private artifacts require authenticated access.
+    The Evergreen API client handles authentication and downloads the file
+    to a local path that can be mounted into Docker containers.
+
+    Args:
+        build_id: The Evergreen build ID to search for the package task
+        download_dir: Directory where the packages tarball should be downloaded
+
+    Returns:
+        The local path to the downloaded packages tarball
+    """
+    logging.info("Fetching packages artifact from Evergreen API for build: %s", build_id)
+
+    evg_api = evergreen_conn.get_evergreen_api()
+    tasks = evg_api.tasks_by_build(build_id)
+
+    package_task = None
+    for task in tasks:
+        if task.display_name == "package":
+            package_task = task
+            break
+
+    if package_task is None:
+        raise RuntimeError(f"Could not find 'package' task in build {build_id}")
+
+    logging.info("Found package task: %s", package_task.task_id)
+
+    packages_url = None
+    for artifact in package_task.artifacts:
+        if artifact.name == "Packages":
+            packages_url = artifact.url
+            logging.info("Found Packages artifact URL: %s", packages_url)
+            break
+
+    if packages_url is None:
+        raise RuntimeError(
+            f"Could not find 'Packages' artifact for package task {package_task.task_id}"
+        )
+
+    # Download the packages file
+    download_dir.mkdir(parents=True, exist_ok=True)
+    local_path = download_dir / "packages.tgz"
+
+    logging.info("Downloading packages to: %s", local_path)
+    response = requests.get(packages_url, stream=True, timeout=300)
+    response.raise_for_status()
+
+    with open(local_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    logging.info("Downloaded packages successfully: %s", local_path)
+    return local_path
+
 
 PACKAGE_MANAGER_COMMANDS = {
     "apt": {
@@ -380,8 +443,28 @@ def run_test(test: Test, client: DockerClient) -> Result:
         commands.append(f"ln -s {test.python_command} /usr/bin/python3")
 
     os.makedirs(log_external_path.parent, exist_ok=True)
+
+    # Transform file:// URLs to use Docker-mounted paths
+    docker_packages_urls = []
+    for url in test.packages_urls:
+        parsed_url = urlparse(url)
+        if parsed_url.scheme == "file":
+            host_path = Path(parsed_url.path)
+            # Check if the path is within the test_external_root (buildscripts dir)
+            try:
+                relative_path = host_path.relative_to(test_external_root)
+                # Transform to Docker-mounted path
+                docker_path = Path(test_docker_root) / relative_path
+                docker_packages_urls.append(f"file://{docker_path}")
+            except ValueError:
+                # Path is not relative to test_external_root
+                docker_packages_urls.append(url)
+        else:
+            docker_packages_urls.append(url)
+
     commands.append(
-        f"python3 /mnt/package_test/package_test_internal.py {log_docker_path} {' '.join(test.packages_urls)}"
+        f"python3 /mnt/package_test/package_test_internal.py {log_docker_path} "
+        f"{' '.join(docker_packages_urls)}"
     )
     logging.debug(
         "Attempting to run the following docker commands:\n\t%s",
@@ -620,6 +703,13 @@ branch_test_parser.add_argument(
 branch_test_parser.add_argument(
     "-v", "--server-version", type=str, help="Server version being tested", required=True
 )
+branch_test_parser.add_argument(
+    "--evg-build-id",
+    type=str,
+    help="Evergreen build ID. If provided, the packages URL will be fetched "
+    "from the Evergreen API (required for private artifacts).",
+    default=None,
+)
 args = parser.parse_args()
 
 if args.command == "release":
@@ -644,9 +734,22 @@ tests: List[Test] = []
 urls: List[str] = []
 
 if args.command == "branch":
+    # If evg-build-id is provided, download the packages locally using the Evergreen API
+    # This is required for private artifacts which need authenticated access
+    local_packages_path: Optional[Path] = None
+    if args.evg_build_id:
+        download_dir = Path(__file__).parent / "downloaded_packages"
+        local_packages_path = download_packages_from_build(args.evg_build_id, download_dir)
+
     for test_pair in args.test:
         test_os = test_pair[0]
-        urls = [test_pair[1]]
+        # Use local path if packages were downloaded, otherwise use the URL from --test argument
+        if local_packages_path:
+            # Use file:// protocol for local files - package_test_internal.py will handle this
+            package_url = f"file://{local_packages_path.resolve()}"
+        else:
+            package_url = test_pair[1]
+        urls = [package_url]
         if test_os not in OS_DOCKER_LOOKUP:
             logging.error(
                 "We have not seen this OS %s before, please add it to OS_DOCKER_LOOKUP", test_os
