@@ -485,23 +485,50 @@ public:
             }
         }
 
-        // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
-        // manually update the plan cache instead without multiplanning but this is simpler.
-        if (1 == solutions.size() && !_cq->getExpCtxRaw()->getForcePlanCache() &&
-            !_cq->getExpCtxRaw()
-                 ->getQueryKnobConfiguration()
-                 .getUseMultiplannerForSingleSolutions()) {
-            // Only one possible plan. Build the stages from the solution.
-            solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
-            return buildSingleSolutionPlan(std::move(solutions[0]),
-                                           std::move(rankerResult.getValue().maybeExplainData));
+        if (1 == solutions.size()) {
+            // The plan ranker returns a single solution when CBR is used to pick the best plan.
+            captureCardinalityEstimationMethodForQueryStats(
+                rankerResult.getValue().maybeExplainData, solutions[0].get());
+
+            if (!shouldMultiPlanForSingleSolution(rankerResult.getValue(), _cq)) {
+                // Only one possible plan. Build the stages from the solution.
+                solutions[0]->indexFilterApplied = _plannerParams->indexFiltersApplied;
+                return buildSingleSolutionPlan(std::move(solutions[0]),
+                                               std::move(rankerResult.getValue().maybeExplainData));
+            }
         }
+
         return buildMultiPlan(std::move(solutions),
                               std::move(rankerResult.getValue().maybeExplainData));
     }
 
     const QueryPlannerParams& getPlannerParams() {
         return *_plannerParams.get();
+    }
+
+    bool shouldMultiPlanForSingleSolution(const plan_ranking::PlanRankingResult& rankerResult,
+                                          const CanonicalQuery* cq) {
+        auto expCtx = _cq->getExpCtxRaw();
+
+        // Force multiplanning (and therefore caching) if forcePlanCache is set. We could
+        // manually update the plan cache instead without multiplanning but this is simpler.
+        bool forceMultiPlanForSingleSolution = expCtx->getForcePlanCache() ||
+            expCtx->getQueryKnobConfiguration().getUseMultiplannerForSingleSolutions();
+
+        // TODO: SERVER-115226: Remove check for rejectedPlansWithStages once we no longer go
+        // through costing for single solution plans.
+        const bool hasRejectedPlans = rankerResult.maybeExplainData &&
+            !rankerResult.maybeExplainData->rejectedPlansWithStages.empty();
+
+        // If there is rejected plans in the  result from 'rankPlans()' and the
+        // 'needsWorksMeasured' flag is set, we run the single CBR picked solution through
+        // multiplanner to measure its number of works and add the plan to the plan cache. If
+        // 'internalQueryDisablePlanCache' disables the plan cache, we will ignore
+        // 'needsWorksMeasured' and the number of rejected plans and instead only check whether
+        // we should force running the single solution plan through the multiplanner.
+        return (!internalQueryDisablePlanCache.load() && hasRejectedPlans &&
+                rankerResult.needsWorksMeasured) ||
+            forceMultiPlanForSingleSolution;
     }
 
 protected:
@@ -702,8 +729,6 @@ private:
     std::unique_ptr<ClassicRuntimePlannerResult> buildSingleSolutionPlan(
         std::unique_ptr<QuerySolution> solution,
         boost::optional<PlanExplainerData> maybeExplainData) final {
-        captureCardinalityEstimationMethodForQueryStats(maybeExplainData, solution.get());
-
         auto result = releaseResult();
         result->runtimePlanner = std::make_unique<crp_classic::SingleSolutionPassthroughPlanner>(
             makePlannerData(),
