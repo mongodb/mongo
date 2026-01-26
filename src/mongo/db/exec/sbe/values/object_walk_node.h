@@ -307,14 +307,16 @@ void walkField(ObjectWalkNode<ProjectionRecorder>* node,
                TypeTags eltTag,
                Value eltVal,
                const char* bsonPtr,
-               const Cb& cb);
+               const Cb& cb,
+               bool traverseArrays);
 
 template <class ProjectionRecorder, class Cb>
 requires std::invocable<Cb&, ObjectWalkNode<ProjectionRecorder>*, TypeTags, Value, const char*>
 void walkBsonObj(ObjectWalkNode<ProjectionRecorder>* node,
                  value::Value inputVal,
                  const char* bsonPtr,
-                 const Cb& cb) {
+                 const Cb& cb,
+                 bool traverseArrays) {
     size_t numChildrenWalked = 0;
     auto bson = value::getRawPointerView(inputVal);
     const auto end = bson::bsonEnd(bson);
@@ -325,7 +327,7 @@ void walkBsonObj(ObjectWalkNode<ProjectionRecorder>* node,
         auto fieldName = bson::fieldNameAndLength(be);
         if (auto child = node->findChild(fieldName); child != nullptr) {
             auto [eltTag, eltVal] = bson::convertFrom<true>(be, end, fieldName.size());
-            walkField<ProjectionRecorder>(child, eltTag, eltVal, be, cb);
+            walkField<ProjectionRecorder>(child, eltTag, eltVal, be, cb, traverseArrays);
             numChildrenWalked++;
         }
         be = bson::advance(be, fieldName.size());
@@ -333,7 +335,10 @@ void walkBsonObj(ObjectWalkNode<ProjectionRecorder>* node,
 }
 
 template <class ProjectionRecorder, class Cb>
-void walkObject(ObjectWalkNode<ProjectionRecorder>* node, value::Value inputVal, const Cb& cb) {
+void walkObject(ObjectWalkNode<ProjectionRecorder>* node,
+                value::Value inputVal,
+                const Cb& cb,
+                bool traverseArrays) {
     size_t numChildrenWalked = 0;
     auto obj = getObjectView(inputVal);
 
@@ -341,7 +346,8 @@ void walkObject(ObjectWalkNode<ProjectionRecorder>* node, value::Value inputVal,
     while (numChildrenWalked < node->numChildren() && i < obj->size()) {
         if (auto child = node->findChild(obj->field(i)); child != nullptr) {
             auto [eltTag, eltVal] = obj->getAt(i);
-            walkField<ProjectionRecorder>(child, eltTag, eltVal, nullptr /*bsonPtr*/, cb);
+            walkField<ProjectionRecorder>(
+                child, eltTag, eltVal, nullptr /*bsonPtr*/, cb, traverseArrays);
             numChildrenWalked++;
         }
         i++;
@@ -354,14 +360,15 @@ void walkField(ObjectWalkNode<ProjectionRecorder>* node,
                TypeTags eltTag,
                Value eltVal,
                const char* bsonPtr,
-               const Cb& cb) {
+               const Cb& cb,
+               bool traverseArrays) {
     if (value::TypeTags::bsonObject == eltTag) {
-        walkBsonObj<ProjectionRecorder, Cb>(node, eltVal, bsonPtr, cb);
+        walkBsonObj<ProjectionRecorder, Cb>(node, eltVal, bsonPtr, cb, traverseArrays);
     } else if (value::TypeTags::Object == eltTag) {
-        walkObject<ProjectionRecorder, Cb>(node, eltVal, cb);
+        walkObject<ProjectionRecorder, Cb>(node, eltVal, cb, traverseArrays);
     }
     if (value::isArray(eltTag)) {
-        if (node->traverseChild) {
+        if (node->traverseChild && traverseArrays) {
             // The projection traversal semantics are "special" in that the leaf must know
             // when there is an array higher up in the tree.
             for (auto& projRecorder : node->childProjRecorders) {
@@ -370,12 +377,13 @@ void walkField(ObjectWalkNode<ProjectionRecorder>* node,
 
             bool isArrayEmpty = true;
 
-            auto arrEltCb =
-                [&](value::TypeTags arrEltTag, value::Value arrEltVal, const char* arrayBson) {
-                    walkField<ProjectionRecorder>(
-                        node->traverseChild.get(), arrEltTag, arrEltVal, arrayBson, cb);
-                    isArrayEmpty = false;
-                };
+            auto arrEltCb = [&](value::TypeTags arrEltTag,
+                                value::Value arrEltVal,
+                                const char* arrayBson) {
+                walkField<ProjectionRecorder>(
+                    node->traverseChild.get(), arrEltTag, arrEltVal, arrayBson, cb, traverseArrays);
+                isArrayEmpty = false;
+            };
             value::arrayForEach(eltTag, eltVal, arrEltCb);
 
             if (isArrayEmpty && node->traverseChild->filterRecorder) {
@@ -390,7 +398,8 @@ void walkField(ObjectWalkNode<ProjectionRecorder>* node,
         }
     } else if (node->traverseChild) {
         // We didn't see an array, so we apply the node below the traverse.
-        walkField<ProjectionRecorder>(node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb);
+        walkField<ProjectionRecorder>(
+            node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb, traverseArrays);
     }
     // Some callbacks use the raw bson pointer, not just the tag and value.
     cb(node, eltTag, eltVal, bsonPtr);

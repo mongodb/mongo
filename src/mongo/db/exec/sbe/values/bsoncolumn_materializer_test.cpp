@@ -439,7 +439,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressSimpleSBEPath) {
         SBEPath path{
             value::PathRequest(value::PathRequestType::kFilter, {value::Get{"b"}, value::Id{}})};
         auto mockRefObj = fromjson("{a: 10, b: 20}");
-        ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+        ASSERT_EQ(path.elementsToMaterialize(mockRefObj, /* traverseArrays */ true).size(), 1);
 
         setExpectedElements({{value::TypeTags::NumberInt32, 20},
                              {value::TypeTags::NumberInt32, 21},
@@ -458,7 +458,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressArrayWithSBEPathNoTraverse) {
     SBEPath path{
         value::PathRequest(value::PathRequestType::kFilter, {value::Get{"a"}, value::Id{}})};
     auto mockRefObj = fromjson("{a: [0, 10]}");
-    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj, /* traverseArrays */ true).size(), 1);
 
     for (int i = 0; i < 4; i++) {
         addExpectedArray(BSON_ARRAY(i * 10 << (i + 1) * 10));
@@ -476,7 +476,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressArrayWithSBEPathWithTraverse) {
     SBEPath path{value::PathRequest(value::PathRequestType::kFilter,
                                     {value::Get{"a"}, value::Traverse{}, value::Id{}})};
     auto mockRefObj = fromjson("{a: [0, 10]}");
-    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj, /* traverseArrays */ true).size(), 2);
 
     for (int i = 0; i < 8; ++i) {
         addExpectedElement({value::TypeTags::NumberInt32, i * 10});
@@ -494,7 +494,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedArrayWithSBEPath) {
     SBEPath path{value::PathRequest(value::PathRequestType::kFilter,
                                     {value::Get{"a"}, value::Traverse{}, value::Id{}})};
     auto mockRefObj = fromjson("{a: [[0, 10]]}");
-    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj, /* traverseArrays */ true).size(), 1);
 
     for (int i = 0; i < 4; i++) {
         addExpectedArray(BSON_ARRAY(i * 10 << (i + 1) * 10));
@@ -512,7 +512,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectWithSBEPath) {
     SBEPath path{
         value::PathRequest(value::PathRequestType::kFilter, {value::Get{"a"}, value::Id{}})};
     auto mockRefObj = fromjson("{a: {b: 0}}");
-    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj, /* traverseArrays */ true).size(), 1);
 
     for (int i = 0; i < 4; i++) {
         addExpectedObj(BSON("b" << i * 10));
@@ -532,7 +532,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectGetWithSBEPath) {
         value::PathRequest(value::PathRequestType::kFilter,
                            {value::Get{"a"}, value::Traverse{}, value::Get{"b"}, value::Id{}})};
     auto mockRefObj = fromjson("{a: {b: 0}}");
-    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj, /* traverseArrays */ true).size(), 1);
 
     for (int i = 0; i < 4; ++i) {
         addExpectedElement({value::TypeTags::NumberInt32, i * 10});
@@ -551,7 +551,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectInArrayWithSBEPath) {
         value::PathRequest(value::PathRequestType::kFilter,
                            {value::Get{"a"}, value::Traverse{}, value::Get{"b"}, value::Id{}})};
     auto mockRefObj = fromjson("{a: {b: 0}}");
-    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj, /* traverseArrays */ true).size(), 1);
 
     std::vector<Element> expected;
     for (int i = 0; i < 4; ++i) {

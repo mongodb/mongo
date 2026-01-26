@@ -929,7 +929,7 @@ namespace internal {
  */
 template <class Path>
 bool isRootPath(Path& path) {
-    return !path.elementsToMaterialize(BSONObj{}).empty();
+    return !path.elementsToMaterialize(BSONObj{}, /*traverseArrays*/ true).empty();
 }
 }  // namespace internal
 }  // namespace mongo::bsoncolumn

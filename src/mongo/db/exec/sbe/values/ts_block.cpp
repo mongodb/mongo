@@ -194,7 +194,7 @@ boost::optional<bsoncolumn::SBEPath> canUsePathBasedDecompression(const PathRequ
     // TODO SERVER-89514 Refactor this to avoid traversing both fieldMin and fieldMax for every
     // path.
     for (auto elem : {elemMin, elemMax}) {
-        auto elems = sbePath.elementsToMaterialize(elem.Obj());
+        auto elems = sbePath.elementsToMaterialize(elem.Obj(), true);
         if (elems.size() > 1) {
             return boost::none;
         }

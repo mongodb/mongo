@@ -115,8 +115,12 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelFi
             rec.newDoc();
         }
 
-        walkField<BlockProjectionPositionInfoRecorder>(
-            node, tags[i], vals[i], nullptr /* bsonPtr */, visitElementExtractorCallback);
+        walkField<BlockProjectionPositionInfoRecorder>(node,
+                                                       tags[i],
+                                                       vals[i],
+                                                       nullptr /* bsonPtr */,
+                                                       visitElementExtractorCallback,
+                                                       /*traverseArrays*/ true);
 
         for (auto& rec : _filterPositionInfoRecorders) {
             rec.endDoc();
@@ -142,7 +146,8 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromBsons(
         walkBsonObj<BlockProjectionPositionInfoRecorder>(&_root,
                                                          bitcastFrom<const char*>(obj.objdata()),
                                                          obj.objdata(),
-                                                         visitElementExtractorCallback);
+                                                         visitElementExtractorCallback,
+                                                         true /* traverseArrays */);
 
         for (auto& rec : _filterPositionInfoRecorders) {
             rec.endDoc();
@@ -197,7 +202,8 @@ std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
 }
 
 std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
-                                                      value::PathRequest pathRequest) {
+                                                      value::PathRequest pathRequest,
+                                                      bool traverseArrays) {
     std::vector<value::PathRequest> pathrequests{pathRequest};
     auto extractor = BSONExtractorImpl(pathrequests);
 
@@ -220,7 +226,8 @@ std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
     walkBsonObj<BlockProjectionPositionInfoRecorder>(extractor.getRoot(),
                                                      bitcastFrom<const char*>(obj.objdata()),
                                                      obj.objdata(),
-                                                     recordValuePointer);
+                                                     recordValuePointer,
+                                                     traverseArrays);
     return bsonPointers;
 }
 }  // namespace mongo::sbe::value

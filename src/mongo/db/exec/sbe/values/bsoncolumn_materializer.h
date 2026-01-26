@@ -355,9 +355,9 @@ inline Decimal128 SBEColumnMaterializer::get<Decimal128>(const Element& elem) {
  * object.
  */
 struct SBEPath {
-    std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+    std::vector<const char*> elementsToMaterialize(BSONObj refObj, bool traverseArrays) {
         // Get the vector of value pointers the pathRequest asks for, in the refObj.
-        auto result = extractValuePointersFromBson(refObj, _pathRequest);
+        auto result = extractValuePointersFromBson(refObj, _pathRequest, traverseArrays);
         return result;
     }
 

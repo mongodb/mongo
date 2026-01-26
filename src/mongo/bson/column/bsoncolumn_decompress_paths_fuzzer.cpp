@@ -91,9 +91,10 @@ static bool containsDuplicateFields(mongo::BSONObj obj) {
 static void findAllScalarPaths(std::vector<mongo::sbe::value::Path>& paths,
                                const mongo::BSONElement& elem,
                                mongo::sbe::value::Path path,
-                               bool previousIsArray) {
+                               bool previousIsArray,
+                               bool legacy) {
     using namespace mongo;
-    if (!elem.isABSONObj()) {
+    if (!elem.isABSONObj() || (elem.type() == BSONType::array && legacy)) {
         // Array elements have a field that is their index in the array. We shouldn't
         // append that field in the 'Path'.
         if (!previousIsArray) {
@@ -121,7 +122,7 @@ static void findAllScalarPaths(std::vector<mongo::sbe::value::Path>& paths,
             path.push_back(sbe::value::Get{std::string{elem.fieldNameStringData()}});
         }
         path.push_back(sbe::value::Traverse{});
-        findAllScalarPaths(paths, obj.firstElement(), path, true);
+        findAllScalarPaths(paths, obj.firstElement(), path, true, legacy);
         return;
     }
 
@@ -132,7 +133,7 @@ static void findAllScalarPaths(std::vector<mongo::sbe::value::Path>& paths,
             nPath.push_back(sbe::value::Get{std::string{elem.fieldNameStringData()}});
             nPath.push_back(sbe::value::Traverse{});
         }
-        findAllScalarPaths(paths, newElem, nPath, false);
+        findAllScalarPaths(paths, newElem, nPath, false, legacy);
     }
 }
 
@@ -155,6 +156,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     // Iterate through the reference object, find all scalar fields and construct a 'SBEPath' for
     // each field.
     const char* control = Data;
+    bool legacy = *control == bsoncolumn::kInterleavedStartControlByteLegacy;
     BSONObj refObj{control + 1};
     if (containsDuplicateFields(refObj)) {
         return 0;
@@ -170,7 +172,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
 
     // Find all the fields including fields nested inside objects that we can decompress.
     for (auto&& elem : refObj) {
-        findAllScalarPaths(fieldPaths, elem, {}, false);
+        findAllScalarPaths(fieldPaths, elem, {}, false, legacy);
     }
 
     // Set up 'SBEPath' for the block-based API, and 'PathRequest' for the iterator API. We need to

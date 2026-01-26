@@ -784,7 +784,7 @@ public:
      * A simple path that traverses an object for a set of fields that make up a path.
      */
     struct TestPath {
-        std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+        std::vector<const char*> elementsToMaterialize(BSONObj refObj, bool traverseArrays) {
             if (_fields.empty()) {
                 return {refObj.objdata()};
             }
@@ -1140,9 +1140,10 @@ public:
     static void findAllScalarPaths(std::vector<mongo::sbe::value::Path>& paths,
                                    const mongo::BSONElement& elem,
                                    mongo::sbe::value::Path path,
-                                   bool previousIsArray) {
+                                   bool previousIsArray,
+                                   bool legacy) {
         using namespace mongo;
-        if (!elem.isABSONObj()) {
+        if (!elem.isABSONObj() || (elem.type() == BSONType::array && legacy)) {
             // Array elements have a field that is their index in the array. We shouldn't
             // append that field in the 'Path'.
             if (!previousIsArray) {
@@ -1170,7 +1171,7 @@ public:
                 path.push_back(sbe::value::Get{std::string{elem.fieldNameStringData()}});
             }
             path.push_back(sbe::value::Traverse{});
-            findAllScalarPaths(paths, obj.firstElement(), path, true);
+            findAllScalarPaths(paths, obj.firstElement(), path, true, legacy);
             return;
         }
 
@@ -1181,7 +1182,7 @@ public:
                 nPath.push_back(sbe::value::Get{std::string{elem.fieldNameStringData()}});
                 nPath.push_back(sbe::value::Traverse{});
             }
-            findAllScalarPaths(paths, newElem, nPath, false);
+            findAllScalarPaths(paths, newElem, nPath, false, legacy);
         }
     }
 
@@ -1279,9 +1280,8 @@ TEST_F(BSONColumnTest, PathFuzzerDiscoveredEdgeCases) {
     // above. This test validates that the iterator API and the block-based API must produce the
     // same results.
     std::vector<StringData> binariesBase64 = {
-        // TODO(SERVER-117056): Uncomment after we are correctly handling this case.
         // Legacy interleaved encoding with array with single null value.
-        // "8BAAAAAExgAIAAAACggAAAB/AP8AfwD/AAAA"_sd,
+        "8BAAAAAExgAIAAAACggAAAB/AP8AfwD/AAAA"_sd,
     };
 
     for (auto&& binaryBase64 : binariesBase64) {
@@ -1300,6 +1300,7 @@ TEST_F(BSONColumnTest, PathFuzzerDiscoveredEdgeCases) {
         // Iterate through the reference object, find all scalar fields and construct a 'SBEPath'
         // for each field.
         const char* control = binary.data();
+        bool legacy = *control == bsoncolumn::kInterleavedStartControlByteLegacy;
         BSONObj refObj{control + 1};
         if (containsDuplicateFields(refObj)) {
             continue;
@@ -1316,7 +1317,7 @@ TEST_F(BSONColumnTest, PathFuzzerDiscoveredEdgeCases) {
 
         // Find all the fields including fields nested inside objects that we can decompress.
         for (auto&& elem : refObj) {
-            findAllScalarPaths(fieldPaths, elem, {}, false);
+            findAllScalarPaths(fieldPaths, elem, {}, false, legacy);
         }
 
         // Set up 'SBEPath' for the block-based API, and 'PathRequest' for the iterator API. We need
@@ -9694,7 +9695,7 @@ TEST_F(BSONColumnTest, LegacyInterleavedPaths) {
 
     // This path is trying to get the element in the array. We cannot handle this path.
     struct ArrayElemPath {
-        std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+        std::vector<const char*> elementsToMaterialize(BSONObj refObj, bool traverseArrays) {
             return {refObj["a"].Array()[0].value()};
         }
     };

@@ -135,10 +135,14 @@ PlanState ExtractFieldPathsStage::getNext() {
 
         if (value::TypeTags::bsonObject == inputTag) {
             value::walkBsonObj<value::ScalarProjectionPositionInfoRecorder>(
-                _root.get(), inputVal, value::bitcastTo<const char*>(inputVal), walk);
+                _root.get(),
+                inputVal,
+                value::bitcastTo<const char*>(inputVal),
+                walk,
+                true /*traverseArrays*/);
         } else if (value::TypeTags::Object == inputTag) {
             value::walkObject<value::ScalarProjectionPositionInfoRecorder>(
-                _root.get(), inputVal, walk);
+                _root.get(), inputVal, walk, true /*traverseArrays*/);
         }
 
     } else {
@@ -154,7 +158,8 @@ PlanState ExtractFieldPathsStage::getNext() {
                         childTag,
                         childVal,
                         value::bitcastTo<const char*>(childVal),
-                        walk);
+                        walk,
+                        true /* traverseArrays */);
                 }
             }
         } else {
@@ -166,7 +171,8 @@ PlanState ExtractFieldPathsStage::getNext() {
                         childTag,
                         childVal,
                         value::bitcastTo<const char*>(childVal),
-                        walk);
+                        walk,
+                        true /* traverseArrays */);
                 }
             }
         }

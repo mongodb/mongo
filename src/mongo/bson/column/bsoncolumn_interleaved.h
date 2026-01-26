@@ -292,7 +292,7 @@ const char* BlockBasedInterleavedDecompressor::decompress(
     absl::flat_hash_map<const void*, BufferVector<Buffer*>> elemToBufferFast;
     absl::flat_hash_map<const void*, BufferVector<Buffer*>> elemToBufferGeneral;
     for (auto&& path : paths) {
-        auto elems = path.first.elementsToMaterialize(refObj);
+        auto elems = path.first.elementsToMaterialize(refObj, _traverseArrays);
         if (elems.empty()) {
             // Use nullptr as a sentinel for paths that don't map to any elements.
             elemToBufferFast[nullptr].push_back(&path.second);

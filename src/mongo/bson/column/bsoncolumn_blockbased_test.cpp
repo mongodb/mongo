@@ -235,7 +235,7 @@ void assertEquals(const T& lhs, const T& rhs) {
  * A simple path that traverses an object for a set of fields that make up a path.
  */
 struct TestPath {
-    std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+    std::vector<const char*> elementsToMaterialize(BSONObj refObj, bool traverseArrays) {
         if (_fields.empty()) {
             return {refObj.objdata()};
         }
@@ -450,7 +450,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSiblingObjects) {
  *     Get("a") / Traverse / Get("b") / Id
  */
 struct TestArrayPath {
-    std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+    std::vector<const char*> elementsToMaterialize(BSONObj refObj, bool traverseArrays) {
         auto a = refObj["a"];
         if (a.type() == BSONType::array) {
             std::vector<const char*> addrs;
@@ -499,7 +499,7 @@ void verifyDecompressPaths(const std::vector<T>& values) {
         // decompressGeneral().
         std::vector<BSONElement> vec0;
         TestPath testPath{};
-        ASSERT_EQ(testPath.elementsToMaterialize(mockRefObj).size(), 1);
+        ASSERT_EQ(testPath.elementsToMaterialize(mockRefObj, true).size(), 1);
         std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{{testPath, vec0}};
 
         // This is decompressing the whole column, in which there are scalars within objects.
@@ -518,7 +518,7 @@ void verifyDecompressPaths(const std::vector<T>& values) {
         // must materialize elements from both scalar streams, the output elements must be
         // interleaved. Hence this will also use decompressGeneral().
         TestArrayPath arrayPath;
-        ASSERT_EQ(arrayPath.elementsToMaterialize(mockRefObj).size(), 2);
+        ASSERT_EQ(arrayPath.elementsToMaterialize(mockRefObj, true).size(), 2);
 
         std::vector<BSONElement> vec1;
         std::vector<std::pair<TestArrayPath, std::vector<BSONElement>&>> arrayPaths{
@@ -550,7 +550,7 @@ void verifyDecompressPaths(const std::vector<T>& values) {
         auto col = BSONColumnBlockBased{cb.finalize()};
         std::vector<BSONElement> vec0;
         TestPath testPath{{"a"}};
-        ASSERT_EQ(testPath.elementsToMaterialize(BSON("a" << 1)).size(), 1);
+        ASSERT_EQ(testPath.elementsToMaterialize(BSON("a" << 1), true).size(), 1);
 
         std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{{testPath, vec0}};
         col.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
@@ -576,7 +576,7 @@ void verifyDecompressPaths(const std::vector<T>& values) {
         auto col = BSONColumnBlockBased{cb.finalize()};
         std::vector<BSONElement> vec0;
         TestPath testPath{{"a"}};
-        ASSERT_EQ(testPath.elementsToMaterialize(BSON("a" << 1)).size(), 1);
+        ASSERT_EQ(testPath.elementsToMaterialize(BSON("a" << 1), true).size(), 1);
 
         std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{{testPath, vec0}};
         col.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
@@ -706,7 +706,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingArrays) {
     // Create a path that will get the "b" fields of both array elements.
     TestArrayPath path;
     auto mockRefObj = fromjson("{a: [{b: 0}, {b: 10}]}");
-    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj, true).size(), 2);
 
     boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec0;
@@ -986,7 +986,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPathWithMinKey) {
     TestArrayPath path;
     auto mockRefObj = BSON("a" << BSON_ARRAY(BSON("b" << MINKEY) << BSON("b" << MINKEY)));
 
-    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj, true).size(), 2);
 
     boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec0;
