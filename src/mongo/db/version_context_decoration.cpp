@@ -37,12 +37,6 @@ MONGO_FAIL_POINT_DEFINE(reduceWaitForOfcvInternalIntervalTo10Ms);
 
 namespace mongo {
 
-static auto getVersionContext = OperationContext::declareDecoration<VersionContext>();
-
-const VersionContext& VersionContext::getDecoration(const OperationContext* opCtx) {
-    return getVersionContext(opCtx);
-}
-
 void VersionContext::setDecoration(ClientLock&,
                                    OperationContext* opCtx,
                                    const VersionContext& vCtx) {
@@ -51,7 +45,7 @@ void VersionContext::setDecoration(ClientLock&,
     // We disallow setting a VersionContext decoration multiple times on the same OperationContext,
     // even if it's the same one. There is no use case for it, and makes our implementation more
     // complex (e.g. ScopedSetDecoration would need to have a "no-op" destructor path).
-    auto& originalVCtx = getVersionContext(opCtx);
+    auto& originalVCtx = _getDecoration(opCtx);
     tassert(10296500,
             "Refusing to set a VersionContext on an operation that already has one",
             !originalVCtx.hasOperationFCV());
@@ -73,12 +67,12 @@ VersionContext::ScopedSetDecoration::ScopedSetDecoration(OperationContext* opCtx
 
 VersionContext::ScopedSetDecoration::~ScopedSetDecoration() {
     ClientLock lk(_opCtx->getClient());
-    getVersionContext(_opCtx).resetToOperationWithoutOFCV();
+    _getDecoration(_opCtx).resetToOperationWithoutOFCV();
 }
 
 VersionContext::FixedOperationFCVRegion::FixedOperationFCVRegion(OperationContext* opCtx)
     : _opCtx(opCtx) {
-    if (getVersionContext(_opCtx).hasOperationFCV()) {
+    if (_getDecoration(_opCtx).hasOperationFCV()) {
         // Already has a VersionContext (re-entrancy)
         _opCtx = nullptr;
         return;
@@ -112,7 +106,7 @@ VersionContext::FixedOperationFCVRegion::FixedOperationFCVRegion(OperationContex
 
         // Iterate again to install the current OFCV because the snapshot acquisition raced with a
         // FCV transition
-        getVersionContext(_opCtx).resetToOperationWithoutOFCV();
+        _getDecoration(_opCtx).resetToOperationWithoutOFCV();
     }
 }
 
@@ -122,7 +116,7 @@ VersionContext::FixedOperationFCVRegion::~FixedOperationFCVRegion() {
     }
 
     ClientLock lk(_opCtx->getClient());
-    getVersionContext(_opCtx).resetToOperationWithoutOFCV();
+    _getDecoration(_opCtx).resetToOperationWithoutOFCV();
 }
 
 void waitForOperationsNotMatchingVersionContextToComplete(OperationContext* opCtx,

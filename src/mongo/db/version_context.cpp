@@ -29,9 +29,23 @@
 
 #include "mongo/db/version_context.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
+namespace {
+
+static auto getVersionContext = OperationContext::declareDecoration<VersionContext>();
+
+}  // namespace
+
+const VersionContext& VersionContext::getDecoration(const OperationContext* opCtx) {
+    return getVersionContext(opCtx);
+}
+
+VersionContext& VersionContext::_getDecoration(OperationContext* opCtx) {
+    return getVersionContext(opCtx);
+}
 
 VersionContext::VersionContext(FCV fcv)
     : _metadataOrTag(std::in_place_type<VersionContextMetadata>, fcv) {}
