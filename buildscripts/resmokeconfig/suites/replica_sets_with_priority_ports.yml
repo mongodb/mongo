@@ -18,6 +18,7 @@ selector:
     - jstests/replsets/awaitable_hello_fcv_change.js
     - jstests/replsets/fcv_retryable_write_concern.js
     - jstests/replsets/writes_wait_for_write_concern.js
+    - jstests/replsets/writes_wait_for_write_concern_timeseries.js
 
     # TODO (SERVER-112863): Enable the following tests once priority ports can be added via force
     # reconfig.
