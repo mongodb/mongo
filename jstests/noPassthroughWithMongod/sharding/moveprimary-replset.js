@@ -4,6 +4,8 @@
 // @tags: [
 //   requires_replication,
 //   requires_sharding,
+//   # We are choosing not to test on MacOS since it's too noisy.
+//   slow_on_macos,
 // ]
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
