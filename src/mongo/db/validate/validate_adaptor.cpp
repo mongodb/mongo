@@ -158,12 +158,13 @@ enum class TimeseriesValidationResult {
     kInvalidBSONInDataField,
 };
 
+
 struct TimeseriesValidationStatus {
     TimeseriesValidationResult result;
     std::string reason;
 };
 
-string _describeTimeseriesValidationResult(TimeseriesValidationResult result) {
+const char* _describeTimeseriesValidationResult(TimeseriesValidationResult result) {
     switch (result) {
         case TimeseriesValidationResult::kValid:
             return "Valid";
@@ -277,18 +278,19 @@ TimeseriesValidationStatus _validateTimeseriesCount(const BSONObj& control,
 }
 
 // Checks if the embedded timestamp in the bucket id field matches that in the 'control.min' field.
-TimeseriesValidationStatus _validateTimeSeriesIdTimestamp(OperationContext* opCtx,
-                                                          const CollectionPtr& collection,
-                                                          const BSONObj& recordBson) {
-    // Compares both timestamps as Dates.
-    auto minTimestamp = recordBson.getField(timeseries::kBucketControlFieldName)
-                            .Obj()
-                            .getField(timeseries::kBucketControlMinFieldName)
-                            .Obj()
-                            .getField(collection->getTimeseriesOptions()->getTimeField())
-                            .Date();
+TimeseriesValidationStatus _validateTimeSeriesIdTimestamp(
+    OperationContext* opCtx,
+    const TimeseriesOptions& timeseriesOptions,
+    const BSONObj& recordBson) {
+    // Ensure the time field exists
+    const StringData timeField = timeseriesOptions.getTimeField();
 
-    auto oidEmbeddedTimestamp = recordBson.getField(timeseries::kBucketIdFieldName).OID().asDateT();
+    // Compares both timestamps as Dates.
+    auto minTimestamp = recordBson[timeseries::kBucketControlFieldName]
+                                  [timeseries::kBucketControlMinFieldName][timeField]
+                                      .Date();
+
+    auto oidEmbeddedTimestamp = recordBson[timeseries::kBucketIdFieldName].OID().asDateT();
 
     // If this collection has extended-range measurements, we cannot assert that the
     // minTimestamp matches the embedded timestamp.
@@ -307,8 +309,8 @@ TimeseriesValidationStatus _validateTimeSeriesIdTimestamp(OperationContext* opCt
  * Checks the bucket's 'control' field to make sure the version is valid and the min max timestamps
  * respect the bucket max span.
  */
-TimeseriesValidationStatus _validateTimeseriesControlField(const CollectionPtr& collection,
-                                                           const BSONObj& controlField) {
+TimeseriesValidationStatus _validateTimeseriesControlField(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& controlField) {
     int bucketVersion = controlField.getIntField(timeseries::kBucketControlVersionFieldName);
     if (bucketVersion != timeseries::kTimeseriesControlUncompressedVersion &&
         bucketVersion != timeseries::kTimeseriesControlCompressedSortedVersion &&
@@ -318,16 +320,15 @@ TimeseriesValidationStatus _validateTimeseriesControlField(const CollectionPtr& 
                             bucketVersion)};
     }
 
-    const auto& timeseriesOptions = collection->getTimeseriesOptions();
     const auto& minTimestamp = controlField.getField(timeseries::kBucketControlMinFieldName)
                                    .Obj()
-                                   .getField(timeseriesOptions->getTimeField())
+                                   .getField(timeseriesOptions.getTimeField())
                                    .Date();
     const auto& maxTimestamp = controlField.getField(timeseries::kBucketControlMaxFieldName)
                                    .Obj()
-                                   .getField(timeseriesOptions->getTimeField())
+                                   .getField(timeseriesOptions.getTimeField())
                                    .Date();
-    const auto& bucketMaxSpanSeconds = timeseriesOptions->getBucketMaxSpanSeconds();
+    const auto& bucketMaxSpanSeconds = timeseriesOptions.getBucketMaxSpanSeconds();
     if (maxTimestamp - minTimestamp >= Seconds(*bucketMaxSpanSeconds)) {
         return {
             TimeseriesValidationResult::kSpanViolation,
@@ -378,15 +379,13 @@ TimeseriesValidationStatus _validateTimeseriesBucketingParametersChanged(
     const CollectionPtr& coll,
     timeseries::bucket_catalog::MinMax& minmax,
     const BSONElement& controlMin,
-    const BSONElement& controlMax,
     StringData fieldName,
     ValidateResults* results,
     int version) {
-    bool timeseriesBucketingParametersHaveChanged =
+    const bool timeseriesBucketingParametersHaveChanged =
         coll->timeseriesBucketingParametersHaveChanged().value_or(true);
 
-    auto min = minmax.min();
-    auto max = minmax.max();
+    const auto min = minmax.min();
 
     auto checkTimeSeriesBucketingParametersChanged = [&]() {
         const auto options = coll->getTimeseriesOptions().value();
@@ -421,17 +420,16 @@ TimeseriesValidationStatus _validateTimeseriesBucketingParametersChanged(
  * Checks whether the min and max values between 'control' and 'data' match, taking timestamp
  * granularity into account.
  */
-TimeseriesValidationStatus _validateTimeSeriesMinMax(const CollectionPtr& coll,
+TimeseriesValidationStatus _validateTimeSeriesMinMax(const TimeseriesOptions& timeseriesOptions,
                                                      timeseries::bucket_catalog::MinMax& minmax,
                                                      const BSONElement& controlMin,
                                                      const BSONElement& controlMax,
                                                      StringData fieldName,
                                                      int version) {
-    auto min = minmax.min();
-    auto max = minmax.max();
+    const auto min = minmax.min();
+    const auto max = minmax.max();
     auto checkMinAndMaxMatch = [&]() {
-        const auto options = coll->getTimeseriesOptions().value();
-        if (fieldName == options.getTimeField()) {
+        if (fieldName == timeseriesOptions.getTimeField()) {
             // With measurement-level deletes (deletes with non-metafield filters) it is possible
             // that the earliest measurements got deleted. Since we keep the bucket's minTime
             // unchanged in that case, we cannot rely on the minTime always corresponding with what
@@ -439,9 +437,9 @@ TimeseriesValidationStatus _validateTimeSeriesMinMax(const CollectionPtr& coll,
             // rounded time of the earliest measurement is at greater than or equal to the
             // control.min time-field.
             // TODO (SERVER-94872): Reinstate the strict equality check.
-            auto minTimestampsMatch =
-                timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(), options) >=
-                timeseries::roundTimestampToGranularity(controlMin.Date(), options);
+            auto minTimestampsMatch = timeseries::roundTimestampToGranularity(
+                                          min.getField(fieldName).Date(), timeseriesOptions) >=
+                timeseries::roundTimestampToGranularity(controlMin.Date(), timeseriesOptions);
             // For the maximum check, if we had measurements that were pre-1970 (the lower end of
             // the extended range check), it is possible that the control.max value gets rounded up
             // to the epoch and is greater than the observed maximum timestamp. In the case where
@@ -571,14 +569,17 @@ TimeseriesValidationStatus _validateTimeSeriesDataTimeField(const CollectionPtr&
                                   << e.toString()};
         }
     }
-    if (auto status =
-            _validateTimeSeriesMinMax(coll, minmax, controlMin, controlMax, fieldName, version);
+    if (auto status = _validateTimeSeriesMinMax(coll->getTimeseriesOptions().value(),
+                                                minmax,
+                                                controlMin,
+                                                controlMax,
+                                                fieldName,
+                                                version);
         status.result != TimeseriesValidationResult::kValid) {
         return status;
     }
-
     if (auto status = _validateTimeseriesBucketingParametersChanged(
-            coll, minmax, controlMin, controlMax, fieldName, results, version);
+            coll, minmax, controlMin, fieldName, results, version);
         status.result != TimeseriesValidationResult::kValid) {
         return status;
     }
@@ -644,8 +645,12 @@ TimeseriesValidationStatus _validateTimeSeriesDataField(const CollectionPtr& col
         }
     }
 
-    if (auto status =
-            _validateTimeSeriesMinMax(coll, minmax, controlMin, controlMax, fieldName, version);
+    if (auto status = _validateTimeSeriesMinMax(coll->getTimeseriesOptions().value(),
+                                                minmax,
+                                                controlMin,
+                                                controlMax,
+                                                fieldName,
+                                                version);
         status.result != TimeseriesValidationResult::kValid) {
         return status;
     }
@@ -692,7 +697,7 @@ TimeseriesValidationStatus _validateTimeSeriesDataFields(const CollectionPtr& co
 
     // Validates the time field.
     int bucketCount = 0;
-    auto timeFieldName = std::string{coll->getTimeseriesOptions().value().getTimeField()};
+    const auto timeFieldName = coll->getTimeseriesOptions().value().getTimeField();
     if (auto status = _validateTimeseriesDataFieldTypes(dataFields[timeFieldName], bucketVersion);
         status.result != TimeseriesValidationResult::kValid) {
         return status;
@@ -745,23 +750,26 @@ TimeseriesValidationStatus _validateTimeSeriesDataFields(const CollectionPtr& co
  * Validates the consistency of a time-series bucket.
  */
 TimeseriesValidationStatus _validateTimeSeriesBucketRecord(OperationContext* opCtx,
-                                                           const CollectionPtr& collection,
+                                                           const CollectionPtr& coll,
                                                            const BSONObj& recordBson,
                                                            ValidateResults* results) {
-    const auto& controlField = recordBson.getField(timeseries::kBucketControlFieldName).Obj();
-    int bucketVersion = controlField.getIntField(timeseries::kBucketControlVersionFieldName);
+    const auto& timeseriesOptions = coll->getTimeseriesOptions().value();
+    const auto controlElem = recordBson.getField(timeseries::kBucketControlFieldName);
 
-    if (auto status = _validateTimeSeriesIdTimestamp(opCtx, collection, recordBson);
+    const int bucketVersion =
+        controlElem.Obj().getIntField(timeseries::kBucketControlVersionFieldName);
+
+    if (auto status = _validateTimeSeriesIdTimestamp(opCtx, timeseriesOptions, recordBson);
         status.result != TimeseriesValidationResult::kValid) {
         return status;
     }
 
-    if (auto status = _validateTimeseriesControlField(collection, controlField);
+    if (auto status = _validateTimeseriesControlField(timeseriesOptions, controlElem.Obj());
         status.result != TimeseriesValidationResult::kValid) {
         return status;
     }
 
-    if (auto status = _validateTimeSeriesDataFields(collection, recordBson, results, bucketVersion);
+    if (auto status = _validateTimeSeriesDataFields(coll, recordBson, results, bucketVersion);
         status.result != TimeseriesValidationResult::kValid) {
         return status;
     }
@@ -1174,79 +1182,93 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             // If the document is not corrupted, validate the document against this collection's
             // schema validator. Don't treat invalid documents as errors since documents can bypass
             // document validation when being inserted or updated.
-            auto result = coll->checkValidation(opCtx, record->data.toBson());
+            const auto [schemaValidationResult, schemaValidationStatus] =
+                coll->checkValidation(opCtx, record->data.toBson());
 
-            if (result.first != Collection::SchemaValidationResult::kPass) {
-                LOGV2_WARNING_OPTIONS(5363500,
-                                      {logv2::LogTruncation::Disabled},
-                                      "Document is not compliant with the collection's schema",
-                                      logAttrs(coll->ns()),
-                                      "recordId"_attr = record->id,
-                                      "reason"_attr = result.first);
+            // Timeseries collections are a special case. The schema is required and all violations
+            // will be logged as errors instead.
+            const bool isTimeseries = coll->getTimeseriesOptions().has_value();
 
-                nNonCompliantDocuments++;
-                results->addWarning(kSchemaValidationFailedReason);
-            } else if (coll->getTimeseriesOptions()) {
-                BSONObj recordBson = record->data.toBson();
-
-                // Checks for time-series collection consistency.
-                auto timeseriesValidationResult =
-                    _validateTimeSeriesBucketRecord(opCtx, coll, recordBson, results);
-                // This log id should be kept in sync with the associated warning messages that are
-                // returned to the client.
-                if (timeseriesValidationResult.result != TimeseriesValidationResult::kValid) {
-                    LOGV2_WARNING_OPTIONS(
-                        6698300,
-                        {logv2::LogTruncation::Disabled},
-                        "Document is not compliant with time-series specifications",
-                        logAttrs(coll->ns()),
-                        "recordId"_attr = record->id,
-                        "reason"_attr = timeseriesValidationResult.reason);
-                    nNonCompliantDocuments++;
-                    // We should not add data-annotated error strings to the set, since
-                    // bucket-specific data can greatly increase the number of unique error strings
-                    // stored; this set is not intended to scale with the number of documents.
-                    // Bucket-specific data should instead be logged above.
-                    results->addError(
-                        _describeTimeseriesValidationResult(timeseriesValidationResult.result));
-                }
-                auto containsMixedSchemaDataResponse =
-                    coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
-                if (!containsMixedSchemaDataResponse.isOK() &&
-                    results->addError(kMalformedMinMaxTimeseriesBucket)) {
-                    LOGV2_WARNING_OPTIONS(8469900,
+            switch (schemaValidationResult) {
+                case Collection::SchemaValidationResult::kError:
+                case Collection::SchemaValidationResult::kErrorAndLog:
+                case Collection::SchemaValidationResult::kWarn:
+                    LOGV2_WARNING_OPTIONS(5363500,
                                           {logv2::LogTruncation::Disabled},
-                                          kMalformedMinMaxTimeseriesBucket,
+                                          "Document is not compliant with the collection's schema",
                                           logAttrs(coll->ns()),
                                           "recordId"_attr = record->id,
-                                          "error"_attr =
-                                              containsMixedSchemaDataResponse.getStatus());
-                } else if (containsMixedSchemaDataResponse.isOK() &&
-                           containsMixedSchemaDataResponse.getValue()) {
-                    bool mixedSchemaAllowed = coll->getTimeseriesMixedSchemaBucketsState()
-                                                  .canStoreMixedSchemaBucketsSafely();
-                    if (mixedSchemaAllowed &&
-                        results->addWarning(kExpectedMixedSchemaTimeseriesWarning)) {
-                        LOGV2_WARNING_OPTIONS(8469901,
-                                              {logv2::LogTruncation::Disabled},
-                                              kExpectedMixedSchemaTimeseriesWarning,
-                                              logAttrs(coll->ns()),
-                                              "recordId"_attr = record->id);
-                    } else if (!mixedSchemaAllowed &&
-                               results->addError(kUnexpectedMixedSchemaTimeseriesError)) {
-                        const auto& controlField =
-                            recordBson.getField(timeseries::kBucketControlFieldName).Obj();
-                        int count =
-                            controlField.getIntField(timeseries::kBucketControlCountFieldName);
-                        LOGV2_WARNING_OPTIONS(8469902,
-                                              {logv2::LogTruncation::Disabled},
-                                              kUnexpectedMixedSchemaTimeseriesError,
-                                              logAttrs(coll->ns()),
-                                              "recordId"_attr = record->id,
-                                              "objSize"_attr = recordBson.objsize(),
-                                              "measurementCount"_attr = count);
+                                          "reason"_attr = schemaValidationResult);
+                    nNonCompliantDocuments++;
+                    isTimeseries ? results->addError(kSchemaValidationFailedReason)
+                                 : results->addWarning(kSchemaValidationFailedReason);
+                    break;
+                case Collection::SchemaValidationResult::kPass:
+                    if (isTimeseries) {
+                        // Timeseries documents checks cannot be run if schema validation fails.
+                        const BSONObj recordBson = record->data.toBson();
+
+                        // Checks for time-series collection consistency.
+                        const auto timeseriesValidationResult =
+                            _validateTimeSeriesBucketRecord(opCtx, coll, recordBson, results);
+                        // This log id should be kept in sync with the associated warning messages
+                        // that are returned to the client.
+                        if (timeseriesValidationResult.result !=
+                            TimeseriesValidationResult::kValid) {
+                            LOGV2_WARNING_OPTIONS(
+                                6698300,
+                                {logv2::LogTruncation::Disabled},
+                                "Document is not compliant with time-series specifications",
+                                logAttrs(coll->ns()),
+                                "recordId"_attr = record->id,
+                                "reason"_attr = timeseriesValidationResult.reason);
+                            nNonCompliantDocuments++;
+                            // We should not add data-annotated error strings to the set, since
+                            // bucket-specific data can greatly increase the number of unique error
+                            // strings stored; this set is not intended to scale with the number of
+                            // documents. Bucket-specific data should instead be logged above.
+                            results->addError(_describeTimeseriesValidationResult(
+                                timeseriesValidationResult.result));
+                        }
+                        const auto containsMixedSchemaDataResponse =
+                            coll->doesTimeseriesBucketsDocContainMixedSchemaData(recordBson);
+                        if (!containsMixedSchemaDataResponse.isOK() &&
+                            results->addError(kMalformedMinMaxTimeseriesBucket)) {
+                            LOGV2_WARNING_OPTIONS(8469900,
+                                                  {logv2::LogTruncation::Disabled},
+                                                  kMalformedMinMaxTimeseriesBucket,
+                                                  logAttrs(coll->ns()),
+                                                  "recordId"_attr = record->id,
+                                                  "error"_attr =
+                                                      containsMixedSchemaDataResponse.getStatus());
+                        } else if (containsMixedSchemaDataResponse.isOK() &&
+                                   containsMixedSchemaDataResponse.getValue()) {
+                            const bool mixedSchemaAllowed =
+                                coll->getTimeseriesMixedSchemaBucketsState()
+                                    .canStoreMixedSchemaBucketsSafely();
+                            if (mixedSchemaAllowed &&
+                                results->addWarning(kExpectedMixedSchemaTimeseriesWarning)) {
+                                LOGV2_WARNING_OPTIONS(8469901,
+                                                      {logv2::LogTruncation::Disabled},
+                                                      kExpectedMixedSchemaTimeseriesWarning,
+                                                      logAttrs(coll->ns()),
+                                                      "recordId"_attr = record->id);
+                            } else if (!mixedSchemaAllowed &&
+                                       results->addError(kUnexpectedMixedSchemaTimeseriesError)) {
+                                const auto& controlField =
+                                    recordBson.getField(timeseries::kBucketControlFieldName).Obj();
+                                const int count = controlField.getIntField(
+                                    timeseries::kBucketControlCountFieldName);
+                                LOGV2_WARNING_OPTIONS(8469902,
+                                                      {logv2::LogTruncation::Disabled},
+                                                      kUnexpectedMixedSchemaTimeseriesError,
+                                                      logAttrs(coll->ns()),
+                                                      "recordId"_attr = record->id,
+                                                      "objSize"_attr = recordBson.objsize(),
+                                                      "measurementCount"_attr = count);
+                            }
+                        }
                     }
-                }
             }
         }
 
@@ -1301,8 +1323,8 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
                                     const IndexCatalogEntry* index,
                                     int64_t* numTraversedKeys,
                                     ValidateResults* results) {
-    // The progress meter will be inactive after traversing the record store to allow the message
-    // and the total to be set to different values.
+    // The progress meter will be inactive after traversing the record store to allow the
+    // message and the total to be set to different values.
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         if (!_progress.get(lk)->isActive()) {
