@@ -48,6 +48,10 @@ bash $HOME_DIR/src/evergreen/functions/venv_setup.sh
 . $HOME_DIR/src/evergreen/prelude.sh
 activate_venv
 
+# gdb is dynamically linked against libpython and therefore always uses the site-packages of the base installation. 
+# See SERVER-81122 for details
+${TOOLCHAIN_ROOT}/bin/python3 -m pip install pymongo
+
 # download archive_dist_test_debug if evergreen did not do so automatically.
 # Evergreen will not automatically download artifacts if it is not in the dep chain
 DOWNLOAD_SCRIPT="${SRC_DIR}/evergreen/spawnhost/download_archive_dist_test_debug.py"
