@@ -608,6 +608,11 @@ public:
     void onBatchedWriteCommit(OperationContext* opCtx,
                               WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
                               OpStateAccumulator* opAccumulator = nullptr) override {
+        if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() ||
+            !opCtx->writesAreReplicated()) {
+            return;
+        }
+
         ReservedTimes times{opCtx};
         OpStateAccumulator opStateAccumulator;
 
