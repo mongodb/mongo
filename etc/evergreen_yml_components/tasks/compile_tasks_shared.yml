@@ -112,6 +112,7 @@ tasks:
   - &archive_dist_test
     name: archive_dist_test
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    priority: 5 # Boost the priority since most testing depends on this finishing early
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
