@@ -428,7 +428,8 @@ public:
         // plans.
         auto needsSubplanning = SubplanStage::needsSubplanning(*_cq);
         if (needsSubplanning &&
-            !plan_ranking::delayOrSkipSubplanner(*_cq, _plannerParams->planRankerMode)) {
+            !plan_ranking::delayOrSkipSubplanner(
+                *_cq, _plannerParams->planRankerMode, usingClassic())) {
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",
@@ -443,9 +444,15 @@ public:
             return buildSubPlan();
         }
 
+
         plan_ranking::PlanRanker planRanker;
-        auto rankerResult = planRanker.rankPlans(
-            _opCtx, *_cq, *_plannerParams, _yieldPolicy, getCollections(), makePlannerData());
+        auto rankerResult = planRanker.rankPlans(_opCtx,
+                                                 *_cq,
+                                                 *_plannerParams,
+                                                 _yieldPolicy,
+                                                 getCollections(),
+                                                 makePlannerData(),
+                                                 usingClassic());
         if (!rankerResult.isOK()) {
             // In case the plan ranker failed to return a result, distinguish two cases:
             // - a rooted $or query exceeded kMaxNumberOfOrPlans plans, in which case we need to
@@ -551,6 +558,12 @@ protected:
     auto releaseResult() {
         return std::move(_result);
     }
+
+    /**
+     * Returns true if we intend to use the classic engine to execute the winning plan and false if
+     * we intend to use SBE.
+     */
+    virtual bool usingClassic() = 0;
 
     /**
      * Attempts to build a special cased fast-path query plan for a find-by-_id query. Returns
@@ -701,6 +714,10 @@ private:
                            _plannerParams,
                            _yieldPolicy,
                            _cachedPlanHash};
+    }
+
+    bool usingClassic() final {
+        return true;
     }
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildIdHackPlan() final {
@@ -877,6 +894,10 @@ protected:
             PlanYieldPolicySBE::make(
                 this->_opCtx, this->_yieldPolicy, this->_collections, this->_cq->nss()),
             _useSbePlanCache};
+    }
+
+    bool usingClassic() final {
+        return false;
     }
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildIdHackPlan() final {

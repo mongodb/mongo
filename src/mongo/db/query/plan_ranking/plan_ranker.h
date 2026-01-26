@@ -63,7 +63,9 @@ static constexpr size_t kMaxNumberOfOrPlans = 16;
  * know the number of plans. The subplanner can be completely skipped if the number of plans is
  * smaller than the kMaxNumberOrPlans.
  */
-bool delayOrSkipSubplanner(CanonicalQuery& query, QueryPlanRankerModeEnum planRankerMode);
+bool delayOrSkipSubplanner(CanonicalQuery& query,
+                           QueryPlanRankerModeEnum planRankerMode,
+                           bool isClassicEngine);
 
 /**
  * The PlanRanker is responsible for ranking candidate query plans and selecting the best plan(s)
@@ -74,6 +76,9 @@ bool delayOrSkipSubplanner(CanonicalQuery& query, QueryPlanRankerModeEnum planRa
  */
 class PlanRanker {
 public:
+    // If the plan will be executed in SBE (i.e. when 'isClassic' is false) then we will not use one
+    // of the CBR fallback strategies for plan ranking and instead use multiplanning.
+    // TODO SERVER-117707: Remove this restriction.
     StatusWith<PlanRankingResult> rankPlans(
         OperationContext* opCtx,
         CanonicalQuery& query,
@@ -82,7 +87,8 @@ public:
         const MultipleCollectionAccessor& collections,
         // PlannerData for classic multiplanner. We only need the classic one since
         // multiplanning only runs with classic, even if SBE is enabled.
-        PlannerData multiPlannerData);
+        PlannerData multiPlannerData,
+        bool isClassic);
 
     std::unique_ptr<WorkingSet> extractWorkingSet();
 
