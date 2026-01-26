@@ -2311,3 +2311,27 @@ tasks:
             JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
             JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
             JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
+
+  # Task to verify that the ci_wrapper timeout mechanism properly generates coredumps.
+  # This test runs a bazel test that intentionally times out, triggering SIGABRT,
+  # and verifies that the resulting coredump is from the actual test binary (not
+  # the bash wrapper script).
+  - name: verify_ci_wrapper_coredump
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    exec_timeout_secs: 1800 # 30 minute timeout
+    commands:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "get engflow creds"
+      - command: subprocess.exec
+        display_name: "Verify CI wrapper coredump generation"
+        type: test
+        timeout_secs: 1800 # 30 minutes
+        params:
+          binary: bash
+          args:
+            - "./src/buildscripts/bazel_testbuilds/verify_coredump_test.sh"
