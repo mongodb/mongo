@@ -2,8 +2,6 @@
 //  requires_non_retryable_writes,
 //  requires_fastcount,
 //  requires_getmore,
-//  # TODO SERVER-113670: Investigate why this test fails with primary_driven_index_builds suites.
-//  primary_driven_index_builds_incompatible,
 // ]
 
 import {IndexUtils} from "jstests/libs/index_utils.js";
