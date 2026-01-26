@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "OWNERS.yml":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "rsm*":
     approvers:
       - 10gen/server-networking-and-observability
@@ -15,98 +15,27 @@ filters:
   - "collection_validator_feature_compatibility_version.js":
     approvers:
       - 10gen/query-optimization
-  - "1_test_launching_replset.js":
-    approvers:
-      - 10gen/server-replication-reviewers
-  - "3_upgrade_replset.js":
-    approvers:
-      - 10gen/server-fcv
-  - "arbiter_always_has_latest_fcv.js":
-    approvers:
-      - 10gen/server-fcv
   - "create_coll_validator_new_feature_no_applyops_check.js":
     approvers:
       - 10gen/query-optimization
-  - "default_startup_FCV_parameter.js":
-    approvers:
-      - 10gen/server-fcv
-  - "do_upgrade_downgrade.js":
-    approvers:
-      - 10gen/server-fcv
-  - "downgrade_replset.js":
-    approvers:
-      - 10gen/server-fcv
-  - "draining_on_FCV_transition.js":
-    approvers:
-      - 10gen/server-fcv
-  - "feature_compatibility_version_lagging_secondary.js":
-    approvers:
-      - 10gen/server-fcv
   - "initial_sync*":
     approvers:
       - 10gen/server-initial-sync
-      - 10gen/server-fcv
-  - "major_version_upgrade.js":
-    approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "profile_filter_query_feature_flag.js":
     approvers:
       - 10gen/query-integration-observability
-  - "remove_feature_compatibility_version.js":
-    approvers:
-      - 10gen/server-fcv
-  - "repair_feature_compatibility_version.js":
-    approvers:
-      - 10gen/server-fcv
-  - "restart_during_downgrading_fcv.js":
-    approvers:
-      - 10gen/server-fcv
-  - "rollback*":
-    approvers:
-      - 10gen/server-fcv
-  - "run_feature_flag_multiversion_test.js":
-    approvers:
-      - 10gen/server-fcv
-  - "set_feature_compatibility_version.js":
-    approvers:
-      - 10gen/server-fcv
-      - 10gen/server-catalog-and-routing-routing-and-topology
-  - "set_feature_compatibility_version_confirm.js":
-    approvers:
-      - 10gen/server-fcv
-  - "test_replica_set_startup_in_downgrading_state.js":
-    approvers:
-      - 10gen/server-fcv
-  - "test_sharding_startup_in_downgrading_state.js":
-    approvers:
-      - 10gen/server-fcv
-  - "set_fcv_dry_run_mode.js":
-    approvers:
-      - 10gen/server-fcv
-      - 10gen/server-catalog-and-routing-routing-and-topology
-  - "set_fcv_automatic_dryRun.js":
-    approvers:
-      - 10gen/server-fcv
-      - 10gen/server-catalog-and-routing-routing-and-topology
-  - "fcv_transition_fails_during_is_cleaning_server_metadata.js":
-    approvers:
-      - 10gen/server-fcv
-  - "can_transition_to_originalFCV_after_failed_upgrade_or_downgrade.js":
-    approvers:
-      - 10gen/server-fcv
-      - 10gen/server-catalog-and-routing-routing-and-topology
   - "authoritative_database_metadata_on_FCV_transition.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
       - 10gen/server-catalog-and-routing-routing-and-topology
   - "upgrade_downgrade_sharded_cluster_remove_shard_state.js":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
       - 10gen/server-catalog-and-routing-ddl
   - "cluster_parameters_disabled_correctly_after_downgrade.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
-      - 10gen/server-fcv
   - "priority_port_downgrade_checks.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology

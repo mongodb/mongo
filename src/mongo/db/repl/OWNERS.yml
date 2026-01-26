@@ -54,7 +54,6 @@ filters:
       - 10gen/server-replication-coordinator
   - "FCV_AND_FEATURE_FLAG_README.md":
     approvers:
-      - 10gen/server-fcv
       - 10gen/server-catalog-and-routing-routing-and-topology
   - "set_multikey_metadata_oplog_entry.idl":
     approvers:

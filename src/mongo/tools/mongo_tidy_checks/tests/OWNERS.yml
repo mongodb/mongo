@@ -5,7 +5,7 @@ filters:
       - 10gen/server-programmability
   - "test_MongoFCVConstantCheck.*":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "test_MongoMacroDefinitionLeaksCheck.*":
     approvers:
       - 10gen/server-networking-and-observability

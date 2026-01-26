@@ -17,7 +17,7 @@ filters:
       - 10gen/query-integration-features
   - "feature_compatibility_version.js":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "*multi_router*.js":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology

@@ -77,7 +77,7 @@ filters:
       - 10gen/server-dbcheck
   - "feature_compatibility*":
     approvers:
-      - 10gen/server-fcv
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "oplog*":
     approvers:
       - 10gen/server-oplog
@@ -102,7 +102,6 @@ filters:
   - "*set_feature_compatibility_version*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
-      - 10gen/server-fcv
   - "snapshot_management*":
     approvers:
       - 10gen/server-replication-reviewers

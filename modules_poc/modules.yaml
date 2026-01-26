@@ -381,7 +381,7 @@ transactions:
 fcv:
   meta:
     slack: server-fcv
-    jira: Replication
+    jira: Catalog and Routing
     fully_marked: true
   files:
     - src/mongo/db/feature_compatibility*
