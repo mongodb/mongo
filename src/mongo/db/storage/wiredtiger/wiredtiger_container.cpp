@@ -55,14 +55,6 @@ boost::optional<std::span<const char>> _find(WiredTigerCursor& cursor) {
 WiredTigerContainer::WiredTigerContainer(std::string uri, uint64_t tableId)
     : _uri(std::move(uri)), _tableId(tableId) {}
 
-StringData WiredTigerContainer::uri() const {
-    return _uri;
-}
-
-uint64_t WiredTigerContainer::tableId() const {
-    return _tableId;
-}
-
 WiredTigerIntegerKeyedContainer::WiredTigerIntegerKeyedContainer(std::shared_ptr<Ident> ident,
                                                                  std::string uri,
                                                                  uint64_t tableId)

@@ -318,8 +318,7 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndex::insert(
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _container.tableId());
-    WiredTigerCursor curwrap(
-        std::move(cursorParams), std::string{_container.uri()}, *wtRu.getSession());
+    WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
 
@@ -336,8 +335,7 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
     auto cursorParams = getWiredTigerCursorParams(wtRu, _container.tableId());
-    WiredTigerCursor curwrap(
-        std::move(cursorParams), std::string{_container.uri()}, *wtRu.getSession());
+    WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     wtRu.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
@@ -367,7 +365,7 @@ IndexValidateResults WiredTigerIndex::validate(
     }
 
     WiredTigerIndexUtil::validateStructure(
-        wtRu, std::string{_container.uri()}, options.verifyConfigurationOverride(), results);
+        wtRu, _container.uri(), options.verifyConfigurationOverride(), results);
 
     return results;
 }
@@ -393,7 +391,7 @@ bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
                                         BSONObjBuilder* output,
                                         double scale) const {
     return WiredTigerIndexUtil::appendCustomStats(
-        WiredTigerRecoveryUnit::get(ru), output, scale, std::string{_container.uri()});
+        WiredTigerRecoveryUnit::get(ru), output, scale, _container.uri());
 }
 
 boost::optional<SortedDataInterface::DuplicateKey> WiredTigerIndex::dupKeyCheck(
@@ -404,8 +402,7 @@ boost::optional<SortedDataInterface::DuplicateKey> WiredTigerIndex::dupKeyCheck(
     // Allow overwrite because it's faster and this is a read-only cursor.
     auto cursorParams =
         getWiredTigerCursorParams(wtRu, _container.tableId(), true /* allowOverwrite */);
-    WiredTigerCursor curwrap(
-        std::move(cursorParams), std::string{_container.uri()}, *wtRu.getSession());
+    WiredTigerCursor curwrap(std::move(cursorParams), _container.uri(), *wtRu.getSession());
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, ru, c, curwrap.getSession(), key)) {
@@ -415,10 +412,8 @@ boost::optional<SortedDataInterface::DuplicateKey> WiredTigerIndex::dupKeyCheck(
 }
 
 bool WiredTigerIndex::isEmpty(OperationContext* opCtx, RecoveryUnit& ru) {
-    return WiredTigerIndexUtil::isEmpty(opCtx,
-                                        WiredTigerRecoveryUnit::get(ru),
-                                        std::string{_container.uri()},
-                                        _container.tableId());
+    return WiredTigerIndexUtil::isEmpty(
+        opCtx, WiredTigerRecoveryUnit::get(ru), _container.uri(), _container.tableId());
 }
 
 void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
@@ -441,7 +436,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     // Open a version cursor. This is a debug cursor that enables iteration through the history of
     // values for a given index entry.
     WT_CURSOR* cursor =
-        session.getNewCursor(std::string{_container.uri()}, "debug=(dump_version=(enabled=true))");
+        session.getNewCursor(_container.uri(), "debug=(dump_version=(enabled=true))");
 
     const auto keyView = keyString.getKeyAndRecordIdView();
     setKey(cursor, keyView);
@@ -498,18 +493,16 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx, RecoveryUn
     WiredTigerSession* s = wtRu.getSession();
 
     if (wtRu.getConnection()->isEphemeral()) {
-        return static_cast<long long>(
-            WiredTigerUtil::getEphemeralIdentSize(*s, std::string{_container.uri()}));
+        return static_cast<long long>(WiredTigerUtil::getEphemeralIdentSize(*s, _container.uri()));
     }
-    return static_cast<long long>(WiredTigerUtil::getIdentSize(*s, std::string{_container.uri()}));
+    return static_cast<long long>(WiredTigerUtil::getIdentSize(*s, _container.uri()));
 }
 
 long long WiredTigerIndex::getFreeStorageBytes(OperationContext* opCtx, RecoveryUnit& ru) const {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     WiredTigerSession* session = wtRu.getSessionNoTxn();
 
-    return static_cast<long long>(
-        WiredTigerUtil::getIdentReuseSize(*session, std::string{_container.uri()}));
+    return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(*session, _container.uri()));
 }
 
 Status WiredTigerIndex::initAsEmpty() {
@@ -521,11 +514,11 @@ StatusWith<int64_t> WiredTigerIndex::compact(OperationContext* opCtx,
                                              RecoveryUnit& ru,
                                              const CompactOptions& options) {
     return WiredTigerIndexUtil::compact(
-        opCtx, WiredTigerRecoveryUnit::get(ru), std::string{_container.uri()}, options);
+        opCtx, WiredTigerRecoveryUnit::get(ru), _container.uri(), options);
 }
 
 Status WiredTigerIndex::truncate(OperationContext* opCtx, RecoveryUnit& ru) {
-    WiredTigerUtil::truncate(WiredTigerRecoveryUnit::get(ru), std::string{_container.uri()});
+    WiredTigerUtil::truncate(WiredTigerRecoveryUnit::get(ru), _container.uri());
     return Status::OK();
 }
 
@@ -747,7 +740,7 @@ public:
     BulkBuilder(WiredTigerIndex* idx, OperationContext* opCtx, RecoveryUnit& ru)
         : _idx(idx),
           _opCtx(opCtx),
-          _cursor(opCtx, *WiredTigerRecoveryUnit::get(ru).getSession(), std::string{idx->uri()}) {}
+          _cursor(opCtx, *WiredTigerRecoveryUnit::get(ru).getSession(), idx->uri()) {}
 
 protected:
     void insert(RecoveryUnit& ru, std::span<const char> key, std::span<const char> value) {
