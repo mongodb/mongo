@@ -262,10 +262,11 @@ public:
                                 const std::vector<OplogSlot>& reservedSlots,
                                 const TransactionOperations& transactionOperations) override {}
 
-    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
-                                        const LogicalSessionId& lsid,
-                                        const std::vector<repl::OplogEntry>& statements,
-                                        const repl::OpTime& prepareOpTime) override {}
+    void onTransactionPrepareNonPrimaryForChunkMigration(
+        OperationContext* opCtx,
+        const LogicalSessionId& lsid,
+        boost::optional<const std::vector<repl::OplogEntry>&> statements,
+        boost::optional<const repl::OpTime&> prepareOpTime) override {}
 
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) override {}

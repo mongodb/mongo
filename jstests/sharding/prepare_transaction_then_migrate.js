@@ -1,7 +1,6 @@
 /**
- * Test that a migration will:
- * 1. Ignore multi-statement transaction prepare conflicts in the clone phase, and
- * 2. Pick up the changes for prepared transactions in the transfer mods phase.
+ * Test that a migration will pick up the changes for prepared transactions in the transfer mods
+ * phase.
  *
  * @tags: [uses_transactions, uses_prepare_transaction, requires_persistence]
  */
@@ -12,6 +11,7 @@ import {
     moveChunkStepNames,
     pauseMigrateAtStep,
     unpauseMigrateAtStep,
+    waitForMigrateStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -50,6 +50,10 @@ let runTest = function (testMode) {
             {_id: 4, x: 100, note: "keep in chunk range being migrated"},
         ]),
     );
+
+    pauseMigrateAtStep(st.shard1, migrateStepNames.cloned);
+
+    const joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {x: 1}, null, "test.user", st.shard1.shardName);
 
     const lsid = {id: UUID()};
     const txnNumber = 0;
@@ -132,20 +136,6 @@ let runTest = function (testMode) {
         });
     }
 
-    const joinMoveChunk = moveChunkParallel(staticMongod, st.s.host, {x: 1}, null, "test.user", st.shard1.shardName);
-
-    pauseMigrateAtStep(st.shard1, migrateStepNames.catchup);
-
-    // The donor shard only ignores prepare conflicts while scanning over the shard key index. We
-    // wait for donor shard to have finished buffering the RecordIds into memory from scanning over
-    // the shard key index before committing the transaction. Notably, the donor shard doesn't
-    // ignore prepare conflicts when fetching the full contents of the documents during calls to
-    // _migrateClone.
-    //
-    // TODO: SERVER-71028 Remove comment after making changes.
-
-    waitForMoveChunkStep(st.shard0, moveChunkStepNames.startedMoveChunk);
-
     assert.commandWorked(
         st.shard0.getDB(dbName).adminCommand(
             Object.assign(
@@ -160,7 +150,7 @@ let runTest = function (testMode) {
         ),
     );
 
-    unpauseMigrateAtStep(st.shard1, migrateStepNames.catchup);
+    unpauseMigrateAtStep(st.shard1, migrateStepNames.cloned);
 
     joinMoveChunk();
 

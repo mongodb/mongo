@@ -116,10 +116,11 @@ public:
                                 const std::vector<OplogSlot>& reservedSlots,
                                 const TransactionOperations& transactionOperations) final;
 
-    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
-                                        const LogicalSessionId& lsid,
-                                        const std::vector<repl::OplogEntry>& statements,
-                                        const repl::OpTime& prepareOpTime) final;
+    void onTransactionPrepareNonPrimaryForChunkMigration(
+        OperationContext* opCtx,
+        const LogicalSessionId& lsid,
+        boost::optional<const std::vector<repl::OplogEntry>&> statements,
+        boost::optional<const repl::OpTime&> prepareOpTime) final;
 
     void onBatchedWriteCommit(OperationContext* opCtx,
                               WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,

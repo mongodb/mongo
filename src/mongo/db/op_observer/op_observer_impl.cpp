@@ -2353,11 +2353,6 @@ void OpObserverImpl::onTransactionPrepare(
     }
 }
 
-void OpObserverImpl::onTransactionPrepareNonPrimary(OperationContext* opCtx,
-                                                    const LogicalSessionId& lsid,
-                                                    const std::vector<repl::OplogEntry>& statements,
-                                                    const repl::OpTime& prepareOpTime) {}
-
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
                                         boost::optional<OplogSlot> abortOplogEntryOpTime) {
     invariant(opCtx->getTxnNumber());
