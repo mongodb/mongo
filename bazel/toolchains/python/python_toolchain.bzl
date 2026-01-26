@@ -5,38 +5,38 @@ load("//bazel/platforms:normalize.bzl", "ARCH_TO_PLATFORM_MAP", "OS_TO_PLATFORM_
 
 URLS_MAP = {
     "linux_aarch64": {
-        "sha": "3e26a672df17708c4dc928475a5974c3fb3a34a9b45c65fb4bd1e50504cc84ec",
-        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-aarch64-unknown-linux-gnu-install_only.tar.gz",
+        "sha": "d9a1344428f16f055d98ba8885b2dd96d780fcb761a3322fdfdadbaf04290d31",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20260114/cpython-3.13.11+20260114-aarch64-unknown-linux-gnu-install_only.tar.gz",
         "interpreter_path": "dist/bin/python3",
     },
     "linux_amd64": {
-        "sha": "ee37a7eae6e80148c7e3abc56e48a397c1664f044920463ad0df0fc706eacea8",
-        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz",
+        "sha": "f31a96948bacdb8155cb3bca643fce47014f9610d90c8f7dcd62973452a43ff5",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20260114/cpython-3.13.11+20260114-x86_64-unknown-linux-gnu-install_only.tar.gz",
         "interpreter_path": "dist/bin/python3",
     },
     "linux_ppc64le": {
-        "sha": "7937035f690a624dba4d014ffd20c342e843dd46f89b0b0a1e5726b85deb8eaf",
-        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-ppc64le-unknown-linux-gnu-install_only.tar.gz",
+        "sha": "e1e406591f346d98f029c0e117130b4307fa802b98da9b82191e43ed2108b5ce",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20260114/cpython-3.13.11+20260114-ppc64le-unknown-linux-gnu-install_only.tar.gz",
         "interpreter_path": "dist/bin/python3",
     },
     "linux_s390x": {
-        "sha": "f9f19823dba3209cedc4647b00f46ed0177242917db20fb7fb539970e384531c",
-        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-s390x-unknown-linux-gnu-install_only.tar.gz",
+        "sha": "27d6e8219687eae81a3a09ae2819e32bbb80aa8ba0f03ae953697068a3f9011c",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20260114/cpython-3.13.11+20260114-s390x-unknown-linux-gnu-install_only.tar.gz",
         "interpreter_path": "dist/bin/python3",
     },
     "windows_amd64": {
-        "sha": "3933545e6d41462dd6a47e44133ea40995bc6efeed8c2e4cbdf1a699303e95ea",
-        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-pc-windows-msvc-shared-install_only.tar.gz",
+        "sha": "9b8e1b811ce8fdf3073e7ea001db448504c8628404b30b676771d52a3686e355",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20260114/cpython-3.13.11+20260114-x86_64-pc-windows-msvc-install_only.tar.gz",
         "interpreter_path": "dist/python.exe",
     },
     "macos_aarch64": {
-        "sha": "916c35125b5d8323a21526d7a9154ca626453f63d0878e95b9f613a95006c990",
-        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-aarch64-apple-darwin-install_only.tar.gz",
+        "sha": "229b1bd07558477db0ad9db1168d7e77c6b3df8284201919305af6d603340a27",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20260114/cpython-3.13.11+20260114-aarch64-apple-darwin-install_only.tar.gz",
         "interpreter_path": "dist/bin/python3",
     },
     "macos_x86_64": {
-        "sha": "178cb1716c2abc25cb56ae915096c1a083e60abeba57af001996e8bc6ce1a371",
-        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-apple-darwin-install_only.tar.gz",
+        "sha": "47d438bbf7b912d8f19ff4436a514f8529e5736ca38cb4bc94ae25d3b2384f15",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20260114/cpython-3.13.11+20260114-x86_64-apple-darwin-install_only.tar.gz",
         "interpreter_path": "dist/bin/python3",
     },
 }
