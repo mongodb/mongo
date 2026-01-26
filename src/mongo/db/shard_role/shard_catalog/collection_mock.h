@@ -179,7 +179,7 @@ public:
     }
 
     Status updateValidator(OperationContext* opCtx,
-                           BSONObj newValidator,
+                           BSONObj newValidatorDoc,
                            boost::optional<ValidationLevelEnum> newLevel,
                            boost::optional<ValidationActionEnum> newAction) override {
         MONGO_UNREACHABLE;

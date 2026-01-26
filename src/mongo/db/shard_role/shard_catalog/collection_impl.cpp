@@ -1299,29 +1299,58 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx,
 }
 
 Status CollectionImpl::updateValidator(OperationContext* opCtx,
-                                       BSONObj newValidator,
+                                       BSONObj newValidatorDoc,
                                        boost::optional<ValidationLevelEnum> newLevel,
                                        boost::optional<ValidationActionEnum> newAction) {
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
+
+    tassert(11738200,
+            fmt::format("Illegal attempt to set a non-empty validator on viewless timeseries "
+                        "collection '{}'",
+                        _ns.toStringForErrorMsg()),
+            !isTimeseriesCollection() || !isNewTimeseriesWithoutView() ||
+                (newValidatorDoc.isEmpty() && !newLevel.has_value() && !newAction.has_value()));
 
     auto status = checkValidationOptionsCanBeUsed(_metadata->options, newLevel, newAction);
     if (!status.isOK()) {
         return status;
     }
 
-    auto validator =
-        parseValidator(opCtx, newValidator, MatchExpressionParser::kAllowAllSpecialFeatures);
-    if (!validator.isOK()) {
-        return validator.getStatus();
+    auto newValidator =
+        parseValidator(opCtx, newValidatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
+    if (!newValidator.isOK()) {
+        return newValidator.getStatus();
     }
 
     _writeMetadata(opCtx, [&](durable_catalog::CatalogEntryMetaData& md) {
-        md.options.validator = newValidator;
+        md.options.validator = newValidatorDoc;
         md.options.validationLevel = newLevel;
         md.options.validationAction = newAction;
     });
 
-    _validator = std::move(validator);
+    // Timeseries collections does not have a persisted validator,
+    // we generate the default one at runtime and cache it in the collection catalog.
+    //
+    // TODO SERVER-114573 the only place where we call this function to update validator on
+    // timeseries collection is FCV upgrade/downgrade 8.x <-> 9.0. Thus once 9.0 becomes last LTS we
+    // can assume no-one will call this function ever on timeseries collections.
+    auto inMemValidator = [&] {
+        if (isTimeseriesCollection() && isNewTimeseriesWithoutView()) {
+            auto validatorDoc = timeseries::generateTimeseriesValidator(
+                timeseries::kTimeseriesControlLatestVersion,
+                _metadata->options.timeseries->getTimeField());
+            auto validator = parseValidator(
+                opCtx, validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
+            tassert(11738201,
+                    "Failed to parse internally-generated validator document for timeseries "
+                    "collection",
+                    validator.isOK());
+            return validator;
+        }
+        return newValidator;
+    }();
+
+    _validator = std::move(inMemValidator);
     return Status::OK();
 }
 

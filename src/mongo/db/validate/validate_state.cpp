@@ -192,7 +192,7 @@ Status ValidateState::initializeCollection(OperationContext* opCtx) {
                     : AcquisitionPrerequisites::OperationType::kRead),
             isBackground() ? LockMode::MODE_IS : LockMode::MODE_X);
         if (wasRenamed) {
-            _nss = _nss.makeTimeseriesBucketsNamespace();
+            _nss = acquisition.nss();
         }
 
         if (!acquisition.exists()) {

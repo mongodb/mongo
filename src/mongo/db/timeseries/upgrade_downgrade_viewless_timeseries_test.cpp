@@ -180,12 +180,21 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, UpgradedOptionsConsistentWithNewV
     createViewlessTimeseriesCollection(nss2);
 
     auto catalog = CollectionCatalog::get(operationContext());
+    auto collPtr1 = catalog->lookupCollectionByNamespace(operationContext(), nss1);
+    auto collPtr2 = catalog->lookupCollectionByNamespace(operationContext(), nss2);
+
     auto options1 =
         catalog->lookupCollectionByNamespace(operationContext(), nss1)->getCollectionOptions();
     auto options2 =
         catalog->lookupCollectionByNamespace(operationContext(), nss2)->getCollectionOptions();
-    ASSERT_BSONOBJ_EQ(options1.toBSON(false /* includeUUID */),
-                      options2.toBSON(false /* includeUUID */));
+    ASSERT_BSONOBJ_EQ(collPtr1->getCollectionOptions().toBSON(false /* includeUUID */),
+                      collPtr2->getCollectionOptions().toBSON(false /* includeUUID */));
+
+    ASSERT_BSONOBJ_EQ(collPtr1->getValidatorDoc(), collPtr2->getValidatorDoc());
+    ASSERT(!collPtr2->getValidatorDoc().isEmpty());
+    ASSERT(collPtr2->getCollectionOptions().validator.isEmpty());
+    ASSERT(!collPtr2->getCollectionOptions().validationAction.has_value());
+    ASSERT(!collPtr2->getCollectionOptions().validationLevel.has_value());
 }
 
 TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradedOptionsConsistentWithNewViewful) {
@@ -198,16 +207,19 @@ TEST_F(UpgradeDowngradeViewlessTimeseriesTest, DowngradedOptionsConsistentWithNe
     createViewfulTimeseriesCollection(nss2);
 
     auto catalog = CollectionCatalog::get(operationContext());
-    auto options1 =
-        catalog
-            ->lookupCollectionByNamespace(operationContext(), nss1.makeTimeseriesBucketsNamespace())
-            ->getCollectionOptions();
-    auto options2 =
-        catalog
-            ->lookupCollectionByNamespace(operationContext(), nss2.makeTimeseriesBucketsNamespace())
-            ->getCollectionOptions();
-    ASSERT_BSONOBJ_EQ(options1.toBSON(false /* includeUUID */),
-                      options2.toBSON(false /* includeUUID */));
+    auto collPtr1 = catalog->lookupCollectionByNamespace(operationContext(),
+                                                         nss1.makeTimeseriesBucketsNamespace());
+    auto collPtr2 = catalog->lookupCollectionByNamespace(operationContext(),
+                                                         nss2.makeTimeseriesBucketsNamespace());
+
+    ASSERT_BSONOBJ_EQ(collPtr1->getCollectionOptions().toBSON(false /* includeUUID */),
+                      collPtr2->getCollectionOptions().toBSON(false /* includeUUID */));
+
+    ASSERT_BSONOBJ_EQ(collPtr1->getValidatorDoc(), collPtr2->getValidatorDoc());
+    ASSERT(!collPtr2->getValidatorDoc().isEmpty());
+    ASSERT(!collPtr2->getCollectionOptions().validator.isEmpty());
+    ASSERT(!collPtr2->getCollectionOptions().validationAction.has_value());
+    ASSERT(!collPtr2->getCollectionOptions().validationLevel.has_value());
 
     auto viewPipeline1 = catalog->lookupView(operationContext(), nss1)->pipeline();
     auto viewPipeline2 = catalog->lookupView(operationContext(), nss2)->pipeline();

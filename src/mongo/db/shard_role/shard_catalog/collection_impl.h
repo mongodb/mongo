@@ -207,7 +207,7 @@ public:
      * should be considered fatal.
      */
     Status updateValidator(OperationContext* opCtx,
-                           BSONObj newValidator,
+                           BSONObj newValidatorDoc,
                            boost::optional<ValidationLevelEnum> newLevel,
                            boost::optional<ValidationActionEnum> newAction) final;
 

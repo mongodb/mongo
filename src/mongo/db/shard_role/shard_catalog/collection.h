@@ -381,7 +381,7 @@ public:
     virtual boost::optional<ValidationActionEnum> getValidationAction() const = 0;
 
     virtual Status updateValidator(OperationContext* opCtx,
-                                   BSONObj newValidator,
+                                   BSONObj newValidatorDoc,
                                    boost::optional<ValidationLevelEnum> newLevel,
                                    boost::optional<ValidationActionEnum> newAction) = 0;
 
