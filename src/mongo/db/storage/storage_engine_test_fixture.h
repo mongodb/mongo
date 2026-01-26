@@ -77,7 +77,8 @@ public:
                 opCtx, catalogId, ns, ident, options, mdbCatalog));
             wuow.commit();
         }
-        std::shared_ptr<Collection> coll = std::make_shared<CollectionImpl>(
+        CollectionImplFactory factory;
+        std::shared_ptr<Collection> coll = factory.make(
             opCtx,
             ns,
             catalogId,

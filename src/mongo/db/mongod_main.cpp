@@ -1273,7 +1273,7 @@ void startupConfigActions(const std::vector<std::string>& args) {
 
 void setUpCatalog(ServiceContext* serviceContext) {
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
-    Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
+    Collection::Factory::set(serviceContext, std::make_unique<CollectionImplFactory>());
 }
 
 auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {

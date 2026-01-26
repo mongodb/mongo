@@ -306,16 +306,6 @@ void CollectionImpl::onDeregisterFromCatalog(ServiceContext* svcCtx) {
     }
 }
 
-std::shared_ptr<Collection> CollectionImpl::FactoryImpl::make(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    RecordId catalogId,
-    std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata,
-    std::unique_ptr<RecordStore> rs) const {
-    return std::make_shared<CollectionImpl>(
-        opCtx, nss, std::move(catalogId), std::move(metadata), std::move(rs));
-}
-
 std::shared_ptr<Collection> CollectionImpl::clone() const {
     return std::make_shared<CollectionImpl>(*this);
 }
@@ -2035,6 +2025,16 @@ void CollectionImpl::_writeMetadata(OperationContext* opCtx, Func func) {
     // Store in durable catalog and replace pointer with our copied instance.
     durable_catalog::putMetaData(opCtx, getCatalogId(), *metadata, MDBCatalog::get(opCtx));
     _metadata = std::move(metadata);
+}
+
+std::shared_ptr<Collection> CollectionImplFactory::make(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    RecordId catalogId,
+    std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata,
+    std::unique_ptr<RecordStore> rs) const {
+    return std::make_shared<CollectionImpl>(
+        opCtx, nss, std::move(catalogId), std::move(metadata), std::move(rs));
 }
 
 }  // namespace mongo

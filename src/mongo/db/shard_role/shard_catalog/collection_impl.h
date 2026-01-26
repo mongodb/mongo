@@ -75,11 +75,7 @@
 
 namespace mongo {
 
-// TODO (SERVER-113355): Change MONGO_MOD_USE_REPLACEMENT below with MONGO_MOD_PRIVATE by either
-// moving FactoryImpl outside of the class so it doesn't inherit the module visibility of
-// CollectionImpl or make it so that visibility at higher levels can be overridden at the lower
-// levels.
-class MONGO_MOD_USE_REPLACEMENT(Collection) CollectionImpl final : public Collection {
+class MONGO_MOD_PRIVATE CollectionImpl final : public Collection {
 public:
     // Uses the collator factory to convert the BSON representation of a collator to a
     // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
@@ -87,7 +83,6 @@ public:
     static std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
                                                              const NamespaceString& nss,
                                                              BSONObj collationSpec);
-
 
     explicit CollectionImpl(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -98,16 +93,6 @@ public:
     ~CollectionImpl() override;
 
     std::shared_ptr<Collection> clone() const final;
-
-    class FactoryImpl : public Factory {
-    public:
-        std::shared_ptr<Collection> make(
-            OperationContext* opCtx,
-            const NamespaceString& nss,
-            RecordId catalogId,
-            std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata,
-            std::unique_ptr<RecordStore> rs) const final;
-    };
 
     SharedCollectionDecorations* getSharedDecorations() const final;
 
@@ -510,6 +495,16 @@ private:
     boost::optional<Timestamp> _minValidSnapshot;
 
     bool _initialized = false;
+};
+
+class MONGO_MOD_PUBLIC CollectionImplFactory : public Collection::Factory {
+public:
+    std::shared_ptr<Collection> make(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        RecordId catalogId,
+        std::shared_ptr<durable_catalog::CatalogEntryMetaData> metadata,
+        std::unique_ptr<RecordStore> rs) const final;
 };
 
 }  // namespace mongo

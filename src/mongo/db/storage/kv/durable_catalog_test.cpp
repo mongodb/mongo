@@ -179,7 +179,8 @@ public:
         const auto catalogId = getMDBCatalog()->reserveCatalogId(operationContext());
         auto rs = unittest::assertGet(durable_catalog::createCollection(
             operationContext(), catalogId, nss, ident, options, getMDBCatalog()));
-        std::shared_ptr<Collection> collection = std::make_shared<CollectionImpl>(
+        CollectionImplFactory factory;
+        std::shared_ptr<Collection> collection = factory.make(
             operationContext(),
             nss,
             catalogId,
