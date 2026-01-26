@@ -86,6 +86,11 @@ bazel_evergreen_shutils::compute_local_arg() {
     elif [[ "$mode" == "test" && "${task_name:-}" == "unit_tests" ]]; then
         local_arg+=" --config=remote_test"
         local_arg+=" --test_timeout=660" # Allow extra 60s for coredump on abort
+
+        # Don't cache test results for merge queue and waterfall tasks initially
+        if [[ "${is_commit_queue:-}" != "true" && "${requester:-}" != "commit" ]]; then
+            local_arg+=" --cache_test_results=auto"
+        fi
     fi
 
     if bazel_evergreen_shutils::is_ppc64le; then
