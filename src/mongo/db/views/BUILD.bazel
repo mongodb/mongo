@@ -36,6 +36,18 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "pipeline_resolver",
+    srcs = [
+        "pipeline_resolver.cpp",
+    ],
+    deps = [
+        ":resolved_view",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:lite_parsed_desugarer",
+    ],
+)
+
+mongo_cc_library(
     name = "view_catalog_helpers",
     srcs = [
         "view_catalog_helpers.cpp",

@@ -117,6 +117,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/db/views/view.h"
 #include "mongo/logv2/log.h"
@@ -992,10 +993,8 @@ SecondParseRequirement maybeApplyViewPipeline(const AggExState& aggExState,
     }
 
     // Desugar the viewPipeline and apply it to the desugared user pipeline.
-    auto viewInfo = aggExState.getResolvedView().toViewInfo(aggExState.getOriginalNss());
-    LiteParsedDesugarer::desugar(viewInfo.viewPipeline.get());
-
-    desugaredLPP->handleView(viewInfo);
+    PipelineResolver::applyViewToLiteParsed(
+        desugaredLPP, aggExState.getResolvedView(), aggExState.getOriginalNss());
     return SecondParseRequirement::kReparseFromLPP;
 }
 
@@ -1047,12 +1046,10 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     // require reparse from the modified LPP).
     // TODO SPM-4488: Once query shape can be generated from LiteParsed, a reparse will no
     // longer be required. Simplify the logic as such.
+    // TODO SERVER-117322 Increase the reparse granularity here so that we only reparse stages that
+    // have been modified by desugaring or view processing.
     auto desugaredLPP = aggExState.getOriginalLiteParsedPipeline().clone();
-
-    // LiteParsedDesugarer::desugar() is called on the router, so if we're from the router
-    // the pipeline is already desugared.
-    const auto desugaredHere =
-        !expCtx->getFromRouter() && LiteParsedDesugarer::desugar(&desugaredLPP);
+    const auto desugaredHere = LiteParsedDesugarer::desugar(&desugaredLPP);
     auto secondParseRequirement =
         desugaredHere ? SecondParseRequirement::kReparseFromLPP : SecondParseRequirement::kNone;
 

@@ -374,6 +374,10 @@ public:
      * Converts all child LiteParsedDocumentSources to own the BSON they hold, similar to
      * BSONObj::getOwned(). This should be called when the source BSONObjs' lifetimes cannot be
      * guaranteed to exceed that of this instance.
+     *
+     * This recursively makes all stages in subpipelines owned as well. Stages with subpipelines
+     * (e.g., LiteParsedDocumentSourceNestedPipelines) override makeOwned() to handle their own
+     * subpipelines.
      */
     void makeOwned() {
         for (auto& stage : _stageSpecs) {

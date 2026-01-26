@@ -92,6 +92,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/version_context.h"
 #include "mongo/db/versioning_protocol/database_version.h"
+#include "mongo/db/views/pipeline_resolver.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
@@ -451,6 +452,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
     boost::optional<ResolvedView> resolvedView,
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
+    bool alreadyDesugared,
     std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr) {
     // Populate the collation. If this is a change stream, take the user-defined collation if one
     // exists, or an empty BSONObj otherwise. Change streams never inherit the collection's default
@@ -563,16 +565,17 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
         }
     }
 
-    // Clone and desugar the pipeline. If the pipeline is modified by desugaring, a reparse
-    // will be required. Otherwise, we can optimize out the reparse.
+    // Clone and desugar the pipeline if it wasn't already desugared earlier during view handling.
+    // If the pipeline is modified by desugaring, a reparse will be required. Otherwise, we can
+    // optimize out the reparse.
     auto clonedLPP = liteParsedPipeline.clone();
-    const auto wasDesugared = LiteParsedDesugarer::desugar(&clonedLPP);
+    const auto wasDesugaredHere = !alreadyDesugared && LiteParsedDesugarer::desugar(&clonedLPP);
 
     // Parse the user's original pipeline pre-desugar to capture query stats. Passing through
-    // wasDesugared will determine whether a StubMongoProcessInterface will be attached to this
+    // wasDesugaredHere will determine whether a StubMongoProcessInterface will be attached to this
     // parse or not.
     auto pipeline =
-        Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, nullptr, false, wasDesugared);
+        Pipeline::parseFromLiteParsed(liteParsedPipeline, expCtx, nullptr, false, wasDesugaredHere);
 
     // Compute QueryShapeHash pre-desugar and record it in CurOp.
     query_shape::DeferredQueryShape deferredShape{[&]() {
@@ -613,7 +616,7 @@ std::unique_ptr<Pipeline> parsePipelineAndRegisterQueryStats(
             hasChangeStream);
     }
 
-    if (wasDesugared) {
+    if (wasDesugaredHere) {
         pipeline = Pipeline::parseFromLiteParsed(clonedLPP, expCtx);
     }
 
@@ -637,7 +640,8 @@ Status _parseQueryStatsAndReturnEmptyResult(
     boost::optional<ResolvedView> resolvedView,
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
-    BSONObjBuilder* result) {
+    BSONObjBuilder* result,
+    bool alreadyDesugared = false) {
 
     // By forcing the validation checks to be done explicitly, instead of indirectly via a callback
     // function (runAggregateImpl) in runAggregate(...) that gets passed to
@@ -674,7 +678,8 @@ Status _parseQueryStatsAndReturnEmptyResult(
                                                requiresCollationForParsingUnshardedAggregate,
                                                resolvedView,
                                                originalRequest,
-                                               verbosity);
+                                               verbosity,
+                                               alreadyDesugared);
 
         pipeline->validateCommon(false);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
@@ -700,7 +705,8 @@ Status runAggregateImpl(OperationContext* opCtx,
                         boost::optional<AggregateCommandRequest> originalRequest,
                         boost::optional<ExplainOptions::Verbosity> verbosity,
                         BSONObjBuilder* res,
-                        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr) {
+                        std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext = nullptr,
+                        bool alreadyDesugared = false) {
     const auto pipelineDataSource = sharded_agg_helpers::getPipelineDataSource(liteParsedPipeline);
     if (!originalRoutingCtx.hasNss(namespaces.executionNss) &&
         sharded_agg_helpers::checkIfMustRunOnAllShards(namespaces.executionNss,
@@ -721,7 +727,8 @@ Status runAggregateImpl(OperationContext* opCtx,
                 resolvedView,
                 originalRequest,
                 verbosity,
-                res);
+                res,
+                alreadyDesugared);
         }
     }
 
@@ -815,6 +822,7 @@ Status runAggregateImpl(OperationContext* opCtx,
                                                resolvedView,
                                                originalRequest,
                                                verbosity,
+                                               alreadyDesugared,
                                                std::move(ifrContext));
         const boost::intrusive_ptr<ExpressionContext>& pipelineCtx = pipeline->getContext();
 
@@ -1053,29 +1061,34 @@ Status runAggregateImpl(OperationContext* opCtx,
 }  // namespace
 
 
-Status ClusterAggregate::runAggregate(OperationContext* opCtx,
-                                      const Namespaces& namespaces,
-                                      AggregateCommandRequest& request,
-                                      const PrivilegeVector& privileges,
-                                      boost::optional<ExplainOptions::Verbosity> verbosity,
-                                      BSONObjBuilder* result,
-                                      StringData comment) {
+Status ClusterAggregate::runAggregate(
+    OperationContext* opCtx,
+    const Namespaces& namespaces,
+    AggregateCommandRequest& request,
+    const PrivilegeVector& privileges,
+    boost::optional<ExplainOptions::Verbosity> verbosity,
+    BSONObjBuilder* result,
+    StringData comment,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     return runAggregate(
-        opCtx, namespaces, request, {request}, privileges, verbosity, result, comment);
+        opCtx, namespaces, request, {request}, privileges, verbosity, result, comment, ifrContext);
 }
 
-Status ClusterAggregate::runAggregate(OperationContext* opCtx,
-                                      const Namespaces& namespaces,
-                                      AggregateCommandRequest& request,
-                                      const LiteParsedPipeline& liteParsedPipeline,
-                                      const PrivilegeVector& privileges,
-                                      boost::optional<ExplainOptions::Verbosity> verbosity,
-                                      BSONObjBuilder* result,
-                                      StringData comment) {
-    // Creates a new IFRContext for the aggregation, which will be shared among the root
-    // ExpressionContext and any child ExpressionContexts that are created, for example, as part of
-    // sub-pipeline execution.
-    auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+Status ClusterAggregate::runAggregate(
+    OperationContext* opCtx,
+    const Namespaces& namespaces,
+    AggregateCommandRequest& request,
+    const LiteParsedPipeline& liteParsedPipeline,
+    const PrivilegeVector& privileges,
+    boost::optional<ExplainOptions::Verbosity> verbosity,
+    BSONObjBuilder* result,
+    StringData comment,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+    // Use the provided IFRContext if available, otherwise create a new one. This ensures consistent
+    // flag values throughout the operation, including retries on view errors.
+    if (!ifrContext) {
+        ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+    }
 
     const bool requiresCollectionRouter = std::invoke([&]() {
         const auto pipelineDataSource =
@@ -1183,7 +1196,8 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
     boost::optional<AggregateCommandRequest> originalRequest,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     BSONObjBuilder* result,
-    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext,
+    bool alreadyDesugared) {
 
     return runAggregateImpl(opCtx,
                             routingCtx,
@@ -1195,27 +1209,53 @@ Status ClusterAggregate::runAggregateWithRoutingCtx(
                             originalRequest,
                             verbosity,
                             result,
-                            ifrContext);
+                            ifrContext,
+                            alreadyDesugared);
 }
 
-Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
-                                          const AggregateCommandRequest& request,
-                                          const ResolvedView& resolvedView,
-                                          const NamespaceString& requestedNss,
-                                          const PrivilegeVector& privileges,
-                                          boost::optional<ExplainOptions::Verbosity> verbosity,
-                                          BSONObjBuilder* result) {
+Status ClusterAggregate::retryOnViewError(
+    OperationContext* opCtx,
+    const AggregateCommandRequest& request,
+    const ResolvedView& resolvedView,
+    const NamespaceString& requestedNss,
+    const PrivilegeVector& privileges,
+    boost::optional<ExplainOptions::Verbosity> verbosity,
+    BSONObjBuilder* result,
+    std::shared_ptr<IncrementalFeatureRolloutContext> ifrContext) {
     struct RetryOnViewState {
         ResolvedView resolvedView;
         stdx::unordered_set<IncrementalRolloutFeatureFlag*> ifrFlagsToDisableOnRetries;
     };
 
+    // Use the provided IFRContext if available, otherwise create a new one. This ensures consistent
+    // flag values between the initial runAggregate() call and retries on view errors.
+    if (!ifrContext) {
+        ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
+    }
+
     auto viewRetryBody = [&](RetryOnViewState& state) {
         auto& currentResolvedView = state.resolvedView;
         auto& ifrFlagsToDisableOnRetries = state.ifrFlagsToDisableOnRetries;
 
-        auto resolvedAggRequest =
-            PipelineResolver::buildRequestWithResolvedPipeline(currentResolvedView, request);
+        // Disable flags directly on the shared IFRContext. Track potentially multiple IFR flags.
+        // For example, consider the following case:
+        // 1. runAggregate with IFR Flag A enabled
+        // 2. IFRFlagRetryInfo gets thrown signalling to disable IFR Flag A
+        // 3. runAggregate retries with IFR Flag A pre-disabled
+        // 4. IFRFlagRetryInfo gets thrown signalling to disable IFR Flag B
+        // The correct behavior for the next retry is to run with both IFR Flags A and B
+        // disabled. The ifrFlagsToDisableOnRetries set accumulates flags across retries, so once
+        // a flag is disabled, it stays disabled for subsequent retries.
+        for (auto* ifrFlag : ifrFlagsToDisableOnRetries) {
+            ifrContext->disableFlag(*ifrFlag);
+        }
+
+        // Build the resolved aggregation request from the view, handling special cases for mongot
+        // pipelines, timeseries views, and invoking ViewPolicy callbacks for extension stages.
+        PipelineResolver::MongosPipelineHelpers helpers{makeExpressionContext,
+                                                        resolveInvolvedNamespaces};
+        auto resolvedViewRequestResult = PipelineResolver::buildResolvedMongosViewRequest(
+            opCtx, request, currentResolvedView, requestedNss, verbosity, ifrContext, helpers);
 
         result->resetToEmpty();
 
@@ -1231,19 +1271,6 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
         nsStruct.requestedNss = requestedNss;
         nsStruct.executionNss = currentResolvedView.getNamespace();
 
-        // Create a new IFR context for the retry aggregate command.
-        // Track potentially multiple IFR flags. For example, consider the following case:
-        // 1. runAggregate with IFR Flag A enabled
-        // 2. IFRFlagRetryInfo gets thrown signalling to disable IFR Flag A
-        // 3. runAggregate retries with IFR Flag A pre-disabled
-        // 4. IFRFlagRetryInfo gets thrown signalling to disable IFR Flag B
-        // The correct behavior for the next retry is to run with both IFR Flags A and B
-        // disabled.
-        auto ifrContext = std::make_shared<IncrementalFeatureRolloutContext>();
-        for (auto* ifrFlag : ifrFlagsToDisableOnRetries) {
-            ifrContext->disableFlag(*ifrFlag);
-        }
-
         uassert(ErrorCodes::OptionNotSupportedOnView,
                 "$rankFusion and $scoreFusion are unsupported on timeseries collections",
                 !(currentResolvedView.timeseries() && request.getIsHybridSearch()));
@@ -1252,6 +1279,9 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
         router.routeWithRoutingContext(
             "ClusterAggregate::retryOnViewError",
             [&](OperationContext* opCtx, RoutingContext& routingCtx) {
+                auto& resolvedAggRequest = resolvedViewRequestResult.resolvedRequest;
+                const auto& userLPP = resolvedViewRequestResult.liteParsedPipeline;
+
                 // For a sharded time-series collection, the routing is based on both routing table
                 // and the bucketMaxSpanSeconds value. We need to make sure we use the
                 // bucketMaxSpanSeconds of the same version as the routing table, instead of the one
@@ -1289,19 +1319,23 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
                     resolvedAggRequest.setPipeline(patchedPipeline);
                 }
 
+                const auto alreadyDesugared = userLPP.has_value();
                 uassertStatusOK(runAggregateWithRoutingCtx(
                     opCtx,
                     routingCtx,
                     nsStruct,
                     resolvedAggRequest,
-                    LiteParsedPipeline(
-                        resolvedAggRequest, true, LiteParserOptions{.ifrContext = ifrContext}),
+                    userLPP ? *userLPP
+                            : LiteParsedPipeline(resolvedAggRequest,
+                                                 true,
+                                                 LiteParserOptions{.ifrContext = ifrContext}),
                     privileges,
                     boost::make_optional(currentResolvedView),
                     boost::make_optional(request),
                     verbosity,
                     result,
-                    ifrContext));
+                    ifrContext,
+                    alreadyDesugared));
             });
 
         return Status::OK();

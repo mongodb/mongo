@@ -203,7 +203,9 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
     if (whenMatched == MergeWhenMatchedModeEnum::kPipeline) {
         auto pipeline = mergeSpec.getWhenMatched()->pipeline;
         tassert(11282975, "$merge spec is missing the whenMatched pipeline", pipeline);
-        liteParsedPipeline = LiteParsedPipeline(nss, *pipeline);
+        auto subpipelineParseOptions = options;
+        subpipelineParseOptions.makeSubpipelineOwned = true;
+        liteParsedPipeline = LiteParsedPipeline(nss, *pipeline, false, subpipelineParseOptions);
     }
     return std::make_unique<DocumentSourceMerge::LiteParsed>(
         spec, std::move(targetNss), whenMatched, whenNotMatched, std::move(liteParsedPipeline));
