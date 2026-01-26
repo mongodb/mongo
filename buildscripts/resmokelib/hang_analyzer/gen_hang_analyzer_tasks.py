@@ -16,6 +16,8 @@ from shrub.v2.command import BuiltInCommand
 
 from buildscripts.resmokelib.core.process import BORING_CORE_DUMP_PIDS_FILE
 from buildscripts.resmokelib.hang_analyzer import dumper
+from evergreen.api import RetryingEvergreenApi
+from evergreen.task import Task as EvgTask
 
 mongo_path = pathlib.Path(__file__).parents[3]
 sys.path.append(mongo_path)
@@ -40,7 +42,20 @@ def get_generated_task_name(current_task_name: str, execution: str) -> str:
     return f"{GENERATED_TASK_PREFIX}_{current_task_name}{execution}_{random_string}"
 
 
-def should_activate_core_analysis_task(task: Task) -> bool:
+def should_activate_core_analysis_task(task: EvgTask, evg_api: RetryingEvergreenApi) -> bool:
+    # We hardcode some task names where the core analysis is extending the long pole
+    # of required patch builds by 100 mins and the BFs are taking too long to fix.
+    # This list is a quick fix to improve development velocity.
+    skip_tasks = ["no_passthrough_disagg_override", "disagg_repl_jscore_passthrough"]
+    current_task_name = task.display_name
+    if task.parent_task_id:
+        parent_task = evg_api.task_by_id(task.parent_task_id)
+        current_task_name = parent_task.display_name
+
+    if current_task_name in skip_tasks:
+        print(f"Skipping core analysis task generation for task: {current_task_name}")
+        return False
+
     core_dump_pids = set()
     for artifact in task.artifacts:
         # Matches "Core Dump 2 (dump_mongo.670872.core.gz)", capturing "dump_mongo.670872.core"
@@ -233,7 +248,7 @@ def generate(
         )
         return
 
-    should_activate = should_activate_core_analysis_task(task_info)
+    should_activate = should_activate_core_analysis_task(task_info, evg_api)
 
     # Get boring core dump PIDs to pass to the analyzer
     boring_core_dump_pids = set()
