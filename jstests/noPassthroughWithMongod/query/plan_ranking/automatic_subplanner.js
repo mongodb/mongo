@@ -24,6 +24,13 @@ assert.commandWorked(coll.insertMany(docs));
 
 assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {c: 1}, {a: 1, b: 1}]));
 
+// Clustered collection.
+const clusteredCollName = jsTestName() + "_" + "clustered";
+const clusteredColl = db[clusteredCollName];
+clusteredColl.drop();
+assert.commandWorked(db.createCollection(clusteredCollName, {clusteredIndex: {key: {_id: 1}, unique: true}}));
+assert.commandWorked(clusteredColl.insertMany(docs));
+
 const pipeline = [
     {
         "$match": {
@@ -50,7 +57,7 @@ function testAutomaticUsesNoSubplanner(maxEnumeratedPlans) {
     assert.eq(explain.executionStats.nReturned, 400, toJsonForLog(explain));
 }
 
-function testAutomaticUsesSubplanner() {
+function testAutomaticUsesSubplanner(coll) {
     jsTest.log.info("Running testAutomaticUsesSublanner");
     const explain = coll.explain("executionStats").aggregate(pipeline);
     const winningPlan = getWinningPlanFromExplain(explain);
@@ -87,10 +94,15 @@ try {
             testAutomaticUsesNoSubplanner(2 * (maxOrSolutionsLow + 1)); // Every strategy (MP + CBR) generates maxOrSolutionsLow plans plus one since there's an index that could be used to satisfy the sorting.
         }
 
+        // AutomaticCE strategies always use the subplanner for clustered collections.
+        // TODO SERVER-117766: Avoid subplanner for $or queries over clustered collections.
+        testAutomaticUsesSubplanner(clusteredColl);
+
+        // AutomaticCE strategies always use the subplanner for more than kMaxNumberOfOrPlans(16).
         assert.commandWorked(
             db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutionsHigh}),
         );
-        testAutomaticUsesSubplanner();
+        testAutomaticUsesSubplanner(coll);
     }
 
     // The default AutomaticCE strategy always uses the subplanner.
@@ -98,7 +110,7 @@ try {
         db.adminCommand({setParameter: 1, automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback"}),
     );
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryEnumerationMaxOrSolutions: maxOrSolutionsLow}));
-    testAutomaticUsesSubplanner();
+    testAutomaticUsesSubplanner(coll);
 } finally {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: prevPlanRankerMode}));
     assert.commandWorked(

@@ -428,8 +428,7 @@ public:
         // plans.
         auto needsSubplanning = SubplanStage::needsSubplanning(*_cq);
         if (needsSubplanning &&
-            !plan_ranking::delayOrSkipSubplanner(
-                *_cq, _plannerParams->planRankerMode, usingClassic())) {
+            !plan_ranking::delayOrSkipSubplanner(*_cq, *_plannerParams, usingClassic())) {
             LOGV2_DEBUG(20924,
                         2,
                         "Running query as sub-queries",
@@ -461,10 +460,13 @@ public:
             if (rankerResult.getStatus().code() != ErrorCodes::MaxNumberOfOrPlansExceeded) {
                 return rankerResult.getStatus();
             }
-            // We can reach this point only for rooted $or queries.
+            // We can reach this point only for rooted $or queries in automaticCE mode. The
+            // automaticCE mode ignores the server parameter
+            // 'internalQueryPlanOrChildrenIndependently' and hence we check here only the query
+            // properties.
             tassert(11260301,
                     "The subplanner can be called only for rooted $or queries",
-                    needsSubplanning);
+                    SubplanStage::canUseSubplanning(*_cq));
             uassert(ErrorCodes::IllegalOperation,
                     "Use of forcedPlanSolutionHash not permitted for rooted $or queries.",
                     !_cq->getForcedPlanSolutionHash());

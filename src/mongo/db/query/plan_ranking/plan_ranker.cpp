@@ -128,8 +128,8 @@ std::unique_ptr<WorkingSet> PlanRanker::extractWorkingSet() {
     return result;
 }
 
-bool delayOrSkipSubplanner(CanonicalQuery& query,
-                           QueryPlanRankerModeEnum planRankerMode,
+bool delayOrSkipSubplanner(const CanonicalQuery& query,
+                           const QueryPlannerParams& params,
                            bool isClassic) {
     // With CBR enabled there should be no changes to the SBE planning path.
     // TODO SERVER-117707: Decide what to do with this restriction.
@@ -137,7 +137,14 @@ bool delayOrSkipSubplanner(CanonicalQuery& query,
         return false;
     }
 
-    if (planRankerMode != QueryPlanRankerModeEnum::kAutomaticCE) {
+    if (params.planRankerMode != QueryPlanRankerModeEnum::kAutomaticCE) {
+        return false;
+    }
+
+    // Always use the subplanner for clustered collections to enable clustered index scans for $or
+    // branches.
+    // TODO SERVER-117766: Avoid subplanner for $or queries over clustered collections.
+    if (params.clusteredInfo) {
         return false;
     }
 

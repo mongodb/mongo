@@ -63,8 +63,8 @@ static constexpr size_t kMaxNumberOfOrPlans = 16;
  * know the number of plans. The subplanner can be completely skipped if the number of plans is
  * smaller than the kMaxNumberOrPlans.
  */
-bool delayOrSkipSubplanner(CanonicalQuery& query,
-                           QueryPlanRankerModeEnum planRankerMode,
+bool delayOrSkipSubplanner(const CanonicalQuery& query,
+                           const QueryPlannerParams& params,
                            bool isClassicEngine);
 
 /**
