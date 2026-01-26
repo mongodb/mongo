@@ -69,7 +69,8 @@ modifiers), the key being extended must already exist and also be a list.
 The generated matrix suites live in the `buildscripts/resmokeconfig/matrix_suites/generated_suites`
 directory. These files may be edited for local testing but must remain consistent with the mapping
 files. There is a task in the commit queue that enforces this. To generate a new version of these
-matrix suites, you may run `python3 ./buildscripts/resmoke.py generate-matrix-suites`. This command
+matrix suites, you may run
+`buildscripts/resmoke.py generate-matrix-suites && bazel run //:format`. This command
 will overwrite the current generated matrix suites on disk so make sure you do not have any unsaved
 changes to these files.
 

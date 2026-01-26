@@ -1643,6 +1643,37 @@ tasks:
             --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
             --runNoFeatureFlagTests
 
+  ## jstestfuzz run_commands fuzzer generating update runs ##
+  - <<: *jstestfuzz_template
+    name: query_shape_hash_stability_fuzzer_update_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "query_shape_hash_stability_fuzzer",
+        "non_deterministic",
+        "require_npm",
+        "random_name",
+        "multiversion",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          sharded_collections_query_shape_hash_stability_update_fuzzer_last_lts_new_old: last_lts
+          sharded_collections_query_shape_hash_stability_update_fuzzer_last_continuous_new_old: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 10
+          num_tasks: 40
+          npm_command: run-command-generator
+          jstestfuzz_vars: --commandType=update
+          resmoke_args: >-
+            --mongodSetParameters='{logComponentVerbosity: {command: 2}}'
+            --runNoFeatureFlagTests
+
   ## jstestfuzz standalone update generational fuzzer ##
   - <<: *jstestfuzz_template
     name: update_fuzzer_gen
