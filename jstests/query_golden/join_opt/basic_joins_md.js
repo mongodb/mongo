@@ -9,7 +9,7 @@
 import {section, subSection} from "jstests/libs/query/pretty_md.js";
 import {outputAggregationPlanAndResults} from "jstests/libs/query/golden_test_utils.js";
 import {runJoinTestAndCompare, joinTestWrapper} from "jstests/query_golden/libs/join_opt.js";
-import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
+import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();

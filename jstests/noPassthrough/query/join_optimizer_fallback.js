@@ -5,7 +5,7 @@
  *   requires_sbe
  * ]
  */
-import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
+import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
 let conn = MongoRunner.runMongod();
 

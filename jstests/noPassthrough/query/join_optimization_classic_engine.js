@@ -6,7 +6,7 @@
  *   requires_fcv_83,
  * ]
  */
-import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
+import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
 let conn = MongoRunner.runMongod();
 const db = conn.getDB("test");

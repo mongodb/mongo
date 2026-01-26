@@ -6,7 +6,7 @@
 //   requires_sbe
 // ]
 //
-import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
+import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function joinOptimizationRuns(db, baseColl, coll1, coll2) {

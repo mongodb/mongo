@@ -1,5 +1,8 @@
 //
 // Test that the cardinality estimates for two-table joins approximate reality
+// @tags: [
+//   requires_sbe
+// ]
 //
 
 import {checkJoinOptimizationStatus} from "jstests/libs/query/sbe_util.js";

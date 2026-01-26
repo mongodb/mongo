@@ -7,7 +7,7 @@
  * ]
  */
 
-import {joinOptUsed} from "jstests/libs/query/analyze_plan.js";
+import {joinOptUsed} from "jstests/libs/query/join_utils.js";
 
 function getUsageCount(indexName, collection) {
     let res = collection.aggregate([{$indexStats: {}}, {$match: {name: indexName}}]).toArray();
