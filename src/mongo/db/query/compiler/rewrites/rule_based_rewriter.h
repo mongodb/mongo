@@ -31,11 +31,17 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
-#include <queue>
+#include <limits>
 #include <string>
+#include <vector>
+
+#include <boost/container/small_vector.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -266,6 +272,9 @@ private:
             }
 
             const auto& rule = *_rules.pop();
+
+            // Must be acquired before precondition check, because precondition check can modify the
+            // number of rules.
             const size_t rulesBefore = _rules.size();
 
             LOGV2_DEBUG(11010013,

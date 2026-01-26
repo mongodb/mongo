@@ -30,6 +30,12 @@
 #include "mongo/db/pipeline/optimization/rule_based_rewriter.h"
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/server_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
+#include <array>
+#include <set>
 
 namespace mongo::rule_based_rewrites::pipeline {
 namespace {
@@ -77,8 +83,7 @@ public:
         }
     }
 
-    const std::vector<RuleRegistration>& getRules(ExpressionContext& expCtx,
-                                                  const DocumentSource& ds) const {
+    const std::vector<RuleRegistration>& getRules(const DocumentSource& ds) const {
         auto id = ds.getId();
         tassert(11641501, "Out of bounds id", id < _rules.size());
         return _rules[id];
@@ -122,7 +127,7 @@ PipelineRewriteContext::PipelineRewriteContext(
           _expCtx.getOperationContext()->getServiceContext())) {}
 
 void PipelineRewriteContext::enqueueRules() {
-    for (auto&& registration : _registry.getRules(_expCtx, current())) {
+    for (auto&& registration : _registry.getRules(current())) {
         // (Generic FCV reference): Fall back to kLastLTS when 'vCtx' is not initialized.
         bool enabled = !registration.featureFlag ||
             registration.featureFlag->checkWithContext(
