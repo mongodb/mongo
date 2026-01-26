@@ -803,6 +803,8 @@ tasks:
 
   - <<: *task_template
     name: external_auth_windows
+    # Disabled until windows-2016-dc is replaced with newer DC distro with Python 3.13 (see SERVER-117162)
+    disable: true
     tags: ["assigned_to_jira_team_server_security", "experimental"]
     commands:
       - func: "do setup"

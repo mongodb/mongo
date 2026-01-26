@@ -30,7 +30,7 @@ variables:
     burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
     content_type: application/zip
-    python: "/cygdrive/c/python/python310/python.exe"
+    python: "/cygdrive/c/python/python313/python.exe"
     ext: zip
     multiversion_platform: windows
     multiversion_edition: enterprise
@@ -66,7 +66,7 @@ buildvariants:
       content_type: application/zip
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=windows
-      python: "/cygdrive/c/python/python310/python.exe"
+      python: "/cygdrive/c/python/python313/python.exe"
       compile_variant: *windows-compile-required
       xlarge_distro_name: windows-2022-expandedports-xlarge
     tasks:
@@ -129,7 +129,7 @@ buildvariants:
       burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
       exe: ".exe"
       content_type: application/zip
-      python: "/cygdrive/c/python/python310/python.exe"
+      python: "/cygdrive/c/python/python313/python.exe"
       ext: zip
       multiversion_platform: windows
       multiversion_edition: enterprise

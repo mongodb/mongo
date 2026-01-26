@@ -45,6 +45,9 @@ filters:
   - "profiler.js":
     approvers:
       - 10gen/query-integration-observability
+  - "python.js":
+    approvers:
+      - 10gen/devprod-build
   - "run_with_retries.js":
     approvers:
       - 10gen/query-execution

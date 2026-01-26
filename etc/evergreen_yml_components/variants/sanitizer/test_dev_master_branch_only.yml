@@ -260,7 +260,7 @@ buildvariants:
         --opt=on
         --define=MONGO_DISTMOD=windows
         --build_enterprise=False
-      python: "/cygdrive/c/python/python310/python.exe"
+      python: "/cygdrive/c/python/python313/python.exe"
       ext: zip
       multiversion_platform: windows
       multiversion_edition: enterprise
@@ -306,7 +306,7 @@ buildvariants:
         --dbg=True
         --opt=off
         --define=MONGO_DISTMOD=windows
-      python: "/cygdrive/c/python/python310/python.exe"
+      python: "/cygdrive/c/python/python313/python.exe"
       ext: zip
       resmoke_jobs_max: 1
       test_flags: >-

@@ -1,5 +1,5 @@
 if [ "Windows_NT" = "$OS" ]; then
-    python='/cygdrive/c/python/python310/python.exe'
+    python='/cygdrive/c/python/python313/python.exe'
     echo "Executing on windows, setting python to ${python}"
 elif [ "$(uname)" = "Darwin" ]; then
     python='/Library/Frameworks/Python.Framework/Versions/3.13/bin/python3'
