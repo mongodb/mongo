@@ -960,31 +960,6 @@ TEST_F(ShardRoleTest, ConflictIsThrownWhenShardVersionUnshardedButStashedCatalog
     }
 }
 
-TEST_F(ShardRoleTest, NoExceptionIsThrownWhenShardVersionUnshardedButStashedIsEquivalentToLatest) {
-    operationContext()->setInMultiDocumentTransaction();
-    shard_role_details::getRecoveryUnit(operationContext())->preallocateSnapshot();
-    CollectionCatalog::stash(operationContext(), CollectionCatalog::get(operationContext()));
-
-    // Re-open the local catalog at its latest version, simulating a rollback event that has no
-    // effects on the metadata of the unsharded collection (although it does force the creation of a
-    // new instance for the "most recent collection snapshot" held by the catalog).
-    simulateReplicationRollbackEvent(operationContext());
-
-    // The acquisition of the unsharded collection is expected to succeed, even though the stashed
-    // snapshot points to a different object than the one kept by the catalog.
-    {
-        ScopedSetShardRole setShardRole(
-            operationContext(), nssUnshardedCollection1, ShardVersion::UNTRACKED(), boost::none);
-        auto acquisition = acquireCollectionOrView(
-            operationContext(),
-            CollectionOrViewAcquisitionRequest::fromOpCtx(
-                operationContext(), nssUnshardedCollection1, AcquisitionPrerequisites::kRead),
-            MODE_IX);
-
-        ASSERT_TRUE(acquisition.collectionExists());
-    }
-}
-
 // ---------------------------------------------------------------------------
 // MaybeLockFree
 TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeTakesLocksWhenInMultiDocTransaction) {
