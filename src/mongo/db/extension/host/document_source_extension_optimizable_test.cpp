@@ -2373,7 +2373,7 @@ TEST_F(DocumentSourceExtensionOptimizableTest,
 namespace {
 class ConfigurableViewPolicyTestAstNode : public sdk::AggStageAstNode {
 public:
-    static constexpr std::string kStageName = "$testStage";
+    static inline const std::string kStageName = "$testStage";
 
     ConfigurableViewPolicyTestAstNode(MongoExtensionFirstStageViewApplicationPolicy viewPolicy)
         : sdk::AggStageAstNode("$configurableViewPolicyAndBindingTest"), _viewPolicy(viewPolicy) {}
