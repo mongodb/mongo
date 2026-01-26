@@ -71,7 +71,21 @@ nodes[1].reconnect(nodes[0]);
 nodes[2].reconnect(nodes[0]);
 // Blocking stepdown process, so we can run reconfig while stepdown is pending
 blockHeartbeatStepdownFailPoint.wait();
-// Let auto reconfig continue while step down is blocked
+
+// Wait for the old primary to receive the term update from the new primary. The term update will
+// log either "Stepping down from primary, because a new term has begun" (log id 21402, if term
+// update triggered stepdown) or "Updated term but not triggering stepdown" (log id 21403, if
+// stepdown was already in progress due to losing majority).
+assert.soon(() => {
+    const logs = checkLog.getGlobalLog(primary).map((l) => JSON.parse(l));
+    return logs.some(
+        (entry) =>
+            entry.id === 21402 /* "Stepping down from primary, because a new term has begun"*/ ||
+            entry.id === 21403 /* "Updated term but not triggering stepdown" */,
+    );
+}, "Old primary should receive term update from new primary");
+
+// Let auto reconfig continue while step down is blocked.
 hangBeforeNewlyAddedRemovalFP.off();
 jsTestLog("Proceeding with newlyAdded field removal");
 // "Wait until the new primary successfully removes the 'newlyAdded' field for node 3. The old
