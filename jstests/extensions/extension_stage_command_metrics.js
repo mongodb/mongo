@@ -25,6 +25,7 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {after, before, beforeEach, describe, it} from "jstests/libs/mochalite.js";
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const collName = jsTestName();
 
@@ -95,7 +96,7 @@ describe("Extension stage command metrics", function () {
     });
 
     beforeEach(function () {
-        coll.drop();
+        assertDropCollection(db, collName);
         assert.commandWorked(coll.insert([{counter: 1}, {counter: 2}, {counter: 3}]));
     });
 
@@ -184,8 +185,8 @@ describe("Extension stage command metrics", function () {
         const nestedViewName = jsTestName() + "_nested_view";
 
         beforeEach(function () {
-            db[viewName].drop();
-            db[nestedViewName].drop();
+            assertDropCollection(db, viewName);
+            assertDropCollection(db, nestedViewName);
         });
 
         after(function () {
@@ -261,7 +262,7 @@ describe("Extension stage command metrics", function () {
         });
 
         beforeEach(function () {
-            otherColl.drop();
+            assertDropCollection(db, otherCollName);
             assert.commandWorked(otherColl.insert([{value: 10}, {value: 20}]));
         });
 
@@ -359,8 +360,8 @@ describe("Extension stage command metrics", function () {
         const otherCollName = jsTestName() + "_combined_other";
 
         beforeEach(function () {
-            db[viewName].drop();
-            db[otherCollName].drop();
+            assertDropCollection(db, viewName);
+            assertDropCollection(db, otherCollName);
             assert.commandWorked(db[otherCollName].insert([{x: 1}]));
         });
 
