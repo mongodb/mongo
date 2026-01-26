@@ -12,10 +12,10 @@ import {
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testGetSetAppExemptions = () => {
-    const kExemptions = ["foo", "bar", "baz"];
+    const kExemptions = {appNames: ["foo", "bar", "baz"]};
     const standalone = MongoRunner.runMongod({
         setParameter: {
-            ingressRequestRateLimiterApplicationExemptions: {appNames: kExemptions},
+            ingressRequestRateLimiterApplicationExemptions: kExemptions,
         },
     });
 
@@ -26,11 +26,11 @@ const testGetSetAppExemptions = () => {
     assert.eq(getParamRes.ingressRequestRateLimiterApplicationExemptions, kExemptions);
 
     // run getParameter with new exemptions to verify the exemptions can be updated correctly.
-    const newExemptions = ["newFoo", "newBar"];
+    const newExemptions = {appNames: ["newFoo", "newBar"]};
     assert.commandWorked(
         standalone.adminCommand({
             setParameter: 1,
-            ingressRequestRateLimiterApplicationExemptions: {appNames: newExemptions},
+            ingressRequestRateLimiterApplicationExemptions: newExemptions,
         }),
     );
 
