@@ -77,6 +77,24 @@ std::string makePreOrPostImageNotFoundErrorMessage(const repl::OplogEntry& oplog
 }
 
 /**
+ * Returns an error message that the pre- or post-image for the given findAndModify oplog entry
+ * and request is no longer available.
+ */
+std::string makePreOrPostImageNotFoundErrorMessage(
+    const write_ops::FindAndModifyCommandRequest& request,
+    const repl::OplogEntry& oplog,
+    const repl::OplogEntry& oplogWithCorrectLinks,
+    repl::RetryImageEnum imageType) {
+    return fmt::format(
+        "Retrying a findAndModify operation with session id {} and txn number {} after it "
+        "has been executed but the {} is no longer available: ",
+        oplogWithCorrectLinks.getSessionId()->toBSON().toString(),
+        *oplogWithCorrectLinks.getTxnNumber(),
+        repl::RetryImage_serializer(imageType),
+        redact(request.toBSON()).toString());
+}
+
+/**
  * Validates that the request is retry-compatible with the operation that occurred.
  * In the case of nested oplog entry where the correct links are in the top level
  * oplog, oplogWithCorrectLinks can be used to specify the outer oplog.
@@ -86,7 +104,14 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
                                        const repl::OplogEntry& oplogWithCorrectLinks) {
     auto opType = oplogEntry.getOpType();
     auto ts = oplogEntry.getTimestamp();
-    const bool needsRetryImage = oplogEntry.getNeedsRetryImage().has_value();
+    const auto needsRetryImage = oplogEntry.getNeedsRetryImage();
+
+    uassert(11731000,
+            "Expected oplog entry for a retryable findAndModify operation to have a session id",
+            oplogWithCorrectLinks.getSessionId());
+    uassert(11731001,
+            "Expected oplog entry for a retryable findAndModify operation to have a txn number",
+            oplogWithCorrectLinks.getTxnNumber());
 
     if (opType == repl::OpTypeEnum::kDelete) {
         uassert(
@@ -96,10 +121,13 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
                           << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
                           << ts.toString() << ", oplog: " << redact(oplogEntry.toBSONForLogging()),
             request.getRemove().value_or(false));
-        uassert(40607,
-                str::stream() << "No pre-image available for findAndModify retry request:"
-                              << redact(request.toBSON()),
-                oplogWithCorrectLinks.getPreImageOpTime() || needsRetryImage);
+
+        // Throw an error if the pre-image was not stored.
+        uassert(ErrorCodes::IncompleteTransactionHistory,
+                makePreOrPostImageNotFoundErrorMessage(
+                    request, oplogEntry, oplogWithCorrectLinks, repl::RetryImageEnum::kPreImage),
+                oplogWithCorrectLinks.getPreImageOpTime() ||
+                    (needsRetryImage == repl::RetryImageEnum::kPreImage));
     } else if (opType == repl::OpTypeEnum::kInsert) {
         uassert(
             40608,
@@ -118,21 +146,39 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
             opType == repl::OpTypeEnum::kUpdate);
 
         if (request.getNew().value_or(false)) {
+            // Throw an error if the pre-image was stored.
             uassert(40611,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON())
                                   << " wants the document after update returned, but only before "
                                      "update document is stored, oplogTs: "
                                   << ts.toString()
                                   << ", oplog: " << redact(oplogEntry.toBSONForLogging()),
-                    oplogWithCorrectLinks.getPostImageOpTime() || needsRetryImage);
+                    !oplogWithCorrectLinks.getPreImageOpTime() &&
+                        (needsRetryImage != repl::RetryImageEnum::kPreImage));
+            // Throw an error if the post-image was not stored.
+            uassert(
+                ErrorCodes::IncompleteTransactionHistory,
+                makePreOrPostImageNotFoundErrorMessage(
+                    request, oplogEntry, oplogWithCorrectLinks, repl::RetryImageEnum::kPostImage),
+                oplogWithCorrectLinks.getPostImageOpTime() ||
+                    (needsRetryImage == repl::RetryImageEnum::kPostImage));
         } else {
+            // Throw an error if the post-image was stored.
             uassert(40612,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON())
                                   << " wants the document before update returned, but only after "
                                      "update document is stored, oplogTs: "
                                   << ts.toString()
                                   << ", oplog: " << redact(oplogEntry.toBSONForLogging()),
-                    oplogWithCorrectLinks.getPreImageOpTime() || needsRetryImage);
+                    !oplogWithCorrectLinks.getPostImageOpTime() &&
+                        (needsRetryImage != repl::RetryImageEnum::kPostImage));
+            // Throw an error if the pre-image was not stored.
+            uassert(
+                ErrorCodes::IncompleteTransactionHistory,
+                makePreOrPostImageNotFoundErrorMessage(
+                    request, oplogEntry, oplogWithCorrectLinks, repl::RetryImageEnum::kPreImage),
+                oplogWithCorrectLinks.getPreImageOpTime() ||
+                    (needsRetryImage == repl::RetryImageEnum::kPreImage));
         }
     }
 }
@@ -217,9 +263,11 @@ BSONObj fetchPreOrPostImageFromOplog(OperationContext* opCtx, const repl::OplogE
     DBDirectClient client(opCtx);
     auto oplogDoc = client.findOne(NamespaceString::kRsOplogNamespace, opTime.asQuery());
 
-    uassert(40613,
-            str::stream() << "oplog no longer contains the complete write history of this "
-                             "transaction, log with opTime "
+    uassert(ErrorCodes::IncompleteTransactionHistory,
+            str::stream() << "The oplog no longer contains the "
+                          << (oplog.getPreImageOpTime() ? "pre-image" : "post-image")
+                          << " for this findAndModify "
+                             "operation, The oplog entry with opTime "
                           << opTime.toString() << " cannot be found",
             !oplogDoc.isEmpty());
 

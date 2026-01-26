@@ -130,6 +130,7 @@ function assertNumEntries(sessionOpts, {numSessionsCollEntries, numTransactionsC
             findAndModify: kCollName,
             query: {x: 0},
             update: {$inc: {y: 1}},
+            new: true,
             lsid: sessionOpts.childLsidForRetryableWrite,
             txnNumber: sessionOpts.childTxnNumber,
             autocommit: false,

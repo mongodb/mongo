@@ -597,8 +597,9 @@ TEST_F(FindAndModifyRetryability, AttemptingToRetryUpsertWithUpdateWithoutUpsert
                                       kNs,                        // namespace
                                       BSON("_id" << 1));          // o
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, insertOplog).toBSON(),
-                  AssertionException);
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, insertOplog).toBSON(),
+                       AssertionException,
+                       40608);
 }
 
 TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPostImageButOplogHasPre) {
@@ -622,8 +623,9 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPostImageButOplogHasPre) {
                                       imageOpTime,                   // pre-image optime
                                       boost::none);                  // post-image optime
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
-                  AssertionException);
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
+                       AssertionException,
+                       40611);
 }
 
 TEST_F(FindAndModifyRetryability, ErrorIfRequestIsUpdateButOplogIsDelete) {
@@ -647,8 +649,9 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsUpdateButOplogIsDelete) {
                                 imageOpTime,                // pre-image optime
                                 boost::none);               // post-image optime
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, oplog).toBSON(),
-                  AssertionException);
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, oplog).toBSON(),
+                       AssertionException,
+                       40606);
 }
 
 TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPreImageButOplogHasPost) {
@@ -672,8 +675,9 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPreImageButOplogHasPost) {
                                       boost::none,                   // pre-image optime
                                       imageOpTime);                  // post-image optime
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
-                  AssertionException);
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
+                       AssertionException,
+                       40612);
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPreImage_PreImageOpTime) {
@@ -856,8 +860,9 @@ TEST_F(FindAndModifyRetryability, UpdateRequestWithPreImageButNestedOpHasNoLinkS
                                       boost::none,                         // pre-image optime
                                       boost::none);                        // post-image optime
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
-                  AssertionException);
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPostImage_PostImageOpTime) {
@@ -1040,8 +1045,27 @@ TEST_F(FindAndModifyRetryability, UpdateRequestWithPostImageButNestedOpHasNoLink
                                       boost::none,                         // pre-image optime
                                       boost::none);                        // post-image optime
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
-                  AssertionException);
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
+}
+
+TEST_F(FindAndModifyRetryability, UpdateWithPreImageButOplogDoesNotExistShouldError) {
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+
+    repl::OpTime imageOpTime(Timestamp(120, 3), 1);
+    auto updateOplog = makeOplogEntry(repl::OpTime(),                // optime
+                                      repl::OpTypeEnum::kUpdate,     // op type
+                                      kNs,                           // namespace
+                                      BSON("_id" << 1 << "y" << 1),  // o
+                                      BSON("_id" << 1),              // o2
+                                      imageOpTime,                   // pre-image optime
+                                      boost::none);                  // post-image optime
+
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPostImageButOplogDoesNotExistShouldError) {
@@ -1058,8 +1082,50 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImageButOplogDoesNotExistShouldE
                                       boost::none,                   // pre-image optime
                                       imageOpTime);                  // post-image optime
 
-    ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
-                  AssertionException);
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
+}
+
+TEST_F(FindAndModifyRetryability, UpdateWithPreImageButImageDocDoesNotExistShouldError) {
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+
+    repl::OpTime imageOpTime(Timestamp(120, 3), 1);
+    auto updateOplog = makeOplogEntry(repl::OpTime(),                // optime
+                                      repl::OpTypeEnum::kUpdate,     // op type
+                                      kNs,                           // namespace
+                                      BSON("_id" << 1 << "y" << 1),  // o
+                                      BSON("_id" << 1),              // o2
+                                      boost::none,                   // pre-image optime
+                                      boost::none,                   // post-image optime
+                                      boost::none,                   // sessionInfo
+                                      repl::RetryImageEnum::kPreImage);
+
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
+                       AssertionException,
+                       5637601);
+}
+
+TEST_F(FindAndModifyRetryability, UpdateWithPostImageButImageDocDoesNotExistShouldError) {
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+    request.setNew(true);
+
+    repl::OpTime imageOpTime(Timestamp(120, 3), 1);
+    auto updateOplog = makeOplogEntry(repl::OpTime(),                // optime
+                                      repl::OpTypeEnum::kUpdate,     // op type
+                                      kNs,                           // namespace
+                                      BSON("_id" << 1 << "y" << 1),  // o
+                                      BSON("_id" << 1),              // o2
+                                      boost::none,                   // pre-image optime
+                                      boost::none,                   // post-image optime
+                                      boost::none,                   // sessionInfo
+                                      repl::RetryImageEnum::kPostImage);
+
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
+                       AssertionException,
+                       5637601);
 }
 
 TEST_F(FindAndModifyRetryability, BasicRemove_PreImageOpTime) {
@@ -1220,6 +1286,101 @@ TEST_F(FindAndModifyRetryability, AttemptingToRetryUpsertWithRemoveErrors) {
 
     ASSERT_THROWS(parseOplogEntryForFindAndModify(opCtx(), request, insertOplog).toBSON(),
                   AssertionException);
+}
+
+TEST_F(FindAndModifyRetryability, BasicRemoveOplogDoesNotExistShouldError) {
+    auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
+    request.setRemove(true);
+
+    repl::OpTime imageOpTime(Timestamp(120, 3), 1);
+    auto removeOplog = makeOplogEntry(repl::OpTime(),             // optime
+                                      repl::OpTypeEnum::kDelete,  // op type
+                                      kNs,                        // namespace
+                                      BSON("_id" << 20),          // o
+                                      boost::none,                // o2
+                                      imageOpTime,                // pre-image optime
+                                      boost::none);               // post-image optime
+
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, removeOplog).toBSON(),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
+}
+
+TEST_F(FindAndModifyRetryability, BasicRemoveImageDocDoesNotExistShouldError) {
+    auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
+    request.setRemove(true);
+
+    auto removeOplog = makeOplogEntry(repl::OpTime(),             // optime
+                                      repl::OpTypeEnum::kDelete,  // op type
+                                      kNs,                        // namespace
+                                      BSON("_id" << 20),          // o
+                                      boost::none,                // o2
+                                      boost::none,                // pre-image optime
+                                      boost::none,                // post-image optime
+                                      boost::none,                // sessionInfo
+                                      repl::RetryImageEnum::kPreImage);
+
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, removeOplog).toBSON(),
+                       AssertionException,
+                       5637601);
+}
+
+TEST_F(FindAndModifyRetryability, MissingSessionId) {
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+    request.setNew(true);
+
+    repl::OpTime imageOpTime(Timestamp(120, 3), 1);
+    auto noteOplog = makeOplogEntry(imageOpTime,                  // optime
+                                    repl::OpTypeEnum::kNoop,      // op type
+                                    kNs,                          // namespace
+                                    BSON("a" << 1 << "b" << 1));  // o
+
+    insertOplogEntry(noteOplog);
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setTxnNumber(0);
+    auto updateOplog = makeOplogEntry(repl::OpTime(),                // optime
+                                      repl::OpTypeEnum::kUpdate,     // op type
+                                      kNs,                           // namespace
+                                      BSON("_id" << 1 << "y" << 1),  // o
+                                      BSON("_id" << 1),              // o2
+                                      boost::none,                   // pre-image optime
+                                      imageOpTime,
+                                      sessionInfo);  // post-image optime
+
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
+                       AssertionException,
+                       11731000);
+}
+
+TEST_F(FindAndModifyRetryability, MissingTxnNumber) {
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+    request.setNew(true);
+
+    repl::OpTime imageOpTime(Timestamp(120, 3), 1);
+    auto noteOplog = makeOplogEntry(imageOpTime,                  // optime
+                                    repl::OpTypeEnum::kNoop,      // op type
+                                    kNs,                          // namespace
+                                    BSON("a" << 1 << "b" << 1));  // o
+
+    insertOplogEntry(noteOplog);
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    auto updateOplog = makeOplogEntry(repl::OpTime(),                // optime
+                                      repl::OpTypeEnum::kUpdate,     // op type
+                                      kNs,                           // namespace
+                                      BSON("_id" << 1 << "y" << 1),  // o
+                                      BSON("_id" << 1),              // o2
+                                      boost::none,                   // pre-image optime
+                                      imageOpTime,
+                                      sessionInfo);  // post-image optime
+
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON(),
+                       AssertionException,
+                       11731001);
 }
 
 }  // namespace
