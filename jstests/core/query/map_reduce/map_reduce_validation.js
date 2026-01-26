@@ -7,7 +7,7 @@
 //   does_not_support_stepdowns,
 //   uses_map_reduce_with_temp_collections,
 //   requires_scripting,
-//   # Time-series collections are views which don't support map-reduce
+//   # Time-series collections aren't supported in mapReduce.
 //   exclude_from_timeseries_crud_passthrough,
 // ]
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
