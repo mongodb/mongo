@@ -67,6 +67,14 @@ JoinCostEstimate::JoinCostEstimate(CardinalityEstimate numDocsProcessed,
     _totalCost = _localOpCost + leftCost.getTotalCost() + rightCost.getTotalCost();
 }
 
+JoinCostEstimate::JoinCostEstimate(CostEstimate totalCost)
+    : _numDocsProcessed(zeroCE),
+      _numDocsOutput(zeroCE),
+      _ioSeqNumPages(zeroCE),
+      _ioRandNumPages(zeroCE),
+      _localOpCost(zeroCost),
+      _totalCost(totalCost) {}
+
 std::string JoinCostEstimate::toString() const {
     return str::stream() << _totalCost.cost().v();
 }

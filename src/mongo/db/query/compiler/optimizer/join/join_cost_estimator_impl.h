@@ -37,7 +37,7 @@
 
 namespace mongo::join_ordering {
 
-class JoinCostEstimatorImpl : public JoinCostEstimator {
+class JoinCostEstimatorImpl final : public JoinCostEstimator {
 public:
     JoinCostEstimatorImpl(const JoinReorderingContext& jCtx,
                           JoinCardinalityEstimator& cardinalityEstimator,
@@ -56,6 +56,7 @@ public:
     JoinCostEstimate costINLJFragment(const JoinPlanNode& left,
                                       NodeId right,
                                       std::shared_ptr<const IndexCatalogEntry> indexProbe) override;
+    JoinCostEstimate costNLJFragment(const JoinPlanNode& left, const JoinPlanNode& right) override;
 
 private:
     double estimateDocSize(NodeSet subset) const;

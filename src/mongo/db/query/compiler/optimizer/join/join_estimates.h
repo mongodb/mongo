@@ -54,6 +54,8 @@ public:
                      JoinCostEstimate leftCost,
                      JoinCostEstimate rightCost);
 
+    JoinCostEstimate(CostEstimate totalCost);
+
     CardinalityEstimate getNumDocsProcessed() const {
         return _numDocsProcessed;
     }
@@ -87,6 +89,10 @@ public:
 
     auto operator<=>(const JoinCostEstimate& other) const {
         return _totalCost <=> other._totalCost;
+    }
+
+    JoinCostEstimate operator*(const CardinalityEstimate& cardEst) const {
+        return JoinCostEstimate(_totalCost * cardEst.toDouble());
     }
 
 private:

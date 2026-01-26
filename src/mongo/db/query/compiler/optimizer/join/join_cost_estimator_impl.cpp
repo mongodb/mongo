@@ -166,4 +166,31 @@ JoinCostEstimate JoinCostEstimatorImpl::costINLJFragment(const JoinPlanNode& lef
                             JoinCostEstimate(zeroCE, zeroCE, zeroCE, zeroCE));
 }
 
+JoinCostEstimate JoinCostEstimatorImpl::costNLJFragment(const JoinPlanNode& left,
+                                                        const JoinPlanNode& right) {
+    NodeSet leftSubset = getNodeBitset(left);
+    NodeSet rightSubset = getNodeBitset(right);
+
+    CardinalityEstimate leftDocs = _cardinalityEstimator.getOrEstimateSubsetCardinality(leftSubset);
+    CardinalityEstimate rightDocs =
+        _cardinalityEstimator.getOrEstimateSubsetCardinality(rightSubset);
+
+    CardinalityEstimate numDocsProcessed = leftDocs * rightDocs.toDouble();
+    CardinalityEstimate numDocsOutput =
+        _cardinalityEstimator.getOrEstimateSubsetCardinality(leftSubset | rightSubset);
+
+    // NLJ itself does not perform any IO.
+    CardinalityEstimate numSeqIOs = zeroCE;
+    CardinalityEstimate numRandIOs = zeroCE;
+
+    return JoinCostEstimate(numDocsProcessed,
+                            numDocsOutput,
+                            numSeqIOs,
+                            numRandIOs,
+                            getNodeCost(left),
+                            // The right side will be executed 'leftDocs' number of times.
+                            getNodeCost(right) * leftDocs);
+}
+
+
 }  // namespace mongo::join_ordering

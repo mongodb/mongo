@@ -76,6 +76,12 @@ public:
         const JoinPlanNode& left,
         NodeId right,
         std::shared_ptr<const IndexCatalogEntry> indexProbe) = 0;
+
+    /**
+     * Estiamte the cost of a nested loop join plan fragment.
+     */
+    virtual JoinCostEstimate costNLJFragment(const JoinPlanNode& left,
+                                             const JoinPlanNode& right) = 0;
 };
 
 }  // namespace mongo::join_ordering
