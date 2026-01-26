@@ -2691,10 +2691,7 @@ __layered_drain_ingest_tables(WT_SESSION_IMPL *session)
     WT_RET(__wt_spin_init(
       session, &conn->layered_drain_data.queue_lock, "layered drain work queue lock"));
 
-    __wt_spin_lock(session, &conn->layered_drain_data.queue_lock);
-    /* WiredTiger doesn't have sequentially consistent stores so we lock around this store. */
-    __wt_atomic_store_bool_relaxed(&conn->layered_drain_data.running, true);
-    __wt_spin_unlock(session, &conn->layered_drain_data.queue_lock);
+    __wt_atomic_store_bool(&conn->layered_drain_data.running, true);
 
     /* Open the internal session early so we can close it on error. */
     bool multithreaded = conn->layered_drain_data.thread_count > 1;
