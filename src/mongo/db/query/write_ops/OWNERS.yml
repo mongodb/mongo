@@ -23,3 +23,8 @@ filters:
     approvers:
       - 10gen/query-optimization
       - 10gen/query-execution-write-exec
+
+  # These files contain the logic for supporting retryable findAndModify.
+  - "find_and_modify_image_lookup_util*":
+    approvers:
+      - 10gen/server-replication-reviewers

@@ -34,10 +34,13 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/local_executor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/write_ops/write_ops_exec.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
@@ -48,6 +51,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -94,7 +98,15 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 BSONObj oField,
                                 boost::optional<BSONObj> o2Field = boost::none,
                                 boost::optional<repl::OpTime> preImageOpTime = boost::none,
-                                boost::optional<repl::OpTime> postImageOpTime = boost::none) {
+                                boost::optional<repl::OpTime> postImageOpTime = boost::none,
+                                boost::optional<OperationSessionInfo> sessionInfo = boost::none,
+                                boost::optional<repl::RetryImageEnum> imageType = boost::none) {
+    if (!sessionInfo) {
+        sessionInfo.emplace();
+        sessionInfo->setSessionId(makeLogicalSessionIdForTest());
+        sessionInfo->setTxnNumber(0);
+    }
+
     return {
         repl::DurableOplogEntry(opTime,                           // optime
                                 opType,                           // opType
@@ -106,7 +118,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 repl::OplogEntry::kOplogVersion,  // version
                                 oField,                           // o
                                 o2Field,                          // o2
-                                {},                               // sessionInfo
+                                *sessionInfo,                     // sessionInfo
                                 boost::none,                      // upsert
                                 Date_t(),                         // wall clock time
                                 {},                               // statement ids
@@ -115,7 +127,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 postImageOpTime,  // post-image optime
                                 boost::none,      // ShardId of resharding recipient
                                 boost::none,      // _id
-                                boost::none)};    // needsRetryImage
+                                imageType)};      // needsRetryImage
 }
 
 void setUpReplication(ServiceContext* svcCtx) {
@@ -142,6 +154,11 @@ write_ops::FindAndModifyCommandRequest makeFindAndModifyRequest(
         request.setUpdate(std::move(update));
     }
     return request;
+}
+
+void insertImageEntry(OperationContext* opCtx, const repl::ImageEntry& imageEntry) {
+    DBDirectClient client(opCtx);
+    client.insert(NamespaceString::kConfigImagesNamespace, imageEntry.toBSON());
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {
@@ -491,7 +508,17 @@ TEST_F(WriteOpsRetryability, PerformUnorderedInsertsContinuesAtBadDoc) {
     ASSERT_EQ(ErrorCodes::BSONObjectTooLarge, result.results[1].getStatus());
 }
 
-using FindAndModifyRetryability = MockReplCoordServerFixture;
+class FindAndModifyRetryability : public MockReplCoordServerFixture {
+public:
+    FindAndModifyRetryability() : MockReplCoordServerFixture() {}
+
+    void setUp() override {
+        MockReplCoordServerFixture::setUp();
+        setLocalExecutor(
+            opCtx()->getServiceContext(),
+            createLocalExecutor(opCtx()->getServiceContext(), "FindAndModifyRetryability"));
+    }
+};
 
 const NamespaceString kNs = NamespaceString::createNamespaceString_forTest("test.user");
 
@@ -649,7 +676,7 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPreImageButOplogHasPost) {
                   AssertionException);
 }
 
-TEST_F(FindAndModifyRetryability, UpdateWithPreImage) {
+TEST_F(FindAndModifyRetryability, UpdateWithPreImage_PreImageOpTime) {
     auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
     request.setNew(false);
@@ -674,6 +701,99 @@ TEST_F(FindAndModifyRetryability, UpdateWithPreImage) {
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
                                              << "value" << BSON("_id" << 1 << "z" << 1)),
                       result);
+}
+
+TEST_F(FindAndModifyRetryability, UpdateWithPreImage_NeedsRetryImage_ImageCollectionAllowed) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagDisallowFindAndModifyImageCollection", false);
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+    request.setNew(false);
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    sessionInfo.setTxnNumber(0);
+
+    repl::OpTime opTime(Timestamp(120, 3), 1);
+
+    // Set up a corresponding document in the image collection.
+    auto preImage = BSON("_id" << 1 << "z" << 1);
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(*sessionInfo.getSessionId());
+    imageEntry.setTxnNumber(*sessionInfo.getTxnNumber());
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+    insertImageEntry(opCtx(), imageEntry);
+
+    auto updateOplog = makeOplogEntry(opTime,                            // optime
+                                      repl::OpTypeEnum::kUpdate,         // op type
+                                      kNs,                               // namespace
+                                      BSON("_id" << 1 << "y" << 1),      // o
+                                      BSON("_id" << 1),                  // o2
+                                      boost::none,                       // pre-image optime
+                                      boost::none,                       // post-image optime
+                                      sessionInfo,                       // session info
+                                      repl::RetryImageEnum::kPreImage);  // needsRetryImage
+
+    auto result = parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON();
+    ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
+                                             << "value" << BSON("_id" << 1 << "z" << 1)),
+                      result);
+}
+
+TEST_F(FindAndModifyRetryability, UpdateWithPreImage_NeedsRetryImage_ImageCollectionDisallowed) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagDisallowFindAndModifyImageCollection", true);
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+    request.setNew(false);
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    sessionInfo.setTxnNumber(0);
+
+    repl::OpTime opTime(Timestamp(120, 3), 1);
+
+    // The image should be fetched from the snapshot rather than the image collection. Force the
+    // snapshot read to fail with SnapshotTooOld.
+    auto fp = globalFailPointRegistry().find("failCommand");
+    auto timesEnteredBefore = fp->setMode(
+        FailPoint::alwaysOn,
+        0,
+        BSON("errorCode" << ErrorCodes::SnapshotTooOld << "namespace" << kNs.toStringForErrorMsg()
+                         << "failCommands" << BSON_ARRAY("find") << "failInternalCommands" << true
+                         << "failLocalClients" << true));
+
+    // Still set up a corresponding document in the image collection but verify that we don't try to
+    // fetch from there.
+    auto preImage = BSON("_id" << 1 << "z" << 1);
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(*sessionInfo.getSessionId());
+    imageEntry.setTxnNumber(*sessionInfo.getTxnNumber());
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+    insertImageEntry(opCtx(), imageEntry);
+
+    auto updateOplog = makeOplogEntry(opTime,                            // optime
+                                      repl::OpTypeEnum::kUpdate,         // op type
+                                      kNs,                               // namespace
+                                      BSON("_id" << 1 << "y" << 1),      // o
+                                      BSON("_id" << 1),                  // o2
+                                      boost::none,                       // pre-image optime
+                                      boost::none,                       // post-image optime
+                                      sessionInfo,                       // session info
+                                      repl::RetryImageEnum::kPreImage);  // needsRetryImage
+
+    // The SnapshotTooOld error should get caught and an IncompleteTransactionHistory error should
+    // be returned.
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
+
+    auto timesEnteredAfter = fp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 1);
 }
 
 TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
@@ -740,7 +860,7 @@ TEST_F(FindAndModifyRetryability, UpdateRequestWithPreImageButNestedOpHasNoLinkS
                   AssertionException);
 }
 
-TEST_F(FindAndModifyRetryability, UpdateWithPostImage) {
+TEST_F(FindAndModifyRetryability, UpdateWithPostImage_PostImageOpTime) {
     auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
     request.setNew(true);
@@ -765,6 +885,99 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImage) {
     ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
                                              << "value" << BSON("a" << 1 << "b" << 1)),
                       result);
+}
+
+TEST_F(FindAndModifyRetryability, UpdateWithPostImage_NeedsRetryImage_ImageCollectionAllowed) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagDisallowFindAndModifyImageCollection", false);
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+    request.setNew(true);
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    sessionInfo.setTxnNumber(0);
+
+    repl::OpTime opTime(Timestamp(120, 3), 1);
+
+    // Set up a corresponding document in the image collection.
+    auto postImage = BSON("a" << 1 << "b" << 1);
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(*sessionInfo.getSessionId());
+    imageEntry.setTxnNumber(*sessionInfo.getTxnNumber());
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPostImage);
+    imageEntry.setImage(postImage);
+    insertImageEntry(opCtx(), imageEntry);
+
+    auto updateOplog = makeOplogEntry(opTime,                             // optime
+                                      repl::OpTypeEnum::kUpdate,          // op type
+                                      kNs,                                // namespace
+                                      BSON("_id" << 1 << "y" << 1),       // o
+                                      BSON("_id" << 1),                   // o2
+                                      boost::none,                        // pre-image optime
+                                      boost::none,                        // post-image optime
+                                      sessionInfo,                        // session info
+                                      repl::RetryImageEnum::kPostImage);  // needsRetryImage
+
+    auto result = parseOplogEntryForFindAndModify(opCtx(), request, updateOplog).toBSON();
+    ASSERT_BSONOBJ_EQ(BSON("lastErrorObject" << BSON("n" << 1 << "updatedExisting" << true)
+                                             << "value" << BSON("a" << 1 << "b" << 1)),
+                      result);
+}
+
+TEST_F(FindAndModifyRetryability, UpdateWithPostImage_NeedsRetryImage_ImageCollectionDisallowed) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagDisallowFindAndModifyImageCollection", true);
+    auto request = makeFindAndModifyRequest(
+        kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
+    request.setNew(true);
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    sessionInfo.setTxnNumber(0);
+
+    repl::OpTime opTime(Timestamp(120, 3), 1);
+
+    // The image should be fetched from the snapshot rather than the image collection. Force the
+    // snapshot read to fail with SnapshotTooOld.
+    auto fp = globalFailPointRegistry().find("failCommand");
+    auto timesEnteredBefore = fp->setMode(
+        FailPoint::alwaysOn,
+        0,
+        BSON("errorCode" << ErrorCodes::SnapshotTooOld << "namespace" << kNs.toStringForErrorMsg()
+                         << "failCommands" << BSON_ARRAY("find") << "failInternalCommands" << true
+                         << "failLocalClients" << true));
+
+    // Still set up a corresponding document in the image collection but verify that we don't try to
+    // fetch from there.
+    auto postImage = BSON("_id" << 1 << "z" << 1);
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(*sessionInfo.getSessionId());
+    imageEntry.setTxnNumber(*sessionInfo.getTxnNumber());
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPostImage);
+    imageEntry.setImage(postImage);
+    insertImageEntry(opCtx(), imageEntry);
+
+    auto updateOplog = makeOplogEntry(opTime,                             // optime
+                                      repl::OpTypeEnum::kUpdate,          // op type
+                                      kNs,                                // namespace
+                                      BSON("_id" << 1 << "y" << 1),       // o
+                                      BSON("_id" << 1),                   // o2
+                                      boost::none,                        // pre-image optime
+                                      boost::none,                        // post-image optime
+                                      sessionInfo,                        // session info
+                                      repl::RetryImageEnum::kPostImage);  // needsRetryImage
+
+    // The SnapshotTooOld error should get caught and an IncompleteTransactionHistory error should
+    // be returned.
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, updateOplog),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
+
+    auto timesEnteredAfter = fp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 1);
 }
 
 TEST_F(FindAndModifyRetryability, NestedUpdateWithPostImage) {
@@ -849,7 +1062,7 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImageButOplogDoesNotExistShouldE
                   AssertionException);
 }
 
-TEST_F(FindAndModifyRetryability, BasicRemove) {
+TEST_F(FindAndModifyRetryability, BasicRemove_PreImageOpTime) {
     auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
     request.setRemove(true);
 
@@ -873,6 +1086,97 @@ TEST_F(FindAndModifyRetryability, BasicRemove) {
     ASSERT_BSONOBJ_EQ(
         BSON("lastErrorObject" << BSON("n" << 1) << "value" << BSON("_id" << 20 << "a" << 1)),
         result);
+}
+
+TEST_F(FindAndModifyRetryability, BasicRemove_NeedsRetryImage_ImageCollectionAllowed) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagDisallowFindAndModifyImageCollection", false);
+    auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
+    request.setRemove(true);
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    sessionInfo.setTxnNumber(0);
+
+    repl::OpTime opTime(Timestamp(120, 3), 1);
+
+    // Set up a corresponding document in the image collection.
+    auto preImage = BSON("_id" << 20 << "a" << 1);
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(*sessionInfo.getSessionId());
+    imageEntry.setTxnNumber(*sessionInfo.getTxnNumber());
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+    insertImageEntry(opCtx(), imageEntry);
+
+    auto removeOplog = makeOplogEntry(opTime,                            // optime
+                                      repl::OpTypeEnum::kDelete,         // op type
+                                      kNs,                               // namespace
+                                      BSON("_id" << 20),                 // o
+                                      boost::none,                       // o2
+                                      boost::none,                       // pre-image optime
+                                      boost::none,                       // post-image optime
+                                      sessionInfo,                       // session info
+                                      repl::RetryImageEnum::kPreImage);  // needsRetryImage
+
+    auto result = parseOplogEntryForFindAndModify(opCtx(), request, removeOplog).toBSON();
+    ASSERT_BSONOBJ_EQ(
+        BSON("lastErrorObject" << BSON("n" << 1) << "value" << BSON("_id" << 20 << "a" << 1)),
+        result);
+}
+
+TEST_F(FindAndModifyRetryability, BasicRemove_NeedsRetryImage_ImageCollectionDisallowed) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagDisallowFindAndModifyImageCollection", true);
+    auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
+    request.setRemove(true);
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(makeLogicalSessionIdForTest());
+    sessionInfo.setTxnNumber(0);
+
+    repl::OpTime opTime(Timestamp(120, 3), 1);
+
+    // The image should be fetched from the snapshot rather than the image collection. Force the
+    // snapshot read to fail with SnapshotTooOld.
+    auto fp = globalFailPointRegistry().find("failCommand");
+    auto timesEnteredBefore = fp->setMode(
+        FailPoint::alwaysOn,
+        0,
+        BSON("errorCode" << ErrorCodes::SnapshotTooOld << "namespace" << kNs.toStringForErrorMsg()
+                         << "failCommands" << BSON_ARRAY("find") << "failInternalCommands" << true
+                         << "failLocalClients" << true));
+
+    // Still set up a corresponding document in the image collection but verify that we don't try to
+    // fetch from there.
+    auto preImage = BSON("_id" << 20 << "a" << 1);
+    repl::ImageEntry imageEntry;
+    imageEntry.set_id(*sessionInfo.getSessionId());
+    imageEntry.setTxnNumber(*sessionInfo.getTxnNumber());
+    imageEntry.setTs(opTime.getTimestamp());
+    imageEntry.setImageKind(repl::RetryImageEnum::kPreImage);
+    imageEntry.setImage(preImage);
+    insertImageEntry(opCtx(), imageEntry);
+
+    auto removeOplog = makeOplogEntry(opTime,                            // optime
+                                      repl::OpTypeEnum::kDelete,         // op type
+                                      kNs,                               // namespace
+                                      BSON("_id" << 20),                 // o
+                                      boost::none,                       // o2
+                                      boost::none,                       // pre-image optime
+                                      boost::none,                       // post-image optime
+                                      sessionInfo,                       // session info
+                                      repl::RetryImageEnum::kPreImage);  // needsRetryImage
+
+    // The SnapshotTooOld error should get caught and an IncompleteTransactionHistory error should
+    // be returned.
+    ASSERT_THROWS_CODE(parseOplogEntryForFindAndModify(opCtx(), request, removeOplog),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
+
+    auto timesEnteredAfter = fp->setMode(FailPoint::off);
+    ASSERT_EQ(timesEnteredAfter, timesEnteredBefore + 1);
 }
 
 TEST_F(FindAndModifyRetryability, NestedRemove) {

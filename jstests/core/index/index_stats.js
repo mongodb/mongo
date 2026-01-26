@@ -95,6 +95,8 @@ countA++;
 assert.eq(countA, getUsageCount("a_1"));
 assert.commandWorked(col.insert(res.value));
 
+const numIdIndexAccessesBefore = getUsageCount("_id_");
+
 //
 // Confirm $and operation ticks indexes for winning plan, but not rejected plans.
 //
@@ -116,7 +118,7 @@ if (countA + 1 == getUsageCount("a_1")) {
 }
 assert.eq(countA, getUsageCount("a_1"));
 assert.eq(countB, getUsageCount("b_1_c_1"));
-assert.eq(0, getUsageCount("_id_"));
+assert.eq(numIdIndexAccessesBefore, getUsageCount("_id_"));
 
 //
 // Confirm index stats tick on distinct().
