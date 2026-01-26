@@ -19,31 +19,31 @@ Level 7:
 Output plans (best plan 0):
 0.(0)[11111111] HJ
  -> left:
-    (0)[10000000][test.nss7] COLLSCAN
+    (9.77217)[10000000][test.nss7] COLLSCAN
  -> right:
     (0)[01111111] HJ
      -> left:
-        (0)[01000000][test.nss6] COLLSCAN
+        (8.29053)[01000000][test.nss6] COLLSCAN
      -> right:
         (0)[00111111] HJ
          -> left:
-            (0)[00100000][test.nss5] COLLSCAN
+            (7.00869)[00100000][test.nss5] COLLSCAN
          -> right:
             (0)[00011111] HJ
              -> left:
-                (0)[00010000][test.nss4] COLLSCAN
+                (5.52705)[00010000][test.nss4] COLLSCAN
              -> right:
                 (0)[00001111] HJ
                  -> left:
-                    (0)[00001000][test.nss3] COLLSCAN
+                    (4.24521)[00001000][test.nss3] COLLSCAN
                  -> right:
                     (0)[00000111] HJ
                      -> left:
-                        (0)[00000100][test.nss2] COLLSCAN
+                        (2.76358)[00000100][test.nss2] COLLSCAN
                      -> right:
                         (0)[00000011] HJ
                          -> left:
-                            (0)[00000001][test.nss0] COLLSCAN
+                            (0.0001)[00000001][test.nss0] COLLSCAN
                          -> right:
-                            (0)[00000010][test.nss1] COLLSCAN
+                            (1.48174)[00000010][test.nss1] COLLSCAN
 

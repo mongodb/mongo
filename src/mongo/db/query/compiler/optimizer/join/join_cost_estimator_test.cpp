@@ -62,11 +62,11 @@ public:
         NodeCardinalities collCards{
             makeCard(100'000), makeCard(2'000'000), makeCard(2'000'000), makeCard(1)};
 
-        cardEstimator =
+        auto cardEstimator =
             std::make_unique<FakeJoinCardinalityEstimator>(*jCtx, subsetCards, collCards);
 
         constexpr double docSizeBytes = 500;
-        catalogStats = {
+        jCtx->catStats = {
             .collStats = {
                 {smallNss,
                  CollectionStats{.allocatedDataPageBytes =
@@ -79,10 +79,9 @@ public:
                                      collCards[extremelySmallNodeId].toDouble() * docSizeBytes}},
             }};
 
-        planEnumCtx =
-            std::make_unique<PlanEnumeratorContext>(*jCtx, std::move(cardEstimator), false);
-        costEstimator = std::make_unique<JoinCostEstimatorImpl>(
-            *jCtx, *planEnumCtx->getJoinCardinalityEstimator(), catalogStats);
+        auto costEstimator = std::make_unique<JoinCostEstimatorImpl>(*jCtx, *cardEstimator);
+        planEnumCtx = std::make_unique<PlanEnumeratorContext>(
+            *jCtx, std::move(cardEstimator), std::move(costEstimator), false);
     }
 
     NamespaceString smallNss;
@@ -94,7 +93,6 @@ public:
     NodeId extremelySmallNodeId;
     boost::optional<JoinReorderingContext> jCtx;
     std::unique_ptr<PlanEnumeratorContext> planEnumCtx;
-    std::unique_ptr<JoinCardinalityEstimator> cardEstimator;
     CatalogStats catalogStats;
     std::unique_ptr<JoinCostEstimator> costEstimator;
     JoinCostEstimate zeroJoinCost =
@@ -105,26 +103,28 @@ public:
 };
 
 TEST_F(JoinCostEstimatorTest, LargerCollectionHasHigherCost) {
-    auto smallCost = costEstimator->costCollScanFragment(smallNodeId);
-    auto largeCost = costEstimator->costCollScanFragment(largeNodeId);
+    auto smallCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId);
+    auto largeCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(largeNodeId);
     ASSERT_GT(largeCost, smallCost);
 }
 
 TEST_F(JoinCostEstimatorTest, LargerIndexScanHasHigherCost) {
-    auto smallCost = costEstimator->costIndexScanFragment(smallNodeId);
-    auto largeCost = costEstimator->costIndexScanFragment(largeNodeId);
+    auto smallCost = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId);
+    auto largeCost = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(largeNodeId);
     ASSERT_GT(largeCost, smallCost);
 }
 
 TEST_F(JoinCostEstimatorTest, SelectiveIndexScanHasSmallerCostThanCollScan) {
-    auto collScanCost = costEstimator->costCollScanFragment(smallNodeId);
-    auto indexScanCost = costEstimator->costIndexScanFragment(smallNodeId);
+    auto collScanCost = planEnumCtx->getJoinCostEstimator()->costCollScanFragment(smallNodeId);
+    auto indexScanCost = planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(smallNodeId);
     ASSERT_GT(collScanCost, indexScanCost);
 }
 
 TEST_F(JoinCostEstimatorTest, UnselectiveIndexScanHasLargerCostThanCollScan) {
-    auto collScanCost = costEstimator->costCollScanFragment(unselectiveNodeId);
-    auto indexScanCost = costEstimator->costIndexScanFragment(unselectiveNodeId);
+    auto collScanCost =
+        planEnumCtx->getJoinCostEstimator()->costCollScanFragment(unselectiveNodeId);
+    auto indexScanCost =
+        planEnumCtx->getJoinCostEstimator()->costIndexScanFragment(unselectiveNodeId);
     ASSERT_GT(indexScanCost, collScanCost);
 }
 
@@ -139,8 +139,10 @@ TEST_F(JoinCostEstimatorTest, HashJoinLargerBuildSideHasLargerCost) {
     BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
     BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
     BaseNode unselectiveBaseNode{.nss = largeNss, .node = unselectiveNodeId, .cost = zeroJoinCost};
-    auto smallHjCost = costEstimator->costHashJoinFragment(smallBaseNode, unselectiveBaseNode);
-    auto largeHjCost = costEstimator->costHashJoinFragment(largeBaseNode, unselectiveBaseNode);
+    auto smallHjCost = planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(
+        smallBaseNode, unselectiveBaseNode);
+    auto largeHjCost = planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(
+        largeBaseNode, unselectiveBaseNode);
     ASSERT_GT(largeHjCost, smallHjCost);
 }
 
@@ -151,16 +153,20 @@ TEST_F(JoinCostEstimatorTest, HashJoinChildCostTakenIntoAccount) {
                                   .node = smallNodeId,
                                   .cost =
                                       JoinCostEstimate(makeCard(10), zeroCE, makeCard(10), zeroCE)};
-    auto smallHjCost = costEstimator->costHashJoinFragment(smallBaseNode, largeBaseNode);
-    auto largeHjCost = costEstimator->costHashJoinFragment(smallBaseNodeNonZero, largeBaseNode);
+    auto smallHjCost =
+        planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(smallBaseNode, largeBaseNode);
+    auto largeHjCost = planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(
+        smallBaseNodeNonZero, largeBaseNode);
     ASSERT_GT(largeHjCost, smallHjCost);
 }
 
 TEST_F(JoinCostEstimatorTest, INLJLargerLeftSideHasLargerCost) {
     BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
     BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
-    auto smallINLJCost = costEstimator->costINLJFragment(smallBaseNode, unselectiveNodeId, nullptr);
-    auto largeINLJCost = costEstimator->costINLJFragment(largeBaseNode, unselectiveNodeId, nullptr);
+    auto smallINLJCost = planEnumCtx->getJoinCostEstimator()->costINLJFragment(
+        smallBaseNode, unselectiveNodeId, nullptr);
+    auto largeINLJCost = planEnumCtx->getJoinCostEstimator()->costINLJFragment(
+        largeBaseNode, unselectiveNodeId, nullptr);
     ASSERT_GT(largeINLJCost, smallINLJCost);
 }
 
@@ -170,8 +176,10 @@ TEST_F(JoinCostEstimatorTest, INLJLowerCostThanHashJoin) {
     BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
     BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
 
-    auto inljCost = costEstimator->costINLJFragment(smallBaseNode, largeNodeId, nullptr);
-    auto hjCost = costEstimator->costHashJoinFragment(smallBaseNode, largeBaseNode);
+    auto inljCost =
+        planEnumCtx->getJoinCostEstimator()->costINLJFragment(smallBaseNode, largeNodeId, nullptr);
+    auto hjCost =
+        planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(smallBaseNode, largeBaseNode);
 
     ASSERT_LT(inljCost, hjCost);
 }
@@ -182,8 +190,10 @@ TEST_F(JoinCostEstimatorTest, INLJHigherCostThanHashJoin) {
     BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
     BaseNode unselectiveBaseNode{.nss = largeNss, .node = unselectiveNodeId, .cost = zeroJoinCost};
 
-    auto inljCost = costEstimator->costINLJFragment(smallBaseNode, unselectiveNodeId, nullptr);
-    auto hjCost = costEstimator->costHashJoinFragment(smallBaseNode, unselectiveBaseNode);
+    auto inljCost = planEnumCtx->getJoinCostEstimator()->costINLJFragment(
+        smallBaseNode, unselectiveNodeId, nullptr);
+    auto hjCost = planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(smallBaseNode,
+                                                                            unselectiveBaseNode);
 
     ASSERT_GT(inljCost, hjCost);
 }
@@ -191,8 +201,10 @@ TEST_F(JoinCostEstimatorTest, INLJHigherCostThanHashJoin) {
 TEST_F(JoinCostEstimatorTest, NLJHigherCostThanHashJoin) {
     BaseNode smallBaseNode{.nss = smallNss, .node = smallNodeId, .cost = zeroJoinCost};
     BaseNode largeBaseNode{.nss = largeNss, .node = largeNodeId, .cost = zeroJoinCost};
-    auto nljCost = costEstimator->costNLJFragment(smallBaseNode, largeBaseNode);
-    auto hjCost = costEstimator->costHashJoinFragment(smallBaseNode, largeBaseNode);
+    auto nljCost =
+        planEnumCtx->getJoinCostEstimator()->costNLJFragment(smallBaseNode, largeBaseNode);
+    auto hjCost =
+        planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(smallBaseNode, largeBaseNode);
     ASSERT_GT(nljCost, hjCost);
 }
 
@@ -201,8 +213,10 @@ TEST_F(JoinCostEstimatorTest, NLJLowerCostThanHashJoin) {
     // overhead of building the hash table is more than performing the additional IO.
     BaseNode extremelySmallNode{
         .nss = extremelySmallNss, .node = extremelySmallNodeId, .cost = zeroJoinCost};
-    auto nljCost = costEstimator->costNLJFragment(extremelySmallNode, extremelySmallNode);
-    auto hjCost = costEstimator->costHashJoinFragment(extremelySmallNode, extremelySmallNode);
+    auto nljCost = planEnumCtx->getJoinCostEstimator()->costNLJFragment(extremelySmallNode,
+                                                                        extremelySmallNode);
+    auto hjCost = planEnumCtx->getJoinCostEstimator()->costHashJoinFragment(extremelySmallNode,
+                                                                            extremelySmallNode);
     ASSERT_LT(nljCost, hjCost);
 }
 

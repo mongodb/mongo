@@ -82,6 +82,11 @@ public:
      */
     virtual JoinCostEstimate costNLJFragment(const JoinPlanNode& left,
                                              const JoinPlanNode& right) = 0;
+
+    /**
+     * Estimate the cost of a single table access path.
+     */
+    virtual JoinCostEstimate costBaseCollectionAccess(NodeId nodeId) = 0;
 };
 
 }  // namespace mongo::join_ordering

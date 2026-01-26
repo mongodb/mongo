@@ -32,9 +32,8 @@
 namespace mongo::join_ordering {
 
 JoinCostEstimatorImpl::JoinCostEstimatorImpl(const JoinReorderingContext& jCtx,
-                                             JoinCardinalityEstimator& cardinalityEstimator,
-                                             const CatalogStats& catalogStats)
-    : _jCtx(jCtx), _cardinalityEstimator(cardinalityEstimator), _catalogStats(catalogStats) {}
+                                             JoinCardinalityEstimator& cardinalityEstimator)
+    : _jCtx(jCtx), _cardinalityEstimator(cardinalityEstimator) {}
 
 JoinCostEstimate JoinCostEstimatorImpl::costCollScanFragment(NodeId nodeId) {
     // CollScan processes all documents in the collection
@@ -43,7 +42,7 @@ JoinCostEstimate JoinCostEstimatorImpl::costCollScanFragment(NodeId nodeId) {
     CardinalityEstimate numDocsOutput =
         _cardinalityEstimator.getOrEstimateSubsetCardinality(makeNodeSet(nodeId));
 
-    auto& collStats = _catalogStats.collStats.at(_jCtx.joinGraph.getNode(nodeId).collectionName);
+    auto& collStats = _jCtx.catStats.collStats.at(_jCtx.joinGraph.getNode(nodeId).collectionName);
     // CollScan performs roughly sequential reads from disk as it is stored in a WT b-tree. We
     // estimate the number of disk read by estimating the number of pages the collscan will read.
     // This is done by dividing the data size by the page size.
@@ -78,7 +77,7 @@ double JoinCostEstimatorImpl::estimateDocSize(NodeSet subset) const {
     double result = 0;
     for (auto nodeId : iterable(subset)) {
         auto& collStats =
-            _catalogStats.collStats.at(_jCtx.joinGraph.getNode(nodeId).collectionName);
+            _jCtx.catStats.collStats.at(_jCtx.joinGraph.getNode(nodeId).collectionName);
         auto avgDocSize = collStats.allocatedDataPageBytes /
             _cardinalityEstimator.getCollCardinality(nodeId).toDouble();
         result += avgDocSize;
@@ -192,5 +191,18 @@ JoinCostEstimate JoinCostEstimatorImpl::costNLJFragment(const JoinPlanNode& left
                             getNodeCost(right) * leftDocs);
 }
 
+JoinCostEstimate JoinCostEstimatorImpl::costBaseCollectionAccess(NodeId baseNode) {
+    const auto* cq = _jCtx.joinGraph.accessPathAt(baseNode);
+    tassert(11729100, "Expected an access path to exist", cq);
+    auto it = _jCtx.cbrCqQsns.find(cq);
+    tassert(11729101, "Expected a QSN to exist for this access path", it != _jCtx.cbrCqQsns.end());
+    // TODO SERVER-117618: Stricter tree-shape validation.
+    if (it->second->hasNode(STAGE_COLLSCAN)) {
+        return costCollScanFragment(baseNode);
+    } else if (it->second->hasNode(STAGE_IXSCAN)) {
+        return costIndexScanFragment(baseNode);
+    }
+    MONGO_UNIMPLEMENTED_TASSERT(11729102);
+}
 
 }  // namespace mongo::join_ordering

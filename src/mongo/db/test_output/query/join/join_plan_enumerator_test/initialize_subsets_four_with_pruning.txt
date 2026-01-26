@@ -16,11 +16,11 @@ Output plans (best plan 0):
      -> left:
         (0)[0011] HJ
          -> left:
-            (0)[0001][test.nss0] COLLSCAN
+            (0.0001)[0001][test.nss0] COLLSCAN
          -> right:
-            (0)[0010][test.nss1] COLLSCAN
+            (1.48174)[0010][test.nss1] COLLSCAN
      -> right:
-        (0)[0100][test.nss2] COLLSCAN
+        (2.76358)[0100][test.nss2] COLLSCAN
  -> right:
-    (0)[1000][test.nss3] COLLSCAN
+    (4.24521)[1000][test.nss3] COLLSCAN
 

@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
-#include "mongo/db/query/compiler/optimizer/join/catalog_stats.h"
 #include "mongo/db/query/compiler/optimizer/join/join_cost_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_estimates.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
@@ -40,8 +39,7 @@ namespace mongo::join_ordering {
 class JoinCostEstimatorImpl final : public JoinCostEstimator {
 public:
     JoinCostEstimatorImpl(const JoinReorderingContext& jCtx,
-                          JoinCardinalityEstimator& cardinalityEstimator,
-                          const CatalogStats& catalogStats);
+                          JoinCardinalityEstimator& cardinalityEstimator);
 
     // Delete copy and move operations to prevent issues with copying reference members.
     JoinCostEstimatorImpl(const JoinCostEstimatorImpl&) = delete;
@@ -51,6 +49,7 @@ public:
 
     JoinCostEstimate costCollScanFragment(NodeId nodeId) override;
     JoinCostEstimate costIndexScanFragment(NodeId nodeId) override;
+    JoinCostEstimate costBaseCollectionAccess(NodeId nodeId) override;
     JoinCostEstimate costHashJoinFragment(const JoinPlanNode& left,
                                           const JoinPlanNode& right) override;
     JoinCostEstimate costINLJFragment(const JoinPlanNode& left,
@@ -63,7 +62,6 @@ private:
 
     const JoinReorderingContext& _jCtx;
     JoinCardinalityEstimator& _cardinalityEstimator;
-    const CatalogStats& _catalogStats;
 };
 
 }  // namespace mongo::join_ordering

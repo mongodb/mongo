@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
+#include "mongo/db/query/compiler/optimizer/join/join_cost_estimator.h"
 #include "mongo/db/query/compiler/optimizer/join/join_plan.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/util/modules.h"
@@ -49,9 +50,11 @@ class PlanEnumeratorContext {
 public:
     PlanEnumeratorContext(const JoinReorderingContext& ctx,
                           std::unique_ptr<JoinCardinalityEstimator> estimator,
+                          std::unique_ptr<JoinCostEstimator> coster,
                           bool enableHJOrderPruning)
         : _ctx{ctx},
           _estimator(std::move(estimator)),
+          _coster(std::move(coster)),
           _enableHJOrderPruning(enableHJOrderPruning) {}
 
     // Delete copy and move operations to prevent issues with copying '_joinGraph'.
@@ -84,6 +87,10 @@ public:
 
     JoinCardinalityEstimator* getJoinCardinalityEstimator() const {
         return _estimator.get();
+    }
+
+    JoinCostEstimator* getJoinCostEstimator() const {
+        return _coster.get();
     }
 
     /**
@@ -126,6 +133,7 @@ private:
 
     const JoinReorderingContext& _ctx;
     std::unique_ptr<JoinCardinalityEstimator> _estimator;
+    std::unique_ptr<JoinCostEstimator> _coster;
     const bool _enableHJOrderPruning;
 
     // Hold intermediate results of the enumeration algorithm. The index into the outer vector

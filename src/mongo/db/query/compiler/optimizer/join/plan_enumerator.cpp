@@ -186,9 +186,8 @@ void PlanEnumeratorContext::enumerateJoinSubsets(PlanTreeShape type) {
         const auto* cq = _ctx.joinGraph.getNode((NodeId)i).accessPath.get();
         const auto* qsn = _ctx.cbrCqQsns.at(cq).get();
         _joinSubsets[kBaseLevel].push_back(JoinSubset(NodeSet{}.set(i)));
-        // TODO SERVER-117291: actually get cost.
-        _joinSubsets[kBaseLevel].back().plans = {
-            _registry.registerBaseNode((NodeId)i, qsn, cq->nss(), getZeroCE())};
+        _joinSubsets[kBaseLevel].back().plans = {_registry.registerBaseNode(
+            (NodeId)i, qsn, cq->nss(), _coster->costBaseCollectionAccess((NodeId)i))};
     }
 
     // Initialize the rest of the joinSubsets.

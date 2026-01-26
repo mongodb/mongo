@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 #include "mongo/db/query/compiler/optimizer/join/cardinality_estimator.h"
+#include "mongo/db/query/compiler/optimizer/join/join_cost_estimator_impl.h"
 #include "mongo/db/query/compiler/optimizer/join/join_reordering_context.h"
 #include "mongo/db/query/compiler/optimizer/join/reorder_joins.h"
 #include "mongo/db/query/compiler/optimizer/join/single_table_access.h"
@@ -156,6 +157,22 @@ AvailableIndexes extractINLJEligibleIndexes(const QuerySolutionMap& solns,
     return perCollIdxs;
 }
 
+CatalogStats createCatalogStats(OperationContext* opCtx, const MultipleCollectionAccessor& mca) {
+    auto& ru = *shard_role_details::getRecoveryUnit(opCtx);
+    CatalogStats catStats;
+    mca.forEach([&catStats, &ru](const CollectionPtr& coll) {
+        auto* recordStore = coll->getRecordStore();
+        double allocatedDataPageBytes =
+            recordStore->storageSize(ru) - recordStore->freeStorageSize(ru);
+        // TODO SERVER-117620: set .pageSizeBytes.
+        catStats.collStats.emplace(coll->ns(),
+                                   CollectionStats{
+                                       .allocatedDataPageBytes = allocatedDataPageBytes,
+                                   });
+    });
+    return catStats;
+}
+
 }  // namespace
 
 /**
@@ -228,17 +245,20 @@ StatusWith<JoinReorderedExecutorResult> getJoinReorderedExecutor(
                               .resolvedPaths = model.resolvedPaths,
                               .cbrCqQsns = std::move(solns),
                               .perCollIdxs = std::move(indexesPerColl),
+                              .catStats = createCatalogStats(opCtx, mca),
                               .explain = expCtx->getExplain().has_value()};
 
     ReorderedJoinSolution reordered;
     switch (qkc.getJoinReorderMode()) {
         case JoinReorderModeEnum::kBottomUp: {
             // Optimize join order using bottom-up Sellinger-style algorithm.
-            auto estimator =
+            auto cardEstimator =
                 std::make_unique<JoinCardinalityEstimator>(JoinCardinalityEstimator::make(
                     ctx, swAccessPlans.getValue().estimate, samplingEstimators));
+            auto costEstimator = std::make_unique<JoinCostEstimatorImpl>(ctx, *cardEstimator);
             reordered = constructSolutionBottomUp(ctx,
-                                                  std::move(estimator),
+                                                  std::move(cardEstimator),
+                                                  std::move(costEstimator),
                                                   getPlanTreeShape(qkc.getJoinPlanTreeShape()),
                                                   qkc.getEnableJoinEnumerationHJOrderPruning());
             break;

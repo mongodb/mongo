@@ -36,7 +36,6 @@
 #include "mongo/db/query/compiler/optimizer/join/plan_enumerator_helpers.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/random_utils.h"
-#include "mongo/db/shard_role/shard_catalog/index_catalog_entry.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -420,9 +419,10 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
 
 ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx,
                                                 std::unique_ptr<JoinCardinalityEstimator> estimator,
+                                                std::unique_ptr<JoinCostEstimator> coster,
                                                 PlanTreeShape shape,
                                                 bool enableHJOrderPruning) {
-    PlanEnumeratorContext peCtx(ctx, std::move(estimator), enableHJOrderPruning);
+    PlanEnumeratorContext peCtx(ctx, std::move(estimator), std::move(coster), enableHJOrderPruning);
 
     peCtx.enumerateJoinSubsets(shape);
     auto bestPlanNodeId = peCtx.getBestFinalPlan();

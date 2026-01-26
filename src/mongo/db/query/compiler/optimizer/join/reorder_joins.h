@@ -60,6 +60,7 @@ ReorderedJoinSolution constructSolutionWithRandomOrder(const JoinReorderingConte
  */
 ReorderedJoinSolution constructSolutionBottomUp(const JoinReorderingContext& ctx,
                                                 std::unique_ptr<JoinCardinalityEstimator> estimator,
+                                                std::unique_ptr<JoinCostEstimator> coster,
                                                 PlanTreeShape shape,
                                                 bool enableHJOrderPruning);
 
