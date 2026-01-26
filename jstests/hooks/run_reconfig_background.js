@@ -76,10 +76,10 @@ function getVotingReconfig(config, primaryIndex, numNodes) {
 }
 
 /**
- * This reconfig command randomly chooses to add or remove a priority port from a single node. If
- * there are no nodes currently configured with a priority port, it will add one. If all nodes
- * are currently configured with a priority port, we will remove one. Otherwise, we will randomly
- * choose to add or remove.
+ * This reconfig command randomly chooses to add or remove priority ports. If there are no nodes
+ * currently configured with a priority port, it will add. If all nodes are currently configured
+ * with a priority port, we will remove. Otherwise, we will randomly choose to add or remove. We
+ * will additionally randomly choose whether to reconfig one by one or in bulk.
  *
  * Changing this continuously in the background ensures that the replica set maintains connectivity
  * during these changes.
@@ -95,16 +95,46 @@ function getPriorityPortReconfig(config, priorityPorts) {
         }
     }
 
-    let addPriorityPortTo = (memberIndex, config, priorityPorts) => {
-        jsTest.log.info(`Running reconfig to add priority port to node at index ${memberIndex}`);
-        config.members[memberIndex].priorityPort = priorityPorts[memberIndex];
+    let addPriorityPortTo = (memberIndexes, config, priorityPorts) => {
+        // Randomly choose between bulk or one-by-one reconfig. We slightly favor one by one since
+        // this is what cloud will do.
+        const doBulk = Random.rand() > 0.7;
+
+        if (doBulk) {
+            jsTest.log.info(
+                `Running bulk reconfig to add priority ports to all nodes without it (${memberIndexes.length} nodes)`,
+            );
+            for (let memberIndex of memberIndexes) {
+                config.members[memberIndex].priorityPort = priorityPorts[memberIndex];
+            }
+        } else {
+            const memberIndex = memberIndexes[Random.randInt(memberIndexes.length)];
+            jsTest.log.info(`Running reconfig to add priority port to node at index ${memberIndex}`);
+            config.members[memberIndex].priorityPort = priorityPorts[memberIndex];
+        }
+
         config.version++;
         return config;
     };
 
-    let removePriorityPortFrom = (memberIndex, config) => {
-        jsTest.log.info(`Running reconfig to remove priority port from node at index ${memberIndex}`);
-        delete config.members[memberIndex].priorityPort;
+    let removePriorityPortFrom = (memberIndexes, config) => {
+        // Randomly choose between bulk or one-by-one reconfig. We slightly favor one by one since
+        // this is what cloud will do.
+        const doBulk = Random.rand() > 0.7;
+
+        if (doBulk) {
+            jsTest.log.info(
+                `Running bulk reconfig to remove priority ports from all nodes with it (${memberIndexes.length} nodes)`,
+            );
+            for (let memberIndex of memberIndexes) {
+                delete config.members[memberIndex].priorityPort;
+            }
+        } else {
+            const memberIndex = memberIndexes[Random.randInt(memberIndexes.length)];
+            jsTest.log.info(`Running reconfig to remove priority port from node at index ${memberIndex}`);
+            delete config.members[memberIndex].priorityPort;
+        }
+
         config.version++;
         return config;
     };
@@ -112,24 +142,16 @@ function getPriorityPortReconfig(config, priorityPorts) {
     // If no members have the priority port, add it. If all nodes have the priority port,
     // remove it. Otherwise, we choose randomly.
     if (memberIndexesWith.length == 0) {
-        return addPriorityPortTo(
-            memberIndexesWithout[Random.randInt(memberIndexesWithout.length)],
-            config,
-            priorityPorts,
-        );
+        return addPriorityPortTo(memberIndexesWithout, config, priorityPorts);
     } else if (memberIndexesWithout.length == 0) {
-        return removePriorityPortFrom(memberIndexesWith[Random.randInt(memberIndexesWith.length)], config);
+        return removePriorityPortFrom(memberIndexesWith, config);
     } else {
         // Otherwise, choose randomly.
         let shouldAdd = Random.rand() > 0.5;
         if (shouldAdd) {
-            return addPriorityPortTo(
-                memberIndexesWithout[Random.randInt(memberIndexesWithout.length)],
-                config,
-                priorityPorts,
-            );
+            return addPriorityPortTo(memberIndexesWithout, config, priorityPorts);
         } else {
-            return removePriorityPortFrom(memberIndexesWith[Random.randInt(memberIndexesWith.length)], config);
+            return removePriorityPortFrom(memberIndexesWith, config);
         }
     }
 }
