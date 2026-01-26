@@ -31,12 +31,15 @@
 
 #include "mongo/db/mirror_maestro_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 #include <chrono>
 #include <cmath>
 #include <utility>
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(disableTargetedMirroring);
 
 MirroringSampler::SamplingParameters::SamplingParameters(const double generalRatio_,
                                                          const double targetedRatio_,
@@ -100,7 +103,8 @@ MirroringSampler::MirroringMode MirroringSampler::getMirrorMode(
         return mode;
     }
 
-    if (params.value < static_cast<int>(params.max * params.targetedRatio)) {
+    if (!disableTargetedMirroring.shouldFail() &&
+        params.value < static_cast<int>(params.max * params.targetedRatio)) {
         mode.targetedEnabled = true;
     }
 
