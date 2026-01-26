@@ -703,8 +703,13 @@ void promoteStoredSourceOrAddIdLookup(
         // an idLookup to go get it.
     } else {
         // idLookup must always be immediately after the first stage in the desugared pipeline
-        auto idLookupStage =
-            make_intrusive<DocumentSourceInternalSearchIdLookUp>(expCtx, limit, view);
+        std::unique_ptr<Pipeline> viewPipeline;
+        if (view) {
+            viewPipeline = pipeline_factory::makePipeline(
+                view->getEffectivePipeline(), expCtx, pipeline_factory::kOptionsMinimal);
+        }
+        auto idLookupStage = make_intrusive<DocumentSourceInternalSearchIdLookUp>(
+            expCtx, limit, std::move(viewPipeline));
         desugaredPipeline.insert(std::next(desugaredPipeline.begin()), idLookupStage);
 
         // Check if the first stage in the pipeline is a mongotRemoteStage (only exists for

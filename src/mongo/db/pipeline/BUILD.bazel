@@ -1261,6 +1261,7 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/search:document_source_search_meta_test.cpp",
         "//src/mongo/db/pipeline/search:document_source_search_test.cpp",
         "//src/mongo/db/pipeline/search:document_source_vector_search_test.cpp",
+        "//src/mongo/db/pipeline/search:lite_parsed_internal_search_id_lookup_test.cpp",
         "//src/mongo/db/pipeline/visitors:docs_needed_bounds_test.cpp",
         "//src/mongo/db/pipeline/visitors:document_source_visitor_docs_needed_bounds_test.cpp",
         "//src/mongo/db/pipeline/visitors:document_source_walker_test.cpp",

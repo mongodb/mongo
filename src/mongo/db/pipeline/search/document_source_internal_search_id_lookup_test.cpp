@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -46,8 +47,13 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
+#include "mongo/db/pipeline/search/lite_parsed_internal_search_id_lookup.h"
+#include "mongo/db/pipeline/stage_params_to_document_source_registry.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
@@ -552,6 +558,193 @@ TEST_F(InternalSearchIdLookupOrphanFilteringTest, ShouldFilterOrphanDocuments) {
 
     // Clearing collections as it needs to be destroyed before the stasher.
     collections.clear();
+}
+
+// Helper namespace strings for ViewInfo tests.
+const NamespaceString kViewNss =
+    NamespaceString::createNamespaceString_forTest("unittests.view_test");
+const NamespaceString kResolvedNss =
+    NamespaceString::createNamespaceString_forTest("unittests.resolved_coll");
+
+/**
+ * Integration test verifying the full flow from LiteParsed -> StageParams -> DocumentSource.
+ */
+class InternalSearchIdLookupBuildDocumentSourceTest : public AggregationContextFixture {};
+
+const auto kExplain = SerializationOptions{
+    .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
+
+TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
+       BuildDocumentSourceFromLiteParsedWithViewPipeline) {
+    BSONObj spec = BSON("$_internalSearchIdLookup" << BSON("limit" << 50));
+    auto liteParsed =
+        LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
+
+    // Simulate what handleView() does: invoke the ViewPolicy callback with a view pipeline.
+    std::vector<BSONObj> viewPipeline = {BSON("$match" << BSON("active" << true)),
+                                         BSON("$sort" << BSON("createdAt" << -1))};
+    ViewInfo viewInfo(kViewNss, kResolvedNss, viewPipeline);
+
+    auto viewPolicy = liteParsed->getViewPolicy();
+    viewPolicy.callback(viewInfo, "$_internalSearchIdLookup");
+
+    // Now use the registry to build the DocumentSource from the LiteParsed.
+    auto docSources = buildDocumentSource(*liteParsed, getExpCtx());
+
+    ASSERT_EQ(docSources.size(), 1U);
+    auto* idLookup = dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(docSources.front().get());
+    ASSERT_TRUE(idLookup != nullptr);
+
+    // Verify that the stage was created with the correct limit.
+    auto serialized = idLookup->serialize(kExplain);
+    ASSERT_TRUE(serialized.isObject());
+    auto serializedObj = serialized.getDocument().toBson();
+    ASSERT_EQ(serializedObj["$_internalSearchIdLookup"]["limit"].safeNumberLong(), 50);
+
+    // Verify that the stage was created with the correct view pipeline.
+    ASSERT_EQ(serializedObj["$_internalSearchIdLookup"]["subPipeline"].Array().size(), 3);
+    // $match added by idLookup.
+    ASSERT_EQ(serializedObj["$_internalSearchIdLookup"]["subPipeline"]
+                  .Array()[0]
+                  .Obj()
+                  .firstElementFieldNameStringData(),
+              "$match");
+    // $match from the view pipeline.
+    ASSERT_EQ(serializedObj["$_internalSearchIdLookup"]["subPipeline"]
+                  .Array()[1]
+                  .Obj()
+                  .firstElementFieldNameStringData(),
+              "$match");
+    // $sort from the view pipeline.
+    ASSERT_EQ(serializedObj["$_internalSearchIdLookup"]["subPipeline"]
+                  .Array()[2]
+                  .Obj()
+                  .firstElementFieldNameStringData(),
+              "$sort");
+}
+
+TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
+       BuildDocumentSourceFromLiteParsedWithoutViewPipeline) {
+    BSONObj spec = BSON("$_internalSearchIdLookup" << BSON("limit" << 25));
+    auto liteParsed =
+        LiteParsedInternalSearchIdLookUp::parse(kTestNss, spec.firstElement(), LiteParserOptions{});
+
+    // Don't invoke the ViewPolicy callback.
+
+    auto docSources = buildDocumentSource(*liteParsed, getExpCtx());
+
+    ASSERT_EQ(docSources.size(), 1U);
+    auto* idLookup = dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(docSources.front().get());
+    ASSERT_TRUE(idLookup != nullptr);
+
+    // Verify the limit is correct.
+    auto serialized = idLookup->serialize(kExplain);
+    ASSERT_TRUE(serialized.isObject());
+    auto serializedObj = serialized.getDocument().toBson();
+    ASSERT_EQ(serializedObj["$_internalSearchIdLookup"]["limit"].safeNumberLong(), 25);
+
+    // Verify that the stage was created with no view pipeline.
+    ASSERT_EQ(serializedObj["$_internalSearchIdLookup"]["subPipeline"].Array().size(), 1);
+    // $match added by idLookup.
+    ASSERT_EQ(serializedObj["$_internalSearchIdLookup"]["subPipeline"]
+                  .Array()[0]
+                  .Obj()
+                  .firstElementFieldNameStringData(),
+              "$match");
+}
+
+TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
+       HandleViewAndParseFromLiteParsedWithViewPipeline) {
+    // Create a user pipeline with $_internalSearchIdLookup as the first stage and a $project after.
+    std::vector<BSONObj> userStages = {BSON("$_internalSearchIdLookup" << BSON("limit" << 100)),
+                                       BSON("$project" << BSON("color" << 1 << "_id" << 1))};
+    LiteParsedPipeline liteParsedPipeline(kTestNss, userStages);
+
+    // Create a view with a $match and $addFields stage.
+    std::vector<BSONObj> viewStages = {BSON("$match" << BSON("status" << "active")),
+                                       BSON("$addFields" << BSON("timestamp" << "$$NOW"))};
+    ViewInfo viewInfo(kViewNss, kResolvedNss, viewStages);
+
+    // Call handleView() on the full pipeline, simulating what runAggregate() does.
+    liteParsedPipeline.handleView(viewInfo);
+
+    // Since $_internalSearchIdLookup has kDoNothing policy, the view pipeline should NOT be
+    // prepended. The LiteParsedPipeline should still have 2 stages, not 4.
+    ASSERT_EQ(liteParsedPipeline.getStages().size(), 2U);
+    ASSERT_EQ(liteParsedPipeline.getStages()[0]->getParseTimeName(), "$_internalSearchIdLookup");
+    ASSERT_EQ(liteParsedPipeline.getStages()[1]->getParseTimeName(), "$project");
+
+    // Parse the full pipeline using Pipeline::parseFromLiteParsed().
+    auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, getExpCtx());
+    ASSERT_TRUE(pipeline != nullptr);
+
+    // The pipeline should have 2 document sources.
+    const auto& sources = pipeline->getSources();
+    ASSERT_EQ(sources.size(), 2U);
+
+    // First stage should be $_internalSearchIdLookup with the view pipeline stored internally.
+    auto* idLookup = dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(sources.front().get());
+    ASSERT_TRUE(idLookup != nullptr);
+
+    auto serialized = idLookup->serialize(kExplain);
+    auto serializedObj = serialized.getDocument().toBson();
+
+    // Verify the view pipeline was captured in the idLookup's subPipeline. subPipeline should
+    // contain: $match (id filter) + $match (view) + $addFields (view)
+    auto subPipeline = serializedObj["$_internalSearchIdLookup"]["subPipeline"].Array();
+    ASSERT_EQ(subPipeline.size(), 3U);
+    ASSERT_EQ(subPipeline[0].Obj().firstElementFieldNameStringData(), "$match");      // id filter
+    ASSERT_EQ(subPipeline[1].Obj().firstElementFieldNameStringData(), "$match");      // from view
+    ASSERT_EQ(subPipeline[2].Obj().firstElementFieldNameStringData(), "$addFields");  // from view
+}
+
+TEST_F(InternalSearchIdLookupBuildDocumentSourceTest,
+       HandleViewWithIdLookupNotFirstStagePrependsViewPipeline) {
+    // Create a user pipeline where $_internalSearchIdLookup is NOT the first stage. In real usage,
+    // this would be after a mongot stage like $search.
+    std::vector<BSONObj> userStages = {BSON("$match" << BSON("x" << 1)),
+                                       BSON("$_internalSearchIdLookup" << BSON("limit" << 30))};
+    LiteParsedPipeline liteParsedPipeline(kTestNss, userStages);
+
+    ASSERT_EQ(liteParsedPipeline.getStages().size(), 2U);
+
+    // Create a view pipeline.
+    std::vector<BSONObj> viewStages = {BSON("$match" << BSON("active" << true))};
+    ViewInfo viewInfo(kViewNss, kResolvedNss, viewStages);
+
+    // Call handleView().
+    liteParsedPipeline.handleView(viewInfo);
+
+    // Since the first stage is $match (which has kDefaultPrepend policy), the view pipeline should
+    // be prepended. The LiteParsedPipeline should now have 3 stages.
+    ASSERT_EQ(liteParsedPipeline.getStages().size(), 3U);
+    ASSERT_EQ(liteParsedPipeline.getStages()[0]->getParseTimeName(), "$match");  // from view
+    ASSERT_EQ(liteParsedPipeline.getStages()[1]->getParseTimeName(), "$match");  // original first
+    ASSERT_EQ(liteParsedPipeline.getStages()[2]->getParseTimeName(), "$_internalSearchIdLookup");
+
+    // Parse the pipeline.
+    auto pipeline = Pipeline::parseFromLiteParsed(liteParsedPipeline, getExpCtx());
+    ASSERT_TRUE(pipeline != nullptr);
+
+    const auto& sources = pipeline->getSources();
+    ASSERT_EQ(sources.size(), 3U);
+
+    // The $_internalSearchIdLookup stage (now third) should also have captured the view pipeline
+    // via the callback.
+    auto it = sources.begin();
+    std::advance(it, 2);
+    auto* idLookup = dynamic_cast<DocumentSourceInternalSearchIdLookUp*>(it->get());
+    ASSERT_TRUE(idLookup != nullptr);
+
+    auto serialized = idLookup->serialize(kExplain);
+    auto serializedObj = serialized.getDocument().toBson();
+
+    // Even though the view pipeline was prepended, the idLookup also captured it via its callback.
+    // subPipeline should contain: $match (id filter) + $match (from view).
+    auto subPipeline = serializedObj["$_internalSearchIdLookup"]["subPipeline"].Array();
+    ASSERT_EQ(subPipeline.size(), 2U);
+    ASSERT_EQ(subPipeline[0].Obj().firstElementFieldNameStringData(), "$match");  // id filter
+    ASSERT_EQ(subPipeline[1].Obj().firstElementFieldNameStringData(), "$match");  // from view
 }
 
 }  // namespace

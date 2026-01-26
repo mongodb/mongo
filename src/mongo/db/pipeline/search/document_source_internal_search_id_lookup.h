@@ -41,8 +41,6 @@
 
 namespace mongo {
 
-DECLARE_STAGE_PARAMS_DERIVED_DEFAULT(InternalSearchIdLookup);
-
 class DSInternalSearchIdLookUpCatalogResourceHandle;
 /**
  * Queries local collection for _id equality matches. Intended for use with
@@ -61,54 +59,9 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    class LiteParsed final : public LiteParsedDocumentSourceDefault<LiteParsed> {
-    public:
-        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec,
-                                                 const LiteParserOptions&) {
-            uassert(ErrorCodes::FailedToParse,
-                    "$_internalSearchIdLookup specification must be an object",
-                    spec.type() == BSONType::object);
-            return std::make_unique<LiteParsed>(spec, spec.Obj().getOwned());
-        }
-
-        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
-            return {};
-        }
-
-        PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const override {
-            return {};
-        }
-
-        bool requiresAuthzChecks() const override {
-            return false;
-        }
-
-        bool isInitialSource() const override {
-            return false;
-        }
-
-        std::unique_ptr<StageParams> getStageParams() const final {
-            return std::make_unique<InternalSearchIdLookupStageParams>(_originalBson);
-        }
-
-        const BSONObj& getBsonSpec() const {
-            return _ownedSpec;
-        }
-
-        // TODO SERVER-114038 Remove redundancy of storing both originalBson and ownedSpec.
-        LiteParsed(const BSONElement& specElem, BSONObj spec)
-            : LiteParsedDocumentSourceDefault(specElem),
-              _ownedSpec(spec.isOwned() ? std::move(spec) : spec.getOwned()) {}
-
-    private:
-        BSONObj _ownedSpec;
-    };
-
     DocumentSourceInternalSearchIdLookUp(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          long long limit = 0,
-                                         boost::optional<SearchQueryViewSpec> view = boost::none);
+                                         std::unique_ptr<Pipeline> viewPipeline = nullptr);
 
     const char* getSourceName() const final;
 
