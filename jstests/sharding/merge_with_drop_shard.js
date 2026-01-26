@@ -142,6 +142,7 @@ withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
     }
 
     runMergeWithMode(whenMatchedMode, whenNotMatchedMode, targetColl, true, undefined);
+    st.restartShardClean(st.shard1);
     runMergeWithMode(
         whenMatchedMode,
         whenNotMatchedMode,

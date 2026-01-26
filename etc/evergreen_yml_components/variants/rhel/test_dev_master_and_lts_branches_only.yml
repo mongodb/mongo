@@ -160,7 +160,6 @@ buildvariants:
       - name: concurrency_replication_multi_stmt_txn_gen
       - name: concurrency_sharded_replication_gen
       - name: concurrency_sharded_replication_with_balancer_gen
-      - name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
       - name: concurrency_sharded_local_read_write_multi_stmt_txn_gen
       - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
       - name: concurrency_sharded_multi_stmt_txn_gen

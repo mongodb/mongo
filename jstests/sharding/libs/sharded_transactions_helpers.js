@@ -192,15 +192,21 @@ export const kShardOptionsForDisabledStaleShardVersionRetries = {
 };
 
 // Flush each router's metadata and force refreshes on each shard for the given namespace and/or
-// database names.
+// database names, except on the replicasets that are marked as skip.
+// You might want to skip a replicaset if that's not part of the sharded cluster at the moment (eg.
+// removed from the cluster, but handled by the ShardingTest).
 //
 // TODO SERVER-39704: Remove this function.
-export function flushRoutersAndRefreshShardMetadata(st, {ns, dbNames = []} = {}) {
+export function flushRoutersAndRefreshShardMetadata(st, {ns, dbNames = []} = {}, skipRs = []) {
     st._mongos.forEach((s) => {
         assert.commandWorked(s.adminCommand({flushRouterConfig: 1}));
     });
 
     st._rs.forEach((rs) => {
+        if (skipRs.includes(rs.test)) {
+            return;
+        }
+
         if (ns) {
             assert.commandWorked(rs.test.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
         }

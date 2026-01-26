@@ -11,6 +11,7 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForCommand} from "jstests/libs/wait_for_command.js";
+import {removeShard as removeShardSync} from "jstests/sharding/libs/remove_shard_util.js";
 
 let st = new ShardingTest({shards: 2, enableBalancer: true});
 
@@ -94,6 +95,8 @@ let coll1 = db["coll1"];
 
     // Start add shard. It should block behind the running DDL.
     let shardToAdd = st.shard1.shardName;
+    // Clean the shard to make sure it's okay to add it again
+    st.restartShardClean(st.shard1);
     let shardToAddUrl = st.rs1.getURL();
     let awaitAddShard = startParallelShell(
         funWithArgs(
@@ -230,6 +233,9 @@ let coll1 = db["coll1"];
         assert(coll1.drop());
 
         // Re-add shard to cluster
+        fp.off();
+        removeShardSync(st, shardToRemove);
+        st.restartShardClean(st.shard1);
         assert.commandWorked(st.s.adminCommand({addShard: shardURL}));
     }
 

@@ -53,7 +53,6 @@ SUITE_HIERARCHY = {
             "concurrency_sharded_with_stepdowns": {}
         }
     },
-    "concurrency_sharded_clusterwide_ops_add_remove_shards": {},
     "concurrency_replication_causal_consistency": {},
     "concurrency_replication_causal_consistency_with_replica_set_endpoint": {},
     "concurrency_replication_for_backup_restore": {},
