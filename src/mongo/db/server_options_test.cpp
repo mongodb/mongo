@@ -28,6 +28,8 @@
  */
 
 
+#include <filesystem>
+#include <fstream>
 #include <ostream>
 #include <utility>
 
@@ -70,6 +72,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/options_parser/environment.h"
@@ -1461,6 +1464,83 @@ TEST_F(SetParameterOptionTest, ApplySetParameters) {
                                 << BSON("default" << 234 << "value" << 666)));
     ASSERT_EQ(p1->val, 555);
     ASSERT_EQ(p2->val, 666);
+}
+
+class ExtensionsSignaturePubKeyPathOptionTest : public unittest::Test {
+protected:
+    void setUp() override {
+        ASSERT_OK(addGeneralServerOptions(&options));
+    }
+
+public:
+    std::filesystem::path touchTempPubKeyFile(std::string filename) {
+        pubKeyTempDir.emplace("ext_sig_pub_key_path_test");
+        auto p = std::filesystem::path(pubKeyTempDir->path()) / filename;
+        std::ofstream{p};
+        return p;
+    }
+
+    /**
+     * 'yaml' determines if the server's argv input should specify the server options
+     * directly, or if it should look for a config yaml file.
+     *
+     * Returns 'extSigPubKeyPath'.
+     */
+    std::filesystem::path parseAndSetupServerOptions(std::filesystem::path extSigPubKeyPath,
+                                                     bool yaml) {
+        std::vector<std::string> argv;
+        if (!yaml) {
+            argv = {"binaryname", "--extensionsSignaturePublicKeyPath", extSigPubKeyPath};
+        } else {
+            argv = {"binaryname", "--config", "config.yaml"};
+            parser.setConfig("config.yaml",
+                             fmt::format("{}:\n"
+                                         "    {}: {}\n",
+                                         "processManagement",
+                                         "extensionsSignaturePublicKeyPath",
+                                         extSigPubKeyPath.string()));
+        }
+
+        ASSERT_OK(parser.run(options, argv, &environment));
+        ASSERT_OK(validateServerOptions(environment));
+        ASSERT_OK(canonicalizeServerOptions(&environment));
+        ASSERT_OK(setupServerOptions(argv));
+
+        return extSigPubKeyPath;
+    }
+
+    OptionsParserTester parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+    boost::optional<unittest::TempDir> pubKeyTempDir;
+};
+
+TEST_F(ExtensionsSignaturePubKeyPathOptionTest, PathFromCLI) {
+    std::filesystem::path path =
+        parseAndSetupServerOptions(touchTempPubKeyFile("ext_sig_key.asc"), false);
+
+    ASSERT_OK(storeServerOptions(environment));
+    ASSERT_EQ(serverGlobalParams.extensionsSignaturePublicKeyPath, path);
+}
+
+TEST_F(ExtensionsSignaturePubKeyPathOptionTest, PathFromConfigFile) {
+    std::filesystem::path path =
+        parseAndSetupServerOptions(touchTempPubKeyFile("ext_sig_key.asc"), true);
+
+    ASSERT_OK(storeServerOptions(environment));
+    ASSERT_EQ(serverGlobalParams.extensionsSignaturePublicKeyPath, path);
+}
+
+TEST_F(ExtensionsSignaturePubKeyPathOptionTest, PathIsNotAsc) {
+    parseAndSetupServerOptions(touchTempPubKeyFile("ext_sig_key.txt"), false);
+
+    ASSERT_EQ(storeServerOptions(environment), ErrorCodes::BadValue);
+}
+
+TEST_F(ExtensionsSignaturePubKeyPathOptionTest, NonexistantFile) {
+    parseAndSetupServerOptions("/dne/ext_sig_key.asc", false);
+
+    ASSERT_EQ(storeServerOptions(environment), ErrorCodes::BadValue);
 }
 
 }  // namespace

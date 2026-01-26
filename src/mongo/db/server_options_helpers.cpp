@@ -59,6 +59,7 @@
 #include "mongo/util/str.h"
 
 #include <cstddef>
+#include <filesystem>
 #include <utility>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -113,6 +114,44 @@ Status setParsedOpts(const moe::Environment& params) {
     cmdline_utils::censorBSONObj(&serverGlobalParams.parsedOpts);
     return Status::OK();
 }
+
+Status setExtensionsSignaturePubKeyPath(const moe::Environment& params) {
+    // If the 'extensionsSignaturePublicKeyPath' server option is not specified:
+    // - In extensions secure build mode: this is expected, the option cannot be present.
+    // - In extensions in-secure build mode: assume signature verification should be skipped.
+    moe::Value extSigPubKeyPathValue = params["processManagement.extensionsSignaturePublicKeyPath"];
+    if (extSigPubKeyPathValue.isEmpty()) {
+        return Status::OK();
+    }
+
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
+    // Extensions signature verification is being performed for testing.
+    // Save path to public key for later verification of test extensions signatures.
+    std::filesystem::path keyPath = extSigPubKeyPathValue.as<std::string>();
+
+    if (keyPath.extension().string() != ".asc") {
+        return Status(ErrorCodes::BadValue,
+                      "`extensionsSignaturePublicKeyPath` option was specified, "
+                      "but the provided file is not a '.asc'.");
+    }
+
+    if (!exists(keyPath)) {
+        return Status(ErrorCodes::BadValue,
+                      "`extensionsSignaturePublicKeyPath` option was specified, "
+                      "but the provided file does not exist.");
+    }
+
+    serverGlobalParams.extensionsSignaturePublicKeyPath = keyPath.string();
+    return Status::OK();
+#else
+    // In extensions signature secure build mode.
+    return Status(ErrorCodes::BadValue,
+                  "`extensionsSignaturePublicKeyPath` option may not be specified in "
+                  "extensions signature secure compilation mode. In secure mode the key "
+                  "used for extensions signature verification is not configurable.");
+#endif  // not MONGO_CONFIG_EXT_SECURE
+}
+
 }  // namespace
 
 Status validateBaseOptions(const moe::Environment& params) {
@@ -492,6 +531,10 @@ Status storeBaseOptions(const moe::Environment& params) {
                       "Loading extensions via `--loadExtensions` or "
                       "`processManagement.loadExtensions` is only supported on Linux");
 #endif
+    }
+
+    if (auto err = setExtensionsSignaturePubKeyPath(params); !err.isOK()) {
+        return err;
     }
 
     return Status::OK();

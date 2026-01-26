@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/config.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/logv2/log_format.h"
@@ -321,6 +322,12 @@ struct MONGO_MOD_PUB ServerGlobalParams {
 
     // List of absolute paths to extension shared object files. These will be loaded during startup.
     std::vector<std::string> extensions;
+
+#ifndef MONGO_CONFIG_EXT_SIG_SECURE
+    // Not in extensions secure build mode. Path to public key to verify test extensions signatures.
+    // If empty string (default), verification will by bypassed (which is fine in insecure mode).
+    std::string extensionsSignaturePublicKeyPath;
+#endif
 };
 
 MONGO_MOD_PUB extern ServerGlobalParams serverGlobalParams;
