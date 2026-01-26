@@ -20,7 +20,7 @@ is_s390x_or_ppc64le() {
 
 ulimit -c unlimited
 
-eval ${@:1} &
+"${@:1}" &
 main_pid=$!
 echo "Process-under-test started with PID: ${main_pid}"
 
