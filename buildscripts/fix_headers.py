@@ -67,7 +67,7 @@ def fix_cycle(fix_target: str, header: str, issue_key: str) -> str:
 
 def todo_comment(issue_key: str, header: str, new_dep: str, fg_label: str) -> None:
     comment = f"TODO({issue_key}): Remove cycle created by moving {header} to {new_dep}".replace(
-        " ", "\ "
+        " ", r"\ "
     )
     bd_utils.bd_comment([fg_label], comment)
 

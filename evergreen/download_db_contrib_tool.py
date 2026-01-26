@@ -33,7 +33,7 @@ def get_binary_name() -> str:
     if machine == "ppc64le":
         # Get the major version from the release string
         # like '4.18.0-513.5.1.el8_9.ppc64le' -> major release 8
-        major_version_match = re.findall("el(\d+)", os.uname().release)
+        major_version_match = re.findall(r"el(\d+)", os.uname().release)
         assert len(major_version_match) == 1
         major_version = int(major_version_match[0])
 

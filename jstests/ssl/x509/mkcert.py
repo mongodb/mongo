@@ -802,7 +802,7 @@ def process_ecdsa_ca(cert):
 
     if "ocsp" in cert["name"]:
         # given foo.pem, we'll generate foo.crt and foo.key as well
-        filename = re.search("(.*)\.pem", cert["name"]).group(1)
+        filename = re.search(r"(.*)\.pem", cert["name"]).group(1)
         process_ecdsa_cert(cert, pem, key, dest, filename)
     else:
         open(dest, "wt").write(
@@ -886,11 +886,11 @@ def process_ecdsa_leaf(cert):
 
     if "responder" in cert.get("tags", []):
         # given foo.crt, we'll generate foo.pem and foo.key
-        filename = re.search("(.*)\.crt", cert["name"]).group(1)
+        filename = re.search(r"(.*)\.crt", cert["name"]).group(1)
         process_ecdsa_cert(cert, pem, key, dest, filename)
     elif "ocsp" in cert.get("tags", []):
         # given foo.pem, we'll regenerate foo.pem and delete foo.crt and foo.key
-        filename = re.search("(.*)\.pem", cert["name"]).group(1)
+        filename = re.search(r"(.*)\.pem", cert["name"]).group(1)
         process_ecdsa_cert(cert, pem, key, dest, filename, split_pem=False)
     else:
         open(dest, "wt").write(
