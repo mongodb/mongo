@@ -3033,6 +3033,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/dbtests/**/mock_dbclient_conn_test.cpp @10gen/server-networking-and-observability @svc-auto-approve-bot
 /src/mongo/dbtests/**/indexupdatetests.cpp @10gen/server-index-builds @svc-auto-approve-bot
 /src/mongo/dbtests/**/insert_test.cpp @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/dbtests/**/jstests.cpp @10gen/query-integration-features @svc-auto-approve-bot
 /src/mongo/dbtests/**/jsobjtests.cpp @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/dbtests/**/jsontests.cpp @10gen/server-programmability @svc-auto-approve-bot
 /src/mongo/dbtests/**/basictests.cpp @10gen/server-programmability @svc-auto-approve-bot
