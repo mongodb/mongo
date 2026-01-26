@@ -111,8 +111,9 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         coordinate_multi_update_util::shouldCoordinateMultiWrite(
             opCtx, _pauseMigrationsDuringMultiUpdatesParameter);
 
-    const bool isMultiWriteBlockingMigrations =
-        (isUpdate || isDelete) && isMultiWrite && enableMultiWriteBlockingMigrations;
+    const bool isTargetDataOwningShardsOnlyMultiWrite =
+        (isMultiWrite && !enableMultiWriteBlockingMigrations &&
+         write_op_helpers::isOnlyTargetDataOwningShardsForMultiWritesEnabled());
 
     if (isTimeseriesCollection && op.isFindAndModify()) {
         uassert(ErrorCodes::InvalidOptions,
@@ -120,101 +121,81 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
                 !op.getSort() || isRawData);
     }
 
-    auto targetedSampleId =
+    AnalysisType type = [&] {
+        if (isUpdate || isDelete) {
+            if (!isMultiWrite && tr.isNonTargetedRetryableWriteWithId) {
+                return AnalysisType::kRetryableWriteWithId;
+            }
+            if (!isMultiWrite && tr.useTwoPhaseWriteProtocol) {
+                return AnalysisType::kTwoPhaseWrite;
+            }
+            if (isMultiWrite && enableMultiWriteBlockingMigrations) {
+                return AnalysisType::kMultiWriteBlockingMigrations;
+            }
+            if (isTimeseriesRetryableUpdateOp) {
+                return AnalysisType::kInternalTransaction;
+            }
+        }
+        return tr.endpoints.size() > 1 ? AnalysisType::kMultiShard : AnalysisType::kSingleShard;
+    }();
+
+    if (type == AnalysisType::kRetryableWriteWithId) {
+        // For kRetryableWriteWithId batches, we need to target all shards.
+        //
+        // TODO SERVER-101167: For kRetryableWriteWithId batches, we should only target the shards
+        // that are needed (instead of targeting all shards).
+        tr.endpoints = targetAllShards(opCtx, cri);
+    }
+
+    if (type == AnalysisType::kMultiShard && !inTxn && !isTargetDataOwningShardsOnlyMultiWrite) {
+        // For kMultiShard batches, if 'isTargetDataOwningShardsOnlyMultiWrite' is false and we're
+        // not running in a transaction, then we need to target all shards -AND- we need to set
+        // 'shardVersion' to IGNORED on all endpoints.
+        //
+        // (When 'isTargetDataOwningShardsOnlyMultiWrite' is true, StaleConfig errors with partially
+        // applied writes will cause the write command to fail with a non-retryable QueryPlanKilled
+        // error, and the user may choose to manually re-run the command if desired.)
+        //
+        // Currently there are two cases where this block of code is reached:
+        //   1) multi:true updates/upserts/deletes outside of transaction (where
+        //      'isTimeseriesRetryableUpdateOp' and 'enableMultiWriteBlockingMigrations' and
+        //      'isTargetDataOwningShardsOnlyMultiWrite' are all false)
+        //   2) non-retryable or sessionless multi:false non-upsert updates/deletes
+        //      that have an _id equality outside of a transaction (where
+        //      'isTimeseriesRetryableUpdateOp' is false)
+        //
+        // TODO SPM-1153: Implement a new approach for multi:true updates/upserts/deletes that
+        // does not need set 'shardVersion' to IGNORED and that can target only the relevant
+        // shards when 'type' is kMultiShard (instead of targeting all shards).
+        //
+        // TODO SPM-3673: For non-retryable/sessionless multi:false non-upsert updates/deletes
+        // that have an _id equality, implement a different approach that doesn't need to set
+        // 'shardVersion' to IGNORED and that can target only the relevant shards when
+        // 'type' is kMultiShard (instead of targeting all shards).
+        tr.endpoints = targetAllShards(opCtx, cri);
+
+        for (auto& endpoint : tr.endpoints) {
+            endpoint.shardVersion->setPlacementVersionIgnored();
+        }
+    }
+
+    auto sampleId =
         analyze_shard_key::tryGenerateTargetedSampleId(opCtx, nss, op.getOpType(), tr.endpoints);
 
-    if (tr.isNonTargetedRetryableWriteWithId) {
-        // For a retryable write without shard key with id operation, there is a special case where
-        // we will target all shards instead  of the initial set of endpoints returned by the
-        // targeter. This is the case when we are:
-        // - Performing an update or delete.
-        // - Not in a transaction.
-        // - Already targeting multiple endpoints.
-        // - We are not in a multi: true write OR 'onlyTargetDataOwningShardsForMultiWrites' is
-        // disabled.
-        // TODO SERVER-101167: For WithoutShardKeyWithId write ops, we should only target the shards
-        // that are needed (instead of targeting all shards).
-        const bool shouldTargetAllShards = [&]() {
-            const bool isUpdateOrDelete = (isUpdate || isDelete);
-            if (isUpdateOrDelete && !inTxn && tr.endpoints.size() > 1) {
-                if (op.getMulti()) {
-                    return !write_op_helpers::isOnlyTargetDataOwningShardsForMultiWritesEnabled();
-                }
-                return true;
-            }
-            return false;
-        }();
-
-        if (shouldTargetAllShards) {
-            tr.endpoints = targetAllShards(opCtx, cri);
-            // Regenerate the targetedSampleId since we changed the endpoints to target all shards.
-            targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
-                opCtx, nss, op.getOpType(), tr.endpoints);
-        }
-        recordTargetingStats(opCtx, cri, tr, op);
-        return Analysis{AnalysisType::kRetryableWriteWithId,
-                        std::move(tr.endpoints),
-                        isViewfulTimeseries,
-                        std::move(targetedSampleId)};
-    } else if (tr.useTwoPhaseWriteProtocol) {
-        recordTargetingStats(opCtx, cri, tr, op);
-        return Analysis{AnalysisType::kTwoPhaseWrite,
-                        std::move(tr.endpoints),
-                        isViewfulTimeseries,
-                        std::move(targetedSampleId)};
-    } else if (isMultiWriteBlockingMigrations) {
-        return Analysis{AnalysisType::kMultiWriteBlockingMigrations,
-                        std::move(tr.endpoints),
-                        isViewfulTimeseries,
-                        std::move(targetedSampleId)};
-    } else if (isTimeseriesRetryableUpdateOp) {
-        // Special case for time series since an update could affect two documents in the underlying
-        // buckets collection.
-        // Targetting code in this path can only handle writes with the full shardKey in the query.
-        tassert(10413902,
-                "Writes without shard key must go through non-targeted path",
-                !(tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId));
-        // Note we do not translate viewful timeseries collection namespace here, it will be
-        // translated within the transaction when we analyze the request again.
-        // Note also that we do not record any targeting stats here as we will do so when we analyze
-        // the request a second time.
-        return Analysis{AnalysisType::kInternalTransaction,
-                        std::move(tr.endpoints),
-                        false /* isViewfulTimeseries */,
-                        std::move(targetedSampleId)};
-    } else if (tr.endpoints.size() == 1) {
-        recordTargetingStats(opCtx, cri, tr, op);
-        return Analysis{AnalysisType::kSingleShard,
-                        std::move(tr.endpoints),
-                        isViewfulTimeseries,
-                        std::move(targetedSampleId)};
-    } else {
-        // For updates/upserts/deletes running outside of a transaction that need to target more
-        // than one endpoint, all shards are targeted -AND- 'shardVersion' is set to IGNORED on all
-        // endpoints. The exception to this is when 'onlyTargetDataOwningShardsForMultiWrites' is
-        // true.
-        const bool shouldTargetAllShards = (isUpdate || isDelete) &&
-            write_op_helpers::shouldTargetAllShardsSVIgnored(inTxn, op.getMulti());
-        if (shouldTargetAllShards) {
-            auto endpoints = targetAllShards(opCtx, cri);
-
-            for (auto& endpoint : endpoints) {
-                endpoint.shardVersion->setPlacementVersionIgnored();
-            }
-            tr.endpoints = std::move(endpoints);
-
-            // Regenerate the targetedSampleId since we changed the endpoints to target all shards.
-            targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
-                opCtx, nss, op.getOpType(), tr.endpoints);
-        }
-
-        recordTargetingStats(opCtx, cri, tr, op);
-
-        return Analysis{AnalysisType::kMultiShard,
-                        std::move(tr.endpoints),
-                        isViewfulTimeseries,
-                        std::move(targetedSampleId)};
+    // For kInternalTransaction batches, we do not translate viewful timeseries collection namespace
+    // here, as it will be translated within the transaction when we analyze the request again.
+    if (type == AnalysisType::kInternalTransaction) {
+        isViewfulTimeseries = false;
     }
+
+    // Record targeting stats. (For kInternalTransaction batches and kMultiWriteBlockingMigrations
+    // batches, we skip recording the stats here because it will be handled later.)
+    if (type != AnalysisType::kInternalTransaction &&
+        type != AnalysisType::kMultiWriteBlockingMigrations) {
+        recordTargetingStats(opCtx, cri, tr, op);
+    }
+
+    return Analysis{type, std::move(tr.endpoints), isViewfulTimeseries, std::move(sampleId)};
 } catch (const DBException& ex) {
     auto status = ex.toStatus();
 

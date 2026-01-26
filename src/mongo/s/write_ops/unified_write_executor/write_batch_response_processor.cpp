@@ -325,62 +325,9 @@ ProcessorResult WriteBatchResponseProcessor::_onWriteBatchResponse(
     result.collsToCreate = std::move(collsToCreate);
     result.successfulShardSet = std::move(successfulShardSet);
 
-    const auto batchSize = itemsByOp.size();
+    // For "RetryableWriteWithId" batches, if the "hangAfterCompletingWriteWithoutShardKeyWithId"
+    // failpoint is set, call pauseWhileSet().
     if (response.isRetryableWriteWithId) {
-        // In the event of a retryable write with id with a batch size of 1, we can ignore any
-        // errors from the shards as long as one shard has reported a successful write. This is
-        // because for this write type, we broadcast the write to all shards with the shard version
-        // attached. As such, a successful write on a single shard means that the write succeeded on
-        // the intended shard.
-        if (batchSize == 1) {
-            const auto opIt = itemsByOp.begin();
-            tassert(11472500, "Expected a non empty 'itemsByOp' map", opIt != itemsByOp.end());
-            const auto& [op, _] = *opIt;
-            const auto opId = getWriteOpId(op);
-            auto resIt = _results.find(opId);
-            tassert(11472501,
-                    "Should have a write op result for single write op",
-                    resIt != _results.end());
-            auto& res = *resIt;
-            const auto* opResults = get_if<BulkWriteOpResults>(&res.second);
-            tassert(11472502, "Expected BulkWriteOpResults", opResults != nullptr);
-
-            if (opResults->hasSuccess && opResults->hasError) {
-                auto& items = opResults->items;
-                std::vector<BulkWriteReplyItem> noErrorItems;
-                auto foundWCOSError = false;
-                for (auto& item : items) {
-                    // One exception to the above rule: if we've encountered a WCOS error, we should
-                    // surface this to the user.
-                    const bool isWCOS = item.getStatus() == ErrorCodes::WouldChangeOwningShard;
-                    if (item.getOk() || isWCOS) {
-                        noErrorItems.emplace_back(std::move(item));
-                        if (isWCOS) {
-                            foundWCOSError = true;
-                        }
-                    } else {
-                        LOGV2_DEBUG(11472503,
-                                    4,
-                                    "Ignoring write without shard key with id op error, as at "
-                                    "least one shard has reported success",
-                                    "error"_attr = redact(item.toBSON()));
-                    }
-                }
-                BulkWriteOpResults newResult;
-                newResult.items = std::move(noErrorItems);
-                newResult.hasError = foundWCOSError;
-                newResult.hasSuccess = true;
-                tassert(11472504, "nErrors should be non-zero", _nErrors > 0);
-                if (!foundWCOSError) {
-                    _nErrors--;
-                }
-
-                res.second = std::move(newResult);
-            }
-        }
-
-        // For kRetryableWriteWithId batches, if the hangAfterCompletingWriteWithoutShardKeyWithId
-        // failpoint is set, call pauseWhileSet().
         auto& fp = getHangAfterCompletingWriteWithoutShardKeyWithIdFailPoint();
         if (MONGO_unlikely(fp.shouldFail())) {
             fp.pauseWhileSet();

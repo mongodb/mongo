@@ -9,6 +9,7 @@
 
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
+import {isUweEnabled} from "jstests/libs/query/uwe_utils.js";
 
 function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
     jsTest.log(
@@ -100,6 +101,8 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
         ],
         txnNumber: NumberLong(2),
     };
+
+    const uweEnabled = isUweEnabled(mongos);
 
     function runRetryableWrites(
         phase,
@@ -197,11 +200,16 @@ function runTest(minimumOperationDurationMS, shouldReshardInPlace) {
             const epsilon = 5000;
             const elapsed = Date.now() - startTime;
             assert.gt(elapsed, minimumOperationDurationMS - epsilon);
-            runRetryableWrites("during resharding after collection cloning had finished");
+
+            const updateExpectedCode = !uweEnabled ? ErrorCodes.OK : ErrorCodes.IncompleteTransactionHistory;
+            runRetryableWrites("during resharding after collection cloning had finished", updateExpectedCode);
         },
     );
 
-    runRetryableWrites("after resharding", ErrorCodes.OK, ErrorCodes.IncompleteTransactionHistory);
+    const updateExpectedCode = !uweEnabled ? ErrorCodes.OK : ErrorCodes.IncompleteTransactionHistory;
+    const insertExpectedCode = ErrorCodes.IncompleteTransactionHistory;
+    runRetryableWrites("after resharding", updateExpectedCode, insertExpectedCode);
+
     reshardingTest.teardown();
 }
 const minimumOperationDurationMS = 30000;
