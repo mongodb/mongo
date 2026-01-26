@@ -31,6 +31,7 @@
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/extension/host/document_source_extension_for_query_shape.h"
+#include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/extension/shared/handle/aggregation_stage/stage_descriptor.h"
 #include "mongo/db/ifr_flag_retry_info.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -221,6 +222,7 @@ ViewPolicy DocumentSourceExtensionOptimizable::LiteParsedExpanded::getViewPolicy
 
         // If this is a $vectorSearch stage, we perform the IFR flag retry kickback to use legacy
         // $vectorSearch instead.
+        vector_search_metrics::onViewKickbackRetryCount.increment();
         uassertStatusOK(
             Status(IFRFlagRetryInfo(feature_flags::gFeatureFlagVectorSearchExtension.getName()),
                    "$vectorSearch-as-an-extension is not allowed against views."));

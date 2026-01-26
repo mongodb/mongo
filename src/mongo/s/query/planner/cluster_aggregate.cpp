@@ -41,7 +41,6 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
@@ -1311,7 +1310,6 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     // Retry if IFRFlagRetry is thrown. On retry, disable the flag in the ifrContext.
     auto onIFRError = [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
                           RetryOnViewState& state) {
-        vector_search_metrics::onViewKickbackRetryCount.increment(1);
         state.ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
             ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
     };

@@ -50,7 +50,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/agg/exchange_stage.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
-#include "mongo/db/extension/host/extension_vector_search_server_status.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/ifr_flag_retry_info.h"
@@ -1504,7 +1503,6 @@ Status runAggregate(
     auto onIFRError =
         [&](const ExceptionFor<ErrorCodes::IFRFlagRetry>& ex,
             stdx::unordered_set<IncrementalRolloutFeatureFlag*>& ifrFlagsToDisableOnRetries) {
-            vector_search_metrics::onViewKickbackRetryCount.increment(1);
             ifrFlagsToDisableOnRetries.insert(IncrementalRolloutFeatureFlag::findByName(
                 ex.extraInfo<IFRFlagRetryInfo>()->getDisabledFlagName()));
         };
