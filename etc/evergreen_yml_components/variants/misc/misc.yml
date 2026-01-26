@@ -12,8 +12,6 @@ buildvariants:
     run_on:
       - rhel8.8-medium
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       large_distro_name: rhel8.8-large
       core_analyzer_distro_name: rhel8.8-xlarge
       burn_in_tag_include_all_required_and_suggested: true
@@ -50,9 +48,6 @@ buildvariants:
     tags: ["assigned_to_jira_team_devprod_release_infrastructure"]
     activate: true
     run_on: ubuntu2404-small
-    expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
     modules:
       - devprod_coverity
     tasks:
@@ -70,9 +65,6 @@ buildvariants:
     allowed_requesters: ["patch"]
     tags: ["assigned_to_jira_team_platsec_server"]
     run_on: ubuntu2404-small
-    expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
     modules:
       - devprod_coverity
     tasks:
@@ -82,9 +74,6 @@ buildvariants:
     display_name: "Promote Custom Build"
     activate: false
     allowed_requesters: ["patch"]
-    expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
     tasks:
       - name: promote_custom_build
 
@@ -92,9 +81,6 @@ buildvariants:
     display_name: "Promote Sys-perf Build"
     activate: false
     allowed_requesters: ["patch"]
-    expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
     tasks:
       - name: promote_sys_perf_build
 
@@ -104,9 +90,6 @@ buildvariants:
     activate: true
     run_on:
       - ubuntu2204-small
-    expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
     stepback: false
     tasks:
       - name: sync_repo_with_copybara
@@ -123,9 +106,6 @@ buildvariants:
       - "poetry_requirements.txt"
     run_on:
       - ubuntu2204-large
-    expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
     tasks:
       - name: devcontainer_test
 
@@ -137,8 +117,6 @@ buildvariants:
     cron: "0 6 * * 1-5"
     run_on: rhel92-small
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       ENDOR_NAMESPACE: mongodb.10gen
     stepback: false
     tasks:

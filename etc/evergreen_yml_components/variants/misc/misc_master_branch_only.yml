@@ -12,8 +12,6 @@ buildvariants:
     run_on:
       - rhel8.8-small
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       multiversion_platform: rhel8
       multiversion_edition: enterprise
       compile_variant: *stm-daily-cron
@@ -44,8 +42,6 @@ buildvariants:
     run_on:
       - amazon2023-arm64-latest-m8g-4xlarge
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: bazel-integration-tests
       evergreen_remote_exec: on
       multiversion_platform: amazon2023

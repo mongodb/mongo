@@ -20,8 +20,6 @@ variables:
   # - etc/evergreen_yml_components/variants/rhel/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux-x86-dynamic-enterprise-compile-expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
     bazel_compile_flags: >-
       --dtlto=False
@@ -49,8 +47,6 @@ variables:
   # - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &generic_linux_compile_expansions # The most commonly used compile expansions.
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
 
   # THIS HAS COPIES IN:
@@ -87,8 +83,6 @@ variables:
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_generic_expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     multiversion_platform: rhel8
     multiversion_edition: enterprise
     repo_edition: enterprise
@@ -120,8 +114,6 @@ variables:
     run_on:
       - rhel8.8-small
     expansions: &enterprise-rhel-8-64-bit-expansions-template
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug
@@ -227,8 +219,6 @@ buildvariants:
     display_name: "* Linux x86 Stitch Enterprise Compile"
     tags: ["suggested"]
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: *linux-stitch-compile-suggested
     tasks:
       - name: .stitch
@@ -238,8 +228,6 @@ buildvariants:
     display_name: "* Linux x86 Crypt Enterprise Compile"
     tags: ["suggested"]
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: *linux-crypt-compile
     tasks:
       - name: .crypt
@@ -371,8 +359,6 @@ buildvariants:
     run_on:
       - rhel8.8-large
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel88
         --dbg_level=1

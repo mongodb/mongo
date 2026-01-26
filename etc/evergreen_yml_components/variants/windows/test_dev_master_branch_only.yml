@@ -26,8 +26,6 @@ variables:
   # - etc/evergreen_yml_components/variants/windows/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &windows_expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     compile_variant: *windows_compile_variant_name
     burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
@@ -60,8 +58,6 @@ buildvariants:
     run_on:
       - windows-2022-small
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug
@@ -92,8 +88,6 @@ buildvariants:
     run_on:
       - windows-2022-xxlarge # To accommodate OOD issues noted in BF-31698
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       additional_package_targets: >-
         archive-mongocryptd-stripped
         archive-mongocryptd-debug

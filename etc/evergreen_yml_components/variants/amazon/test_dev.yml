@@ -16,8 +16,6 @@ variables:
     stepback: false
 
   - &linux-arm64-static-enterprise-compile-expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=amazon2023
@@ -32,8 +30,6 @@ variables:
   # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_arm64_generic_expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: aarch64

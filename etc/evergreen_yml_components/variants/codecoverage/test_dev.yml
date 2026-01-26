@@ -9,8 +9,6 @@ buildvariants:
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     stepback: false
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
       bazel_compile_flags: >-
         --allocator=system
@@ -64,8 +62,6 @@ buildvariants:
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     stepback: false
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
       bazel_compile_flags: >-
         --allocator=system

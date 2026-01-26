@@ -16,8 +16,6 @@ variables:
     stepback: false
 
   - &linux-arm64-dynamic-enterprise-compile-expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     has_packages: false
     bazel_compile_flags: >-
       --define=MONGO_DISTMOD=amazon2023
@@ -47,8 +45,6 @@ variables:
   # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_arm64_generic_expansions
-    mciuploads_binary_permissions: public-read
-    mciuploads_binary_visibility: public
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
     multiversion_architecture: aarch64
@@ -85,8 +81,6 @@ buildvariants:
     run_on:
       - amazon2023-arm64-latest-m8g-4xlarge
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
         --config=local
@@ -105,8 +99,6 @@ buildvariants:
       - rhel81-power8-large
     stepback: false
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: *rhel81-ppc64le-bazel-compile
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=rhel81
@@ -220,8 +212,6 @@ buildvariants:
       - amazon2023-arm64-atlas-latest-m8g-xlarge
     stepback: true
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       compile_variant: amazon-linux2023-arm64-lto-pgo-bolt
       has_packages: false
       jstestfuzz_num_generated_files: 40
@@ -405,8 +395,6 @@ buildvariants:
     run_on:
       - amazon2023.3-arm64-m6g-4xlarge
     expansions:
-      mciuploads_binary_permissions: public-read
-      mciuploads_binary_visibility: public
       build_timeout_seconds: 900
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
