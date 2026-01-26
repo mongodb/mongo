@@ -1520,9 +1520,9 @@ extern int __wti_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *i
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_page_inmem_updates(WT_SESSION_IMPL *session, WT_REF *ref)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_REF *ref,
-  WT_ITEM *deltas, size_t delta_size, WT_REF ***refsp, size_t *ref_entriesp, size_t *incr,
-  WT_ITEM *new_image, const void *base_image_addr) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_page_merge_deltas_with_base_image_int(WT_SESSION_IMPL *session, WT_ITEM *deltas,
+  size_t delta_size, WT_REF ***refsp, size_t *ref_entriesp, WT_ITEM *new_image,
+  const void *base_image_addr) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *deltas,
   size_t delta_size, WT_ITEM *new_image, WT_PAGE_HEADER *base_dsk)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

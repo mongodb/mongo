@@ -29,6 +29,7 @@
 import errno, inspect, os, wiredtiger, wttest
 from helper_disagg import DisaggConfigMixin, gen_disagg_storages
 from wtscenario import make_scenarios
+from wiredtiger import stat
 
 # test_disagg04.py
 # Note that the APIs we are testing are not meant to be used directly
@@ -55,6 +56,19 @@ class test_disagg04(wttest.WiredTigerTestCase, DisaggConfigMixin):
         if check_func is not None:
             check_func(c.get_value())
         c.close()
+
+    def get_stat(self, stat):
+        stat_cursor = self.session.open_cursor('statistics:')
+        val = stat_cursor[stat][2]
+        stat_cursor.close()
+        return val
+
+    def add_data(self, uri, nitems):
+        cursor = self.session.open_cursor(uri, None, None)
+        for i in range(nitems):
+            cursor["Key " + str(i)] = str(i)
+        cursor.close()
+        self.session.checkpoint()
 
 
     def test_disagg_storage_tier(self):
@@ -92,3 +106,16 @@ class test_disagg04(wttest.WiredTigerTestCase, DisaggConfigMixin):
                     'key_format=S,value_format=S,disaggregated=(storage_tier=coldd),',
                     lambda v: self.assertTrue(v.find('storage_tier=cold') == -1)
                 )
+
+    def test_cold_write(self):
+        self.conn.reconfigure(f'disaggregated=(role=leader)')
+
+        uri = self.uri%5
+
+        self.session.create(uri, 'key_format=S,value_format=S,disaggregated=(storage_tier=cold),')
+
+        self.assertEqual(self.get_stat(stat.conn.disagg_block_put_cold), 0)
+
+        self.add_data(uri, 1000)
+
+        self.assertGreater(self.get_stat(stat.conn.disagg_block_put_cold), 0)

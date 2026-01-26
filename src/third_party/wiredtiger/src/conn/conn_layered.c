@@ -365,7 +365,8 @@ err:
 
 /*
  * __disagg_put_page --
- *     Write a page to disaggregated storage.
+ *     Write a page to disaggregated storage. This is intended for pages that are not part of a
+ *     btree, such as shared turtle files and encryption key.
  */
 static int
 __disagg_put_page(WT_SESSION_IMPL *session, WT_PAGE_LOG_HANDLE *page_log, uint64_t page_id,
@@ -379,6 +380,7 @@ __disagg_put_page(WT_SESSION_IMPL *session, WT_PAGE_LOG_HANDLE *page_log, uint64
     WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
 
     WT_CLEAR(put_args);
+
     put_args.backlink_lsn = last_page_lsn[page_id];
 
     WT_RET(page_log->plh_put(page_log, &session->iface, page_id, 0, &put_args, item));

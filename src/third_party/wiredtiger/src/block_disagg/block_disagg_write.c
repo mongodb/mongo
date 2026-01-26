@@ -78,6 +78,7 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
   uint32_t *checksump, bool data_checksum, bool checkpoint_io)
 {
     WT_BLOCK_DISAGG_HEADER *blk;
+    WT_BTREE *btree;
     WT_CONNECTION_IMPL *conn;
     WT_PAGE_HEADER *header;
     WT_PAGE_LOG_HANDLE *plhandle;
@@ -86,6 +87,7 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
     uint32_t checksum;
 
     time_start = __wt_clock(session);
+    btree = S2BT(session);
 
     WT_ASSERT(session, block_meta != NULL);
     WT_ASSERT(session, block_meta->page_id >= WT_BLOCK_MIN_PAGE_ID);
@@ -178,6 +180,8 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
         F_SET(&put_args, WT_PAGE_LOG_COMPRESSED);
     if (F_ISSET(blk, WT_BLOCK_DISAGG_ENCRYPTED))
         F_SET(&put_args, WT_PAGE_LOG_ENCRYPTED);
+    if (btree->storage_tier == WT_BTREE_STORAGE_TIER_COLD)
+        F_SET(&put_args, WT_PAGE_LOG_STORAGE_TIER_COLD);
 
     /* Write the block. */
     WT_RET(plhandle->plh_put(plhandle, &session->iface, page_id, 0, &put_args, buf));
@@ -189,6 +193,8 @@ __wti_block_disagg_write_internal(WT_SESSION_IMPL *session, WT_BLOCK_DISAGG *blo
         WT_STAT_CONN_INCR(session, disagg_block_hs_put);
         WT_STAT_CONN_INCRV(session, disagg_block_hs_byte_write, buf->size);
     }
+    if (F_ISSET(&put_args, WT_PAGE_LOG_STORAGE_TIER_COLD))
+        WT_STAT_CONN_INCR(session, disagg_block_put_cold);
     if (checkpoint_io)
         WT_STAT_CONN_INCRV(session, block_byte_write_checkpoint, buf->size);
     time_stop = __wt_clock(session);
