@@ -47,11 +47,10 @@ struct ExtensionMetricsAllocation {
           failedMetricCounter(
               getSingletonMetricPtrWithinCmd(commandName, "withExtension.failed", role)) {}
 
-    // A counter for how many times this command has been executed with an aggregation
-    // pipeline-style update parameter.
+    // A counter for how many times this command has been successful *and* used an extension.
     Counter64* successMetricCounter;
 
-    // A counter for how many times this command has been executed with the arrayFilters option.
+    // A counter for how many times this command has failed *and* used an extension.
     Counter64* failedMetricCounter;
 };
 
