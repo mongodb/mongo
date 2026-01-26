@@ -1,3 +1,9 @@
+/**
+ * @tags: [
+ *   # TODO (SERVER-117836): Reenable this test.
+ *   featureFlagRecordIdsReplicated_incompatible,
+ * ]
+ */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const debug = 0;
