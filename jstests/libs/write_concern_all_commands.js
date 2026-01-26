@@ -6163,6 +6163,19 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
             jsTestLog("Skipping " + command + " test for failure case.");
             return true;
         }
+
+        // When UWE is enabled, a findAndModify update on sharded viewful timeseries collection
+        // may fail on mongos directly, so there's no write concern error to check.
+        if (
+            FeatureFlagUtil.isEnabled(coll.getDB(), "UnifiedWriteExecutor") &&
+            clusterType == "sharded" &&
+            ["findAndModify", "findOneAndUpdate"].includes(command) &&
+            shardedCollection &&
+            timeseriesViews
+        ) {
+            jsTestLog("Skipping " + command + " test for failure case.");
+            return true;
+        }
     }
 }
 

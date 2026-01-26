@@ -58,8 +58,8 @@ protected:
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
             cb(request);
 
-            BSONObjBuilder bob;
-            bob.append("_id", -1);
+            BSONObjBuilder bob(BSON("value" << BSONNULL << "lastErrorObject"
+                                            << BSON("n" << 0 << "updatedExisting" << false)));
             appendTxnResponseMetadata(bob);
             return bob.obj();
         });
@@ -69,7 +69,8 @@ protected:
         onCommandForPoolExecutor([this, shardIndex](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(kNss.coll(), request.cmdObj.firstElement().valueStringData());
 
-            BSONObjBuilder bob;
+            BSONObjBuilder bob(BSON("value" << BSONNULL << "lastErrorObject"
+                                            << BSON("n" << 0 << "updatedExisting" << false)));
             bob.append("_id", -1);
             appendTxnResponseMetadata(bob);
             return bob.obj();

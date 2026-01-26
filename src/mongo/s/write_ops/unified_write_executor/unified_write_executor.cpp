@@ -146,7 +146,7 @@ FindAndModifyCommandResponse findAndModify(
         boost::optional<WriteConcernErrorDetail> wce = boost::none;
         FLEBatchResult result = processFLEFindAndModify(opCtx, request, swReply, wce);
         if (result == FLEBatchResult::kProcessed) {
-            return {swReply, wce};
+            return {swReply, ShardId(), wce};
         }
         // When FLE logic determines there is no need of processing, we fall through to the normal
         // case.

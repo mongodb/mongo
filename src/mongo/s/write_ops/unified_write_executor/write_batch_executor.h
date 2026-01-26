@@ -74,12 +74,14 @@ public:
                   boost::optional<WriteConcernErrorDetail> wce,
                   std::vector<WriteOp> ops,
                   bool transientTxnError,
-                  boost::optional<HostAndPort> hostAndPort = boost::none)
+                  boost::optional<HostAndPort> hostAndPort = boost::none,
+                  boost::optional<ShardId> shardId = boost::none)
         : _swReply(std::move(swReply)),
           _wce(std::move(wce)),
           _ops(std::move(ops)),
           _transientTxnError(transientTxnError),
-          _hostAndPort(std::move(hostAndPort)) {}
+          _hostAndPort(std::move(hostAndPort)),
+          _shardId(std::move(shardId)) {}
 
     bool isOK() const {
         return _swReply && _swReply->isOK();
@@ -125,6 +127,10 @@ public:
         return _hostAndPort;
     }
 
+    const boost::optional<ShardId>& getShardId() const {
+        return _shardId;
+    }
+
     // Returns true if this BasicResponse contains a WouldChangeOwningShard error.
     bool isWouldChangeOwningShardError() const {
         return isError() && getStatus() == ErrorCodes::WouldChangeOwningShard;
@@ -150,6 +156,9 @@ private:
 
     // For debugging purposes.
     boost::optional<HostAndPort> _hostAndPort;
+
+    // The single targeted shard ID this response comes from if known.
+    boost::optional<ShardId> _shardId;
 };
 
 class ShardResponse : public BasicResponse {
@@ -163,7 +172,7 @@ public:
                               std::vector<WriteOp> ops,
                               bool inTransaction = false,
                               boost::optional<HostAndPort> hostAndPort = boost::none,
-                              boost::optional<const ShardId&> shardId = boost::none);
+                              boost::optional<ShardId> shardId = boost::none);
 
     /**
      * Creates an "empty" ShardResponse. This method is used when there is no RemoteCommandResponse
@@ -201,7 +210,8 @@ public:
     static NoRetryWriteBatchResponse make(StatusWith<BatchWriteCommandReply> swResponse,
                                           boost::optional<WriteConcernErrorDetail> wce,
                                           const WriteOp& op,
-                                          bool inTransaction);
+                                          bool inTransaction,
+                                          boost::optional<ShardId> shardId = boost::none);
 
     /**
      * Creates a NoRetryWriteBatchResponse from the supplied BulkWriteCommandReply.
@@ -209,7 +219,8 @@ public:
     static NoRetryWriteBatchResponse make(StatusWith<BulkWriteCommandReply> swResponse,
                                           boost::optional<WriteConcernErrorDetail> wce,
                                           const WriteOp& op,
-                                          bool inTransaction);
+                                          bool inTransaction,
+                                          boost::optional<ShardId> shardId = boost::none);
 
     /**
      * Creates a NoRetryWriteBatchResponse from the supplied FindAndModifyCommandReply.
@@ -218,7 +229,8 @@ public:
         StatusWith<write_ops::FindAndModifyCommandReply> swResponse,
         boost::optional<WriteConcernErrorDetail> wce,
         const WriteOp& op,
-        bool inTransaction);
+        bool inTransaction,
+        boost::optional<ShardId> shardId = boost::none);
 
     /**
      * Creates a NoRetryWriteBatchResponse from the supplied BSONObj response.
@@ -226,7 +238,8 @@ public:
     static NoRetryWriteBatchResponse make(const StatusWith<BSONObj>& swResponse,
                                           boost::optional<WriteConcernErrorDetail> wce,
                                           const WriteOp& op,
-                                          bool inTransaction);
+                                          bool inTransaction,
+                                          boost::optional<ShardId> shardId = boost::none);
 
     const WriteOp& getOp() const {
         tassert(11182200, "Expected vector to contain exactly one op", getOps().size() == 1);
@@ -238,7 +251,8 @@ private:
     static NoRetryWriteBatchResponse makeImpl(StatusWith<ResponseType> swResponse,
                                               boost::optional<WriteConcernErrorDetail> wce,
                                               const WriteOp& op,
-                                              bool inTransaction);
+                                              bool inTransaction,
+                                              boost::optional<ShardId> shardId = boost::none);
 };
 
 using WriteBatchResponse =

@@ -812,6 +812,65 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     // Collect metrics.
     _updateMetrics->collectMetrics(originalCmdObj);
 
+    if (unified_write_executor::isEnabled(opCtx)) {
+        auto cmdObjForShard = CommandHelpers::filterCommandRequestForPassthrough(originalCmdObj);
+
+        // Evaluate let parameters once before forwarding to the shards for non-deterministic
+        // operators like $rand.
+        cmdObjForShard = expandLetParams(opCtx, originalNss, cmdObjForShard);
+
+        // Manually appending the required "$db" field name so that we can pass the parsed command
+        // request to further processing.
+        BSONObjBuilder bob(cmdObjForShard);
+        bob.append(write_ops::FindAndModifyCommandRequest::kDbNameFieldName,
+                   DatabaseNameUtil::serialize(originalNss.dbName(), SerializationContext{}));
+        cmdObjForShard = bob.obj();
+
+        auto request = write_ops::FindAndModifyCommandRequest::parse(
+            cmdObjForShard, IDLParserContext("ClusterFindAndModify"));
+        request.setNamespace(originalNss);
+
+        auto response = unified_write_executor::findAndModify(opCtx, request, originalCmdObj);
+        if (response.swReply.isOK()) {
+            auto& reply = response.swReply.getValue();
+            if (response.wce) {
+                reply.setWriteConcernError(response.wce->toBSON());
+            }
+            reply.serialize(&result);
+        } else {
+            if (response.swReply.getStatus().code() == ErrorCodes::WouldChangeOwningShard) {
+                auto cri = getCollectionRoutingInfo(opCtx, originalCmdObj, originalNss);
+                const auto& cm = cri.getChunkManager();
+                auto isTrackedTimeseries = cri.hasRoutingTable() && cm.getTimeseriesFields();
+                bool isTimeseriesViewRequest = false;
+                if (isTrackedTimeseries && !isRawDataOperation(opCtx) &&
+                    !originalNss.isTimeseriesBucketsCollection()) {
+                    isTimeseriesViewRequest = true;
+                }
+                NamespaceString nss = originalNss;
+                if (isTrackedTimeseries && !cm.isNewTimeseriesWithoutView() && nss != cm.getNss()) {
+                    nss = cm.getNss();
+                }
+                handleWouldChangeOwningShardError(opCtx,
+                                                  response.shardId ? *response.shardId : ShardId(),
+                                                  cri,
+                                                  nss,
+                                                  response.swReply.getStatus(),
+                                                  cmdObjForShard,
+                                                  isTimeseriesViewRequest,
+                                                  &result);
+                return true;
+            }
+
+            if (response.wce && !result.hasField("writeConcernError")) {
+                result.append("writeConcernError", response.wce->toBSON());
+            }
+            uassertStatusOK(response.swReply.getStatus());
+        }
+
+        return true;
+    }
+
     if (processFLEFindAndModify(opCtx, originalCmdObj, result) == FLEBatchResult::kProcessed) {
         return true;
     }
@@ -969,6 +1028,42 @@ bool FindAndModifyCmd::getCrudProcessedFromCmd(const BSONObj& cmdObj) {
         req.getEncryptionInformation()->getCrudProcessed().get_value_or(false);
 }
 
+// TODO SERVER-114994: Handle WCOS error using UWE code path if possible.
+void FindAndModifyCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
+                                                         const ShardId& shardId,
+                                                         const CollectionRoutingInfo& cri,
+                                                         const NamespaceString& nss,
+                                                         const Status& responseStatus,
+                                                         const BSONObj& cmdObj,
+                                                         bool isTimeseriesViewRequest,
+                                                         BSONObjBuilder* result) {
+    auto txnRouter = TransactionRouter::get(opCtx);
+    bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
+
+    if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+            VersionContext::getDecoration(opCtx),
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        handleWouldChangeOwningShardErrorUsingTransactionApi(
+            opCtx, shardId, nss, cmdObj, responseStatus, result);
+    } else {
+        // TODO SERVER-67429: Remove this branch.
+        opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptOut);
+
+        if (isRetryableWrite) {
+            _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
+                opCtx, shardId, cri, nss, cmdObj, isTimeseriesViewRequest, result);
+        } else {
+            handleWouldChangeOwningShardErrorTransactionLegacy(opCtx,
+                                                               nss,
+                                                               responseStatus,
+                                                               cmdObj,
+                                                               result,
+                                                               isTimeseriesViewRequest,
+                                                               getCrudProcessedFromCmd(cmdObj));
+        }
+    }
+}
+
 // Catches errors in the given response, and reruns the command if necessary. Uses the given
 // response to construct the findAndModify command result passed to the client.
 void FindAndModifyCmd::_handleResponseAndConstructResult(OperationContext* opCtx,
@@ -980,9 +1075,6 @@ void FindAndModifyCmd::_handleResponseAndConstructResult(OperationContext* opCtx
                                                          const BSONObj& response,
                                                          bool isTimeseriesViewRequest,
                                                          BSONObjBuilder* result) {
-    auto txnRouter = TransactionRouter::get(opCtx);
-    bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
-
     if (ErrorCodes::isNeedRetargettingError(responseStatus.code()) ||
         ErrorCodes::isSnapshotError(responseStatus.code()) ||
         responseStatus.code() == ErrorCodes::StaleDbVersion) {
@@ -991,28 +1083,8 @@ void FindAndModifyCmd::_handleResponseAndConstructResult(OperationContext* opCtx
     }
 
     if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
-        if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
-                VersionContext::getDecoration(opCtx),
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            handleWouldChangeOwningShardError(opCtx, shardId, nss, cmdObj, responseStatus, result);
-        } else {
-            // TODO SERVER-67429: Remove this branch.
-            opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptOut);
-
-            if (isRetryableWrite) {
-                _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
-                    opCtx, shardId, cri, nss, cmdObj, isTimeseriesViewRequest, result);
-            } else {
-                handleWouldChangeOwningShardErrorTransactionLegacy(opCtx,
-                                                                   nss,
-                                                                   responseStatus,
-                                                                   cmdObj,
-                                                                   result,
-                                                                   isTimeseriesViewRequest,
-                                                                   getCrudProcessedFromCmd(cmdObj));
-            }
-        }
-
+        handleWouldChangeOwningShardError(
+            opCtx, shardId, cri, nss, responseStatus, cmdObj, isTimeseriesViewRequest, result);
         return;
     }
 
@@ -1281,12 +1353,13 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
     }
 }
 
-void FindAndModifyCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
-                                                         const ShardId& shardId,
-                                                         const NamespaceString& nss,
-                                                         const BSONObj& cmdObj,
-                                                         const Status& responseStatus,
-                                                         BSONObjBuilder* result) {
+void FindAndModifyCmd::handleWouldChangeOwningShardErrorUsingTransactionApi(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const Status& responseStatus,
+    BSONObjBuilder* result) {
     auto txnRouter = TransactionRouter::get(opCtx);
     bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 

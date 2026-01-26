@@ -52,11 +52,11 @@ std::unique_ptr<write_op_helpers::BatchCommandSizeEstimatorBase> getSizeEstimato
     } else if (cmdRef.isBulkWriteCommand()) {
         return std::make_unique<write_op_helpers::BulkCommandSizeEstimator>(
             opCtx, cmdRef.getBulkWriteCommandRequest());
+    } else {
+        // For other unbatched commands, e.g. findAndModify, we do not need size estimation so just
+        // construct an estimator that always estimates zero.
+        return std::make_unique<write_op_helpers::NoBatchCommandSizeEstimator>();
     }
-
-    // TODO(SERVER-115502): Check if we hit this tassert for FAM commands, we may need to add a
-    // no-op size estimator.
-    tasserted(11576100, "Expected bulk or batched write command in a SimpleBatch");
 }
 }  // namespace
 
