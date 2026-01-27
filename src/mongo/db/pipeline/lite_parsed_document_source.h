@@ -464,6 +464,13 @@ public:
     }
 
     /**
+     * Returns true if this is the merge stage.
+     */
+    virtual bool isMergeStage() const {
+        return false;
+    }
+
+    /**
      * Returns true if this stage is an initial source and should run just once on the entire
      * cluster.
      */

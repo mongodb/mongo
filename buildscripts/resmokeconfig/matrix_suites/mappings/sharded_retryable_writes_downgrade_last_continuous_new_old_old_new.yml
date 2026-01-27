@@ -1,3 +1,5 @@
 base_suite: sharded_retryable_writes_downgrade
 overrides:
   - "multiversion.sharded_fixture_last_continuous_new_old_old_new"
+  # TODO (SERVER-117693) - Remove this override once SERVER-114640 is backported to 8.2
+  - "multiversion.sharding_temporarily_enforce_1_mongos"

@@ -148,6 +148,10 @@ public:
             return true;
         }
 
+        bool isMergeStage() const override {
+            return true;
+        }
+
         std::unique_ptr<StageParams> getStageParams() const override {
             return std::make_unique<MergeStageParams>(_originalBson);
         }

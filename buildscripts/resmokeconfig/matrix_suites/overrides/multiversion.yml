@@ -178,6 +178,12 @@
         - requires_profiling
         - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
 
+- name: sharding_temporarily_enforce_1_mongos
+  value:
+    executor:
+      fixture:
+        num_mongos: 1
+
 - name: multiversion_future_git_tag_exclude_files
   value:
     exclude_with_any_tags:

@@ -200,6 +200,10 @@ public:
         return !_stageSpecs.empty() && _stageSpecs.back()->isWriteStage();
     }
 
+    bool endsWithMergeStage() const {
+        return !_stageSpecs.empty() && _stageSpecs.back()->isMergeStage();
+    }
+
     /**
      * Returns true if the pipeline has a $changeStream stage.
      */

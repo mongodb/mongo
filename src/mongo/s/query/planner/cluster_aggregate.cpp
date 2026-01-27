@@ -1128,27 +1128,28 @@ Status ClusterAggregate::runAggregate(
         router.createDbImplicitlyOnRoute();
     }
 
-    // We'll use routerBodyStarted to distinguish whether an error was thrown before or after the
-    // body function was executed.
-    bool routerBodyStarted = false;
+    // We'll use the aggregationStatus to distinguish whether an error was thrown by the
+    // aggregation command or the refresh loop.
+    Status aggregationStatus = Status::OK();
     auto bodyFn = [&](OperationContext* opCtx, RoutingContext& routingCtx) {
-        routerBodyStarted = true;
-        uassertStatusOK(runAggregateImpl(opCtx,
-                                         routingCtx,
-                                         namespaces,
-                                         request,
-                                         liteParsedPipeline,
-                                         privileges,
-                                         boost::none /* resolvedView */,
-                                         boost::none /* originalRequest */,
-                                         verbosity,
-                                         result,
-                                         ifrContext));
+        aggregationStatus = runAggregateImpl(opCtx,
+                                             routingCtx,
+                                             namespaces,
+                                             request,
+                                             liteParsedPipeline,
+                                             privileges,
+                                             boost::none /* resolvedView */,
+                                             boost::none /* originalRequest */,
+                                             verbosity,
+                                             result,
+                                             ifrContext);
+
+        uassertStatusOK(aggregationStatus);
         return Status::OK();
     };
 
     // Route the command and capture the returned status.
-    Status status = std::invoke([&]() -> Status {
+    Status finalStatus = std::invoke([&]() -> Status {
         try {
             return router.routeWithRoutingContext(comment, bodyFn);
         } catch (const DBException& ex) {
@@ -1156,23 +1157,40 @@ Status ClusterAggregate::runAggregate(
         }
     });
 
-    // Error handling for exceptions raised prior to executing the runAggregation operation.
-    if (!status.isOK() && !routerBodyStarted) {
+    // Error handling for exceptions raised by the refresh loop.
+    // We can infer this by comparing the 2 status received:
+    // - a failed finalStatus might be either an error from the refresh loop or from the the
+    // aggregate command
+    // - a failed aggregationStatus can only be from the aggregate command (note this includes
+    // StaleDb and StaleConfig)
+    // A refresh error is calculated as follows
+    // - the finalStatus fails but the aggregation doesn't
+    // - both finalStatus and aggregationStatus fails, but they are different
+    bool isRefreshError =
+        !finalStatus.isOK() && (aggregationStatus.isOK() || aggregationStatus != finalStatus);
+    if (isRefreshError) {
         uassert(CollectionUUIDMismatchInfo(request.getDbName(),
                                            *request.getCollectionUUID(),
                                            std::string{request.getNamespace().coll()},
                                            boost::none),
                 "Database does not exist",
-                status != ErrorCodes::NamespaceNotFound || !request.getCollectionUUID());
+                finalStatus != ErrorCodes::NamespaceNotFound || !request.getCollectionUUID());
 
         if (liteParsedPipeline.startsWithCollStats()) {
-            uassertStatusOKWithContext(status,
+            uassertStatusOKWithContext(finalStatus,
                                        "Unable to retrieve information for $collStats stage");
+        }
+
+        // $merge is the only stage that requires to report specifically NamespaceNotFound, instead
+        // of returning an empty batch with status ok.
+        if (finalStatus == ErrorCodes::NamespaceNotFound &&
+            liteParsedPipeline.endsWithMergeStage()) {
+            return finalStatus;
         }
 
         // Return an empty cursor with the given status.
         return _parseQueryStatsAndReturnEmptyResult(opCtx,
-                                                    status,
+                                                    finalStatus,
                                                     namespaces,
                                                     request,
                                                     liteParsedPipeline,
@@ -1182,7 +1200,7 @@ Status ClusterAggregate::runAggregate(
                                                     result);
     }
 
-    return status;
+    return finalStatus;
 }
 
 Status ClusterAggregate::runAggregateWithRoutingCtx(

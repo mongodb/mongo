@@ -20,7 +20,7 @@ import {
     getTimeseriesCollForDDLOps,
 } from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
-// TODO SERVER-114640 Remove this line once aggregate won't report NamespaceNotFound if the db gets dropped.
+// TODO (SERVER-117871) remove once the topologyTime is guaranteed to be gossiped out to all routers.
 TestData.pinToSingleMongos = true;
 
 assert.commandWorked(db.dropDatabase());

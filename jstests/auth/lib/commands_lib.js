@@ -1648,6 +1648,14 @@ export const authCommandsLib = {
         },
         {
             testname: "aggregate_merge_insert_documents",
+            setup: function (db) {
+                assert.commandWorked(db.getSiblingDB(firstDbName).foo.insert({}));
+                assert.commandWorked(db.getSiblingDB(secondDbName).foo.insert({}));
+            },
+            teardown: function (db) {
+                assert.commandWorked(db.getSiblingDB(firstDbName).dropDatabase());
+                assert.commandWorked(db.getSiblingDB(secondDbName).dropDatabase());
+            },
             command: function (state, args) {
                 return {
                     aggregate: "foo",
@@ -1724,6 +1732,14 @@ export const authCommandsLib = {
         },
         {
             testname: "aggregate_merge_replace_documents",
+            setup: function (db) {
+                assert.commandWorked(db.getSiblingDB(firstDbName).foo.insert({}));
+                assert.commandWorked(db.getSiblingDB(secondDbName).foo.insert({}));
+            },
+            teardown: function (db) {
+                assert.commandWorked(db.getSiblingDB(firstDbName).dropDatabase());
+                assert.commandWorked(db.getSiblingDB(secondDbName).dropDatabase());
+            },
             command: function (state, args) {
                 return {
                     aggregate: "foo",
