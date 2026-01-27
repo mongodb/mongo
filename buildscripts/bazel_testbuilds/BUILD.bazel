@@ -9,6 +9,20 @@ mongo_cc_binary(
     srcs = ["unit_test.cpp"],
 )
 
+# Verifies evergreen symbol-check report uses the exact bazel invocation
+# emitted by the Evergreen bazel compile script, and suggests *_with_debug targets.
+py_test(
+    name = "test_generate_symbol_check_report",
+    srcs = ["test_generate_symbol_check_report.py"],
+    data = [
+        "//evergreen:generate_symbol_check_report.py",
+    ],
+    deps = [
+        "//buildscripts:simple_report",
+        "//buildscripts/util",
+    ],
+)
+
 # Test for verifying test_wrapper.sh timeout behavior and coredump generation.
 # This test intentionally hangs to trigger the timeout mechanism in test_wrapper.sh.
 # When run via the --run_under=//bazel:test_wrapper param, it should:

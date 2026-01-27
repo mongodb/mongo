@@ -26,6 +26,10 @@ py_library(
             group = "testing",
         ),
         dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
             "structlog",
             group = "evergreen",
         ),
