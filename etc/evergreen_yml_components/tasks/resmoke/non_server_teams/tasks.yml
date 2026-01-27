@@ -301,6 +301,8 @@ tasks:
     commands:
       - func: "do setup"
       - func: "run tests"
+        vars:
+          resmoke_jobs_max: 1
 
   - <<: *task_template
     name: streams_kinesis
