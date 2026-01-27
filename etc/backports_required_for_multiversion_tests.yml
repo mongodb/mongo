@@ -512,6 +512,8 @@ last-continuous:
       ticket: SERVER-115594
     - test_file: jstests/aggregation/variables/subpipeline_system_variables.js
       ticket: SERVER-114384
+    - test_file: jstests/core/index/geo/geo_polygon3.js
+      ticket: SERVER-106239
   suites: null
 last-lts:
   all:
@@ -1081,4 +1083,6 @@ last-lts:
       ticket: SERVER-115594
     - test_file: jstests/aggregation/variables/subpipeline_system_variables.js
       ticket: SERVER-114384
+    - test_file: jstests/core/index/geo/geo_polygon3.js
+      ticket: SERVER-106239
   suites: null
