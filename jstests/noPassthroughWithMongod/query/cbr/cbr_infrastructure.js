@@ -212,7 +212,13 @@ function checkWinningPlan({query = {}, project = {}, order = {}}) {
     const r0 = getRejectedPlans(e0);
 
     // Classic plan via CBR
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}));
+    assert.commandWorked(
+        db.adminCommand({
+            setParameter: 1,
+            planRankerMode: "automaticCE",
+            automaticCEPlanRankingStrategy: "HistogramCEWithHeuristicFallback",
+        }),
+    );
     const e1 = coll.find(query, project).sort(order).explain("executionStats");
     const w1 = getWinningPlanFromExplain(e1);
     const r1 = getRejectedPlans(e1);
