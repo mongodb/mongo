@@ -25,6 +25,33 @@ LOG = structlog.getLogger(__name__)
 JIRA_SERVER = "https://jira.mongodb.org"
 
 
+def _get_jira_field_errors(err: JIRAError) -> dict:
+    """
+    Best-effort extraction of field-level errors from a JIRAError.
+
+    JIRA commonly returns:
+        {"errorMessages": [], "errors": {"customfield_12751": "Option value 'X' is not valid"}}
+    """
+    response = getattr(err, "response", None)
+    if response is None:
+        return {}
+
+    json_fn = getattr(response, "json", None)
+    if json_fn is None:
+        return {}
+
+    try:
+        payload = json_fn()
+    except Exception:
+        return {}
+
+    if not isinstance(payload, dict):
+        return {}
+
+    errors = payload.get("errors")
+    return errors if isinstance(errors, dict) else {}
+
+
 def find_todos(search_file, jira, file_name):
     """Iterate through a file, finding TODOs with resolved tickets and creating new tickets."""
     for i, line in enumerate(search_file):
@@ -93,11 +120,46 @@ def create_todo_ticket(jira, resolved_issue):
     # It's possible for us to try and create a ticket with an illegal assignee (most commonly
     # a former employee) so for now we default to hard assigning these to Joe to reassign.
     # This situation should be very infrequent.
-    try:
-        new_issue = jira.create_issue(fields=issue_dict)
-    except JIRAError:
-        issue_dict["assignee"]["name"] = "joseph.kanaan@mongodb.com"
-        new_issue = jira.create_issue(fields=issue_dict)
+    fallback_assignee = "joseph.kanaan@mongodb.com"
+    fallback_team = "Server Triage"
+
+    new_issue = None
+    for attempt in range(3):
+        try:
+            new_issue = jira.create_issue(fields=issue_dict)
+            break
+        except JIRAError as err:
+            field_errors = _get_jira_field_errors(err)
+            updated = False
+
+            # If the resolved issue has a team value that isn't valid for the target project/type,
+            # fall back to "Server Triage" and retry.
+            if (
+                "customfield_12751" in field_errors
+                or "customfield_12751" in str(err)
+                or "Option value" in str(err)
+            ):
+                current_team = issue_dict.get("customfield_12751", [{}])[0].get("value")
+                if current_team != fallback_team:
+                    LOG.warning(
+                        "Invalid Jira team option; falling back to Server Triage",
+                        team=current_team,
+                        key=key,
+                    )
+                    issue_dict["customfield_12751"] = [{"value": fallback_team}]
+                    updated = True
+
+            # Preserve existing behavior: retry once with a known-good assignee.
+            current_assignee = issue_dict.get("assignee", {}).get("name")
+            if current_assignee != fallback_assignee:
+                issue_dict["assignee"]["name"] = fallback_assignee
+                updated = True
+
+            if not updated or attempt == 2:
+                raise
+
+    if new_issue is None:
+        raise RuntimeError("Failed to create todo ticket after retries")
     jira.create_issue_link(
         type="Related", inwardIssue=resolved_issue.key, outwardIssue=new_issue.key
     )
