@@ -239,6 +239,7 @@ executor:
             shardsAddedRemoved: true
             hasRandomShardsAddedRemoved: true
     - class: ValidateCollections
+    - class: CheckShardFilteringMetadata
     - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20

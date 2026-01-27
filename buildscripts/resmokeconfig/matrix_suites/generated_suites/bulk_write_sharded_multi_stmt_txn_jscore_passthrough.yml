@@ -48,6 +48,7 @@ executor:
         global_vars:
           TestData: *id001
     - class: ValidateCollections
+    - class: CheckShardFilteringMetadata
     - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20

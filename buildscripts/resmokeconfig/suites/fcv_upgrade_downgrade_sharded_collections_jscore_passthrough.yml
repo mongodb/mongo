@@ -265,6 +265,8 @@ executor:
           TestData:
             isRunningFCVUpgradeDowngradeSuite: true
     - class: FCVUpgradeDowngradeInBackground
+    - class: CheckShardFilteringMetadata
+    - class: CheckOrphansDeleted
     - class: CleanEveryN
       n: 20
   fixture:

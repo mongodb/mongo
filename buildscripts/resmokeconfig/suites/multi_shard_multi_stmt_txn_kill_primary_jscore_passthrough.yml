@@ -355,6 +355,7 @@ executor:
     - class: CheckReplOplogs
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+    - class: CheckShardFilteringMetadata
     - class: CheckOrphansDeleted
     - class: ValidateCollections
       shell_options:
