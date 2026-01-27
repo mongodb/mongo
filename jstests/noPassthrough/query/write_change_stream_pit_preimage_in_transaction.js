@@ -13,7 +13,11 @@
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {getPreImagesCollection, preImagesForOps} from "jstests/libs/query/change_stream_util.js";
+import {
+    getPreImagesCollection,
+    preImagesForOps,
+    assertValidChangeStreamPreImageDocument,
+} from "jstests/libs/query/change_stream_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {TxnUtil} from "jstests/libs/txns/txn_util.js";
 
@@ -63,36 +67,7 @@ function assertPreImagesWrittenForOps(db, ops, expectedPreImages) {
 
     for (let idx = 0; idx < writtenPreImages.length; idx++) {
         assert.eq(writtenPreImages[idx].preImage, expectedPreImages[idx]);
-        assertValidChangeStreamPreImageDocument(writtenPreImages[idx]);
-    }
-}
-
-// Cross-checks the content of the pre-image document 'preImage' against the associated oplog entry.
-function assertValidChangeStreamPreImageDocument(preImage) {
-    function assertChangeStreamPreImageDocumentMatchesOplogEntry(oplogEntry, preImage, wallTime) {
-        // Pre-images documents are recorded only for update and delete commands.
-        assert.contains(oplogEntry.op, ["u", "d"], oplogEntry);
-        assert.eq(preImage._id.nsUUID, oplogEntry.ui, oplogEntry);
-        assert.eq(preImage.operationTime, wallTime, oplogEntry);
-        if (oplogEntry.hasOwnProperty("o2")) {
-            assert.eq(preImage.preImage._id, oplogEntry.o2._id, oplogEntry);
-        }
-    }
-    const oplogEntryCursor = localDB.oplog.rs.find({ts: preImage._id.ts});
-    assert(oplogEntryCursor.hasNext());
-    const oplogEntry = oplogEntryCursor.next();
-    if (oplogEntry.o.hasOwnProperty("applyOps")) {
-        const applyOpsOplogEntry = oplogEntry;
-        assert(preImage._id.applyOpsIndex < applyOpsOplogEntry.o.applyOps.length);
-        const applyOpsEntry = applyOpsOplogEntry.o.applyOps[preImage._id.applyOpsIndex.toNumber()];
-        assertChangeStreamPreImageDocumentMatchesOplogEntry(applyOpsEntry, preImage, applyOpsOplogEntry.wall);
-    } else {
-        assert.eq(
-            preImage._id.applyOpsIndex,
-            0,
-            "applyOpsIndex value greater than 0 not expected for non-applyOps oplog entries",
-        );
-        assertChangeStreamPreImageDocumentMatchesOplogEntry(oplogEntry, preImage, oplogEntry.wall);
+        assertValidChangeStreamPreImageDocument(writtenPreImages[idx], localDB);
     }
 }
 

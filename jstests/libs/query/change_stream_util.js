@@ -868,6 +868,37 @@ export function assertPreImagesCollectionExists(db) {
 }
 
 /**
+ * Cross-checks the content of the pre-image document 'preImage' against the associated oplog entry.
+ */
+export function assertValidChangeStreamPreImageDocument(preImage, db) {
+    function assertChangeStreamPreImageDocumentMatchesOplogEntry(oplogEntry, preImage, wallTime) {
+        // Pre-images documents are recorded only for update and delete commands.
+        assert.contains(oplogEntry.op, ["u", "d"], oplogEntry);
+        assert.eq(preImage._id.nsUUID, oplogEntry.ui, oplogEntry);
+        assert.eq(preImage.operationTime, wallTime, oplogEntry);
+        if (oplogEntry.hasOwnProperty("o2")) {
+            assert.eq(preImage.preImage._id, oplogEntry.o2._id, oplogEntry);
+        }
+    }
+    const oplogEntryCursor = db.oplog.rs.find({ts: preImage._id.ts});
+    assert(oplogEntryCursor.hasNext());
+    const oplogEntry = oplogEntryCursor.next();
+    if (oplogEntry.o.hasOwnProperty("applyOps")) {
+        const applyOpsOplogEntry = oplogEntry;
+        assert.lt(preImage._id.applyOpsIndex, applyOpsOplogEntry.o.applyOps.length);
+        const applyOpsEntry = applyOpsOplogEntry.o.applyOps[preImage._id.applyOpsIndex.toNumber()];
+        assertChangeStreamPreImageDocumentMatchesOplogEntry(applyOpsEntry, preImage, applyOpsOplogEntry.wall);
+    } else {
+        assert.eq(
+            preImage._id.applyOpsIndex,
+            0,
+            "applyOpsIndex value greater than 0 not expected for non-applyOps oplog entries",
+        );
+        assertChangeStreamPreImageDocumentMatchesOplogEntry(oplogEntry, preImage, oplogEntry.wall);
+    }
+}
+
+/**
  * Returns the current cluster time by issuing a 'hello' command to the server and extracting
  * the cluster time from it.
  */
