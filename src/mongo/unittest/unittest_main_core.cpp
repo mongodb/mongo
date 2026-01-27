@@ -42,6 +42,7 @@
 #include "mongo/unittest/unittest_details.h"
 #include "mongo/unittest/unittest_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debugger.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -105,7 +106,19 @@ public:
 
 class ThrowListener : public testing::EmptyTestEventListener {
     void OnTestPartResult(const testing::TestPartResult& result) override {
-        if (result.type() != testing::TestPartResult::kFatalFailure)
+        if (result.type() == testing::TestPartResult::kSuccess ||
+            result.type() == testing::TestPartResult::kSkip)
+            return;
+
+        if (GTEST_FLAG_GET(break_on_failure)) {
+#if defined(_WIN32)
+            DebugBreak();
+#else
+            raise(SIGTRAP);
+#endif
+        }
+
+        if (result.type() == testing::TestPartResult::kNonFatalFailure)
             return;
 
         StringData msg = result.message();
@@ -278,6 +291,10 @@ void MainProgress::initialize() {
     // to a TTY.
     if (details::gtestColorDefaulted() && details::stdoutIsTty()) {
         GTEST_FLAG_SET(color, "yes");
+    }
+
+    if (isDebuggerActive()) {
+        GTEST_FLAG_SET(break_on_failure, true);
     }
 
     if (isDeathTestChild()) {

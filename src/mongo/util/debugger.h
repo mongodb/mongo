@@ -41,4 +41,6 @@ void waitForDebugger();
 
 MONGO_MOD_PUBLIC void breakpoint();
 
+bool isDebuggerActive();
+
 }  // namespace mongo
