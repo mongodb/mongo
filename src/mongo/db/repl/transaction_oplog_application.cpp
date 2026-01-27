@@ -222,6 +222,9 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                               "'createIndexes' command");
                     return repl::applyCommand_inlock(
                         opCtx, ApplierOperation{&op}, oplogApplicationMode);
+                } else if (op.isContainerOpType()) {
+                    return applyContainerOperation_inlock(
+                        opCtx, ApplierOperation{&op}, oplogApplicationMode);
                 }
                 return repl::applyOperation_inlock(opCtx,
                                                    coll,
