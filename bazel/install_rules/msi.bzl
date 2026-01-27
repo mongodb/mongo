@@ -113,13 +113,12 @@ def mongo_msi_impl(ctx):
     )
 
     output_msi = ctx.actions.declare_file(output_filename + ".msi")
-    msi_trim_script = ctx.attr._msi_trim_script.files.to_list()[0].path
 
     ctx.actions.run(
         outputs = [output_msi],
-        inputs = depset(transitive = [depset(light_out), ctx.attr._msi_trim_script.files, python.files]),
-        executable = python.interpreter.path,
-        arguments = [msi_trim_script, light_msi.path, output_msi.path],
+        inputs = depset(transitive = [depset(light_out), ctx.attr._msi_trim_script[DefaultInfo].default_runfiles.files, python.files]),
+        executable = ctx.executable._msi_trim_script,
+        arguments = [light_msi.path, output_msi.path],
     )
 
     return [DefaultInfo(
@@ -157,8 +156,9 @@ mongo_msi = rule(
         ),
         "_msi_trim_script": attr.label(
             doc = "The python msi trimming script to use.",
-            default = "//buildscripts:msitrim.py",
-            allow_single_file = True,
+            default = "//buildscripts:msitrim",
+            executable = True,
+            cfg = "exec",
         ),
         "_merge_modules": attr.label(
             default = "@local_windows_msvc//:merge_modules",

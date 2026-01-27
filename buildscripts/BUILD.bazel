@@ -7,11 +7,26 @@ exports_files([
     "cheetah_source_generator.py",
     "clang_tidy_config_gen.py",
     "jstoh.py",
-    "msitrim.py",
     "pip_requirements.py",
     "symbols.orderfile",
     "symbols-al2023.orderfile",
 ])
+
+py_binary(
+    name = "msitrim",
+    srcs = ["msitrim.py"],
+    main = "msitrim.py",
+    visibility = ["//visibility:public"],
+    deps = select({
+        "@platforms//os:windows": [
+            dependency(
+                "python-msilib",
+                group = "platform",
+            ),
+        ],
+        "//conditions:default": [],
+    }),
+)
 
 py_binary(
     name = "simple_report",
