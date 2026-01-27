@@ -1387,6 +1387,15 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
     const std::string ident = released->getIdent();
     Status status = engine->getEngine()->dropIdentSynchronous(
         shard_role_details::getRecoveryUnit(opCtx), ident);
+
+    // Retry the drop if we fail with an EBUSY code. If this is caused by dirty data, it will be
+    // resolved by a checkpoint here. Otherwise, propagate the failure to drop.
+    if (status.code() == ErrorCodes::ObjectIsBusy) {
+        engine->getEngine()->checkpoint();
+        status = engine->getEngine()->dropIdentSynchronous(
+            shard_role_details::getRecoveryUnit(opCtx), ident);
+    }
+
     if (!status.isOK()) {
         return status;
     }
