@@ -35,6 +35,14 @@
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -318,7 +326,7 @@ rightEmbeddingField: "y"
 ```
 ### Results
 ```json
-{ "_id" : "bar", "count" : 6 }
+{ "_id" : "bar", "count" : 14 }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -2234,6 +2242,10 @@ rightEmbeddingField: "y"
 { "_id" : 1, "a" : 1, "b" : "bar", "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -2316,7 +2328,7 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [x.c = c]
+NESTED_LOOP_JOIN_EMBEDDING [x.c = c]
 leftEmbeddingField: "none"
 rightEmbeddingField: "z"
   |  |
@@ -2515,6 +2527,14 @@ rightEmbeddingField: "z"
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -2991,7 +3011,7 @@ rightEmbeddingField: "k.y.z"
   |  COLLSCAN [test.basic_joins_md_foreign2]
   |  direction: "forward"
   |
-  HASH_JOIN_EMBEDDING [x.c = c]
+  NESTED_LOOP_JOIN_EMBEDDING [x.c = c]
   leftEmbeddingField: "none"
   rightEmbeddingField: "w.y"
   |  |
@@ -3226,6 +3246,14 @@ rightEmbeddingField: "k.y.z"
 { "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 { "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
 { "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "a" : null, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -3548,6 +3576,10 @@ rightEmbeddingField: "y"
 { "_id" : 1, "a" : 1, "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
 { "_id" : 2, "a" : 2, "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
 { "_id" : 2, "a" : 2, "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -3643,7 +3675,7 @@ rightEmbeddingField: "none"
 usedJoinOptimization: true
 
 ```
-HASH_JOIN_EMBEDDING [x.c = c]
+NESTED_LOOP_JOIN_EMBEDDING [x.c = c]
 leftEmbeddingField: "none"
 rightEmbeddingField: "z"
   |  |
@@ -3856,6 +3888,10 @@ rightEmbeddingField: "z"
 { "_id" : 1, "a" : 1, "extra" : 1, "x" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 }, "z" : { "_id" : 0, "a" : 1, "c" : "zoo", "d" : 1 } }
 { "_id" : 2, "a" : 2, "extra" : 2, "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 } }
 { "_id" : 2, "a" : 2, "extra" : 2, "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "extra" : null, "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 3, "a" : null, "extra" : null, "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
+{ "_id" : 4, "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "z" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 } }
 ```
 ### Summarized explain
 Execution Engine: sbe
@@ -4682,6 +4718,10 @@ rightEmbeddingField: "z"
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "y" : { "_id" : 1, "a" : 2, "c" : "blah", "d" : 2 }, "z" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 0, "b" : "bar", "d" : 2 } }
 { "_id" : 2, "a" : 2, "b" : "bar", "x" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "y" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 3, "a" : null, "b" : "bar", "x" : { "_id" : 3, "a" : null, "c" : "x", "d" : 4 }, "y" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 1, "b" : "bar", "d" : 6 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 0, "b" : "bar", "d" : 2 } }
+{ "_id" : 4, "b" : "bar", "x" : { "_id" : 4, "c" : "x", "d" : 5 }, "y" : { "_id" : 2, "a" : 2, "c" : "x", "d" : 3 }, "z" : { "_id" : 1, "b" : "bar", "d" : 6 } }
 ```
 ### Summarized explain
 Execution Engine: sbe

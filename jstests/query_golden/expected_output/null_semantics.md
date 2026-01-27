@@ -151,18 +151,6 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null } }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
@@ -177,18 +165,6 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null } }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
@@ -202,18 +178,6 @@ rightEmbeddingField: "cor"
   |
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
-```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null } }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
 ```
 ## 4. Correlated sub-pipeline (nested field)
 ### No join opt
@@ -252,36 +216,6 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } } }
-{ "_id" : 1, "cor" : { "_id" : 0 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 2, "key" : null }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 3, "key" : { } }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : 1 }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null }
-{ "_id" : 3, "cor" : { "_id" : 0 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 1, "key" : 1 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 2, "key" : null }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { } }
-{ "_id" : 4, "cor" : { "_id" : 0 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 1, "key" : 1 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 2, "key" : null }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 3, "key" : { } }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
@@ -296,36 +230,6 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } } }
-{ "_id" : 1, "cor" : { "_id" : 0 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 2, "key" : null }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 3, "key" : { } }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : 1 }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null }
-{ "_id" : 3, "cor" : { "_id" : 0 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 1, "key" : 1 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 2, "key" : null }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { } }
-{ "_id" : 4, "cor" : { "_id" : 0 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 1, "key" : 1 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 2, "key" : null }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 3, "key" : { } }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
@@ -339,36 +243,6 @@ rightEmbeddingField: "cor"
   |
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
-```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } } }
-{ "_id" : 1, "cor" : { "_id" : 0 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 2, "key" : null }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 3, "key" : { } }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : 1 }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null }
-{ "_id" : 3, "cor" : { "_id" : 0 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 1, "key" : 1 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 2, "key" : null }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { } }
-{ "_id" : 4, "cor" : { "_id" : 0 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 1, "key" : 1 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 2, "key" : null }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 3, "key" : { } }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
 ```
 ## 5. Implicit cycle (local-foreign)
 ### No join opt
@@ -487,31 +361,6 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 3, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { }, "lf" : { "_id" : 3, "key" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
@@ -533,31 +382,6 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 3, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { }, "lf" : { "_id" : 3, "key" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
@@ -578,31 +402,6 @@ rightEmbeddingField: "none"
   |
   COLLSCAN [test.null_semantics_md_third]
   direction: "forward"
-```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 3, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { }, "lf" : { "_id" : 3, "key" : { } } }
 ```
 ## 7. Implicit cycle (correlated)
 ### No join opt
@@ -654,50 +453,6 @@ rightEmbeddingField: "cor2"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 1, "key" : 1 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 3, "key" : { } } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 4, "key" : { "foo" : null } } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 1, "key" : 1 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 3, "key" : { } } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 4, "key" : { "foo" : null } } }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 0 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 2, "key" : null }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 3, "key" : { } }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : 1 }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 3, "key" : { } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 3, "key" : { } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 0 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 0 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 0 }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
@@ -719,50 +474,6 @@ rightEmbeddingField: "cor2"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 1, "key" : 1 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 3, "key" : { } } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 4, "key" : { "foo" : null } } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 1, "key" : 1 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 3, "key" : { } } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 4, "key" : { "foo" : null } } }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 0 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 2, "key" : null }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 3, "key" : { } }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : 1 }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 3, "key" : { } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 3, "key" : { } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 0 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 0 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 0 }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
@@ -783,50 +494,6 @@ rightEmbeddingField: "none"
   |
   COLLSCAN [test.null_semantics_md_other]
   direction: "forward"
-```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 1, "key" : 1 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 3, "key" : { } } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 4, "key" : { "foo" : null } } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 1, "key" : 1 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 3, "key" : { } } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 4, "key" : { "foo" : null } } }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 0 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 2, "key" : null }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 3, "key" : { } }, "key" : 1 }
-{ "_id" : 1, "cor" : { "_id" : 1, "key" : 1 }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : 1 }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 3, "key" : { } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 3, "key" : { } }, "key" : null }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 0 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 3, "cor" : { "_id" : 3, "key" : { } }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 0 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { "foo" : null } }
-{ "_id" : 4, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 0 }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 1, "key" : 1 }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 2, "key" : null }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 3, "key" : { } }, "key" : { "foo" : { } } }
-{ "_id" : 5, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "cor2" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : { } } }
 ```
 ## 8. Implicit cycle (mixed) + indexes
 ### No join opt
@@ -873,31 +540,6 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 3, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { }, "lf" : { "_id" : 3, "key" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
@@ -927,31 +569,6 @@ rightEmbeddingField: "cor"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 3, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { }, "lf" : { "_id" : 3, "key" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
 
@@ -980,31 +597,6 @@ rightEmbeddingField: "none"
   |
   COLLSCAN [test.null_semantics_md_third]
   direction: "forward"
-```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 0 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 1, "key" : 1 }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 2, "key" : null }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 3, "key" : { } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 0 } }
-{ "_id" : 0, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 0 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 1, "key" : 1 }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 2, "key" : null }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 3, "key" : { } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 0 } }
-{ "_id" : 2, "cor" : { "_id" : 4, "key" : { "foo" : null } }, "key" : null, "lf" : { "_id" : 2, "key" : null } }
-{ "_id" : 3, "cor" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { }, "lf" : { "_id" : 3, "key" : { } } }
 ```
 ## 9. Large implicit cycle (5 nodes)
 ### No join opt
@@ -1068,46 +660,6 @@ rightEmbeddingField: "c4"
   COLLSCAN [test.null_semantics_md]
   direction: "forward"
 ```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 1, "c1" : { "_id" : 1, "key" : 1 }, "c2" : { "_id" : 1, "key" : 1 }, "c3" : { "_id" : 1, "key" : 1 }, "c4" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 3, "c1" : { "_id" : 3, "key" : { } }, "c2" : { "_id" : 3, "key" : { } }, "c3" : { "_id" : 3, "key" : { } }, "c4" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 4, "c1" : { "_id" : 4, "key" : { "foo" : null } }, "c2" : { "_id" : 4, "key" : { "foo" : null } }, "c3" : { "_id" : 4, "key" : { "foo" : null } }, "c4" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "c1" : { "_id" : 5, "key" : { "foo" : { } } }, "c2" : { "_id" : 5, "key" : { "foo" : { } } }, "c3" : { "_id" : 5, "key" : { "foo" : { } } }, "c4" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
-```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = true, internalRandomJoinOrderSeed = 42
 usedJoinOptimization: true
 
@@ -1150,46 +702,6 @@ rightEmbeddingField: "c3"
   |
   COLLSCAN [test.null_semantics_md_third]
   direction: "forward"
-```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 1, "c1" : { "_id" : 1, "key" : 1 }, "c2" : { "_id" : 1, "key" : 1 }, "c3" : { "_id" : 1, "key" : 1 }, "c4" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 3, "c1" : { "_id" : 3, "key" : { } }, "c2" : { "_id" : 3, "key" : { } }, "c3" : { "_id" : 3, "key" : { } }, "c4" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 4, "c1" : { "_id" : 4, "key" : { "foo" : null } }, "c2" : { "_id" : 4, "key" : { "foo" : null } }, "c3" : { "_id" : 4, "key" : { "foo" : null } }, "c4" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "c1" : { "_id" : 5, "key" : { "foo" : { } } }, "c2" : { "_id" : 5, "key" : { "foo" : { } } }, "c3" : { "_id" : 5, "key" : { "foo" : { } } }, "c4" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
 ```
 ### internalJoinReorderMode = random, internalRandomJoinReorderDefaultToHashJoin = false, internalRandomJoinOrderSeed = 64
 usedJoinOptimization: true
@@ -1241,44 +753,4 @@ rightEmbeddingField: "c1"
   |
   COLLSCAN [test.null_semantics_md_fourth]
   direction: "forward"
-```
-WARNING: results differ from expected!
-### Actual results
-```json
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 } }
-{ "_id" : 0, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null } }
-{ "_id" : 1, "c1" : { "_id" : 1, "key" : 1 }, "c2" : { "_id" : 1, "key" : 1 }, "c3" : { "_id" : 1, "key" : 1 }, "c4" : { "_id" : 1, "key" : 1 }, "key" : 1 }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 0 }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 0 }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 0 }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 0 }, "key" : null }
-{ "_id" : 2, "c1" : { "_id" : 2, "key" : null }, "c2" : { "_id" : 2, "key" : null }, "c3" : { "_id" : 2, "key" : null }, "c4" : { "_id" : 2, "key" : null }, "key" : null }
-{ "_id" : 3, "c1" : { "_id" : 3, "key" : { } }, "c2" : { "_id" : 3, "key" : { } }, "c3" : { "_id" : 3, "key" : { } }, "c4" : { "_id" : 3, "key" : { } }, "key" : { } }
-{ "_id" : 4, "c1" : { "_id" : 4, "key" : { "foo" : null } }, "c2" : { "_id" : 4, "key" : { "foo" : null } }, "c3" : { "_id" : 4, "key" : { "foo" : null } }, "c4" : { "_id" : 4, "key" : { "foo" : null } }, "key" : { "foo" : null } }
-{ "_id" : 5, "c1" : { "_id" : 5, "key" : { "foo" : { } } }, "c2" : { "_id" : 5, "key" : { "foo" : { } } }, "c3" : { "_id" : 5, "key" : { "foo" : { } } }, "c4" : { "_id" : 5, "key" : { "foo" : { } } }, "key" : { "foo" : { } } }
 ```
