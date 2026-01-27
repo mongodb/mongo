@@ -166,6 +166,7 @@ struct __wt_config_parser_impl {
 extern const char __WT_CONFIG_CHOICE_NULL[]; /* not set in configuration */
 extern const char __WT_CONFIG_CHOICE_DRAM[];
 extern const char __WT_CONFIG_CHOICE_FILE[];
+extern const char __WT_CONFIG_CHOICE_after_key_rotation[];
 extern const char __WT_CONFIG_CHOICE_aggressive_stash_free[];
 extern const char __WT_CONFIG_CHOICE_aggressive_sweep[];
 extern const char __WT_CONFIG_CHOICE_all[];
@@ -175,6 +176,9 @@ extern const char __WT_CONFIG_CHOICE_api[];
 extern const char __WT_CONFIG_CHOICE_backup[];
 extern const char __WT_CONFIG_CHOICE_backup_checkpoint[];
 extern const char __WT_CONFIG_CHOICE_backup_rename[];
+extern const char __WT_CONFIG_CHOICE_before_key_rotation[];
+extern const char __WT_CONFIG_CHOICE_before_metadata_sync[];
+extern const char __WT_CONFIG_CHOICE_before_metadata_update[];
 extern const char __WT_CONFIG_CHOICE_best[];
 extern const char __WT_CONFIG_CHOICE_block[];
 extern const char __WT_CONFIG_CHOICE_block_cache[];
@@ -207,6 +211,7 @@ extern const char __WT_CONFIG_CHOICE_disagg[];
 extern const char __WT_CONFIG_CHOICE_disaggregated_storage[];
 extern const char __WT_CONFIG_CHOICE_disk_validate[];
 extern const char __WT_CONFIG_CHOICE_dsync[];
+extern const char __WT_CONFIG_CHOICE_during_key_rotation[];
 extern const char __WT_CONFIG_CHOICE_error[];
 extern const char __WT_CONFIG_CHOICE_error_returns[];
 extern const char __WT_CONFIG_CHOICE_evict_reposition[];

@@ -97,6 +97,7 @@
 #define WT_CONF_ID_checkpoint_cleanup 181ULL
 #define WT_CONF_ID_checkpoint_cleanup_obsolete_tw_pages_dirty_max 270ULL
 #define WT_CONF_ID_checkpoint_crash_point 182ULL
+#define WT_CONF_ID_checkpoint_crash_trigger_point 183ULL
 #define WT_CONF_ID_checkpoint_fail_before_turtle_update 309ULL
 #define WT_CONF_ID_checkpoint_lsn 63ULL
 #define WT_CONF_ID_checkpoint_meta 75ULL
@@ -220,7 +221,6 @@
 #define WT_CONF_ID_json_output 278ULL
 #define WT_CONF_ID_key_format 35ULL
 #define WT_CONF_ID_key_gap 36ULL
-#define WT_CONF_ID_key_provider_trigger_crash_points 183ULL
 #define WT_CONF_ID_keyid 25ULL
 #define WT_CONF_ID_last 84ULL
 #define WT_CONF_ID_last_materialized_lsn 77ULL

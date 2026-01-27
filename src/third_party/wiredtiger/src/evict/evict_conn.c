@@ -440,8 +440,6 @@ __wt_evict_stats_update(WT_SESSION_IMPL *session)
     evict = conn->evict;
     stats = conn->stats;
 
-    WT_STATP_CONN_SET(session, stats, eviction_maximum_page_size,
-      __wt_atomic_load_uint64_relaxed(&evict->evict_max_page_size));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_clean_page_size_per_checkpoint,
       __wt_atomic_load_uint64_relaxed(&evict->evict_max_clean_page_size_per_checkpoint));
     WT_STATP_CONN_SET(session, stats, eviction_maximum_dirty_page_size_per_checkpoint,

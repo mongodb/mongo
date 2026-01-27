@@ -383,7 +383,7 @@ __page_merge_base_internal_deltas(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR 
 
     hdr->write_gen = latest_write_gen;
     hdr->type = WT_PAGE_ROW_INT;
-    hdr->unused = 0;
+    hdr->reserved = 0;
     hdr->version = WT_PAGE_VERSION_TS;
 
     *ref_entriesp = final_entries;
@@ -640,7 +640,7 @@ __wti_page_merge_deltas_with_base_image_leaf(WT_SESSION_IMPL *session, WT_ITEM *
     dsk->mem_size = WT_STORE_SIZE(new_image->size);
 
     dsk->write_gen = ((WT_PAGE_HEADER *)deltas[delta_size - 1].data)->write_gen;
-    dsk->unused = 0;
+    dsk->reserved = 0;
     dsk->version = WT_PAGE_VERSION_TS;
 
     /* Clear the memory owned by the block manager. */

@@ -21,23 +21,20 @@ struct __wt_ckpt_session {
     u_int handle_next;       /* Next empty slot */
     size_t handle_allocated; /* Bytes allocated */
 
-    /* Checkpoint crash. */
-    u_int crash_point; /* Crash point in the middle of checkpoint process */
+    /* Crash at a progress point in checkpoint. */
+    u_int crash_point;
+    /* Crash at a specific point in checkpoint. */
+    u_int crash_trigger_point;
     enum {
-        CKPT_CRASH_BEFORE_METADATA_SYNC = 0,
+        CKPT_CRASH_NONE = 0,
+        CKPT_CRASH_BEFORE_METADATA_SYNC,
         CKPT_CRASH_BEFORE_METADATA_UPDATE,
-        CKPT_CRASH_ENUM_END
-    } ckpt_crash_state;
-
-    /* Key provider crash. */
-    int key_provider_crash_point; /* Crash points during key provider process */
-    enum {
-        KEY_PROVIDER_CRASH_NONE = 0,
+        CKPT_CRASH_PROGRESS_ENUM_END,
         KEY_PROVIDER_CRASH_BEFORE_KEY_ROTATION,
         KEY_PROVIDER_CRASH_DURING_KEY_ROTATION,
         KEY_PROVIDER_CRASH_AFTER_KEY_ROTATION,
-        KEY_PROVIDER_CRASH_ENUM_END
-    } key_provider_crash_state;
+        CKPT_CRASH_ENUM_END,
+    } ckpt_crash_state;
 
     /* Named checkpoint drop list, during a checkpoint */
     WT_ITEM *drop_list;

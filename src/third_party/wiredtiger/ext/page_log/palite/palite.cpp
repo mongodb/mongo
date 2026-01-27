@@ -2131,8 +2131,10 @@ public:
     }
 
     void
-    abandon_checkpoint(uint64_t checkpoint_lsn)
+    abandon_checkpoint()
     {
+        uint64_t checkpoint_lsn = WT_PAGE_LOG_LSN_MAX;
+
         /* Ensure exclusive access to storage since we update multiple tables. */
         std::unique_lock write_lock(store_access);
 
@@ -2370,10 +2372,10 @@ public:
      * given LSN.
      */
     int
-    abandon_checkpoint(uint64_t checkpoint_lsn)
+    abandon_checkpoint()
     {
-        LOG_DEBUG("Abandoning checkpoint at lsn={}", checkpoint_lsn);
-        storage.abandon_checkpoint(checkpoint_lsn);
+        LOG_DEBUG("Abandoning checkpoint");
+        storage.abandon_checkpoint();
 
         return 0;
     }
@@ -2483,9 +2485,9 @@ palite_add_reference(WT_PAGE_LOG *page_log)
 }
 
 static int
-palite_abandon_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *sess, uint64_t last_checkpoint_lsn)
+palite_abandon_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *sess)
 {
-    return safe_call<Palite>(sess, page_log, &Palite::abandon_checkpoint, last_checkpoint_lsn);
+    return safe_call<Palite>(sess, page_log, &Palite::abandon_checkpoint);
 }
 
 static int

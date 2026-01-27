@@ -69,3 +69,6 @@ class test_layered61(wttest.WiredTigerTestCase):
 
         # Step up
         self.conn.reconfigure('disaggregated=(role="leader")')
+        cursor = self.session.open_cursor(self.uri, None, None)
+        self.assertEqual(cursor['a'], 'b')
+        cursor.close()

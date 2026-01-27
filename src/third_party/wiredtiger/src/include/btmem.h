@@ -81,8 +81,8 @@ struct __wt_page_header {
 #define WT_PAGE_FT_UPDATE 0x20u    /* Page contains updated fast-truncate information */
     uint8_t flags;                 /* 25: flags */
 
-    /* A byte of padding, positioned to be added to the flags. */
-    uint8_t unused; /* 26: unused padding */
+    /* FIXME-WT-16512: A byte of padding, reserved to make the header extensible in the future. */
+    uint8_t reserved; /* 26: padding, used for future use (until then, please always set to 0) */
 
 #define WT_PAGE_VERSION_ORIG 0 /* Original version */
 #define WT_PAGE_VERSION_TS 1   /* Timestamps added */

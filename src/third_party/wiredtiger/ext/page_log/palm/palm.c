@@ -631,19 +631,20 @@ palm_add_reference(WT_PAGE_LOG *page_log)
 
 /*
  * palm_abandon_checkpoint --
- *     Abandon an incomplete checkpoint. This is an optional function, required only for internal
- *     testing.
+ *     Abandon an incomplete checkpoint.
  */
 static int
-palm_abandon_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t last_checkpoint_lsn)
+palm_abandon_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *session)
 {
     PALM *palm;
     PALM_KV_CONTEXT context;
     uint64_t lsn;
     int ret;
+    uint64_t last_checkpoint_lsn;
 
     palm = (PALM *)page_log;
     palm_init_context(palm, &context);
+    last_checkpoint_lsn = WT_PAGE_LOG_LSN_MAX;
 
     PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
     if (last_checkpoint_lsn == WT_PAGE_LOG_LSN_MAX) {

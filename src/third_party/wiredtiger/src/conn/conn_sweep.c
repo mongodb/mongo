@@ -181,13 +181,24 @@ __sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
     conn = S2C(session);
 
     TAILQ_FOREACH (dhandle, &conn->dhqh, q) {
+        bool sweep_non_outdated_handle =
+          __wt_atomic_load_uint32_relaxed(&conn->open_btree_count) >= conn->sweep_handles_min;
         /*
          * Ignore open files once the btree file count is below the minimum number of handles.
          */
-        if (__wt_atomic_load_uint32_relaxed(&conn->open_btree_count) < conn->sweep_handles_min)
+        if (!__wt_conn_is_disagg(session) && !sweep_non_outdated_handle)
             break;
 
-        if (WT_IS_METADATA(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
+        if (!F_ISSET(dhandle, WT_DHANDLE_OUTDATED) && !sweep_non_outdated_handle)
+            continue;
+        /*
+         * Close outdated btrees immediately, even if they are metadata. For trees not marked with
+         * outdated, wait until the idle time has elapsed since time of death.
+         */
+        if (F_ISSET(dhandle, WT_DHANDLE_OUTDATED)) {
+            if (__wt_atomic_load_int32_relaxed(&dhandle->session_inuse) > 0)
+                continue;
+        } else if (WT_IS_METADATA(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
           __wt_atomic_load_int32_relaxed(&dhandle->session_inuse) != 0 ||
           __wt_tsan_suppress_load_uint64(&dhandle->timeofdeath) == 0 ||
           now - dhandle->timeofdeath <= conn->sweep_idle_time)
@@ -463,11 +474,12 @@ __sweep_server(void *arg)
             __sweep_mark(session, now);
 
         /*
-         * Close handles if we have reached the configured limit. If sweep_idle_time is 0, handles
-         * never become idle.
+         * Close handles if we have reached the configured limit or in disaggregated storage. If
+         * sweep_idle_time is 0, handles never become idle.
          */
         if (conn->sweep_idle_time != 0 &&
-          __wt_atomic_load_uint32_relaxed(&conn->open_btree_count) >= conn->sweep_handles_min)
+          (__wt_atomic_load_uint32_relaxed(&conn->open_btree_count) >= conn->sweep_handles_min ||
+            __wt_conn_is_disagg(session)))
             WT_ERR(__sweep_expire(session, now));
 
         WT_ERR(__sweep_discard_trees(session, &dead_handles));

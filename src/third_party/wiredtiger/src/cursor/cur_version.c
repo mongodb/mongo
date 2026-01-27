@@ -372,8 +372,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                             goto skip_on_page;
                     } else {
                         if (cbt->upd_value->tw.start_txn > version_cursor->upd_stop_txnid ||
-                          cbt->upd_value->tw.start_ts > version_cursor->upd_stop_ts ||
-                          cbt->upd_value->tw.durable_start_ts > version_cursor->upd_durable_stop_ts)
+                          cbt->upd_value->tw.start_ts > version_cursor->upd_stop_ts)
                             goto skip_on_page;
                     }
 
@@ -402,8 +401,7 @@ __curversion_next_single_key(WT_CURSOR *cursor)
                             goto skip_on_page;
                     } else {
                         if (cbt->upd_value->tw.stop_txn > version_cursor->upd_stop_txnid ||
-                          cbt->upd_value->tw.stop_ts > version_cursor->upd_stop_ts ||
-                          cbt->upd_value->tw.durable_stop_ts > version_cursor->upd_durable_stop_ts)
+                          cbt->upd_value->tw.stop_ts > version_cursor->upd_stop_ts)
                             goto skip_on_page;
                     }
 
