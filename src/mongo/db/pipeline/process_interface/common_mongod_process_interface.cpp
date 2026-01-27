@@ -78,6 +78,7 @@
 #include "mongo/db/shard_role/lock_manager/fill_locker_info.h"
 #include "mongo/db/shard_role/lock_manager/lock_manager_defs.h"
 #include "mongo/db/shard_role/shard_catalog/catalog_raii.h"
+#include "mongo/db/shard_role/shard_catalog/clustered_collection_util.h"
 #include "mongo/db/shard_role/shard_catalog/collection.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog.h"
 #include "mongo/db/shard_role/shard_catalog/collection_catalog_helper.h"
@@ -991,10 +992,23 @@ CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
                                      PlacementConcern::kPretendUnsharded,
                                      repl::ReadConcernArgs::get(opCtx),
                                      AcquisitionPrerequisites::kRead));
+    const bool fieldPathsIsSingletonId = fieldPaths == std::set<FieldPath>{"_id"};
     if (!collection.exists()) {
-        return fieldPaths == std::set<FieldPath>{"_id"} ? SupportingUniqueIndex::Full
-                                                        : SupportingUniqueIndex::None;
+        return fieldPathsIsSingletonId ? SupportingUniqueIndex::Full : SupportingUniqueIndex::None;
     }
+
+    const bool isClusteredOnId = collection.getCollectionPtr() &&
+        collection.getCollectionPtr()->isClustered() &&
+        clustered_util::isClusteredOnId(collection.getCollectionPtr()->getClusteredInfo());
+    if (isClusteredOnId && fieldPathsIsSingletonId) {
+        // If the collection is clustered on _id, there is no separate _id index. Directly check
+        // the collection's collation.
+        return CollatorInterface::collatorsMatch(
+                   expCtx->getCollator(), collection.getCollectionPtr()->getDefaultCollator())
+            ? SupportingUniqueIndex::Full
+            : SupportingUniqueIndex::None;
+    }
+
     auto indexIterator = collection.getCollectionPtr()->getIndexCatalog()->getIndexIterator(
         IndexCatalog::InclusionPolicy::kReady);
     auto result = SupportingUniqueIndex::None;
@@ -1124,11 +1138,12 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
             "cannot have unique indexes ",
             acquisition.getCollectionType() != query_shape::CollectionType::kTimeseries);
 
-    if (!fieldPaths) {
+
+    if (!fieldPaths.has_value()) {
+        // Verify _id index supports the required unique constraint. Collation-mismatch can prevent
+        // this.
         uassert(51124, "Expected fields to be provided from router", !expCtx->getFromRouter());
-        return {std::set<FieldPath>{"_id"},
-                targetCollectionPlacementVersion,
-                SupportingUniqueIndex::Full};
+        fieldPaths = std::set<FieldPath>{"_id"};
     }
 
     // Make sure the 'fields' array has a supporting index. Skip this check if the command is sent
