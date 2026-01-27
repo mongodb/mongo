@@ -13,6 +13,7 @@
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStage, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
+import {getPlanRankerMode} from "jstests/libs/query/cbr_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/query/sbe_util.js";
 
 const coll = db[jsTestName()];
@@ -54,8 +55,25 @@ function confirmSubplanningBehavior(filter, expected) {
     // Confirm the winning plan uses an OR stage.
     assert(getPlanStage(winningPlan, "OR"), explain);
     if (!checkSbeFullyEnabled(db)) {
-        // If SBE is not fully enabled, confirm we subplan the distinct query.
-        assert(getPlanStage(winningPlan, "SUBPLAN"), explain);
+        const planRankerMode = getPlanRankerMode(db);
+        const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        const automaticCEPlanRankingStrategy =
+            // FCV < 8.3 does not have the automaticCEPlanRankingStrategy knob
+            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.3") < 0
+                ? null
+                : assert.commandWorked(
+                      db.adminCommand({
+                          getParameter: 1,
+                          automaticCEPlanRankingStrategy: 1,
+                      }),
+                  )["automaticCEPlanRankingStrategy"];
+
+        // If SBE is not fully enabled, confirm we subplan the distinct query when the CBR feature flag is not enabled.
+        if (planRankerMode === "automaticCE" && automaticCEPlanRankingStrategy === "CBRForNoMultiplanningResults") {
+            assert(getPlanStage(winningPlan, "OR"), explain);
+        } else {
+            assert(getPlanStage(winningPlan, "SUBPLAN"), explain);
+        }
     }
 }
 
