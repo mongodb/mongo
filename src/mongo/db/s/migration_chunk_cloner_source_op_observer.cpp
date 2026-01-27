@@ -167,6 +167,10 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
         return;
     }
 
+    if (!opAccumulator) {
+        return;
+    }
+
     int index = 0;
     const auto& opTimeList = opAccumulator->batchOpTimes;
     for (auto it = first; it != last; it++, index++) {
@@ -235,9 +239,11 @@ void MigrationChunkClonerSourceOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
-    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-        std::make_unique<LogUpdateForShardingHandler>(
-            nss, preImageDoc, postImageDoc, opAccumulator->opTime.writeOpTime));
+    if (opAccumulator) {
+        shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+            std::make_unique<LogUpdateForShardingHandler>(
+                nss, preImageDoc, postImageDoc, opAccumulator->opTime.writeOpTime));
+    }
 }
 
 void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
@@ -285,9 +291,11 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    shard_role_details::getRecoveryUnit(opCtx)->registerChange(
-        std::make_unique<LogDeleteForShardingHandler>(
-            nss, documentKey, opAccumulator->opTime.writeOpTime));
+    if (opAccumulator) {
+        shard_role_details::getRecoveryUnit(opCtx)->registerChange(
+            std::make_unique<LogDeleteForShardingHandler>(
+                nss, documentKey, opAccumulator->opTime.writeOpTime));
+    }
 }
 
 void MigrationChunkClonerSourceOpObserver::postTransactionPrepare(
