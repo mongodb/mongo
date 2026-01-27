@@ -330,6 +330,20 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
     _sessionCatalogSource->fetchNextOplog(opCtx);
 
     {
+        // Ignore prepare conflicts when we load ids of currently available documents. This is
+        // acceptable because we will track changes made by prepared transactions at transaction
+        // commit time.
+        auto originalPrepareConflictBehavior =
+            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior();
+
+        ON_BLOCK_EXIT([&] {
+            shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
+                originalPrepareConflictBehavior);
+        });
+
+        shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
+            PrepareConflictBehavior::kIgnoreConflicts);
+
         auto storeCurrentRecordIdStatus = _storeCurrentRecordId(opCtx);
         if (storeCurrentRecordIdStatus == ErrorCodes::ChunkTooBig && _forceJumbo) {
             stdx::lock_guard<stdx::mutex> sl(_mutex);
@@ -648,17 +662,6 @@ void MigrationChunkClonerSource::_nextCloneBatchFromIndexScan(
     ElapsedTracker tracker(&opCtx->fastClockSource(),
                            internalQueryExecYieldIterations.load(),
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
-    // Prepare conflicts should never be ignored when performing the shard key index scan to get
-    // Record IDs of documents to transfer as part of cloning. This is because there can be prepared
-    // transactions recovered from a precise checkpoint as part of startup recovery that can not set
-    // up an onCommit handler to send transaction operations to chunk migration's internal buffers.
-    // As a result, we need to wait on those recovered prepared transactions to complete and be
-    // transferred as part of cloning, otherwise we can lose data.
-    tassert(11374001,
-            "Expected to not ignore prepare conflicts when performing index scan during cloning",
-            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() ==
-                PrepareConflictBehavior::kEnforce);
-
     boost::optional<HandleTransactionResourcesFromStasher> scopedResourceHandler;
     auto isFirstIteration = !_jumboChunkCloneState->clonerExec;
     if (isFirstIteration) {
@@ -1027,17 +1030,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 MigrationChunkClonerSource::_getIndexScanExecutor(OperationContext* opCtx,
                                                   const CollectionAcquisition& acquisition,
                                                   InternalPlanner::IndexScanOptions scanOption) {
-    // Prepare conflicts should never be ignored when performing the shard key index scan to get
-    // Record IDs of documents to transfer as part of cloning. This is because there can be prepared
-    // transactions recovered from a precise checkpoint as part of startup recovery that can not set
-    // up an onCommit handler to send transaction operations to chunk migration's internal buffers.
-    // As a result, we need to wait on those recovered prepared transactions to complete and be
-    // transferred as part of cloning, otherwise we can lose data.
-    tassert(11374002,
-            "Expected to not ignore prepare conflicts when performing index scan during cloning",
-            shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() ==
-                PrepareConflictBehavior::kEnforce);
-
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore, any
     // multi-key index prefixed by shard key cannot be multikey over the shard key fields.
     const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,

@@ -1365,8 +1365,6 @@ private:
         // transaction.
         bool needToWriteAbortEntry{false};
 
-        // Set to true if the transaction was recovered from a precise checkpoint.
-        bool recoveredFromPreciseCheckpoint{false};
     } _p;
 };  // class TransactionParticipant
 
