@@ -57,6 +57,7 @@ buildvariants:
       - name: streams_aspio_iceberg_2
       - name: streams_aspio_iceberg_3
       - name: streams_aspio_iceberg_4
+      - name: streams_aspio_pubsub
       - name: streams_build_and_push_gen
       - name: streams_skip_tests_build_and_push_gen
       - name: generate_buildid_to_debug_symbols_mapping
@@ -110,6 +111,7 @@ buildvariants:
       - name: streams_aspio_iceberg_2
       - name: streams_aspio_iceberg_3
       - name: streams_aspio_iceberg_4
+      - name: streams_aspio_pubsub
       - name: streams_build_and_push_gen
       - name: streams_skip_tests_build_and_push_gen
       # Only needed once to generate the streams manifest for both x86 and arm
