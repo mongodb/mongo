@@ -66,7 +66,7 @@
 
 /* MOZILLA JSAPI version number components */
 #define MOZJS_MAJOR_VERSION 140
-#define MOZJS_MINOR_VERSION 3
+#define MOZJS_MINOR_VERSION 7
 
 /* MONGODB MODIFICATION: Define based on platform */
 /* #undef XP_WIN */

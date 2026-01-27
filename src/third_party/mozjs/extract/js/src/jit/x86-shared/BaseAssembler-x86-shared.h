@@ -1838,24 +1838,24 @@ class BaseAssembler : public GenericAssembler {
 
   void cmpb_rr(RegisterID rhs, RegisterID lhs) {
     spew("cmpb       %s, %s", GPReg8Name(rhs), GPReg8Name(lhs));
-    m_formatter.oneByteOp(OP_CMP_GbEb, rhs, lhs);
+    m_formatter.oneByteOp8(OP_CMP_GbEb, rhs, lhs);
   }
 
   void cmpb_rm(RegisterID rhs, int32_t offset, RegisterID base) {
     spew("cmpb       %s, " MEM_ob, GPReg8Name(rhs), ADDR_ob(offset, base));
-    m_formatter.oneByteOp(OP_CMP_EbGb, offset, base, rhs);
+    m_formatter.oneByteOp8(OP_CMP_EbGb, offset, base, rhs);
   }
 
   void cmpb_rm(RegisterID rhs, int32_t offset, RegisterID base,
                RegisterID index, int scale) {
     spew("cmpb       %s, " MEM_obs, GPReg8Name(rhs),
          ADDR_obs(offset, base, index, scale));
-    m_formatter.oneByteOp(OP_CMP_EbGb, offset, base, index, scale, rhs);
+    m_formatter.oneByteOp8(OP_CMP_EbGb, offset, base, index, scale, rhs);
   }
 
   void cmpb_rm(RegisterID rhs, const void* addr) {
     spew("cmpb       %s, %p", GPReg8Name(rhs), addr);
-    m_formatter.oneByteOp(OP_CMP_EbGb, addr, rhs);
+    m_formatter.oneByteOp8(OP_CMP_EbGb, addr, rhs);
   }
 
   void cmpb_ir(int32_t rhs, RegisterID lhs) {
@@ -1866,9 +1866,9 @@ class BaseAssembler : public GenericAssembler {
 
     spew("cmpb       $0x%x, %s", uint32_t(rhs), GPReg8Name(lhs));
     if (lhs == rax) {
-      m_formatter.oneByteOp(OP_CMP_EAXIb);
+      m_formatter.oneByteOp8(OP_CMP_EAXIb);
     } else {
-      m_formatter.oneByteOp(OP_GROUP1_EbIb, lhs, GROUP1_OP_CMP);
+      m_formatter.oneByteOp8(OP_GROUP1_EbIb, lhs, GROUP1_OP_CMP);
     }
     m_formatter.immediate8(rhs);
   }
@@ -2054,7 +2054,7 @@ class BaseAssembler : public GenericAssembler {
 
   void testb_rr(RegisterID rhs, RegisterID lhs) {
     spew("testb      %s, %s", GPReg8Name(rhs), GPReg8Name(lhs));
-    m_formatter.oneByteOp(OP_TEST_EbGb, lhs, rhs);
+    m_formatter.oneByteOp8(OP_TEST_EbGb, lhs, rhs);
   }
 
   void testl_ir(int32_t rhs, RegisterID lhs) {
@@ -6093,6 +6093,13 @@ class BaseAssembler : public GenericAssembler {
       m_buffer.ensureSpace(MaxInstructionSize);
       emitRexIf(byteRegRequiresRex(r), 0, 0, r);
       m_buffer.putByteUnchecked(opcode + (r & 7));
+    }
+
+    void oneByteOp8(OneByteOpcodeID opcode, RegisterID rm, RegisterID reg) {
+      m_buffer.ensureSpace(MaxInstructionSize);
+      emitRexIf(byteRegRequiresRex(reg) || byteRegRequiresRex(rm), reg, 0, rm);
+      m_buffer.putByteUnchecked(opcode);
+      registerModRM(rm, reg);
     }
 
     void oneByteOp8(OneByteOpcodeID opcode, RegisterID rm,

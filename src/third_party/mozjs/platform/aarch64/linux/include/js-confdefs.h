@@ -71,9 +71,9 @@
 #define MALLOC_H <malloc.h>
 #define MALLOC_USABLE_SIZE_CONST_PTR 
 #define MOZILLA_UAVERSION "140.0"
-#define MOZILLA_VERSION "140.3.0"
+#define MOZILLA_VERSION "140.7.0"
 #define MOZJS_MAJOR_VERSION 140
-#define MOZJS_MINOR_VERSION 3
+#define MOZJS_MINOR_VERSION 7
 #define MOZ_BUILD_APP js
 #define MOZ_DLL_PREFIX "lib"
 #define MOZ_DLL_SUFFIX ".so"

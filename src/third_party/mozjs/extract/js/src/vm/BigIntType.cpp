@@ -3684,42 +3684,6 @@ JS::Result<bool> BigInt::equal(JSContext* cx, Handle<BigInt*> lhs,
   return equal(lhs, rhsBigInt);
 }
 
-// BigInt proposal section 3.2.5
-JS::Result<bool> BigInt::looselyEqual(JSContext* cx, HandleBigInt lhs,
-                                      HandleValue rhs) {
-  // Step 1.
-  if (rhs.isBigInt()) {
-    return equal(lhs, rhs.toBigInt());
-  }
-
-  // Steps 2-5 (not applicable).
-
-  // Steps 6-7.
-  if (rhs.isString()) {
-    RootedString rhsString(cx, rhs.toString());
-    return equal(cx, lhs, rhsString);
-  }
-
-  // Steps 8-9 (not applicable).
-
-  // Steps 10-11.
-  if (rhs.isObject()) {
-    RootedValue rhsPrimitive(cx, rhs);
-    if (!ToPrimitive(cx, &rhsPrimitive)) {
-      return cx->alreadyReportedError();
-    }
-    return looselyEqual(cx, lhs, rhsPrimitive);
-  }
-
-  // Step 12.
-  if (rhs.isNumber()) {
-    return equal(lhs, rhs.toNumber());
-  }
-
-  // Step 13.
-  return false;
-}
-
 // BigInt proposal section 1.1.12. BigInt::lessThan ( x, y )
 bool BigInt::lessThan(const BigInt* x, const BigInt* y) {
   return compare(x, y) < 0;

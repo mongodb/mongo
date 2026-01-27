@@ -791,10 +791,10 @@ class MacroAssemblerRiscv64Compat : public MacroAssemblerRiscv64 {
 
   void unboxGCThingForGCBarrier(const Address& src, Register dest) {
     loadPtr(src, dest);
-    ExtractBits(dest, dest, 0, JSVAL_TAG_SHIFT - 1);
+    ExtractBits(dest, dest, 0, JSVAL_TAG_SHIFT);
   }
   void unboxGCThingForGCBarrier(const ValueOperand& src, Register dest) {
-    ExtractBits(dest, src.valueReg(), 0, JSVAL_TAG_SHIFT - 1);
+    ExtractBits(dest, src.valueReg(), 0, JSVAL_TAG_SHIFT);
   }
 
   void unboxWasmAnyRefGCThingForGCBarrier(const Address& src, Register dest) {
