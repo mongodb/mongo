@@ -126,34 +126,6 @@ private:
     DataType _data;
 };
 
-template <typename DataType>
-class ResourceMutexController {
-public:
-    explicit ResourceMutexController(DataType value)
-        : _svcCtx(ServiceContext::make()),
-          _lockManager(LockManager::get(_svcCtx.get())),
-          _locker(_svcCtx.get()),
-          _mutex("BM_ResourceMutexController"),
-          _data(value) {}
-
-    auto read() {
-        LockRequest request;
-        request.initNew(&_locker, nullptr /* No need for a notifier since this won't block. */);
-        _lockManager->lock(_mutex.getRid(), &request, MODE_IS);
-        auto data = _data;
-        _lockManager->unlock(&request);
-        return data;
-    }
-
-private:
-    ServiceContext::UniqueServiceContext _svcCtx;
-    LockManager* _lockManager;
-    Locker _locker;
-
-    ResourceMutex _mutex;
-    DataType _data;
-};
-
 template <template <class> class ControllerType>
 class RWMutexBm : public benchmark::Fixture {
 public:
@@ -182,18 +154,84 @@ BENCHMARK_TEMPLATE_DEFINE_F(RWMutexBm, Mutex, MutexController)(benchmark::State&
 BENCHMARK_TEMPLATE_DEFINE_F(RWMutexBm, RWMutex, RWMutexController)(benchmark::State& s) {
     run(s);
 }
-BENCHMARK_TEMPLATE_DEFINE_F(RWMutexBm, ResourceMutex, ResourceMutexController)
-(benchmark::State& s) {
-    run(s);
-}
 
 const auto kMaxThreads = ProcessInfo::getNumLogicalCores() * 2;
 BENCHMARK_REGISTER_F(RWMutexBm, WriteRarelyRWMutex)->ThreadRange(1, kMaxThreads);
 BENCHMARK_REGISTER_F(RWMutexBm, SharedMutex)->ThreadRange(1, kMaxThreads);
 BENCHMARK_REGISTER_F(RWMutexBm, Mutex)->ThreadRange(1, kMaxThreads);
 BENCHMARK_REGISTER_F(RWMutexBm, RWMutex)->ThreadRange(1, kMaxThreads);
+
+class ResourceMutexBm : public benchmark::Fixture {
+    using DataType = uint64_t;
+    struct ThreadState {
+        ServiceContext::UniqueClient client;
+        ServiceContext::UniqueOperationContext opCtx;
+    };
+
+public:
+    void SetUp(benchmark::State& state) override {
+        stdx::unique_lock lk(_initializationMutex);
+        if (state.thread_index == 0) {
+            _svcCtx = ServiceContext::make();
+            _locker = std::make_unique<Locker>(_svcCtx.get());
+            _threadStates.reserve(state.threads);
+            for (int i = 0; i < state.threads; i++) {
+                auto client = _svcCtx->getService()->makeClient("ResourceMutexBm");
+                auto opCtx = client->makeOperationContext();
+                _threadStates.emplace_back(std::move(client), std::move(opCtx));
+            }
+            _initializationCv.notify_all();
+        } else {
+            _initializationCv.wait(lk, [&] { return _svcCtx.get() != nullptr; });
+        }
+    }
+
+    void TearDown(benchmark::State& state) override {
+        stdx::unique_lock lk(_initializationMutex);
+        if (state.thread_index == 0) {
+            _threadStates.clear();
+            _locker.reset();
+            _svcCtx.reset();
+            _initializationCv.notify_all();
+        } else {
+            _initializationCv.wait(lk, [&] { return _svcCtx.get() == nullptr; });
+        }
+    }
+
+    auto read(benchmark::State& state) {
+        auto opCtx = _threadStates[state.thread_index].opCtx.get();
+        LockRequest request;
+        request.initNew(_locker.get(),
+                        nullptr /* No need for a notifier since this won't block. */);
+        Lock::ResourceLock lk(opCtx, _mutex.getRid(), MODE_IS);
+        auto data = _data;
+        return data;
+    }
+
+    void run(benchmark::State& state) {
+        for (auto _ : state) {
+            benchmark::DoNotOptimize(read(state));
+        }
+    }
+
+private:
+    ServiceContext::UniqueServiceContext _svcCtx;
+    std::unique_ptr<Locker> _locker;
+    std::vector<ThreadState> _threadStates;
+
+    ResourceMutex _mutex{"BM_ResourceMutexController"};
+    DataType _data = 0xABCDEF;
+
+    stdx::mutex _initializationMutex;
+    stdx::condition_variable _initializationCv;
+};
+
+BENCHMARK_DEFINE_F(ResourceMutexBm, ResourceMutex)(benchmark::State& s) {
+    run(s);
+}
+
 #if REGISTER_RESOURCE_MUTEX_BENCHMARKS
-BENCHMARK_REGISTER_F(RWMutexBm, ResourceMutex)->ThreadRange(1, kMaxThreads);
+BENCHMARK_REGISTER_F(ResourceMutexBm, ResourceMutex)->ThreadRange(1, kMaxThreads);
 #endif
 
 class RWMutexStressBm : public benchmark::Fixture {
