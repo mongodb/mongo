@@ -72,6 +72,10 @@ public:
 
     static const char* kStageType;
 
+    long long getLimit();
+
+    long long getSkip();
+
 private:
     // An integer limiting the number of documents to count. 0 means no limit.
     long long _limit;

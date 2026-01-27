@@ -112,4 +112,12 @@ const SpecificStats* CountStage::getSpecificStats() const {
     return &_specificStats;
 }
 
+long long CountStage::getLimit() {
+    return _limit;
+}
+
+long long CountStage::getSkip() {
+    return _skip;
+}
+
 }  // namespace mongo
